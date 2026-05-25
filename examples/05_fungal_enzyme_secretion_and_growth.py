@@ -30,10 +30,17 @@ os.environ.setdefault("MPLCONFIGDIR", str(MPL_CACHE))
 import matplotlib.pyplot as plt
 
 from fungal_model.chemistry.reactions import Reaction
+from fungal_model.chemistry.stoichiometry import CarbonContent, OxygenDemand
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.simulation import SimulationEngine, SimulationRecord
 from fungal_model.core.units import Q_
-from fungal_model.core.validators import validate_mass_balance, validate_non_negative
+from fungal_model.core.validators import (
+    validate_biomass_yield_limit,
+    validate_carbon_conservation,
+    validate_mass_balance,
+    validate_non_negative,
+    validate_oxygen_limitation,
+)
 from fungal_model.fungi import (
     BiomassMaintenanceRateLaw,
     EnzymeCapability,
@@ -377,6 +384,86 @@ def run(output_dir: Path = ROOT / "outputs" / "example_05_fungal_enzyme_secretio
     validations = [
         validate_non_negative(result),
         validate_mass_balance(result, closed_system=False),
+        validate_carbon_conservation(
+            result,
+            carbon_contents=[
+                CarbonContent(
+                    species="PET",
+                    carbon_fraction=benchmark_parameter(
+                        name="toy PET carbon mass fraction",
+                        symbol="fC_PET",
+                        value=0.625,
+                        units="dimensionless",
+                        notes="Artificial carbon fraction for Stage 7 validation bookkeeping.",
+                    ),
+                ),
+                CarbonContent(
+                    species="hydrolysate",
+                    carbon_fraction=benchmark_parameter(
+                        name="toy hydrolysate carbon mass fraction",
+                        symbol="fC_hydrolysate",
+                        value=0.625,
+                        units="dimensionless",
+                        notes="Artificial carbon fraction for Stage 7 validation bookkeeping.",
+                    ),
+                ),
+                CarbonContent(
+                    species="B_active",
+                    carbon_fraction=benchmark_parameter(
+                        name="toy active biomass carbon mass fraction",
+                        symbol="fC_B_active",
+                        value=0.5,
+                        units="dimensionless",
+                        notes="Artificial biomass carbon fraction for Stage 7 validation bookkeeping.",
+                    ),
+                ),
+                CarbonContent(
+                    species="B_dormant",
+                    carbon_fraction=benchmark_parameter(
+                        name="toy dormant biomass carbon mass fraction",
+                        symbol="fC_B_dormant",
+                        value=0.5,
+                        units="dimensionless",
+                        notes="Artificial biomass carbon fraction for Stage 7 validation bookkeeping.",
+                    ),
+                ),
+                CarbonContent(
+                    species="B_dead",
+                    carbon_fraction=benchmark_parameter(
+                        name="toy dead biomass carbon mass fraction",
+                        symbol="fC_B_dead",
+                        value=0.5,
+                        units="dimensionless",
+                        notes="Artificial biomass carbon fraction for Stage 7 validation bookkeeping.",
+                    ),
+                ),
+            ],
+        ),
+        validate_oxygen_limitation(
+            result,
+            oxygen_demand=OxygenDemand(
+                process_name="toy aerobic PET-associated metabolism",
+                substrate_species="PET",
+                oxygen_per_substrate=benchmark_parameter(
+                    name="toy oxygen demand per PET consumed",
+                    symbol="O2_per_PET",
+                    value=2.0,
+                    units="kilogram / kilogram",
+                    notes="Artificial oxygen demand used only for Stage 7 oxygen-limit validation.",
+                ),
+            ),
+            oxygen_available=Q_(1.0e-3, "kilogram"),
+        ),
+        validate_biomass_yield_limit(
+            yield_parameter=fungus.parameters.get("Y_B"),
+            maximum_yield_parameter=benchmark_parameter(
+                name="toy maximum theoretical biomass yield",
+                symbol="Y_B_max",
+                value=0.6,
+                units="dimensionless",
+                notes="Artificial yield ceiling used only for Stage 7 validation.",
+            ),
+        ),
     ]
     validation_data = [validation.to_dict() for validation in validations]
     SimulationRecord.from_result(result, validation_summary=validation_data).to_json(
@@ -428,4 +515,3 @@ def run(output_dir: Path = ROOT / "outputs" / "example_05_fungal_enzyme_secretio
 
 if __name__ == "__main__":
     run()
-

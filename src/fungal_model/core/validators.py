@@ -8,7 +8,9 @@ from typing import Any
 
 import numpy as np
 
+from fungal_model.chemistry.stoichiometry import CarbonContent, OxygenDemand
 from fungal_model.core.parameters import Parameter
+from fungal_model.core.provenance import UnknownParameterError
 from fungal_model.core.units import Q_, Quantity, assert_compatible, is_quantity
 
 DEFAULT_VALIDATION_RELATIVE_TOLERANCE = Parameter(
@@ -148,6 +150,169 @@ def validate_mass_balance(
     )
 
 
+def validate_carbon_conservation(
+    result: Any,
+    *,
+    carbon_contents: Sequence[CarbonContent],
+    external_carbon: Quantity | None = None,
+    relative_tolerance: Quantity | None = None,
+) -> ValidationResult:
+    """Check that tracked carbon does not exceed initial plus external carbon."""
+
+    epsilon = relative_tolerance or DEFAULT_VALIDATION_RELATIVE_TOLERANCE.quantity
+    epsilon_value = float(assert_compatible(epsilon, "dimensionless").magnitude)
+    external = (
+        Q_(0.0, "kilogram")
+        if external_carbon is None
+        else assert_compatible(external_carbon, "kilogram", name="external_carbon")
+    )
+    total: Quantity | None = None
+    included_species: list[str] = []
+    for content in carbon_contents:
+        if content.species not in result.species:
+            raise KeyError(f"Carbon content provided for unknown species {content.species!r}.")
+        carbon = content.carbon_mass(result.species[content.species])
+        total = carbon if total is None else total + carbon.to(total.units)
+        included_species.append(content.species)
+    if total is None:
+        raise ValueError("At least one carbon content entry is required.")
+
+    values = np.asarray(total.to("kilogram").magnitude, dtype=float)
+    initial = float(values.flat[0])
+    allowance = initial + float(external.to("kilogram").magnitude)
+    max_carbon = float(np.max(values))
+    scale = max(1.0, abs(allowance), abs(max_carbon))
+    excess = max(0.0, max_carbon - allowance)
+    passed = excess <= epsilon_value * scale
+    return ValidationResult(
+        name="carbon_conservation",
+        passed=passed,
+        message=(
+            "Tracked carbon did not exceed initial plus external carbon."
+            if passed
+            else "Tracked carbon exceeded initial plus external carbon."
+        ),
+        details={
+            "included_species": included_species,
+            "units": "kilogram carbon equivalent",
+            "initial_carbon": initial,
+            "external_carbon": float(external.to("kilogram").magnitude),
+            "allowed_carbon": allowance,
+            "maximum_tracked_carbon": max_carbon,
+            "excess_carbon": excess,
+            "relative_tolerance": epsilon_value,
+        },
+    )
+
+
+def validate_oxygen_limitation(
+    result: Any,
+    *,
+    oxygen_demand: OxygenDemand,
+    oxygen_available: Quantity | None = None,
+    oxygen_species: str | None = None,
+    relative_tolerance: Quantity | None = None,
+) -> ValidationResult:
+    """Check whether aerobic substrate consumption exceeds available oxygen."""
+
+    epsilon = relative_tolerance or DEFAULT_VALIDATION_RELATIVE_TOLERANCE.quantity
+    epsilon_value = float(assert_compatible(epsilon, "dimensionless").magnitude)
+    if oxygen_demand.substrate_species not in result.species:
+        raise KeyError(f"Unknown substrate species {oxygen_demand.substrate_species!r}.")
+    if oxygen_available is None and oxygen_species is None:
+        raise ValueError("oxygen_available or oxygen_species must be provided.")
+    if oxygen_available is not None and oxygen_species is not None:
+        raise ValueError("Provide only one of oxygen_available or oxygen_species.")
+
+    substrate = assert_compatible(
+        result.species[oxygen_demand.substrate_species],
+        "kilogram",
+        name=oxygen_demand.substrate_species,
+    )
+    substrate_values = np.asarray(substrate.magnitude, dtype=float)
+    consumed = max(0.0, float(substrate_values.flat[0] - np.min(substrate_values)))
+    required = oxygen_demand.required_oxygen(Q_(consumed, "kilogram"))
+
+    if oxygen_species is not None:
+        if oxygen_species not in result.species:
+            raise KeyError(f"Unknown oxygen species {oxygen_species!r}.")
+        available = assert_compatible(
+            result.species[oxygen_species],
+            "kilogram",
+            name=oxygen_species,
+        )
+        available_value = float(np.asarray(available.magnitude, dtype=float).flat[0])
+    else:
+        available_value = float(
+            assert_compatible(oxygen_available, "kilogram", name="oxygen_available").magnitude
+        )
+    required_value = float(required.to("kilogram").magnitude)
+    scale = max(1.0, abs(available_value), abs(required_value))
+    deficit = max(0.0, required_value - available_value)
+    passed = deficit <= epsilon_value * scale
+    return ValidationResult(
+        name="oxygen_limitation",
+        passed=passed,
+        message=(
+            "Available oxygen is sufficient for tracked aerobic substrate consumption."
+            if passed
+            else "Tracked aerobic substrate consumption exceeds available oxygen."
+        ),
+        details={
+            "process_name": oxygen_demand.process_name,
+            "substrate_species": oxygen_demand.substrate_species,
+            "substrate_consumed": consumed,
+            "oxygen_required": required_value,
+            "oxygen_available": available_value,
+            "oxygen_deficit": deficit,
+            "units": "kilogram",
+            "relative_tolerance": epsilon_value,
+        },
+    )
+
+
+def validate_biomass_yield_limit(
+    *,
+    yield_parameter: Parameter,
+    maximum_yield_parameter: Parameter,
+) -> ValidationResult:
+    """Check that biomass yield does not exceed a configured maximum."""
+
+    if yield_parameter.quantity is None:
+        raise UnknownParameterError(f"Biomass yield {yield_parameter.symbol} is unknown.")
+    if maximum_yield_parameter.quantity is None:
+        raise UnknownParameterError(f"Maximum biomass yield {maximum_yield_parameter.symbol} is unknown.")
+    yield_value = assert_compatible(yield_parameter.quantity, "dimensionless", name=yield_parameter.symbol)
+    maximum = assert_compatible(maximum_yield_parameter.quantity, "dimensionless", name=maximum_yield_parameter.symbol)
+    y = float(yield_value.magnitude)
+    y_max = float(maximum.magnitude)
+    if y < 0.0:
+        return ValidationResult(
+            name="biomass_yield_limit",
+            passed=False,
+            message="Biomass yield is negative.",
+            details={"yield": y, "maximum_yield": y_max},
+        )
+    if y_max < 0.0 or y_max > 1.0:
+        return ValidationResult(
+            name="biomass_yield_limit",
+            passed=False,
+            message="Configured maximum biomass yield must be between 0 and 1.",
+            details={"yield": y, "maximum_yield": y_max},
+        )
+    passed = y <= y_max
+    return ValidationResult(
+        name="biomass_yield_limit",
+        passed=passed,
+        message=(
+            "Biomass yield is within the configured maximum."
+            if passed
+            else "Biomass yield exceeds the configured maximum."
+        ),
+        details={"yield": y, "maximum_yield": y_max},
+    )
+
+
 @dataclass
 class LimitingCase:
     """A named limiting case with executable setup and validation functions."""
@@ -194,7 +359,9 @@ __all__ = [
     "LimitingCase",
     "LimitingCaseSuite",
     "ValidationResult",
+    "validate_biomass_yield_limit",
+    "validate_carbon_conservation",
     "validate_mass_balance",
     "validate_non_negative",
+    "validate_oxygen_limitation",
 ]
-

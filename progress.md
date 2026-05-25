@@ -13,9 +13,9 @@ Status key:
 
 ## Current Deliverable
 
-Goal: implement Stage 6 fungal enzyme secretion and biomass dynamics on top of the validated Stage 0-5 foundation.
+Goal: implement Stage 7 thermodynamic and stoichiometric consistency interfaces on top of the validated Stage 0-6 foundation.
 
-Current status: `complete` for Stage 6 fungal enzyme secretion and biomass dynamics.
+Current status: `complete` for Stage 7 thermodynamic and stoichiometric consistency interfaces.
 
 Implemented:
 
@@ -86,6 +86,15 @@ Implemented:
 - Stage 6 benchmark example:
   - `examples/05_fungal_enzyme_secretion_and_growth.py`
   - active biomass secretes enzyme, pays secretion/maintenance costs, hydrolyses PET, and grows only from explicitly assimilable lumped hydrolysate.
+- Stage 7 stoichiometric and thermodynamic layer:
+  - elemental formula parsing and reaction stoichiometry metadata.
+  - carbon content metadata for state species.
+  - oxygen demand metadata for aerobic processes.
+  - Gibbs free energy estimate metadata with provenance and optional known-value checks.
+  - carbon conservation validator.
+  - oxygen limitation validator.
+  - biomass yield limit validator.
+  - Stage 7 validators added to the Stage 6 fungal benchmark validation report.
 - Tests:
   - parameter provenance and unknown values
   - unit compatibility
@@ -100,11 +109,12 @@ Implemented:
   - PET surface model zero surface area, zero enzyme, zero PET mass, surface-area monotonicity, crystallinity effect, explicit accessible-area override, Langmuir unit checks, and ODE integration.
   - Arrhenius reference-rate identity at reference temperature, temperature monotonicity within range, out-of-range warnings, prefactor units, pH optimum activity, pH out-of-range warnings, positive pH width, ODE integration with environmental modifiers, missing activation energy handling, and pH profile source enforcement.
   - fungal metadata unknown-parameter handling, fungal parameter unit checks, no biomass/no enzyme production, enzyme production biomass cost, enzyme decay, maintenance-driven active biomass decline, no product/no growth, non-assimilable product/no growth, and assimilable product/growth.
+  - elemental formula parsing, balanced/unbalanced stoichiometry detection, Gibbs provenance, Gibbs exergonic metadata, unknown carbon fraction handling, carbon conservation pass/fail cases, oxygen sufficiency/deficit checks, and biomass yield limit pass/fail cases.
 
 Validation status:
 
 - Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 62 tests passed.
+- Result: 74 tests passed.
 - Verified examples:
   - `.venv/bin/python examples/01_first_order_reaction.py`
   - `.venv/bin/python examples/02_homogeneous_michaelis_menten.py`
@@ -117,6 +127,7 @@ Validation status:
   - `outputs/example_03_pet_surface_hydrolysis/`
   - `outputs/example_04_pet_temperature_ph/`
   - `outputs/example_05_fungal_enzyme_secretion_and_growth/`
+  - Stage 7 validation results are included in the Stage 6 fungal benchmark validation report.
 
 ## Stage Roadmap
 
@@ -361,12 +372,49 @@ Remaining:
 
 ### Stage 7: Thermodynamic And Stoichiometric Consistency
 
-Status: `not started`
+Status: `complete`
 
 Plan:
 
 - Track stoichiometry, carbon balance, oxygen demand, approximate Gibbs energy where available, and biomass-yield constraints.
 - Reject impossible growth when carbon, energy, oxygen, or yield constraints are violated.
+
+Implemented:
+
+- `src/fungal_model/chemistry/stoichiometry.py`
+- `src/fungal_model/chemistry/thermodynamics.py`
+- `src/fungal_model/validation/stoichiometry.py`
+- `ElementalComposition`
+- `StoichiometricTerm`
+- `StoichiometricReactionMetadata`
+- `CarbonContent`
+- `OxygenDemand`
+- `GibbsFreeEnergyEstimate`
+- `validate_carbon_conservation`
+- `validate_oxygen_limitation`
+- `validate_biomass_yield_limit`
+- `tests/test_stoichiometry_thermodynamics.py`
+- Stage 7 validators included in `examples/05_fungal_enzyme_secretion_and_growth.py`
+
+Current enforcement:
+
+- Carbon in tracked species cannot exceed initial tracked carbon plus explicit external carbon.
+- Aerobic substrate consumption can be checked against configured oxygen availability or an initial oxygen state.
+- Biomass yield can be checked against a configured maximum yield.
+- Stoichiometric reaction metadata can report elemental balance when formulas are supplied.
+- Gibbs free energy estimates can be recorded with units, provenance, conditions, and exergonic metadata.
+
+Important limitations:
+
+- Full thermodynamic flux analysis is not implemented.
+- Gibbs free energy estimates are metadata and are not yet solver constraints.
+- Oxygen is still not coupled as a dynamic limiter in the ODE equations.
+- Carbon validation depends on supplied carbon fractions and tracked state species.
+- Energy source checks are not complete; Stage 7 provides the interface for Gibbs estimates but does not reject all energetically impossible growth yet.
+
+Remaining:
+
+- Stage 8 should add spatial reaction-diffusion only after preserving the ODE, PET, fungal, and stoichiometric validation tests.
 
 ### Stage 8: Spatial Reaction-Diffusion Model
 

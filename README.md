@@ -15,13 +15,15 @@ basic kinetics layer:
 - Arrhenius temperature scaling with validity-range warnings,
 - Gaussian pH activity scaling with validity-range warnings,
 - minimal fungal metadata, enzyme secretion, enzyme decay, maintenance, and product-coupled biomass growth,
+- stoichiometric and thermodynamic metadata interfaces,
+- carbon conservation, oxygen limitation, and biomass-yield validation checks,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
 - a PET surface-hydrolysis benchmark example.
 - a PET temperature/pH modifier benchmark example.
 - a fungal enzyme secretion and product-coupled growth benchmark example.
 
-It does not yet implement thermodynamic consistency, oxygen limitation, resolved intracellular metabolism, spatial transport, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
+It does not yet implement full thermodynamic flux analysis, resolved intracellular metabolism, spatial transport, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
 
 ## Scientific Philosophy
 
@@ -61,6 +63,8 @@ Each example saves a plot, simulation record, validation report, and assumptions
 - pH activity currently uses an empirical Gaussian profile; mechanistic ionization chemistry is not implemented.
 - Fungal growth currently uses a simple assimilable-product uptake law; oxygen, transporters, toxicity, regulation, and intracellular metabolism are not modelled.
 - Enzyme production has an explicit active-biomass cost, but the cost parameter is lumped and must be sourced before scientific use.
+- Stage 7 oxygen handling is currently a validation check against available oxygen, not a coupled oxygen state in the ODE model.
+- Gibbs free energy values are metadata with provenance; full thermodynamic feasibility constraints are not yet enforced by the solver.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.
