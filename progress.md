@@ -13,9 +13,9 @@ Status key:
 
 ## Current Deliverable
 
-Goal: implement Stage 4 surface-limited PET hydrolysis on top of the validated Stage 0-3 foundation.
+Goal: implement Stage 5 temperature and pH dependence on top of the validated Stage 0-4 foundation.
 
-Current status: `complete` for Stage 4 surface-limited PET hydrolysis.
+Current status: `complete` for Stage 5 temperature and pH dependence.
 
 Implemented:
 
@@ -62,6 +62,17 @@ Implemented:
 - Stage 4 benchmark example:
   - `examples/03_pet_surface_hydrolysis.py`
   - fixed-enzyme PET surface hydrolysis to lumped mass-equivalent hydrolysate.
+- Stage 5 environmental modifiers:
+  - Arrhenius absolute prefactor form.
+  - Arrhenius reference-rate scaling form.
+  - universal gas constant as a sourced `Parameter`.
+  - validity-range warnings for temperature extrapolation.
+  - Gaussian pH activity profile.
+  - validity-range warnings for pH extrapolation.
+  - environmental modifier composition with `PETSurfaceHydrolysisRateLaw`.
+- Stage 5 benchmark example:
+  - `examples/04_pet_temperature_ph.py`
+  - fixed-enzyme PET surface hydrolysis with Arrhenius temperature scaling and Gaussian pH activity.
 - Tests:
   - parameter provenance and unknown values
   - unit compatibility
@@ -74,19 +85,22 @@ Implemented:
   - Michaelis-Menten low-substrate, high-substrate, zero-substrate, zero-enzyme, unit, and ODE-engine behavior.
   - PET identity, default model preference, unknown parameters, degradation products, unit checks, fraction validation, roughness validation, and accessible-area derivation.
   - PET surface model zero surface area, zero enzyme, zero PET mass, surface-area monotonicity, crystallinity effect, explicit accessible-area override, Langmuir unit checks, and ODE integration.
+  - Arrhenius reference-rate identity at reference temperature, temperature monotonicity within range, out-of-range warnings, prefactor units, pH optimum activity, pH out-of-range warnings, positive pH width, ODE integration with environmental modifiers, missing activation energy handling, and pH profile source enforcement.
 
 Validation status:
 
 - Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 43 tests passed.
+- Result: 53 tests passed.
 - Verified examples:
   - `.venv/bin/python examples/01_first_order_reaction.py`
   - `.venv/bin/python examples/02_homogeneous_michaelis_menten.py`
   - `.venv/bin/python examples/03_pet_surface_hydrolysis.py`
+  - `.venv/bin/python examples/04_pet_temperature_ph.py`
 - Example artifacts were written to:
   - `outputs/example_01_first_order/`
   - `outputs/example_02_homogeneous_michaelis_menten/`
   - `outputs/example_03_pet_surface_hydrolysis/`
+  - `outputs/example_04_pet_temperature_ph/`
 
 ## Stage Roadmap
 
@@ -241,13 +255,44 @@ Remaining:
 
 ### Stage 5: Temperature And pH Dependence
 
-Status: `not started`
+Status: `complete`
 
 Plan:
 
 - Add Arrhenius scaling with required activation energy and provenance.
 - Add optional pH activity profile with measured-range warnings.
 - Mark missing high-temperature enzyme deactivation as a limitation until implemented.
+
+Implemented:
+
+- `src/fungal_model/kinetics/arrhenius.py`
+- `src/fungal_model/kinetics/ph.py`
+- `EnvironmentalValidityWarning`
+- `arrhenius_rate_constant`
+- `arrhenius_reference_scaled_rate`
+- `ArrheniusReferenceTemperatureScaler`
+- `gaussian_ph_activity`
+- `GaussianPHActivityProfile`
+- optional temperature and pH scaling inside `PETSurfaceHydrolysisRateLaw`
+- `tests/test_environmental_modifiers.py`
+- `examples/04_pet_temperature_ph.py`
+
+Model equations:
+
+- `k(T) = A * exp(-Ea / (R*T))`
+- `k(T) = k_ref * exp((-Ea/R) * (1/T - 1/T_ref))`
+- `activity_pH = exp(-0.5 * ((pH - pH_opt) / sigma_pH)^2)`
+
+Important limitations:
+
+- Arrhenius scaling does not include enzyme thermal deactivation.
+- The model warns outside measured temperature ranges but still returns a value so failed extrapolation is visible to callers.
+- Gaussian pH activity is empirical and does not model ionization chemistry.
+- pH out-of-range evaluations warn but are not automatically rejected.
+
+Remaining:
+
+- Stage 6 should introduce fungal enzyme secretion and biomass only after preserving the enzyme-only PET model tests.
 
 ### Stage 6: Fungal Enzyme Secretion And Biomass
 

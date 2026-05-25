@@ -25,7 +25,9 @@ from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.provenance import UnknownParameterError
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
+from fungal_model.kinetics.arrhenius import ArrheniusReferenceTemperatureScaler
 from fungal_model.kinetics.langmuir import langmuir_surface_coverage
+from fungal_model.kinetics.ph import GaussianPHActivityProfile
 from fungal_model.substrates.pet import PETSubstrate
 
 
@@ -113,6 +115,8 @@ class PETSurfaceHydrolysisRateLaw:
     surface_rate_symbol: str
     rate_units: str
     enzyme_units: str | None = None
+    temperature_scaler: ArrheniusReferenceTemperatureScaler | None = None
+    ph_profile: GaussianPHActivityProfile | None = None
 
     def __post_init__(self) -> None:
         if not self.pet.uses_surface_degradation_by_default:
@@ -123,7 +127,12 @@ class PETSurfaceHydrolysisRateLaw:
 
     @property
     def assumptions(self) -> list[Assumption]:
-        return [pet_surface_hydrolysis_assumption(), *self.pet.assumptions]
+        assumptions = [pet_surface_hydrolysis_assumption(), *self.pet.assumptions]
+        if self.temperature_scaler is not None:
+            assumptions.extend(self.temperature_scaler.assumptions)
+        if self.ph_profile is not None:
+            assumptions.extend(self.ph_profile.assumptions)
+        return assumptions
 
     def __call__(
         self,
@@ -140,20 +149,29 @@ class PETSurfaceHydrolysisRateLaw:
                 "PET accessible surface area is unknown for surface hydrolysis. "
                 "Supply A_accessible, or supply A_surface, r_rough, and phi_amorphous/chi_c."
             )
-        return surface_hydrolysis_rate(
+        surface_rate_constant = parameters.require_quantity(
+            self.surface_rate_symbol,
+            f"{self.rate_units} / meter ** 2",
+        )
+        if self.temperature_scaler is not None:
+            surface_rate_constant = self.temperature_scaler.scale(
+                reference_rate=surface_rate_constant,
+                parameters=parameters,
+            )
+        rate = surface_hydrolysis_rate(
             free_enzyme=assert_compatible(enzyme, enzyme_units, name=self.enzyme),
             adsorption_equilibrium_constant=parameters.require_quantity(
                 self.adsorption_symbol,
                 f"1 / ({enzyme_units})",
             ),
             accessible_surface_area=accessible_area,
-            surface_hydrolysis_rate_constant=parameters.require_quantity(
-                self.surface_rate_symbol,
-                f"{self.rate_units} / meter ** 2",
-            ),
+            surface_hydrolysis_rate_constant=surface_rate_constant,
             pet_mass=state[self.pet_mass],
             rate_units=self.rate_units,
         )
+        if self.ph_profile is not None:
+            rate = self.ph_profile.scale(rate=rate, parameters=parameters)
+        return assert_compatible(rate, self.rate_units, name="environment-scaled PET surface hydrolysis rate")
 
 
 __all__ = [
