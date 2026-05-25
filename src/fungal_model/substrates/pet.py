@@ -142,9 +142,10 @@ def pet_surface_assumption() -> Assumption:
             "than as homogeneous dissolved-substrate turnover."
         ),
         known_limitations=(
-            "Stage 3 stores material metadata only. Adsorption, desorption, "
-            "surface coverage, hydrolysis rate, crystallinity-dependent "
-            "accessibility, and transport are deferred to later stages."
+            "The substrate object stores material metadata only. Surface "
+            "kinetics are implemented separately; dynamic morphology changes, "
+            "surface renewal, crystallinity evolution, and transport remain "
+            "outside this substrate definition."
         ),
         source=PET_REFERENCE_NOTE,
     )

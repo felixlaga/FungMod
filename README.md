@@ -11,10 +11,12 @@ basic kinetics layer:
 - non-negativity, mass-balance, and limiting-case validation helpers,
 - homogeneous dissolved-substrate Michaelis-Menten rate laws,
 - PET substrate metadata with explicit unknown physical parameters,
+- a minimal heterogeneous PET surface-hydrolysis rate law,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
+- a PET surface-hydrolysis benchmark example.
 
-It does not yet implement PET hydrolysis kinetics, surface-limited polymer reaction rates, fungal growth, enzyme secretion, spatial transport, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
+It does not yet implement temperature/pH dependence, fungal growth, enzyme secretion, spatial transport, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
 
 ## Scientific Philosophy
 
@@ -37,6 +39,7 @@ pytest
 ```bash
 python examples/01_first_order_reaction.py
 python examples/02_homogeneous_michaelis_menten.py
+python examples/03_pet_surface_hydrolysis.py
 ```
 
 Each example saves a plot, simulation record, validation report, and assumptions file under `outputs/`.
@@ -45,7 +48,8 @@ Each example saves a plot, simulation record, validation report, and assumptions
 
 - Only well-mixed ODE systems are supported.
 - Michaelis-Menten kinetics currently means homogeneous dissolved-substrate kinetics only.
-- PET is currently a substrate metadata object only. It defaults to a heterogeneous surface-degradation modelling preference, but Stage 4 kinetics are not implemented yet.
+- PET surface hydrolysis currently uses a minimal equilibrium Langmuir coverage model with constant accessible surface area.
+- PET product release is represented as a lumped mass-equivalent hydrolysate in the Stage 4 example, not resolved MHET/BHET/TPA/EG chemistry.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.

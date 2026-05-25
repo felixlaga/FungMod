@@ -13,9 +13,9 @@ Status key:
 
 ## Current Deliverable
 
-Goal: implement Stage 3 PET substrate metadata on top of the validated Stage 0-2 foundation.
+Goal: implement Stage 4 surface-limited PET hydrolysis on top of the validated Stage 0-3 foundation.
 
-Current status: `complete` for Stage 3 PET substrate metadata.
+Current status: `complete` for Stage 4 surface-limited PET hydrolysis.
 
 Implemented:
 
@@ -54,6 +54,14 @@ Implemented:
   - explicit default preference for heterogeneous surface modelling.
   - explicit unknown defaults for density, crystallinity, amorphous fraction, surface area, geometry size, roughness, and accessible surface area.
   - derived accessible-area helper for metadata bookkeeping only.
+- Stage 4 surface-limited PET hydrolysis:
+  - Langmuir equilibrium surface coverage.
+  - PET surface hydrolysis rate proportional to occupied accessible surface.
+  - PET-specific `Reaction` rate-law object.
+  - explicit assumptions and limitations.
+- Stage 4 benchmark example:
+  - `examples/03_pet_surface_hydrolysis.py`
+  - fixed-enzyme PET surface hydrolysis to lumped mass-equivalent hydrolysate.
 - Tests:
   - parameter provenance and unknown values
   - unit compatibility
@@ -65,17 +73,20 @@ Implemented:
   - simulation record serialization.
   - Michaelis-Menten low-substrate, high-substrate, zero-substrate, zero-enzyme, unit, and ODE-engine behavior.
   - PET identity, default model preference, unknown parameters, degradation products, unit checks, fraction validation, roughness validation, and accessible-area derivation.
+  - PET surface model zero surface area, zero enzyme, zero PET mass, surface-area monotonicity, crystallinity effect, explicit accessible-area override, Langmuir unit checks, and ODE integration.
 
 Validation status:
 
 - Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 34 tests passed.
+- Result: 43 tests passed.
 - Verified examples:
   - `.venv/bin/python examples/01_first_order_reaction.py`
   - `.venv/bin/python examples/02_homogeneous_michaelis_menten.py`
+  - `.venv/bin/python examples/03_pet_surface_hydrolysis.py`
 - Example artifacts were written to:
   - `outputs/example_01_first_order/`
   - `outputs/example_02_homogeneous_michaelis_menten/`
+  - `outputs/example_03_pet_surface_hydrolysis/`
 
 ## Stage Roadmap
 
@@ -193,13 +204,40 @@ Remaining:
 
 ### Stage 4: Surface-Limited PET Hydrolysis
 
-Status: `not started`
+Status: `complete`
 
 Plan:
 
 - Implement enzyme adsorption/desorption and surface coverage.
 - Add modular surface hydrolysis rate laws.
 - Validate zero surface area, zero enzyme, zero PET mass, surface-area monotonicity, and crystallinity effect.
+
+Implemented:
+
+- `src/fungal_model/kinetics/langmuir.py`
+- `src/fungal_model/kinetics/surface_kinetics.py`
+- `langmuir_surface_coverage`
+- `surface_hydrolysis_rate`
+- `PETSurfaceHydrolysisRateLaw`
+- `pet_surface_hydrolysis_assumption`
+- `tests/test_surface_pet.py`
+- `examples/03_pet_surface_hydrolysis.py`
+
+Model equations:
+
+- `theta = K_ads * E / (1 + K_ads * E)`
+- `rate = k_surface * theta * A_accessible`
+
+Important limitations:
+
+- `K_ads` is an equilibrium lumped adsorption parameter, not separate dynamic adsorption/desorption states.
+- Accessible surface area is constant during a run.
+- PET morphology, crystallinity evolution, erosion, diffusion, enzyme depletion by binding, deactivation, and product inhibition are not yet modelled.
+- Product release is currently a mass-equivalent lump in examples; chemically resolved MHET/BHET/TPA/EG product partitioning is not implemented.
+
+Remaining:
+
+- Stage 5 should add temperature and pH dependence with strict provenance and validity-range warnings.
 
 ### Stage 5: Temperature And pH Dependence
 
