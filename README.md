@@ -17,13 +17,15 @@ basic kinetics layer:
 - minimal fungal metadata, enzyme secretion, enzyme decay, maintenance, and product-coupled biomass growth,
 - stoichiometric and thermodynamic metadata interfaces,
 - carbon conservation, oxygen limitation, and biomass-yield validation checks,
+- 1D finite-volume reaction-diffusion with explicit boundary conditions,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
 - a PET surface-hydrolysis benchmark example.
 - a PET temperature/pH modifier benchmark example.
 - a fungal enzyme secretion and product-coupled growth benchmark example.
+- a 1D PET film enzyme-diffusion benchmark example.
 
-It does not yet implement full thermodynamic flux analysis, resolved intracellular metabolism, spatial transport, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
+It does not yet implement full thermodynamic flux analysis, resolved intracellular metabolism, 2D/3D spatial models, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
 
 ## Scientific Philosophy
 
@@ -49,6 +51,7 @@ python examples/02_homogeneous_michaelis_menten.py
 python examples/03_pet_surface_hydrolysis.py
 python examples/04_pet_temperature_ph.py
 python examples/05_fungal_enzyme_secretion_and_growth.py
+python examples/06_spatial_pet_film_enzyme_diffusion.py
 ```
 
 Each example saves a plot, simulation record, validation report, and assumptions file under `outputs/`.
@@ -65,6 +68,8 @@ Each example saves a plot, simulation record, validation report, and assumptions
 - Enzyme production has an explicit active-biomass cost, but the cost parameter is lumped and must be sourced before scientific use.
 - Stage 7 oxygen handling is currently a validation check against available oxygen, not a coupled oxygen state in the ODE model.
 - Gibbs free energy values are metadata with provenance; full thermodynamic feasibility constraints are not yet enforced by the solver.
+- Spatial modelling is currently 1D finite-volume method-of-lines only.
+- Stage 8 diffusion fields are unit-aware, but geometry is a simple uniform 1D grid; 2D, variable geometry, and true volume/area coupling are not implemented.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.

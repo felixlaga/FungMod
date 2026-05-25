@@ -13,9 +13,9 @@ Status key:
 
 ## Current Deliverable
 
-Goal: implement Stage 7 thermodynamic and stoichiometric consistency interfaces on top of the validated Stage 0-6 foundation.
+Goal: implement Stage 8 1D spatial reaction-diffusion on top of the validated Stage 0-7 foundation.
 
-Current status: `complete` for Stage 7 thermodynamic and stoichiometric consistency interfaces.
+Current status: `complete` for Stage 8 1D spatial reaction-diffusion.
 
 Implemented:
 
@@ -95,6 +95,16 @@ Implemented:
   - oxygen limitation validator.
   - biomass yield limit validator.
   - Stage 7 validators added to the Stage 6 fungal benchmark validation report.
+- Stage 8 spatial layer:
+  - explicit 1D finite-volume uniform grid.
+  - explicit no-flux, fixed-value, and periodic boundary conditions.
+  - finite-volume 1D diffusion operator.
+  - spatial reaction-diffusion method-of-lines engine.
+  - spatial simulation record.
+  - spatial validators for gradient smoothing, no-flux integral conservation, and well-mixed average comparison.
+- Stage 8 benchmark example:
+  - `examples/06_spatial_pet_film_enzyme_diffusion.py`
+  - 1D PET film with fixed enzyme boundary, enzyme diffusion, and local PET surface hydrolysis.
 - Tests:
   - parameter provenance and unknown values
   - unit compatibility
@@ -110,23 +120,26 @@ Implemented:
   - Arrhenius reference-rate identity at reference temperature, temperature monotonicity within range, out-of-range warnings, prefactor units, pH optimum activity, pH out-of-range warnings, positive pH width, ODE integration with environmental modifiers, missing activation energy handling, and pH profile source enforcement.
   - fungal metadata unknown-parameter handling, fungal parameter unit checks, no biomass/no enzyme production, enzyme production biomass cost, enzyme decay, maintenance-driven active biomass decline, no product/no growth, non-assimilable product/no growth, and assimilable product/growth.
   - elemental formula parsing, balanced/unbalanced stoichiometry detection, Gibbs provenance, Gibbs exergonic metadata, unknown carbon fraction handling, carbon conservation pass/fail cases, oxygen sufficiency/deficit checks, and biomass yield limit pass/fail cases.
+  - finite-volume no-flux conservation, missing boundary rejection, diffusion smoothing, zero-diffusion local ODE behavior, high-diffusion/well-mixed average agreement, and fixed-value boundary behaviour.
 
 Validation status:
 
 - Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 74 tests passed.
+- Result: 80 tests passed.
 - Verified examples:
   - `.venv/bin/python examples/01_first_order_reaction.py`
   - `.venv/bin/python examples/02_homogeneous_michaelis_menten.py`
   - `.venv/bin/python examples/03_pet_surface_hydrolysis.py`
   - `.venv/bin/python examples/04_pet_temperature_ph.py`
   - `.venv/bin/python examples/05_fungal_enzyme_secretion_and_growth.py`
+  - `.venv/bin/python examples/06_spatial_pet_film_enzyme_diffusion.py`
 - Example artifacts were written to:
   - `outputs/example_01_first_order/`
   - `outputs/example_02_homogeneous_michaelis_menten/`
   - `outputs/example_03_pet_surface_hydrolysis/`
   - `outputs/example_04_pet_temperature_ph/`
   - `outputs/example_05_fungal_enzyme_secretion_and_growth/`
+  - `outputs/example_06_spatial_pet_film_enzyme_diffusion/`
   - Stage 7 validation results are included in the Stage 6 fungal benchmark validation report.
 
 ## Stage Roadmap
@@ -418,13 +431,52 @@ Remaining:
 
 ### Stage 8: Spatial Reaction-Diffusion Model
 
-Status: `not started`
+Status: `complete`
 
 Plan:
 
 - Start with 1D finite differences, then 2D.
 - Track substrate, enzyme, biomass, oxygen, and products as fields.
 - Keep boundary conditions explicit.
+
+Implemented:
+
+- `src/fungal_model/transport/geometry.py`
+- `src/fungal_model/transport/diffusion.py`
+- `src/fungal_model/transport/reaction_diffusion.py`
+- `src/fungal_model/validation/spatial.py`
+- `BoundaryCondition`
+- `BoundaryConditions1D`
+- `UniformGrid1D`
+- `finite_volume_laplacian_1d`
+- `ReactionDiffusionEngine1D`
+- `ReactionDiffusionResult1D`
+- `ReactionDiffusionRecord`
+- `validate_diffusion_smooths_gradient`
+- `validate_no_flux_spatial_integral_conserved`
+- `validate_spatial_average_close_to_expected`
+- `tests/test_reaction_diffusion.py`
+- `examples/06_spatial_pet_film_enzyme_diffusion.py`
+
+Current checks:
+
+- Diffusion smooths gradients in a diffusion-only run.
+- No-flux boundaries conserve the discrete spatial integral for diffusion.
+- Zero diffusion reproduces independent local ODE behavior.
+- Spatial average agrees with a well-mixed linear reaction benchmark.
+- Boundary conditions are explicit and missing boundaries are rejected.
+
+Important limitations:
+
+- Only 1D uniform finite-volume grids are implemented.
+- 2D and 3D are not implemented.
+- Geometry does not yet include true cross-sectional area, volume, porosity, or film-surface coupling.
+- The spatial PET example uses a per-cell accessible surface area benchmark.
+- Oxygen and biomass fields can be represented but no spatial fungal ecology example is implemented yet.
+
+Remaining:
+
+- Stage 9 should generalize substrate representation across PET, cellulose, lignin, starch, and chitin with explicit completeness levels.
 
 ### Stage 9: Universal Substrate Engine
 
