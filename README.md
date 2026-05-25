@@ -19,6 +19,8 @@ basic kinetics layer:
 - carbon conservation, oxygen limitation, and biomass-yield validation checks,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
+- least-squares calibration utilities with train/validation residual reporting,
+- Monte Carlo uncertainty propagation and local sensitivity analysis,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
 - a PET surface-hydrolysis benchmark example.
@@ -53,6 +55,12 @@ python examples/03_pet_surface_hydrolysis.py
 python examples/04_pet_temperature_ph.py
 python examples/05_fungal_enzyme_secretion_and_growth.py
 python examples/06_spatial_pet_film_enzyme_diffusion.py
+python examples/stage12_01_homogeneous_michaelis_menten.py
+python examples/stage12_02_pet_surface_model.py
+python examples/stage12_03_pet_with_temperature.py
+python examples/stage12_04_fungal_enzyme_secretion.py
+python examples/stage12_05_fungal_growth_from_assimilable_products.py
+python examples/stage12_06_spatial_pet_film.py
 ```
 
 Each example saves a plot, simulation record, validation report, and assumptions file under `outputs/`.
@@ -73,6 +81,8 @@ Each example saves a plot, simulation record, validation report, and assumptions
 - Stage 8 diffusion fields are unit-aware, but geometry is a simple uniform 1D grid; 2D, variable geometry, and true volume/area coupling are not implemented.
 - PET is the only substrate marked `partial`; cellulose, lignin, starch, and chitin are Stage 9 `placeholder` metadata classes with unknown physical parameters and no default degradation model.
 - Universal substrate modules record bond classes, required enzyme classes, and product classes, but they do not implement substrate-specific kinetics, accessibility models, thermodynamic constraints, or assimilation evidence.
+- Calibration utilities are generic least-squares tools; no literature data are bundled and no parameters are calibrated by default.
+- Monte Carlo and local sensitivity utilities require explicit uncertainty/perturbation specifications; Bayesian calibration and global sensitivity are not implemented.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.

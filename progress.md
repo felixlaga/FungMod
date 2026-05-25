@@ -13,9 +13,9 @@ Status key:
 
 ## Current Deliverable
 
-Goal: implement Stage 9 universal substrate metadata on top of the validated Stage 0-8 foundation.
+Goal: complete Stages 10, 11, and 12 on top of the validated Stage 0-9 foundation.
 
-Current status: `complete` for Stage 9 universal substrate engine.
+Current status: `complete` for Stages 10, 11, and 12.
 
 Implemented:
 
@@ -112,6 +112,26 @@ Implemented:
   - PET remains the only `partial` substrate and keeps its heterogeneous surface-model default.
   - cellulose, lignin, starch, and chitin expose identity, bond classes, broad enzyme-class requirements, product classes, unknown physical parameters, assumptions, limitations, and references.
   - placeholder substrates use `default_degradation_model="unknown"` and do not imply kinetics or assimilation.
+- Stage 10 calibration layer:
+  - unit-aware residual computation and plotting.
+  - deterministic train/validation split helper.
+  - bounded least-squares calibration wrapper.
+  - explicit fittable parameter bounds as provenance-backed `Parameter` objects.
+  - fit result serialization with training residuals, validation residuals, covariance diagnostics, approximate confidence intervals where identifiable, optimizer metadata, and warnings for reused validation data or raw-unit residual scaling.
+  - failed model/optimizer runs are reported as `success=False` results.
+- Stage 11 uncertainty and sensitivity layer:
+  - Monte Carlo uncertainty propagation for normal, uniform, and lognormal parameter uncertainty specifications.
+  - reproducible sampling when a seed is supplied and explicit warnings when no seed is supplied.
+  - summary quantiles for uncertainty bands.
+  - local finite-difference sensitivity analysis with dimensional derivatives, normalized sensitivities, rankings, and saved reports.
+- Stage 12 canonical examples:
+  - `examples/stage12_01_homogeneous_michaelis_menten.py`
+  - `examples/stage12_02_pet_surface_model.py`
+  - `examples/stage12_03_pet_with_temperature.py`
+  - `examples/stage12_04_fungal_enzyme_secretion.py`
+  - `examples/stage12_05_fungal_growth_from_assimilable_products.py`
+  - `examples/stage12_06_spatial_pet_film.py`
+  - `examples/stage12_common.py`
 - Tests:
   - parameter provenance and unknown values
   - unit compatibility
@@ -129,11 +149,13 @@ Implemented:
   - elemental formula parsing, balanced/unbalanced stoichiometry detection, Gibbs provenance, Gibbs exergonic metadata, unknown carbon fraction handling, carbon conservation pass/fail cases, oxygen sufficiency/deficit checks, and biomass yield limit pass/fail cases.
   - finite-volume no-flux conservation, missing boundary rejection, diffusion smoothing, zero-diffusion local ODE behavior, high-diffusion/well-mixed average agreement, and fixed-value boundary behaviour.
   - universal substrate completeness levels, placeholder unknown-parameter handling, product-assimilation non-claims, bond/enzyme metadata, PET maturity preservation, serialization fields, unit-checked parameter overrides, and lignin ordered-fraction caveat.
+  - least-squares fit recovery, validation-data reuse warnings, unit rejection for residuals and bounds, failed-fit reporting, and calibration-source enforcement.
+  - Monte Carlo reproducibility, uncertainty-band widening with wider input uncertainty, uncertainty provenance enforcement, uncertainty unit checks, local sensitivity ranking, and zero-base relative sensitivity rejection.
 
 Validation status:
 
 - Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 88 tests passed.
+- Result: 100 tests passed.
 - Verified examples:
   - `.venv/bin/python examples/01_first_order_reaction.py`
   - `.venv/bin/python examples/02_homogeneous_michaelis_menten.py`
@@ -141,6 +163,12 @@ Validation status:
   - `.venv/bin/python examples/04_pet_temperature_ph.py`
   - `.venv/bin/python examples/05_fungal_enzyme_secretion_and_growth.py`
   - `.venv/bin/python examples/06_spatial_pet_film_enzyme_diffusion.py`
+  - `.venv/bin/python examples/stage12_01_homogeneous_michaelis_menten.py`
+  - `.venv/bin/python examples/stage12_02_pet_surface_model.py`
+  - `.venv/bin/python examples/stage12_03_pet_with_temperature.py`
+  - `.venv/bin/python examples/stage12_04_fungal_enzyme_secretion.py`
+  - `.venv/bin/python examples/stage12_05_fungal_growth_from_assimilable_products.py`
+  - `.venv/bin/python examples/stage12_06_spatial_pet_film.py`
 - Example artifacts were written to:
   - `outputs/example_01_first_order/`
   - `outputs/example_02_homogeneous_michaelis_menten/`
@@ -148,6 +176,12 @@ Validation status:
   - `outputs/example_04_pet_temperature_ph/`
   - `outputs/example_05_fungal_enzyme_secretion_and_growth/`
   - `outputs/example_06_spatial_pet_film_enzyme_diffusion/`
+  - `outputs/stage12_01_homogeneous_michaelis_menten/`
+  - `outputs/stage12_02_pet_surface_model/`
+  - `outputs/stage12_03_pet_with_temperature/`
+  - `outputs/stage12_04_fungal_enzyme_secretion/`
+  - `outputs/stage12_05_fungal_growth_from_assimilable_products/`
+  - `outputs/stage12_06_spatial_pet_film/`
   - Stage 7 validation results are included in the Stage 6 fungal benchmark validation report.
 
 ## Stage Roadmap
@@ -484,7 +518,7 @@ Important limitations:
 
 Remaining:
 
-- Stage 9 has generalized substrate representation across PET, cellulose, lignin, starch, and chitin with explicit completeness levels. Stage 10 should add calibration and validation against data.
+- Stage 9 has generalized substrate representation across PET, cellulose, lignin, starch, and chitin with explicit completeness levels. Stages 10-12 now add calibration, uncertainty/sensitivity, and canonical examples. Future work should move beyond the planned scaffold into real data ingestion, literature curation, and model validation against experiments.
 
 ### Stage 9: Universal Substrate Engine
 
@@ -541,25 +575,87 @@ Validation:
 
 ### Stage 10: Calibration And Validation Against Data
 
-Status: `not started`
+Status: `complete`
 
 Plan:
 
 - Add least-squares fitting, residual plots, parameter bounds, train/validation split, and confidence intervals where possible.
 - Later add Bayesian calibration and posterior predictive checks.
 
+Implemented:
+
+- `src/fungal_model/calibration/residuals.py`
+  - `CalibrationResiduals`
+  - `residuals_between`
+  - `sequential_train_validation_split`
+  - residual JSON export and residual plotting.
+- `src/fungal_model/calibration/fitting.py`
+  - `FittableParameter`
+  - `fit_least_squares`
+  - `LeastSquaresCalibrationResult`
+  - provenance-backed optimizer diagnostic constants.
+- `tests/test_calibration.py`
+
+Current enforcement:
+
+- Fitted parameters must already be known, sourced `Parameter` objects.
+- Parameter bounds are themselves `Parameter` objects and must carry units and provenance.
+- Calibration source is required.
+- Train and validation residuals are both recorded.
+- If validation indices are omitted, the result explicitly warns that validation reused training data.
+- Failed model/optimizer calls return `success=False` calibration reports.
+- Approximate covariance and 95 percent intervals are reported only when residual degrees of freedom and Jacobian rank allow it.
+
+Important limitations:
+
+- Only deterministic least-squares calibration is implemented.
+- Bayesian calibration remains a placeholder.
+- Confidence intervals are linearized approximations, not full posterior uncertainty.
+- Identifiability diagnostics are rank-based and basic.
+- The framework does not include real experimental datasets yet.
+
 ### Stage 11: Uncertainty And Sensitivity
 
-Status: `not started`
+Status: `complete`
 
 Plan:
 
 - Add Monte Carlo sampling, local sensitivity, and later global sensitivity.
 - Report uncertainty bands and sensitivity rankings.
 
+Implemented:
+
+- `src/fungal_model/uncertainty/monte_carlo.py`
+  - `ParameterUncertaintySpec`
+  - `run_monte_carlo`
+  - `MonteCarloResult`
+  - normal, uniform, and lognormal parameter uncertainty propagation.
+- `src/fungal_model/uncertainty/sensitivity.py`
+  - `LocalSensitivitySpec`
+  - `local_sensitivity`
+  - `LocalSensitivityResult`
+  - dimensional derivatives, normalized sensitivities, and rankings.
+- `tests/test_uncertainty_sensitivity.py`
+
+Current enforcement:
+
+- Uncertainty specifications require a source.
+- Distribution parameters are unit-checked against the nominal parameter.
+- Monte Carlo runs record the random seed; if no seed is supplied, the result warns that exact reproducibility is absent.
+- Failed samples are recorded rather than suppressed.
+- Wider input uncertainty is preserved in wider output intervals in the tested benchmark.
+- Local sensitivity rejects zero base parameter values for relative perturbations.
+
+Important limitations:
+
+- Global sensitivity analysis is not implemented.
+- Monte Carlo sampling does not impose physical constraints beyond the distribution supplied by the caller.
+- Correlated parameter uncertainty is not implemented.
+- Uncertainty summaries are empirical quantiles, not Bayesian credible intervals unless the input samples are defined that way.
+
 ### Stage 12: Examples
 
-Status: `partial`
+Status: `complete`
 
 Plan:
 
@@ -574,6 +670,26 @@ Implemented:
 
 - A preliminary Stage 1 first-order `A -> B` benchmark. This is not one of the final Stage 12 biological examples; it is a foundation check.
 - Stage 2 dissolved homogeneous Michaelis-Menten toy benchmark. This is not PET and is explicitly labelled as a dissolved-substrate benchmark.
+- Canonical Stage 12 wrappers and outputs:
+  - `examples/stage12_01_homogeneous_michaelis_menten.py`
+  - `examples/stage12_02_pet_surface_model.py`
+  - `examples/stage12_03_pet_with_temperature.py`
+  - `examples/stage12_04_fungal_enzyme_secretion.py`
+  - `examples/stage12_05_fungal_growth_from_assimilable_products.py`
+  - `examples/stage12_06_spatial_pet_film.py`
+- Stage 12 example 4 is a distinct no-growth secretion example:
+  - active biomass secretes enzyme,
+  - enzyme hydrolyses PET,
+  - biomass pays secretion and maintenance costs,
+  - no product assimilation reaction is present,
+  - validation reports whether active biomass avoids positive growth.
+- Each Stage 12 example writes a plot, simulation record, validation report, and assumptions file.
+
+Validation:
+
+- Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
+- Result: 100 tests passed.
+- Verified all six canonical Stage 12 scripts run successfully.
 
 ## Handoff Notes
 
