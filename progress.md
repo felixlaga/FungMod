@@ -13,9 +13,9 @@ Status key:
 
 ## Current Deliverable
 
-Goal: create a clean Python project and implement Stage 0 plus Stage 1 only.
+Goal: implement Stage 2 basic enzyme kinetics on top of the validated Stage 0/1 foundation.
 
-Current status: `complete` for the requested Stage 0 and Stage 1 foundation.
+Current status: `complete` for Stage 2 basic enzyme kinetics.
 
 Implemented:
 
@@ -39,6 +39,15 @@ Implemented:
 - Minimal benchmark example:
   - `examples/01_first_order_reaction.py`
   - closed first-order `A -> B` system.
+- Stage 2 homogeneous enzyme kinetics:
+  - `michaelis_menten_rate`
+  - `enzyme_explicit_michaelis_menten_rate`
+  - `MichaelisMentenRateLaw`
+  - `EnzymeExplicitMichaelisMentenRateLaw`
+  - explicit homogeneous dissolved-substrate assumption.
+- Stage 2 benchmark example:
+  - `examples/02_homogeneous_michaelis_menten.py`
+  - dissolved toy substrate `S -> P`.
 - Tests:
   - parameter provenance and unknown values
   - unit compatibility
@@ -48,13 +57,18 @@ Implemented:
   - non-negativity
   - limiting-case suite
   - simulation record serialization.
+  - Michaelis-Menten low-substrate, high-substrate, zero-substrate, zero-enzyme, unit, and ODE-engine behavior.
 
 Validation status:
 
 - Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 16 tests passed.
-- Verified example run with `.venv/bin/python examples/01_first_order_reaction.py`.
-- Example artifacts were written to `outputs/example_01_first_order/`.
+- Result: 24 tests passed.
+- Verified examples:
+  - `.venv/bin/python examples/01_first_order_reaction.py`
+  - `.venv/bin/python examples/02_homogeneous_michaelis_menten.py`
+- Example artifacts were written to:
+  - `outputs/example_01_first_order/`
+  - `outputs/example_02_homogeneous_michaelis_menten/`
 
 ## Stage Roadmap
 
@@ -108,7 +122,7 @@ Remaining:
 
 ### Stage 2: Basic Enzyme Kinetics
 
-Status: `not started`
+Status: `complete`
 
 Plan:
 
@@ -116,6 +130,19 @@ Plan:
 - Add enzyme-explicit `kcat * E * S / (Km + S)` form.
 - Clearly label homogeneous PET use as a benchmark only.
 - Add low-substrate, high-substrate, zero-enzyme, zero-substrate, and units tests.
+
+Implemented:
+
+- `src/fungal_model/kinetics/michaelis_menten.py`
+- Homogeneous dissolved-substrate assumption helper.
+- Direct quantity functions for classic and enzyme-explicit forms.
+- Callable rate-law objects for use with `Reaction`.
+- `tests/test_michaelis_menten.py`
+- `examples/02_homogeneous_michaelis_menten.py`
+
+Remaining:
+
+- Do not expand this homogeneous layer into PET realism. Stage 3 should introduce PET as a substrate object, and Stage 4 should add heterogeneous surface-limited PET hydrolysis.
 
 ### Stage 3: PET Substrate Module
 
@@ -220,6 +247,7 @@ Plan:
 Implemented:
 
 - A preliminary Stage 1 first-order `A -> B` benchmark. This is not one of the final Stage 12 biological examples; it is a foundation check.
+- Stage 2 dissolved homogeneous Michaelis-Menten toy benchmark. This is not PET and is explicitly labelled as a dissolved-substrate benchmark.
 
 ## Handoff Notes
 
