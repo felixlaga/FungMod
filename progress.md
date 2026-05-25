@@ -13,9 +13,9 @@ Status key:
 
 ## Current Deliverable
 
-Goal: implement Stage 5 temperature and pH dependence on top of the validated Stage 0-4 foundation.
+Goal: implement Stage 6 fungal enzyme secretion and biomass dynamics on top of the validated Stage 0-5 foundation.
 
-Current status: `complete` for Stage 5 temperature and pH dependence.
+Current status: `complete` for Stage 6 fungal enzyme secretion and biomass dynamics.
 
 Implemented:
 
@@ -73,6 +73,19 @@ Implemented:
 - Stage 5 benchmark example:
   - `examples/04_pet_temperature_ph.py`
   - fixed-enzyme PET surface hydrolysis with Arrhenius temperature scaling and Gaussian pH activity.
+- Stage 6 fungal layer:
+  - `Fungus` metadata object.
+  - `EnzymeProfile` and `EnzymeCapability`.
+  - complete fungal `ParameterSet` helper with unknown defaults.
+  - enzyme secretion rate `dE/dt = alpha_E * B_active`.
+  - enzyme production active-biomass cost.
+  - first-order extracellular enzyme decay.
+  - first-order active biomass maintenance loss.
+  - product assimilation evidence gate.
+  - product uptake and biomass yield helper.
+- Stage 6 benchmark example:
+  - `examples/05_fungal_enzyme_secretion_and_growth.py`
+  - active biomass secretes enzyme, pays secretion/maintenance costs, hydrolyses PET, and grows only from explicitly assimilable lumped hydrolysate.
 - Tests:
   - parameter provenance and unknown values
   - unit compatibility
@@ -86,21 +99,24 @@ Implemented:
   - PET identity, default model preference, unknown parameters, degradation products, unit checks, fraction validation, roughness validation, and accessible-area derivation.
   - PET surface model zero surface area, zero enzyme, zero PET mass, surface-area monotonicity, crystallinity effect, explicit accessible-area override, Langmuir unit checks, and ODE integration.
   - Arrhenius reference-rate identity at reference temperature, temperature monotonicity within range, out-of-range warnings, prefactor units, pH optimum activity, pH out-of-range warnings, positive pH width, ODE integration with environmental modifiers, missing activation energy handling, and pH profile source enforcement.
+  - fungal metadata unknown-parameter handling, fungal parameter unit checks, no biomass/no enzyme production, enzyme production biomass cost, enzyme decay, maintenance-driven active biomass decline, no product/no growth, non-assimilable product/no growth, and assimilable product/growth.
 
 Validation status:
 
 - Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 53 tests passed.
+- Result: 62 tests passed.
 - Verified examples:
   - `.venv/bin/python examples/01_first_order_reaction.py`
   - `.venv/bin/python examples/02_homogeneous_michaelis_menten.py`
   - `.venv/bin/python examples/03_pet_surface_hydrolysis.py`
   - `.venv/bin/python examples/04_pet_temperature_ph.py`
+  - `.venv/bin/python examples/05_fungal_enzyme_secretion_and_growth.py`
 - Example artifacts were written to:
   - `outputs/example_01_first_order/`
   - `outputs/example_02_homogeneous_michaelis_menten/`
   - `outputs/example_03_pet_surface_hydrolysis/`
   - `outputs/example_04_pet_temperature_ph/`
+  - `outputs/example_05_fungal_enzyme_secretion_and_growth/`
 
 ## Stage Roadmap
 
@@ -296,13 +312,52 @@ Remaining:
 
 ### Stage 6: Fungal Enzyme Secretion And Biomass
 
-Status: `not started`
+Status: `complete`
 
 Plan:
 
 - Introduce fungus object after enzyme-only PET model works.
 - Track active/dormant/dead biomass, secreted enzyme, substrate, products, and optional oxygen.
 - Enforce enzyme production cost and no growth without assimilable carbon/energy.
+
+Implemented:
+
+- `src/fungal_model/fungi/base.py`
+- `src/fungal_model/fungi/enzyme_profile.py`
+- `src/fungal_model/fungi/growth.py`
+- `src/fungal_model/fungi/metabolism.py`
+- `Fungus`
+- `EnzymeProfile`
+- `EnzymeCapability`
+- `EnzymeSecretionRateLaw`
+- `EnzymeProductionCostRateLaw`
+- `EnzymeDecayRateLaw`
+- `BiomassMaintenanceRateLaw`
+- `ProductAssimilation`
+- `ProductUptakeRateLaw`
+- `biomass_yield_coefficient`
+- `tests/test_fungal_dynamics.py`
+- `examples/05_fungal_enzyme_secretion_and_growth.py`
+
+Model equations:
+
+- `dE/dt = alpha_E * B_active - delta_E * E`
+- active biomass cost from enzyme secretion is proportional to `alpha_E * B_active`
+- active biomass maintenance loss is `m_B * B_active`
+- product uptake is `q_product * product * B_active`, gated by explicit assimilability evidence
+- biomass production from uptake uses a configured yield `Y_B`
+
+Important limitations:
+
+- Dormant biomass is tracked as a state but no dormancy transition model is implemented yet.
+- Oxygen is described in fungal metadata but not modelled as a state or limiter.
+- Product assimilation is a binary evidence gate; transporters, intracellular pathways, toxicity, repression, and thermodynamics are not modelled yet.
+- Biomass yield is constrained to 0-1 but full carbon/energy balance is deferred to Stage 7.
+- Enzyme secretion cost is a lumped parameter that must be sourced before scientific use.
+
+Remaining:
+
+- Stage 7 should add thermodynamic and stoichiometric consistency, including carbon balance, oxygen demand, and physical yield constraints.
 
 ### Stage 7: Thermodynamic And Stoichiometric Consistency
 

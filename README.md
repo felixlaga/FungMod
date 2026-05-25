@@ -14,12 +14,14 @@ basic kinetics layer:
 - a minimal heterogeneous PET surface-hydrolysis rate law,
 - Arrhenius temperature scaling with validity-range warnings,
 - Gaussian pH activity scaling with validity-range warnings,
+- minimal fungal metadata, enzyme secretion, enzyme decay, maintenance, and product-coupled biomass growth,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
 - a PET surface-hydrolysis benchmark example.
 - a PET temperature/pH modifier benchmark example.
+- a fungal enzyme secretion and product-coupled growth benchmark example.
 
-It does not yet implement fungal growth, enzyme secretion, spatial transport, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
+It does not yet implement thermodynamic consistency, oxygen limitation, resolved intracellular metabolism, spatial transport, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
 
 ## Scientific Philosophy
 
@@ -44,6 +46,7 @@ python examples/01_first_order_reaction.py
 python examples/02_homogeneous_michaelis_menten.py
 python examples/03_pet_surface_hydrolysis.py
 python examples/04_pet_temperature_ph.py
+python examples/05_fungal_enzyme_secretion_and_growth.py
 ```
 
 Each example saves a plot, simulation record, validation report, and assumptions file under `outputs/`.
@@ -56,6 +59,8 @@ Each example saves a plot, simulation record, validation report, and assumptions
 - PET product release is represented as a lumped mass-equivalent hydrolysate in the Stage 4 example, not resolved MHET/BHET/TPA/EG chemistry.
 - Temperature scaling currently uses Arrhenius acceleration only; enzyme thermal deactivation is recorded as a limitation and is not implemented.
 - pH activity currently uses an empirical Gaussian profile; mechanistic ionization chemistry is not implemented.
+- Fungal growth currently uses a simple assimilable-product uptake law; oxygen, transporters, toxicity, regulation, and intracellular metabolism are not modelled.
+- Enzyme production has an explicit active-biomass cost, but the cost parameter is lumped and must be sourced before scientific use.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.
