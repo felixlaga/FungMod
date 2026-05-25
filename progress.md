@@ -13,9 +13,9 @@ Status key:
 
 ## Current Deliverable
 
-Goal: implement Stage 8 1D spatial reaction-diffusion on top of the validated Stage 0-7 foundation.
+Goal: implement Stage 9 universal substrate metadata on top of the validated Stage 0-8 foundation.
 
-Current status: `complete` for Stage 8 1D spatial reaction-diffusion.
+Current status: `complete` for Stage 9 universal substrate engine.
 
 Implemented:
 
@@ -105,6 +105,13 @@ Implemented:
 - Stage 8 benchmark example:
   - `examples/06_spatial_pet_film_enzyme_diffusion.py`
   - 1D PET film with fixed enzyme boundary, enzyme diffusion, and local PET surface hydrolysis.
+- Stage 9 universal substrate engine:
+  - generic substrate physical-parameter specification helper.
+  - universal substrate fields for water-activity dependence and thermodynamic metadata.
+  - explicit placeholder substrate classes for cellulose, lignin, starch, and chitin.
+  - PET remains the only `partial` substrate and keeps its heterogeneous surface-model default.
+  - cellulose, lignin, starch, and chitin expose identity, bond classes, broad enzyme-class requirements, product classes, unknown physical parameters, assumptions, limitations, and references.
+  - placeholder substrates use `default_degradation_model="unknown"` and do not imply kinetics or assimilation.
 - Tests:
   - parameter provenance and unknown values
   - unit compatibility
@@ -121,11 +128,12 @@ Implemented:
   - fungal metadata unknown-parameter handling, fungal parameter unit checks, no biomass/no enzyme production, enzyme production biomass cost, enzyme decay, maintenance-driven active biomass decline, no product/no growth, non-assimilable product/no growth, and assimilable product/growth.
   - elemental formula parsing, balanced/unbalanced stoichiometry detection, Gibbs provenance, Gibbs exergonic metadata, unknown carbon fraction handling, carbon conservation pass/fail cases, oxygen sufficiency/deficit checks, and biomass yield limit pass/fail cases.
   - finite-volume no-flux conservation, missing boundary rejection, diffusion smoothing, zero-diffusion local ODE behavior, high-diffusion/well-mixed average agreement, and fixed-value boundary behaviour.
+  - universal substrate completeness levels, placeholder unknown-parameter handling, product-assimilation non-claims, bond/enzyme metadata, PET maturity preservation, serialization fields, unit-checked parameter overrides, and lignin ordered-fraction caveat.
 
 Validation status:
 
 - Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 80 tests passed.
+- Result: 88 tests passed.
 - Verified examples:
   - `.venv/bin/python examples/01_first_order_reaction.py`
   - `.venv/bin/python examples/02_homogeneous_michaelis_menten.py`
@@ -476,17 +484,60 @@ Important limitations:
 
 Remaining:
 
-- Stage 9 should generalize substrate representation across PET, cellulose, lignin, starch, and chitin with explicit completeness levels.
+- Stage 9 has generalized substrate representation across PET, cellulose, lignin, starch, and chitin with explicit completeness levels. Stage 10 should add calibration and validation against data.
 
 ### Stage 9: Universal Substrate Engine
 
-Status: `not started`
+Status: `complete`
 
 Plan:
 
 - Generalize substrate representation.
 - Add PET, cellulose, lignin, starch, and chitin subclasses with explicit completeness levels.
 - Do not imply equal maturity across substrates.
+
+Implemented:
+
+- Extended `src/fungal_model/substrates/base.py` with:
+  - `SubstrateParameterSpec`
+  - unknown substrate-parameter construction helper
+  - unit-checked substrate `ParameterSet` construction helper
+  - universal `water_activity_dependence` field
+  - universal `thermodynamic_data` field
+  - substrate parameter accessor.
+- Added placeholder substrate modules:
+  - `src/fungal_model/substrates/cellulose.py`
+  - `src/fungal_model/substrates/lignin.py`
+  - `src/fungal_model/substrates/starch.py`
+  - `src/fungal_model/substrates/chitin.py`
+- Each placeholder substrate records:
+  - chemical class and physical state
+  - bond classes and accessible bond classes
+  - broad required enzyme classes
+  - degradation product classes
+  - product assimilability as unknown
+  - density, porosity, crystallinity or ordered-fraction metadata, surface area, accessible surface area, and water-activity threshold as explicitly unknown `Parameter` objects.
+- Updated `src/fungal_model/substrates/__init__.py` exports.
+- Added `tests/test_universal_substrates.py`.
+
+Current scientific scope:
+
+- PET remains `completeness="partial"` and defaults to heterogeneous surface modelling.
+- Cellulose, lignin, starch, and chitin are `completeness="placeholder"` and use `default_degradation_model="unknown"`.
+- No substrate-specific kinetics, product assimilation, thermodynamic feasibility, or accessibility models were added for the placeholder substrates.
+
+Important limitations:
+
+- Cellulose lacks degree-of-polymerization, fibril morphology, enzyme synergy, and lignocellulose matrix coupling.
+- Lignin lacks bond-frequency distributions, redox mediator chemistry, oxygen/redox coupling, radical chemistry, and resolved product chemistry.
+- Starch lacks gelatinization, granule morphology, amylose/amylopectin ratio, and adsorption/hydrolysis kinetics.
+- Chitin lacks polymorph, acetylation/chitosan conversion, nitrogen assimilation, enzyme synergy, and adsorption/hydrolysis kinetics.
+
+Validation:
+
+- Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
+- Result: 88 tests passed.
+- Re-ran examples 01-06 successfully after Stage 9 export changes.
 
 ### Stage 10: Calibration And Validation Against Data
 

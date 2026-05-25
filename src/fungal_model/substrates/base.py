@@ -9,10 +9,12 @@ the relevant stage has been validated.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Iterable, Literal
 
+from fungal_model.chemistry.thermodynamics import GibbsFreeEnergyEstimate
 from fungal_model.core.assumptions import Assumption
-from fungal_model.core.parameters import ParameterSet
+from fungal_model.core.parameters import Parameter, ParameterSet
+from fungal_model.core.units import Q_, UnitError
 
 CompletenessLevel = Literal["experimental", "partial", "placeholder"]
 PhysicalState = Literal["dissolved", "solid_polymer", "solid_biomass", "mixed_solid", "unknown"]
@@ -22,6 +24,95 @@ DegradationModelPreference = Literal[
     "reaction_diffusion",
     "unknown",
 ]
+
+
+@dataclass(frozen=True)
+class SubstrateParameterSpec:
+    """Expected units and meaning for one substrate physical parameter."""
+
+    symbol: str
+    name: str
+    units: str
+    notes: str
+
+
+def make_unknown_substrate_parameter(
+    spec: SubstrateParameterSpec,
+    *,
+    substrate_name: str,
+    stage_notes: str,
+) -> Parameter:
+    """Create a provenance-backed explicitly unknown substrate parameter."""
+
+    return Parameter(
+        name=spec.name,
+        symbol=spec.symbol,
+        value=None,
+        units=spec.units,
+        uncertainty=None,
+        source=(
+            f"Not provided; explicitly marked unknown by {substrate_name} "
+            "substrate construction."
+        ),
+        confidence_level="unknown",
+        notes=f"{stage_notes} {spec.notes}".strip(),
+        measurement_method=None,
+    )
+
+
+def make_substrate_parameter_set(
+    specs: Iterable[SubstrateParameterSpec],
+    *,
+    substrate_name: str,
+    stage_notes: str,
+    overrides: Iterable[Parameter] | None = None,
+) -> ParameterSet:
+    """Create a parameter set with unknown defaults and unit-checked overrides."""
+
+    spec_by_symbol = {spec.symbol: spec for spec in specs}
+    parameters = {
+        symbol: make_unknown_substrate_parameter(
+            spec,
+            substrate_name=substrate_name,
+            stage_notes=stage_notes,
+        )
+        for symbol, spec in spec_by_symbol.items()
+    }
+    for override in overrides or ():
+        try:
+            spec = spec_by_symbol[override.symbol]
+        except KeyError as exc:
+            raise KeyError(
+                f"{override.symbol!r} is not a recognized {substrate_name} parameter symbol."
+            ) from exc
+        try:
+            Q_(1, override.units).to(spec.units)
+        except Exception as exc:
+            raise UnitError(
+                f"{substrate_name} parameter {override.symbol} must use units "
+                f"compatible with {spec.units}."
+            ) from exc
+        parameters[override.symbol] = override
+    return ParameterSet(parameters.values())
+
+
+def validate_substrate_parameter_units(
+    parameters: ParameterSet,
+    specs: Iterable[SubstrateParameterSpec],
+    *,
+    substrate_name: str,
+) -> None:
+    """Validate that a substrate parameter set contains expected unit dimensions."""
+
+    for spec in specs:
+        parameter = parameters.get(spec.symbol)
+        try:
+            Q_(1, parameter.units).to(spec.units)
+        except Exception as exc:
+            raise UnitError(
+                f"{substrate_name} parameter {spec.symbol} must use units "
+                f"compatible with {spec.units}."
+            ) from exc
 
 
 @dataclass(frozen=True)
@@ -63,6 +154,8 @@ class Substrate:
     assumptions: tuple[Assumption, ...] = field(default_factory=tuple)
     completeness: CompletenessLevel = "placeholder"
     default_degradation_model: DegradationModelPreference = "unknown"
+    water_activity_dependence: str = "unknown"
+    thermodynamic_data: tuple[GibbsFreeEnergyEstimate, ...] = field(default_factory=tuple)
     notes: str = ""
     references: tuple[str, ...] = field(default_factory=tuple)
 
@@ -78,6 +171,16 @@ class Substrate:
             allow_unsourced_for_testing=allow_unsourced_for_testing,
             require_values=require_parameter_values,
         )
+        for estimate in self.thermodynamic_data:
+            estimate.validate(
+                allow_unsourced_for_testing=allow_unsourced_for_testing,
+                require_value=require_parameter_values,
+            )
+
+    def parameter(self, symbol: str) -> Parameter:
+        """Return a named physical parameter for this substrate."""
+
+        return self.parameters.get(symbol)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -94,6 +197,10 @@ class Substrate:
             "assumptions": [assumption.to_dict() for assumption in self.assumptions],
             "completeness": self.completeness,
             "default_degradation_model": self.default_degradation_model,
+            "water_activity_dependence": self.water_activity_dependence,
+            "thermodynamic_data": [
+                estimate.to_dict() for estimate in self.thermodynamic_data
+            ],
             "notes": self.notes,
             "references": list(self.references),
         }
@@ -105,4 +212,8 @@ __all__ = [
     "DegradationProduct",
     "PhysicalState",
     "Substrate",
+    "SubstrateParameterSpec",
+    "make_substrate_parameter_set",
+    "make_unknown_substrate_parameter",
+    "validate_substrate_parameter_units",
 ]

@@ -18,6 +18,7 @@ basic kinetics layer:
 - stoichiometric and thermodynamic metadata interfaces,
 - carbon conservation, oxygen limitation, and biomass-yield validation checks,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
+- universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
 - a PET surface-hydrolysis benchmark example.
@@ -58,7 +59,7 @@ Each example saves a plot, simulation record, validation report, and assumptions
 
 ## Current Limitations
 
-- Only well-mixed ODE systems are supported.
+- Well-mixed ODE systems and an initial 1D reaction-diffusion engine are supported.
 - Michaelis-Menten kinetics currently means homogeneous dissolved-substrate kinetics only.
 - PET surface hydrolysis currently uses a minimal equilibrium Langmuir coverage model with constant accessible surface area.
 - PET product release is represented as a lumped mass-equivalent hydrolysate in the Stage 4 example, not resolved MHET/BHET/TPA/EG chemistry.
@@ -70,6 +71,8 @@ Each example saves a plot, simulation record, validation report, and assumptions
 - Gibbs free energy values are metadata with provenance; full thermodynamic feasibility constraints are not yet enforced by the solver.
 - Spatial modelling is currently 1D finite-volume method-of-lines only.
 - Stage 8 diffusion fields are unit-aware, but geometry is a simple uniform 1D grid; 2D, variable geometry, and true volume/area coupling are not implemented.
+- PET is the only substrate marked `partial`; cellulose, lignin, starch, and chitin are Stage 9 `placeholder` metadata classes with unknown physical parameters and no default degradation model.
+- Universal substrate modules record bond classes, required enzyme classes, and product classes, but they do not implement substrate-specific kinetics, accessibility models, thermodynamic constraints, or assimilation evidence.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.
