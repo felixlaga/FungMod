@@ -10,10 +10,11 @@ basic kinetics layer:
 - a generic deterministic ODE reaction engine,
 - non-negativity, mass-balance, and limiting-case validation helpers,
 - homogeneous dissolved-substrate Michaelis-Menten rate laws,
+- PET substrate metadata with explicit unknown physical parameters,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
 
-It does not yet implement PET, surface-limited polymer hydrolysis, fungal growth, enzyme secretion, spatial transport, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
+It does not yet implement PET hydrolysis kinetics, surface-limited polymer reaction rates, fungal growth, enzyme secretion, spatial transport, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
 
 ## Scientific Philosophy
 
@@ -44,6 +45,7 @@ Each example saves a plot, simulation record, validation report, and assumptions
 
 - Only well-mixed ODE systems are supported.
 - Michaelis-Menten kinetics currently means homogeneous dissolved-substrate kinetics only.
+- PET is currently a substrate metadata object only. It defaults to a heterogeneous surface-degradation modelling preference, but Stage 4 kinetics are not implemented yet.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.

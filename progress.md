@@ -13,9 +13,9 @@ Status key:
 
 ## Current Deliverable
 
-Goal: implement Stage 2 basic enzyme kinetics on top of the validated Stage 0/1 foundation.
+Goal: implement Stage 3 PET substrate metadata on top of the validated Stage 0-2 foundation.
 
-Current status: `complete` for Stage 2 basic enzyme kinetics.
+Current status: `complete` for Stage 3 PET substrate metadata.
 
 Implemented:
 
@@ -48,6 +48,12 @@ Implemented:
 - Stage 2 benchmark example:
   - `examples/02_homogeneous_michaelis_menten.py`
   - dissolved toy substrate `S -> P`.
+- Stage 3 substrate metadata:
+  - generic `Substrate` and `DegradationProduct` interfaces.
+  - `PETSubstrate` with required PET identity, geometry type, degradation products, and provenance-backed material parameters.
+  - explicit default preference for heterogeneous surface modelling.
+  - explicit unknown defaults for density, crystallinity, amorphous fraction, surface area, geometry size, roughness, and accessible surface area.
+  - derived accessible-area helper for metadata bookkeeping only.
 - Tests:
   - parameter provenance and unknown values
   - unit compatibility
@@ -58,11 +64,12 @@ Implemented:
   - limiting-case suite
   - simulation record serialization.
   - Michaelis-Menten low-substrate, high-substrate, zero-substrate, zero-enzyme, unit, and ODE-engine behavior.
+  - PET identity, default model preference, unknown parameters, degradation products, unit checks, fraction validation, roughness validation, and accessible-area derivation.
 
 Validation status:
 
 - Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 24 tests passed.
+- Result: 34 tests passed.
 - Verified examples:
   - `.venv/bin/python examples/01_first_order_reaction.py`
   - `.venv/bin/python examples/02_homogeneous_michaelis_menten.py`
@@ -146,13 +153,43 @@ Remaining:
 
 ### Stage 3: PET Substrate Module
 
-Status: `not started`
+Status: `complete`
 
 Plan:
 
 - Implement PET substrate properties.
 - Represent crystallinity, amorphous fraction, geometry, surface area, roughness, and degradation products.
 - Default PET to heterogeneous surface treatment, not dissolved-substrate kinetics.
+
+Implemented:
+
+- `src/fungal_model/substrates/base.py`
+- `src/fungal_model/substrates/pet.py`
+- `PETSubstrate` records:
+  - polymer type
+  - repeating unit
+  - dominant cleavable bond type
+  - density
+  - crystallinity
+  - amorphous fraction
+  - surface area
+  - geometry type
+  - thickness
+  - particle size
+  - roughness factor
+  - accessible surface area
+  - degradation products
+  - limitations and references.
+- PET defaults:
+  - `physical_state="solid_polymer"`
+  - `default_degradation_model="heterogeneous_surface"`
+  - `is_dissolved_by_default=False`
+  - numeric material parameters default to explicit unknown `Parameter` objects.
+- `tests/test_pet_substrate.py`
+
+Remaining:
+
+- Stage 4 must implement actual surface-limited PET hydrolysis. Stage 3 only supplies metadata and derived accessible-area bookkeeping.
 
 ### Stage 4: Surface-Limited PET Hydrolysis
 

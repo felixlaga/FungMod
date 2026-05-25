@@ -1,2 +1,12 @@
-"""Substrate definitions. PET and biological substrates are intentionally not implemented yet."""
+"""Substrate definitions."""
 
+from .base import DegradationProduct, Substrate
+from .pet import PETSubstrate, make_pet_parameter_set, pet_surface_assumption
+
+__all__ = [
+    "DegradationProduct",
+    "PETSubstrate",
+    "Substrate",
+    "make_pet_parameter_set",
+    "pet_surface_assumption",
+]
