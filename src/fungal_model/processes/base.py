@@ -105,16 +105,26 @@ class Process:
     def __post_init__(self) -> None:
         _validate_identifier(self.name, field_name="Process.name")
         _validate_identifier(self.process_type, field_name=f"Process({self.name}).process_type")
-        self._validate_unique_specs(
-            self.required_state_variables + self.changed_state_variables,
-            attribute="name",
-            collection_name="state variable",
+        self._validate_state_specs_compatible(
+            self.required_state_variables + self.changed_state_variables
         )
         self._validate_unique_specs(
             self.required_parameters,
             attribute="symbol",
             collection_name="parameter requirement",
         )
+
+    @staticmethod
+    def _validate_state_specs_compatible(specs: tuple[StateVariableSpec, ...]) -> None:
+        units_by_name: dict[str, str] = {}
+        for spec in specs:
+            previous_units = units_by_name.get(spec.name)
+            if previous_units is not None and previous_units != spec.units:
+                raise InvalidMechanismError(
+                    f"State variable {spec.name} has conflicting units: "
+                    f"{previous_units} and {spec.units}."
+                )
+            units_by_name[spec.name] = spec.units
 
     @staticmethod
     def _validate_unique_specs(

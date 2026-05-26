@@ -14,11 +14,37 @@ from .base import (
     StateVariableSpec,
     ValidityDomain,
 )
+from .homogeneous import (
+    FirstOrderDecayProcess,
+    HomogeneousMichaelisMentenProcess,
+    MassActionProcess,
+    homogeneous_process_assumption,
+)
 from .registry import MissingProcessIssue, ProcessRegistry
+from .surface import (
+    AccessibleSitePool,
+    AccessibleSurfaceAreaModel,
+    BondCleavageProcess,
+    EquilibriumSurfaceCoverageModel,
+    LangmuirAdsorptionModel,
+    ProductReleaseMap,
+    SurfaceCatalysisModel,
+    SurfaceCatalysisProcess,
+    surface_catalysis_assumption,
+    surface_catalysis_rate,
+)
 
 __all__ = [
+    "AccessibleSitePool",
+    "AccessibleSurfaceAreaModel",
     "AssembledModel",
     "AssemblyReport",
+    "BondCleavageProcess",
+    "EquilibriumSurfaceCoverageModel",
+    "FirstOrderDecayProcess",
+    "HomogeneousMichaelisMentenProcess",
+    "LangmuirAdsorptionModel",
+    "MassActionProcess",
     "MissingProcessIssue",
     "ModelAssemblyContext",
     "ModelBuilder",
@@ -27,6 +53,12 @@ __all__ = [
     "Process",
     "ProcessMatch",
     "ProcessRegistry",
+    "ProductReleaseMap",
     "StateVariableSpec",
+    "SurfaceCatalysisModel",
+    "SurfaceCatalysisProcess",
     "ValidityDomain",
+    "homogeneous_process_assumption",
+    "surface_catalysis_assumption",
+    "surface_catalysis_rate",
 ]

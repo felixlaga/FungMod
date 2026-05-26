@@ -55,6 +55,7 @@ from fungal_model.fungi import (
     make_fungal_parameter_set,
 )
 from fungal_model.kinetics.surface_kinetics import PETSurfaceHydrolysisRateLaw
+from fungal_model.results import SimulationResult as StandardSimulationResult
 from fungal_model.substrates.pet import PETSubstrate, make_pet_parameter_set
 
 
@@ -485,6 +486,12 @@ def run(output_dir: Path = ROOT / "outputs" / "example_05_fungal_enzyme_secretio
         json.dumps([assumption.to_dict() for assumption in result.assumptions], indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    StandardSimulationResult.from_ode_result(
+        result,
+        validation_results=validations,
+        name="example_05_fungal_enzyme_secretion_and_growth",
+        label="toy",
+    ).save(output_dir)
 
     time_seconds = result.time.to("second").magnitude
     fig, axes = plt.subplots(3, 1, figsize=(7, 8), sharex=True)

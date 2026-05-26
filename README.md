@@ -21,6 +21,14 @@ basic kinetics layer:
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - least-squares calibration utilities with train/validation residual reporting,
 - Monte Carlo uncertainty propagation and local sensitivity analysis,
+- process-centered assembly scaffolding with structured missing-process,
+  missing-parameter, and incompatible-unit reports,
+- a standardized result/export object that writes reports, CSV tables, logs,
+  and figures,
+- generic homogeneous process classes for first-order, mass-action, and
+  Michaelis-Menten benchmark models,
+- generic surface adsorption/catalysis process components that can run with PET
+  or a dummy non-PET substrate,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
 - a PET surface-hydrolysis benchmark example.
@@ -83,6 +91,13 @@ Each example saves a plot, simulation record, validation report, and assumptions
 - Universal substrate modules record bond classes, required enzyme classes, and product classes, but they do not implement substrate-specific kinetics, accessibility models, thermodynamic constraints, or assimilation evidence.
 - Calibration utilities are generic least-squares tools; no literature data are bundled and no parameters are calibrated by default.
 - Monte Carlo and local sensitivity utilities require explicit uncertainty/perturbation specifications; Bayesian calibration and global sensitivity are not implemented.
+- The process-centered `ModelBuilder` currently assembles and reports process
+  requirements, but process-native solver execution is not implemented yet.
+- The standardized `results.SimulationResult` wraps existing ODE/spatial
+  results; future milestones should make it the native solver output.
+- Generic surface catalysis now exists, and PET composes it through a PET
+  accessibility adapter, but resolved PET product chemistry and dynamic
+  morphology remain future work.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.

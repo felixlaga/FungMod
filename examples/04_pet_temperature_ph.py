@@ -34,6 +34,7 @@ from fungal_model.core.validators import validate_mass_balance, validate_non_neg
 from fungal_model.kinetics.arrhenius import ArrheniusReferenceTemperatureScaler
 from fungal_model.kinetics.ph import GaussianPHActivityProfile
 from fungal_model.kinetics.surface_kinetics import PETSurfaceHydrolysisRateLaw
+from fungal_model.results import SimulationResult as StandardSimulationResult
 from fungal_model.substrates.pet import PETSubstrate, make_pet_parameter_set
 
 
@@ -266,6 +267,12 @@ def run(output_dir: Path = ROOT / "outputs" / "example_04_pet_temperature_ph") -
         json.dumps([assumption.to_dict() for assumption in result.assumptions], indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    StandardSimulationResult.from_ode_result(
+        result,
+        validation_results=validations,
+        name="example_04_pet_temperature_ph",
+        label="toy",
+    ).save(output_dir, mass_balance_weights={"PET": 1.0, "hydrolysate": 1.0})
 
     time_seconds = result.time.to("second").magnitude
     plt.figure(figsize=(7, 4))

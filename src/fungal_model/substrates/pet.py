@@ -21,6 +21,7 @@ from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.provenance import UnknownParameterError
 from fungal_model.core.units import Q_, Quantity, UnitError, assert_compatible
+from fungal_model.processes.surface import ProductReleaseMap
 from fungal_model.substrates.base import DegradationProduct, Substrate
 
 PETGeometryType = Literal["film", "powder", "fiber", "bead", "unknown"]
@@ -407,9 +408,58 @@ class PETSubstrate(Substrate):
         return data
 
 
+@dataclass(frozen=True)
+class PETAccessibleSurfaceAreaModel:
+    """PET-specific accessibility model used by generic surface processes."""
+
+    pet: PETSubstrate
+    name: str = "PET accessible surface area"
+
+    @property
+    def assumptions(self) -> tuple[Assumption, ...]:
+        return self.pet.assumptions
+
+    def required_parameters(self) -> tuple[object, ...]:
+        """PET parameters are validated on the substrate, not duplicated here."""
+
+        return ()
+
+    def accessible_area(self, parameters: ParameterSet | None = None) -> Quantity:
+        del parameters
+        return self.pet.require_accessible_surface_area()
+
+    def to_dict(self) -> dict[str, object]:
+        area = self.pet.accessible_surface_area()
+        return {
+            "name": self.name,
+            "substrate": self.pet.name,
+            "area": None if area is None else {"value": area.magnitude, "units": str(area.units)},
+            "notes": "PET-specific accessibility is supplied to generic surface processes by composition.",
+        }
+
+
+def pet_product_release_map(
+    *,
+    substrate_state: str = "PET",
+    product_state: str = "hydrolysate",
+) -> ProductReleaseMap:
+    """Return the current PET mass-equivalent benchmark product map."""
+
+    return ProductReleaseMap.one_to_one(
+        substrate_state=substrate_state,
+        product_state=product_state,
+        notes=(
+            "Current PET integration uses a lumped mass-equivalent hydrolysate "
+            "state for benchmark conservation checks; resolved MHET/BHET/TPA/EG "
+            "stoichiometry remains future work."
+        ),
+    )
+
+
 __all__ = [
     "MINIMUM_ROUGHNESS_FACTOR",
     "PETGeometryType",
+    "PETAccessibleSurfaceAreaModel",
     "PETSubstrate",
     "PET_PARAMETER_NAMES",
     "PET_PARAMETER_UNITS",
@@ -417,5 +467,6 @@ __all__ = [
     "ZERO_FRACTION",
     "default_pet_degradation_products",
     "make_pet_parameter_set",
+    "pet_product_release_map",
     "pet_surface_assumption",
 ]

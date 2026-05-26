@@ -25,6 +25,134 @@ Current active milestone: **Milestone 1: Process base classes**.
 
 Status: `complete` for the Milestone 1 skeleton scope.
 
+Most recently completed milestone: **Milestone 2: Generic result object**.
+
+Milestone 2 status: `complete` for the first standardized result/export scope.
+
+Completed in Milestone 2:
+
+- Added `src/fungal_model/results/result.py`.
+- Added `src/fungal_model/results/__init__.py`.
+- Exposed roadmap `SimulationResult` from top-level `fungal_model`.
+- Added a standard result wrapper that can be built from:
+  - existing well-mixed ODE results;
+  - existing 1D reaction-diffusion results.
+- Added state and rate accessors:
+  - `state(name)`
+  - `rate(name)`
+- Added validation attachment and validation report export.
+- Added plot methods:
+  - `plot_state`
+  - `plot_states`
+  - `plot_rates`
+  - `plot_mass_balance`
+- Added standardized output saving:
+  - `record.json`
+  - `model_assembly_report.json`
+  - `assumptions.json`
+  - `parameters.csv`
+  - `validation_report.json`
+  - `solver_report.json`
+  - `state_trajectories.csv`
+  - `process_rates.csv`
+  - `derived_quantities.csv`
+  - `figures/state_trajectories.png`
+  - `figures/process_rates.png`
+  - optional `figures/mass_balance.png`
+  - `logs/warnings.txt`
+  - `logs/provenance_report.md`
+- Updated examples 01-06 to save standardized result outputs while preserving
+  their existing legacy files and plots.
+- Added `tests/test_results.py`.
+
+Milestone 2 verification:
+
+- `./.venv/bin/python -m pytest tests/test_results.py tests/test_simulation_record.py`
+- Result: 4 passed.
+- Re-ran examples 01-06 successfully.
+
+Most recently completed milestone: **Milestone 3: Generic homogeneous kinetics**.
+
+Milestone 3 status: `complete` for the first generic homogeneous process scope.
+
+Completed in Milestone 3:
+
+- Added `src/fungal_model/processes/homogeneous.py`.
+- Added generic homogeneous process classes:
+  - `FirstOrderDecayProcess`
+  - `MassActionProcess`
+  - `HomogeneousMichaelisMentenProcess`
+- Added `homogeneous_process_assumption`.
+- Added `as_reaction()` adapters so the new process classes can run through the
+  existing ODE `SimulationEngine` before the future process solver exists.
+- Updated process and top-level package exports.
+- Migrated examples 01 and 02 to build reactions from generic homogeneous
+  process classes.
+- Added `tests/test_homogeneous_processes.py`.
+
+Milestone 3 behavior now available:
+
+- First-order homogeneous decay/product formation can be declared as a generic
+  process and converted into a runnable `Reaction`.
+- Generic mass-action processes check state units and rate units.
+- Generic homogeneous Michaelis-Menten processes support:
+  - classic `Vmax * S / (Km + S)`;
+  - enzyme-explicit `kcat * E * S / (Km + S)`;
+  - required parameter declarations for model assembly.
+- Homogeneous process assumptions stay generic and do not mention PET.
+
+Milestone 3 verification:
+
+- `./.venv/bin/python -m pytest tests/test_homogeneous_processes.py tests/test_michaelis_menten.py tests/test_reaction_engine.py`
+- Result: 16 passed.
+- Re-ran examples 01 and 02 successfully after migration.
+
+Most recently completed milestone: **Milestone 4: Generic surface process refactor**.
+
+Milestone 4 status: `complete` for the first generic surface-process scope.
+
+Completed in Milestone 4:
+
+- Added `src/fungal_model/processes/surface.py`.
+- Added generic surface process components:
+  - `AccessibleSitePool`
+  - `AccessibleSurfaceAreaModel`
+  - `LangmuirAdsorptionModel`
+  - `EquilibriumSurfaceCoverageModel`
+  - `SurfaceCatalysisModel`
+  - `ProductReleaseMap`
+  - `SurfaceCatalysisProcess`
+  - `BondCleavageProcess` alias
+  - `surface_catalysis_rate`
+- Added `PETAccessibleSurfaceAreaModel` to `src/fungal_model/substrates/pet.py`.
+- Added `pet_product_release_map` for the current mass-equivalent PET benchmark.
+- Refactored `PETSurfaceHydrolysisRateLaw` so no-modifier PET surface
+  hydrolysis delegates to a generic `SurfaceCatalysisProcess`.
+- Kept environmental PET scaling working by applying temperature/pH modifiers
+  around the generic `surface_catalysis_rate`.
+- Updated process, substrate, and top-level exports.
+- Added `tests/test_generic_surface_processes.py`.
+- Updated `README.md` with the new roadmap capabilities and limitations.
+
+Milestone 4 behavior now available:
+
+- A generic surface catalysis process can run a dummy non-PET solid substrate.
+- Generic surface modules do not import PET-specific modules.
+- PET exposes accessibility and product-release composition pieces instead of
+  making the generic surface machinery live inside PET.
+- PET can still run through the existing `PETSurfaceHydrolysisRateLaw` API.
+- PET can also expose its generic composed process through
+  `PETSurfaceHydrolysisRateLaw.as_generic_process()`.
+- Missing PET accessible surface area still fails honestly.
+- The PET mass-equivalent benchmark product map can be checked for mass
+  conservation.
+
+Milestone 4 verification:
+
+- `./.venv/bin/python -m pytest tests/test_generic_surface_processes.py tests/test_surface_pet.py tests/test_environmental_modifiers.py`
+- Result: 26 passed.
+- Re-ran examples 03-06 successfully after the generic surface refactor.
+
 Completed in this slice:
 
 - Added structured assembly errors in `src/fungal_model/core/errors.py`:
@@ -478,48 +606,64 @@ Remaining future expansion:
 
 ### Milestone 2: Generic result object
 
-Status: `not started` for the roadmap version.
+Status: `complete` for the first standardized result/export scope.
 
-Existing related work:
+Implemented:
 
-- `SimulationResult` exists for the current ODE engine.
-- `ReactionDiffusionResult1D` exists for the current spatial engine.
+- `src/fungal_model/results/result.py`
+- `src/fungal_model/results/__init__.py`
+- standardized `results.SimulationResult`
+- ODE and reaction-diffusion wrapper constructors
+- report/table/log/figure export
+- result-generated plots
+- tests in `tests/test_results.py`
 
 Still required:
 
-- first-class result module under `results/`;
-- standard save/export methods;
-- standard plotting methods generated from result objects;
-- standard output folder structure;
-- validation report integration across model types.
+- make the roadmap result object the native output of all solvers rather than
+  a wrapper around current solver results;
+- add specialized plots for carbon, oxygen, spatial profiles, uncertainty
+  bands, and calibration diagnostics.
 
 ### Milestone 3: Generic homogeneous kinetics
 
-Status: `partial`.
+Status: `complete` for the first generic homogeneous process scope.
 
-Existing related work:
+Implemented:
 
-- Homogeneous Michaelis-Menten functions and rate-law classes exist.
+- `HomogeneousMichaelisMentenProcess`
+- `MassActionProcess`
+- `FirstOrderDecayProcess`
+- `as_reaction()` adapters for current ODE engine execution
+- examples 01 and 02 migrated to generic process classes
+- tests in `tests/test_homogeneous_processes.py`
 
 Still required:
 
-- `HomogeneousMichaelisMentenProcess`;
-- `MassActionProcess`;
-- `FirstOrderDecayProcess`;
-- migration of old examples to generic process architecture.
+- native process solver execution through `AssembledModel.run()`;
+- richer process-rate recording from homogeneous processes.
 
 ### Milestone 4: Generic surface process refactor
 
-Status: `not started`.
+Status: `complete` for the first generic surface-process scope.
 
-Still required:
+Implemented:
 
 - generic adsorption model in process form;
 - generic surface catalysis/bond cleavage process;
 - accessible site/surface model;
 - product release map;
+- PET accessibility adapter;
 - PET migration to generic process composition;
 - dummy non-PET substrate surface test.
+
+Still required:
+
+- dynamic adsorption/desorption states;
+- resolved PET product maps beyond the current mass-equivalent benchmark;
+- dynamic morphology/accessibility evolution;
+- full entity compatibility matching for enzyme class, target bond, substrate,
+  environment, and geometry.
 
 ### Milestone 5: Environment object and modifiers
 
@@ -642,4 +786,4 @@ Current focused verification:
 
 Current full-suite verification:
 
-- 2026-05-26: full test suite passed with 108 tests.
+- 2026-05-26: full test suite passed with 123 tests after Milestones 2-4.

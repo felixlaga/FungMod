@@ -25,12 +25,12 @@ os.environ.setdefault("MPLCONFIGDIR", str(MPL_CACHE))
 
 import matplotlib.pyplot as plt
 
-from fungal_model.chemistry.reactions import Reaction
-from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.simulation import SimulationEngine, SimulationRecord
 from fungal_model.core.units import Q_
 from fungal_model.core.validators import validate_mass_balance, validate_non_negative
+from fungal_model.processes import FirstOrderDecayProcess
+from fungal_model.results import SimulationResult as StandardSimulationResult
 
 
 def build_engine() -> SimulationEngine:
@@ -49,33 +49,20 @@ def build_engine() -> SimulationEngine:
             )
         ]
     )
-    assumption = Assumption(
-        name="closed well-mixed first-order benchmark",
-        description="A converts irreversibly to B with rate k[A] in a closed homogeneous system.",
-        justification="Minimal model for testing ODE integration, dimensional consistency, and mass conservation.",
-        known_limitations="Not a PET, enzyme, or fungal mechanism; should not be interpreted biologically.",
-        source="Canonical first-order kinetics derivation.",
-    )
-
-    def rate_law(state, time, parameter_set):
-        del time
-        return parameter_set.require_quantity("k", "1 / second") * state["A"]
-
-    reaction = Reaction(
+    process = FirstOrderDecayProcess(
         name="A to B first-order benchmark",
-        reactants={"A": 1.0},
-        products={"B": 1.0},
-        rate_law=rate_law,
-        rate_units="mole / liter / second",
-        assumptions=[assumption],
+        substrate_state="A",
+        product_state="B",
+        rate_constant_symbol="k",
+        state_units="mole / liter",
         source="Canonical first-order kinetics derivation.",
         notes="Benchmark reaction for Stage 1 only.",
     )
     return SimulationEngine(
-        reactions=[reaction],
+        reactions=[process.as_reaction()],
         parameters=parameters,
         species_units={"A": "mole / liter", "B": "mole / liter"},
-        assumptions=[assumption],
+        assumptions=list(process.assumptions),
     )
 
 
@@ -103,6 +90,12 @@ def run(output_dir: Path = ROOT / "outputs" / "example_01_first_order") -> None:
         json.dumps([assumption.to_dict() for assumption in result.assumptions], indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    StandardSimulationResult.from_ode_result(
+        result,
+        validation_results=validations,
+        name="example_01_first_order",
+        label="toy",
+    ).save(output_dir, mass_balance_weights={"A": 1.0, "B": 1.0})
 
     time_seconds = result.time.to("second").magnitude
     plt.figure(figsize=(7, 4))

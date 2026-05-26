@@ -19,16 +19,25 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-import numpy as np
-
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.provenance import UnknownParameterError
-from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
+from fungal_model.core.units import Q_, Quantity, assert_compatible
 from fungal_model.kinetics.arrhenius import ArrheniusReferenceTemperatureScaler
-from fungal_model.kinetics.langmuir import langmuir_surface_coverage
 from fungal_model.kinetics.ph import GaussianPHActivityProfile
-from fungal_model.substrates.pet import PETSubstrate
+from fungal_model.processes.surface import (
+    AccessibleSitePool,
+    LangmuirAdsorptionModel,
+    ProductReleaseMap,
+    SurfaceCatalysisModel,
+    SurfaceCatalysisProcess,
+    surface_catalysis_rate,
+)
+from fungal_model.substrates.pet import (
+    PETAccessibleSurfaceAreaModel,
+    PETSubstrate,
+    pet_product_release_map,
+)
 
 
 def pet_surface_hydrolysis_assumption() -> Assumption:
@@ -56,16 +65,6 @@ def pet_surface_hydrolysis_assumption() -> Assumption:
     )
 
 
-def _ensure_non_negative(quantity: Quantity, name: str) -> None:
-    if np.any(np.asarray(quantity.magnitude, dtype=float) < 0):
-        raise ValueError(f"{name} must be non-negative.")
-
-
-def _is_zero_or_negative(quantity: Quantity) -> bool:
-    values = np.asarray(quantity.magnitude, dtype=float)
-    return bool(np.all(values <= 0))
-
-
 def surface_hydrolysis_rate(
     *,
     free_enzyme: Quantity,
@@ -75,33 +74,16 @@ def surface_hydrolysis_rate(
     pet_mass: Quantity | None = None,
     rate_units: str | None = None,
 ) -> Quantity:
-    """Compute PET surface hydrolysis rate with dimensional checks."""
+    """Compute PET surface hydrolysis rate through generic surface catalysis."""
 
-    enzyme = require_quantity(free_enzyme, name="free_enzyme")
-    accessible_area = require_quantity(
-        accessible_surface_area,
-        name="accessible_surface_area",
-    )
-    surface_rate_constant = require_quantity(
-        surface_hydrolysis_rate_constant,
-        name="surface_hydrolysis_rate_constant",
-    )
-    _ensure_non_negative(enzyme, "free_enzyme")
-    _ensure_non_negative(accessible_area, "accessible_surface_area")
-    _ensure_non_negative(surface_rate_constant, "surface_hydrolysis_rate_constant")
-
-    coverage = langmuir_surface_coverage(
-        free_enzyme=enzyme,
+    return surface_catalysis_rate(
+        free_enzyme=free_enzyme,
         adsorption_equilibrium_constant=adsorption_equilibrium_constant,
+        accessible_surface_area=accessible_surface_area,
+        surface_catalysis_rate_constant=surface_hydrolysis_rate_constant,
+        substrate_amount=pet_mass,
+        rate_units=rate_units,
     )
-    rate = surface_rate_constant * coverage * accessible_area
-    if pet_mass is not None:
-        mass = require_quantity(pet_mass, name="pet_mass")
-        if _is_zero_or_negative(mass):
-            rate = rate * Q_(0.0, "dimensionless")
-    if rate_units is not None:
-        return assert_compatible(rate, rate_units, name="PET surface hydrolysis rate")
-    return rate
 
 
 @dataclass(frozen=True)
@@ -134,6 +116,41 @@ class PETSurfaceHydrolysisRateLaw:
             assumptions.extend(self.ph_profile.assumptions)
         return assumptions
 
+    def as_generic_process(self, product_state: str = "hydrolysate") -> SurfaceCatalysisProcess:
+        """Return the generic surface-catalysis process used by this PET adapter."""
+
+        enzyme_units = self.enzyme_units or "mole / liter"
+        return SurfaceCatalysisProcess(
+            name="PET surface hydrolysis through generic surface catalysis",
+            substrate_state=self.pet_mass,
+            enzyme_state=self.enzyme,
+            substrate_units="kilogram",
+            enzyme_units=enzyme_units,
+            accessible_site_pool=AccessibleSitePool(
+                name="PET accessible ester-bond surface",
+                bond_type=self.pet.dominant_cleavable_bond_type,
+                notes="PET-specific accessible surface metadata supplied to a generic surface process.",
+            ),
+            accessible_surface_model=PETAccessibleSurfaceAreaModel(self.pet),
+            adsorption_model=LangmuirAdsorptionModel(
+                adsorption_symbol=self.adsorption_symbol,
+                enzyme_units=enzyme_units,
+                source="PET adapter configured with a generic Langmuir adsorption model.",
+            ),
+            catalytic_model=SurfaceCatalysisModel(
+                surface_rate_symbol=self.surface_rate_symbol,
+                rate_units=self.rate_units,
+                source="PET adapter configured with a generic surface catalysis model.",
+            ),
+            product_release_map=pet_product_release_map(
+                substrate_state=self.pet_mass,
+                product_state=product_state,
+            ),
+            state_units={self.pet_mass: "kilogram", product_state: "kilogram", self.enzyme: enzyme_units},
+            source="PET-specific adapter composed from generic surface process components.",
+            notes="PET identity remains outside the generic process module.",
+        )
+
     def __call__(
         self,
         state: Mapping[str, Quantity],
@@ -143,6 +160,8 @@ class PETSurfaceHydrolysisRateLaw:
         del time
         enzyme = state[self.enzyme]
         enzyme_units = self.enzyme_units or str(enzyme.units)
+        if self.temperature_scaler is None and self.ph_profile is None:
+            return self.as_generic_process().rate(state, Q_(0.0, "second"), parameters)
         accessible_area = self.pet.accessible_surface_area()
         if accessible_area is None:
             raise UnknownParameterError(
