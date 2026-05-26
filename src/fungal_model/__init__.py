@@ -28,6 +28,14 @@ from fungal_model.geometry import (
     SlabGeometry,
     WellMixedGeometry,
 )
+from fungal_model.io import (
+    load_enzyme,
+    load_environment,
+    load_fungus,
+    load_geometry,
+    load_parameter_set,
+    load_substrate,
+)
 from fungal_model.modifiers import (
     OxygenModifier,
     PHModifier,
@@ -60,6 +68,7 @@ from fungal_model.processes import (
 )
 from fungal_model.results import SimulationResult
 from fungal_model.substrates.base import Substrate
+from fungal_model.workflows import PETSurfaceWorkflowConfig, run_pet_surface_integration
 
 __all__ = [
     "AssembledModel",
@@ -79,6 +88,12 @@ __all__ = [
     "HomogeneousMichaelisMentenProcess",
     "IncompatibleUnitsError",
     "InvalidMechanismError",
+    "load_enzyme",
+    "load_environment",
+    "load_fungus",
+    "load_geometry",
+    "load_parameter_set",
+    "load_substrate",
     "MassActionProcess",
     "MissingParameterError",
     "MissingProcessError",
@@ -88,6 +103,7 @@ __all__ = [
     "Parameter",
     "ParameterRequirement",
     "ParameterSet",
+    "PETSurfaceWorkflowConfig",
     "ParticleGeometry",
     "PorousMediumGeometry",
     "Process",
@@ -107,5 +123,6 @@ __all__ = [
     "ValidityDomain",
     "WaterActivityModifier",
     "WellMixedGeometry",
+    "run_pet_surface_integration",
     "__version__",
 ]

@@ -35,6 +35,14 @@ basic kinetics layer:
   inhibition modifiers,
 - compatibility checks for enzyme/substrate/bond/fungus pairings during model
   assembly,
+- a top-level notebook set that imports package code rather than redefining
+  core model logic,
+- human-editable YAML config folders for fungi, substrates, enzymes,
+  environments, geometries, parameters, and experiments,
+- schema-checked config loaders with explicit unknown-value handling,
+- a first config-driven PET surface integration workflow that assembles
+  fungus/enzyme/substrate/environment/geometry metadata through the process
+  registry and saves a full standardized output bundle,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
 - a PET surface-hydrolysis benchmark example.
@@ -79,6 +87,49 @@ python examples/stage12_06_spatial_pet_film.py
 
 Each example saves a plot, simulation record, validation report, and assumptions file under `outputs/`.
 
+## Notebooks
+
+The `notebooks/` folder contains the first roadmap notebook set:
+
+- `00_quickstart.ipynb`
+- `01_process_library_demo.ipynb`
+- `02_surface_hydrolysis_demo.ipynb`
+- `03_fungus_on_pet_demo.ipynb`
+- `04_reaction_diffusion_demo.ipynb`
+- `05_calibration_and_uncertainty_demo.ipynb`
+
+Notebook tests check that notebooks import `fungal_model`, avoid defining core
+rate laws/classes inline, and execute the quickstart smoke path.
+
+## Data And Configs
+
+Top-level YAML configs live under `data/fungi/`, `data/substrates/`,
+`data/enzymes/`, `data/environments/`, `data/geometries/`,
+`data/parameters/`, and `data/experiments/`. Loaders are exposed from
+`fungal_model` as `load_fungus`, `load_substrate`, `load_enzyme`,
+`load_environment`, `load_geometry`, and `load_parameter_set`.
+
+Configs are intentionally provenance-heavy. Top-level records and parameter
+entries must include source, measurement method, confidence, notes, validity
+range, units, and value fields. Unknown scientific values should be written as
+`value: null`; loaders preserve them as explicit unknown parameters.
+
+## Integration Workflow
+
+The first full integration workflow is available as:
+
+```python
+from fungal_model import run_pet_surface_integration
+
+result = run_pet_surface_integration("outputs/pet_surface_integration")
+```
+
+It loads the example PET film, PETase-like enzyme, toy fungus, lab environment,
+well-mixed geometry, and benchmark parameter configs; assembles the generic
+surface-catalysis process through `ModelBuilder`; runs the current ODE engine;
+validates non-negativity and mass balance; and writes standardized reports,
+tables, logs, figures, input-config snapshots, and entity JSON files.
+
 ## Current Limitations
 
 - Well-mixed ODE systems and an initial 1D reaction-diffusion engine are supported.
@@ -108,6 +159,9 @@ Each example saves a plot, simulation record, validation report, and assumptions
   slab, and porous-medium geometries are honest metadata placeholders.
 - Enzyme/fungus compatibility matching checks declared capabilities, but it
   does not yet auto-build full living-fungus ODE systems from entities.
+- The config-driven PET integration workflow is intentionally a first complete
+  slice: it still uses a lumped hydrolysate state and the current ODE adapter,
+  not native `AssembledModel.run()` execution.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.

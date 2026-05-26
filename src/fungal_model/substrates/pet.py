@@ -13,7 +13,7 @@ accidentally run a scientific PET simulation with guessed values.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Literal
+from typing import TYPE_CHECKING, Iterable, Literal
 
 import numpy as np
 
@@ -21,8 +21,10 @@ from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.provenance import UnknownParameterError
 from fungal_model.core.units import Q_, Quantity, UnitError, assert_compatible
-from fungal_model.processes.surface import ProductReleaseMap
 from fungal_model.substrates.base import DegradationProduct, Substrate
+
+if TYPE_CHECKING:
+    from fungal_model.processes.surface import ProductReleaseMap
 
 PETGeometryType = Literal["film", "powder", "fiber", "bead", "unknown"]
 
@@ -444,6 +446,8 @@ def pet_product_release_map(
     product_state: str = "hydrolysate",
 ) -> ProductReleaseMap:
     """Return the current PET mass-equivalent benchmark product map."""
+
+    from fungal_model.processes.surface import ProductReleaseMap
 
     return ProductReleaseMap.one_to_one(
         substrate_state=substrate_state,

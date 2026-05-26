@@ -21,11 +21,13 @@ Status key:
 
 ## Current Roadmap Slice
 
-Current active milestone: **Milestone 1: Process base classes**.
+Current active milestone: **Milestones 1-10 complete for the first roadmap
+implementation slice**.
 
-Status: `complete` for the Milestone 1 skeleton scope.
+Status: `complete` for the tested scope documented below. Remaining work is
+future expansion beyond the first long-term architecture pass.
 
-Most recently completed milestone: **Milestone 2: Generic result object**.
+Completed milestone: **Milestone 2: Generic result object**.
 
 Milestone 2 status: `complete` for the first standardized result/export scope.
 
@@ -71,7 +73,7 @@ Milestone 2 verification:
 - Result: 4 passed.
 - Re-ran examples 01-06 successfully.
 
-Most recently completed milestone: **Milestone 3: Generic homogeneous kinetics**.
+Completed milestone: **Milestone 3: Generic homogeneous kinetics**.
 
 Milestone 3 status: `complete` for the first generic homogeneous process scope.
 
@@ -107,7 +109,7 @@ Milestone 3 verification:
 - Result: 16 passed.
 - Re-ran examples 01 and 02 successfully after migration.
 
-Most recently completed milestone: **Milestone 4: Generic surface process refactor**.
+Completed milestone: **Milestone 4: Generic surface process refactor**.
 
 Milestone 4 status: `complete` for the first generic surface-process scope.
 
@@ -153,7 +155,7 @@ Milestone 4 verification:
 - Result: 26 passed.
 - Re-ran examples 03-06 successfully after the generic surface refactor.
 
-Most recently completed milestone: **Milestone 5: Environment object and modifiers**.
+Completed milestone: **Milestone 5: Environment object and modifiers**.
 
 Milestone 5 status: `complete` for the first environment/modifier scope.
 
@@ -192,7 +194,7 @@ Milestone 5 verification:
 - `./.venv/bin/python -m pytest tests/test_environment_modifiers.py tests/test_environmental_modifiers.py`
 - Result: 16 passed.
 
-Most recently completed milestone: **Milestone 6: Geometry abstraction**.
+Completed milestone: **Milestone 6: Geometry abstraction**.
 
 Milestone 6 status: `complete` for the first geometry abstraction scope.
 
@@ -223,7 +225,7 @@ Milestone 6 verification:
 - `./.venv/bin/python -m pytest tests/test_geometry_abstractions.py tests/test_reaction_diffusion.py`
 - Result: 11 passed.
 
-Most recently completed milestone: **Milestone 7: Fungus/enzyme/process compatibility**.
+Completed milestone: **Milestone 7: Fungus/enzyme/process compatibility**.
 
 Milestone 7 status: `complete` for the first compatibility-matching scope.
 
@@ -435,8 +437,8 @@ FungMod can:
 
 Current limitations:
 
-- Homogeneous kinetics are still exposed as rate-law classes, not as
-  `HomogeneousMichaelisMentenProcess`.
+- Homogeneous process classes can adapt to the existing ODE `Reaction` engine,
+  but `AssembledModel.run()` is still a future native process solver.
 - PET is explicitly not treated as a valid dissolved-substrate default.
 
 Core files:
@@ -461,13 +463,13 @@ FungMod can:
 
 Current limitations:
 
-- The surface hydrolysis process is still PET-specific
-  (`PETSurfaceHydrolysisRateLaw`).
-- The roadmap-required generic `SurfaceCatalysisProcess`,
-  `AccessibleSurfaceAreaModel`, `ProductReleaseMap`, and dummy non-PET surface
-  integration are not implemented yet.
-- PET product release is still represented in examples as a simplified lumped
-  hydrolysate where noted.
+- Generic surface catalysis exists and PET composes it through
+  `PETAccessibleSurfaceAreaModel`, but the workflow still executes through the
+  current ODE reaction adapter rather than a native process solver.
+- PET product release is still represented in examples and the integration
+  workflow as a simplified lumped mass-equivalent hydrolysate where noted.
+- Dynamic adsorption/desorption states, evolving morphology, and resolved
+  MHET/BHET/TPA/EG product stoichiometry remain future work.
 
 Core files:
 
@@ -524,11 +526,10 @@ FungMod can:
 
 Current limitations:
 
-- Fungi are not yet full roadmap entities with taxonomy, oxygen dependence,
-  environmental tolerance metadata, and model-builder compatibility matching.
-- Enzymes are not yet standalone roadmap entities.
+- Fungi and enzymes now participate in model-builder compatibility matching,
+  but the builder does not yet auto-generate full living-fungus ODE systems.
 - Living-fungus simulations still use existing `Reaction` rate laws rather than
-  process-registry assembly.
+  native process-registry solver execution.
 
 Core files:
 
@@ -577,8 +578,8 @@ FungMod can:
 
 Current limitations:
 
-- Geometry is not yet exposed through the roadmap's `Geometry` entity hierarchy.
-- Transport is not yet a `DiffusionProcess` assembled by `ModelBuilder`.
+- Geometry metadata is now exposed through the roadmap `Geometry` hierarchy,
+  but transport is not yet a `DiffusionProcess` assembled by `ModelBuilder`.
 - 2D/3D, porous media, advection, and dynamic surface/volume coupling are not
   implemented.
 
@@ -639,7 +640,7 @@ Core files:
 
 ### Examples
 
-Status: `partial`.
+Status: `complete` for the current runnable example set.
 
 Current examples demonstrate:
 
@@ -653,10 +654,9 @@ Current examples demonstrate:
 
 Current limitations:
 
-- Examples still use the existing solver/rate-law architecture, not the new
-  process-centered assembly system.
-- Output folders are useful but not yet standardized to the roadmap's complete
-  `outputs/run_name/` structure.
+- Examples now save standardized result outputs, but most still use the
+  existing solver/rate-law architecture rather than native process-centered
+  solver execution.
 
 Core files:
 
@@ -664,9 +664,9 @@ Core files:
 
 ### Notebooks
 
-Status: `not started`.
+Status: `complete` for the first required notebook/smoke-test scope.
 
-Required by roadmap:
+Implemented notebooks:
 
 - `notebooks/00_quickstart.ipynb`
 - `notebooks/01_process_library_demo.ipynb`
@@ -679,12 +679,15 @@ Important rule:
 
 - Notebooks must import package code and demonstrate workflows. They must not
   contain core model implementation.
+- `tests/test_notebooks.py` enforces that notebooks import `fungal_model`, do
+  not define core classes/rate laws, and the quickstart notebook can execute as
+  a smoke test.
 
 ### Data and Configuration
 
-Status: `not started` for the long-term roadmap.
+Status: `complete` for the first YAML schema/loader scope.
 
-Required top-level folders:
+Implemented top-level folders:
 
 - `data/fungi/`
 - `data/substrates/`
@@ -694,11 +697,15 @@ Required top-level folders:
 - `data/parameters/`
 - `data/experiments/`
 
-Current note:
+Current behavior:
 
-- The package has `src/fungal_model/data/README.md`, but the roadmap's
-  top-level human-editable data/config system and schema validation are not yet
-  implemented.
+- YAML configs load into `Environment`, `Enzyme`, `Fungus`, `Substrate`,
+  `Geometry`, and `ParameterSet` objects.
+- Configs require top-level provenance and parameter-level source,
+  measurement-method, confidence, notes, validity-range, units, and value
+  fields.
+- Unknown values remain explicit `value: null` inputs and become unknown
+  `Parameter` objects instead of guessed numbers.
 
 ## Long-Term Roadmap Status
 
@@ -784,81 +791,101 @@ Still required:
 
 ### Milestone 5: Environment object and modifiers
 
-Status: `partial`.
+Status: `complete` for the first environment/modifier scope.
 
-Existing related work:
+Implemented:
 
-- Arrhenius and pH modifier logic exists.
+- `Environment` entity.
+- Temperature, pH, water activity, oxygen, and product inhibition modifiers.
+- Tests in `tests/test_environment_modifiers.py`.
 
 Still required:
 
-- `Environment` entity;
-- modifiers that read from environment objects;
-- water activity, oxygen, and product inhibition modifiers in the roadmap
-  architecture;
-- modifier plots in result outputs.
+- richer modifier plots and automatic modifier selection during assembly.
 
 ### Milestone 6: Geometry abstraction
 
-Status: `partial`.
+Status: `complete` for the first geometry abstraction scope.
 
-Existing related work:
+Implemented:
 
-- 1D finite-volume grid and boundary conditions exist.
+- roadmap `Geometry` hierarchy;
+- functional well-mixed and 1D film geometry wrappers;
+- particle, slab, and porous-medium metadata placeholders;
+- tests in `tests/test_geometry_abstractions.py`.
 
 Still required:
 
-- roadmap `Geometry` hierarchy;
-- well-mixed, film, particle, slab, and porous-medium objects;
-- common model interface for well-mixed and spatial examples.
+- process-native diffusion assembly and richer geometry-specific solvers.
 
 ### Milestone 7: Fungus/enzyme/process compatibility
 
-Status: `not started` for the new registry layer.
+Status: `complete` for the first compatibility-matching scope.
 
-Existing related work:
+Implemented:
 
-- fungus metadata and enzyme profile classes exist.
+- explicit enzyme entities;
+- compatibility matching between fungus, enzyme, substrate bond, and surface
+  catalysis processes;
+- clear assembly failures for missing biological capability;
+- tests in `tests/test_enzyme_compatibility.py`.
 
 Still required:
 
-- explicit enzyme entities;
-- compatibility matching between fungus, enzyme, substrate bond, environment,
-  geometry, and process;
-- clear assembly failures for missing biological capability.
+- broader environment and geometry compatibility rules for every process type.
 
 ### Milestone 8: Notebooks
 
-Status: `not started`.
+Status: `complete` for the first required notebook/smoke-test scope.
+
+Implemented:
+
+- `/notebooks`;
+- required six notebooks;
+- notebook structure and smoke tests in `tests/test_notebooks.py`.
 
 Still required:
 
-- create `/notebooks`;
-- add required notebooks;
-- add smoke/execution tests where practical.
+- richer executed notebook snapshots as workflows mature.
 
 ### Milestone 9: Data/config schemas
 
-Status: `not started`.
+Status: `complete` for the first YAML schema/loader scope.
+
+Implemented:
+
+- YAML loaders;
+- JSON export helper;
+- schema validation;
+- example configs with provenance;
+- unknown-value handling in config files;
+- tests in `tests/test_config_io.py`.
 
 Still required:
 
-- YAML/JSON loaders;
-- schema validation;
-- example configs with provenance;
-- unknown-value handling in config files.
+- full versioned schemas and broader literature-backed config libraries.
 
 ### Milestone 10: First full integration workflow
 
-Status: `not started`.
+Status: `complete` for the first config-driven PET surface integration scope.
+
+Implemented:
+
+- `src/fungal_model/workflows/pet_surface_integration.py`;
+- one fungus/enzyme/PET/environment/geometry workflow assembled through the
+  registry and model builder;
+- standardized output folder with reports, tables, logs, figures, input
+  configs, and entity JSON snapshots;
+- validation and process-rate plots;
+- honest failure when accessible PET surface area is missing;
+- honest failure when enzyme/substrate metadata are incompatible;
+- tests in `tests/test_full_integration_workflow.py`.
 
 Still required:
 
-- one fungus/enzyme/PET/environment/geometry workflow assembled through the
-  registry and model builder;
-- full output folder;
-- validation and plots;
-- honest failure when PET parameters or processes are missing.
+- native execution through `AssembledModel.run()`;
+- resolved PET product chemistry;
+- broader living-fungus dynamics assembled from configs.
 
 ## Anti-Cheating Checklist Status
 
@@ -869,19 +896,21 @@ Implemented in current tests:
 - missing provenance fails in scientific assembly mode;
 - incompatible units fail with `IncompatibleUnitsError`;
 - generic process modules do not import PET-specific modules;
+- generic surface hydrolysis works with PET and a dummy non-PET substrate;
+- PET composes generic surface processes through a PET accessibility adapter;
+- incompatible fungus/substrate/enzyme pairings fail in model assembly;
 - non-assimilable product cannot cause biomass growth;
+- roadmap result object saves standardized files, plots, logs, and reports;
+- notebooks import from `fungal_model` and do not define core rate laws/classes;
 - zero enzyme, zero accessible surface, zero substrate, and zero PET mass checks
   exist for current PET rate-law tests;
 - high diffusion approaches well-mixed behavior in existing spatial tests.
 
 Still required:
 
-- generic surface hydrolysis works with PET and a dummy non-PET substrate;
-- PET plugin uses generic processes;
-- incompatible fungus/substrate/enzyme pairing fails in model assembly;
 - oxygen cannot be consumed if oxygen process is absent or unavailable;
-- roadmap result object saves standardized files and plots;
-- notebooks import from `fungal_model` and do not define core rate laws/classes.
+- native process-solver execution through `AssembledModel.run()`;
+- resolved product stoichiometry for PET surface hydrolysis.
 
 ## How To Verify
 
@@ -904,3 +933,122 @@ Current focused verification:
 Current full-suite verification:
 
 - 2026-05-26: full test suite passed with 141 tests after Milestones 5-7.
+- 2026-05-26: full test suite passed with 153 tests after Milestones 8-10.
+
+Completed milestone: **Milestone 8: Notebooks**.
+
+Milestone 8 status: `complete` for the first required notebook/smoke-test scope.
+
+Completed in Milestone 8:
+
+- Added top-level `/notebooks`.
+- Added required notebooks:
+  - `notebooks/00_quickstart.ipynb`
+  - `notebooks/01_process_library_demo.ipynb`
+  - `notebooks/02_surface_hydrolysis_demo.ipynb`
+  - `notebooks/03_fungus_on_pet_demo.ipynb`
+  - `notebooks/04_reaction_diffusion_demo.ipynb`
+  - `notebooks/05_calibration_and_uncertainty_demo.ipynb`
+- The quickstart notebook creates entities, assembles a generic PET surface
+  process, runs through the current ODE engine, validates, plots, and saves
+  standardized outputs.
+- Added `tests/test_notebooks.py`.
+
+Milestone 8 verification:
+
+- `./.venv/bin/python -m pytest tests/test_notebooks.py`
+- Result: 3 passed.
+
+Completed milestone: **Milestone 9: Data/config schemas**.
+
+Milestone 9 status: `complete` for the first YAML schema/loader scope.
+
+Completed in Milestone 9:
+
+- Added top-level data folders:
+  - `data/fungi/`
+  - `data/substrates/`
+  - `data/enzymes/`
+  - `data/environments/`
+  - `data/geometries/`
+  - `data/parameters/`
+  - `data/experiments/`
+- Added example configs:
+  - `data/substrates/pet_film.yml`
+  - `data/substrates/cellulose_powder.yml`
+  - `data/fungi/toy_pet_fungus.yml`
+  - `data/fungi/pleurotus_ostreatus.yml`
+  - `data/enzymes/petase_like.yml`
+  - `data/environments/lab_30C_pH7.yml`
+  - `data/geometries/well_mixed_100ml.yml`
+  - `data/geometries/pet_film_1d.yml`
+  - `data/parameters/pet_surface_benchmark.yml`
+  - `data/experiments/synthetic_pet_surface.yml`
+- Added `src/fungal_model/io/`.
+- Added schema validation in `src/fungal_model/io/schema.py`.
+- Added YAML loaders in `src/fungal_model/io/yaml_loader.py`.
+- Added JSON export helper in `src/fungal_model/io/json_export.py`.
+- Exposed loaders from top-level `fungal_model`.
+- Added `tests/test_config_io.py`.
+
+Milestone 9 behavior now available:
+
+- YAML configs must include top-level provenance fields.
+- Parameter entries must include source, measurement method, confidence level,
+  notes, validity range, units, and value.
+- Unknown values remain `value: null` and load as explicit unknown parameters.
+- Example configs can load into `Environment`, `Enzyme`, `PETSubstrate`,
+  `Fungus`, `WellMixedGeometry`, `Film1DGeometry`, and `ParameterSet`.
+
+Milestone 9 verification:
+
+- `./.venv/bin/python -m pytest tests/test_config_io.py`
+- Result: 6 passed.
+
+Most recently completed milestone: **Milestone 10: First full integration workflow**.
+
+Milestone 10 status: `complete` for the first config-driven PET surface
+integration scope.
+
+Completed in Milestone 10:
+
+- Added `src/fungal_model/workflows/pet_surface_integration.py`.
+- Added `src/fungal_model/workflows/__init__.py`.
+- Exposed `PETSurfaceWorkflowConfig` and `run_pet_surface_integration` from
+  top-level `fungal_model`.
+- The workflow loads the example configs for:
+  - PET film substrate;
+  - PETase-like enzyme;
+  - toy PET-capable fungus;
+  - lab temperature/pH environment;
+  - well-mixed geometry;
+  - PET surface benchmark parameters.
+- The workflow assembles generic surface catalysis through `ModelBuilder` and
+  `ProcessRegistry`.
+- The workflow runs the assembled process through the current ODE adapter,
+  validates non-negativity and mass balance, records process-rate trajectories,
+  and wraps the run in standardized `results.SimulationResult`.
+- The workflow saves the full standardized output folder plus:
+  - `input_configs.json`
+  - `substrate.json`
+  - `enzyme.json`
+  - `fungus.json`
+  - `environment.json`
+  - `geometry.json`
+- Added `tests/test_full_integration_workflow.py`.
+
+Milestone 10 behavior now available:
+
+- A complete config-driven PET surface run can be launched from
+  `run_pet_surface_integration(output_dir)`.
+- Missing accessible PET surface area fails before simulation with
+  `MissingParameterError` and a structured assembly report.
+- Incompatible enzyme/substrate metadata fails before simulation with
+  `InvalidMechanismError` and structured compatibility issues.
+- The saved output folder contains reports, tables, figures, logs, provenance,
+  input config references, and entity snapshots.
+
+Milestone 10 verification:
+
+- `./.venv/bin/python -m pytest tests/test_full_integration_workflow.py`
+- Result: 3 passed.
