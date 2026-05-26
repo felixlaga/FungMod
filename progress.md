@@ -1,700 +1,645 @@
 # FungMod Progress
 
-This file is the handoff ledger for the modelling framework. Update it at the
-end of each completed task or stage so a new agent can continue without
-guessing what was done, tested, or intentionally deferred.
+This is the active progress ledger for the long-term architecture roadmap in
+`FungMod_long_term_architecture_roadmap.md`.
+
+Update this file whenever a feature, test, example, notebook, or architectural
+milestone changes. The goal is that a future reader can quickly answer:
+
+- what FungMod can do today;
+- what is still only a roadmap item;
+- what scientific assumptions are implemented;
+- what failure modes are tested;
+- which examples and tests prove the current behavior.
 
 Status key:
 
-- `complete`: implemented and tested for the intended stage scope.
-- `partial`: some infrastructure exists, but the stage is not scientifically complete.
-- `not started`: no functional model layer implemented.
-- `blocked`: progress needs a dependency, decision, or data source.
+- `complete`: implemented and tested for the stated scope.
+- `partial`: useful infrastructure exists, but the roadmap stage is not fully complete.
+- `not started`: no new long-term-roadmap implementation exists yet.
+- `blocked`: implementation needs a decision, dependency, or sourced data.
 
-## Current Deliverable
+## Current Roadmap Slice
 
-Goal: complete Stages 10, 11, and 12 on top of the validated Stage 0-9 foundation.
+Current active milestone: **Milestone 1: Process base classes**.
 
-Current status: `complete` for Stages 10, 11, and 12.
+Status: `complete` for the Milestone 1 skeleton scope.
 
-Implemented:
+Completed in this slice:
 
-- `pyproject.toml` with package metadata and dependencies.
-- `src/fungal_model` package skeleton.
-- Stage 0 governance objects:
-  - `Parameter`
-  - `ParameterSet`
-  - `Assumption`
-  - `SimulationRecord`
-  - shared `pint` unit registry and unit helpers.
-- Stage 1 reaction ODE infrastructure:
-  - generic `Reaction`
-  - `SimulationEngine`
-  - `SolverSettings`
-  - unit-aware state conversion and rate-law checks.
-- Validators:
-  - non-negativity
-  - mass balance
-  - limiting-case framework.
-- Minimal benchmark example:
-  - `examples/01_first_order_reaction.py`
-  - closed first-order `A -> B` system.
-- Stage 2 homogeneous enzyme kinetics:
-  - `michaelis_menten_rate`
-  - `enzyme_explicit_michaelis_menten_rate`
-  - `MichaelisMentenRateLaw`
-  - `EnzymeExplicitMichaelisMentenRateLaw`
-  - explicit homogeneous dissolved-substrate assumption.
-- Stage 2 benchmark example:
-  - `examples/02_homogeneous_michaelis_menten.py`
-  - dissolved toy substrate `S -> P`.
-- Stage 3 substrate metadata:
-  - generic `Substrate` and `DegradationProduct` interfaces.
-  - `PETSubstrate` with required PET identity, geometry type, degradation products, and provenance-backed material parameters.
-  - explicit default preference for heterogeneous surface modelling.
-  - explicit unknown defaults for density, crystallinity, amorphous fraction, surface area, geometry size, roughness, and accessible surface area.
-  - derived accessible-area helper for metadata bookkeeping only.
-- Stage 4 surface-limited PET hydrolysis:
-  - Langmuir equilibrium surface coverage.
-  - PET surface hydrolysis rate proportional to occupied accessible surface.
-  - PET-specific `Reaction` rate-law object.
-  - explicit assumptions and limitations.
-- Stage 4 benchmark example:
-  - `examples/03_pet_surface_hydrolysis.py`
-  - fixed-enzyme PET surface hydrolysis to lumped mass-equivalent hydrolysate.
-- Stage 5 environmental modifiers:
-  - Arrhenius absolute prefactor form.
-  - Arrhenius reference-rate scaling form.
-  - universal gas constant as a sourced `Parameter`.
-  - validity-range warnings for temperature extrapolation.
-  - Gaussian pH activity profile.
-  - validity-range warnings for pH extrapolation.
-  - environmental modifier composition with `PETSurfaceHydrolysisRateLaw`.
-- Stage 5 benchmark example:
-  - `examples/04_pet_temperature_ph.py`
-  - fixed-enzyme PET surface hydrolysis with Arrhenius temperature scaling and Gaussian pH activity.
-- Stage 6 fungal layer:
-  - `Fungus` metadata object.
-  - `EnzymeProfile` and `EnzymeCapability`.
-  - complete fungal `ParameterSet` helper with unknown defaults.
-  - enzyme secretion rate `dE/dt = alpha_E * B_active`.
-  - enzyme production active-biomass cost.
-  - first-order extracellular enzyme decay.
-  - first-order active biomass maintenance loss.
-  - product assimilation evidence gate.
-  - product uptake and biomass yield helper.
-- Stage 6 benchmark example:
-  - `examples/05_fungal_enzyme_secretion_and_growth.py`
-  - active biomass secretes enzyme, pays secretion/maintenance costs, hydrolyses PET, and grows only from explicitly assimilable lumped hydrolysate.
-- Stage 7 stoichiometric and thermodynamic layer:
-  - elemental formula parsing and reaction stoichiometry metadata.
-  - carbon content metadata for state species.
-  - oxygen demand metadata for aerobic processes.
-  - Gibbs free energy estimate metadata with provenance and optional known-value checks.
-  - carbon conservation validator.
-  - oxygen limitation validator.
-  - biomass yield limit validator.
-  - Stage 7 validators added to the Stage 6 fungal benchmark validation report.
-- Stage 8 spatial layer:
-  - explicit 1D finite-volume uniform grid.
-  - explicit no-flux, fixed-value, and periodic boundary conditions.
-  - finite-volume 1D diffusion operator.
-  - spatial reaction-diffusion method-of-lines engine.
-  - spatial simulation record.
-  - spatial validators for gradient smoothing, no-flux integral conservation, and well-mixed average comparison.
-- Stage 8 benchmark example:
-  - `examples/06_spatial_pet_film_enzyme_diffusion.py`
-  - 1D PET film with fixed enzyme boundary, enzyme diffusion, and local PET surface hydrolysis.
-- Stage 9 universal substrate engine:
-  - generic substrate physical-parameter specification helper.
-  - universal substrate fields for water-activity dependence and thermodynamic metadata.
-  - explicit placeholder substrate classes for cellulose, lignin, starch, and chitin.
-  - PET remains the only `partial` substrate and keeps its heterogeneous surface-model default.
-  - cellulose, lignin, starch, and chitin expose identity, bond classes, broad enzyme-class requirements, product classes, unknown physical parameters, assumptions, limitations, and references.
-  - placeholder substrates use `default_degradation_model="unknown"` and do not imply kinetics or assimilation.
-- Stage 10 calibration layer:
-  - unit-aware residual computation and plotting.
-  - deterministic train/validation split helper.
-  - bounded least-squares calibration wrapper.
-  - explicit fittable parameter bounds as provenance-backed `Parameter` objects.
-  - fit result serialization with training residuals, validation residuals, covariance diagnostics, approximate confidence intervals where identifiable, optimizer metadata, and warnings for reused validation data or raw-unit residual scaling.
-  - failed model/optimizer runs are reported as `success=False` results.
-- Stage 11 uncertainty and sensitivity layer:
-  - Monte Carlo uncertainty propagation for normal, uniform, and lognormal parameter uncertainty specifications.
-  - reproducible sampling when a seed is supplied and explicit warnings when no seed is supplied.
-  - summary quantiles for uncertainty bands.
-  - local finite-difference sensitivity analysis with dimensional derivatives, normalized sensitivities, rankings, and saved reports.
-- Stage 12 canonical examples:
-  - `examples/stage12_01_homogeneous_michaelis_menten.py`
-  - `examples/stage12_02_pet_surface_model.py`
-  - `examples/stage12_03_pet_with_temperature.py`
-  - `examples/stage12_04_fungal_enzyme_secretion.py`
-  - `examples/stage12_05_fungal_growth_from_assimilable_products.py`
-  - `examples/stage12_06_spatial_pet_film.py`
-  - `examples/stage12_common.py`
-- Tests:
-  - parameter provenance and unknown values
-  - unit compatibility
-  - reaction engine execution
-  - reaction provenance enforcement
-  - mass balance
-  - non-negativity
-  - limiting-case suite
-  - simulation record serialization.
-  - Michaelis-Menten low-substrate, high-substrate, zero-substrate, zero-enzyme, unit, and ODE-engine behavior.
-  - PET identity, default model preference, unknown parameters, degradation products, unit checks, fraction validation, roughness validation, and accessible-area derivation.
-  - PET surface model zero surface area, zero enzyme, zero PET mass, surface-area monotonicity, crystallinity effect, explicit accessible-area override, Langmuir unit checks, and ODE integration.
-  - Arrhenius reference-rate identity at reference temperature, temperature monotonicity within range, out-of-range warnings, prefactor units, pH optimum activity, pH out-of-range warnings, positive pH width, ODE integration with environmental modifiers, missing activation energy handling, and pH profile source enforcement.
-  - fungal metadata unknown-parameter handling, fungal parameter unit checks, no biomass/no enzyme production, enzyme production biomass cost, enzyme decay, maintenance-driven active biomass decline, no product/no growth, non-assimilable product/no growth, and assimilable product/growth.
-  - elemental formula parsing, balanced/unbalanced stoichiometry detection, Gibbs provenance, Gibbs exergonic metadata, unknown carbon fraction handling, carbon conservation pass/fail cases, oxygen sufficiency/deficit checks, and biomass yield limit pass/fail cases.
-  - finite-volume no-flux conservation, missing boundary rejection, diffusion smoothing, zero-diffusion local ODE behavior, high-diffusion/well-mixed average agreement, and fixed-value boundary behaviour.
-  - universal substrate completeness levels, placeholder unknown-parameter handling, product-assimilation non-claims, bond/enzyme metadata, PET maturity preservation, serialization fields, unit-checked parameter overrides, and lignin ordered-fraction caveat.
-  - least-squares fit recovery, validation-data reuse warnings, unit rejection for residuals and bounds, failed-fit reporting, and calibration-source enforcement.
-  - Monte Carlo reproducibility, uncertainty-band widening with wider input uncertainty, uncertainty provenance enforcement, uncertainty unit checks, local sensitivity ranking, and zero-base relative sensitivity rejection.
+- Added structured assembly errors in `src/fungal_model/core/errors.py`:
+  - `ModelAssemblyError`
+  - `MissingProcessError`
+  - `MissingParameterError`
+  - `IncompatibleUnitsError`
+  - `InvalidMechanismError`
+- Added generic process contracts in `src/fungal_model/processes/base.py`:
+  - `Process`
+  - `StateVariableSpec`
+  - `ParameterRequirement`
+  - `ValidityDomain`
+- Added a generic registry in `src/fungal_model/processes/registry.py`:
+  - `ProcessRegistry`
+  - `MissingProcessIssue`
+  - empty `ProcessRegistry.default()` for the current milestone
+- Added model assembly scaffolding in `src/fungal_model/processes/assembly.py`:
+  - `ModelAssemblyContext`
+  - `ProcessMatch`
+  - `ParameterIssue`
+  - `AssemblyReport`
+  - `AssembledModel`
+  - `ModelBuilder`
+- Added `src/fungal_model/processes/__init__.py` exports.
+- Updated top-level package exports in `src/fungal_model/__init__.py`.
+- Updated core exports in `src/fungal_model/core/__init__.py`.
+- Added assembly tests in `tests/test_process_assembly.py`.
 
-Validation status:
+Milestone 1 behavior now available:
 
-- Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 100 tests passed.
-- Verified examples:
-  - `.venv/bin/python examples/01_first_order_reaction.py`
-  - `.venv/bin/python examples/02_homogeneous_michaelis_menten.py`
-  - `.venv/bin/python examples/03_pet_surface_hydrolysis.py`
-  - `.venv/bin/python examples/04_pet_temperature_ph.py`
-  - `.venv/bin/python examples/05_fungal_enzyme_secretion_and_growth.py`
-  - `.venv/bin/python examples/06_spatial_pet_film_enzyme_diffusion.py`
-  - `.venv/bin/python examples/stage12_01_homogeneous_michaelis_menten.py`
-  - `.venv/bin/python examples/stage12_02_pet_surface_model.py`
-  - `.venv/bin/python examples/stage12_03_pet_with_temperature.py`
-  - `.venv/bin/python examples/stage12_04_fungal_enzyme_secretion.py`
-  - `.venv/bin/python examples/stage12_05_fungal_growth_from_assimilable_products.py`
-  - `.venv/bin/python examples/stage12_06_spatial_pet_film.py`
-- Example artifacts were written to:
-  - `outputs/example_01_first_order/`
-  - `outputs/example_02_homogeneous_michaelis_menten/`
-  - `outputs/example_03_pet_surface_hydrolysis/`
-  - `outputs/example_04_pet_temperature_ph/`
-  - `outputs/example_05_fungal_enzyme_secretion_and_growth/`
-  - `outputs/example_06_spatial_pet_film_enzyme_diffusion/`
-  - `outputs/stage12_01_homogeneous_michaelis_menten/`
-  - `outputs/stage12_02_pet_surface_model/`
-  - `outputs/stage12_03_pet_with_temperature/`
-  - `outputs/stage12_04_fungal_enzyme_secretion/`
-  - `outputs/stage12_05_fungal_growth_from_assimilable_products/`
-  - `outputs/stage12_06_spatial_pet_film/`
-  - Stage 7 validation results are included in the Stage 6 fungal benchmark validation report.
+- A model can request named process types.
+- A `ProcessRegistry` can match registered generic processes.
+- Missing mechanisms fail with `MissingProcessError`.
+- Missing parameters fail with `MissingParameterError`.
+- Explicitly unknown parameters fail instead of receiving fallback constants.
+- Missing provenance fails in scientific mode.
+- Unsourced parameters are allowed only with `allow_unsourced_for_testing=True`.
+- Incompatible parameter units fail separately with `IncompatibleUnitsError`.
+- Assembly reports are both machine-readable (`to_dict`) and human-readable
+  (`human_readable`).
+- A successful assembly produces an `AssembledModel` containing matched
+  processes, state variables, parameters, assumptions, validators, solver
+  settings, and the assembly report.
 
-## Stage Roadmap
+Important deliberate limitation:
 
-### Stage 0: Scientific Governance Layer
+- `AssembledModel.run()` is a placeholder. Solver-backed execution through the
+  process architecture belongs to later milestones. Current runnable models
+  still use the existing `SimulationEngine` and `ReactionDiffusionEngine1D`.
 
-Status: `complete`
+Milestone 1 tests added:
 
-Plan:
+- missing process gives a structured report;
+- matched process with absent parameter gives a structured missing-parameter
+  report;
+- unknown parameter value blocks assembly;
+- missing parameter provenance blocks assembly;
+- testing escape hatch for unsourced parameters is explicit;
+- incompatible units are reported separately;
+- successful assembly exports state variables, assumptions, solver settings,
+  and report data;
+- generic process modules do not import PET-specific modules.
 
-- Enforce parameter provenance.
-- Represent unknown values explicitly.
-- Separate assumptions from parameters.
-- Save reproducible simulation records.
-- Require explicit testing escape hatch for unsourced parameters.
+Verification:
 
-Implemented:
+- `./.venv/bin/python -m pytest tests/test_process_assembly.py`
+- Result: 8 passed.
+
+Full-suite verification for this slice:
+
+- `./.venv/bin/python -m pytest`
+- Result: 108 passed.
+
+## Current Codebase Capability Inventory
+
+### Scientific Governance
+
+Status: `complete` for the existing foundation.
+
+FungMod can:
+
+- represent scientific parameters with names, symbols, values, units,
+  uncertainties, sources, confidence levels, notes, and measurement methods;
+- represent unknown parameters explicitly with `value=None`;
+- require provenance before scientific runs;
+- allow unsourced values only through explicit testing escape hatches;
+- serialize parameter sets to JSON and YAML;
+- represent modelling assumptions separately from parameters;
+- enforce unit-bearing quantities through a shared `pint` registry.
+
+Core files:
 
 - `src/fungal_model/core/parameters.py`
-- `src/fungal_model/core/assumptions.py`
-- `src/fungal_model/core/simulation.py`
-- `src/fungal_model/core/logging.py`
 - `src/fungal_model/core/provenance.py`
+- `src/fungal_model/core/assumptions.py`
 - `src/fungal_model/core/units.py`
+- `src/fungal_model/core/errors.py`
 
-Remaining:
+### Existing Well-Mixed Solver
 
-- Add richer provenance schema later if literature metadata needs structured DOI/authors/year fields.
+Status: `complete` for deterministic ODE reaction systems.
 
-### Stage 1: General ODE Reaction Engine
+FungMod can:
 
-Status: `complete`
+- run deterministic well-mixed ODE models through `SimulationEngine`;
+- use generic `Reaction` objects with unit-checked rate laws;
+- validate reaction provenance before scientific execution;
+- require unit-bearing initial states and simulation times;
+- record solver settings and solver metadata;
+- return unit-bearing `SimulationResult` objects;
+- create reproducible `SimulationRecord` JSON outputs.
 
-Plan:
+Current limitation:
 
-- Implement deterministic `dx/dt = F(x, t, theta)` engine.
-- Support unit-aware species, reactions, rate laws, and SciPy solvers.
-- Validate non-negativity, mass balance, and limiting cases.
-- Provide one minimal mass-conserving example.
+- This solver works with `Reaction` objects, not yet with the new
+  process-centered `AssembledModel`.
 
-Implemented:
+Core files:
 
 - `src/fungal_model/chemistry/reactions.py`
-- `SimulationEngine` in `src/fungal_model/core/simulation.py`
-- validators in `src/fungal_model/core/validators.py`
-- validation re-export modules under `src/fungal_model/validation`
-- `examples/01_first_order_reaction.py`
+- `src/fungal_model/core/simulation.py`
 
-Remaining:
+### Validation
 
-- Add Stage 2 kinetics only after preserving these tests.
+Status: `partial` relative to the long-term roadmap; substantial existing
+foundation is implemented.
 
-### Stage 2: Basic Enzyme Kinetics
+FungMod can validate:
 
-Status: `complete`
+- non-negativity;
+- weighted mass balance;
+- carbon conservation;
+- oxygen limitation;
+- biomass yield bounds;
+- limiting-case suites;
+- selected spatial checks for 1D diffusion and reaction-diffusion models.
 
-Plan:
+Current limitations:
 
-- Add homogeneous Michaelis-Menten kinetics.
-- Add enzyme-explicit `kcat * E * S / (Km + S)` form.
-- Clearly label homogeneous PET use as a benchmark only.
-- Add low-substrate, high-substrate, zero-enzyme, zero-substrate, and units tests.
+- Validation results do not yet use the roadmap's richer severity/residual
+  schema everywhere.
+- Validators are not yet automatically attached by the new `ModelBuilder`.
+- Thermodynamic feasibility is metadata-supported but not solver-enforced.
 
-Implemented:
+Core files:
+
+- `src/fungal_model/core/validators.py`
+- `src/fungal_model/validation/`
+
+### Homogeneous Kinetics
+
+Status: `complete` for the existing dissolved-substrate benchmark layer;
+`partial` relative to the future process architecture.
+
+FungMod can:
+
+- compute homogeneous Michaelis-Menten rates;
+- compute enzyme-explicit Michaelis-Menten rates;
+- wrap homogeneous kinetics as `Reaction` rate laws;
+- check low-substrate, high-substrate, zero-substrate, zero-enzyme, and unit
+  limiting cases.
+
+Current limitations:
+
+- Homogeneous kinetics are still exposed as rate-law classes, not as
+  `HomogeneousMichaelisMentenProcess`.
+- PET is explicitly not treated as a valid dissolved-substrate default.
+
+Core files:
 
 - `src/fungal_model/kinetics/michaelis_menten.py`
-- Homogeneous dissolved-substrate assumption helper.
-- Direct quantity functions for classic and enzyme-explicit forms.
-- Callable rate-law objects for use with `Reaction`.
-- `tests/test_michaelis_menten.py`
-- `examples/02_homogeneous_michaelis_menten.py`
 
-Remaining:
+### Surface and PET Kinetics
 
-- Do not expand this homogeneous layer into PET realism. Stage 3 should introduce PET as a substrate object, and Stage 4 should add heterogeneous surface-limited PET hydrolysis.
+Status: `partial`.
 
-### Stage 3: PET Substrate Module
+FungMod can:
 
-Status: `complete`
+- represent PET as a solid polyester substrate with explicit unknown material
+  parameters by default;
+- derive accessible PET surface area from supplied surface area, roughness, and
+  amorphous fraction/crystallinity metadata;
+- compute Langmuir equilibrium surface coverage;
+- run a PET-specific surface hydrolysis rate law through the existing
+  `Reaction` engine;
+- apply Arrhenius temperature and Gaussian pH modifiers to the PET surface
+  hydrolysis rate law.
 
-Plan:
+Current limitations:
 
-- Implement PET substrate properties.
-- Represent crystallinity, amorphous fraction, geometry, surface area, roughness, and degradation products.
-- Default PET to heterogeneous surface treatment, not dissolved-substrate kinetics.
+- The surface hydrolysis process is still PET-specific
+  (`PETSurfaceHydrolysisRateLaw`).
+- The roadmap-required generic `SurfaceCatalysisProcess`,
+  `AccessibleSurfaceAreaModel`, `ProductReleaseMap`, and dummy non-PET surface
+  integration are not implemented yet.
+- PET product release is still represented in examples as a simplified lumped
+  hydrolysate where noted.
 
-Implemented:
+Core files:
+
+- `src/fungal_model/substrates/pet.py`
+- `src/fungal_model/kinetics/langmuir.py`
+- `src/fungal_model/kinetics/surface_kinetics.py`
+- `src/fungal_model/kinetics/arrhenius.py`
+- `src/fungal_model/kinetics/ph.py`
+
+### Universal Substrate Metadata
+
+Status: `partial`.
+
+FungMod can:
+
+- represent generic substrate metadata through `Substrate`;
+- represent degradation products without assuming assimilation;
+- create explicit unknown parameter sets for substrate metadata;
+- expose placeholder metadata classes for cellulose, lignin, starch, and
+  chitin;
+- keep PET marked as the only currently partial substrate with an implemented
+  process path.
+
+Current limitations:
+
+- Placeholder substrates do not yet assemble into scientific kinetic models.
+- Substrate maturity levels from the roadmap are conceptually present through
+  `completeness`, but not yet enforced by the new process registry.
+
+Core files:
 
 - `src/fungal_model/substrates/base.py`
 - `src/fungal_model/substrates/pet.py`
-- `PETSubstrate` records:
-  - polymer type
-  - repeating unit
-  - dominant cleavable bond type
-  - density
-  - crystallinity
-  - amorphous fraction
-  - surface area
-  - geometry type
-  - thickness
-  - particle size
-  - roughness factor
-  - accessible surface area
-  - degradation products
-  - limitations and references.
-- PET defaults:
-  - `physical_state="solid_polymer"`
-  - `default_degradation_model="heterogeneous_surface"`
-  - `is_dissolved_by_default=False`
-  - numeric material parameters default to explicit unknown `Parameter` objects.
-- `tests/test_pet_substrate.py`
+- `src/fungal_model/substrates/cellulose.py`
+- `src/fungal_model/substrates/lignin.py`
+- `src/fungal_model/substrates/starch.py`
+- `src/fungal_model/substrates/chitin.py`
 
-Remaining:
+### Fungal Dynamics
 
-- Stage 4 must implement actual surface-limited PET hydrolysis. Stage 3 only supplies metadata and derived accessible-area bookkeeping.
+Status: `partial`.
 
-### Stage 4: Surface-Limited PET Hydrolysis
+FungMod can:
 
-Status: `complete`
+- represent basic fungus metadata;
+- represent enzyme capabilities and enzyme profiles;
+- model enzyme secretion from active biomass;
+- model enzyme production cost;
+- model enzyme decay;
+- model active-biomass maintenance loss;
+- gate product uptake and growth through explicit product-assimilation
+  evidence;
+- prevent non-assimilable products from causing biomass growth.
 
-Plan:
+Current limitations:
 
-- Implement enzyme adsorption/desorption and surface coverage.
-- Add modular surface hydrolysis rate laws.
-- Validate zero surface area, zero enzyme, zero PET mass, surface-area monotonicity, and crystallinity effect.
+- Fungi are not yet full roadmap entities with taxonomy, oxygen dependence,
+  environmental tolerance metadata, and model-builder compatibility matching.
+- Enzymes are not yet standalone roadmap entities.
+- Living-fungus simulations still use existing `Reaction` rate laws rather than
+  process-registry assembly.
 
-Implemented:
-
-- `src/fungal_model/kinetics/langmuir.py`
-- `src/fungal_model/kinetics/surface_kinetics.py`
-- `langmuir_surface_coverage`
-- `surface_hydrolysis_rate`
-- `PETSurfaceHydrolysisRateLaw`
-- `pet_surface_hydrolysis_assumption`
-- `tests/test_surface_pet.py`
-- `examples/03_pet_surface_hydrolysis.py`
-
-Model equations:
-
-- `theta = K_ads * E / (1 + K_ads * E)`
-- `rate = k_surface * theta * A_accessible`
-
-Important limitations:
-
-- `K_ads` is an equilibrium lumped adsorption parameter, not separate dynamic adsorption/desorption states.
-- Accessible surface area is constant during a run.
-- PET morphology, crystallinity evolution, erosion, diffusion, enzyme depletion by binding, deactivation, and product inhibition are not yet modelled.
-- Product release is currently a mass-equivalent lump in examples; chemically resolved MHET/BHET/TPA/EG product partitioning is not implemented.
-
-Remaining:
-
-- Stage 5 should add temperature and pH dependence with strict provenance and validity-range warnings.
-
-### Stage 5: Temperature And pH Dependence
-
-Status: `complete`
-
-Plan:
-
-- Add Arrhenius scaling with required activation energy and provenance.
-- Add optional pH activity profile with measured-range warnings.
-- Mark missing high-temperature enzyme deactivation as a limitation until implemented.
-
-Implemented:
-
-- `src/fungal_model/kinetics/arrhenius.py`
-- `src/fungal_model/kinetics/ph.py`
-- `EnvironmentalValidityWarning`
-- `arrhenius_rate_constant`
-- `arrhenius_reference_scaled_rate`
-- `ArrheniusReferenceTemperatureScaler`
-- `gaussian_ph_activity`
-- `GaussianPHActivityProfile`
-- optional temperature and pH scaling inside `PETSurfaceHydrolysisRateLaw`
-- `tests/test_environmental_modifiers.py`
-- `examples/04_pet_temperature_ph.py`
-
-Model equations:
-
-- `k(T) = A * exp(-Ea / (R*T))`
-- `k(T) = k_ref * exp((-Ea/R) * (1/T - 1/T_ref))`
-- `activity_pH = exp(-0.5 * ((pH - pH_opt) / sigma_pH)^2)`
-
-Important limitations:
-
-- Arrhenius scaling does not include enzyme thermal deactivation.
-- The model warns outside measured temperature ranges but still returns a value so failed extrapolation is visible to callers.
-- Gaussian pH activity is empirical and does not model ionization chemistry.
-- pH out-of-range evaluations warn but are not automatically rejected.
-
-Remaining:
-
-- Stage 6 should introduce fungal enzyme secretion and biomass only after preserving the enzyme-only PET model tests.
-
-### Stage 6: Fungal Enzyme Secretion And Biomass
-
-Status: `complete`
-
-Plan:
-
-- Introduce fungus object after enzyme-only PET model works.
-- Track active/dormant/dead biomass, secreted enzyme, substrate, products, and optional oxygen.
-- Enforce enzyme production cost and no growth without assimilable carbon/energy.
-
-Implemented:
+Core files:
 
 - `src/fungal_model/fungi/base.py`
 - `src/fungal_model/fungi/enzyme_profile.py`
 - `src/fungal_model/fungi/growth.py`
 - `src/fungal_model/fungi/metabolism.py`
-- `Fungus`
-- `EnzymeProfile`
-- `EnzymeCapability`
-- `EnzymeSecretionRateLaw`
-- `EnzymeProductionCostRateLaw`
-- `EnzymeDecayRateLaw`
-- `BiomassMaintenanceRateLaw`
-- `ProductAssimilation`
-- `ProductUptakeRateLaw`
-- `biomass_yield_coefficient`
-- `tests/test_fungal_dynamics.py`
-- `examples/05_fungal_enzyme_secretion_and_growth.py`
 
-Model equations:
+### Stoichiometry and Thermodynamics
 
-- `dE/dt = alpha_E * B_active - delta_E * E`
-- active biomass cost from enzyme secretion is proportional to `alpha_E * B_active`
-- active biomass maintenance loss is `m_B * B_active`
-- product uptake is `q_product * product * B_active`, gated by explicit assimilability evidence
-- biomass production from uptake uses a configured yield `Y_B`
+Status: `partial`.
 
-Important limitations:
+FungMod can:
 
-- Dormant biomass is tracked as a state but no dormancy transition model is implemented yet.
-- Oxygen is described in fungal metadata but not modelled as a state or limiter.
-- Product assimilation is a binary evidence gate; transporters, intracellular pathways, toxicity, repression, and thermodynamics are not modelled yet.
-- Biomass yield is constrained to 0-1 but full carbon/energy balance is deferred to Stage 7.
-- Enzyme secretion cost is a lumped parameter that must be sourced before scientific use.
+- parse elemental formula strings;
+- represent stoichiometric reaction metadata;
+- detect balanced and unbalanced stoichiometry;
+- represent carbon-content metadata for state variables;
+- represent oxygen-demand metadata;
+- represent Gibbs free energy estimates with provenance.
 
-Remaining:
+Current limitations:
 
-- Stage 7 should add thermodynamic and stoichiometric consistency, including carbon balance, oxygen demand, and physical yield constraints.
+- Gibbs free energy is not yet enforced as a thermodynamic feasibility
+  constraint during solving.
+- Redox balance is not yet implemented as a process or validator beyond the
+  current oxygen-demand checks.
 
-### Stage 7: Thermodynamic And Stoichiometric Consistency
-
-Status: `complete`
-
-Plan:
-
-- Track stoichiometry, carbon balance, oxygen demand, approximate Gibbs energy where available, and biomass-yield constraints.
-- Reject impossible growth when carbon, energy, oxygen, or yield constraints are violated.
-
-Implemented:
+Core files:
 
 - `src/fungal_model/chemistry/stoichiometry.py`
 - `src/fungal_model/chemistry/thermodynamics.py`
-- `src/fungal_model/validation/stoichiometry.py`
-- `ElementalComposition`
-- `StoichiometricTerm`
-- `StoichiometricReactionMetadata`
-- `CarbonContent`
-- `OxygenDemand`
-- `GibbsFreeEnergyEstimate`
-- `validate_carbon_conservation`
-- `validate_oxygen_limitation`
-- `validate_biomass_yield_limit`
-- `tests/test_stoichiometry_thermodynamics.py`
-- Stage 7 validators included in `examples/05_fungal_enzyme_secretion_and_growth.py`
 
-Current enforcement:
+### Spatial Transport
 
-- Carbon in tracked species cannot exceed initial tracked carbon plus explicit external carbon.
-- Aerobic substrate consumption can be checked against configured oxygen availability or an initial oxygen state.
-- Biomass yield can be checked against a configured maximum yield.
-- Stoichiometric reaction metadata can report elemental balance when formulas are supplied.
-- Gibbs free energy estimates can be recorded with units, provenance, conditions, and exergonic metadata.
+Status: `partial`.
 
-Important limitations:
+FungMod can:
 
-- Full thermodynamic flux analysis is not implemented.
-- Gibbs free energy estimates are metadata and are not yet solver constraints.
-- Oxygen is still not coupled as a dynamic limiter in the ODE equations.
-- Carbon validation depends on supplied carbon fractions and tracked state species.
-- Energy source checks are not complete; Stage 7 provides the interface for Gibbs estimates but does not reject all energetically impossible growth yet.
+- represent a uniform 1D finite-volume grid;
+- represent no-flux, fixed-value, and periodic boundary conditions;
+- compute a 1D finite-volume diffusion operator;
+- run a 1D method-of-lines reaction-diffusion model;
+- validate no-flux conservation, gradient smoothing, and high-diffusion
+  well-mixed behavior.
 
-Remaining:
+Current limitations:
 
-- Stage 8 should add spatial reaction-diffusion only after preserving the ODE, PET, fungal, and stoichiometric validation tests.
+- Geometry is not yet exposed through the roadmap's `Geometry` entity hierarchy.
+- Transport is not yet a `DiffusionProcess` assembled by `ModelBuilder`.
+- 2D/3D, porous media, advection, and dynamic surface/volume coupling are not
+  implemented.
 
-### Stage 8: Spatial Reaction-Diffusion Model
-
-Status: `complete`
-
-Plan:
-
-- Start with 1D finite differences, then 2D.
-- Track substrate, enzyme, biomass, oxygen, and products as fields.
-- Keep boundary conditions explicit.
-
-Implemented:
+Core files:
 
 - `src/fungal_model/transport/geometry.py`
 - `src/fungal_model/transport/diffusion.py`
 - `src/fungal_model/transport/reaction_diffusion.py`
-- `src/fungal_model/validation/spatial.py`
-- `BoundaryCondition`
-- `BoundaryConditions1D`
-- `UniformGrid1D`
-- `finite_volume_laplacian_1d`
-- `ReactionDiffusionEngine1D`
-- `ReactionDiffusionResult1D`
-- `ReactionDiffusionRecord`
-- `validate_diffusion_smooths_gradient`
-- `validate_no_flux_spatial_integral_conserved`
-- `validate_spatial_average_close_to_expected`
-- `tests/test_reaction_diffusion.py`
-- `examples/06_spatial_pet_film_enzyme_diffusion.py`
 
-Current checks:
+### Calibration
 
-- Diffusion smooths gradients in a diffusion-only run.
-- No-flux boundaries conserve the discrete spatial integral for diffusion.
-- Zero diffusion reproduces independent local ODE behavior.
-- Spatial average agrees with a well-mixed linear reaction benchmark.
-- Boundary conditions are explicit and missing boundaries are rejected.
+Status: `partial`.
 
-Important limitations:
+FungMod can:
 
-- Only 1D uniform finite-volume grids are implemented.
-- 2D and 3D are not implemented.
-- Geometry does not yet include true cross-sectional area, volume, porosity, or film-surface coupling.
-- The spatial PET example uses a per-cell accessible surface area benchmark.
-- Oxygen and biomass fields can be represented but no spatial fungal ecology example is implemented yet.
+- compute unit-aware residuals;
+- split sequential train/validation data;
+- fit selected parameters with bounded least squares;
+- report failed optimizer/model runs without hiding them;
+- serialize fit results, residuals, covariance diagnostics, approximate
+  confidence intervals where valid, and warnings.
 
-Remaining:
+Current limitations:
 
-- Stage 9 has generalized substrate representation across PET, cellulose, lignin, starch, and chitin with explicit completeness levels. Stages 10-12 now add calibration, uncertainty/sensitivity, and canonical examples. Future work should move beyond the planned scaffold into real data ingestion, literature curation, and model validation against experiments.
+- Bayesian calibration is a placeholder.
+- Calibration is generic but not yet integrated into the future result/output
+  system.
 
-### Stage 9: Universal Substrate Engine
-
-Status: `complete`
-
-Plan:
-
-- Generalize substrate representation.
-- Add PET, cellulose, lignin, starch, and chitin subclasses with explicit completeness levels.
-- Do not imply equal maturity across substrates.
-
-Implemented:
-
-- Extended `src/fungal_model/substrates/base.py` with:
-  - `SubstrateParameterSpec`
-  - unknown substrate-parameter construction helper
-  - unit-checked substrate `ParameterSet` construction helper
-  - universal `water_activity_dependence` field
-  - universal `thermodynamic_data` field
-  - substrate parameter accessor.
-- Added placeholder substrate modules:
-  - `src/fungal_model/substrates/cellulose.py`
-  - `src/fungal_model/substrates/lignin.py`
-  - `src/fungal_model/substrates/starch.py`
-  - `src/fungal_model/substrates/chitin.py`
-- Each placeholder substrate records:
-  - chemical class and physical state
-  - bond classes and accessible bond classes
-  - broad required enzyme classes
-  - degradation product classes
-  - product assimilability as unknown
-  - density, porosity, crystallinity or ordered-fraction metadata, surface area, accessible surface area, and water-activity threshold as explicitly unknown `Parameter` objects.
-- Updated `src/fungal_model/substrates/__init__.py` exports.
-- Added `tests/test_universal_substrates.py`.
-
-Current scientific scope:
-
-- PET remains `completeness="partial"` and defaults to heterogeneous surface modelling.
-- Cellulose, lignin, starch, and chitin are `completeness="placeholder"` and use `default_degradation_model="unknown"`.
-- No substrate-specific kinetics, product assimilation, thermodynamic feasibility, or accessibility models were added for the placeholder substrates.
-
-Important limitations:
-
-- Cellulose lacks degree-of-polymerization, fibril morphology, enzyme synergy, and lignocellulose matrix coupling.
-- Lignin lacks bond-frequency distributions, redox mediator chemistry, oxygen/redox coupling, radical chemistry, and resolved product chemistry.
-- Starch lacks gelatinization, granule morphology, amylose/amylopectin ratio, and adsorption/hydrolysis kinetics.
-- Chitin lacks polymorph, acetylation/chitosan conversion, nitrogen assimilation, enzyme synergy, and adsorption/hydrolysis kinetics.
-
-Validation:
-
-- Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 88 tests passed.
-- Re-ran examples 01-06 successfully after Stage 9 export changes.
-
-### Stage 10: Calibration And Validation Against Data
-
-Status: `complete`
-
-Plan:
-
-- Add least-squares fitting, residual plots, parameter bounds, train/validation split, and confidence intervals where possible.
-- Later add Bayesian calibration and posterior predictive checks.
-
-Implemented:
+Core files:
 
 - `src/fungal_model/calibration/residuals.py`
-  - `CalibrationResiduals`
-  - `residuals_between`
-  - `sequential_train_validation_split`
-  - residual JSON export and residual plotting.
 - `src/fungal_model/calibration/fitting.py`
-  - `FittableParameter`
-  - `fit_least_squares`
-  - `LeastSquaresCalibrationResult`
-  - provenance-backed optimizer diagnostic constants.
-- `tests/test_calibration.py`
+- `src/fungal_model/calibration/bayesian.py`
 
-Current enforcement:
+### Uncertainty and Sensitivity
 
-- Fitted parameters must already be known, sourced `Parameter` objects.
-- Parameter bounds are themselves `Parameter` objects and must carry units and provenance.
-- Calibration source is required.
-- Train and validation residuals are both recorded.
-- If validation indices are omitted, the result explicitly warns that validation reused training data.
-- Failed model/optimizer calls return `success=False` calibration reports.
-- Approximate covariance and 95 percent intervals are reported only when residual degrees of freedom and Jacobian rank allow it.
+Status: `partial`.
 
-Important limitations:
+FungMod can:
 
-- Only deterministic least-squares calibration is implemented.
-- Bayesian calibration remains a placeholder.
-- Confidence intervals are linearized approximations, not full posterior uncertainty.
-- Identifiability diagnostics are rank-based and basic.
-- The framework does not include real experimental datasets yet.
+- run Monte Carlo uncertainty propagation for normal, uniform, and lognormal
+  parameter uncertainty specifications;
+- preserve sample provenance;
+- summarize output quantiles;
+- run local finite-difference sensitivity analysis with dimensional and
+  normalized sensitivities.
 
-### Stage 11: Uncertainty And Sensitivity
+Current limitations:
 
-Status: `complete`
+- Global sensitivity is not implemented.
+- Uncertainty bands are not yet integrated with a first-class roadmap
+  `SimulationResult` plotting system.
 
-Plan:
-
-- Add Monte Carlo sampling, local sensitivity, and later global sensitivity.
-- Report uncertainty bands and sensitivity rankings.
-
-Implemented:
+Core files:
 
 - `src/fungal_model/uncertainty/monte_carlo.py`
-  - `ParameterUncertaintySpec`
-  - `run_monte_carlo`
-  - `MonteCarloResult`
-  - normal, uniform, and lognormal parameter uncertainty propagation.
 - `src/fungal_model/uncertainty/sensitivity.py`
-  - `LocalSensitivitySpec`
-  - `local_sensitivity`
-  - `LocalSensitivityResult`
-  - dimensional derivatives, normalized sensitivities, and rankings.
-- `tests/test_uncertainty_sensitivity.py`
 
-Current enforcement:
+### Examples
 
-- Uncertainty specifications require a source.
-- Distribution parameters are unit-checked against the nominal parameter.
-- Monte Carlo runs record the random seed; if no seed is supplied, the result warns that exact reproducibility is absent.
-- Failed samples are recorded rather than suppressed.
-- Wider input uncertainty is preserved in wider output intervals in the tested benchmark.
-- Local sensitivity rejects zero base parameter values for relative perturbations.
+Status: `partial`.
 
-Important limitations:
+Current examples demonstrate:
 
-- Global sensitivity analysis is not implemented.
-- Monte Carlo sampling does not impose physical constraints beyond the distribution supplied by the caller.
-- Correlated parameter uncertainty is not implemented.
-- Uncertainty summaries are empirical quantiles, not Bayesian credible intervals unless the input samples are defined that way.
+- first-order well-mixed reaction;
+- homogeneous Michaelis-Menten dissolved-substrate benchmark;
+- PET surface hydrolysis;
+- PET surface hydrolysis with temperature and pH modifiers;
+- fungal enzyme secretion and product-coupled growth;
+- 1D PET film enzyme diffusion and local hydrolysis;
+- Stage 12 wrapper examples for the current canonical examples.
 
-### Stage 12: Examples
+Current limitations:
 
-Status: `complete`
+- Examples still use the existing solver/rate-law architecture, not the new
+  process-centered assembly system.
+- Output folders are useful but not yet standardized to the roadmap's complete
+  `outputs/run_name/` structure.
 
-Plan:
+Core files:
 
-- Example 1: homogeneous Michaelis-Menten toy substrate.
-- Example 2: surface-limited PET hydrolysis.
-- Example 3: PET hydrolysis with Arrhenius temperature dependence.
-- Example 4: fungal enzyme secretion without growth from products.
-- Example 5: fungal growth only from assimilable products.
-- Example 6: 1D spatial PET film with enzyme diffusion.
+- `examples/`
 
-Implemented:
+### Notebooks
 
-- A preliminary Stage 1 first-order `A -> B` benchmark. This is not one of the final Stage 12 biological examples; it is a foundation check.
-- Stage 2 dissolved homogeneous Michaelis-Menten toy benchmark. This is not PET and is explicitly labelled as a dissolved-substrate benchmark.
-- Canonical Stage 12 wrappers and outputs:
-  - `examples/stage12_01_homogeneous_michaelis_menten.py`
-  - `examples/stage12_02_pet_surface_model.py`
-  - `examples/stage12_03_pet_with_temperature.py`
-  - `examples/stage12_04_fungal_enzyme_secretion.py`
-  - `examples/stage12_05_fungal_growth_from_assimilable_products.py`
-  - `examples/stage12_06_spatial_pet_film.py`
-- Stage 12 example 4 is a distinct no-growth secretion example:
-  - active biomass secretes enzyme,
-  - enzyme hydrolyses PET,
-  - biomass pays secretion and maintenance costs,
-  - no product assimilation reaction is present,
-  - validation reports whether active biomass avoids positive growth.
-- Each Stage 12 example writes a plot, simulation record, validation report, and assumptions file.
+Status: `not started`.
 
-Validation:
+Required by roadmap:
 
-- Verified on 2026-05-25 with `.venv/bin/python -m pytest`.
-- Result: 100 tests passed.
-- Verified all six canonical Stage 12 scripts run successfully.
+- `notebooks/00_quickstart.ipynb`
+- `notebooks/01_process_library_demo.ipynb`
+- `notebooks/02_surface_hydrolysis_demo.ipynb`
+- `notebooks/03_fungus_on_pet_demo.ipynb`
+- `notebooks/04_reaction_diffusion_demo.ipynb`
+- `notebooks/05_calibration_and_uncertainty_demo.ipynb`
 
-## Handoff Notes
+Important rule:
 
-- Do not implement PET or fungal biology until Stage 0 and Stage 1 tests pass.
-- Do not add numerical values for biological or polymer parameters without provenance.
-- If a value is needed but unknown, create a `Parameter` with `value=None`, source text explaining that the value is missing, and `confidence_level="unknown"`.
-- Use `allow_unsourced_for_testing=True` only in tests or explicitly artificial benchmarks.
-- Keep later-stage placeholder modules honest: they should not expose fake model behaviour.
+- Notebooks must import package code and demonstrate workflows. They must not
+  contain core model implementation.
+
+### Data and Configuration
+
+Status: `not started` for the long-term roadmap.
+
+Required top-level folders:
+
+- `data/fungi/`
+- `data/substrates/`
+- `data/enzymes/`
+- `data/environments/`
+- `data/geometries/`
+- `data/parameters/`
+- `data/experiments/`
+
+Current note:
+
+- The package has `src/fungal_model/data/README.md`, but the roadmap's
+  top-level human-editable data/config system and schema validation are not yet
+  implemented.
+
+## Long-Term Roadmap Status
+
+### Milestone 1: Process base classes
+
+Status: `complete` for the skeleton scope.
+
+Done:
+
+- Process contracts.
+- Process registry.
+- Model builder skeleton.
+- Structured assembly report.
+- Structured assembly errors.
+- Missing process and missing parameter tests.
+
+Remaining future expansion:
+
+- Entity-aware compatibility matching.
+- Process-to-solver execution.
+- Automatic validator selection.
+
+### Milestone 2: Generic result object
+
+Status: `not started` for the roadmap version.
+
+Existing related work:
+
+- `SimulationResult` exists for the current ODE engine.
+- `ReactionDiffusionResult1D` exists for the current spatial engine.
+
+Still required:
+
+- first-class result module under `results/`;
+- standard save/export methods;
+- standard plotting methods generated from result objects;
+- standard output folder structure;
+- validation report integration across model types.
+
+### Milestone 3: Generic homogeneous kinetics
+
+Status: `partial`.
+
+Existing related work:
+
+- Homogeneous Michaelis-Menten functions and rate-law classes exist.
+
+Still required:
+
+- `HomogeneousMichaelisMentenProcess`;
+- `MassActionProcess`;
+- `FirstOrderDecayProcess`;
+- migration of old examples to generic process architecture.
+
+### Milestone 4: Generic surface process refactor
+
+Status: `not started`.
+
+Still required:
+
+- generic adsorption model in process form;
+- generic surface catalysis/bond cleavage process;
+- accessible site/surface model;
+- product release map;
+- PET migration to generic process composition;
+- dummy non-PET substrate surface test.
+
+### Milestone 5: Environment object and modifiers
+
+Status: `partial`.
+
+Existing related work:
+
+- Arrhenius and pH modifier logic exists.
+
+Still required:
+
+- `Environment` entity;
+- modifiers that read from environment objects;
+- water activity, oxygen, and product inhibition modifiers in the roadmap
+  architecture;
+- modifier plots in result outputs.
+
+### Milestone 6: Geometry abstraction
+
+Status: `partial`.
+
+Existing related work:
+
+- 1D finite-volume grid and boundary conditions exist.
+
+Still required:
+
+- roadmap `Geometry` hierarchy;
+- well-mixed, film, particle, slab, and porous-medium objects;
+- common model interface for well-mixed and spatial examples.
+
+### Milestone 7: Fungus/enzyme/process compatibility
+
+Status: `not started` for the new registry layer.
+
+Existing related work:
+
+- fungus metadata and enzyme profile classes exist.
+
+Still required:
+
+- explicit enzyme entities;
+- compatibility matching between fungus, enzyme, substrate bond, environment,
+  geometry, and process;
+- clear assembly failures for missing biological capability.
+
+### Milestone 8: Notebooks
+
+Status: `not started`.
+
+Still required:
+
+- create `/notebooks`;
+- add required notebooks;
+- add smoke/execution tests where practical.
+
+### Milestone 9: Data/config schemas
+
+Status: `not started`.
+
+Still required:
+
+- YAML/JSON loaders;
+- schema validation;
+- example configs with provenance;
+- unknown-value handling in config files.
+
+### Milestone 10: First full integration workflow
+
+Status: `not started`.
+
+Still required:
+
+- one fungus/enzyme/PET/environment/geometry workflow assembled through the
+  registry and model builder;
+- full output folder;
+- validation and plots;
+- honest failure when PET parameters or processes are missing.
+
+## Anti-Cheating Checklist Status
+
+Implemented in current tests:
+
+- missing process fails with `MissingProcessError`;
+- missing parameter fails with `MissingParameterError`;
+- missing provenance fails in scientific assembly mode;
+- incompatible units fail with `IncompatibleUnitsError`;
+- generic process modules do not import PET-specific modules;
+- non-assimilable product cannot cause biomass growth;
+- zero enzyme, zero accessible surface, zero substrate, and zero PET mass checks
+  exist for current PET rate-law tests;
+- high diffusion approaches well-mixed behavior in existing spatial tests.
+
+Still required:
+
+- generic surface hydrolysis works with PET and a dummy non-PET substrate;
+- PET plugin uses generic processes;
+- incompatible fungus/substrate/enzyme pairing fails in model assembly;
+- oxygen cannot be consumed if oxygen process is absent or unavailable;
+- roadmap result object saves standardized files and plots;
+- notebooks import from `fungal_model` and do not define core rate laws/classes.
+
+## How To Verify
+
+Focused Milestone 1 tests:
+
+```bash
+.venv/bin/python -m pytest tests/test_process_assembly.py
+```
+
+Full test suite:
+
+```bash
+.venv/bin/python -m pytest
+```
+
+Current focused verification:
+
+- 2026-05-26: `tests/test_process_assembly.py` passed with 8 tests.
+
+Current full-suite verification:
+
+- 2026-05-26: full test suite passed with 108 tests.
