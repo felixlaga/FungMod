@@ -17,7 +17,24 @@ from fungal_model.core.errors import (
 )
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.simulation import SolverSettings
+from fungal_model.entities import Environment
+from fungal_model.entities import Enzyme
 from fungal_model.fungi.base import Fungus
+from fungal_model.geometry import (
+    Film1DGeometry,
+    Geometry,
+    ParticleGeometry,
+    PorousMediumGeometry,
+    SlabGeometry,
+    WellMixedGeometry,
+)
+from fungal_model.modifiers import (
+    OxygenModifier,
+    PHModifier,
+    ProductInhibitionModifier,
+    TemperatureModifier,
+    WaterActivityModifier,
+)
 from fungal_model.processes import (
     AssembledModel,
     AssemblyReport,
@@ -39,6 +56,7 @@ from fungal_model.processes import (
     ProductReleaseMap,
     SurfaceCatalysisModel,
     SurfaceCatalysisProcess,
+    CompatibilityIssue,
 )
 from fungal_model.results import SimulationResult
 from fungal_model.substrates.base import Substrate
@@ -50,8 +68,13 @@ __all__ = [
     "AccessibleSitePool",
     "AccessibleSurfaceAreaModel",
     "BondCleavageProcess",
+    "CompatibilityIssue",
+    "Enzyme",
     "EquilibriumSurfaceCoverageModel",
+    "Environment",
+    "Film1DGeometry",
     "Fungus",
+    "Geometry",
     "FirstOrderDecayProcess",
     "HomogeneousMichaelisMentenProcess",
     "IncompatibleUnitsError",
@@ -65,15 +88,24 @@ __all__ = [
     "Parameter",
     "ParameterRequirement",
     "ParameterSet",
+    "ParticleGeometry",
+    "PorousMediumGeometry",
     "Process",
     "ProcessRegistry",
     "ProductReleaseMap",
+    "OxygenModifier",
+    "PHModifier",
+    "ProductInhibitionModifier",
     "SimulationResult",
+    "SlabGeometry",
     "SolverSettings",
     "StateVariableSpec",
     "Substrate",
     "SurfaceCatalysisModel",
     "SurfaceCatalysisProcess",
+    "TemperatureModifier",
     "ValidityDomain",
+    "WaterActivityModifier",
+    "WellMixedGeometry",
     "__version__",
 ]

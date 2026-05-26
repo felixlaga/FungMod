@@ -9,6 +9,7 @@ from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.units import Q_, UnitError
 from fungal_model.fungi.enzyme_profile import EnzymeProfile
+from fungal_model.fungi.metabolism import ProductAssimilation
 
 
 FUNGAL_PARAMETER_UNITS = {
@@ -106,6 +107,7 @@ class Fungus:
     enzyme_profile: EnzymeProfile
     parameters: ParameterSet
     known_substrates: tuple[str, ...] = field(default_factory=tuple)
+    uptake_capabilities: tuple[ProductAssimilation, ...] = field(default_factory=tuple)
     oxygen_requirement: str = "unknown"
     moisture_requirement: str = "unknown"
     assumptions: tuple[Assumption, ...] = field(default_factory=lambda: (fungal_stage6_assumption(),))
@@ -119,6 +121,8 @@ class Fungus:
         require_parameter_values: bool = False,
     ) -> None:
         self.enzyme_profile.validate(allow_unsourced_for_testing=allow_unsourced_for_testing)
+        for capability in self.uptake_capabilities:
+            capability.validate(allow_unsourced_for_testing=allow_unsourced_for_testing)
         self.parameters.validate(
             allow_unsourced_for_testing=allow_unsourced_for_testing,
             require_values=require_parameter_values,
@@ -132,12 +136,22 @@ class Fungus:
                     f"Fungal parameter {symbol} must use units compatible with {units}."
                 ) from exc
 
+    def can_assimilate_product(self, product: str) -> bool:
+        normalized = product.casefold()
+        return any(
+            capability.product.casefold() == normalized and capability.assimilable
+            for capability in self.uptake_capabilities
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "species_name": self.species_name,
             "enzyme_profile": self.enzyme_profile.to_dict(),
             "parameters": self.parameters.to_dict(),
             "known_substrates": list(self.known_substrates),
+            "uptake_capabilities": [
+                capability.to_dict() for capability in self.uptake_capabilities
+            ],
             "oxygen_requirement": self.oxygen_requirement,
             "moisture_requirement": self.moisture_requirement,
             "assumptions": [assumption.to_dict() for assumption in self.assumptions],

@@ -29,6 +29,12 @@ basic kinetics layer:
   Michaelis-Menten benchmark models,
 - generic surface adsorption/catalysis process components that can run with PET
   or a dummy non-PET substrate,
+- explicit `Environment`, `Geometry`, and `Enzyme` entities for process-centered
+  assembly,
+- environment-driven temperature, pH, water-activity, oxygen, and product
+  inhibition modifiers,
+- compatibility checks for enzyme/substrate/bond/fungus pairings during model
+  assembly,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
 - a PET surface-hydrolysis benchmark example.
@@ -98,6 +104,10 @@ Each example saves a plot, simulation record, validation report, and assumptions
 - Generic surface catalysis now exists, and PET composes it through a PET
   accessibility adapter, but resolved PET product chemistry and dynamic
   morphology remain future work.
+- Geometry abstractions currently wrap well-mixed and 1D film cases; particle,
+  slab, and porous-medium geometries are honest metadata placeholders.
+- Enzyme/fungus compatibility matching checks declared capabilities, but it
+  does not yet auto-build full living-fungus ODE systems from entities.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.

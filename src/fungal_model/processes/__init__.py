@@ -3,6 +3,7 @@
 from .assembly import (
     AssembledModel,
     AssemblyReport,
+    CompatibilityIssue,
     ModelAssemblyContext,
     ModelBuilder,
     ParameterIssue,
@@ -40,6 +41,7 @@ __all__ = [
     "AssembledModel",
     "AssemblyReport",
     "BondCleavageProcess",
+    "CompatibilityIssue",
     "EquilibriumSurfaceCoverageModel",
     "FirstOrderDecayProcess",
     "HomogeneousMichaelisMentenProcess",

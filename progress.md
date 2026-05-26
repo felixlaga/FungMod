@@ -153,6 +153,123 @@ Milestone 4 verification:
 - Result: 26 passed.
 - Re-ran examples 03-06 successfully after the generic surface refactor.
 
+Most recently completed milestone: **Milestone 5: Environment object and modifiers**.
+
+Milestone 5 status: `complete` for the first environment/modifier scope.
+
+Completed in Milestone 5:
+
+- Added `src/fungal_model/entities/environment.py`.
+- Added `src/fungal_model/entities/__init__.py`.
+- Added `Environment` with temperature, pH, oxygen, water activity, nutrient,
+  ionic-strength, pressure, boundary-condition, validity-label, source, notes,
+  and assumptions fields.
+- Added environment validation and unit checks.
+- Added `src/fungal_model/modifiers/`.
+- Added environment-driven modifiers:
+  - `TemperatureModifier`
+  - `PHModifier`
+  - `WaterActivityModifier`
+  - `OxygenModifier`
+  - `ProductInhibitionModifier`
+- Added explicit assumptions for water activity, oxygen limitation, and product
+  inhibition modifiers.
+- Exposed environment and modifiers from top-level `fungal_model`.
+- Added `tests/test_environment_modifiers.py`.
+
+Milestone 5 behavior now available:
+
+- Modifiers read environmental values from an `Environment` object rather than
+  loose parameters.
+- Temperature and pH modifiers reuse the existing Arrhenius and Gaussian pH
+  implementations.
+- Water activity can explicitly block rates below a sourced threshold.
+- Oxygen can explicitly limit rates through a Monod-style activity.
+- Product inhibition can explicitly reduce rates from a named product state.
+
+Milestone 5 verification:
+
+- `./.venv/bin/python -m pytest tests/test_environment_modifiers.py tests/test_environmental_modifiers.py`
+- Result: 16 passed.
+
+Most recently completed milestone: **Milestone 6: Geometry abstraction**.
+
+Milestone 6 status: `complete` for the first geometry abstraction scope.
+
+Completed in Milestone 6:
+
+- Added `src/fungal_model/geometry/`.
+- Added base `Geometry` metadata object.
+- Added functional `WellMixedGeometry`.
+- Added functional `Film1DGeometry` wrapping the existing `UniformGrid1D`.
+- Added explicit metadata placeholders:
+  - `ParticleGeometry`
+  - `SlabGeometry`
+  - `PorousMediumGeometry`
+- Added geometry assumptions and provenance/source checks.
+- Exposed geometry classes from top-level `fungal_model`.
+- Added `tests/test_geometry_abstractions.py`.
+
+Milestone 6 behavior now available:
+
+- Well-mixed models can carry explicit volume, optional surface area, and
+  area/volume ratio metadata.
+- 1D film models can carry explicit grid and boundary-condition metadata.
+- Particle, slab, and porous-medium objects record metadata honestly without
+  pretending solver support exists.
+
+Milestone 6 verification:
+
+- `./.venv/bin/python -m pytest tests/test_geometry_abstractions.py tests/test_reaction_diffusion.py`
+- Result: 11 passed.
+
+Most recently completed milestone: **Milestone 7: Fungus/enzyme/process compatibility**.
+
+Milestone 7 status: `complete` for the first compatibility-matching scope.
+
+Completed in Milestone 7:
+
+- Added `src/fungal_model/entities/enzyme.py`.
+- Added explicit `Enzyme` entity with:
+  - enzyme class;
+  - target bond types;
+  - target substrate names/classes;
+  - catalytic and adsorption parameter sets;
+  - pH/temperature profile placeholders;
+  - validity labels;
+  - assumptions, source, and notes.
+- Added `Enzyme.compatible_with_substrate`.
+- Extended `EnzymeProfile` with `compatible_capabilities`.
+- Extended `Fungus` with explicit `uptake_capabilities` and
+  `can_assimilate_product`.
+- Extended `ModelBuilder` and `ModelAssemblyContext` with `enzymes`.
+- Added `CompatibilityIssue` to assembly reports.
+- Added assembly failure for incompatible mechanisms through
+  `InvalidMechanismError`.
+- Added compatibility checks for generic surface-catalysis processes:
+  - missing catalyst entity;
+  - incompatible enzyme/substrate/bond pairing;
+  - fungus lacking a matching enzyme capability.
+- Exposed `Enzyme` and `CompatibilityIssue` from package exports.
+- Added `tests/test_enzyme_compatibility.py`.
+- Updated `README.md`.
+
+Milestone 7 behavior now available:
+
+- Isolated enzyme surface systems can assemble without a fungus when a
+  compatible enzyme entity is supplied.
+- Living-fungus surface systems require the fungus to declare a compatible
+  enzyme capability.
+- Incompatible enzyme, substrate, and target-bond pairings fail with structured
+  assembly reports.
+- Product uptake/assimilation capability is explicit on the fungus.
+- Living-fungus process assembly can block on unknown secretion parameters.
+
+Milestone 7 verification:
+
+- `./.venv/bin/python -m pytest tests/test_enzyme_compatibility.py tests/test_process_assembly.py tests/test_fungal_dynamics.py`
+- Result: 24 passed.
+
 Completed in this slice:
 
 - Added structured assembly errors in `src/fungal_model/core/errors.py`:
@@ -786,4 +903,4 @@ Current focused verification:
 
 Current full-suite verification:
 
-- 2026-05-26: full test suite passed with 123 tests after Milestones 2-4.
+- 2026-05-26: full test suite passed with 141 tests after Milestones 5-7.

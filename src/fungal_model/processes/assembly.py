@@ -8,6 +8,7 @@ from typing import Any, Sequence
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.errors import (
     IncompatibleUnitsError,
+    InvalidMechanismError,
     MissingParameterError,
     MissingProcessError,
 )
@@ -25,6 +26,7 @@ class ModelAssemblyContext:
 
     fungus: Any | None = None
     substrates: tuple[Any, ...] = ()
+    enzymes: tuple[Any, ...] = ()
     environment: Any | None = None
     geometry: Any | None = None
     requested_processes: tuple[str, ...] = ()
@@ -33,6 +35,7 @@ class ModelAssemblyContext:
         return {
             "fungus": _entity_name(self.fungus),
             "substrates": [_entity_name(substrate) for substrate in self.substrates],
+            "enzymes": [_entity_name(enzyme) for enzyme in self.enzymes],
             "environment": _entity_name(self.environment),
             "geometry": _entity_name(self.geometry),
             "requested_processes": list(self.requested_processes),
@@ -80,6 +83,30 @@ class ParameterIssue:
 
 
 @dataclass(frozen=True)
+class CompatibilityIssue:
+    """A biological or mechanism compatibility problem discovered during assembly."""
+
+    process_name: str
+    substrate: str
+    reason: str
+    message: str
+    enzyme: str | None = None
+    fungus: str | None = None
+    bond_type: str | None = None
+
+    def to_dict(self) -> dict[str, str | None]:
+        return {
+            "process_name": self.process_name,
+            "substrate": self.substrate,
+            "enzyme": self.enzyme,
+            "fungus": self.fungus,
+            "bond_type": self.bond_type,
+            "reason": self.reason,
+            "message": self.message,
+        }
+
+
+@dataclass(frozen=True)
 class AssemblyReport:
     """Machine- and human-readable model assembly report."""
 
@@ -88,6 +115,7 @@ class AssemblyReport:
     missing_processes: tuple[MissingProcessIssue, ...] = ()
     missing_parameters: tuple[ParameterIssue, ...] = ()
     incompatible_units: tuple[ParameterIssue, ...] = ()
+    incompatible_mechanisms: tuple[CompatibilityIssue, ...] = ()
     warnings: tuple[str, ...] = ()
 
     @property
@@ -96,6 +124,7 @@ class AssemblyReport:
             not self.missing_processes
             and not self.missing_parameters
             and not self.incompatible_units
+            and not self.incompatible_mechanisms
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -114,6 +143,9 @@ class AssemblyReport:
             "incompatible_units": [
                 issue.to_dict() for issue in self.incompatible_units
             ],
+            "incompatible_mechanisms": [
+                issue.to_dict() for issue in self.incompatible_mechanisms
+            ],
             "warnings": list(self.warnings),
         }
 
@@ -123,6 +155,7 @@ class AssemblyReport:
         lines.extend(_section("missing processes", _format_missing_processes(self.missing_processes)))
         lines.extend(_section("missing parameters", _format_parameter_issues(self.missing_parameters)))
         lines.extend(_section("incompatible units", _format_parameter_issues(self.incompatible_units)))
+        lines.extend(_section("incompatible mechanisms", _format_compatibility_issues(self.incompatible_mechanisms)))
         lines.extend(_section("warnings", list(self.warnings)))
         return "\n".join(lines)
 
@@ -171,6 +204,7 @@ class ModelBuilder:
 
     fungus: Any | None = None
     substrates: Sequence[Any] = ()
+    enzymes: Sequence[Any] = ()
     environment: Any | None = None
     geometry: Any | None = None
     process_library: ProcessRegistry | None = None
@@ -186,6 +220,7 @@ class ModelBuilder:
         context = ModelAssemblyContext(
             fungus=self.fungus,
             substrates=tuple(self.substrates),
+            enzymes=tuple(self.enzymes),
             environment=self.environment,
             geometry=self.geometry,
             requested_processes=tuple(self.requested_processes),
@@ -196,12 +231,14 @@ class ModelBuilder:
             self.parameters,
             allow_unsourced_for_testing=self.allow_unsourced_for_testing,
         )
+        incompatible_mechanisms = _compatibility_issues(processes, context)
         report = AssemblyReport(
             context=context,
             matched_processes=tuple(ProcessMatch.from_process(process) for process in processes),
             missing_processes=missing_processes,
             missing_parameters=missing_parameters,
             incompatible_units=incompatible_units,
+            incompatible_mechanisms=incompatible_mechanisms,
         )
         if missing_processes:
             raise MissingProcessError("Model assembly failed: missing process.", report=report)
@@ -212,6 +249,11 @@ class ModelBuilder:
             )
         if missing_parameters:
             raise MissingParameterError("Model assembly failed: missing parameter.", report=report)
+        if incompatible_mechanisms:
+            raise InvalidMechanismError(
+                "Model assembly failed: incompatible mechanism.",
+                report=report,
+            )
 
         return AssembledModel(
             processes=processes,
@@ -228,7 +270,108 @@ class ModelBuilder:
 def _entity_name(entity: Any | None) -> str | None:
     if entity is None:
         return None
-    return str(getattr(entity, "name", entity.__class__.__name__))
+    return str(getattr(entity, "name", getattr(entity, "species_name", entity.__class__.__name__)))
+
+
+def _compatibility_issues(
+    processes: Sequence[Process],
+    context: ModelAssemblyContext,
+) -> tuple[CompatibilityIssue, ...]:
+    issues: list[CompatibilityIssue] = []
+    for process in processes:
+        site_pool = getattr(process, "accessible_site_pool", None)
+        if site_pool is None:
+            continue
+        bond_type = getattr(site_pool, "bond_type", None)
+        for substrate in context.substrates:
+            compatible_enzymes = tuple(
+                enzyme
+                for enzyme in context.enzymes
+                if _enzyme_compatible(enzyme, substrate, bond_type=bond_type)
+            )
+            if context.enzymes and not compatible_enzymes:
+                issues.append(
+                    CompatibilityIssue(
+                        process_name=process.name,
+                        substrate=_entity_name(substrate) or "unknown",
+                        enzyme=", ".join(_entity_name(enzyme) or "unknown" for enzyme in context.enzymes),
+                        bond_type=bond_type,
+                        reason="enzyme_substrate_mismatch",
+                        message=(
+                            "No supplied enzyme matches the substrate metadata, "
+                            "required enzyme class, and target bond type."
+                        ),
+                    )
+                )
+            if context.fungus is not None and not _fungus_compatible(
+                context.fungus,
+                substrate,
+                bond_type=bond_type,
+                compatible_enzymes=compatible_enzymes,
+            ):
+                issues.append(
+                    CompatibilityIssue(
+                        process_name=process.name,
+                        substrate=_entity_name(substrate) or "unknown",
+                        fungus=_entity_name(context.fungus),
+                        bond_type=bond_type,
+                        reason="fungus_lacks_capability",
+                        message=(
+                            "The supplied fungus does not declare a compatible "
+                            "enzyme capability for the substrate and bond type."
+                        ),
+                    )
+                )
+            if not context.enzymes and context.fungus is None:
+                issues.append(
+                    CompatibilityIssue(
+                        process_name=process.name,
+                        substrate=_entity_name(substrate) or "unknown",
+                        bond_type=bond_type,
+                        reason="missing_catalyst_entity",
+                        message=(
+                            "Surface catalysis assembly requires either an "
+                            "explicit enzyme entity or a fungus with a matching capability."
+                        ),
+                    )
+                )
+    return tuple(issues)
+
+
+def _enzyme_compatible(enzyme: Any, substrate: Any, *, bond_type: str | None) -> bool:
+    if hasattr(enzyme, "compatible_with_substrate"):
+        return bool(enzyme.compatible_with_substrate(substrate, bond_type=bond_type))
+    return False
+
+
+def _fungus_compatible(
+    fungus: Any,
+    substrate: Any,
+    *,
+    bond_type: str | None,
+    compatible_enzymes: Sequence[Any],
+) -> bool:
+    substrate_name = str(getattr(substrate, "name", ""))
+    if bond_type is None:
+        bonds = tuple(getattr(substrate, "accessible_bonds", ()) or getattr(substrate, "bond_types", ()))
+    else:
+        bonds = (bond_type,)
+    enzyme_classes = (
+        tuple(getattr(enzyme, "enzyme_class", "") for enzyme in compatible_enzymes)
+        or tuple(getattr(substrate, "required_enzyme_classes", ()))
+    )
+    profile = getattr(fungus, "enzyme_profile", None)
+    if profile is None:
+        return False
+    for bond in bonds:
+        for enzyme_class in enzyme_classes:
+            if profile.compatible_capabilities(
+                substrate_name=substrate_name,
+                bond_type=str(bond),
+                enzyme_class=str(enzyme_class) if enzyme_class else None,
+            ):
+                return True
+    return False
 
 
 def _parameter_issues(
@@ -355,11 +498,22 @@ def _format_parameter_issues(issues: Sequence[ParameterIssue]) -> list[str]:
     ]
 
 
+def _format_compatibility_issues(issues: Sequence[CompatibilityIssue]) -> list[str]:
+    return [
+        (
+            f"{issue.process_name} on {issue.substrate}: {issue.reason}"
+            + ("" if issue.bond_type is None else f" for bond {issue.bond_type}")
+        )
+        for issue in issues
+    ]
+
+
 __all__ = [
     "AssembledModel",
     "AssemblyReport",
     "ModelAssemblyContext",
     "ModelBuilder",
     "ParameterIssue",
+    "CompatibilityIssue",
     "ProcessMatch",
 ]

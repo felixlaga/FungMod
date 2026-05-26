@@ -107,6 +107,29 @@ class EnzymeProfile:
             for capability in self.capabilities
         )
 
+    def compatible_capabilities(
+        self,
+        *,
+        substrate_name: str,
+        bond_type: str,
+        enzyme_class: str | None = None,
+    ) -> tuple[EnzymeCapability, ...]:
+        """Return capabilities matching a substrate, bond, and optional enzyme class."""
+
+        normalized_substrate = substrate_name.casefold()
+        normalized_bond = bond_type.casefold()
+        normalized_class = None if enzyme_class is None else enzyme_class.casefold()
+        return tuple(
+            capability
+            for capability in self.capabilities
+            if capability.target_substrate.casefold() == normalized_substrate
+            and capability.target_bond_type.casefold() == normalized_bond
+            and (
+                normalized_class is None
+                or capability.enzyme_class.casefold() == normalized_class
+            )
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "capabilities": [capability.to_dict() for capability in self.capabilities],
