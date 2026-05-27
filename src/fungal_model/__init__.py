@@ -33,8 +33,10 @@ from fungal_model.io import (
     load_environment,
     load_fungus,
     load_geometry,
+    load_model_config,
     load_parameter_set,
     load_substrate,
+    ModelConfig,
 )
 from fungal_model.modifiers import (
     OxygenModifier,
@@ -50,6 +52,7 @@ from fungal_model.processes import (
     ModelBuilder,
     ParameterRequirement,
     Process,
+    ProcessLibrary,
     ProcessRegistry,
     StateVariableSpec,
     ValidityDomain,
@@ -68,7 +71,11 @@ from fungal_model.processes import (
 )
 from fungal_model.results import SimulationResult
 from fungal_model.substrates.base import Substrate
-from fungal_model.workflows import PETSurfaceWorkflowConfig, run_pet_surface_integration
+from fungal_model.workflows import (
+    ConfiguredModelExecutionError,
+    ConfiguredModelRunReport,
+    run_configured_model,
+)
 
 __all__ = [
     "AssembledModel",
@@ -78,6 +85,8 @@ __all__ = [
     "AccessibleSurfaceAreaModel",
     "BondCleavageProcess",
     "CompatibilityIssue",
+    "ConfiguredModelExecutionError",
+    "ConfiguredModelRunReport",
     "Enzyme",
     "EquilibriumSurfaceCoverageModel",
     "Environment",
@@ -92,6 +101,7 @@ __all__ = [
     "load_environment",
     "load_fungus",
     "load_geometry",
+    "load_model_config",
     "load_parameter_set",
     "load_substrate",
     "MassActionProcess",
@@ -100,13 +110,14 @@ __all__ = [
     "ModelAssemblyContext",
     "ModelAssemblyError",
     "ModelBuilder",
+    "ModelConfig",
     "Parameter",
     "ParameterRequirement",
     "ParameterSet",
-    "PETSurfaceWorkflowConfig",
     "ParticleGeometry",
     "PorousMediumGeometry",
     "Process",
+    "ProcessLibrary",
     "ProcessRegistry",
     "ProductReleaseMap",
     "OxygenModifier",
@@ -123,6 +134,6 @@ __all__ = [
     "ValidityDomain",
     "WaterActivityModifier",
     "WellMixedGeometry",
-    "run_pet_surface_integration",
+    "run_configured_model",
     "__version__",
 ]

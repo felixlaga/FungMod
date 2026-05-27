@@ -11,19 +11,19 @@ file, not normalize them.
 
 Status: active transitional debt
 
-Reason: `src/fungal_model/workflows/pet_surface_integration.py` and
-`src/fungal_model/workflows/__init__.py` predate the generic configured-model
-workflow and are still needed by existing integration tests.
+Reason: `src/fungal_model/workflows/pet_surface_integration.py` predates the
+generic configured-model workflow and is still needed by existing integration
+tests. It is no longer exported from top-level `fungal_model`, but remains
+available from `fungal_model.workflows` for compatibility.
 
 Risk: PET remains visible from the generic workflow namespace and can keep
 pulling high-level execution toward a substrate-specific path.
 
-Exit condition: introduce `run_configured_model` and migrate the PET example to
-delegate through it or move the PET-specific workflow behind a plugin/example
-boundary.
+Exit condition: migrate the PET example to delegate through
+`run_configured_model` or move the PET-specific workflow behind a
+plugin/example boundary.
 
-Removal milestone: Milestone 2 for generic-first public API deprecation, with
-full removal or plugin relocation by Milestone 8.
+Removal milestone: full removal or plugin relocation by Milestone 8.
 
 Tests protecting it: `tests/test_guardrails_no_hardcoding.py` permits only the
 current exact legacy lines and fails on new PET-specific lines in generic
@@ -66,5 +66,26 @@ Removal milestone: Milestone 7.
 
 Tests protecting it: `tests/test_guardrails_no_shortcuts.py` makes this the
 only non-abstract public `NotImplementedError` allowance in high-risk source
-paths, and `tests/test_guardrails_public_api.py` marks the next generic public
-API names without faking them.
+paths, and `tests/test_guardrails_public_api.py` requires generic public API
+names without faking end-to-end execution.
+
+## FD-004 Configured-model runner is a structural preflight boundary
+
+Status: active transitional debt
+
+Reason: Milestone 2 introduces `run_configured_model` as the generic public
+entry point before registry-based entity loading, process factories, native
+assembled-model execution, and configured output bundles exist.
+
+Risk: users can see the correct generic entry point before it can execute a
+model end to end.
+
+Exit condition: `run_configured_model` loads entities through registries,
+builds processes through factories, assembles a model, calls
+`AssembledModel.run()`, validates the result, and saves the output bundle.
+
+Removal milestone: Milestone 8.
+
+Tests protecting it: `tests/test_guardrails_public_api.py` requires the public
+API names to exist and checks that `run_configured_model` fails with a
+structured report rather than silently constructing a substrate-specific path.

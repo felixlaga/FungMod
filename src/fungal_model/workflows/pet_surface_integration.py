@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -65,6 +66,14 @@ def run_pet_surface_integration(
 ) -> SimulationResult:
     """Run the first registry-assembled PET surface workflow."""
 
+    warnings.warn(
+        (
+            "This substrate-specific integration workflow is deprecated; use "
+            "the generic configured-model API for new workflow code."
+        ),
+        DeprecationWarning,
+        stacklevel=2,
+    )
     config = config or PETSurfaceWorkflowConfig.default()
     substrate = load_substrate(config.substrate_path)
     enzyme = load_enzyme(config.enzyme_path)

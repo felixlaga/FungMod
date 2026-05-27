@@ -125,19 +125,27 @@ range, units, and value fields. Unknown scientific values should be written as
 
 ## Integration Workflow
 
-The first full integration workflow is available as:
+The generic configured-model API is the public workflow entry point:
 
 ```python
-from fungal_model import run_pet_surface_integration
+from fungal_model import ConfiguredModelExecutionError, load_model_config, run_configured_model
 
-result = run_pet_surface_integration("outputs/pet_surface_integration")
+config = load_model_config("path/to/model_config.yml")
+try:
+    run_configured_model("path/to/model_config.yml")
+except ConfiguredModelExecutionError as exc:
+    report = exc.report.to_dict()
 ```
 
-It loads the example PET film, PETase-like enzyme, toy fungus, lab environment,
-well-mixed geometry, and benchmark parameter configs; assembles the generic
-surface-catalysis process through `ModelBuilder`; runs the current ODE engine;
-validates non-negativity and mass balance; and writes standardized reports,
-tables, logs, figures, input-config snapshots, and entity JSON files.
+At the current foundation stage, `load_model_config` validates the generic
+top-level config contract. `run_configured_model` loads the config and fails
+with a structured report until registry-based entity loading, process
+factories, native `AssembledModel.run()`, and configured output bundles are in
+place.
+
+The older PET surface integration remains available from
+`fungal_model.workflows` as a deprecated compatibility workflow for existing
+tests and examples.
 
 ## Current Limitations
 

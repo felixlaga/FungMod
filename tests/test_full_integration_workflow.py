@@ -15,7 +15,8 @@ DATA = ROOT / "data"
 
 
 def test_pet_surface_integration_workflow_saves_full_output_folder(tmp_path) -> None:
-    result = run_pet_surface_integration(tmp_path / "run")
+    with pytest.warns(DeprecationWarning):
+        result = run_pet_surface_integration(tmp_path / "run")
 
     assert result.assembly_report is not None
     assert result.assembly_report.success
@@ -69,7 +70,7 @@ def test_missing_pet_accessible_surface_fails_honestly(tmp_path) -> None:
         parameters_path=config.parameters_path,
     )
 
-    with pytest.raises(MissingParameterError) as exc_info:
+    with pytest.warns(DeprecationWarning), pytest.raises(MissingParameterError) as exc_info:
         run_pet_surface_integration(tmp_path / "bad_run", config=config)
 
     issue = exc_info.value.report.missing_parameters[0]
@@ -96,7 +97,7 @@ def test_changing_enzyme_config_changes_model_assembly(tmp_path) -> None:
         parameters_path=default.parameters_path,
     )
 
-    with pytest.raises(InvalidMechanismError) as exc_info:
+    with pytest.warns(DeprecationWarning), pytest.raises(InvalidMechanismError) as exc_info:
         run_pet_surface_integration(tmp_path / "bad_enzyme_run", config=config)
 
     reasons = {issue.reason for issue in exc_info.value.report.incompatible_mechanisms}

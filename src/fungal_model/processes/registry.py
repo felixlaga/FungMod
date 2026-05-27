@@ -106,4 +106,17 @@ class ProcessRegistry:
         }
 
 
-__all__ = ["MissingProcessIssue", "ProcessRegistry"]
+class ProcessLibrary(ProcessRegistry):
+    """Public process library for already-built foundation process objects."""
+
+    @classmethod
+    def default_foundation(cls) -> "ProcessLibrary":
+        """Return the default foundation process library."""
+
+        return cls()
+
+    def register_process(self, process: Process) -> None:
+        self.register(process)
+
+
+__all__ = ["MissingProcessIssue", "ProcessLibrary", "ProcessRegistry"]

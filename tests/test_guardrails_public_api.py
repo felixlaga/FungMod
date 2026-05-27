@@ -2,40 +2,96 @@ from __future__ import annotations
 
 import inspect
 
+import pytest
+
 import fungal_model
-from fungal_model.processes import ModelBuilder, ProcessRegistry
+from fungal_model.processes import ModelBuilder, ProcessLibrary, ProcessRegistry
 from fungal_model.results import SimulationResult
-
-
-NEXT_MILESTONE_PUBLIC_API = (
-    "run_configured_model",
-    "load_model_config",
-    "ProcessLibrary",
-)
+from fungal_model.workflows import ConfiguredModelExecutionError
 
 
 def test_current_foundation_public_api_is_exported() -> None:
     assert inspect.isclass(ModelBuilder)
     assert inspect.isclass(ProcessRegistry)
+    assert inspect.isclass(ProcessLibrary)
     assert inspect.isclass(SimulationResult)
     assert fungal_model.ModelBuilder is ModelBuilder
     assert fungal_model.ProcessRegistry is ProcessRegistry
+    assert fungal_model.ProcessLibrary is ProcessLibrary
     assert fungal_model.SimulationResult is SimulationResult
+    assert callable(fungal_model.load_model_config)
+    assert callable(fungal_model.run_configured_model)
 
 
-def test_process_registry_or_future_process_library_is_available() -> None:
-    process_library = getattr(fungal_model, "ProcessLibrary", None)
-    assert inspect.isclass(process_library) or inspect.isclass(ProcessRegistry)
+def test_top_level_api_is_generic_first() -> None:
+    assert not hasattr(fungal_model, "run_pet_surface_integration")
+    assert not hasattr(fungal_model, "PETSurfaceWorkflowConfig")
 
 
-def test_next_milestone_public_api_is_not_faked_when_introduced() -> None:
-    # TODO Milestone 2: require these names once generic configured execution is
-    # introduced. For Milestone 1, absence is honest; placeholder exports are not.
-    for name in NEXT_MILESTONE_PUBLIC_API:
-        candidate = getattr(fungal_model, name, None)
-        if candidate is None:
-            continue
+def test_public_api_names_are_not_unfinished_placeholders() -> None:
+    for candidate in (
+        fungal_model.load_model_config,
+        fungal_model.run_configured_model,
+        fungal_model.ProcessLibrary,
+    ):
         source = inspect.getsource(candidate).lower()
         assert "notimplementederror" not in source
         assert "placeholder" not in source
         assert "todo" not in source
+
+
+def test_load_model_config_validates_generic_top_level_contract(tmp_path) -> None:
+    config_path = tmp_path / "toy_model.yml"
+    config_path.write_text(
+        """
+kind: model_config
+name: toy generic shell
+mode: toy
+maturity: framework_benchmark
+entities: {}
+parameters: []
+processes: []
+initial_state: {}
+time: {}
+validators: []
+outputs: {}
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    config = fungal_model.load_model_config(config_path)
+
+    assert config.kind == "model_config"
+    assert config.name == "toy generic shell"
+    assert config.validate().passed
+    assert config.to_dict()["maturity"] == "framework_benchmark"
+
+
+def test_run_configured_model_fails_with_structured_report(tmp_path) -> None:
+    config_path = tmp_path / "toy_model.yml"
+    config_path.write_text(
+        """
+kind: model_config
+name: toy generic shell
+mode: toy
+maturity: framework_benchmark
+entities: {}
+parameters: []
+processes: []
+initial_state: {}
+time: {}
+validators: []
+outputs: {}
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        fungal_model.run_configured_model(config_path)
+
+    report = exc_info.value.report
+    assert report.config_name == "toy generic shell"
+    assert report.stage == "configured_model_execution"
+    assert "entity_loader_registries" in report.missing_capabilities
+    assert "process_factory_library" in report.missing_capabilities
+    assert report.to_dict()["config_path"] == str(config_path)

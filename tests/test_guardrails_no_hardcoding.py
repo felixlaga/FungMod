@@ -46,7 +46,7 @@ LEGACY_ALLOWLISTED_LINES = {
     },
     "src/fungal_model/workflows/__init__.py": {
         "from .pet_surface_integration import PETSurfaceWorkflowConfig, run_pet_surface_integration",
-        '__all__ = ["PETSurfaceWorkflowConfig", "run_pet_surface_integration"]',
+        '"run_pet_surface_integration",',
     },
     "src/fungal_model/workflows/pet_surface_integration.py": {
         '"""First config-driven PET surface integration workflow."""',

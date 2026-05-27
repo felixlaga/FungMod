@@ -55,6 +55,44 @@ Next foundation milestone: Milestone 2, generic public API names
 (`run_configured_model`, `load_model_config`, and future `ProcessLibrary`)
 without faking runnable implementation.
 
+## Foundation-First Reset: Milestone 2 Generic Public API
+
+Date: 2026-05-27
+
+Status: `complete` for generic-first public API introduction.
+
+Completed in this foundation-first pass:
+
+- Added `src/fungal_model/io/model_config.py` with a real `ModelConfig`,
+  `load_model_config`, and top-level generic model-config validation.
+- Added `src/fungal_model/workflows/configured_model.py` with
+  `run_configured_model`.
+- Made `run_configured_model` load the generic config and fail with a
+  structured `ConfiguredModelRunReport` until registry loading, process
+  factories, native `AssembledModel.run()`, and configured output bundles exist.
+- Added `ProcessLibrary` as the public foundation process-library name over
+  current already-built process objects.
+- Exposed `load_model_config`, `run_configured_model`, `ProcessLibrary`,
+  `ModelConfig`, `ConfiguredModelExecutionError`, and
+  `ConfiguredModelRunReport` from top-level `fungal_model`.
+- Removed `run_pet_surface_integration` and `PETSurfaceWorkflowConfig` from
+  top-level `fungal_model` exports.
+- Kept the legacy PET workflow available from `fungal_model.workflows` and made
+  it emit a `DeprecationWarning`.
+- Updated README workflow guidance to point at the generic configured-model API.
+- Updated `ARCHITECTURE_DEBT.md` with `FD-004` for the structural preflight
+  runner boundary.
+
+Verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py tests/test_full_integration_workflow.py`
+- Result: 12 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 162 passed.
+
+Next foundation milestone: Milestone 3, registry-based loading for substrates,
+geometries, product maps, and validators.
+
 ## Current Roadmap Slice
 
 Current active milestone: **Milestones 1-10 complete for the first roadmap

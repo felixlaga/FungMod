@@ -21,7 +21,7 @@ from .homogeneous import (
     MassActionProcess,
     homogeneous_process_assumption,
 )
-from .registry import MissingProcessIssue, ProcessRegistry
+from .registry import MissingProcessIssue, ProcessLibrary, ProcessRegistry
 from .surface import (
     AccessibleSitePool,
     AccessibleSurfaceAreaModel,
@@ -53,6 +53,7 @@ __all__ = [
     "ParameterIssue",
     "ParameterRequirement",
     "Process",
+    "ProcessLibrary",
     "ProcessMatch",
     "ProcessRegistry",
     "ProductReleaseMap",
