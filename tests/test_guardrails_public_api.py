@@ -52,7 +52,14 @@ entities: {}
 parameters: []
 processes: []
 initial_state: {}
-time: {}
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 1.0
+    units: second
+  points: 2
 validators: []
 outputs: {}
 """.lstrip(),
@@ -79,7 +86,14 @@ entities: {}
 parameters: []
 processes: []
 initial_state: {}
-time: {}
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 1.0
+    units: second
+  points: 2
 validators: []
 outputs: {}
 """.lstrip(),

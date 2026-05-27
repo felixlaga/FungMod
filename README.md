@@ -112,11 +112,20 @@ rate laws/classes inline, and execute the quickstart smoke path.
 
 ## Data And Configs
 
-Top-level YAML configs live under `data/fungi/`, `data/substrates/`,
-`data/enzymes/`, `data/environments/`, `data/geometries/`,
+Top-level YAML configs live under `data/model_configs/`, `data/fungi/`,
+`data/substrates/`, `data/enzymes/`, `data/environments/`, `data/geometries/`,
 `data/parameters/`, and `data/experiments/`. Loaders are exposed from
 `fungal_model` as `load_fungus`, `load_substrate`, `load_enzyme`,
 `load_environment`, `load_geometry`, and `load_parameter_set`.
+
+Foundation model-config shells are available for:
+
+- `data/model_configs/toy_homogeneous_ab.yml`
+- `data/model_configs/toy_surface_pet_plugin.yml`
+- `data/model_configs/toy_surface_dummy_non_pet.yml`
+
+All three load through `load_model_config`. They are framework benchmarks, not
+scientific biology.
 
 Substrate, geometry, product-map, and validator loading now goes through
 registries. The default substrate registry is generic-first and supports

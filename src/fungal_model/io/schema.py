@@ -56,25 +56,26 @@ def validate_config(data: Mapping[str, Any]) -> SchemaValidationResult:
         )
         _validate_units(provenance.get("units"), "provenance.units")
 
-    for index, parameter in enumerate(data.get("parameters", []) or []):
-        if not isinstance(parameter, Mapping):
-            missing.append(f"parameters[{index}]")
-            continue
-        for field in (
-            "name",
-            "symbol",
-            "value",
-            "units",
-            "source",
-            "confidence_level",
-            "notes",
-            "measurement_method",
-            "validity_range",
-        ):
-            if field not in parameter:
-                missing.append(f"parameters[{index}].{field}")
-        if "units" in parameter:
-            _validate_units(parameter["units"], f"parameters[{index}].units")
+    if data.get("kind") != "model_config":
+        for index, parameter in enumerate(data.get("parameters", []) or []):
+            if not isinstance(parameter, Mapping):
+                missing.append(f"parameters[{index}]")
+                continue
+            for field in (
+                "name",
+                "symbol",
+                "value",
+                "units",
+                "source",
+                "confidence_level",
+                "notes",
+                "measurement_method",
+                "validity_range",
+            ):
+                if field not in parameter:
+                    missing.append(f"parameters[{index}].{field}")
+            if "units" in parameter:
+                _validate_units(parameter["units"], f"parameters[{index}].units")
 
     if missing:
         raise SchemaValidationError(

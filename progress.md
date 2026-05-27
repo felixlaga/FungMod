@@ -134,6 +134,47 @@ Verification:
 Next foundation milestone: Milestone 4, model config object expansion for
 homogeneous, PET plugin, and dummy non-PET configs.
 
+## Foundation-First Reset: Milestone 4 Model Config Objects
+
+Date: 2026-05-27
+
+Status: `complete` for generic model-config object loading.
+
+Completed in this foundation-first pass:
+
+- Expanded `src/fungal_model/io/model_config.py` from top-level validation into
+  structured config objects:
+  - `ConfigReference`;
+  - `EntityConfigRefs`;
+  - `ParameterSetConfig`;
+  - `ProcessConfig`;
+  - `InitialStateConfig`;
+  - `TimeConfig`;
+  - `ValidatorConfig`;
+  - `OutputConfig`.
+- Kept `load_model_config` generic and made it return structured sections
+  without executing loaders, factories, or solvers.
+- Added canonical foundation model-config shells:
+  - `data/model_configs/toy_homogeneous_ab.yml`;
+  - `data/model_configs/toy_surface_pet_plugin.yml`;
+  - `data/model_configs/toy_surface_dummy_non_pet.yml`.
+- The plugin surface config and dummy non-PET surface config use the same
+  `surface_catalysis` process shape and configured state mappings.
+- Updated schema validation so `model_config` records are treated as
+  config-of-configs rather than raw parameter-set files.
+- Added `tests/test_model_config_loading.py`.
+- Updated README data/config guidance.
+
+Verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_model_config_loading.py tests/test_config_io.py tests/test_guardrails_public_api.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py`
+- Result: 21 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 174 passed.
+
+Next foundation milestone: Milestone 5, product-map configs and loader path
+for configured product-state mappings.
+
 ## Current Roadmap Slice
 
 Current active milestone: **Milestones 1-10 complete for the first roadmap

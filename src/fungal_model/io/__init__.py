@@ -2,9 +2,17 @@
 
 from .json_export import export_json
 from .model_config import (
+    ConfigReference,
+    EntityConfigRefs,
+    InitialStateConfig,
     ModelConfig,
     ModelConfigError,
     ModelConfigValidationResult,
+    OutputConfig,
+    ParameterSetConfig,
+    ProcessConfig,
+    TimeConfig,
+    ValidatorConfig,
     load_model_config,
     validate_model_config_mapping,
 )
@@ -30,8 +38,11 @@ from .yaml_loader import (
 __all__ = [
     "SchemaValidationError",
     "SchemaValidationResult",
+    "ConfigReference",
+    "EntityConfigRefs",
     "export_json",
     "GeometryLoaderRegistry",
+    "InitialStateConfig",
     "load_enzyme",
     "load_environment",
     "load_fungus",
@@ -43,12 +54,17 @@ __all__ = [
     "ModelConfig",
     "ModelConfigError",
     "ModelConfigValidationResult",
+    "OutputConfig",
     "parameter_from_config",
     "parameter_set_from_config",
+    "ParameterSetConfig",
+    "ProcessConfig",
     "ProductMapRegistry",
     "RegistryLookupError",
     "SubstrateLoaderRegistry",
     "validate_config",
     "validate_model_config_mapping",
+    "TimeConfig",
+    "ValidatorConfig",
     "ValidatorRegistry",
 ]
