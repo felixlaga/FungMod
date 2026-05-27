@@ -14,8 +14,11 @@ NOTEBOOKS = [
 ]
 
 
+NOTEBOOK_DIR = Path(__file__).resolve().parents[1] / "notebooks" / "examples"
+
+
 def load_notebook(name: str) -> dict:
-    path = Path(__file__).resolve().parents[1] / "notebooks" / name
+    path = NOTEBOOK_DIR / name
     return json.loads(path.read_text(encoding="utf-8"))
 
 

@@ -19,6 +19,42 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## Foundation-First Reset: Milestone 1 Governance Gate
+
+Date: 2026-05-27
+
+Status: `complete` for the initial governance and architecture guardrail scope.
+
+Completed in this foundation-first pass:
+
+- Added `ARCHITECTURE_DEBT.md` as the required containment register for
+  temporary architecture compromises.
+- Documented the current narrow transitional debts:
+  - `FD-001`: legacy PET workflow still exported from generic workflows;
+  - `FD-002`: PET-only substrate branch in YAML loading;
+  - `FD-003`: `AssembledModel.run()` is still non-native execution debt.
+- Added guardrail tests for:
+  - PET/product hardcoding in generic source paths;
+  - shortcut/fallback patterns in high-risk modules;
+  - current and next-milestone public API expectations.
+- Added a GitHub PR template requiring scope, tests, limitations, shortcut
+  removal, architecture debt, and progress-doc updates.
+- Added a minimal GitHub Actions CI workflow that installs `.[dev]` and runs
+  `pytest`.
+- Updated the notebook test path to the actual `notebooks/examples/` location
+  so notebook smoke checks execute rather than failing on discovery.
+
+Verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py`
+- Result: 7 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 160 passed.
+
+Next foundation milestone: Milestone 2, generic public API names
+(`run_configured_model`, `load_model_config`, and future `ProcessLibrary`)
+without faking runnable implementation.
+
 ## Current Roadmap Slice
 
 Current active milestone: **Milestones 1-10 complete for the first roadmap

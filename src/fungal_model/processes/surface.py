@@ -32,7 +32,7 @@ def surface_catalysis_assumption() -> Assumption:
         ),
         justification=(
             "Surface-limited solid-substrate models need a generic mechanism "
-            "that is independent of any named substrate such as PET."
+            "that is independent of any named substrate."
         ),
         known_limitations=(
             "Does not model dynamic adsorption/desorption state variables, "

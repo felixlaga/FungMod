@@ -1,5 +1,14 @@
 # FungMod
 
+Before implementing any new feature, read:
+foundation_progress/00_START_HERE_FOUNDATION_FIRST.md
+foundation_progress/01_CODEX_NO_SHORTCUT_CONTRACT.md
+foundation_progress/02_GUARDRAILS_AND_TESTS_SPEC.md
+foundation_progress/11_MILESTONE_SEQUENCE_FOUNDATION_ONLY.md
+
+Do not implement real biology yet. First complete the foundation milestones: remove hardcoding, implement native model execution, implement generic configured workflows, add guardrails, and make the package architecture Atmodeller-grade.
+
+
 FungMod is a scientific Python codebase for building a physically grounded fungal-substrate degradation model. The long-term target is a modular API that can simulate a fungus, substrate, environment, geometry, and parameter set without hiding assumptions or provenance.
 
 This repository currently implements the validated foundation plus the first
