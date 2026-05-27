@@ -5,19 +5,31 @@ import inspect
 import pytest
 
 import fungal_model
-from fungal_model.processes import ModelBuilder, ProcessLibrary, ProcessRegistry
+from fungal_model.processes import (
+    AssembledModel,
+    ModelBuilder,
+    ProcessLibrary,
+    ProcessRegistry,
+)
 from fungal_model.results import SimulationResult
+from fungal_model.solvers import ProcessODESolver, RunRequest
 from fungal_model.workflows import ConfiguredModelExecutionError
 
 
 def test_current_foundation_public_api_is_exported() -> None:
+    assert inspect.isclass(AssembledModel)
     assert inspect.isclass(ModelBuilder)
     assert inspect.isclass(ProcessRegistry)
     assert inspect.isclass(ProcessLibrary)
+    assert inspect.isclass(ProcessODESolver)
+    assert inspect.isclass(RunRequest)
     assert inspect.isclass(SimulationResult)
+    assert fungal_model.AssembledModel is AssembledModel
     assert fungal_model.ModelBuilder is ModelBuilder
     assert fungal_model.ProcessRegistry is ProcessRegistry
     assert fungal_model.ProcessLibrary is ProcessLibrary
+    assert fungal_model.ProcessODESolver is ProcessODESolver
+    assert fungal_model.RunRequest is RunRequest
     assert fungal_model.SimulationResult is SimulationResult
     assert callable(fungal_model.load_model_config)
     assert callable(fungal_model.run_configured_model)
@@ -33,6 +45,7 @@ def test_public_api_names_are_not_unfinished_placeholders() -> None:
         fungal_model.load_model_config,
         fungal_model.run_configured_model,
         fungal_model.ProcessLibrary,
+        fungal_model.AssembledModel.run,
     ):
         source = inspect.getsource(candidate).lower()
         assert "notimplementederror" not in source

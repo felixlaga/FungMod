@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.errors import (
@@ -15,9 +15,12 @@ from fungal_model.core.errors import (
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.provenance import ProvenanceError, UnknownParameterError
 from fungal_model.core.simulation import SolverSettings
-from fungal_model.core.units import UnitError, assert_compatible
+from fungal_model.core.units import Quantity, UnitError, assert_compatible
 from fungal_model.processes.base import Process, StateVariableSpec
 from fungal_model.processes.registry import MissingProcessIssue, ProcessRegistry
+
+if TYPE_CHECKING:
+    from fungal_model.results import SimulationResult
 
 
 @dataclass(frozen=True)
@@ -173,14 +176,29 @@ class AssembledModel:
     solver_settings: SolverSettings
     assembly_report: AssemblyReport
 
-    def run(self, *args: Any, **kwargs: Any) -> Any:
-        """Placeholder until solver-backed process execution is implemented."""
+    def run(
+        self,
+        *,
+        initial_state: dict[str, Quantity],
+        t_span: tuple[Quantity, Quantity],
+        t_eval: Quantity | None = None,
+        validators: Sequence[Any] = (),
+        label: str = "toy",
+        name: str = "assembled_model",
+    ) -> "SimulationResult":
+        """Run this assembled model through the process ODE solver."""
 
-        del args, kwargs
-        raise NotImplementedError(
-            "Process-centered solver execution is scheduled after Milestone 1. "
-            "Use the existing SimulationEngine or ReactionDiffusionEngine1D for "
-            "current runnable models."
+        from fungal_model.solvers import ProcessODESolver, RunRequest
+
+        return ProcessODESolver(self).run(
+            RunRequest(
+                initial_state=initial_state,
+                t_span=t_span,
+                t_eval=t_eval,
+                validators=tuple(validators),
+                label=label,
+                name=name,
+            )
         )
 
     def to_dict(self) -> dict[str, Any]:

@@ -138,6 +138,12 @@ homogeneous Michaelis-Menten, and generic surface-catalysis benchmark
 processes. These are framework mechanisms, not organism- or substrate-specific
 biology.
 
+Assembled process models now support native well-mixed execution through
+`AssembledModel.run()`. The method delegates to `ProcessODESolver`, returns a
+standard `SimulationResult`, records process-rate trajectories, runs supplied
+validators, and rejects unsupported geometry instead of silently switching
+execution paths.
+
 Substrate, geometry, product-map, and validator loading now goes through
 registries. The default substrate registry is generic-first and supports
 foundation benchmark substrates such as `generic_solid` and
@@ -174,10 +180,9 @@ except ConfiguredModelExecutionError as exc:
 ```
 
 At the current foundation stage, `load_model_config` validates the generic
-top-level config contract. `run_configured_model` loads the config and fails
-with a structured report until registry-based entity loading, process
-factories, native `AssembledModel.run()`, and configured output bundles are in
-place.
+top-level config contract. `run_configured_model` remains a structural preflight
+boundary while config-driven assembly and output-bundle wiring are completed.
+Native execution itself is available through `AssembledModel.run()`.
 
 The older PET surface integration remains available from
 `fungal_model.workflows` as a deprecated compatibility workflow for existing
@@ -201,10 +206,12 @@ tests and examples.
 - Universal substrate modules record bond classes, required enzyme classes, and product classes, but they do not implement substrate-specific kinetics, accessibility models, thermodynamic constraints, or assimilation evidence.
 - Calibration utilities are generic least-squares tools; no literature data are bundled and no parameters are calibrated by default.
 - Monte Carlo and local sensitivity utilities require explicit uncertainty/perturbation specifications; Bayesian calibration and global sensitivity are not implemented.
-- The process-centered `ModelBuilder` currently assembles and reports process
-  requirements, but process-native solver execution is not implemented yet.
-- The standardized `results.SimulationResult` wraps existing ODE/spatial
-  results; future milestones should make it the native solver output.
+- `AssembledModel.run()` currently supports well-mixed process ODE execution;
+  unsupported geometry fails before simulation.
+- The generic configured workflow still does not assemble, run, validate, and
+  save a complete output bundle from model configs end to end.
+- The standardized `results.SimulationResult` is now native output for
+  `AssembledModel.run()` and still wraps older adapter workflows.
 - Generic surface catalysis now exists, and PET composes it through a PET
   accessibility adapter, but resolved PET product chemistry and dynamic
   morphology remain future work.
@@ -212,9 +219,8 @@ tests and examples.
   slab, and porous-medium geometries are honest metadata placeholders.
 - Enzyme/fungus compatibility matching checks declared capabilities, but it
   does not yet auto-build full living-fungus ODE systems from entities.
-- The config-driven PET integration workflow is intentionally a first complete
-  slice: it still uses a lumped hydrolysate state and the current ODE adapter,
-  not native `AssembledModel.run()` execution.
+- The config-driven PET integration workflow is a deprecated compatibility
+  slice; the generic configured workflow is the main foundation path.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.

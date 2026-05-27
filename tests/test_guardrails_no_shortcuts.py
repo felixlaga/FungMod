@@ -33,19 +33,11 @@ ABSTRACT_INTERFACE_LINES = {
     },
 }
 
-TRANSITIONAL_DEBT_LINES = {
-    "src/fungal_model/processes/assembly.py": {
-        '"""Placeholder until solver-backed process execution is implemented."""',
-        "raise NotImplementedError(",
-    },
-}
-
-
 def test_no_undocumented_shortcut_patterns_in_high_risk_modules() -> None:
     violations: list[str] = []
     for path in _python_files(HIGH_RISK_PATHS):
         relative = path.relative_to(ROOT).as_posix()
-        allowed_lines = ABSTRACT_INTERFACE_LINES.get(relative, set()) | TRANSITIONAL_DEBT_LINES.get(relative, set())
+        allowed_lines = ABSTRACT_INTERFACE_LINES.get(relative, set())
         for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             stripped = line.strip()
             for label, pattern in SUSPICIOUS_PATTERNS.items():
@@ -67,6 +59,8 @@ def test_shortcut_allowlist_is_documented_as_architecture_debt() -> None:
     debt = (ROOT / "ARCHITECTURE_DEBT.md").read_text(encoding="utf-8")
     assert "FD-003" in debt
     assert "AssembledModel.run" in debt
+    assert "resolved in Milestone 7" in debt
+    assert "tests/test_native_assembled_model_run.py" in debt
     assert "tests/test_guardrails_no_shortcuts.py" in debt
 
 

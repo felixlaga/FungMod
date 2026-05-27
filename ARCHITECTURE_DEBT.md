@@ -50,25 +50,29 @@ PET-specific lines in generic IO paths, and
 `tests/test_registry_based_loading.py` verifies both default non-PET loading
 and explicit PET plugin loading.
 
-## FD-003 `AssembledModel.run()` is not native execution yet
+## FD-003 `AssembledModel.run()` native execution
 
-Status: active transitional debt
+Status: resolved in Milestone 7
 
-Reason: `AssembledModel.run()` exists as a public method but still raises
-`NotImplementedError` until the process-centered ODE solver is introduced.
+Reason: `AssembledModel.run()` existed as a public method before native
+process-centered ODE execution was available.
 
 Risk: high-level workflows may continue manually constructing lower-level
 solvers instead of routing through the assembled model.
 
-Exit condition: implement solver-backed native execution on `AssembledModel.run`
-that returns `fungal_model.results.SimulationResult`.
+Exit condition: met. `AssembledModel.run()` now delegates to
+`ProcessODESolver`, builds derivatives from process `rate()` and
+`contributions()`, records process-rate trajectories, runs validators, and
+returns `fungal_model.results.SimulationResult`.
 
-Removal milestone: Milestone 7.
+Removal milestone: resolved in Milestone 7.
 
-Tests protecting it: `tests/test_guardrails_no_shortcuts.py` makes this the
-only non-abstract public `NotImplementedError` allowance in high-risk source
-paths, and `tests/test_guardrails_public_api.py` requires generic public API
-names without faking end-to-end execution.
+Tests protecting it: `tests/test_native_assembled_model_run.py` verifies native
+first-order and non-PET surface execution through `AssembledModel.run()`.
+`tests/test_guardrails_no_shortcuts.py` no longer allows a public
+`NotImplementedError` in `AssembledModel.run()`, and
+`tests/test_guardrails_public_api.py` requires the generic public API names
+without faking end-to-end execution.
 
 ## FD-004 Configured-model runner is a structural preflight boundary
 

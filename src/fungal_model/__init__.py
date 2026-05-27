@@ -91,6 +91,7 @@ from fungal_model.processes import (
     CompatibilityIssue,
 )
 from fungal_model.results import SimulationResult
+from fungal_model.solvers import ProcessODESolver, RunRequest
 from fungal_model.substrates.base import Substrate
 from fungal_model.workflows import (
     ConfiguredModelExecutionError,
@@ -154,9 +155,11 @@ __all__ = [
     "ProcessConfig",
     "ProcessLibrary",
     "ProcessRegistry",
+    "ProcessODESolver",
     "ProductMapRegistry",
     "ProductReleaseMap",
     "RegistryLookupError",
+    "RunRequest",
     "OxygenModifier",
     "PHModifier",
     "ProductInhibitionModifier",

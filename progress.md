@@ -1284,3 +1284,39 @@ Milestone 10 verification:
 
 - `./.venv/bin/python -m pytest tests/test_full_integration_workflow.py`
 - Result: 3 passed.
+
+## Foundation-First Reset: Milestone 7 Native AssembledModel.run
+
+Date: 2026-05-27
+
+Milestone 7 status: `complete` for the first native assembled-model execution
+scope.
+
+Completed in Milestone 7:
+
+- Added `src/fungal_model/solvers/process_ode.py`.
+- Added `RunRequest` and `ProcessODESolver`.
+- Implemented `AssembledModel.run()` as a real public execution method.
+- `AssembledModel.run()` now delegates to the process ODE solver and returns a
+  standardized `SimulationResult`.
+- The solver builds derivatives from registered process `rate()` and
+  `contributions()` methods.
+- Process-rate trajectories are recorded into `SimulationResult.process_rates`.
+- Model-level and request-level validators are run against the result.
+- Unsupported geometry and mismatched initial states fail before simulation
+  with structural `ValueError` messages.
+- Resolved architecture debt `FD-003`; the shortcut guardrail no longer
+  allowlists public `NotImplementedError` in `AssembledModel.run()`.
+
+Milestone 7 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_native_assembled_model_run.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_public_api.py`
+- Result: 13 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 192 passed.
+
+Next milestone:
+
+- Milestone 8: wire the generic `run_configured_model` workflow into config
+  loading, registries, process factories, `AssembledModel.run()`, result
+  validation, and output-bundle saving.
