@@ -207,6 +207,50 @@ Verification:
 
 Next foundation milestone: Milestone 6, process factory library foundation.
 
+## Foundation-First Reset: Milestone 6 Process Factory Library
+
+Date: 2026-05-27
+
+Status: `complete` for the foundation process-factory layer.
+
+Completed in this foundation-first pass:
+
+- Added `src/fungal_model/processes/factories.py` with:
+  - `BuildDecision`;
+  - `ProcessBuildContext`;
+  - `ProcessFactory`;
+  - `FirstOrderFactory`;
+  - `MassActionFactory`;
+  - `HomogeneousMichaelisMentenFactory`;
+  - `SurfaceCatalysisFactory`;
+  - `default_foundation_factories`.
+- Extended `ProcessLibrary` so it can register factories, reject duplicate
+  factories, return a factory by process type, build decisions, and build
+  process objects from structured `ProcessConfig` entries.
+- Kept existing `ProcessRegistry` behavior intact for already-built process
+  objects.
+- Verified that:
+  - homogeneous `toy_homogeneous_ab.yml` builds through the first-order factory;
+  - plugin surface and dummy non-PET surface configs build through the same
+    generic surface factory;
+  - mass-action and homogeneous Michaelis-Menten factories build generic process
+    objects;
+  - missing state units/product maps produce structured `BuildDecision`
+    failures;
+  - the factory module contains no plugin imports or domain names.
+- Updated `run_configured_model` preflight reporting so it now names missing
+  process-factory wiring, not a missing process-factory library.
+- Updated README process-library guidance.
+
+Verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_process_factory_library.py tests/test_model_config_loading.py tests/test_product_map_configs.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py`
+- Result: 29 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 188 passed.
+
+Next foundation milestone: Milestone 7, native `AssembledModel.run()`.
+
 ## Current Roadmap Slice
 
 Current active milestone: **Milestones 1-10 complete for the first roadmap

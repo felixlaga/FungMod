@@ -57,14 +57,15 @@ def _execution_not_ready_report(config: ModelConfig) -> ConfiguredModelRunReport
         stage="configured_model_execution",
         missing_capabilities=(
             "entity_loader_registries",
-            "process_factory_library",
+            "configured_process_factory_wiring",
             "native_assembled_model_run",
             "configured_output_bundle",
         ),
         message=(
             "The generic configured-model runner loaded the config, but cannot "
-            "assemble and execute it until entity registries, process factories, "
-            "native assembled-model execution, and configured output saving are available."
+            "assemble and execute it until entity registries, process-factory "
+            "wiring, native assembled-model execution, and configured output "
+            "saving are available."
         ),
     )
 

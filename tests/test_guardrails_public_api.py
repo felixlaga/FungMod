@@ -107,5 +107,5 @@ outputs: {}
     assert report.config_name == "toy generic shell"
     assert report.stage == "configured_model_execution"
     assert "entity_loader_registries" in report.missing_capabilities
-    assert "process_factory_library" in report.missing_capabilities
+    assert "configured_process_factory_wiring" in report.missing_capabilities
     assert report.to_dict()["config_path"] == str(config_path)

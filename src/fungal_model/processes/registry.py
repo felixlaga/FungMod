@@ -7,6 +7,12 @@ from typing import Any, Iterable
 
 from fungal_model.core.errors import InvalidMechanismError
 from fungal_model.processes.base import Process
+from fungal_model.processes.factories import (
+    BuildDecision,
+    ProcessBuildContext,
+    ProcessFactory,
+    default_foundation_factories,
+)
 
 
 @dataclass(frozen=True)
@@ -107,16 +113,81 @@ class ProcessRegistry:
 
 
 class ProcessLibrary(ProcessRegistry):
-    """Public process library for already-built foundation process objects."""
+    """Public process library for process objects and process factories."""
+
+    def __init__(
+        self,
+        processes: Iterable[Process] | None = None,
+        factories: Iterable[ProcessFactory] | None = None,
+    ) -> None:
+        super().__init__(processes)
+        self._factories: dict[str, ProcessFactory] = {}
+        for factory in factories or ():
+            self.register_factory(factory)
 
     @classmethod
     def default_foundation(cls) -> "ProcessLibrary":
         """Return the default foundation process library."""
 
-        return cls()
+        return cls(factories=default_foundation_factories())
 
     def register_process(self, process: Process) -> None:
         self.register(process)
+
+    def register_factory(self, factory: ProcessFactory) -> None:
+        if factory.process_type in self._factories:
+            raise InvalidMechanismError(f"Duplicate process factory: {factory.process_type}")
+        self._factories[factory.process_type] = factory
+
+    @property
+    def factories(self) -> tuple[ProcessFactory, ...]:
+        return tuple(self._factories.values())
+
+    def factory_types(self) -> tuple[str, ...]:
+        return tuple(sorted(self._factories))
+
+    def factory_for(self, process_type: str) -> ProcessFactory:
+        try:
+            return self._factories[process_type]
+        except KeyError as exc:
+            available = ", ".join(self.factory_types()) or "none"
+            raise InvalidMechanismError(
+                f"No process factory registered for {process_type!r}. "
+                f"Registered factory types: {available}."
+            ) from exc
+
+    def build_decisions(
+        self,
+        context: ProcessBuildContext,
+        process_configs: Iterable[Any],
+    ) -> tuple[BuildDecision, ...]:
+        decisions: list[BuildDecision] = []
+        for process_config in process_configs:
+            factory = self.factory_for(process_config.process_type)
+            decisions.append(factory.can_build(context, process_config))
+        return tuple(decisions)
+
+    def build_processes(
+        self,
+        context: ProcessBuildContext,
+        process_configs: Iterable[Any],
+    ) -> tuple[Process, ...]:
+        processes: list[Process] = []
+        for process_config in process_configs:
+            factory = self.factory_for(process_config.process_type)
+            decision = factory.can_build(context, process_config)
+            if not decision.can_build:
+                raise InvalidMechanismError(
+                    f"Process factory {decision.factory} cannot build "
+                    f"{process_config.id!r}: {decision.to_dict()}"
+                )
+            processes.append(factory.build(context, process_config))
+        return tuple(processes)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = super().to_dict()
+        data["factory_types"] = list(self.factory_types())
+        return data
 
 
 __all__ = ["MissingProcessIssue", "ProcessLibrary", "ProcessRegistry"]

@@ -87,6 +87,7 @@ def test_run_configured_model_loads_each_foundation_config_before_structured_fai
         report = exc_info.value.report
         assert report.config_path == str(path)
         assert report.stage == "configured_model_execution"
+        assert "configured_process_factory_wiring" in report.missing_capabilities
         assert "native_assembled_model_run" in report.missing_capabilities
 
 

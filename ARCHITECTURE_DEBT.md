@@ -74,9 +74,9 @@ names without faking end-to-end execution.
 
 Status: active transitional debt
 
-Reason: Milestone 2 introduces `run_configured_model` as the generic public
-entry point before registry-based entity loading, process factories, native
-assembled-model execution, and configured output bundles exist.
+Reason: Milestone 2 introduced `run_configured_model` as the generic public
+entry point before registry-based entity loading, process-factory wiring,
+native assembled-model execution, and configured output bundles exist.
 
 Risk: users can see the correct generic entry point before it can execute a
 model end to end.

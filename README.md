@@ -132,6 +132,12 @@ Product maps live under `data/product_maps/` and are loaded through
 metadata, so product release mappings do not have to be embedded in process
 code or a substrate-specific workflow.
 
+Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
+The current library provides factories for first-order, mass-action,
+homogeneous Michaelis-Menten, and generic surface-catalysis benchmark
+processes. These are framework mechanisms, not organism- or substrate-specific
+biology.
+
 Substrate, geometry, product-map, and validator loading now goes through
 registries. The default substrate registry is generic-first and supports
 foundation benchmark substrates such as `generic_solid` and
