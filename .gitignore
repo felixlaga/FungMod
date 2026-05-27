@@ -9,5 +9,7 @@ notebooks/your-notebooks/
 notebooks/outputs/
 foundation_progress/
 old_progress/
+foundation_progress
+old_progress
 ARCHITECTURE_DEBT.md
 progress.md
