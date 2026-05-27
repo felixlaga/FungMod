@@ -17,6 +17,7 @@ from .model_config import (
     validate_model_config_mapping,
 )
 from .parameters import parameter_from_config, parameter_set_from_config
+from .product_maps import load_product_map
 from .registries import (
     GeometryLoaderRegistry,
     ProductMapRegistry,
@@ -49,6 +50,7 @@ __all__ = [
     "load_geometry",
     "load_model_config",
     "load_parameter_set",
+    "load_product_map",
     "load_substrate",
     "load_yaml_config",
     "ModelConfig",

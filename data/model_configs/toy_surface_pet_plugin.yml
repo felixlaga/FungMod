@@ -32,12 +32,8 @@ entities:
       loader: enzyme
   product_maps:
     - id: plugin_release_map
+      path: data/product_maps/toy_surface_plugin_mass_equivalent.yml
       loader: one_to_one
-      data:
-        product_map_type: one_to_one
-        substrate_state: solid_polymer_amount
-        product_state: released_product_amount
-        notes: Plugin benchmark uses arbitrary configured state names.
 parameters:
   - id: plugin_surface_parameters
     path: data/parameters/pet_surface_benchmark.yml

@@ -175,6 +175,38 @@ Verification:
 Next foundation milestone: Milestone 5, product-map configs and loader path
 for configured product-state mappings.
 
+## Foundation-First Reset: Milestone 5 Product-Map Configs
+
+Date: 2026-05-27
+
+Status: `complete` for file-backed product-map config loading.
+
+Completed in this foundation-first pass:
+
+- Added `src/fungal_model/io/product_maps.py` with `load_product_map`.
+- Extended `ProductReleaseMap` with optional `name`, `maturity`, and `source`
+  metadata while preserving existing process compatibility.
+- Updated `ProductMapRegistry` loaders to preserve product-map metadata from
+  config files.
+- Added canonical product-map configs:
+  - `data/product_maps/toy_surface_plugin_mass_equivalent.yml`;
+  - `data/product_maps/toy_surface_dummy_mass_equivalent.yml`.
+- Updated the plugin surface and dummy non-PET surface model configs to
+  reference product-map files instead of embedding product maps inline.
+- Added tests proving product maps load from files, preserve arbitrary state
+  names, fail on unknown map types, and are referenced from surface model
+  configs.
+- Updated README data/config guidance.
+
+Verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_product_map_configs.py tests/test_model_config_loading.py tests/test_registry_based_loading.py tests/test_config_io.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py`
+- Result: 31 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 178 passed.
+
+Next foundation milestone: Milestone 6, process factory library foundation.
+
 ## Current Roadmap Slice
 
 Current active milestone: **Milestones 1-10 complete for the first roadmap

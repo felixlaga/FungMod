@@ -190,18 +190,26 @@ def load_film_1d_geometry(data: Mapping[str, Any]) -> Film1DGeometry:
 
 
 def load_one_to_one_product_map(data: Mapping[str, Any]) -> ProductReleaseMap:
+    provenance = data.get("provenance", {})
     return ProductReleaseMap.one_to_one(
         substrate_state=str(data["substrate_state"]),
         product_state=str(data["product_state"]),
         notes=str(data.get("notes", "")),
+        name=None if data.get("name") is None else str(data["name"]),
+        maturity=None if data.get("maturity") is None else str(data["maturity"]),
+        source=provenance.get("source"),
     )
 
 
 def load_stoichiometric_product_map(data: Mapping[str, Any]) -> ProductReleaseMap:
+    provenance = data.get("provenance", {})
     return ProductReleaseMap(
         reactants={str(name): float(value) for name, value in data["reactants"].items()},
         products={str(name): float(value) for name, value in data["products"].items()},
         notes=str(data.get("notes", "")),
+        name=None if data.get("name") is None else str(data["name"]),
+        maturity=None if data.get("maturity") is None else str(data["maturity"]),
+        source=provenance.get("source"),
     )
 
 

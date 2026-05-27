@@ -127,6 +127,11 @@ Foundation model-config shells are available for:
 All three load through `load_model_config`. They are framework benchmarks, not
 scientific biology.
 
+Product maps live under `data/product_maps/` and are loaded through
+`load_product_map`. They carry configured state names and benchmark maturity
+metadata, so product release mappings do not have to be embedded in process
+code or a substrate-specific workflow.
+
 Substrate, geometry, product-map, and validator loading now goes through
 registries. The default substrate registry is generic-first and supports
 foundation benchmark substrates such as `generic_solid` and

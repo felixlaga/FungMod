@@ -270,10 +270,29 @@ class ProductReleaseMap:
     reactants: Mapping[str, float]
     products: Mapping[str, float]
     notes: str = ""
+    name: str | None = None
+    maturity: str | None = None
+    source: str | None = None
 
     @classmethod
-    def one_to_one(cls, *, substrate_state: str, product_state: str, notes: str = "") -> "ProductReleaseMap":
-        return cls(reactants={substrate_state: 1.0}, products={product_state: 1.0}, notes=notes)
+    def one_to_one(
+        cls,
+        *,
+        substrate_state: str,
+        product_state: str,
+        notes: str = "",
+        name: str | None = None,
+        maturity: str | None = None,
+        source: str | None = None,
+    ) -> "ProductReleaseMap":
+        return cls(
+            reactants={substrate_state: 1.0},
+            products={product_state: 1.0},
+            notes=notes,
+            name=name,
+            maturity=maturity,
+            source=source,
+        )
 
     @property
     def species(self) -> set[str]:
@@ -289,9 +308,12 @@ class ProductReleaseMap:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "name": self.name,
             "reactants": dict(self.reactants),
             "products": dict(self.products),
             "notes": self.notes,
+            "maturity": self.maturity,
+            "source": self.source,
         }
 
 

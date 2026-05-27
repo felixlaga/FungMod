@@ -37,12 +37,8 @@ entities:
             notes: Toy product for config loading only.
   product_maps:
     - id: dummy_release_map
+      path: data/product_maps/toy_surface_dummy_mass_equivalent.yml
       loader: one_to_one
-      data:
-        product_map_type: one_to_one
-        substrate_state: solid_substrate_amount
-        product_state: released_product_amount
-        notes: Arbitrary non-PET state names.
 parameters:
   - id: dummy_surface_parameters
     parameters:
