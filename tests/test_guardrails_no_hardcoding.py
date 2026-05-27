@@ -38,12 +38,6 @@ FORBIDDEN_PATTERNS = {
 }
 
 LEGACY_ALLOWLISTED_LINES = {
-    "src/fungal_model/io/yaml_loader.py": {
-        "from fungal_model.substrates.pet import PETSubstrate, make_pet_parameter_set",
-        "def load_substrate(path: str | Path) -> PETSubstrate:",
-        'raise ValueError("Only PET substrate config loading is implemented in this milestone.")',
-        "return PETSubstrate(",
-    },
     "src/fungal_model/workflows/__init__.py": {
         "from .pet_surface_integration import PETSurfaceWorkflowConfig, run_pet_surface_integration",
         '"run_pet_surface_integration",',

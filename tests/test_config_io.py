@@ -16,6 +16,7 @@ from fungal_model.io import (
     load_yaml_config,
     validate_config,
 )
+from fungal_model.plugins.pet import pet_substrate_loader_registry
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,7 +64,10 @@ def test_parameter_set_loader_preserves_units_and_values() -> None:
 
 
 def test_substrate_loader_keeps_unknown_values_unknown() -> None:
-    substrate = load_substrate(DATA / "substrates" / "pet_film.yml")
+    substrate = load_substrate(
+        DATA / "substrates" / "pet_film.yml",
+        registry=pet_substrate_loader_registry(),
+    )
 
     assert substrate.require_accessible_surface_area().to("meter ** 2").magnitude == pytest.approx(0.1)
     assert substrate.parameters.get("rho_pet").is_unknown
@@ -75,7 +79,10 @@ def test_entity_loaders_create_environment_enzyme_geometry_and_fungus() -> None:
     well_mixed = load_geometry(DATA / "geometries" / "well_mixed_100ml.yml")
     film = load_geometry(DATA / "geometries" / "pet_film_1d.yml")
     fungus = load_fungus(DATA / "fungi" / "toy_pet_fungus.yml")
-    substrate = load_substrate(DATA / "substrates" / "pet_film.yml")
+    substrate = load_substrate(
+        DATA / "substrates" / "pet_film.yml",
+        registry=pet_substrate_loader_registry(),
+    )
 
     assert environment.require_temperature().to("kelvin").magnitude == pytest.approx(303.15)
     assert enzyme.compatible_with_substrate(substrate, bond_type="ester")

@@ -25,6 +25,7 @@ from fungal_model.io import (
     load_substrate,
 )
 from fungal_model.kinetics.surface_kinetics import PETSurfaceHydrolysisRateLaw
+from fungal_model.plugins.pet import pet_substrate_loader_registry
 from fungal_model.processes import (
     AssemblyReport,
     ModelAssemblyContext,
@@ -75,7 +76,10 @@ def run_pet_surface_integration(
         stacklevel=2,
     )
     config = config or PETSurfaceWorkflowConfig.default()
-    substrate = load_substrate(config.substrate_path)
+    substrate = load_substrate(
+        config.substrate_path,
+        registry=pet_substrate_loader_registry(),
+    )
     enzyme = load_enzyme(config.enzyme_path)
     fungus = load_fungus(config.fungus_path)
     environment = load_environment(config.environment_path)

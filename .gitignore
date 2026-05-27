@@ -7,3 +7,7 @@ src/*.egg-info/
 outputs/
 notebooks/your-notebooks/
 notebooks/outputs/
+foundation_progress/
+old_progress/
+ARCHITECTURE_DEBT.md
+progress.md

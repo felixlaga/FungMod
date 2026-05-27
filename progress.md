@@ -93,6 +93,47 @@ Verification:
 Next foundation milestone: Milestone 3, registry-based loading for substrates,
 geometries, product maps, and validators.
 
+## Foundation-First Reset: Milestone 3 Registry-Based Loading
+
+Date: 2026-05-27
+
+Status: `complete` for the initial registry-based loader boundary.
+
+Completed in this foundation-first pass:
+
+- Added neutral config parameter parsing in `src/fungal_model/io/parameters.py`.
+- Added `src/fungal_model/io/registries.py` with:
+  - `SubstrateLoaderRegistry`;
+  - `GeometryLoaderRegistry`;
+  - `ProductMapRegistry`;
+  - `ValidatorRegistry`;
+  - `RegistryLookupError`.
+- Changed `load_substrate` to delegate through `SubstrateLoaderRegistry`.
+- Changed `load_geometry` to delegate through `GeometryLoaderRegistry`.
+- Added default non-PET substrate loaders for `generic_solid` and
+  `generic_dissolved` foundation benchmark configs.
+- Added default geometry loaders for `well_mixed` and `film_1d`.
+- Added default product-map loaders for `one_to_one` and `stoichiometric`
+  configured state mappings.
+- Added default validator loaders for `non_negative` and `mass_balance`.
+- Added `src/fungal_model/plugins/pet/` with explicit PET substrate loader
+  registration.
+- Migrated the legacy PET integration workflow and PET config tests to use the
+  explicit PET plugin registry.
+- Resolved architecture debt `FD-002`: the generic YAML substrate loader no
+  longer imports PET or branches on PET.
+- Updated README loader guidance to describe the registry boundary.
+
+Verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_registry_based_loading.py tests/test_config_io.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py tests/test_full_integration_workflow.py`
+- Result: 24 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 168 passed.
+
+Next foundation milestone: Milestone 4, model config object expansion for
+homogeneous, PET plugin, and dummy non-PET configs.
+
 ## Current Roadmap Slice
 
 Current active milestone: **Milestones 1-10 complete for the first roadmap

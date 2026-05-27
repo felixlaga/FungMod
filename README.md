@@ -118,6 +118,22 @@ Top-level YAML configs live under `data/fungi/`, `data/substrates/`,
 `fungal_model` as `load_fungus`, `load_substrate`, `load_enzyme`,
 `load_environment`, `load_geometry`, and `load_parameter_set`.
 
+Substrate, geometry, product-map, and validator loading now goes through
+registries. The default substrate registry is generic-first and supports
+foundation benchmark substrates such as `generic_solid` and
+`generic_dissolved`. PET substrate loading is available only through the
+explicit PET plugin registry:
+
+```python
+from fungal_model import load_substrate
+from fungal_model.plugins.pet import pet_substrate_loader_registry
+
+substrate = load_substrate(
+    "data/substrates/pet_film.yml",
+    registry=pet_substrate_loader_registry(),
+)
+```
+
 Configs are intentionally provenance-heavy. Top-level records and parameter
 entries must include source, measurement method, confidence, notes, validity
 range, units, and value fields. Unknown scientific values should be written as

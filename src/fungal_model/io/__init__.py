@@ -8,6 +8,14 @@ from .model_config import (
     load_model_config,
     validate_model_config_mapping,
 )
+from .parameters import parameter_from_config, parameter_set_from_config
+from .registries import (
+    GeometryLoaderRegistry,
+    ProductMapRegistry,
+    RegistryLookupError,
+    SubstrateLoaderRegistry,
+    ValidatorRegistry,
+)
 from .schema import SchemaValidationError, SchemaValidationResult, validate_config
 from .yaml_loader import (
     load_enzyme,
@@ -17,14 +25,13 @@ from .yaml_loader import (
     load_parameter_set,
     load_substrate,
     load_yaml_config,
-    parameter_from_config,
-    parameter_set_from_config,
 )
 
 __all__ = [
     "SchemaValidationError",
     "SchemaValidationResult",
     "export_json",
+    "GeometryLoaderRegistry",
     "load_enzyme",
     "load_environment",
     "load_fungus",
@@ -38,6 +45,10 @@ __all__ = [
     "ModelConfigValidationResult",
     "parameter_from_config",
     "parameter_set_from_config",
+    "ProductMapRegistry",
+    "RegistryLookupError",
+    "SubstrateLoaderRegistry",
     "validate_config",
     "validate_model_config_mapping",
+    "ValidatorRegistry",
 ]

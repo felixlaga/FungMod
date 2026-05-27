@@ -31,23 +31,24 @@ workflow paths.
 
 ## FD-002 PET-only substrate branch in YAML loading
 
-Status: active transitional debt
+Status: resolved in Milestone 3
 
-Reason: `src/fungal_model/io/yaml_loader.py` currently has a PET-only
-`load_substrate` implementation used by existing config and workflow tests.
+Reason: `src/fungal_model/io/yaml_loader.py` had a PET-only `load_substrate`
+implementation used by earlier config and workflow tests.
 
-Risk: generic entity loading can stay hardcoded to one substrate and block
+Risk: generic entity loading could stay hardcoded to one substrate and block
 non-PET foundation benchmarks.
 
-Exit condition: replace `load_substrate` with a substrate loader registry that
-supports PET plugin/example loading and at least one generic non-PET benchmark
-substrate without a PET branch.
+Exit condition: met. `load_substrate` now delegates to
+`SubstrateLoaderRegistry`, the default registry loads generic benchmark
+substrates, and PET loading requires an explicit plugin registry.
 
-Removal milestone: Milestone 3.
+Removal milestone: resolved in Milestone 3.
 
-Tests protecting it: `tests/test_guardrails_no_hardcoding.py` permits only the
-current exact legacy lines and fails on new PET-specific lines in generic IO
-paths.
+Tests protecting it: `tests/test_guardrails_no_hardcoding.py` fails on
+PET-specific lines in generic IO paths, and
+`tests/test_registry_based_loading.py` verifies both default non-PET loading
+and explicit PET plugin loading.
 
 ## FD-003 `AssembledModel.run()` is not native execution yet
 

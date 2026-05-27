@@ -7,14 +7,14 @@ from typing import Any, Mapping
 
 import yaml
 
-from fungal_model.core.parameters import Parameter, ParameterSet
+from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_
 from fungal_model.entities import Enzyme, Environment
 from fungal_model.fungi import EnzymeCapability, EnzymeProfile, Fungus, make_fungal_parameter_set
 from fungal_model.fungi.metabolism import ProductAssimilation
-from fungal_model.geometry import Film1DGeometry, WellMixedGeometry
+from fungal_model.io.parameters import parameter_from_config, parameter_set_from_config
+from fungal_model.io.registries import GeometryLoaderRegistry, SubstrateLoaderRegistry
 from fungal_model.io.schema import validate_config
-from fungal_model.substrates.pet import PETSubstrate, make_pet_parameter_set
 
 
 def load_yaml_config(path: str | Path, *, validate: bool = True) -> dict[str, Any]:
@@ -26,26 +26,6 @@ def load_yaml_config(path: str | Path, *, validate: bool = True) -> dict[str, An
     if validate:
         validate_config(data)
     return data
-
-
-def parameter_from_config(data: Mapping[str, Any]) -> Parameter:
-    """Create a Parameter from a config parameter mapping."""
-
-    return Parameter(
-        name=str(data["name"]),
-        symbol=str(data["symbol"]),
-        value=data.get("value"),
-        units=str(data["units"]),
-        uncertainty=data.get("uncertainty"),
-        source=data.get("source"),
-        confidence_level=data.get("confidence_level", "unknown"),
-        notes=str(data.get("notes", "")),
-        measurement_method=data.get("measurement_method"),
-    )
-
-
-def parameter_set_from_config(data: Mapping[str, Any]) -> ParameterSet:
-    return ParameterSet(parameter_from_config(parameter) for parameter in data.get("parameters", []) or [])
 
 
 def load_parameter_set(path: str | Path) -> ParameterSet:
@@ -86,50 +66,14 @@ def load_enzyme(path: str | Path) -> Enzyme:
     )
 
 
-def load_substrate(path: str | Path) -> PETSubstrate:
+def load_substrate(path: str | Path, *, registry: SubstrateLoaderRegistry | None = None):
     data = load_yaml_config(path)
-    if data.get("substrate_type") != "pet":
-        raise ValueError("Only PET substrate config loading is implemented in this milestone.")
-    return PETSubstrate(
-        geometry_type=data.get("geometry_type", "unknown"),
-        parameters=make_pet_parameter_set(parameter_from_config(item) for item in data.get("parameters", []) or []),
-        notes=data.get("provenance", {}).get("notes", ""),
-    )
+    return (registry or SubstrateLoaderRegistry.default()).load(data)
 
 
-def load_geometry(path: str | Path):
+def load_geometry(path: str | Path, *, registry: GeometryLoaderRegistry | None = None):
     data = load_yaml_config(path)
-    geometry_type = data.get("geometry_type")
-    provenance = data["provenance"]
-    if geometry_type == "well_mixed":
-        return WellMixedGeometry(
-            volume=_quantity(data["volume"]),
-            surface_area=_quantity(data.get("surface_area")),
-            source=provenance["source"],
-            notes=provenance.get("notes", ""),
-        )
-    if geometry_type == "film_1d":
-        length_data = data["length"]
-        length_parameter = Parameter(
-            name="1D film length",
-            symbol=str(length_data.get("symbol", "L_film")),
-            value=length_data["value"],
-            units=length_data["units"],
-            uncertainty=length_data.get("uncertainty"),
-            source=provenance["source"],
-            confidence_level=provenance["confidence_level"],
-            notes=provenance.get("notes", ""),
-            measurement_method=provenance.get("measurement_method"),
-        )
-        return Film1DGeometry(
-            length=length_parameter,
-            n_cells=int(data["n_cells"]),
-            surface_area=_quantity(data.get("surface_area")),
-            volume=_quantity(data.get("volume")),
-            source=provenance["source"],
-            notes=provenance.get("notes", ""),
-        )
-    raise ValueError(f"Unsupported geometry_type: {geometry_type}")
+    return (registry or GeometryLoaderRegistry.default()).load(data)
 
 
 def load_fungus(path: str | Path) -> Fungus:
