@@ -1881,3 +1881,51 @@ Next milestone:
 
 - F10.5: make the public API intentionally stable and documented, while
   keeping PET-specific helpers contained in `fungal_model.plugins.pet`.
+
+## Foundation 10/10 Push: F10.5 Stable Foundation Public API
+
+Date: 2026-05-28
+
+F10.5 status: `complete` for a documented, generic-first foundation public API.
+
+Completed in F10.5:
+
+- Added a `Foundation Public API` section to `README.md` documenting the stable
+  top-level foundation names for configured execution, loaders, model assembly,
+  solvers, results, and parameter containers.
+- Strengthened `tests/test_guardrails_public_api.py` so the required
+  foundation API names must be exported from `fungal_model.__all__` and must
+  resolve to the expected objects.
+- Added explicit plugin containment checks proving PET helper names are absent
+  from top-level `fungal_model` and `fungal_model.workflows`.
+- Added explicit plugin availability checks proving PET helper names remain
+  available only from `fungal_model.plugins.pet`.
+- Expanded public API cleanliness checks across the documented foundation
+  primitives so they contain no `TODO`, `placeholder`, or public
+  `NotImplementedError` markers.
+- Added README documentation coverage checks for every required foundation API
+  name and for the PET plugin containment path.
+
+Architecture debt:
+
+- No new architecture debt was added for F10.5.
+
+F10.5 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_public_api.py`
+- Result: 7 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_config_generality.py tests/test_guardrails_native_execution.py tests/test_quality_config.py`
+- Result: 14 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_model_workflow.py tests/test_configured_workflow_components.py tests/test_configured_workflow_failures.py tests/test_configured_output_bundle_reproducibility.py tests/test_full_integration_workflow.py tests/test_notebooks.py`
+- Result: 37 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 247 passed.
+
+Next milestone:
+
+- F10.6: harden notebook smoke tests so foundation notebooks demonstrate only
+  public APIs and do not hide implementation in notebook cells.

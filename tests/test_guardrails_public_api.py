@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 import inspect
+from pathlib import Path
 
 import pytest
 
 import fungal_model
 import fungal_model.workflows as workflows
+from fungal_model import (
+    Parameter,
+    ParameterSet,
+    load_geometry,
+    load_model_config,
+    load_parameter_set,
+    load_product_map,
+    load_substrate,
+    run_configured_model,
+)
+from fungal_model.plugins import pet as pet_plugin
 from fungal_model.processes import (
     AssembledModel,
     ModelBuilder,
@@ -17,43 +29,86 @@ from fungal_model.solvers import ProcessODESolver, RunRequest
 from fungal_model.workflows import ConfiguredModelExecutionError
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+FOUNDATION_PUBLIC_API = {
+    "run_configured_model": run_configured_model,
+    "load_model_config": load_model_config,
+    "load_substrate": load_substrate,
+    "load_geometry": load_geometry,
+    "load_product_map": load_product_map,
+    "load_parameter_set": load_parameter_set,
+    "ModelBuilder": ModelBuilder,
+    "AssembledModel": AssembledModel,
+    "ProcessLibrary": ProcessLibrary,
+    "ProcessRegistry": ProcessRegistry,
+    "ProcessODESolver": ProcessODESolver,
+    "RunRequest": RunRequest,
+    "SimulationResult": SimulationResult,
+    "Parameter": Parameter,
+    "ParameterSet": ParameterSet,
+}
+
+PET_PLUGIN_ONLY_NAMES = (
+    "PETSurfaceWorkflowConfig",
+    "pet_substrate_loader_registry",
+    "register_pet_substrate_loader",
+    "run_pet_surface_integration",
+)
+
+
 def test_current_foundation_public_api_is_exported() -> None:
-    assert inspect.isclass(AssembledModel)
-    assert inspect.isclass(ModelBuilder)
-    assert inspect.isclass(ProcessRegistry)
-    assert inspect.isclass(ProcessLibrary)
-    assert inspect.isclass(ProcessODESolver)
-    assert inspect.isclass(RunRequest)
-    assert inspect.isclass(SimulationResult)
-    assert fungal_model.AssembledModel is AssembledModel
-    assert fungal_model.ModelBuilder is ModelBuilder
-    assert fungal_model.ProcessRegistry is ProcessRegistry
-    assert fungal_model.ProcessLibrary is ProcessLibrary
-    assert fungal_model.ProcessODESolver is ProcessODESolver
-    assert fungal_model.RunRequest is RunRequest
-    assert fungal_model.SimulationResult is SimulationResult
-    assert callable(fungal_model.load_model_config)
-    assert callable(fungal_model.run_configured_model)
+    class_names = {
+        "ModelBuilder",
+        "AssembledModel",
+        "ProcessLibrary",
+        "ProcessRegistry",
+        "ProcessODESolver",
+        "RunRequest",
+        "SimulationResult",
+        "Parameter",
+        "ParameterSet",
+    }
+    for name, expected in FOUNDATION_PUBLIC_API.items():
+        assert name in fungal_model.__all__
+        assert getattr(fungal_model, name) is expected
+        if name in class_names:
+            assert inspect.isclass(expected)
+        else:
+            assert callable(expected)
 
 
 def test_top_level_api_is_generic_first() -> None:
-    assert not hasattr(fungal_model, "run_pet_surface_integration")
-    assert not hasattr(fungal_model, "PETSurfaceWorkflowConfig")
-    assert not hasattr(workflows, "run_pet_surface_integration")
-    assert not hasattr(workflows, "PETSurfaceWorkflowConfig")
+    for name in PET_PLUGIN_ONLY_NAMES:
+        assert not hasattr(fungal_model, name)
+        assert not hasattr(workflows, name)
+
+
+def test_pet_plugin_helpers_are_available_only_from_pet_plugin() -> None:
+    for name in PET_PLUGIN_ONLY_NAMES:
+        assert hasattr(pet_plugin, name)
+        assert name in pet_plugin.__all__
 
 
 def test_public_api_names_are_not_unfinished_placeholders() -> None:
-    for candidate in (
-        fungal_model.load_model_config,
-        fungal_model.run_configured_model,
-        fungal_model.ProcessLibrary,
+    candidates = (
+        *FOUNDATION_PUBLIC_API.values(),
         fungal_model.AssembledModel.run,
-    ):
+    )
+    for candidate in candidates:
         source = inspect.getsource(candidate).lower()
         assert "notimplementederror" not in source
         assert "placeholder" not in source
         assert "todo" not in source
+
+
+def test_foundation_public_api_is_documented_in_readme() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "## Foundation Public API" in readme
+    for name in FOUNDATION_PUBLIC_API:
+        assert f"`{name}`" in readme
+    assert "`run_pet_surface_integration`" in readme
+    assert "fungal_model.plugins.pet" in readme
 
 
 def test_load_model_config_validates_generic_top_level_contract(tmp_path) -> None:

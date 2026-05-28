@@ -112,6 +112,33 @@ Each configured run saves a plot, simulation record, validation report,
 assumptions file, process-build decisions, entity snapshots, and manifest under
 its configured `outputs/` directory unless an explicit `output_dir` is supplied.
 
+## Foundation Public API
+
+The stable foundation API is intentionally generic-first. These names are
+supported from top-level `fungal_model` for config loading, model assembly,
+execution, and result inspection:
+
+- `run_configured_model`
+- `load_model_config`
+- `load_substrate`
+- `load_geometry`
+- `load_product_map`
+- `load_parameter_set`
+- `ModelBuilder`
+- `AssembledModel`
+- `ProcessLibrary`
+- `ProcessRegistry`
+- `ProcessODESolver`
+- `RunRequest`
+- `SimulationResult`
+- `Parameter`
+- `ParameterSet`
+
+PET-specific convenience helpers are not part of the top-level public API.
+They live under `fungal_model.plugins.pet`, where plugin users can explicitly
+import `pet_substrate_loader_registry`, `PETSurfaceWorkflowConfig`, and
+`run_pet_surface_integration`.
+
 ## Notebooks
 
 The `notebooks/examples/` folder contains the foundation notebook set:
