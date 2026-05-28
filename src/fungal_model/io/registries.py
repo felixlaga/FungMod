@@ -4,14 +4,20 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast, get_args
 
 from fungal_model.core.parameters import Parameter
-from fungal_model.core.units import Q_
+from fungal_model.core.units import Q_, Quantity
 from fungal_model.core.validators import validate_mass_balance, validate_non_negative
 from fungal_model.geometry import Film1DGeometry, WellMixedGeometry
 from fungal_model.processes import ProductReleaseMap
-from fungal_model.substrates.base import DegradationProduct, Substrate
+from fungal_model.substrates.base import (
+    CompletenessLevel,
+    DegradationModelPreference,
+    DegradationProduct,
+    PhysicalState,
+    Substrate,
+)
 
 from .parameters import parameter_set_from_config
 
@@ -119,6 +125,11 @@ class ValidatorRegistry(_LoaderRegistry):
         return registry
 
 
+_PHYSICAL_STATES = {"dissolved", "solid_polymer", "solid_biomass", "mixed_solid", "unknown"}
+_COMPLETENESS_LEVELS = set(get_args(CompletenessLevel))
+_DEGRADATION_MODELS = {"homogeneous_dissolved", "heterogeneous_surface", "reaction_diffusion", "unknown"}
+
+
 def load_generic_solid_substrate(data: Mapping[str, Any]) -> Substrate:
     return _load_generic_substrate(data, physical_state="mixed_solid")
 
@@ -127,12 +138,15 @@ def load_generic_dissolved_substrate(data: Mapping[str, Any]) -> Substrate:
     return _load_generic_substrate(data, physical_state="dissolved")
 
 
-def _load_generic_substrate(data: Mapping[str, Any], *, physical_state: str) -> Substrate:
+def _load_generic_substrate(data: Mapping[str, Any], *, physical_state: PhysicalState) -> Substrate:
     provenance = data.get("provenance", {})
     return Substrate(
         name=str(data["name"]),
         chemical_class=str(data.get("chemical_class", "generic benchmark material")),
-        physical_state=str(data.get("physical_state", physical_state)),
+        physical_state=cast(
+            PhysicalState,
+            _choice(data, "physical_state", physical_state, _PHYSICAL_STATES),
+        ),
         bond_types=tuple(data.get("bond_types", ()) or ()),
         accessible_bonds=tuple(data.get("accessible_bonds", ()) or ()),
         required_enzyme_classes=tuple(data.get("required_enzyme_classes", ()) or ()),
@@ -147,8 +161,14 @@ def _load_generic_substrate(data: Mapping[str, Any], *, physical_state: str) -> 
             for product in data.get("degradation_products", ()) or ()
         ),
         parameters=parameter_set_from_config(data),
-        completeness=str(data.get("completeness", "partial")),
-        default_degradation_model=str(data.get("default_degradation_model", "unknown")),
+        completeness=cast(
+            CompletenessLevel,
+            _choice(data, "completeness", "partial", _COMPLETENESS_LEVELS),
+        ),
+        default_degradation_model=cast(
+            DegradationModelPreference,
+            _choice(data, "default_degradation_model", "unknown", _DEGRADATION_MODELS),
+        ),
         water_activity_dependence=str(data.get("water_activity_dependence", "unknown")),
         notes=str(provenance.get("notes", data.get("notes", ""))),
         references=(str(provenance["source"]),) if provenance.get("source") else (),
@@ -158,7 +178,7 @@ def _load_generic_substrate(data: Mapping[str, Any], *, physical_state: str) -> 
 def load_well_mixed_geometry(data: Mapping[str, Any]) -> WellMixedGeometry:
     provenance = data["provenance"]
     return WellMixedGeometry(
-        volume=_quantity(data["volume"]),
+        volume=_required_quantity(data["volume"], name="well_mixed.volume"),
         surface_area=_quantity(data.get("surface_area")),
         source=provenance["source"],
         notes=provenance.get("notes", ""),
@@ -228,10 +248,25 @@ def load_mass_balance_validator(data: Mapping[str, Any]) -> Callable[[Any], Any]
     )
 
 
-def _quantity(data: Mapping[str, Any] | None):
+def _quantity(data: Mapping[str, Any] | None) -> Quantity | None:
     if data is None:
         return None
     return Q_(data["value"], data["units"])
+
+
+def _required_quantity(data: Mapping[str, Any] | None, *, name: str) -> Quantity:
+    quantity = _quantity(data)
+    if quantity is None:
+        raise ValueError(f"{name} must be provided.")
+    return quantity
+
+
+def _choice(data: Mapping[str, Any], field: str, default: str, allowed: set[str]) -> str:
+    value = str(data.get(field, default))
+    if value not in allowed:
+        allowed_values = ", ".join(sorted(allowed))
+        raise ValueError(f"{field} must be one of {allowed_values}; got {value!r}.")
+    return value
 
 
 def _clean_name(value: Any, *, field_name: str) -> str:

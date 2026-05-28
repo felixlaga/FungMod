@@ -102,24 +102,26 @@ that plugin loading requires an explicit registry instead of a generic
 substrate-specific branch, and `tests/test_guardrails_public_api.py` keeps the
 public entry point non-placeholder.
 
-## FD-005 Permissive Pyright quantity-typing baseline
+## FD-005 Remaining Pyright optional-value baseline
 
 Status: active
 
-Reason: The first package-quality milestone adds Pyright to CI before the
-existing Pint quantity aliases, optional-state checks, and quantity return
-types are fully Pyright-clean.
+Reason: Pyright now checks invalid type forms, return types, assignment types,
+argument types, attribute access, call issues, operator issues, optional
+operands, and general type issues. Optional member access remains disabled
+because calibration, transport, uncertainty, and plugin substrate modules still
+need explicit non-null quantity narrowing.
 
-Risk: Type checking can pass while quantity-type and optional-state issues
+Risk: Type checking can pass while some optional quantity/member access issues
 remain in scientific modules. This must not be mistaken for a strict typing
 guarantee.
 
-Exit condition: the quantity alias layer and optional-state contracts are
-rewritten or annotated so Pyright can re-enable the disabled diagnostics while
-remaining green in CI.
+Exit condition: optional-state contracts are rewritten or annotated so
+`reportOptionalMemberAccess` can be re-enabled while remaining green in CI.
 
-Removal milestone: the next dedicated quantity-typing package-quality ratchet.
+Removal milestone: the next optional-quantity narrowing package-quality ratchet.
 
 Tests protecting it: `tests/test_quality_config.py` verifies that Pyright is a
-declared dev dependency, that `pyrightconfig.json` exists, and that CI runs the
-Pyright command. GitHub Actions runs Pyright on every push and pull request.
+declared dev dependency, that `pyrightconfig.json` exists, that stricter
+diagnostics are enabled, and that CI runs the Pyright command. GitHub Actions
+runs Pyright on every push and pull request.

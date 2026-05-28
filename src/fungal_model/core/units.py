@@ -7,13 +7,16 @@ numbers where a unit-bearing physical quantity is required.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 import pint
 
 ureg = pint.UnitRegistry(autoconvert_offset_to_baseunit=True)
-Q_ = ureg.Quantity
-Quantity = pint.Quantity
+Q_: Any = ureg.Quantity
+if TYPE_CHECKING:
+    Quantity: TypeAlias = pint.Quantity[Any]
+else:
+    Quantity = pint.Quantity
 
 
 class UnitError(ValueError):
@@ -81,4 +84,3 @@ __all__ = [
     "ureg",
     "units_are_compatible",
 ]
-

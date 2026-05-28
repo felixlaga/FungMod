@@ -100,8 +100,11 @@ class UniformGrid1D:
 
     @property
     def cell_width(self) -> Quantity:
+        length_quantity = self.length.quantity
+        if length_quantity is None:
+            raise ValueError("UniformGrid1D length must be known.")
         return assert_compatible(
-            self.length.quantity / self.n_cells,
+            length_quantity / self.n_cells,
             "meter",
             name="cell width",
         )

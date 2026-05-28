@@ -28,12 +28,19 @@ def test_quality_tool_configs_exist() -> None:
     assert pyproject["tool"]["coverage"]["report"]["fail_under"] >= 80
     assert pyright["include"] == ["src/fungal_model"]
     assert pyright["typeCheckingMode"] == "basic"
-    assert pyright["reportArgumentType"] is False
-    assert pyright["reportInvalidTypeForm"] is False
+    assert pyright["reportArgumentType"] is True
+    assert pyright["reportAssignmentType"] is True
+    assert pyright["reportAttributeAccessIssue"] is True
+    assert pyright["reportCallIssue"] is True
+    assert pyright["reportGeneralTypeIssues"] is True
+    assert pyright["reportInvalidTypeForm"] is True
+    assert pyright["reportOperatorIssue"] is True
+    assert pyright["reportOptionalOperand"] is True
+    assert pyright["reportReturnType"] is True
     assert pyright["reportOptionalMemberAccess"] is False
 
     debt_register = (ROOT / "ARCHITECTURE_DEBT.md").read_text(encoding="utf-8")
-    assert "FD-005 Permissive Pyright quantity-typing baseline" in debt_register
+    assert "FD-005 Remaining Pyright optional-value baseline" in debt_register
 
 
 def test_ci_runs_lint_typecheck_and_coverage() -> None:

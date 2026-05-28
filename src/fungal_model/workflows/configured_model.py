@@ -491,6 +491,13 @@ def _write_json(path: Path, data: Any) -> None:
 
 
 def _run_summary(config: ModelConfig, result: SimulationResult) -> dict[str, Any]:
+    assembly_report = result.assembly_report
+    if assembly_report is None:
+        assembly_success = None
+    elif isinstance(assembly_report, Mapping):
+        assembly_success = assembly_report.get("success")
+    else:
+        assembly_success = assembly_report.success
     return {
         "config_name": config.name,
         "config_path": "" if config.path is None else str(config.path),
@@ -498,7 +505,7 @@ def _run_summary(config: ModelConfig, result: SimulationResult) -> dict[str, Any
         "maturity": config.maturity,
         "result_name": result.name,
         "result_label": result.label,
-        "assembly_success": None if result.assembly_report is None else result.assembly_report.success,
+        "assembly_success": assembly_success,
         "state_names": sorted(result.states),
         "process_rate_names": sorted(result.process_rates),
         "validation": _validation_summary(result),

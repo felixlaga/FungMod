@@ -30,11 +30,12 @@ validate, and save configured output bundles.
 
 ## Active Architecture Debt
 
-- `FD-005`: the Pyright gate is intentionally permissive around Pint quantity
-  typing and optional-state inference.
+- `FD-005`: `reportOptionalMemberAccess` remains disabled while optional
+  quantity/member narrowing is cleaned up.
 
 This is a package-quality debt, not biology permission. The next quality ratchet
-should tighten quantity typing before any real scientific mechanism work.
+should tighten optional quantity/member access before any real scientific
+mechanism work.
 
 ## Deferred
 

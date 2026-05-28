@@ -336,7 +336,7 @@ def fit_least_squares(
         return _replace_parameters(base_parameters, replacements)
 
     def objective(vector: np.ndarray) -> np.ndarray:
-        parameter_set = parameter_set_from_vector(vector)
+        parameter_set = parameter_set_from_vector(vector.tolist())
         predictions = predict(parameter_set)
         residuals = residuals_between(
             predictions,

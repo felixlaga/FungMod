@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 
@@ -135,7 +136,7 @@ class FirstOrderDecayProcess(Process):
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
-        contributions: dict[str, Quantity] = {self.substrate_state: -value}
+        contributions: dict[str, Quantity] = {self.substrate_state: cast(Quantity, -value)}
         if self.product_state is not None:
             contributions[self.product_state] = value
         return contributions
@@ -365,7 +366,7 @@ class HomogeneousMichaelisMentenProcess(Process):
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
-        contributions: dict[str, Quantity] = {self.substrate_state: -value}
+        contributions: dict[str, Quantity] = {self.substrate_state: cast(Quantity, -value)}
         if self.product_state is not None:
             contributions[self.product_state] = value
         return contributions

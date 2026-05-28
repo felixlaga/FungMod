@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -56,7 +56,7 @@ def validate_non_negative(
     epsilon_value = float(assert_compatible(epsilon, "dimensionless").magnitude)
     selected_species = list(species) if species is not None else list(result.species)
     minima: dict[str, float] = {}
-    failures: dict[str, dict[str, float]] = {}
+    failures: dict[str, dict[str, float | str]] = {}
     for name in selected_species:
         quantity = result.species[name]
         values = np.asarray(quantity.magnitude, dtype=float)
@@ -117,7 +117,7 @@ def validate_mass_balance(
         if name not in result.species:
             raise KeyError(f"Conserved weight provided for unknown species {name!r}.")
         term = _as_weighted_quantity(result.species[name], weight)
-        total = term if total is None else total + term.to(total.units)
+        total = term if total is None else cast(Quantity, total + term.to(total.units))
         included_species.append(name)
     if total is None:
         raise ValueError("At least one conserved species weight is required.")
@@ -172,7 +172,7 @@ def validate_carbon_conservation(
         if content.species not in result.species:
             raise KeyError(f"Carbon content provided for unknown species {content.species!r}.")
         carbon = content.carbon_mass(result.species[content.species])
-        total = carbon if total is None else total + carbon.to(total.units)
+        total = carbon if total is None else cast(Quantity, total + carbon.to(total.units))
         included_species.append(content.species)
     if total is None:
         raise ValueError("At least one carbon content entry is required.")

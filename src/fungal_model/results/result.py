@@ -6,7 +6,7 @@ import csv
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, cast
 
 import numpy as np
 
@@ -27,9 +27,9 @@ def _quantity_to_dict(quantity: Quantity) -> dict[str, Any]:
 
 
 def _validation_to_dict(validation: ValidationResult | Mapping[str, Any]) -> dict[str, Any]:
-    if hasattr(validation, "to_dict"):
-        return validation.to_dict()
-    return dict(validation)
+    if isinstance(validation, Mapping):
+        return dict(validation)
+    return validation.to_dict()
 
 
 def _json_default(value: Any) -> Any:
@@ -160,12 +160,12 @@ class SimulationResult:
 
     def to_dict(self) -> dict[str, Any]:
         assembly_report = self.assembly_report
-        if hasattr(assembly_report, "to_dict"):
-            assembly_data = assembly_report.to_dict()
-        elif assembly_report is None:
+        if assembly_report is None:
             assembly_data = None
-        else:
+        elif isinstance(assembly_report, Mapping):
             assembly_data = dict(assembly_report)
+        else:
+            assembly_data = assembly_report.to_dict()
         return {
             "name": self.name,
             "label": self.label,
@@ -252,7 +252,7 @@ class SimulationResult:
         total: Quantity | None = None
         for name, weight in conserved_weights.items():
             term = self.states[name] * weight if is_quantity(weight) else self.states[name] * float(weight)
-            total = term if total is None else total + term.to(total.units)
+            total = term if total is None else cast(Quantity, total + term.to(total.units))
         if total is None:
             raise ValueError("At least one conserved weight is required.")
         values = np.asarray(total.magnitude, dtype=float)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from fungal_model.processes.base import Process
@@ -51,19 +51,21 @@ class ProcessBuildContext:
     """Context available to process factories."""
 
     state_units: Mapping[str, str]
-    product_maps: Mapping[str, ProductReleaseMap] = None
+    product_maps: Mapping[str, ProductReleaseMap] = field(default_factory=dict)
     assumptions: tuple[Any, ...] = ()
     source: str = "Generic process factory."
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "product_maps", dict(self.product_maps or {}))
+        object.__setattr__(self, "product_maps", dict(self.product_maps))
         object.__setattr__(self, "state_units", dict(self.state_units))
 
 
 class ProcessFactory(Protocol):
     """Protocol implemented by process factories."""
 
-    process_type: str
+    @property
+    def process_type(self) -> str:
+        ...
 
     def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
         ...

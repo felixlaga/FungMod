@@ -199,7 +199,8 @@ def local_sensitivity(
     entries: list[LocalSensitivityEntry] = []
     for spec in specs:
         parameter = base_parameters.get(spec.symbol)
-        parameter_value = float(parameter.quantity.to(parameter.units).magnitude)
+        parameter_quantity = require_quantity(parameter.quantity, name=parameter.symbol)
+        parameter_value = float(parameter_quantity.to(parameter.units).magnitude)
         step = float(spec.relative_step.quantity.to("dimensionless").magnitude)
         lower_value = parameter_value * (1.0 - step)
         upper_value = parameter_value * (1.0 + step)
@@ -223,7 +224,10 @@ def local_sensitivity(
             output_units,
             name=f"{spec.symbol} upper output",
         )
-        denominator = upper_parameter.quantity - lower_parameter.quantity
+        denominator = require_quantity(upper_parameter.quantity, name=upper_parameter.symbol) - require_quantity(
+            lower_parameter.quantity,
+            name=lower_parameter.symbol,
+        )
         derivative = (upper_output - lower_output) / denominator
         if base_output_value == 0.0:
             normalized = None
@@ -231,7 +235,7 @@ def local_sensitivity(
                 f"Base output is zero; normalized sensitivity for {spec.symbol} is undefined."
             )
         else:
-            normalized_quantity = derivative * parameter.quantity / base_output
+            normalized_quantity = derivative * parameter_quantity / base_output
             normalized = float(
                 assert_compatible(
                     normalized_quantity,

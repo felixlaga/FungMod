@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Sequence
 
 from fungal_model.core.assumptions import Assumption
@@ -179,7 +180,7 @@ class AssembledModel:
     def run(
         self,
         *,
-        initial_state: dict[str, Quantity],
+        initial_state: Mapping[str, Quantity],
         t_span: tuple[Quantity, Quantity],
         t_eval: Quantity | None = None,
         validators: Sequence[Any] = (),

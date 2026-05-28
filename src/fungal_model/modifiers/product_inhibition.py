@@ -9,7 +9,7 @@ import numpy as np
 
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import ParameterSet
-from fungal_model.core.units import Quantity, assert_compatible
+from fungal_model.core.units import Q_, Quantity, assert_compatible
 from fungal_model.entities.environment import Environment
 
 
@@ -52,7 +52,9 @@ class ProductInhibitionModifier:
         inhibition = parameters.require_quantity(self.inhibition_constant_symbol, self.product_units)
         if np.any(np.asarray(inhibition.magnitude, dtype=float) <= 0):
             raise ValueError("Product inhibition constant must be positive.")
-        return assert_compatible(1 / (1 + product / inhibition), "dimensionless", name="product inhibition activity")
+        ratio = assert_compatible(product / inhibition, "dimensionless", name="product / inhibition_constant")
+        activity = 1.0 / (1.0 + np.asarray(ratio.magnitude, dtype=float))
+        return Q_(activity, "dimensionless")
 
     def scale(
         self,

@@ -304,7 +304,7 @@ class ProductReleaseMap:
     def validate_weight_conservation(self, weights: Mapping[str, float]) -> bool:
         reactant_total = sum(float(coef) * float(weights[name]) for name, coef in self.reactants.items())
         product_total = sum(float(coef) * float(weights[name]) for name, coef in self.products.items())
-        return np.isclose(reactant_total, product_total)
+        return bool(np.isclose(reactant_total, product_total))
 
     def to_dict(self) -> dict[str, Any]:
         return {

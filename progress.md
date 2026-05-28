@@ -1603,3 +1603,52 @@ Next milestone:
 
 - Quantity-typing package-quality ratchet: reduce `FD-005` by tightening
   Pyright diagnostics around Pint quantity aliases and optional-state handling.
+
+## Foundation-First Reset: Milestone 14 Pyright Quantity-Typing Ratchet
+
+Date: 2026-05-28
+
+Milestone 14 status: `complete` for the first Pyright quantity/type diagnostic
+ratchet.
+
+Completed in Milestone 14:
+
+- Made `fungal_model.core.units.Quantity` a static `TypeAlias` while preserving
+  the runtime Pint class export.
+- Marked the runtime `Q_` constructor alias as `Any` so Pyright does not treat
+  it as a type alias.
+- Re-enabled these Pyright diagnostics:
+  - `reportInvalidTypeForm`;
+  - `reportReturnType`;
+  - `reportAssignmentType`;
+  - `reportArgumentType`;
+  - `reportAttributeAccessIssue`;
+  - `reportCallIssue`;
+  - `reportOperatorIssue`;
+  - `reportOptionalOperand`;
+  - `reportGeneralTypeIssues`.
+- Tightened process factory protocol typing and product-map defaults.
+- Added explicit casts/guards for quantity arithmetic, mass-balance totals,
+  local sensitivity perturbations, spatial grid cell width, registry literal
+  loading, and result assembly-report summaries.
+- Reworked product inhibition activity calculation to avoid ambiguous
+  dimensionless quantity operators.
+- Updated `ARCHITECTURE_DEBT.md` so `FD-005` now tracks only the remaining
+  optional-member-access cleanup.
+
+Milestone 14 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_quality_config.py tests/test_units.py tests/test_process_factory_library.py tests/test_results.py tests/test_configured_model_workflow.py tests/test_registry_based_loading.py tests/test_uncertainty_sensitivity.py tests/test_reaction_diffusion.py tests/test_environment_modifiers.py tests/test_calibration.py`
+- Result: 55 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`
+- Result: 209 passed, total coverage 84.83%, required coverage 80% reached.
+
+Next milestone:
+
+- Optional-member-access package-quality ratchet: re-enable
+  `reportOptionalMemberAccess` by narrowing optional quantities in calibration,
+  transport, uncertainty, pH kinetics, and plugin substrate modules.

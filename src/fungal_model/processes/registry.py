@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 from fungal_model.core.errors import InvalidMechanismError
 from fungal_model.processes.base import Process
@@ -75,7 +75,7 @@ class ProcessRegistry:
     ) -> tuple[tuple[Process, ...], tuple[MissingProcessIssue, ...]]:
         """Match requested process types and report absent mechanisms."""
 
-        requested = tuple(getattr(context, "requested_processes", ()) or ())
+        requested = cast(tuple[str, ...], tuple(getattr(context, "requested_processes", ()) or ()))
         if not requested:
             return (
                 tuple(process for process in self._processes.values() if process.applies_to(context)),
