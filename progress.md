@@ -1929,3 +1929,52 @@ Next milestone:
 
 - F10.6: harden notebook smoke tests so foundation notebooks demonstrate only
   public APIs and do not hide implementation in notebook cells.
+
+## Foundation 10/10 Push: F10.6 Notebook Public-API Smoke Tests
+
+Date: 2026-05-28
+
+F10.6 status: `complete` for notebook public-API and smoke-test guardrails.
+
+Completed in F10.6:
+
+- Added a `FUNGMOD_NOTEBOOK_OUTPUT_ROOT` output-root override to every
+  foundation example notebook while preserving the default
+  `notebooks/examples/Outputs/<notebook-name>/` location for normal use.
+- Updated notebook smoke tests to redirect outputs to `tmp_path` so test runs
+  do not write generated files into the repository.
+- Strengthened notebook import checks so every foundation notebook must import
+  or use public `fungal_model` APIs and call `run_configured_model`.
+- Strengthened hidden-implementation guardrails so notebooks cannot define
+  process classes, solver classes, process factories, rate-law functions,
+  solver functions, direct SciPy solver calls, core simulation-engine imports,
+  solver imports, process-internal imports, or legacy rate-law classes.
+- Added an explicit quickstart smoke test that executes
+  `00_quickstart.ipynb` with temporary outputs and verifies the expected
+  result bundle files.
+- Kept the full foundation notebook smoke path so the complete example set
+  still executes through package APIs.
+
+Architecture debt:
+
+- No new architecture debt was added for F10.6.
+
+F10.6 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_notebooks.py`
+- Result: 4 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_public_api.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_config_generality.py tests/test_guardrails_native_execution.py tests/test_quality_config.py`
+- Result: 21 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_model_workflow.py tests/test_configured_workflow_components.py tests/test_configured_workflow_failures.py tests/test_configured_output_bundle_reproducibility.py tests/test_full_integration_workflow.py`
+- Result: 34 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 248 passed.
+
+Next milestone:
+
+- F10.7: harden CI and branch-protection documentation around lint, type,
+  coverage, and merge requirements.

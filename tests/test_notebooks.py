@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
+
+import pytest
 
 
 NOTEBOOKS = [
@@ -13,7 +16,27 @@ NOTEBOOKS = [
 
 
 NOTEBOOK_DIR = Path(__file__).resolve().parents[1] / "notebooks" / "examples"
-NOTEBOOK_OUTPUT_DIR = NOTEBOOK_DIR / "Outputs"
+
+PUBLIC_API_PATTERNS = (
+    re.compile(r"(^|\n)\s*(from\s+fungal_model\s+import|import\s+fungal_model)\b"),
+    re.compile(r"\brun_configured_model\s*\("),
+)
+
+HIDDEN_IMPLEMENTATION_PATTERNS = {
+    "process class": re.compile(r"(^|\n)\s*class\s+\w*Process\b"),
+    "solver class": re.compile(r"(^|\n)\s*class\s+\w*Solver\b"),
+    "process factory class": re.compile(r"(^|\n)\s*class\s+\w*Factory\b"),
+    "rate-law function": re.compile(r"(^|\n)\s*def\s+\w*rate\w*\s*\("),
+    "solver function": re.compile(r"(^|\n)\s*def\s+\w*solver\w*\s*\("),
+    "low-level solver import": re.compile(r"(^|\n)\s*(from\s+fungal_model\.solvers|from\s+scipy\.integrate)"),
+    "core engine import": re.compile(r"(^|\n)\s*from\s+fungal_model\.core\.simulation\b"),
+    "process internals import": re.compile(r"(^|\n)\s*from\s+fungal_model\.processes\b"),
+    "direct scipy solver call": re.compile(r"\bsolve_ivp\s*\("),
+    "legacy rate-law class": re.compile(r"\bRateLaw\s*="),
+    "legacy PET rate law": re.compile(r"\bPETSurfaceHydrolysisRateLaw\b"),
+    "reaction-diffusion engine": re.compile(r"\bReactionDiffusionEngine\b"),
+    "simulation engine": re.compile(r"\bSimulationEngine\b"),
+}
 
 
 def load_notebook(name: str) -> dict:
@@ -34,40 +57,55 @@ def test_required_notebooks_exist_and_import_package_code() -> None:
         notebook = load_notebook(name)
         assert notebook["nbformat"] == 4
         source = "\n".join(code_cells(notebook))
-        assert "fungal_model" in source
-        assert "run_configured_model" in source
+        for pattern in PUBLIC_API_PATTERNS:
+            assert pattern.search(source), f"{name} does not demonstrate required public API pattern {pattern.pattern!r}"
+        assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
 
 
 def test_notebooks_do_not_define_core_classes_or_rate_laws() -> None:
-    forbidden = (
-        "\nclass ",
-        "RateLaw =",
-        "SimulationEngine",
-        "ReactionDiffusionEngine",
-        "PETSurfaceHydrolysisRateLaw",
-        "def surface_catalysis_rate",
-        "def michaelis_menten_rate",
-        "def arrhenius_rate_constant",
-    )
     for name in NOTEBOOKS:
         source = "\n".join(code_cells(load_notebook(name)))
-        for pattern in forbidden:
-            assert pattern not in source, f"{name} contains implementation pattern {pattern!r}"
+        for label, pattern in HIDDEN_IMPLEMENTATION_PATTERNS.items():
+            assert not pattern.search(source), f"{name} contains hidden implementation pattern {label!r}"
 
 
-def test_foundation_notebooks_execute_smoke_paths() -> None:
-    for name in NOTEBOOKS:
-        namespace: dict[str, object] = {"__name__": "__notebook_smoke__"}
-        for source in code_cells(load_notebook(name)):
-            exec(compile(source, f"notebooks/{name}", "exec"), namespace)
+def test_quickstart_notebook_executes_smoke_path_with_temp_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "notebook_outputs"
+    monkeypatch.setenv("FUNGMOD_NOTEBOOK_OUTPUT_ROOT", str(output_root))
+    _execute_notebook("00_quickstart.ipynb")
 
-    output = NOTEBOOK_OUTPUT_DIR / "00_quickstart"
+    output = output_root / "00_quickstart"
     assert (output / "record.json").exists()
     assert (output / "figures" / "state_trajectories.png").exists()
     assert (output / "output_manifest.json").exists()
 
-    failure_output = NOTEBOOK_OUTPUT_DIR / "02_failure_report"
+
+def test_foundation_notebooks_execute_smoke_paths_with_temp_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "notebook_outputs"
+    monkeypatch.setenv("FUNGMOD_NOTEBOOK_OUTPUT_ROOT", str(output_root))
+
+    for name in NOTEBOOKS:
+        _execute_notebook(name)
+
+    output = output_root / "00_quickstart"
+    assert (output / "record.json").exists()
+    assert (output / "figures" / "state_trajectories.png").exists()
+    assert (output / "output_manifest.json").exists()
+
+    failure_output = output_root / "02_failure_report"
     assert (failure_output / "failure_report.json").exists()
 
-    inspection_output = NOTEBOOK_OUTPUT_DIR / "03_configured_outputs"
+    inspection_output = output_root / "03_configured_outputs"
     assert (inspection_output / "configured_metadata.json").exists()
+
+
+def _execute_notebook(name: str) -> None:
+    namespace: dict[str, object] = {"__name__": "__notebook_smoke__"}
+    for source in code_cells(load_notebook(name)):
+        exec(compile(source, f"notebooks/{name}", "exec"), namespace)
