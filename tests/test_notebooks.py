@@ -13,6 +13,7 @@ NOTEBOOKS = [
 
 
 NOTEBOOK_DIR = Path(__file__).resolve().parents[1] / "notebooks" / "examples"
+NOTEBOOK_OUTPUT_DIR = NOTEBOOK_DIR / "Outputs"
 
 
 def load_notebook(name: str) -> dict:
@@ -60,13 +61,13 @@ def test_foundation_notebooks_execute_smoke_paths() -> None:
         for source in code_cells(load_notebook(name)):
             exec(compile(source, f"notebooks/{name}", "exec"), namespace)
 
-    output = Path(__file__).resolve().parents[1] / "outputs" / "notebook_00_quickstart"
+    output = NOTEBOOK_OUTPUT_DIR / "00_quickstart"
     assert (output / "record.json").exists()
     assert (output / "figures" / "state_trajectories.png").exists()
     assert (output / "output_manifest.json").exists()
 
-    failure_output = Path(__file__).resolve().parents[1] / "outputs" / "notebook_02_failure_report"
+    failure_output = NOTEBOOK_OUTPUT_DIR / "02_failure_report"
     assert (failure_output / "failure_report.json").exists()
 
-    inspection_output = Path(__file__).resolve().parents[1] / "outputs" / "notebook_03_configured_outputs"
+    inspection_output = NOTEBOOK_OUTPUT_DIR / "03_configured_outputs"
     assert (inspection_output / "configured_metadata.json").exists()

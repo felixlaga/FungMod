@@ -9,6 +9,7 @@ src/*.egg-info/
 outputs/
 notebooks/your-notebooks/
 notebooks/outputs/
+notebooks/examples/Outputs/
 foundation_progress/
 old_progress/
 foundation_progress

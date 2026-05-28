@@ -27,6 +27,7 @@ def parameter_from_config(data: Mapping[str, Any]) -> Parameter:
         confidence_level=data.get("confidence_level", "unknown"),
         notes=str(data.get("notes", "")),
         measurement_method=data.get("measurement_method"),
+        validity_range=data.get("validity_range"),
     )
 
 
@@ -62,6 +63,7 @@ def _same_parameter(left: Parameter, right: Parameter) -> bool:
         and left.confidence_level == right.confidence_level
         and left.notes == right.notes
         and left.measurement_method == right.measurement_method
+        and left.validity_range == right.validity_range
         and _same_value(left.value, right.value, left.units)
         and _same_value(left.uncertainty, right.uncertainty, left.units)
     )

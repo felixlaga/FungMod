@@ -95,6 +95,7 @@ from fungal_model.processes import (
 from fungal_model.results import SimulationResult
 from fungal_model.solvers import ProcessODESolver, RunRequest
 from fungal_model.substrates.base import Substrate
+from fungal_model.validation import InvalidDataMaturityError, MaturityIssue
 from fungal_model.workflows import (
     ConfiguredModelExecutionError,
     ConfiguredModelRunReport,
@@ -128,6 +129,7 @@ __all__ = [
     "LangmuirAdsorptionModel",
     "InitialStateConfig",
     "IncompatibleUnitsError",
+    "InvalidDataMaturityError",
     "InvalidMechanismError",
     "load_enzyme",
     "load_environment",
@@ -142,6 +144,7 @@ __all__ = [
     "MassActionFactory",
     "MissingParameterError",
     "MissingProcessError",
+    "MaturityIssue",
     "ModelAssemblyContext",
     "ModelAssemblyError",
     "ModelBuilder",

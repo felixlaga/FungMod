@@ -37,6 +37,7 @@ from fungal_model.io.yaml_loader import (
 )
 from fungal_model.processes import ModelBuilder, ProcessBuildContext, ProcessLibrary, ProcessRegistry
 from fungal_model.results import SimulationResult
+from fungal_model.validation.maturity import enforce_run_maturity
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,14 @@ def run_configured_model(
         geometry_registry=geometry_registry,
         product_map_registry=product_map_registry,
         validator_registry=validator_registry,
+    )
+    enforce_run_maturity(
+        mode=config.mode,
+        maturity=config.maturity,
+        parameters=inputs.parameters,
+        entities=_maturity_entities(inputs),
+        product_maps=inputs.product_maps,
+        process_configs=config.processes,
     )
     library = process_library or ProcessLibrary.default_foundation()
     build_context = ProcessBuildContext(
@@ -152,6 +161,16 @@ class _ConfiguredInputs:
     initial_state: Mapping[str, Quantity]
     t_span: tuple[Quantity, Quantity]
     t_eval: Quantity | None
+
+
+def _maturity_entities(inputs: _ConfiguredInputs) -> tuple[Any, ...]:
+    entities: list[Any] = []
+    for entity in (inputs.fungus, inputs.environment, inputs.geometry):
+        if entity is not None:
+            entities.append(entity)
+    entities.extend(inputs.substrates)
+    entities.extend(inputs.enzymes)
+    return tuple(entities)
 
 
 def _load_configured_inputs(

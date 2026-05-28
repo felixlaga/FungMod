@@ -1652,3 +1652,60 @@ Next milestone:
 - Optional-member-access package-quality ratchet: re-enable
   `reportOptionalMemberAccess` by narrowing optional quantities in calibration,
   transport, uncertainty, pH kinetics, and plugin substrate modules.
+
+## Foundation 10/10 Push: F10.2 Centralized Mode/Maturity Enforcement
+
+Date: 2026-05-28
+
+F10.2 status: `complete` for centralized toy/scientific/strict run-mode
+preflight enforcement.
+
+Completed in F10.2:
+
+- Added `fungal_model.validation.maturity` as the central maturity-policy
+  module for configured runs.
+- Added structured `MaturityIssue` records and `InvalidDataMaturityError`
+  failures with object type, object id, field, requested mode, reason, and fix.
+- Wired `run_configured_model` to enforce the maturity policy after generic
+  config/entity/parameter/product-map loading and before process factories,
+  model assembly, or solving.
+- Preserved toy benchmark execution while preventing framework benchmark
+  parameters, toy-only provenance, unknown required parameter values, missing
+  required parameter metadata, and toy/framework product maps from running in
+  scientific or strict modes.
+- Made strict mode reject missing uncertainty metadata for required
+  parameters, which scientific mode still allows.
+- Added `validity_range` to parameter parsing/serialization so required
+  parameter validity metadata can be enforced centrally.
+- Moved example notebook outputs from root-level `outputs/` paths to
+  `notebooks/examples/Outputs/<notebook-name>/`, with notebook smoke tests
+  updated to protect that layout.
+
+Architecture debt:
+
+- No new architecture debt was added for F10.2.
+
+F10.2 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_maturity_policy.py`
+- Result: 10 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_model_workflow.py`
+- Result: 5 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py`
+- Result: 2 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_shortcuts.py`
+- Result: 2 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_notebooks.py`
+- Result: 3 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 219 passed.
+
+Next milestone:
+
+- F10.1: typed model-config schema validation with clearer diagnostics for
+  entities, parameters, processes, initial state, time grids, validators, and
+  output settings.

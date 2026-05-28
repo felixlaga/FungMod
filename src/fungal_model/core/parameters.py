@@ -34,6 +34,7 @@ class Parameter:
     confidence_level: ConfidenceLevel
     notes: str
     measurement_method: str | None = None
+    validity_range: str | None = None
 
     def __post_init__(self) -> None:
         if not has_text(self.name):
@@ -96,6 +97,7 @@ class Parameter:
             "confidence_level": self.confidence_level,
             "notes": self.notes,
             "measurement_method": self.measurement_method,
+            "validity_range": self.validity_range,
         }
 
     @classmethod
@@ -116,6 +118,7 @@ class Parameter:
             confidence_level=data.get("confidence_level", "unknown"),
             notes=str(data.get("notes", "")),
             measurement_method=data.get("measurement_method"),
+            validity_range=data.get("validity_range"),
         )
 
 
@@ -191,6 +194,7 @@ class ParameterSet:
                 "source": parameter.source,
                 "confidence_level": parameter.confidence_level,
                 "measurement_method": parameter.measurement_method,
+                "validity_range": parameter.validity_range,
             }
             for parameter in self
         }
