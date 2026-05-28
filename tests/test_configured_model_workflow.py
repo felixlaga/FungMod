@@ -142,6 +142,10 @@ def _expected_configured_output_files() -> tuple[str, ...]:
         "time_grid.json",
         "validators.json",
         "merged_parameters.json",
+        "run_environment.json",
+        "package_versions.json",
+        "source_revision.json",
+        "solver_settings.json",
         "entity_snapshots/index.json",
         "output_manifest.json",
     )

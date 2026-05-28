@@ -127,6 +127,10 @@ def test_configured_output_writer_writes_expected_files(tmp_path: Path) -> None:
         "configured_model_run.json",
         "process_build_decisions.json",
         "merged_parameters.json",
+        "run_environment.json",
+        "package_versions.json",
+        "source_revision.json",
+        "solver_settings.json",
         "entity_snapshots/index.json",
         "output_manifest.json",
     ):

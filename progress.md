@@ -1832,3 +1832,52 @@ Next milestone:
 
 - F10.4: make configured output bundles reproducibility-grade by adding run
   environment, package version, source revision, and solver settings metadata.
+
+## Foundation 10/10 Push: F10.4 Reproducibility-Grade Output Bundles
+
+Date: 2026-05-28
+
+F10.4 status: `complete` for configured-run output bundle reproducibility
+metadata.
+
+Completed in F10.4:
+
+- Added `run_environment.json` to each configured output bundle with UTC run
+  timestamp, Python runtime details, platform details, executable path, and
+  working directory.
+- Added `package_versions.json` with the FungMod model version and installed
+  package versions for core runtime dependencies.
+- Added `source_revision.json` with truthful Git metadata when available:
+  repository root, commit, branch, dirty state, and an error field when Git
+  metadata cannot be resolved.
+- Added `solver_settings.json` with both configured solver settings and solver
+  backend metadata.
+- Ensured the output manifest includes the new files and still includes
+  itself.
+- Added reproducibility tests that assert every manifest-listed file exists,
+  mode/maturity are recorded, solver metadata is present, package version
+  metadata is present, and process-build decisions are included.
+
+Architecture debt:
+
+- No new architecture debt was added for F10.4.
+
+F10.4 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_output_bundle_reproducibility.py tests/test_configured_model_workflow.py tests/test_configured_workflow_components.py tests/test_configured_workflow_failures.py`
+- Result: 31 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py tests/test_guardrails_config_generality.py tests/test_guardrails_native_execution.py`
+- Result: 15 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_notebooks.py tests/test_full_integration_workflow.py`
+- Result: 6 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 245 passed.
+
+Next milestone:
+
+- F10.5: make the public API intentionally stable and documented, while
+  keeping PET-specific helpers contained in `fungal_model.plugins.pet`.

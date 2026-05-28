@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
 import json
+import platform
 import re
+import subprocess
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -90,6 +95,10 @@ class ConfiguredOutputWriter:
             },
         )
         _write_json(destination / "merged_parameters.json", inputs.parameters.to_dict())
+        _write_json(destination / "run_environment.json", _run_environment())
+        _write_json(destination / "package_versions.json", _package_versions(result))
+        _write_json(destination / "source_revision.json", _source_revision(config))
+        _write_json(destination / "solver_settings.json", _solver_settings(result))
         _write_entity_snapshots(destination, config=config, inputs=inputs)
         _write_output_manifest(destination, config=config, result=result)
 
@@ -155,6 +164,101 @@ def _validation_summary(result: SimulationResult) -> dict[str, Any]:
         "count": len(report),
         "passed": bool(report) and all(bool(item.get("passed")) for item in report),
         "failed": [item for item in report if not bool(item.get("passed"))],
+    }
+
+
+def _run_environment() -> dict[str, Any]:
+    return {
+        "timestamp_utc": datetime.now(UTC).isoformat(),
+        "python": {
+            "version": sys.version,
+            "version_info": list(sys.version_info[:3]),
+            "implementation": platform.python_implementation(),
+            "executable": sys.executable,
+        },
+        "platform": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "version": platform.version(),
+            "machine": platform.machine(),
+            "processor": platform.processor(),
+        },
+        "working_directory": str(Path.cwd()),
+    }
+
+
+def _package_versions(result: SimulationResult) -> dict[str, Any]:
+    distributions = ("fungal-model", "numpy", "scipy", "pint", "matplotlib", "PyYAML")
+    return {
+        "fungal_model": {
+            "version": result.model_version,
+            "distribution": "fungal-model",
+        },
+        "distributions": {
+            distribution: _distribution_version(distribution)
+            for distribution in distributions
+        },
+    }
+
+
+def _distribution_version(distribution: str) -> str | None:
+    try:
+        return version(distribution)
+    except PackageNotFoundError:
+        return None
+
+
+def _source_revision(config: ModelConfig) -> dict[str, Any]:
+    cwd = Path.cwd() if config.path is None else config.path.parent
+    root, root_error = _git_text(("git", "rev-parse", "--show-toplevel"), cwd=cwd)
+    if root is None:
+        return {
+            "available": False,
+            "root": None,
+            "commit": None,
+            "branch": None,
+            "dirty": None,
+            "error": root_error,
+        }
+    root_path = Path(root)
+    commit, commit_error = _git_text(("git", "rev-parse", "HEAD"), cwd=root_path)
+    branch, branch_error = _git_text(("git", "rev-parse", "--abbrev-ref", "HEAD"), cwd=root_path)
+    status, status_error = _git_text(("git", "status", "--porcelain"), cwd=root_path)
+    errors = [error for error in (commit_error, branch_error, status_error) if error is not None]
+    return {
+        "available": commit is not None,
+        "root": root,
+        "commit": commit,
+        "branch": branch,
+        "dirty": None if status is None else bool(status),
+        "error": "; ".join(errors) if errors else None,
+    }
+
+
+def _git_text(command: tuple[str, ...], *, cwd: Path) -> tuple[str | None, str | None]:
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return None, str(exc)
+    stdout = completed.stdout.strip()
+    stderr = completed.stderr.strip()
+    if completed.returncode != 0:
+        message = stderr or stdout or f"{command[0]} exited with status {completed.returncode}"
+        return None, message
+    return stdout, None
+
+
+def _solver_settings(result: SimulationResult) -> dict[str, Any]:
+    return {
+        "solver_settings": result.solver_settings.to_dict(),
+        "solver_metadata": dict(result.solver_metadata),
     }
 
 
