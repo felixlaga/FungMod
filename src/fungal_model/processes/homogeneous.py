@@ -10,7 +10,7 @@ import numpy as np
 from fungal_model.chemistry.reactions import Reaction
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import ParameterSet
-from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
+from fungal_model.core.units import Quantity, assert_compatible, require_quantity
 from fungal_model.kinetics.michaelis_menten import (
     enzyme_explicit_michaelis_menten_rate,
     michaelis_menten_rate,

@@ -14,7 +14,7 @@ from fungal_model import __version__
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.simulation import SolverSettings
-from fungal_model.core.units import Q_, Quantity, assert_compatible, is_quantity
+from fungal_model.core.units import Q_, Quantity, is_quantity
 from fungal_model.core.validators import ValidationResult
 from fungal_model.processes.assembly import AssemblyReport
 

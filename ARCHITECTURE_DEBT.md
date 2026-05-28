@@ -101,3 +101,26 @@ non-plugin foundation configs. `tests/test_model_config_loading.py` verifies
 that plugin loading requires an explicit registry instead of a generic
 substrate-specific branch, and `tests/test_guardrails_public_api.py` keeps the
 public entry point non-placeholder.
+
+## FD-005 Permissive Pyright quantity-typing baseline
+
+Status: active
+
+Reason: The first package-quality milestone adds Pyright to CI before the
+existing Pint quantity aliases, optional-state checks, and quantity return
+types are fully Pyright-clean.
+
+Risk: Type checking can pass while quantity-type and optional-state issues
+remain in scientific modules. This must not be mistaken for a strict typing
+guarantee.
+
+Exit condition: the quantity alias layer and optional-state contracts are
+rewritten or annotated so Pyright can re-enable the disabled diagnostics while
+remaining green in CI.
+
+Removal milestone: Milestone 13 or the next dedicated package-quality ratchet,
+whichever first touches quantity typing.
+
+Tests protecting it: `tests/test_quality_config.py` verifies that Pyright is a
+declared dev dependency, that `pyrightconfig.json` exists, and that CI runs the
+Pyright command. GitHub Actions runs Pyright on every push and pull request.

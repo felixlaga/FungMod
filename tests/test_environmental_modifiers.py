@@ -16,10 +16,7 @@ from fungal_model.kinetics.arrhenius import (
     arrhenius_reference_scaled_rate,
 )
 from fungal_model.kinetics.ph import GaussianPHActivityProfile, gaussian_ph_activity
-from fungal_model.kinetics.surface_kinetics import (
-    PETSurfaceHydrolysisRateLaw,
-    pet_surface_hydrolysis_assumption,
-)
+from fungal_model.kinetics.surface_kinetics import PETSurfaceHydrolysisRateLaw
 from fungal_model.substrates.pet import PETSubstrate, make_pet_parameter_set
 
 
@@ -347,4 +344,3 @@ def test_ph_profile_requires_source() -> None:
             width_symbol="pH_sigma",
             source="",
         )
-

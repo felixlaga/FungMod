@@ -1,0 +1,27 @@
+{
+  "include": ["src/fungal_model"],
+  "exclude": [
+    "**/__pycache__",
+    "build",
+    "dist",
+    "outputs",
+    "notebooks"
+  ],
+  "typeCheckingMode": "basic",
+  "pythonVersion": "3.11",
+  "reportArgumentType": false,
+  "reportAssignmentType": false,
+  "reportAttributeAccessIssue": false,
+  "reportCallIssue": false,
+  "reportGeneralTypeIssues": false,
+  "reportInvalidTypeForm": false,
+  "reportOperatorIssue": false,
+  "reportOptionalMemberAccess": false,
+  "reportOptionalOperand": false,
+  "reportReturnType": false,
+  "reportMissingTypeStubs": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownParameterType": false,
+  "reportUnknownVariableType": false
+}

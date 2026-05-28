@@ -11,7 +11,7 @@ import numpy as np
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.provenance import ProvenanceError, has_text
-from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
+from fungal_model.core.units import Quantity, assert_compatible, require_quantity
 
 
 def enzyme_secretion_assumption() -> Assumption:

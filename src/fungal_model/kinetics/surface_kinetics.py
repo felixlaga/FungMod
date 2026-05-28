@@ -28,7 +28,6 @@ from fungal_model.kinetics.ph import GaussianPHActivityProfile
 from fungal_model.processes.surface import (
     AccessibleSitePool,
     LangmuirAdsorptionModel,
-    ProductReleaseMap,
     SurfaceCatalysisModel,
     SurfaceCatalysisProcess,
     surface_catalysis_rate,

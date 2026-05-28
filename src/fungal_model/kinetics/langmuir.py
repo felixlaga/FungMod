@@ -19,7 +19,7 @@ from __future__ import annotations
 import numpy as np
 
 from fungal_model.core.parameters import Parameter
-from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
+from fungal_model.core.units import Quantity, assert_compatible, require_quantity
 
 LANGMUIR_DENOMINATOR_OFFSET = Parameter(
     name="Langmuir empty-site denominator offset",

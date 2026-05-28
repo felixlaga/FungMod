@@ -22,4 +22,5 @@
 - [ ] No unfinished public API.
 - [ ] Generic features tested on non-PET where applicable.
 - [ ] Architecture debt documented in `ARCHITECTURE_DEBT.md` if any temporary compromise remains.
+- [ ] Ruff, pyright, coverage, and pytest status are reported.
 - [ ] Progress docs updated.

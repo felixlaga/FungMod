@@ -125,6 +125,7 @@ __all__ = [
     "FirstOrderFactory",
     "HomogeneousMichaelisMentenProcess",
     "HomogeneousMichaelisMentenFactory",
+    "LangmuirAdsorptionModel",
     "InitialStateConfig",
     "IncompatibleUnitsError",
     "InvalidMechanismError",

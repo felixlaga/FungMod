@@ -5,7 +5,7 @@ import pytest
 
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.provenance import ProvenanceError
-from fungal_model.core.units import Q_, UnitError
+from fungal_model.core.units import UnitError
 from fungal_model.uncertainty import (
     LocalSensitivitySpec,
     ParameterUncertaintySpec,

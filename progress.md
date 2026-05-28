@@ -1504,3 +1504,50 @@ Next milestone:
 
 - Milestone 12: package quality and CI discipline, including initial linting,
   type-checking, coverage, and README/CI alignment.
+
+## Foundation-First Reset: Milestone 12 Package Quality And CI
+
+Date: 2026-05-28
+
+Milestone 12 status: `complete` for the first executable package-quality
+baseline.
+
+Completed in Milestone 12:
+
+- Added `ruff`, `pyright`, and `pytest-cov` to the `dev` extra.
+- Added Ruff configuration for correctness-oriented linting over `src` and
+  `tests`.
+- Added `pyrightconfig.json` as an explicit initial type-checking baseline.
+- Added coverage configuration with branch coverage and a starting
+  `fail_under = 60` gate.
+- Updated GitHub Actions CI to run lint, type check, and coverage-backed tests.
+- Added `.github/BRANCH_PROTECTION.md` documenting the default-branch
+  protection expectation for the CI workflow.
+- Added `tests/test_quality_config.py` to protect declared dev dependencies,
+  quality-tool configuration, and CI commands.
+- Updated the PR template to require Ruff, Pyright, coverage, and pytest status.
+- Cleaned up unused imports surfaced by Ruff without broad style churn.
+- Updated `.gitignore` for local coverage artifacts.
+
+Milestone 12 type-checking note:
+
+- The Pyright gate is intentionally permissive around Pint quantity typing and
+  optional-state inference. It is active and passing, but the stricter quantity
+  typing cleanup remains a future package-quality milestone and is documented
+  as `FD-005` in `ARCHITECTURE_DEBT.md`.
+
+Milestone 12 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_quality_config.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py`
+- Result: 13 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`
+- Result: 203 passed, total coverage 84.92%, required coverage 60% reached.
+
+Next milestone:
+
+- Milestone 13: tighten foundation review/readiness, including explicit
+  remaining architecture debt and the next realistic type/coverage ratchet.

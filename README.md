@@ -76,6 +76,22 @@ python3 -m pip install -e ".[dev]"
 pytest
 ```
 
+## Quality Gates
+
+The CI workflow installs `.[dev]` and runs the package-quality gates below:
+
+```bash
+python -m ruff check src tests
+python -m pyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"
+python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml
+```
+
+The current Pyright gate is an initial baseline. It resolves imports from the
+active Python interpreter and intentionally keeps Pint quantity-type diagnostics
+permissive until the quantity alias layer is tightened in a later milestone.
+
+Branch protection expectations are documented in `.github/BRANCH_PROTECTION.md`.
+
 ## Run The Examples
 
 ```bash
