@@ -35,6 +35,10 @@ entities:
         degradation_products:
           - name: released generic product
             notes: Toy product for config loading only.
+  enzymes:
+    - id: generic_surface_catalyst
+      path: data/enzymes/toy_generic_surface_catalyst.yml
+      loader: enzyme
   product_maps:
     - id: dummy_release_map
       path: data/product_maps/toy_surface_dummy_mass_equivalent.yml
@@ -79,6 +83,7 @@ processes:
       substrate: solid_substrate_amount
       catalyst: free_catalyst_concentration
       product: released_product_amount
+      bond_type: generic_linkage
     parameters:
       adsorption_constant: K_ads_dummy
       surface_rate_constant: k_surface_dummy

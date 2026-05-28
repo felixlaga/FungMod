@@ -170,19 +170,29 @@ range, units, and value fields. Unknown scientific values should be written as
 The generic configured-model API is the public workflow entry point:
 
 ```python
-from fungal_model import ConfiguredModelExecutionError, load_model_config, run_configured_model
+from fungal_model import load_model_config, run_configured_model
 
 config = load_model_config("path/to/model_config.yml")
-try:
-    run_configured_model("path/to/model_config.yml")
-except ConfiguredModelExecutionError as exc:
-    report = exc.report.to_dict()
+result = run_configured_model("path/to/model_config.yml")
 ```
 
-At the current foundation stage, `load_model_config` validates the generic
-top-level config contract. `run_configured_model` remains a structural preflight
-boundary while config-driven assembly and output-bundle wiring are completed.
-Native execution itself is available through `AssembledModel.run()`.
+`run_configured_model` now loads entities through registries, merges configured
+and entity parameter sets, builds processes through `ProcessLibrary`, assembles
+a `ModelBuilder`, executes through `AssembledModel.run()`, validates the
+`SimulationResult`, and saves the standard output bundle when an output
+directory is configured.
+
+Plugin-backed configs use the same function with explicit registry injection:
+
+```python
+from fungal_model import run_configured_model
+from fungal_model.plugins.pet import pet_substrate_loader_registry
+
+result = run_configured_model(
+    "data/model_configs/toy_surface_pet_plugin.yml",
+    substrate_registry=pet_substrate_loader_registry(),
+)
+```
 
 The older PET surface integration remains available from
 `fungal_model.workflows` as a deprecated compatibility workflow for existing
@@ -208,8 +218,9 @@ tests and examples.
 - Monte Carlo and local sensitivity utilities require explicit uncertainty/perturbation specifications; Bayesian calibration and global sensitivity are not implemented.
 - `AssembledModel.run()` currently supports well-mixed process ODE execution;
   unsupported geometry fails before simulation.
-- The generic configured workflow still does not assemble, run, validate, and
-  save a complete output bundle from model configs end to end.
+- The generic configured workflow currently supports foundation process
+  factories and well-mixed execution; unsupported process types and geometry
+  fail before simulation.
 - The standardized `results.SimulationResult` is now native output for
   `AssembledModel.run()` and still wraps older adapter workflows.
 - Generic surface catalysis now exists, and PET composes it through a PET

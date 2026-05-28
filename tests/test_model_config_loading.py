@@ -18,6 +18,7 @@ from fungal_model import (
     run_configured_model,
 )
 from fungal_model.io import ModelConfigError
+from fungal_model.plugins.pet import pet_substrate_loader_registry
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -80,15 +81,44 @@ def test_plugin_config_state_names_are_configured_not_hardcoded() -> None:
     assert config.processes[0].states["substrate"] == "solid_polymer_amount"
 
 
-def test_run_configured_model_loads_each_foundation_config_before_structured_failure() -> None:
-    for path in FOUNDATION_MODEL_CONFIGS:
-        with pytest.raises(ConfiguredModelExecutionError) as exc_info:
-            run_configured_model(path)
-        report = exc_info.value.report
-        assert report.config_path == str(path)
-        assert report.stage == "configured_model_execution"
-        assert "configured_process_factory_wiring" in report.missing_capabilities
-        assert "native_assembled_model_run" in report.missing_capabilities
+def test_run_configured_model_executes_non_plugin_foundation_configs(tmp_path) -> None:
+    runnable_paths = (
+        MODEL_CONFIGS / "toy_homogeneous_ab.yml",
+        MODEL_CONFIGS / "toy_surface_dummy_non_pet.yml",
+    )
+
+    for path in runnable_paths:
+        result = run_configured_model(path, output_dir=tmp_path / path.stem)
+
+        assert result.assembly_report is not None
+        assert result.assembly_report.success
+        assert result.validation_results
+        assert all(validation.passed for validation in result.validation_results)
+        assert (tmp_path / path.stem / "record.json").exists()
+
+
+def test_run_configured_model_executes_plugin_config_with_explicit_registry(tmp_path) -> None:
+    result = run_configured_model(
+        MODEL_CONFIGS / "toy_surface_pet_plugin.yml",
+        output_dir=tmp_path / "plugin_run",
+        substrate_registry=pet_substrate_loader_registry(),
+    )
+
+    assert result.assembly_report is not None
+    assert result.assembly_report.success
+    assert result.state("solid_polymer_amount").magnitude[-1] < result.state("solid_polymer_amount").magnitude[0]
+    assert result.rate("plugin_surface_catalysis").magnitude[0] > 0.0
+    assert (tmp_path / "plugin_run" / "configured_model_run.json").exists()
+
+
+def test_plugin_config_requires_explicit_loader_registry() -> None:
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(MODEL_CONFIGS / "toy_surface_pet_plugin.yml")
+
+    report = exc_info.value.report
+    assert report.config_path == str(MODEL_CONFIGS / "toy_surface_pet_plugin.yml")
+    assert report.stage == "configured_input_loading"
+    assert report.details["error_type"] == "RegistryLookupError"
 
 
 def test_model_config_rejects_missing_required_sections(tmp_path) -> None:

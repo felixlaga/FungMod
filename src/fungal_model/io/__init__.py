@@ -16,7 +16,12 @@ from .model_config import (
     load_model_config,
     validate_model_config_mapping,
 )
-from .parameters import parameter_from_config, parameter_set_from_config
+from .parameters import (
+    ParameterMergeError,
+    merge_parameter_sets,
+    parameter_from_config,
+    parameter_set_from_config,
+)
 from .product_maps import load_product_map
 from .registries import (
     GeometryLoaderRegistry,
@@ -57,6 +62,8 @@ __all__ = [
     "ModelConfigError",
     "ModelConfigValidationResult",
     "OutputConfig",
+    "ParameterMergeError",
+    "merge_parameter_sets",
     "parameter_from_config",
     "parameter_set_from_config",
     "ParameterSetConfig",

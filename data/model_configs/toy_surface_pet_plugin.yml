@@ -44,6 +44,7 @@ processes:
       substrate: solid_polymer_amount
       catalyst: free_catalyst_concentration
       product: released_product_amount
+      bond_type: ester
     parameters:
       adsorption_constant: K_ads
       surface_rate_constant: k_surface

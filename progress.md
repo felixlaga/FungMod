@@ -1320,3 +1320,53 @@ Next milestone:
 - Milestone 8: wire the generic `run_configured_model` workflow into config
   loading, registries, process factories, `AssembledModel.run()`, result
   validation, and output-bundle saving.
+
+## Foundation-First Reset: Milestone 8 Generic run_configured_model
+
+Date: 2026-05-27
+
+Milestone 8 status: `complete` for the first generic configured-model
+execution scope.
+
+Completed in Milestone 8:
+
+- Implemented `run_configured_model` as the generic workflow orchestrator.
+- Configured runs now load substrates, geometries, product maps, validators,
+  fungi, enzymes, environments, and parameter sets from the config contract.
+- Plugin-backed substrate loading remains explicit through caller-supplied
+  registries; the generic workflow does not import plugin loaders.
+- Added `merge_parameter_sets` with duplicate-identical acceptance and
+  duplicate-conflict rejection.
+- Configured process entries build through `ProcessLibrary` factories and then
+  assemble through `ModelBuilder`.
+- Configured execution calls `AssembledModel.run()` and returns
+  `SimulationResult`.
+- Output saving uses the standard `SimulationResult.save()` bundle and adds
+  `input_model_config.json` plus `configured_model_run.json`.
+- Added a toy generic surface catalyst config so the dummy non-plugin surface
+  benchmark exercises entity compatibility without substrate-specific biology.
+- Resolved architecture debt `FD-004`.
+
+Milestone 8 behavior now available:
+
+- `run_configured_model("data/model_configs/toy_homogeneous_ab.yml")` runs the
+  homogeneous benchmark through the generic workflow.
+- `run_configured_model("data/model_configs/toy_surface_dummy_non_pet.yml")`
+  runs the dummy non-plugin surface benchmark through the same workflow.
+- `run_configured_model("data/model_configs/toy_surface_pet_plugin.yml",
+  substrate_registry=pet_substrate_loader_registry())` runs the explicit plugin
+  benchmark through the same workflow.
+- Running the plugin config without the explicit registry fails structurally at
+  input loading instead of creating a generic substrate-specific branch.
+
+Milestone 8 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_model_workflow.py tests/test_model_config_loading.py tests/test_guardrails_public_api.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py`
+- Result: 21 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 198 passed.
+
+Next milestone:
+
+- Milestone 9: remove or relocate the deprecated direct PET workflow path so
+  workflows no longer call lower-level solvers directly.

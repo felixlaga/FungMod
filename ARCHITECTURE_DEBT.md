@@ -23,7 +23,9 @@ Exit condition: migrate the PET example to delegate through
 `run_configured_model` or move the PET-specific workflow behind a
 plugin/example boundary.
 
-Removal milestone: full removal or plugin relocation by Milestone 8.
+Removal milestone: full removal or plugin relocation by Milestone 9, now that
+the generic configured-model runner can execute the plugin benchmark through
+an explicit registry.
 
 Tests protecting it: `tests/test_guardrails_no_hardcoding.py` permits only the
 current exact legacy lines and fails on new PET-specific lines in generic
@@ -74,9 +76,9 @@ first-order and non-PET surface execution through `AssembledModel.run()`.
 `tests/test_guardrails_public_api.py` requires the generic public API names
 without faking end-to-end execution.
 
-## FD-004 Configured-model runner is a structural preflight boundary
+## FD-004 Configured-model runner execution
 
-Status: active transitional debt
+Status: resolved in Milestone 8
 
 Reason: Milestone 2 introduced `run_configured_model` as the generic public
 entry point before registry-based entity loading, process-factory wiring,
@@ -85,12 +87,17 @@ native assembled-model execution, and configured output bundles exist.
 Risk: users can see the correct generic entry point before it can execute a
 model end to end.
 
-Exit condition: `run_configured_model` loads entities through registries,
-builds processes through factories, assembles a model, calls
-`AssembledModel.run()`, validates the result, and saves the output bundle.
+Exit condition: met. `run_configured_model` loads entities through registries,
+loads product maps, merges parameter sets with conflict detection, builds
+processes through `ProcessLibrary`, assembles a `ModelBuilder`, calls
+`AssembledModel.run()`, validates the result, and saves a standard output
+bundle when an output directory is configured.
 
-Removal milestone: Milestone 8.
+Removal milestone: resolved in Milestone 8.
 
-Tests protecting it: `tests/test_guardrails_public_api.py` requires the public
-API names to exist and checks that `run_configured_model` fails with a
-structured report rather than silently constructing a substrate-specific path.
+Tests protecting it: `tests/test_configured_model_workflow.py` verifies that
+the same generic runner executes the homogeneous, explicit-plugin, and dummy
+non-plugin foundation configs. `tests/test_model_config_loading.py` verifies
+that plugin loading requires an explicit registry instead of a generic
+substrate-specific branch, and `tests/test_guardrails_public_api.py` keeps the
+public entry point non-placeholder.
