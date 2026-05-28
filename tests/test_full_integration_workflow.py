@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 from fungal_model.core.errors import InvalidMechanismError, MissingParameterError
-from fungal_model.workflows import PETSurfaceWorkflowConfig, run_pet_surface_integration
+from fungal_model.plugins.pet import PETSurfaceWorkflowConfig, run_pet_surface_integration
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,8 +20,8 @@ def test_pet_surface_integration_workflow_saves_full_output_folder(tmp_path) -> 
 
     assert result.assembly_report is not None
     assert result.assembly_report.success
-    assert result.state("PET").magnitude[-1] < result.state("PET").magnitude[0]
-    assert result.rate("surface_catalysis").magnitude[0] > 0.0
+    assert result.state("solid_polymer_amount").magnitude[-1] < result.state("solid_polymer_amount").magnitude[0]
+    assert result.rate("plugin_surface_catalysis").magnitude[0] > 0.0
 
     expected = [
         "record.json",
@@ -36,12 +36,9 @@ def test_pet_surface_integration_workflow_saves_full_output_folder(tmp_path) -> 
         "figures/process_rates.png",
         "figures/mass_balance.png",
         "logs/provenance_report.md",
-        "input_configs.json",
-        "substrate.json",
-        "enzyme.json",
-        "fungus.json",
-        "environment.json",
-        "geometry.json",
+        "input_model_config.json",
+        "configured_model_run.json",
+        "resolved_model_config.yml",
     ]
     for relative_path in expected:
         assert (tmp_path / "run" / relative_path).exists(), relative_path

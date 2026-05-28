@@ -9,27 +9,27 @@ file, not normalize them.
 
 ## FD-001 Legacy PET workflow in the generic workflow package
 
-Status: active transitional debt
+Status: resolved in Milestone 9
 
 Reason: `src/fungal_model/workflows/pet_surface_integration.py` predates the
 generic configured-model workflow and is still needed by existing integration
-tests. It is no longer exported from top-level `fungal_model`, but remains
-available from `fungal_model.workflows` for compatibility.
+tests.
 
 Risk: PET remains visible from the generic workflow namespace and can keep
 pulling high-level execution toward a substrate-specific path.
 
-Exit condition: migrate the PET example to delegate through
-`run_configured_model` or move the PET-specific workflow behind a
-plugin/example boundary.
+Exit condition: met. The PET convenience workflow moved to
+`src/fungal_model/plugins/pet/workflows.py` and delegates to
+`run_configured_model` with an explicit plugin registry. The generic
+`src/fungal_model/workflows/` package no longer exposes PET workflow names or
+imports low-level solvers.
 
-Removal milestone: full removal or plugin relocation by Milestone 9, now that
-the generic configured-model runner can execute the plugin benchmark through
-an explicit registry.
+Removal milestone: resolved in Milestone 9.
 
-Tests protecting it: `tests/test_guardrails_no_hardcoding.py` permits only the
-current exact legacy lines and fails on new PET-specific lines in generic
-workflow paths.
+Tests protecting it: `tests/test_guardrails_no_hardcoding.py` no longer keeps
+a PET allowlist for generic workflow paths, and
+`tests/test_full_integration_workflow.py` verifies that the plugin convenience
+helper still runs through the generic configured workflow.
 
 ## FD-002 PET-only substrate branch in YAML loading
 

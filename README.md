@@ -49,9 +49,8 @@ basic kinetics layer:
 - human-editable YAML config folders for fungi, substrates, enzymes,
   environments, geometries, parameters, and experiments,
 - schema-checked config loaders with explicit unknown-value handling,
-- a first config-driven PET surface integration workflow that assembles
-  fungus/enzyme/substrate/environment/geometry metadata through the process
-  registry and saves a full standardized output bundle,
+- an optional PET plugin convenience helper that delegates to the generic
+  configured workflow with an explicit plugin registry,
 - a minimal first-order `A -> B` benchmark example,
 - a homogeneous Michaelis-Menten toy-substrate benchmark example.
 - a PET surface-hydrolysis benchmark example.
@@ -194,9 +193,9 @@ result = run_configured_model(
 )
 ```
 
-The older PET surface integration remains available from
-`fungal_model.workflows` as a deprecated compatibility workflow for existing
-tests and examples.
+The older PET convenience entry point now lives under
+`fungal_model.plugins.pet` and delegates to `run_configured_model`; the generic
+`fungal_model.workflows` package stays substrate-neutral.
 
 ## Current Limitations
 
@@ -222,7 +221,7 @@ tests and examples.
   factories and well-mixed execution; unsupported process types and geometry
   fail before simulation.
 - The standardized `results.SimulationResult` is now native output for
-  `AssembledModel.run()` and still wraps older adapter workflows.
+  `AssembledModel.run()` and still wraps older non-workflow adapters.
 - Generic surface catalysis now exists, and PET composes it through a PET
   accessibility adapter, but resolved PET product chemistry and dynamic
   morphology remain future work.
@@ -230,8 +229,8 @@ tests and examples.
   slab, and porous-medium geometries are honest metadata placeholders.
 - Enzyme/fungus compatibility matching checks declared capabilities, but it
   does not yet auto-build full living-fungus ODE systems from entities.
-- The config-driven PET integration workflow is a deprecated compatibility
-  slice; the generic configured workflow is the main foundation path.
+- The PET plugin convenience helper is a deprecated compatibility slice; the
+  generic configured workflow is the main foundation path.
 - PET must not be treated with the homogeneous Michaelis-Menten layer except as an explicitly labelled artificial benchmark.
 - The reaction engine assumes each reaction rate can be converted into every affected species unit per simulation time unit.
 - Mass-balance validation requires the caller to provide conserved weights when species do not share directly compatible units.

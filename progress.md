@@ -1365,8 +1365,54 @@ Milestone 8 verification:
 - Result: 21 passed.
 - `/private/tmp/fungmod-venv/bin/python -m pytest`
 - Result: 198 passed.
+- `rg -n "SimulationEngine|ReactionDiffusionEngine|solve_ivp" src/fungal_model/workflows src/fungal_model/plugins/pet`
+- Result: no matches.
+- Generic PET-hardcoding scan over core/process/results/modifiers/io/workflows
+  source paths.
+- Result: no matches.
 
 Next milestone:
 
 - Milestone 9: remove or relocate the deprecated direct PET workflow path so
   workflows no longer call lower-level solvers directly.
+
+## Foundation-First Reset: Milestone 9 Workflow Solver Isolation
+
+Date: 2026-05-28
+
+Milestone 9 status: `complete` for workflow-level solver isolation.
+
+Completed in Milestone 9:
+
+- Removed `src/fungal_model/workflows/pet_surface_integration.py`.
+- Removed `PETSurfaceWorkflowConfig` and `run_pet_surface_integration` from
+  `fungal_model.workflows`.
+- Added `src/fungal_model/plugins/pet/workflows.py` as the plugin-local
+  compatibility helper.
+- The PET plugin helper materializes a generic model config and delegates to
+  `run_configured_model` with `pet_substrate_loader_registry()`.
+- The plugin helper no longer constructs processes, reactions, or low-level
+  solvers directly.
+- Tightened `tests/test_guardrails_no_hardcoding.py` by removing the legacy
+  PET allowlist for generic workflow paths.
+- Resolved architecture debt `FD-001`.
+
+Milestone 9 behavior now available:
+
+- `fungal_model.workflows` exports only generic configured-model workflow
+  names.
+- PET-specific convenience execution lives under `fungal_model.plugins.pet`.
+- Generic workflow source paths no longer contain PET-specific workflow names,
+  hardcoded PET states, or direct low-level solver imports.
+
+Milestone 9 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_full_integration_workflow.py tests/test_configured_model_workflow.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_public_api.py tests/test_guardrails_no_shortcuts.py`
+- Result: 16 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 198 passed.
+
+Next milestone:
+
+- Milestone 10: harden the result/output foundation for configured runs,
+  including complete output metadata and snapshots for generic configs.

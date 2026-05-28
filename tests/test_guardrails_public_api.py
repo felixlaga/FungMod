@@ -5,6 +5,7 @@ import inspect
 import pytest
 
 import fungal_model
+import fungal_model.workflows as workflows
 from fungal_model.processes import (
     AssembledModel,
     ModelBuilder,
@@ -38,6 +39,8 @@ def test_current_foundation_public_api_is_exported() -> None:
 def test_top_level_api_is_generic_first() -> None:
     assert not hasattr(fungal_model, "run_pet_surface_integration")
     assert not hasattr(fungal_model, "PETSurfaceWorkflowConfig")
+    assert not hasattr(workflows, "run_pet_surface_integration")
+    assert not hasattr(workflows, "PETSurfaceWorkflowConfig")
 
 
 def test_public_api_names_are_not_unfinished_placeholders() -> None:

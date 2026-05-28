@@ -37,32 +37,6 @@ FORBIDDEN_PATTERNS = {
     "petase token": re.compile(r"petase", re.IGNORECASE),
 }
 
-LEGACY_ALLOWLISTED_LINES = {
-    "src/fungal_model/workflows/__init__.py": {
-        "from .pet_surface_integration import PETSurfaceWorkflowConfig, run_pet_surface_integration",
-        '"run_pet_surface_integration",',
-    },
-    "src/fungal_model/workflows/pet_surface_integration.py": {
-        '"""First config-driven PET surface integration workflow."""',
-        "from fungal_model.kinetics.surface_kinetics import PETSurfaceHydrolysisRateLaw",
-        'enzyme_path: Path = DATA / "enzymes" / "petase_like.yml"',
-        "def run_pet_surface_integration(",
-        '"""Run the first registry-assembled PET surface workflow."""',
-        'process_name="PET surface catalysis workflow",',
-        'raise MissingParameterError("Workflow assembly failed: missing PET accessible surface.", report=report) from exc',
-        "rate_law = PETSurfaceHydrolysisRateLaw(",
-        'pet_mass="PET",',
-        'process = rate_law.as_generic_process(product_state="hydrolysate")',
-        '"PET": "kilogram",',
-        '"hydrolysate": "kilogram",',
-        '"PET": config.initial_pet_mass,',
-        '"hydrolysate": config.initial_product_mass,',
-        'validate_mass_balance(raw, conserved_weights={"PET": 1.0, "hydrolysate": 1.0}),',
-        'result.save(output, mass_balance_weights={"PET": 1.0, "hydrolysate": 1.0})',
-        '__all__ = ["PETSurfaceWorkflowConfig", "run_pet_surface_integration"]',
-    },
-}
-
 
 def test_no_new_pet_or_product_hardcoding_in_generic_source_paths() -> None:
     violations: list[str] = []
@@ -72,8 +46,6 @@ def test_no_new_pet_or_product_hardcoding_in_generic_source_paths() -> None:
             stripped = line.strip()
             for label, pattern in FORBIDDEN_PATTERNS.items():
                 if not pattern.search(line):
-                    continue
-                if stripped in LEGACY_ALLOWLISTED_LINES.get(relative, set()):
                     continue
                 violations.append(f"{relative}:{line_number}: {label}: {stripped}")
 
@@ -88,6 +60,7 @@ def test_no_new_pet_or_product_hardcoding_in_generic_source_paths() -> None:
 def test_hardcoding_allowlist_is_documented_as_architecture_debt() -> None:
     debt = (ROOT / "ARCHITECTURE_DEBT.md").read_text(encoding="utf-8")
     assert "FD-001" in debt
+    assert "resolved in Milestone 9" in debt
     assert "FD-002" in debt
     assert "tests/test_guardrails_no_hardcoding.py" in debt
 
