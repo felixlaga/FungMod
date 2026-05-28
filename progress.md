@@ -1978,3 +1978,89 @@ Next milestone:
 
 - F10.7: harden CI and branch-protection documentation around lint, type,
   coverage, and merge requirements.
+
+## Foundation 10/10 Push: F10.7 CI And Branch Protection Gate
+
+Date: 2026-05-28
+
+F10.7 status: `complete` for documented CI and merge-quality policy.
+
+Completed in F10.7:
+
+- Confirmed `.github/workflows/ci.yml` runs the required package-quality gates:
+  Ruff, Pyright, and pytest with coverage XML output.
+- Strengthened `.github/BRANCH_PROTECTION.md` so default-branch policy requires
+  pull requests, the `CI / tests` status check, up-to-date branches, no force
+  pushes, and no unaudited direct bypass.
+- Updated `README.md` to state that CI is required before merging and to
+  summarize the protected-branch requirements.
+- Expanded `tests/test_quality_config.py` so the CI commands, coverage gate,
+  branch-protection policy, and README merge policy stay mechanically checked.
+
+Architecture debt:
+
+- No new architecture debt was added for F10.7.
+- `FD-005` remains active as a documented package-quality typing ratchet, not
+  foundation-blocking architecture debt.
+
+F10.7 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_quality_config.py tests/test_foundation_complete_gate.py`
+- Result: 8 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`
+- Result: 252 passed; coverage 85.35%, above the 80% gate.
+
+Next milestone:
+
+- F10.8: add and test the formal foundation-complete gate before biology may
+  begin.
+
+## Foundation 10/10 Push: F10.8 Foundation Complete Gate
+
+Date: 2026-05-28
+
+F10.8 status: `complete` for the formal foundation-complete gate.
+
+Completed in F10.8:
+
+- Added `FOUNDATION_COMPLETE.md` with `Status: complete` for the software
+  foundation only.
+- Recorded the completion criteria required before biology may begin:
+  guardrails, configured workflows, failure paths, maturity modes,
+  reproducibility outputs, CI, coverage, plugin containment, notebook public
+  API usage, README limitations, and all three foundation configured runs.
+- Explicitly stated that the completion gate does not approve real fungal
+  biology, PETase mechanisms, literature parameters, metabolism, growth
+  physiology, or substrate-specific scientific mechanisms.
+- Documented active non-blocking architecture debt `FD-005` as a typing
+  ratchet only, not foundation-blocking architecture debt.
+- Added `tests/test_foundation_complete_gate.py` so a complete foundation gate
+  requires all evidence and cannot coexist with undocumented active
+  architecture debt.
+
+Architecture debt:
+
+- No new architecture debt was added for F10.8.
+
+F10.8 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py tests/test_guardrails_config_generality.py tests/test_guardrails_native_execution.py tests/test_configured_model_workflow.py tests/test_configured_workflow_components.py tests/test_configured_workflow_failures.py tests/test_maturity_policy.py tests/test_configured_output_bundle_reproducibility.py tests/test_notebooks.py tests/test_quality_config.py tests/test_foundation_complete_gate.py`
+- Result: 70 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`
+- Result: 252 passed; coverage 85.35%, above the 80% gate.
+
+Next milestone:
+
+- Foundation F10.1-F10.8 is complete. The next work should start the
+  post-foundation biology-readiness path from
+  `foundation_progress/FUNG_MOD_FOUNDATION_8_TO_10_MILESTONES.md`: literature
+  dataset schema, provenance templates, experiment dataset object, and
+  calibration workflow on synthetic data before any real biology is added.

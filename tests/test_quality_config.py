@@ -60,7 +60,21 @@ def test_ci_runs_lint_typecheck_and_coverage() -> None:
 def test_branch_protection_policy_documents_quality_gates() -> None:
     policy = (ROOT / ".github" / "BRANCH_PROTECTION.md").read_text(encoding="utf-8")
 
+    assert "require pull requests before merging" in policy
     assert "`CI / tests`" in policy
     assert "python -m ruff check src tests" in policy
     assert "python -m pyright" in policy
     assert "python -m pytest --cov=fungal_model" in policy
+    assert "require branches to be up to date before merging" in policy
+    assert "block force pushes" in policy
+    assert "block direct bypass" in policy
+
+
+def test_readme_states_ci_is_required_before_merging() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "CI is required before merging" in readme
+    assert "passing CI" in readme
+    assert "up-to-date branches" in readme
+    assert "no force pushes" in readme
+    assert "no unaudited direct bypass" in readme

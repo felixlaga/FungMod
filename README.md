@@ -78,7 +78,8 @@ pytest
 
 ## Quality Gates
 
-The CI workflow installs `.[dev]` and runs the package-quality gates below:
+CI is required before merging. The CI workflow installs `.[dev]` and runs the
+package-quality gates below:
 
 ```bash
 python -m ruff check src tests
@@ -93,6 +94,8 @@ ratchet documented in `ARCHITECTURE_DEBT.md`.
 Coverage currently has an 80% minimum gate.
 
 Branch protection expectations are documented in `.github/BRANCH_PROTECTION.md`.
+The protected default branch should require pull requests, passing CI,
+up-to-date branches, no force pushes, and no unaudited direct bypass.
 
 ## Run The Foundation Benchmarks
 
