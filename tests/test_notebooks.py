@@ -6,11 +6,9 @@ from pathlib import Path
 
 NOTEBOOKS = [
     "00_quickstart.ipynb",
-    "01_process_library_demo.ipynb",
-    "02_surface_hydrolysis_demo.ipynb",
-    "03_fungus_on_pet_demo.ipynb",
-    "04_reaction_diffusion_demo.ipynb",
-    "05_calibration_and_uncertainty_demo.ipynb",
+    "01_config_entity_inspection.ipynb",
+    "02_failure_report.ipynb",
+    "03_configured_outputs.ipynb",
 ]
 
 
@@ -36,12 +34,16 @@ def test_required_notebooks_exist_and_import_package_code() -> None:
         assert notebook["nbformat"] == 4
         source = "\n".join(code_cells(notebook))
         assert "fungal_model" in source
+        assert "run_configured_model" in source
 
 
 def test_notebooks_do_not_define_core_classes_or_rate_laws() -> None:
     forbidden = (
         "\nclass ",
         "RateLaw =",
+        "SimulationEngine",
+        "ReactionDiffusionEngine",
+        "PETSurfaceHydrolysisRateLaw",
         "def surface_catalysis_rate",
         "def michaelis_menten_rate",
         "def arrhenius_rate_constant",
@@ -52,11 +54,19 @@ def test_notebooks_do_not_define_core_classes_or_rate_laws() -> None:
             assert pattern not in source, f"{name} contains implementation pattern {pattern!r}"
 
 
-def test_quickstart_notebook_executes_smoke_path() -> None:
-    namespace: dict[str, object] = {"__name__": "__notebook_smoke__"}
-    for source in code_cells(load_notebook("00_quickstart.ipynb")):
-        exec(compile(source, "notebooks/00_quickstart.ipynb", "exec"), namespace)
+def test_foundation_notebooks_execute_smoke_paths() -> None:
+    for name in NOTEBOOKS:
+        namespace: dict[str, object] = {"__name__": "__notebook_smoke__"}
+        for source in code_cells(load_notebook(name)):
+            exec(compile(source, f"notebooks/{name}", "exec"), namespace)
 
     output = Path(__file__).resolve().parents[1] / "outputs" / "notebook_00_quickstart"
     assert (output / "record.json").exists()
     assert (output / "figures" / "state_trajectories.png").exists()
+    assert (output / "output_manifest.json").exists()
+
+    failure_output = Path(__file__).resolve().parents[1] / "outputs" / "notebook_02_failure_report"
+    assert (failure_output / "failure_report.json").exists()
+
+    inspection_output = Path(__file__).resolve().parents[1] / "outputs" / "notebook_03_configured_outputs"
+    assert (inspection_output / "configured_metadata.json").exists()

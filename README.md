@@ -97,17 +97,16 @@ Each example saves a plot, simulation record, validation report, and assumptions
 
 ## Notebooks
 
-The `notebooks/` folder contains the first roadmap notebook set:
+The `notebooks/examples/` folder contains the foundation notebook set:
 
 - `00_quickstart.ipynb`
-- `01_process_library_demo.ipynb`
-- `02_surface_hydrolysis_demo.ipynb`
-- `03_fungus_on_pet_demo.ipynb`
-- `04_reaction_diffusion_demo.ipynb`
-- `05_calibration_and_uncertainty_demo.ipynb`
+- `01_config_entity_inspection.ipynb`
+- `02_failure_report.ipynb`
+- `03_configured_outputs.ipynb`
 
 Notebook tests check that notebooks import `fungal_model`, avoid defining core
-rate laws/classes inline, and execute the quickstart smoke path.
+rate laws/classes or low-level solvers inline, and execute every foundation
+notebook smoke path.
 
 ## Data And Configs
 

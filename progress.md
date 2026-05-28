@@ -1453,8 +1453,54 @@ Milestone 10 verification:
 - Result: 17 passed.
 - `/private/tmp/fungmod-venv/bin/python -m pytest`
 - Result: 199 passed.
+- Notebook JSON validation for all four foundation notebooks.
+- Result: passed.
+- Notebook direct-solver/core-implementation scan.
+- Result: no matches.
 
 Next milestone:
 
 - Milestone 11: notebook foundation for generic quickstart, config/entity
   inspection, failure reports, and configured output inspection.
+
+## Foundation-First Reset: Milestone 11 Notebook Foundation
+
+Date: 2026-05-28
+
+Milestone 11 status: `complete` for foundation notebook smoke coverage.
+
+Completed in Milestone 11:
+
+- Replaced the old roadmap notebooks with foundation-first notebooks under
+  `notebooks/examples/`.
+- Added a generic quickstart notebook that runs
+  `data/model_configs/toy_homogeneous_ab.yml` through `run_configured_model`.
+- Added a config/entity inspection notebook for the dummy non-plugin surface
+  benchmark.
+- Added a structured failure-report notebook that captures the expected plugin
+  registry failure as a `ConfiguredModelRunReport`.
+- Added a configured-output inspection notebook that reads the manifest,
+  metadata, build decisions, validators, and result state names.
+- Tightened notebook tests so required notebooks import package code, call the
+  generic configured workflow, avoid core class/rate-law/solver definitions,
+  and execute every foundation notebook smoke path.
+
+Milestone 11 behavior now available:
+
+- Notebooks demonstrate the generic workflow instead of constructing low-level
+  solvers.
+- Failure handling and output inspection are documented as runnable examples.
+- Notebook smoke tests create quickstart, failure-report, and output-inspection
+  artifacts under `outputs/`.
+
+Milestone 11 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_notebooks.py`
+- Result: 3 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 199 passed.
+
+Next milestone:
+
+- Milestone 12: package quality and CI discipline, including initial linting,
+  type-checking, coverage, and README/CI alignment.
