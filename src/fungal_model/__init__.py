@@ -97,8 +97,12 @@ from fungal_model.solvers import ProcessODESolver, RunRequest
 from fungal_model.substrates.base import Substrate
 from fungal_model.validation import InvalidDataMaturityError, MaturityIssue
 from fungal_model.workflows import (
+    ConfiguredInputLoader,
     ConfiguredModelExecutionError,
     ConfiguredModelRunReport,
+    ConfiguredModelRunner,
+    ConfiguredOutputWriter,
+    ConfiguredProcessAssembler,
     run_configured_model,
 )
 
@@ -112,8 +116,12 @@ __all__ = [
     "BuildDecision",
     "CompatibilityIssue",
     "ConfigReference",
+    "ConfiguredInputLoader",
     "ConfiguredModelExecutionError",
     "ConfiguredModelRunReport",
+    "ConfiguredModelRunner",
+    "ConfiguredOutputWriter",
+    "ConfiguredProcessAssembler",
     "Enzyme",
     "EntityConfigRefs",
     "EquilibriumSurfaceCoverageModel",

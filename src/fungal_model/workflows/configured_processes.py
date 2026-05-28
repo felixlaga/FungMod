@@ -1,0 +1,92 @@
+"""Process assembly for generic configured-model workflows."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from fungal_model.io.model_config import ModelConfig
+from fungal_model.processes import (
+    AssembledModel,
+    ModelBuilder,
+    Process,
+    ProcessBuildContext,
+    ProcessLibrary,
+    ProcessRegistry,
+)
+from fungal_model.workflows.configured_errors import raise_configured_model_execution_error
+from fungal_model.workflows.configured_inputs import ConfiguredInputs
+
+
+@dataclass(frozen=True)
+class ConfiguredProcessAssembly:
+    """Built process decisions and assembled model for a configured run."""
+
+    decisions: tuple[Any, ...]
+    processes: tuple[Process, ...]
+    model: AssembledModel
+
+
+@dataclass(frozen=True)
+class ConfiguredProcessAssembler:
+    """Build process objects and assemble an executable model from loaded inputs."""
+
+    process_library: ProcessLibrary | None = None
+
+    def assemble(self, config: ModelConfig, inputs: ConfiguredInputs) -> ConfiguredProcessAssembly:
+        library = self.process_library or ProcessLibrary.default_foundation()
+        build_context = ProcessBuildContext(
+            state_units=inputs.state_units(),
+            product_maps=inputs.product_maps,
+            source=f"Configured process factory for {config.name}.",
+        )
+        decisions = library.build_decisions(build_context, config.processes)
+        rejected = tuple(decision for decision in decisions if not decision.can_build)
+        if rejected:
+            raise_configured_model_execution_error(
+                config,
+                stage="process_factory_build",
+                missing_capabilities=("process_factory_requirements",),
+                message="At least one configured process cannot be built by the process library.",
+                details={"decisions": [decision.to_dict() for decision in decisions]},
+            )
+        processes = library.build_processes(build_context, config.processes)
+        model = ModelBuilder(
+            fungus=inputs.fungus,
+            substrates=inputs.substrates,
+            enzymes=inputs.enzymes,
+            environment=inputs.environment,
+            geometry=inputs.geometry,
+            process_library=ProcessRegistry(processes),
+            parameters=inputs.parameters,
+            requested_processes=tuple(process.name for process in processes),
+            validators=inputs.validators,
+            allow_unsourced_for_testing=config.mode == "toy",
+        ).assemble()
+        return ConfiguredProcessAssembly(
+            decisions=decisions,
+            processes=tuple(processes),
+            model=model,
+        )
+
+
+def require_runnable_config(config: ModelConfig) -> None:
+    missing: list[str] = []
+    if not config.processes:
+        missing.append("configured_processes")
+    if not config.initial_state.states:
+        missing.append("configured_initial_state")
+    if missing:
+        raise_configured_model_execution_error(
+            config,
+            stage="configured_model_execution",
+            missing_capabilities=tuple(missing),
+            message="Configured model is missing sections required for execution.",
+        )
+
+
+__all__ = [
+    "ConfiguredProcessAssembler",
+    "ConfiguredProcessAssembly",
+    "require_runnable_config",
+]

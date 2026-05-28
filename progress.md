@@ -1706,6 +1706,60 @@ F10.2 verification:
 
 Next milestone:
 
-- F10.1: typed model-config schema validation with clearer diagnostics for
-  entities, parameters, processes, initial state, time grids, validators, and
-  output settings.
+- F10.1: decompose the generic configured workflow into separately testable
+  input loading, process assembly, orchestration, and output writing
+  responsibilities.
+
+## Foundation 10/10 Push: F10.1 Configured Workflow Decomposition
+
+Date: 2026-05-28
+
+F10.1 status: `complete` for decomposing the generic configured workflow into
+separately testable responsibilities.
+
+Completed in F10.1:
+
+- Kept `run_configured_model(config_path, output_dir=None, ...)` as the stable
+  public entry point.
+- Added `ConfiguredModelRunner` for orchestration of config loading, maturity
+  preflight, process assembly, model execution, and output writing.
+- Added `ConfiguredInputLoader` and `ConfiguredInputs` for resolving entity
+  registries, product maps, merged parameter sets, validators, initial state,
+  and time grids.
+- Added `ConfiguredProcessAssembler` and `ConfiguredProcessAssembly` for
+  process-factory decisions, process construction, and `ModelBuilder`
+  assembly.
+- Added `ConfiguredOutputWriter` for configured output bundle persistence.
+- Moved configured workflow error/report helpers into a shared internal module
+  so loader, assembler, and runner can all raise the same structured
+  execution error without import cycles.
+- Exported the new workflow components from `fungal_model.workflows` and the
+  top-level package.
+
+Architecture debt:
+
+- No new architecture debt was added for F10.1.
+
+F10.1 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_workflow_components.py`
+- Result: 8 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_model_workflow.py`
+- Result: 5 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_model_config_loading.py`
+- Result: 8 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py tests/test_guardrails_config_generality.py tests/test_guardrails_native_execution.py`
+- Result: 15 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_maturity_policy.py tests/test_notebooks.py`
+- Result: 13 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 227 passed.
+
+Next milestone:
+
+- F10.3: strengthen generic workflow failure-path tests with structured
+  exception-stage assertions and no false-success output.
