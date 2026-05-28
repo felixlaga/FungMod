@@ -89,27 +89,27 @@ python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml
 The current Pyright gate is an initial baseline. It resolves imports from the
 active Python interpreter and intentionally keeps Pint quantity-type diagnostics
 permissive until the quantity alias layer is tightened in a later milestone.
+Coverage currently has an 80% minimum gate.
 
 Branch protection expectations are documented in `.github/BRANCH_PROTECTION.md`.
 
-## Run The Examples
+## Run The Foundation Benchmarks
 
-```bash
-python examples/01_first_order_reaction.py
-python examples/02_homogeneous_michaelis_menten.py
-python examples/03_pet_surface_hydrolysis.py
-python examples/04_pet_temperature_ph.py
-python examples/05_fungal_enzyme_secretion_and_growth.py
-python examples/06_spatial_pet_film_enzyme_diffusion.py
-python examples/stage12_01_homogeneous_michaelis_menten.py
-python examples/stage12_02_pet_surface_model.py
-python examples/stage12_03_pet_with_temperature.py
-python examples/stage12_04_fungal_enzyme_secretion.py
-python examples/stage12_05_fungal_growth_from_assimilable_products.py
-python examples/stage12_06_spatial_pet_film.py
+```python
+from fungal_model import run_configured_model
+from fungal_model.plugins.pet import pet_substrate_loader_registry
+
+run_configured_model("data/model_configs/toy_homogeneous_ab.yml")
+run_configured_model("data/model_configs/toy_surface_dummy_non_pet.yml")
+run_configured_model(
+    "data/model_configs/toy_surface_pet_plugin.yml",
+    substrate_registry=pet_substrate_loader_registry(),
+)
 ```
 
-Each example saves a plot, simulation record, validation report, and assumptions file under `outputs/`.
+Each configured run saves a plot, simulation record, validation report,
+assumptions file, process-build decisions, entity snapshots, and manifest under
+its configured `outputs/` directory unless an explicit `output_dir` is supplied.
 
 ## Notebooks
 

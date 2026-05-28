@@ -9,6 +9,9 @@ The CI workflow currently blocks on:
 - `python -m pyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`
 - `python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`
 
+Coverage must stay at or above the `fail_under` threshold configured in
+`pyproject.toml`.
+
 This file documents repository policy. The actual branch protection rule must
 be enabled in the GitHub repository settings by a maintainer with permission.
 

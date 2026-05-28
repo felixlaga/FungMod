@@ -118,8 +118,7 @@ Exit condition: the quantity alias layer and optional-state contracts are
 rewritten or annotated so Pyright can re-enable the disabled diagnostics while
 remaining green in CI.
 
-Removal milestone: Milestone 13 or the next dedicated package-quality ratchet,
-whichever first touches quantity typing.
+Removal milestone: the next dedicated quantity-typing package-quality ratchet.
 
 Tests protecting it: `tests/test_quality_config.py` verifies that Pyright is a
 declared dev dependency, that `pyrightconfig.json` exists, and that CI runs the

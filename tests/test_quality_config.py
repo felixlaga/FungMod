@@ -25,7 +25,7 @@ def test_quality_tool_configs_exist() -> None:
     assert pyproject["tool"]["ruff"]["src"] == ["src", "tests"]
     assert "F" in pyproject["tool"]["ruff"]["lint"]["select"]
     assert pyproject["tool"]["coverage"]["run"]["source"] == ["fungal_model"]
-    assert pyproject["tool"]["coverage"]["report"]["fail_under"] >= 60
+    assert pyproject["tool"]["coverage"]["report"]["fail_under"] >= 80
     assert pyright["include"] == ["src/fungal_model"]
     assert pyright["typeCheckingMode"] == "basic"
     assert pyright["reportArgumentType"] is False

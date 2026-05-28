@@ -1551,3 +1551,55 @@ Next milestone:
 
 - Milestone 13: tighten foundation review/readiness, including explicit
   remaining architecture debt and the next realistic type/coverage ratchet.
+
+## Foundation-First Reset: Milestone 13 Foundation Review
+
+Date: 2026-05-28
+
+Milestone 13 status: `complete` for the foundation review/readiness gate.
+
+Completed in Milestone 13:
+
+- Added `FOUNDATION_READINESS.md` with the current foundation gate result,
+  active architecture debt, deferred biology scope, and review commands.
+- Added `tests/test_guardrails_config_generality.py` to prove the homogeneous,
+  explicit PET plugin, and dummy non-PET surface configs all run through
+  `run_configured_model`.
+- Added `tests/test_guardrails_config_generality.py` coverage for arbitrary
+  state names and explicit plugin registry failure.
+- Added `tests/test_guardrails_native_execution.py` to prove the configured
+  workflow calls `AssembledModel.run()` and high-level workflows do not import
+  low-level solver backends.
+- Replaced the stale README example-script section with the current
+  configured-model benchmark workflow.
+- Raised the coverage gate from 60% to 80%.
+- Updated branch-protection and quality-config docs/tests for the new coverage
+  floor.
+- Clarified that `FD-005` remains active and should be removed in a dedicated
+  quantity-typing package-quality ratchet.
+
+Milestone 13 behavior now available:
+
+- The required foundation benchmark trio is protected by explicit guardrail
+  tests.
+- Output bundles are inspected as part of the generic-config guardrail.
+- The package now has a more serious coverage gate while preserving the
+  documented Pyright quantity-typing baseline.
+
+Milestone 13 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_config_generality.py tests/test_guardrails_native_execution.py`
+- Result: 6 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_quality_config.py tests/test_guardrails_config_generality.py tests/test_guardrails_native_execution.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py`
+- Result: 19 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`
+- Result: 209 passed, total coverage 84.92%, required coverage 80% reached.
+
+Next milestone:
+
+- Quantity-typing package-quality ratchet: reduce `FD-005` by tightening
+  Pyright diagnostics around Pint quantity aliases and optional-state handling.
