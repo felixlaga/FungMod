@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from fungal_model.core.errors import InvalidMechanismError, MissingParameterError
 from fungal_model.plugins.pet import PETSurfaceWorkflowConfig, run_pet_surface_integration
+from fungal_model.workflows import ConfiguredModelExecutionError
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,12 +67,16 @@ def test_missing_pet_accessible_surface_fails_honestly(tmp_path) -> None:
         parameters_path=config.parameters_path,
     )
 
-    with pytest.warns(DeprecationWarning), pytest.raises(MissingParameterError) as exc_info:
+    with pytest.warns(DeprecationWarning), pytest.raises(ConfiguredModelExecutionError) as exc_info:
         run_pet_surface_integration(tmp_path / "bad_run", config=config)
 
-    issue = exc_info.value.report.missing_parameters[0]
-    assert issue.symbol == "A_accessible"
-    assert issue.reason == "unknown_value"
+    report = exc_info.value.report
+    assembly_report = report.details["assembly_report"]
+    issue = assembly_report["missing_parameters"][0]
+    assert report.stage == "model_assembly"
+    assert "required_parameters" in report.missing_capabilities
+    assert issue["symbol"] == "A_accessible"
+    assert issue["reason"] == "unknown_value"
 
 
 def test_changing_enzyme_config_changes_model_assembly(tmp_path) -> None:
@@ -94,8 +98,12 @@ def test_changing_enzyme_config_changes_model_assembly(tmp_path) -> None:
         parameters_path=default.parameters_path,
     )
 
-    with pytest.warns(DeprecationWarning), pytest.raises(InvalidMechanismError) as exc_info:
+    with pytest.warns(DeprecationWarning), pytest.raises(ConfiguredModelExecutionError) as exc_info:
         run_pet_surface_integration(tmp_path / "bad_enzyme_run", config=config)
 
-    reasons = {issue.reason for issue in exc_info.value.report.incompatible_mechanisms}
+    report = exc_info.value.report
+    assembly_report = report.details["assembly_report"]
+    reasons = {issue["reason"] for issue in assembly_report["incompatible_mechanisms"]}
+    assert report.stage == "model_assembly"
+    assert "compatible_mechanisms" in report.missing_capabilities
     assert "enzyme_substrate_mismatch" in reasons

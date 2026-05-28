@@ -1763,3 +1763,72 @@ Next milestone:
 
 - F10.3: strengthen generic workflow failure-path tests with structured
   exception-stage assertions and no false-success output.
+
+## Foundation 10/10 Push: F10.3 Generic Workflow Failure-Path Tests
+
+Date: 2026-05-28
+
+F10.3 status: `complete` for structured generic workflow failure-path coverage.
+
+Completed in F10.3:
+
+- Added `tests/test_configured_workflow_failures.py` with all required generic
+  workflow failure-path cases.
+- Wrapped model-config loading failures at the public configured workflow
+  boundary with `ConfiguredModelExecutionError` stage `model_config_loading`.
+- Wrapped process-factory lookup failures, model-assembly failures, and
+  model-execution failures with structured configured-run reports.
+- Added strict-mode result-validation enforcement: strict configured runs now
+  raise before output writing if any configured validator fails.
+- Kept non-strict failed validation behavior record-oriented: failed
+  validators are saved in result metadata and output bundles instead of being
+  hidden or treated as success.
+- Updated PET plugin integration tests to assert the generic configured
+  workflow error boundary while preserving plugin delegation to
+  `run_configured_model`.
+
+F10.3 failure cases now covered:
+
+- missing config file;
+- invalid top-level config kind;
+- missing configured processes;
+- missing configured initial state;
+- unknown substrate loader;
+- plugin config without explicit plugin registry;
+- unknown product-map loader;
+- unknown validator type;
+- unknown process type;
+- missing product map;
+- missing state unit;
+- missing required parameter;
+- conflicting duplicate parameters;
+- incompatible initial-state units;
+- unsupported geometry;
+- failed validation recorded in non-strict mode;
+- failed validation raises in strict mode.
+
+Architecture debt:
+
+- No new architecture debt was added for F10.3.
+
+F10.3 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_workflow_failures.py`
+- Result: 17 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_full_integration_workflow.py tests/test_configured_workflow_failures.py`
+- Result: 20 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_workflow_components.py tests/test_configured_model_workflow.py tests/test_model_config_loading.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py tests/test_guardrails_config_generality.py tests/test_guardrails_native_execution.py`
+- Result: 36 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_maturity_policy.py tests/test_notebooks.py`
+- Result: 13 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 244 passed.
+
+Next milestone:
+
+- F10.4: make configured output bundles reproducibility-grade by adding run
+  environment, package version, source revision, and solver settings metadata.

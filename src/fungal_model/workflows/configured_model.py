@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fungal_model.io.model_config import load_model_config
+from fungal_model.io.model_config import ModelConfigError, load_model_config
 from fungal_model.io.registries import (
     GeometryLoaderRegistry,
     ProductMapRegistry,
@@ -18,6 +18,8 @@ from fungal_model.validation.maturity import enforce_run_maturity
 from fungal_model.workflows.configured_errors import (
     ConfiguredModelExecutionError,
     ConfiguredModelRunReport,
+    raise_configured_model_execution_error,
+    raise_configured_model_loading_error,
 )
 from fungal_model.workflows.configured_inputs import ConfiguredInputLoader
 from fungal_model.workflows.configured_outputs import ConfiguredOutputWriter
@@ -40,7 +42,14 @@ class ConfiguredModelRunner:
         config_path: str | Path,
         output_dir: str | Path | None = None,
     ) -> SimulationResult:
-        config = load_model_config(config_path)
+        try:
+            config = load_model_config(config_path)
+        except (OSError, ModelConfigError, ValueError) as exc:
+            raise_configured_model_loading_error(
+                config_path,
+                message=str(exc),
+                details={"error_type": type(exc).__name__},
+            )
         require_runnable_config(config)
         inputs = self.input_loader.load(config)
         enforce_run_maturity(
@@ -52,13 +61,35 @@ class ConfiguredModelRunner:
             process_configs=config.processes,
         )
         assembly = self.process_assembler.assemble(config, inputs)
-        result = assembly.model.run(
-            initial_state=inputs.initial_state,
-            t_span=inputs.t_span,
-            t_eval=inputs.t_eval,
-            label=config.mode,
-            name=config.name,
-        )
+        try:
+            result = assembly.model.run(
+                initial_state=inputs.initial_state,
+                t_span=inputs.t_span,
+                t_eval=inputs.t_eval,
+                label=config.mode,
+                name=config.name,
+            )
+        except ValueError as exc:
+            raise_configured_model_execution_error(
+                config,
+                stage="model_execution",
+                missing_capabilities=("successful_model_execution",),
+                message=str(exc),
+                details={"error_type": type(exc).__name__},
+            )
+        failed_validations = [
+            validation
+            for validation in result.validation_report()
+            if not bool(validation.get("passed"))
+        ]
+        if config.mode == "strict" and failed_validations:
+            raise_configured_model_execution_error(
+                config,
+                stage="result_validation",
+                missing_capabilities=("passing_validators",),
+                message="Strict mode requires all configured validators to pass.",
+                details={"failed_validations": failed_validations},
+            )
         self.output_writer.write_result_bundle(
             config=config,
             inputs=inputs,

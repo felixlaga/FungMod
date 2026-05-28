@@ -5,6 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from fungal_model.core.errors import (
+    IncompatibleUnitsError,
+    InvalidMechanismError,
+    MissingParameterError,
+    MissingProcessError,
+    ModelAssemblyError,
+)
 from fungal_model.io.model_config import ModelConfig
 from fungal_model.processes import (
     AssembledModel,
@@ -40,7 +47,20 @@ class ConfiguredProcessAssembler:
             product_maps=inputs.product_maps,
             source=f"Configured process factory for {config.name}.",
         )
-        decisions = library.build_decisions(build_context, config.processes)
+        try:
+            decisions = library.build_decisions(build_context, config.processes)
+        except InvalidMechanismError as exc:
+            raise_configured_model_execution_error(
+                config,
+                stage="process_factory_build",
+                missing_capabilities=("process_factory",),
+                message=str(exc),
+                details={
+                    "error_type": type(exc).__name__,
+                    "factory_types": list(library.factory_types()),
+                    "process_types": [process.process_type for process in config.processes],
+                },
+            )
         rejected = tuple(decision for decision in decisions if not decision.can_build)
         if rejected:
             raise_configured_model_execution_error(
@@ -50,19 +70,31 @@ class ConfiguredProcessAssembler:
                 message="At least one configured process cannot be built by the process library.",
                 details={"decisions": [decision.to_dict() for decision in decisions]},
             )
-        processes = library.build_processes(build_context, config.processes)
-        model = ModelBuilder(
-            fungus=inputs.fungus,
-            substrates=inputs.substrates,
-            enzymes=inputs.enzymes,
-            environment=inputs.environment,
-            geometry=inputs.geometry,
-            process_library=ProcessRegistry(processes),
-            parameters=inputs.parameters,
-            requested_processes=tuple(process.name for process in processes),
-            validators=inputs.validators,
-            allow_unsourced_for_testing=config.mode == "toy",
-        ).assemble()
+        try:
+            processes = library.build_processes(build_context, config.processes)
+            model = ModelBuilder(
+                fungus=inputs.fungus,
+                substrates=inputs.substrates,
+                enzymes=inputs.enzymes,
+                environment=inputs.environment,
+                geometry=inputs.geometry,
+                process_library=ProcessRegistry(processes),
+                parameters=inputs.parameters,
+                requested_processes=tuple(process.name for process in processes),
+                validators=inputs.validators,
+                allow_unsourced_for_testing=config.mode == "toy",
+            ).assemble()
+        except ModelAssemblyError as exc:
+            details: dict[str, Any] = {"error_type": type(exc).__name__}
+            if exc.report is not None and hasattr(exc.report, "to_dict"):
+                details["assembly_report"] = exc.report.to_dict()
+            raise_configured_model_execution_error(
+                config,
+                stage="model_assembly",
+                missing_capabilities=_assembly_missing_capabilities(exc),
+                message=str(exc),
+                details=details,
+            )
         return ConfiguredProcessAssembly(
             decisions=decisions,
             processes=tuple(processes),
@@ -83,6 +115,18 @@ def require_runnable_config(config: ModelConfig) -> None:
             missing_capabilities=tuple(missing),
             message="Configured model is missing sections required for execution.",
         )
+
+
+def _assembly_missing_capabilities(error: ModelAssemblyError) -> tuple[str, ...]:
+    if isinstance(error, MissingParameterError):
+        return ("required_parameters",)
+    if isinstance(error, IncompatibleUnitsError):
+        return ("compatible_parameter_units",)
+    if isinstance(error, MissingProcessError):
+        return ("requested_processes",)
+    if isinstance(error, InvalidMechanismError):
+        return ("compatible_mechanisms",)
+    return ("model_assembly",)
 
 
 __all__ = [

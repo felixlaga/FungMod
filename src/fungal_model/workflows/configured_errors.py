@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from fungal_model.io.model_config import ModelConfig
@@ -57,6 +58,24 @@ def raise_configured_model_execution_error(
     raise ConfiguredModelExecutionError(message, report=report)
 
 
+def raise_configured_model_loading_error(
+    config_path: str | Path,
+    *,
+    message: str,
+    details: Mapping[str, Any] | None = None,
+) -> None:
+    path = Path(config_path)
+    report = ConfiguredModelRunReport(
+        config_name=path.stem,
+        config_path=str(path),
+        stage="model_config_loading",
+        missing_capabilities=("model_config",),
+        message=message,
+        details={} if details is None else details,
+    )
+    raise ConfiguredModelExecutionError(message, report=report)
+
+
 def configured_model_run_report(
     config: ModelConfig,
     *,
@@ -81,4 +100,5 @@ __all__ = [
     "ConfiguredModelRunReport",
     "configured_model_run_report",
     "raise_configured_model_execution_error",
+    "raise_configured_model_loading_error",
 ]
