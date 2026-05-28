@@ -1416,3 +1416,45 @@ Next milestone:
 
 - Milestone 10: harden the result/output foundation for configured runs,
   including complete output metadata and snapshots for generic configs.
+
+## Foundation-First Reset: Milestone 10 Result/Output Foundation
+
+Date: 2026-05-28
+
+Milestone 10 status: `complete` for configured-run output bundles.
+
+Completed in Milestone 10:
+
+- Hardened configured-run output saving around `SimulationResult.save()`.
+- Added `configured_metadata.json` with config name, mode, maturity, result
+  label, model version, state count, process-rate count, and validation
+  summary.
+- Expanded `configured_model_run.json` with state names, process-rate names,
+  validation summary, and solver metadata.
+- Added `process_build_decisions.json` so factory decisions are inspectable.
+- Added `initial_state.json`, `time_grid.json`, `validators.json`, and
+  `merged_parameters.json`.
+- Added `entity_snapshots/` with snapshots for configured fungi, substrates,
+  enzymes, environments, geometries, and product maps.
+- Added `output_manifest.json` listing the complete saved bundle.
+- Updated configured workflow tests so homogeneous, plugin, and non-plugin
+  foundation configs all prove the complete output bundle exists.
+
+Milestone 10 behavior now available:
+
+- Every configured foundation benchmark saves a complete output folder.
+- Mode and maturity are visible without opening the source config.
+- Users can inspect config, entity, parameter, process-build, validation, solver,
+  trajectory, plot, and provenance artifacts from the output directory.
+
+Milestone 10 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_model_workflow.py tests/test_full_integration_workflow.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_guardrails_public_api.py`
+- Result: 17 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 199 passed.
+
+Next milestone:
+
+- Milestone 11: notebook foundation for generic quickstart, config/entity
+  inspection, failure reports, and configured output inspection.

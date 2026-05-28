@@ -181,6 +181,20 @@ a `ModelBuilder`, executes through `AssembledModel.run()`, validates the
 `SimulationResult`, and saves the standard output bundle when an output
 directory is configured.
 
+Configured output folders include the core `SimulationResult` files plus
+configuration-facing artifacts:
+
+- `input_model_config.json`
+- `configured_model_run.json`
+- `configured_metadata.json`
+- `process_build_decisions.json`
+- `initial_state.json`
+- `time_grid.json`
+- `validators.json`
+- `merged_parameters.json`
+- `entity_snapshots/`
+- `output_manifest.json`
+
 Plugin-backed configs use the same function with explicit registry injection:
 
 ```python
