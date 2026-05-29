@@ -19,3 +19,8 @@ Each synthetic dataset folder should contain:
 CSV files must include the columns declared in the YAML validation section.
 Uncertainty columns must either be present with explicit units or be
 intentionally allowed missing by the dataset validation metadata.
+
+Synthetic datasets can be compared against model outputs with
+`ObservableMapping` and `evaluate_model_against_dataset`. A low residual on a
+synthetic fixture only proves that the data plumbing and configured benchmark
+agree; it is not an empirical validation claim.

@@ -7,7 +7,7 @@
     "name": "first_order_a_to_b",
     "equation": "product_mass_kg = initial_mass_kg * (1 - exp(-k_per_s * time_s))",
     "initial_mass_kg": 1.0,
-    "k_per_s": 0.02
+    "k_per_s": 0.1
   },
   "noise": {
     "type": "none",

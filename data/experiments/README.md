@@ -46,3 +46,23 @@ Measurement series must declare explicit time and value units. If an
 uncertainty column is configured, uncertainty units are required. Missing
 uncertainty is allowed only when `validation.allow_missing_uncertainty: true`
 is explicitly set.
+
+## Model Comparison
+
+Dataset measurements must be compared to model outputs through explicit
+observable mappings. FungMod does not infer that a dataset column and a model
+state mean the same thing from similar names.
+
+Initial comparison outputs are written as an inspectable bundle:
+
+- `comparison_record.json`;
+- `dataset_snapshot.json`;
+- `observable_mapping.json`;
+- `residuals.csv`;
+- `metrics.json`;
+- `validation_report.json`;
+- `figures/observed_vs_predicted.png`;
+- `figures/residuals.png`.
+
+Synthetic comparison results are infrastructure checks only. They are not
+empirical validation and must not be used as biological evidence.

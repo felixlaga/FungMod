@@ -1,5 +1,13 @@
 """Scientific data infrastructure for FungMod."""
 
+from fungal_model.data.comparison import (
+    ModelDatasetComparison,
+    ModelDatasetComparisonError,
+    ObservableMapping,
+    ResidualPoint,
+    ResidualSeries,
+    evaluate_model_against_dataset,
+)
 from fungal_model.data.datasets import (
     ALLOWED_DATASET_MATURITIES,
     DataSource,
@@ -21,6 +29,12 @@ __all__ = [
     "ExperimentalSystem",
     "MeasurementPoint",
     "MeasurementSeries",
+    "ModelDatasetComparison",
+    "ModelDatasetComparisonError",
+    "ObservableMapping",
     "PreprocessingRecord",
+    "ResidualPoint",
+    "ResidualSeries",
+    "evaluate_model_against_dataset",
     "load_experiment_dataset",
 ]

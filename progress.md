@@ -2116,3 +2116,60 @@ Next milestone:
 
 - D2 should add the explicit observable mapping and model-dataset comparison
   layer before any calibration or real literature data work begins.
+
+## Data Infrastructure: D2 Observable Mapping And Comparison
+
+Date: 2026-05-29
+
+D2 status: `complete` for explicit model-dataset comparison on synthetic data.
+
+Completed in D2:
+
+- Added `src/fungal_model/data/comparison.py` with `ObservableMapping`,
+  `ResidualPoint`, `ResidualSeries`, `ModelDatasetComparison`, and
+  `evaluate_model_against_dataset`.
+- Required explicit dataset-measurement to model-observable mappings; no fuzzy
+  matching or automatic biological interpretation is used.
+- Implemented state, process-rate, and derived-observable lookup against
+  `SimulationResult`.
+- Implemented unit-aware identity and unit-conversion comparisons, plus a
+  guarded fractional-conversion path that requires an explicit initial value
+  and units.
+- Implemented linear interpolation to dataset times and structural rejection
+  of extrapolation beyond the model time range.
+- Implemented raw residuals, standardized residuals when uncertainty exists,
+  RMSE, mean absolute residual, chi-square, and reduced chi-square metrics.
+- Implemented comparison output bundles with comparison record, dataset
+  snapshot, observable mapping, residuals CSV, metrics, validation report, and
+  observed-vs-predicted and residual figures.
+- Updated the synthetic first-order fixture so it aligns with the existing
+  `toy_homogeneous_ab.yml` benchmark time window and rate constant.
+- Exposed comparison names from `fungal_model.data` without adding unstable
+  data APIs to top-level `fungal_model`.
+- Updated data documentation to describe explicit observable mappings and the
+  comparison output bundle.
+
+Architecture debt:
+
+- No new architecture debt was added for D2.
+
+D2 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_experiment_dataset_loading.py tests/test_model_dataset_comparison.py`
+- Result: 23 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_maturity_policy.py`
+- Result: 14 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_model_dataset_comparison.py`
+- Result: 12 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 275 passed.
+
+Next milestone:
+
+- D3 should add synthetic dataset generation from `SimulationResult`, including
+  Gaussian noise options, generation records, reproducibility tests, and
+  reloadability checks. No calibration or real literature data yet.
