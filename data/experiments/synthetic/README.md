@@ -24,3 +24,9 @@ Synthetic datasets can be compared against model outputs with
 `ObservableMapping` and `evaluate_model_against_dataset`. A low residual on a
 synthetic fixture only proves that the data plumbing and configured benchmark
 agree; it is not an empirical validation claim.
+
+Synthetic datasets can also be generated from an existing `SimulationResult`
+with `GaussianNoise` and `generate_synthetic_dataset_from_result`. Generated
+folders must include the dataset YAML, observations CSV, and
+`generation_record.json` so the seed, noise model, source result, observable
+mapping, and true values are inspectable.

@@ -2173,3 +2173,58 @@ Next milestone:
 - D3 should add synthetic dataset generation from `SimulationResult`, including
   Gaussian noise options, generation records, reproducibility tests, and
   reloadability checks. No calibration or real literature data yet.
+
+## Data Infrastructure: D3 Synthetic Dataset Generation
+
+Date: 2026-05-29
+
+D3 status: `complete` for synthetic dataset generation from existing
+`SimulationResult` objects.
+
+Completed in D3:
+
+- Added `src/fungal_model/data/synthetic.py` with `GaussianNoise`,
+  `SyntheticDatasetGenerationError`, and
+  `generate_synthetic_dataset_from_result`.
+- Implemented generation from explicit `ObservableMapping` entries or a simple
+  measurement-to-state mapping, using existing `SimulationResult` states,
+  process rates, or derived quantities.
+- Wrote reloadable dataset bundles containing:
+  - dataset YAML;
+  - observations CSV;
+  - `generation_record.json`.
+- Recorded seed, noise model, source result metadata, optional source config,
+  observable mappings, output file names, and true values in the generation
+  record.
+- Enforced unit compatibility for Gaussian noise and generated measurement
+  units.
+- Added fixed-seed reproducibility tests, changed-seed tests, reloadability
+  tests, comparison-back-to-source tests, generation-record metadata tests,
+  incompatible-noise-unit tests, and missing-model-observable tests.
+- Updated synthetic-data documentation to describe generation from
+  `SimulationResult` and the required generation record.
+
+Architecture debt:
+
+- No new architecture debt was added for D3.
+
+D3 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_experiment_dataset_loading.py tests/test_model_dataset_comparison.py tests/test_synthetic_dataset_generation.py`
+- Result: 30 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_maturity_policy.py`
+- Result: 14 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_synthetic_dataset_generation.py`
+- Result: 7 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 282 passed.
+
+Next milestone:
+
+- D4 should add synthetic-only calibration that can recover a known first-order
+  parameter from generated synthetic data. Do not add real literature data or
+  biological mechanisms.
