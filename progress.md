@@ -2228,3 +2228,63 @@ Next milestone:
 - D4 should add synthetic-only calibration that can recover a known first-order
   parameter from generated synthetic data. Do not add real literature data or
   biological mechanisms.
+
+## Data Infrastructure: D4-D6 Synthetic Calibration And Literature Contract
+
+Date: 2026-05-29
+
+D4-D6 status: `complete` for synthetic-only calibration, train/validation
+splits, literature schema guardrails, and the remaining data-validation rules.
+
+Completed in D4-D6:
+
+- Added `calibrate_configured_model` and `CalibrationResult` in
+  `src/fungal_model/calibration/configured.py` for synthetic configured-model
+  calibration.
+- Kept calibration synthetic-only: non-synthetic datasets are rejected, source
+  model configs are copied through temporary configured runs, and source config
+  files are not mutated in place.
+- Added a synthetic first-order calibration model config and calibration
+  contract fixture under `data/model_configs/` and `data/calibration/`.
+- Wrote inspectable calibration bundles with calibration records, source model
+  snapshots, dataset snapshots, fitted parameter files, optimizer metadata,
+  train/validation residual CSVs, metrics, assumptions, warnings, and figures.
+- Added deterministic train/validation split support by time, with separate
+  train and validation residuals/metrics and a clear warning when no
+  validation split is supplied.
+- Added dataset validation rules for known units, finite numeric values,
+  nonnegative time, strictly increasing time per series, nonnegative
+  uncertainty, duplicate measurement IDs, source/provenance, preprocessing
+  status, and preprocessing notes.
+- Added `data/experiments/literature/README.md` as the literature extraction
+  metadata contract while keeping the literature directory free of real paper
+  data.
+- Added `data/experiments/validation/README.md`, `data/calibration/README.md`,
+  and `data/README.md` to document maturity labels, synthetic-only calibration,
+  and the current no-real-literature boundary.
+
+Architecture debt:
+
+- No new architecture debt was added for D4-D6.
+
+D4-D6 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_synthetic_calibration.py tests/test_calibration_config_contract.py tests/test_experiment_dataset_validation_rules.py tests/test_literature_schema_contract.py`
+- Result: 18 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_experiment_dataset_loading.py tests/test_experiment_dataset_validation_rules.py tests/test_model_dataset_comparison.py tests/test_synthetic_dataset_generation.py tests/test_configured_synthetic_calibration.py tests/test_calibration_config_contract.py tests/test_literature_schema_contract.py`
+- Result: 48 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_maturity_policy.py tests/test_config_io.py`
+- Result: 20 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 300 passed.
+
+Data infrastructure roadmap status:
+
+- D1-D6 and the roadmap definition-of-done items are complete for the
+  synthetic/no-real-biology scope. Real literature extraction and real fungal
+  biology remain explicitly out of scope until schema-compliant data curation
+  work is requested and reviewed.

@@ -1,5 +1,11 @@
 """Calibration tools."""
 
+from .configured import (
+    CalibrationResult,
+    CalibrationSplit,
+    ConfiguredCalibrationError,
+    calibrate_configured_model,
+)
 from .fitting import (
     APPROXIMATE_NORMAL_95_Z,
     BOUND_PROXIMITY_RELATIVE_TOLERANCE,
@@ -17,10 +23,14 @@ from .residuals import (
 __all__ = [
     "APPROXIMATE_NORMAL_95_Z",
     "BOUND_PROXIMITY_RELATIVE_TOLERANCE",
+    "CalibrationResult",
     "CalibrationResiduals",
+    "CalibrationSplit",
+    "ConfiguredCalibrationError",
     "DEFAULT_VALIDATION_FRACTION",
     "FittableParameter",
     "LeastSquaresCalibrationResult",
+    "calibrate_configured_model",
     "fit_least_squares",
     "residuals_between",
     "sequential_train_validation_split",

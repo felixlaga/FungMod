@@ -1,0 +1,92 @@
+kind: model_config
+name: synthetic first-order calibration source model
+mode: toy
+maturity: synthetic
+provenance:
+  source: FungMod synthetic calibration infrastructure config; not empirical evidence.
+  measurement_method: defined synthetic benchmark
+  confidence_level: testing
+  notes: Exercises configured calibration against synthetic A to B data only.
+  validity_range: synthetic calibration tests only
+  units: not_applicable
+entities:
+  environment:
+    id: environment
+    path: data/environments/lab_30C_pH7.yml
+    loader: environment
+  geometry:
+    id: geometry
+    path: data/geometries/well_mixed_100ml.yml
+    loader: well_mixed
+  substrates:
+    - id: dissolved_substrate
+      loader: generic_dissolved
+      data:
+        kind: substrate
+        name: generic dissolved synthetic calibration substrate
+        substrate_type: generic_dissolved
+        chemical_class: synthetic benchmark
+        physical_state: dissolved
+        bond_types: []
+        accessible_bonds: []
+        required_enzyme_classes: []
+        degradation_products:
+          - name: generic product B
+            notes: Synthetic product for calibration infrastructure tests only.
+parameters:
+  - id: synthetic_calibration_parameters
+    parameters:
+      - name: synthetic first-order conversion constant
+        symbol: k_ab
+        value: 0.1
+        units: 1 / second
+        uncertainty: 0.0
+        source: FungMod synthetic calibration fixture.
+        confidence_level: testing
+        notes: Artificial known value used to verify parameter recovery.
+        measurement_method: defined synthetic benchmark value
+        validity_range: synthetic calibration tests only
+processes:
+  - id: a_to_b
+    process_type: first_order
+    states:
+      source: dissolved_substrate_amount
+      product: released_product_amount
+    parameters:
+      rate_constant: k_ab
+    assumptions:
+      - synthetic first-order benchmark only
+initial_state:
+  states:
+    dissolved_substrate_amount:
+      value: 1.0
+      units: kilogram
+    released_product_amount:
+      value: 0.0
+      units: kilogram
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 10.0
+    units: second
+  points: 11
+validators:
+  - id: non_negative_states
+    validator_type: non_negative
+    species:
+      - dissolved_substrate_amount
+      - released_product_amount
+  - id: closed_mass_balance
+    validator_type: mass_balance
+    conserved_weights:
+      dissolved_substrate_amount: 1.0
+      released_product_amount: 1.0
+outputs:
+  directory: outputs/synthetic_first_order_calibration_source_model
+  save:
+    - record
+    - validation_report
+  plots:
+    - state_trajectories

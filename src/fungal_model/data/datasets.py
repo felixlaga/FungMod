@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+import math
 from pathlib import Path
 from typing import Any
 
+from fungal_model.core.units import Q_
 from fungal_model.core.validators import ValidationResult
 
 
@@ -213,16 +215,44 @@ class ExperimentDataset:
             issues.append({"field": "measurements", "message": "At least one measurement series is required."})
         if not self.preprocessing.status:
             issues.append({"field": "preprocessing.status", "message": "Preprocessing status is required."})
+        if not self.preprocessing.notes:
+            issues.append({"field": "preprocessing.notes", "message": "Preprocessing notes are required."})
 
+        seen_measurements: set[str] = set()
         for series in self.measurements:
             if not series.measurement_id:
                 issues.append({"field": "measurements[].id", "message": "Measurement id is required."})
+            elif series.measurement_id in seen_measurements:
+                issues.append(
+                    {
+                        "field": "measurements[].id",
+                        "value": series.measurement_id,
+                        "message": "Measurement ids must be unique.",
+                    }
+                )
+            seen_measurements.add(series.measurement_id)
             if not series.points:
                 issues.append({"field": series.measurement_id, "message": "Measurement series has no data points."})
             if not series.time_units:
                 issues.append({"field": f"{series.measurement_id}.units.time", "message": "Time units are required."})
+            elif not _known_units(series.time_units):
+                issues.append(
+                    {
+                        "field": f"{series.measurement_id}.units.time",
+                        "value": series.time_units,
+                        "message": "Time units are not recognized.",
+                    }
+                )
             if not series.value_units:
                 issues.append({"field": f"{series.measurement_id}.units.value", "message": "Value units are required."})
+            elif not _known_units(series.value_units):
+                issues.append(
+                    {
+                        "field": f"{series.measurement_id}.units.value",
+                        "value": series.value_units,
+                        "message": "Value units are not recognized.",
+                    }
+                )
             if series.uncertainty_column and not series.uncertainty_units:
                 issues.append(
                     {
@@ -230,6 +260,35 @@ class ExperimentDataset:
                         "message": "Uncertainty units are required when uncertainty data are configured.",
                     }
                 )
+            elif series.uncertainty_units and not _known_units(series.uncertainty_units):
+                issues.append(
+                    {
+                        "field": f"{series.measurement_id}.units.uncertainty",
+                        "value": series.uncertainty_units,
+                        "message": "Uncertainty units are not recognized.",
+                    }
+                )
+            previous_time: float | None = None
+            for index, point in enumerate(series.points):
+                prefix = f"{series.measurement_id}.points[{index}]"
+                if not math.isfinite(point.time):
+                    issues.append({"field": f"{prefix}.time", "message": "Time values must be finite."})
+                elif point.time < 0.0:
+                    issues.append({"field": f"{prefix}.time", "message": "Time values must be nonnegative."})
+                if previous_time is not None and point.time <= previous_time:
+                    issues.append({"field": f"{prefix}.time", "message": "Time values must be strictly increasing."})
+                previous_time = point.time
+                if not math.isfinite(point.value):
+                    issues.append({"field": f"{prefix}.value", "message": "Measurement values must be finite."})
+                if point.uncertainty is not None:
+                    if not math.isfinite(point.uncertainty):
+                        issues.append(
+                            {"field": f"{prefix}.uncertainty", "message": "Uncertainty values must be finite."}
+                        )
+                    elif point.uncertainty < 0.0:
+                        issues.append(
+                            {"field": f"{prefix}.uncertainty", "message": "Uncertainty values must be nonnegative."}
+                        )
 
         return ValidationResult(
             name="experiment_dataset",
@@ -253,6 +312,14 @@ class ExperimentDataset:
             "notes": self.notes,
             "path": str(self.path) if self.path is not None else None,
         }
+
+
+def _known_units(units: str) -> bool:
+    try:
+        Q_(1, units)
+    except Exception:
+        return False
+    return True
 
 
 __all__ = [

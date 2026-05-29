@@ -333,11 +333,12 @@ def _parse_float(value: str | None, path: Path, row_number: int, column: str) ->
     if value in (None, ""):
         raise ExperimentDatasetLoadError(f"{path} row {row_number} is missing a value in {column!r}.")
     try:
-        return float(value)
+        parsed = float(value)
     except ValueError as exc:
         raise ExperimentDatasetLoadError(
             f"{path} row {row_number} has non-numeric value {value!r} in {column!r}."
         ) from exc
+    return parsed
 
 
 __all__ = [
