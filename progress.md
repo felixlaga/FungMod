@@ -2064,3 +2064,55 @@ Next milestone:
   `foundation_progress/FUNG_MOD_FOUNDATION_8_TO_10_MILESTONES.md`: literature
   dataset schema, provenance templates, experiment dataset object, and
   calibration workflow on synthetic data before any real biology is added.
+
+## Data Infrastructure: D1 ExperimentDataset Loader
+
+Date: 2026-05-29
+
+D1 status: `complete` for the first strict experiment-dataset schema and
+loader.
+
+Completed in D1:
+
+- Added the `fungal_model.data` package with explicit dataset objects:
+  `ExperimentDataset`, `DataSource`, `ExperimentalSystem`,
+  `ExperimentalConditions`, `MeasurementSeries`, `MeasurementPoint`, and
+  `PreprocessingRecord`.
+- Added `load_experiment_dataset` for YAML-backed datasets with CSV
+  measurement loading, relative CSV resolution, explicit maturity validation,
+  required source metadata, required time/value units, uncertainty-unit checks,
+  expected-column validation, and optional missing-uncertainty handling only
+  when configured.
+- Added a synthetic first-order A to B dataset fixture under
+  `data/experiments/synthetic/first_order_ab/` with YAML metadata,
+  observation CSV, and a generation record.
+- Added experiment dataset documentation for maturity labels, toy versus
+  synthetic data, provenance, unit requirements, uncertainty behavior, and the
+  current no-literature-data boundary.
+- Added loader tests covering valid synthetic loading, maturity preservation,
+  measurement units and uncertainty, missing kind, invalid maturity, missing
+  source, missing CSV files, missing value columns, missing uncertainty
+  columns, explicitly allowed missing uncertainty, JSON-safe `to_dict()`, and
+  `validate()` success.
+
+Architecture debt:
+
+- No new architecture debt was added for D1.
+
+D1 verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_experiment_dataset_loading.py`
+- Result: 11 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_maturity_policy.py`
+- Result: 12 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 263 passed.
+
+Next milestone:
+
+- D2 should add the explicit observable mapping and model-dataset comparison
+  layer before any calibration or real literature data work begins.

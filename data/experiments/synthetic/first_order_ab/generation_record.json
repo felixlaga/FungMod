@@ -1,0 +1,18 @@
+{
+  "kind": "synthetic_generation_record",
+  "dataset_id": "synthetic_first_order_ab_v1",
+  "status": "fixture_record",
+  "generated_by": "FungMod synthetic dataset fixture",
+  "model": {
+    "name": "first_order_a_to_b",
+    "equation": "product_mass_kg = initial_mass_kg * (1 - exp(-k_per_s * time_s))",
+    "initial_mass_kg": 1.0,
+    "k_per_s": 0.02
+  },
+  "noise": {
+    "type": "none",
+    "assigned_standard_deviation_kg": 0.005
+  },
+  "source_config": "data/model_configs/toy_homogeneous_ab.yml",
+  "notes": "Synthetic infrastructure fixture only; not empirical evidence and not a biological claim."
+}
