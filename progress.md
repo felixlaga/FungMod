@@ -2288,3 +2288,68 @@ Data infrastructure roadmap status:
   synthetic/no-real-biology scope. Real literature extraction and real fungal
   biology remain explicitly out of scope until schema-compliant data curation
   work is requested and reviewed.
+
+## Data Infrastructure Finalization: D4-D6 Hardening Before Real Data
+
+Date: 2026-05-31
+
+Status: `complete` for the final pre-real-data hardening pass.
+
+Completed in this pass:
+
+- Finalized configured synthetic calibration behavior:
+  - fitted `k_ab` still recovers the synthetic first-order target near
+    `0.1 1 / second`;
+  - fitted parameter provenance now records synthetic-only calibration,
+    dataset ID, least-squares fitting, and not-empirical-validation status;
+  - source model configs are not mutated;
+  - missing parameter symbols, missing initial guesses, bad bounds,
+    non-synthetic datasets, and parameters absent from the configured model
+    fail structurally.
+- Hardened calibration path resolution:
+  - calibration now resolves model-config references against the source config
+    path and its ancestors before writing temporary configured runs;
+  - synthetic calibration works when invoked from outside the repository root.
+- Fixed D5 split semantics with explicit train/validation/holdout behavior:
+  - `train_fraction` selects the first time-ordered block;
+  - `validation_fraction` selects the next time-ordered block;
+  - remaining points become holdout/unused data for future workflows;
+  - train, validation, and holdout indices are disjoint and reported in
+    `CalibrationSplit.to_dict()`;
+  - validation metrics are reported only when validation indices exist.
+- Upgraded D6 from README-only to machine-readable literature metadata schema:
+  - added `validate_literature_dataset_metadata`;
+  - added fake schema-only metadata under
+    `data/experiments/literature_schema_examples/`;
+  - preserved the rule that `data/experiments/literature/` contains no real
+    paper-derived data files.
+- Updated the literature README to state that future literature datasets must
+  pass machine-readable schema validation and include provenance, units,
+  extraction notes, preprocessing, uncertainty status, and source metadata.
+
+Architecture/data debt:
+
+- No architecture or data debt was added.
+- No real literature data or real biological mechanisms were inserted.
+
+Verification:
+
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_configured_synthetic_calibration.py`
+- Result: 15 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_literature_schema_contract.py`
+- Result: 13 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_experiment_dataset_loading.py tests/test_model_dataset_comparison.py tests/test_synthetic_dataset_generation.py`
+- Result: 30 passed.
+- `/private/tmp/fungmod-venv/bin/python -m pytest tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py tests/test_maturity_policy.py tests/test_calibration_config_contract.py`
+- Result: 16 passed.
+- `/private/tmp/fungmod-venv/bin/python -m ruff check src tests`
+- Result: passed.
+- `/private/tmp/fungmod-venv/bin/python -m pyright --pythonpath /private/tmp/fungmod-venv/bin/python`
+- Result: 0 errors.
+- `/private/tmp/fungmod-venv/bin/python -m pytest`
+- Result: 320 passed.
+
+Next allowed step:
+
+- Select one candidate real dataset for schema-first ingestion review. Do not
+  implement broad biology or substrate-specific mechanisms as the next step.

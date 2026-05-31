@@ -19,6 +19,10 @@ from fungal_model.data.datasets import (
     PreprocessingRecord,
 )
 from fungal_model.data.loaders import ExperimentDatasetLoadError, load_experiment_dataset
+from fungal_model.data.literature_schema import (
+    LITERATURE_MATURITIES,
+    validate_literature_dataset_metadata,
+)
 from fungal_model.data.synthetic import (
     GaussianNoise,
     SyntheticDatasetGenerationError,
@@ -33,6 +37,7 @@ __all__ = [
     "ExperimentalConditions",
     "ExperimentalSystem",
     "GaussianNoise",
+    "LITERATURE_MATURITIES",
     "MeasurementPoint",
     "MeasurementSeries",
     "ModelDatasetComparison",
@@ -45,4 +50,5 @@ __all__ = [
     "evaluate_model_against_dataset",
     "generate_synthetic_dataset_from_result",
     "load_experiment_dataset",
+    "validate_literature_dataset_metadata",
 ]

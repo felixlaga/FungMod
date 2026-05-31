@@ -48,6 +48,32 @@ def test_configured_synthetic_calibration_recovers_first_order_rate(tmp_path: Pa
     assert MODEL_CONFIG.read_text(encoding="utf-8") == original_config
 
 
+def test_fitted_parameter_records_synthetic_only_provenance(tmp_path: Path) -> None:
+    dataset = _generated_dataset(tmp_path)
+
+    result = calibrate_configured_model(
+        model_config=MODEL_CONFIG,
+        dataset=dataset,
+        parameter_symbols=["k_ab"],
+        observable_mapping=_mapping(),
+        initial_guess={"k_ab": 0.03},
+        bounds={"k_ab": (0.0, 1.0)},
+    )
+
+    fitted = result.fitted_parameters.get("k_ab")
+    provenance_text = " ".join(
+        (
+            fitted.source,
+            fitted.measurement_method,
+            fitted.notes,
+        )
+    ).lower()
+    assert "synthetic-only" in provenance_text
+    assert dataset.dataset_id in provenance_text
+    assert "least-squares" in provenance_text
+    assert "not empirical validation" in provenance_text
+
+
 def test_calibration_output_bundle_is_inspectable(tmp_path: Path) -> None:
     dataset = _generated_dataset(tmp_path)
 
@@ -104,6 +130,7 @@ def test_calibration_without_split_makes_no_validation_claim(tmp_path: Path) -> 
     assert any("no validation claim" in warning for warning in result.warnings)
     assert result.split is not None
     assert not result.split.has_validation
+    assert not result.split.has_holdout
 
 
 def test_configured_calibration_rejects_non_synthetic_dataset(tmp_path: Path) -> None:
@@ -117,6 +144,46 @@ def test_configured_calibration_rejects_non_synthetic_dataset(tmp_path: Path) ->
             observable_mapping=_mapping(),
             initial_guess={"k_ab": 0.03},
             bounds={"k_ab": (0.0, 1.0)},
+        )
+
+
+def test_configured_calibration_rejects_missing_parameter_symbols(tmp_path: Path) -> None:
+    dataset = _generated_dataset(tmp_path)
+
+    with pytest.raises(ConfiguredCalibrationError, match="At least one parameter symbol"):
+        calibrate_configured_model(
+            model_config=MODEL_CONFIG,
+            dataset=dataset,
+            parameter_symbols=[],
+            observable_mapping=_mapping(),
+            initial_guess={},
+        )
+
+
+def test_configured_calibration_rejects_missing_initial_guess(tmp_path: Path) -> None:
+    dataset = _generated_dataset(tmp_path)
+
+    with pytest.raises(ConfiguredCalibrationError, match="Missing initial guesses"):
+        calibrate_configured_model(
+            model_config=MODEL_CONFIG,
+            dataset=dataset,
+            parameter_symbols=["k_ab"],
+            observable_mapping=_mapping(),
+            initial_guess={},
+        )
+
+
+def test_configured_calibration_rejects_bad_bounds(tmp_path: Path) -> None:
+    dataset = _generated_dataset(tmp_path)
+
+    with pytest.raises(ConfiguredCalibrationError, match="lower < upper"):
+        calibrate_configured_model(
+            model_config=MODEL_CONFIG,
+            dataset=dataset,
+            parameter_symbols=["k_ab"],
+            observable_mapping=_mapping(),
+            initial_guess={"k_ab": 0.03},
+            bounds={"k_ab": (1.0, 0.0)},
         )
 
 
@@ -135,6 +202,100 @@ def test_configured_calibration_rejects_bad_split(tmp_path: Path) -> None:
         )
 
 
+def test_train_validation_split_rejects_fraction_sum_over_one(tmp_path: Path) -> None:
+    dataset = _generated_dataset(tmp_path)
+
+    with pytest.raises(ConfiguredCalibrationError, match="<= 1"):
+        calibrate_configured_model(
+            model_config=MODEL_CONFIG,
+            dataset=dataset,
+            parameter_symbols=["k_ab"],
+            observable_mapping=_mapping(),
+            initial_guess={"k_ab": 0.03},
+            bounds={"k_ab": (0.0, 1.0)},
+            split={"method": "by_time", "train_fraction": 0.8, "validation_fraction": 0.3},
+        )
+
+
+def test_train_validation_split_records_holdout_when_fractions_leave_unused_points(tmp_path: Path) -> None:
+    dataset = _generated_dataset(tmp_path)
+
+    result = calibrate_configured_model(
+        model_config=MODEL_CONFIG,
+        dataset=dataset,
+        parameter_symbols=["k_ab"],
+        observable_mapping=_mapping(),
+        initial_guess={"k_ab": 0.03},
+        bounds={"k_ab": (0.0, 1.0)},
+        split={"method": "by_time", "train_fraction": 0.6, "validation_fraction": 0.2},
+    )
+
+    assert result.split is not None
+    train = set(result.split.train_indices["product_mass"])
+    validation = set(result.split.validation_indices["product_mass"])
+    holdout = set(result.split.holdout_indices["product_mass"])
+    assert train
+    assert validation
+    assert holdout
+    assert not train.intersection(validation)
+    assert not train.intersection(holdout)
+    assert not validation.intersection(holdout)
+    assert result.split.has_holdout
+
+
+def test_validation_fraction_controls_validation_set_size(tmp_path: Path) -> None:
+    dataset = _generated_dataset(tmp_path)
+
+    smaller = calibrate_configured_model(
+        model_config=MODEL_CONFIG,
+        dataset=dataset,
+        parameter_symbols=["k_ab"],
+        observable_mapping=_mapping(),
+        initial_guess={"k_ab": 0.03},
+        bounds={"k_ab": (0.0, 1.0)},
+        split={"method": "by_time", "train_fraction": 0.6, "validation_fraction": 0.2},
+    )
+    larger = calibrate_configured_model(
+        model_config=MODEL_CONFIG,
+        dataset=dataset,
+        parameter_symbols=["k_ab"],
+        observable_mapping=_mapping(),
+        initial_guess={"k_ab": 0.03},
+        bounds={"k_ab": (0.0, 1.0)},
+        split={"method": "by_time", "train_fraction": 0.6, "validation_fraction": 0.4},
+    )
+
+    assert smaller.split is not None
+    assert larger.split is not None
+    assert len(smaller.split.validation_indices["product_mass"]) == 2
+    assert len(larger.split.validation_indices["product_mass"]) == 5
+
+
+def test_validation_metrics_only_appear_when_validation_split_exists(tmp_path: Path) -> None:
+    dataset = _generated_dataset(tmp_path)
+
+    no_split = calibrate_configured_model(
+        model_config=MODEL_CONFIG,
+        dataset=dataset,
+        parameter_symbols=["k_ab"],
+        observable_mapping=_mapping(),
+        initial_guess={"k_ab": 0.03},
+        bounds={"k_ab": (0.0, 1.0)},
+    )
+    with_split = calibrate_configured_model(
+        model_config=MODEL_CONFIG,
+        dataset=dataset,
+        parameter_symbols=["k_ab"],
+        observable_mapping=_mapping(),
+        initial_guess={"k_ab": 0.03},
+        bounds={"k_ab": (0.0, 1.0)},
+        split={"method": "by_time", "train_fraction": 0.7, "validation_fraction": 0.3},
+    )
+
+    assert "validation_rmse" not in no_split.metrics
+    assert "validation_rmse" in with_split.metrics
+
+
 def test_configured_calibration_rejects_parameter_not_in_config(tmp_path: Path) -> None:
     dataset = _generated_dataset(tmp_path)
 
@@ -147,6 +308,28 @@ def test_configured_calibration_rejects_parameter_not_in_config(tmp_path: Path) 
             initial_guess={"not_in_config": 0.03},
             bounds={"not_in_config": (0.0, 1.0)},
         )
+
+
+def test_configured_calibration_resolves_config_paths_outside_repository_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _generated_dataset(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = calibrate_configured_model(
+        model_config=MODEL_CONFIG,
+        dataset=dataset,
+        parameter_symbols=["k_ab"],
+        observable_mapping=_mapping(),
+        initial_guess={"k_ab": 0.03},
+        bounds={"k_ab": (0.0, 1.0)},
+        split={"method": "by_time", "train_fraction": 0.7, "validation_fraction": 0.3},
+        output_dir=tmp_path / "calibration_outside_root",
+    )
+
+    assert result.success
+    assert result.fitted_parameters.get("k_ab").quantity.to("1 / second").magnitude == pytest.approx(0.1, rel=0.05)
 
 
 def _generated_dataset(tmp_path: Path):
