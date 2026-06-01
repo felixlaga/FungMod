@@ -160,6 +160,9 @@ def _environment_record(data: Mapping[str, Any]) -> EnvironmentRecord:
 
 
 def _process_compatibility_record(data: Mapping[str, Any]) -> ProcessCompatibilityRecord:
+    parameter_roles = data.get("parameter_roles", {}) or {}
+    if not isinstance(parameter_roles, Mapping):
+        parameter_roles = {}
     return ProcessCompatibilityRecord(
         record_id=_record_id(data),
         name=_name(data),
@@ -171,6 +174,7 @@ def _process_compatibility_record(data: Mapping[str, Any]) -> ProcessCompatibili
         required_bond_classes=_tuple_of_strings(_sequence(data.get("required_bond_classes"))),
         process_type=str(data.get("process_type", "")),
         required_parameters=_tuple_of_strings(_sequence(data.get("required_parameters"))),
+        parameter_roles={str(role): str(symbol) for role, symbol in parameter_roles.items()},
         product_map_required=bool(data.get("product_map_required", False)),
     )
 

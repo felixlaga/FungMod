@@ -177,6 +177,7 @@ class ProcessCompatibilityRecord(RegistryRecord):
     required_bond_classes: tuple[str, ...] = ()
     process_type: str = ""
     required_parameters: tuple[str, ...] = ()
+    parameter_roles: Mapping[str, str] = field(default_factory=dict)
     product_map_required: bool = False
 
     def validate(self) -> ValidationResult:
@@ -186,6 +187,19 @@ class ProcessCompatibilityRecord(RegistryRecord):
                 issues.append({"field": field_name, "message": f"{field_name} is required."})
         if not self.required_bond_classes:
             issues.append({"field": "required_bond_classes", "message": "Required bond classes are required."})
+        unknown_role_parameters = tuple(
+            symbol
+            for symbol in self.parameter_roles.values()
+            if symbol not in self.required_parameters
+        )
+        if unknown_role_parameters:
+            issues.append(
+                {
+                    "field": "parameter_roles",
+                    "message": "Parameter role mappings must reference required parameters.",
+                    "details": {"unknown_symbols": unknown_role_parameters},
+                }
+            )
         return _validation_result(self.record_id, issues)
 
     def to_dict(self) -> dict[str, Any]:
@@ -197,6 +211,7 @@ class ProcessCompatibilityRecord(RegistryRecord):
                 "required_bond_classes": list(self.required_bond_classes),
                 "process_type": self.process_type,
                 "required_parameters": list(self.required_parameters),
+                "parameter_roles": dict(self.parameter_roles),
                 "product_map_required": self.product_map_required,
             }
         )

@@ -95,3 +95,49 @@ records:
       confidence_level: testing
       notes: Value intentionally unknown for registry tests.
     notes: Toy/development unknown only; not empirical.
+
+  - record_id: toy_param_k_ads_exact
+    name: Toy exact adsorption parameter
+    maturity: toy_development
+    provenance:
+      source: FungMod R3 toy registry fixture.
+      confidence_level: testing
+      notes: Artificial exact adsorption parameter for case-builder tests only.
+    parameter_symbol: k_ads_exact
+    process_type: surface_catalysis
+    enzyme_class: toy_cellulase
+    substrate_class: toy_cellulose_like
+    fungus_id: toy_fungus_alpha
+    substrate_id: toy_cellulose_like_solid
+    environment_id: toy_lab_environment
+    value:
+      kind: exact
+      value: 1.0
+      units: liter / mole
+      source: FungMod R3 toy registry fixture.
+      confidence_level: testing
+      notes: Artificial exact adsorption value for case-builder tests only.
+    notes: Toy/development parameter only; not empirical.
+
+  - record_id: toy_param_A_surface_exact
+    name: Toy exact accessible surface area
+    maturity: toy_development
+    provenance:
+      source: FungMod R3 toy registry fixture.
+      confidence_level: testing
+      notes: Artificial exact surface-area parameter for case-builder tests only.
+    parameter_symbol: A_surface_exact
+    process_type: surface_catalysis
+    enzyme_class: toy_cellulase
+    substrate_class: toy_cellulose_like
+    fungus_id: toy_fungus_alpha
+    substrate_id: toy_cellulose_like_solid
+    environment_id: toy_lab_environment
+    value:
+      kind: exact
+      value: 0.2
+      units: meter ** 2
+      source: FungMod R3 toy registry fixture.
+      confidence_level: testing
+      notes: Artificial exact accessible surface area for case-builder tests only.
+    notes: Toy/development parameter only; not empirical.

@@ -17,6 +17,11 @@ records:
       - k_surface_exact
       - k_surface_range
       - k_surface_prior
+      - A_surface_exact
       - k_ads_unknown
+    parameter_roles:
+      surface_rate_constant: k_surface_exact
+      adsorption_constant: k_ads_unknown
+      accessible_surface_area: A_surface_exact
     product_map_required: true
     notes: Toy/development compatibility only; not a scientific process rule.

@@ -154,6 +154,7 @@ def _registry_with_required_parameters(tmp_path: Path, required_parameters: list
     data = _yaml_mapping(process_path)
     records = cast(list[dict[str, Any]], data["records"])
     records[0]["required_parameters"] = required_parameters
+    records[0]["parameter_roles"] = {"surface_rate_constant": required_parameters[0]} if required_parameters else {}
     process_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return load_registry(registry_dir / "registry_index.yml")
 

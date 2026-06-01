@@ -2470,3 +2470,58 @@ Next milestone:
 - R3 should implement a toy-registry case builder that converts a modelable
   registry case into a generic `ModelConfig` for `run_configured_model`. Do not
   start range-based ensemble simulation or real registry data insertion yet.
+
+## Registry And Ranges: R3 Plug-And-Play Case Builder
+
+Date: 2026-06-01
+
+R3 status: `complete` for deterministic toy-registry case building.
+
+Completed in R3:
+
+- Added `src/fungal_model/screening/case_builder.py` with:
+  - `build_model_config_from_registry_case`;
+  - `RegistryCaseBuildError`;
+  - an explicit toy-only config mode boundary for R3.
+- The case builder now gates assembly through `assess_modelability` and refuses
+  underparameterized, exploratory, unsupported, or non-toy cases.
+- Added process-compatibility `parameter_roles` metadata so registry parameter
+  symbols can be mapped into the existing generic process factory roles without
+  hardcoding substrate-specific workflow logic.
+- Converted modelable toy surface-catalysis registry cases into regular
+  `ModelConfig` objects that run through `run_configured_model`.
+- Kept the generated config self-contained with inline toy geometry, generic
+  substrate metadata, toy product maps, explicit parameters, validators, time
+  grid, and output settings.
+- Added toy/development-only exact adsorption and accessible-surface parameter
+  records for case-builder tests while preserving the default underparameterized
+  R2 registry case.
+
+Architecture/data debt:
+
+- No architecture or data debt was added.
+- No real biology, real registry records, range-based ensemble simulation, or
+  new process equations were added.
+
+Verification:
+
+- `.venv/bin/python -m pytest tests/test_registry_case_builder.py`
+- Result: 6 passed.
+- `.venv/bin/python -m pytest tests/test_value_spec.py tests/test_registry_loading.py tests/test_modelability_report.py tests/test_registry_case_builder.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py`
+- Result: 39 passed.
+- `/private/tmp/fungmod-venv/bin/ruff check src tests`
+- Result: passed.
+- `.venv/bin/python -m pytest`
+- Result: 355 passed.
+
+Tooling note:
+
+- The `/private/tmp/fungmod-venv/bin/pyright` entry point was present but its
+  Python module was missing in this environment, so pyright could not be run in
+  this pass.
+
+Next milestone:
+
+- R4 should implement exploratory ensemble simulation over `ValueSpec` ranges
+  and distributions. Do not add real biology or real literature capability
+  records as part of R4.

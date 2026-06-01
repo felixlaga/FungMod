@@ -82,6 +82,7 @@ def test_load_toy_process_compatibility_record() -> None:
     assert len(records) == 1
     assert records[0].product_map_required
     assert "k_surface_exact" in records[0].required_parameters
+    assert records[0].parameter_roles["surface_rate_constant"] == "k_surface_exact"
 
 
 def test_load_exact_range_distribution_and_unknown_parameter_records() -> None:
@@ -91,12 +92,14 @@ def test_load_exact_range_distribution_and_unknown_parameter_records() -> None:
     range_record = registry.get_parameter_records(parameter_symbol="k_surface_range")[0]
     distribution = registry.get_parameter_records(parameter_symbol="k_surface_prior")[0]
     unknown = registry.get_parameter_records(parameter_symbol="k_ads_unknown")[0]
+    exact_adsorption = registry.get_parameter_records(parameter_symbol="k_ads_exact")[0]
 
     assert exact.value.kind == "exact"
     assert range_record.value.kind == "range"
     assert distribution.value.kind == "distribution"
     assert distribution.value.distribution == "loguniform"
     assert unknown.value.kind == "unknown"
+    assert exact_adsorption.value.kind == "exact"
 
 
 def test_duplicate_record_ids_fail(tmp_path: Path) -> None:

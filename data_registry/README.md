@@ -8,6 +8,12 @@ The registry layer is intended to support future modelability assessment and
 plug-and-play screening. It separates categorical facts, such as enzyme class
 and substrate class compatibility, from numeric value specifications.
 
+Process compatibility records may include `parameter_roles` to map registry
+parameter symbols into generic process-factory roles. For example, a
+surface-catalysis compatibility can map exact registry symbols to
+`surface_rate_constant`, `adsorption_constant`, and `accessible_surface_area`
+without introducing a substrate-specific workflow.
+
 Value specifications may be:
 
 - `exact`: a single unit-bearing value;

@@ -26,6 +26,7 @@ from fungal_model.io.registries import (
     ValidatorRegistry,
 )
 from fungal_model.io.yaml_loader import (
+    enzyme_from_config,
     load_enzyme,
     load_environment,
     load_fungus,
@@ -179,6 +180,8 @@ def _load_fungus_reference(reference: ConfigReference | None, config: ModelConfi
 
 
 def _load_enzyme_reference(reference: ConfigReference, config: ModelConfig) -> Any:
+    if reference.data is not None:
+        return enzyme_from_config(reference.data)
     _require_path_reference(reference, entity_name="enzyme")
     return load_enzyme(_resolve_path(reference, config))
 
