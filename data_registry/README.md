@@ -14,6 +14,10 @@ surface-catalysis compatibility can map exact registry symbols to
 `surface_rate_constant`, `adsorption_constant`, and `accessible_surface_area`
 without introducing a substrate-specific workflow.
 
+Exploratory registry screens may sample `range` and `distribution` value specs
+to generate toy configured-model runs. These ensembles are uncertainty plumbing
+tests only unless the records have later been curated as real scientific data.
+
 Value specifications may be:
 
 - `exact`: a single unit-bearing value;

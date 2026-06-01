@@ -5,6 +5,14 @@ from fungal_model.screening.case_builder import (
     RegistryCaseConfigMode,
     build_model_config_from_registry_case,
 )
+from fungal_model.screening.ensemble import (
+    EnsembleSample,
+    RegistryCaseEnsemble,
+    RegistryScreenResult,
+    RegistryScreenSimulationError,
+    ScreenSimulationMode,
+    simulate_screen,
+)
 from fungal_model.screening.modelability import (
     ModelabilityMode,
     ModelabilityReport,
@@ -16,10 +24,16 @@ from fungal_model.screening.modelability import (
 __all__ = [
     "RegistryCaseBuildError",
     "RegistryCaseConfigMode",
+    "EnsembleSample",
     "ModelabilityMode",
     "ModelabilityReport",
     "ModelabilityStatus",
+    "RegistryCaseEnsemble",
+    "RegistryScreenResult",
+    "RegistryScreenSimulationError",
     "ReportItem",
+    "ScreenSimulationMode",
     "assess_modelability",
     "build_model_config_from_registry_case",
+    "simulate_screen",
 ]

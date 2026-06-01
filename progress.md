@@ -2525,3 +2525,60 @@ Next milestone:
 - R4 should implement exploratory ensemble simulation over `ValueSpec` ranges
   and distributions. Do not add real biology or real literature capability
   records as part of R4.
+
+## Registry And Ranges: R4 Exploratory Ensemble Simulation
+
+Date: 2026-06-01
+
+R4 status: `complete` for toy-registry exploratory ensemble execution.
+
+Completed in R4:
+
+- Added `src/fungal_model/screening/ensemble.py` with:
+  - `simulate_screen`;
+  - `RegistryScreenResult`;
+  - `RegistryCaseEnsemble`;
+  - `EnsembleSample`;
+  - `RegistryScreenSimulationError`.
+- Implemented sampling over registry `ValueSpec` exact, range, and distribution
+  values for exploratory toy screen runs.
+- Added seeded reproducibility for sampled registry screens.
+- Materialized each sampled run as a standard generic `ModelConfig`, then ran it
+  through `run_configured_model`; no separate solver path was introduced.
+- Wrote per-sample configs, configured output bundles, and
+  `screen_summary.json`.
+- Kept R4 limited to toy/exploratory registry cases and explicit
+  surface-catalysis configs using existing generic process factories.
+- Added clear rejection paths for underparameterized cases, unknown parameters,
+  unsupported process types, missing parameter-role mappings, invalid sample
+  counts, empty input lists, and non-exploratory screen modes.
+
+Architecture/data debt:
+
+- No architecture or data debt was added.
+- No real biology, real literature capability records, real fungal datasets,
+  JAX, or new biological process equations were added.
+
+Verification:
+
+- `.venv/bin/python -m pytest tests/test_registry_ensemble_simulation.py`
+- Result: 6 passed.
+- `.venv/bin/python -m pytest tests/test_value_spec.py tests/test_registry_loading.py tests/test_modelability_report.py tests/test_registry_case_builder.py tests/test_registry_ensemble_simulation.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py`
+- Result: 45 passed.
+- `/private/tmp/fungmod-venv/bin/ruff check src tests`
+- Result: passed.
+- `.venv/bin/python -m pytest`
+- Result: 361 passed.
+
+Tooling note:
+
+- The `/private/tmp/fungmod-venv/bin/pyright` entry point was present but its
+  Python module was missing in this environment, so pyright could not be run in
+  this pass.
+
+Next milestone:
+
+- The registry-and-ranges foundation is now ready for a schema-first review of
+  the first candidate real capability/dataset records. Real data should enter
+  one selected case at a time, with literature-schema validation and no broad
+  biology implementation.
