@@ -66,3 +66,11 @@ Initial comparison outputs are written as an inspectable bundle:
 
 Synthetic comparison results are infrastructure checks only. They are not
 empirical validation and must not be used as biological evidence.
+
+## Candidate Reviews
+
+Before any real literature dataset is inserted, add a dataset candidate review
+under `data/experiments/candidate_reviews/`. Candidate reviews are not datasets:
+they must not include observations, measurement rows, CSV paths, or extracted
+values. They exist to document the candidate source, intended use, exclusion
+criteria, and required schema gates before ingestion begins.

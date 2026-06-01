@@ -2582,3 +2582,60 @@ Next milestone:
   the first candidate real capability/dataset records. Real data should enter
   one selected case at a time, with literature-schema validation and no broad
   biology implementation.
+
+## Data Intake Gate: Dataset Candidate Review
+
+Date: 2026-06-01
+
+Status: `complete` for schema-first candidate-review scaffolding before real
+data insertion.
+
+Completed:
+
+- Added `src/fungal_model/data/candidate_review.py` with:
+  - `DatasetCandidateReview`;
+  - `DatasetCandidateReviewLoadError`;
+  - `load_dataset_candidate_review`;
+  - `validate_dataset_candidate_review`.
+- Added public exports from `fungal_model.data`.
+- Added `data/experiments/candidate_reviews/README.md` and a
+  fake/schema-test-only candidate review fixture.
+- Candidate reviews now require:
+  - candidate id, name, status, maturity, source, intended use, schema gates,
+    review metadata, and notes;
+  - literature candidates to include citation, authors, year, and DOI or URL;
+  - explicit schema-gate flags for units, uncertainty, preprocessing, and no
+    embedded real data.
+- Candidate reviews reject observations, measurement series, CSV paths, data
+  rows, and other data-insertion fields.
+- Documentation now states that candidate reviews are not datasets and must not
+  contain extracted values.
+
+Architecture/data debt:
+
+- No architecture or data debt was added.
+- No real literature data, real capability records, biological mechanisms, JAX,
+  or broad biology implementation were added.
+
+Verification:
+
+- `.venv/bin/python -m pytest tests/test_dataset_candidate_review.py`
+- Result: 11 passed.
+- `.venv/bin/python -m pytest tests/test_dataset_candidate_review.py tests/test_literature_schema_contract.py tests/test_experiment_dataset_loading.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py`
+- Result: 39 passed.
+- `/private/tmp/fungmod-venv/bin/ruff check src tests`
+- Result: passed.
+- `.venv/bin/python -m pytest`
+- Result: 372 passed.
+
+Tooling note:
+
+- The `/private/tmp/fungmod-venv/bin/pyright` entry point was present but its
+  Python module was missing in this environment, so pyright could not be run in
+  this pass.
+
+Next milestone:
+
+- Select one real dataset candidate as a review record only, then validate its
+  source/provenance metadata before adding any observations or registry
+  capability records.
