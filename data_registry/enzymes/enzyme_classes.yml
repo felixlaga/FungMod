@@ -1,0 +1,17 @@
+kind: fungmod_registry_records
+record_type: enzyme_classes
+records:
+  - record_id: toy_cellulase
+    name: Toy cellulase class
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Fake enzyme class for categorical compatibility tests only.
+    target_bond_classes:
+      - toy_beta_1_4_glycosidic
+    compatible_substrate_classes:
+      - toy_cellulose_like
+    compatible_processes:
+      - surface_catalysis
+    notes: Toy/development enzyme class only; not a real literature capability.

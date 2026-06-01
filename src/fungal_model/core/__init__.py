@@ -11,6 +11,7 @@ from .errors import (
 from .parameters import Parameter, ParameterSet
 from .simulation import SimulationEngine, SimulationRecord, SimulationResult, SolverSettings
 from .units import Q_, Quantity, UnitError
+from .value_spec import ValueSpec, ValueSpecError
 
 __all__ = [
     "Assumption",
@@ -28,4 +29,6 @@ __all__ = [
     "SimulationResult",
     "SolverSettings",
     "UnitError",
+    "ValueSpec",
+    "ValueSpecError",
 ]

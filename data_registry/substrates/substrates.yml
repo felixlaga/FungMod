@@ -1,0 +1,33 @@
+kind: fungmod_registry_records
+record_type: substrates
+records:
+  - record_id: toy_cellulose_like_solid
+    name: Toy cellulose-like solid
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Fake substrate record for loader tests only.
+    substrate_class: toy_cellulose_like
+    physical_state: toy_solid
+    bond_classes:
+      - toy_beta_1_4_glycosidic
+    products:
+      - toy_sugar_product
+    properties:
+      accessible_surface_area:
+        kind: range
+        lower: 0.1
+        upper: 10.0
+        units: meter ** 2 / gram
+        source: FungMod toy registry fixture.
+        confidence_level: testing
+        notes: Artificial range for registry loader tests only.
+      roughness_factor:
+        kind: exact
+        value: 1.0
+        units: dimensionless
+        source: FungMod toy registry fixture.
+        confidence_level: testing
+        notes: Artificial exact value for registry loader tests only.
+    notes: Toy/development substrate only; not real cellulose data.

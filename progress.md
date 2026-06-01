@@ -2353,3 +2353,61 @@ Next allowed step:
 
 - Select one candidate real dataset for schema-first ingestion review. Do not
   implement broad biology or substrate-specific mechanisms as the next step.
+
+## Registry And Ranges: R1 ValueSpec And Registry Loader
+
+Date: 2026-06-01
+
+R1 status: `complete` for the ValueSpec and registry-loader foundation.
+
+Completed in R1:
+
+- Added `ValueSpec` in `src/fungal_model/core/value_spec.py` to represent
+  exact values, ranges, distributions, unknowns, and not-applicable values with
+  explicit units, source, confidence, notes, validation, sampling, and exact
+  quantity conversion.
+- Supported initial `uniform` and `loguniform` distribution sampling with fixed
+  RNG reproducibility.
+- Added `src/fungal_model/registry/` with registry records, YAML loading, and
+  an in-memory `FungModRegistry` store.
+- Implemented minimal records for fungi, enzyme classes, substrates,
+  environments, process compatibility, and parameters.
+- Added registry lookup methods for fungi, enzyme classes, substrates,
+  environments, process compatibility records, and parameter records.
+- Added toy/development-only registry fixtures under `data_registry/`.
+- Added registry documentation explaining that the registry is not a complete
+  biological database and that all current records are toy/development
+  fixtures only.
+
+Architecture/data debt:
+
+- No architecture or data debt was added.
+- No real biology, real literature capability records, real fungal datasets,
+  range-based ensemble simulation, or new biological process equations were
+  added.
+
+Verification:
+
+- `.venv/bin/python -m pytest tests/test_value_spec.py`
+- Result: 10 passed.
+- `.venv/bin/python -m pytest tests/test_registry_loading.py`
+- Result: 11 passed.
+- `.venv/bin/python -m pytest tests/test_value_spec.py tests/test_registry_loading.py tests/test_guardrails_no_hardcoding.py`
+- Result: 23 passed.
+- `.venv/bin/python -m pytest tests/test_guardrails_no_shortcuts.py`
+- Result: 2 passed.
+- `/private/tmp/fungmod-venv/bin/ruff check src tests`
+- Result: passed.
+- `.venv/bin/python -m pytest`
+- Result: 341 passed.
+
+Tooling note:
+
+- The `/private/tmp/fungmod-venv/bin/pyright` entry point was present but its
+  Python module was missing in this environment, so pyright could not be run in
+  this pass.
+
+Next milestone:
+
+- R2 should implement a modelability report over the toy registry. Do not start
+  range-based ensemble simulation or real registry data insertion yet.

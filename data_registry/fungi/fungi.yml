@@ -1,0 +1,15 @@
+kind: fungmod_registry_records
+record_type: fungi
+records:
+  - record_id: toy_fungus_alpha
+    name: Toy fungus alpha
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Fake fungus capability record for loader tests only.
+    enzyme_classes:
+      - toy_cellulase
+    assimilable_products:
+      - toy_sugar_product
+    notes: Toy/development record only; not a real fungus or literature capability.

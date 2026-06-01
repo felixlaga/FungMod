@@ -1,0 +1,33 @@
+kind: fungmod_registry_records
+record_type: environments
+records:
+  - record_id: toy_lab_environment
+    name: Toy lab environment
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Fake environment record for loader tests only.
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: FungMod toy registry fixture.
+        confidence_level: testing
+        notes: Artificial exact temperature for registry tests only.
+      ph:
+        kind: range
+        lower: 5.0
+        upper: 7.0
+        units: dimensionless
+        source: FungMod toy registry fixture.
+        confidence_level: testing
+        notes: Artificial pH range for registry tests only.
+      oxygen_concentration:
+        kind: not_applicable
+        units: null
+        source: FungMod toy registry fixture.
+        confidence_level: testing
+        notes: Oxygen is intentionally not represented in this toy R1 registry case.
+    notes: Toy/development environment only; not empirical data.

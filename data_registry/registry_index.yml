@@ -1,0 +1,17 @@
+kind: fungmod_registry_index
+registry_id: toy_registry
+version: 0.1.0
+maturity: development
+description: Toy FungMod registry for registry-loader and ValueSpec tests only.
+records:
+  fungi: fungi/fungi.yml
+  enzyme_classes: enzymes/enzyme_classes.yml
+  substrates: substrates/substrates.yml
+  environments: environments/environments.yml
+  process_compatibility: processes/process_compatibility.yml
+  parameters: parameters/parameter_records.yml
+provenance:
+  created_by: FungMod
+  source: FungMod R1 toy registry fixture.
+  confidence_level: testing
+  notes: Not a complete biological database and not real literature-derived evidence.

@@ -1,0 +1,22 @@
+kind: fungmod_registry_records
+record_type: process_compatibility
+records:
+  - record_id: toy_cellulase_on_toy_cellulose_like_surface
+    name: Toy cellulase on toy cellulose-like surface compatibility
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Fake compatibility rule for registry loader tests only.
+    enzyme_class: toy_cellulase
+    substrate_class: toy_cellulose_like
+    required_bond_classes:
+      - toy_beta_1_4_glycosidic
+    process_type: surface_catalysis
+    required_parameters:
+      - k_surface_exact
+      - k_surface_range
+      - k_surface_prior
+      - k_ads_unknown
+    product_map_required: true
+    notes: Toy/development compatibility only; not a scientific process rule.

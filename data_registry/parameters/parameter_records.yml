@@ -1,0 +1,97 @@
+kind: fungmod_registry_records
+record_type: parameters
+records:
+  - record_id: toy_param_k_surface_exact
+    name: Toy exact surface rate parameter
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Artificial exact parameter for registry loader tests only.
+    parameter_symbol: k_surface_exact
+    process_type: surface_catalysis
+    enzyme_class: toy_cellulase
+    substrate_class: toy_cellulose_like
+    fungus_id: toy_fungus_alpha
+    substrate_id: toy_cellulose_like_solid
+    environment_id: toy_lab_environment
+    value:
+      kind: exact
+      value: 1.0e-6
+      units: kilogram / meter ** 2 / second
+      source: FungMod toy registry fixture.
+      confidence_level: testing
+      notes: Artificial exact value for registry tests only.
+    notes: Toy/development parameter only; not empirical.
+
+  - record_id: toy_param_k_surface_range
+    name: Toy range surface rate parameter
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Artificial range parameter for registry loader tests only.
+    parameter_symbol: k_surface_range
+    process_type: surface_catalysis
+    enzyme_class: toy_cellulase
+    substrate_class: toy_cellulose_like
+    fungus_id: null
+    substrate_id: null
+    environment_id: null
+    value:
+      kind: range
+      lower: 1.0e-9
+      upper: 1.0e-6
+      units: kilogram / meter ** 2 / second
+      source: FungMod toy registry fixture.
+      confidence_level: testing
+      notes: Artificial range for registry tests only.
+    notes: Toy/development range only; not empirical.
+
+  - record_id: toy_param_k_surface_loguniform
+    name: Toy loguniform surface rate prior
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Artificial distribution parameter for registry loader tests only.
+    parameter_symbol: k_surface_prior
+    process_type: surface_catalysis
+    enzyme_class: toy_cellulase
+    substrate_class: toy_cellulose_like
+    fungus_id: null
+    substrate_id: null
+    environment_id: null
+    value:
+      kind: distribution
+      distribution: loguniform
+      parameters:
+        lower: 1.0e-9
+        upper: 1.0e-6
+      units: kilogram / meter ** 2 / second
+      source: FungMod toy registry fixture.
+      confidence_level: testing
+      notes: Artificial loguniform distribution for registry tests only.
+    notes: Toy/development distribution only; not empirical.
+
+  - record_id: toy_param_k_ads_unknown
+    name: Toy unknown adsorption parameter
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Artificial unknown parameter for registry loader tests only.
+    parameter_symbol: k_ads_unknown
+    process_type: surface_catalysis
+    enzyme_class: toy_cellulase
+    substrate_class: toy_cellulose_like
+    fungus_id: null
+    substrate_id: null
+    environment_id: null
+    value:
+      kind: unknown
+      units: liter / mole
+      source: FungMod toy registry fixture.
+      confidence_level: testing
+      notes: Value intentionally unknown for registry tests.
+    notes: Toy/development unknown only; not empirical.
