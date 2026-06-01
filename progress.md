@@ -2411,3 +2411,62 @@ Next milestone:
 
 - R2 should implement a modelability report over the toy registry. Do not start
   range-based ensemble simulation or real registry data insertion yet.
+
+## Registry And Ranges: R2 Modelability Report
+
+Date: 2026-06-01
+
+R2 status: `complete` for toy-registry modelability reporting.
+
+Completed in R2:
+
+- Added `src/fungal_model/screening/modelability.py` with:
+  - `ReportItem`;
+  - `ModelabilityReport`;
+  - `assess_modelability`.
+- Added `src/fungal_model/screening/__init__.py` as the public screening
+  package boundary.
+- Implemented registry-only case assessment for:
+  - fungus record loading;
+  - substrate record loading;
+  - environment record loading;
+  - fungus enzyme-class capability matching;
+  - enzyme/substrate class and bond compatibility;
+  - process compatibility discovery;
+  - required parameter lookup;
+  - exact, uncertain, unknown, and mode-incompatible parameter classification.
+- Implemented the four R2 statuses over toy records:
+  - `modelable`;
+  - `exploratory`;
+  - `underparameterized`;
+  - `unsupported`.
+- Added JSON-safe `ModelabilityReport.to_dict()` and a concise
+  `ModelabilityReport.summary()`.
+- Added tests that verify default toy underparameterization, exact-only
+  modelability, range-based exploratory status, scientific-mode rejection of
+  uncertain parameters, missing-parameter reporting, unsupported compatibility,
+  JSON-safe report serialization, and invalid mode errors.
+
+Architecture/data debt:
+
+- No architecture or data debt was added.
+- No real biology, real registry records, case-builder workflow, model
+  assembly, range-based ensemble simulation, or new process equations were
+  added.
+
+Verification:
+
+- `.venv/bin/python -m pytest tests/test_modelability_report.py`
+- Result: 8 passed.
+- `.venv/bin/python -m pytest tests/test_value_spec.py tests/test_registry_loading.py tests/test_modelability_report.py tests/test_guardrails_no_hardcoding.py tests/test_guardrails_no_shortcuts.py`
+- Result: 33 passed.
+- `/private/tmp/fungmod-venv/bin/ruff check src tests`
+- Result: passed.
+- `.venv/bin/python -m pytest`
+- Result: 349 passed.
+
+Next milestone:
+
+- R3 should implement a toy-registry case builder that converts a modelable
+  registry case into a generic `ModelConfig` for `run_configured_model`. Do not
+  start range-based ensemble simulation or real registry data insertion yet.
