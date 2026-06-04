@@ -114,10 +114,22 @@ def test_registry_loads_homogeneous_michaelis_menten_compatibility_record() -> N
 
 def test_parameter_records_preserve_exact_and_unknown_value_specs(tmp_path: Path) -> None:
     registry = load_registry(REGISTRY_INDEX)
+    parameter_records = registry.get_parameter_records(process_type=PROCESS_TYPE)
     exact_parameters = {
         record.parameter_symbol: record
-        for record in registry.get_parameter_records(process_type=PROCESS_TYPE)
+        for record in parameter_records
+        if record.maturity != "exploratory_prior"
     }
+    unknown_enzyme_record = _parameter_record(
+        parameter_records,
+        symbol=ENZYME_CONCENTRATION_SYMBOL,
+        maturity="literature_processed",
+    )
+    exploratory_enzyme_record = _parameter_record(
+        parameter_records,
+        symbol=ENZYME_CONCENTRATION_SYMBOL,
+        maturity="exploratory_prior",
+    )
 
     assert exact_parameters["Km_cellobiose"].value.kind == "exact"
     assert exact_parameters["Km_cellobiose"].value.value == pytest.approx(15.3)
@@ -128,16 +140,22 @@ def test_parameter_records_preserve_exact_and_unknown_value_specs(tmp_path: Path
     assert exact_parameters["initial_cellobiose_concentration"].value.kind == "exact"
     assert exact_parameters["initial_cellobiose_concentration"].value.value == pytest.approx(3.06)
     assert exact_parameters["initial_cellobiose_concentration"].value.units == "mM"
-    assert exact_parameters[ENZYME_CONCENTRATION_SYMBOL].value.kind == "unknown"
-    assert exact_parameters[ENZYME_CONCENTRATION_SYMBOL].value.units == "mM"
-    assert (
-        exact_parameters[ENZYME_CONCENTRATION_SYMBOL].value.confidence_level
-        == "missing_from_selected_entry"
-    )
+    assert unknown_enzyme_record.value.kind == "unknown"
+    assert unknown_enzyme_record.value.units == "mM"
+    assert unknown_enzyme_record.value.confidence_level == "missing_from_selected_entry"
+    assert exploratory_enzyme_record.value.kind == "distribution"
+    assert exploratory_enzyme_record.value.distribution == "loguniform"
+    assert exploratory_enzyme_record.value.parameters["lower"] == pytest.approx(1.0e-6)
+    assert exploratory_enzyme_record.value.parameters["upper"] == pytest.approx(1.0e-3)
+    assert exploratory_enzyme_record.value.units == "mM"
+    assert exploratory_enzyme_record.value.source == "user-supplied exploratory range"
+    assert exploratory_enzyme_record.value.confidence_level == "exploratory_assumption"
+    assert exploratory_enzyme_record.provenance["exploratory_prior"] is True
     _assert_sabiork_provenance(exact_parameters["Km_cellobiose"].provenance)
     _assert_sabiork_provenance(exact_parameters["kcat_cellobiose"].provenance)
     _assert_sabiork_provenance(exact_parameters["initial_cellobiose_concentration"].provenance)
-    _assert_sabiork_provenance(exact_parameters[ENZYME_CONCENTRATION_SYMBOL].provenance)
+    _assert_sabiork_provenance(unknown_enzyme_record.provenance)
+    _assert_sabiork_provenance(exploratory_enzyme_record.provenance)
 
     unknown_registry = _registry_with_parameter_values(
         tmp_path,
@@ -182,6 +200,30 @@ def test_reaction_618_modelability_is_underparameterized_when_enzyme_concentrati
     assert _has_item(report.known, "parameter", "initial_cellobiose_concentration")
     assert _has_item(report.missing, "parameter", ENZYME_CONCENTRATION_SYMBOL)
     assert not report.incompatible
+
+
+def test_reaction_618_exploratory_modelability_uses_marked_prior_only_in_exploratory_mode() -> None:
+    registry = load_registry(REGISTRY_INDEX)
+
+    report = assess_modelability(
+        fungus_id=FUNGUS_ID,
+        substrate_id=SUBSTRATE_ID,
+        environment_id=ENVIRONMENT_ID,
+        registry=registry,
+        mode="exploratory",
+    )
+
+    assert report.status == "exploratory"
+    assert _has_item(report.uncertain, "parameter", ENZYME_CONCENTRATION_SYMBOL)
+    assert not _has_item(report.missing, "parameter", ENZYME_CONCENTRATION_SYMBOL)
+    enzyme_item = next(
+        item for item in report.uncertain if item.item_id == ENZYME_CONCENTRATION_SYMBOL
+    )
+    assert (
+        enzyme_item.details["record_id"]
+        == "exploratory_reaction_618_enzyme_concentration_beta_glucosidase_loguniform"
+    )
+    assert enzyme_item.details["value"]["confidence_level"] == "exploratory_assumption"
 
 
 def test_reaction_618_modelability_is_modelable_when_required_values_are_exact(tmp_path: Path) -> None:
@@ -409,6 +451,13 @@ def _assert_sabiork_provenance(provenance) -> None:
     assert provenance["source_database"] == "SABIO-RK"
     assert provenance["source_reaction_id"] == REACTION_ID
     assert provenance["selected_kinlaw_entry_id"] == SELECTED_ENTRY_ID
+
+
+def _parameter_record(records, *, symbol: str, maturity: str):
+    for record in records:
+        if record.parameter_symbol == symbol and record.maturity == maturity:
+            return record
+    raise AssertionError(f"Missing parameter record for {symbol!r} with maturity {maturity!r}")
 
 
 def _has_item(items, item_type: str, item_id: str) -> bool:

@@ -216,6 +216,7 @@ def assess_modelability(
                 fungus_id=fungus_id,
                 substrate_id=substrate_id,
                 environment_id=environment_id,
+                mode=mode,
             )
             if record is None:
                 missing.append(
@@ -337,6 +338,7 @@ def _best_parameter_record(
     fungus_id: str,
     substrate_id: str,
     environment_id: str,
+    mode: ModelabilityMode,
 ) -> ParameterRecord | None:
     candidates = [
         record
@@ -349,16 +351,22 @@ def _best_parameter_record(
         and _matches(record.substrate_id, substrate_id)
         and _matches(record.environment_id, environment_id)
     ]
+    if mode == "scientific":
+        candidates = [
+            record
+            for record in candidates
+            if not _is_exploratory_parameter_record(record)
+        ]
     if not candidates:
         return None
-    return max(candidates, key=_parameter_specificity)
+    return max(candidates, key=lambda record: _parameter_specificity(record, mode=mode))
 
 
 def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
 
 
-def _parameter_specificity(record: ParameterRecord) -> tuple[int, int]:
+def _parameter_specificity(record: ParameterRecord, *, mode: ModelabilityMode) -> tuple[int, ...]:
     selector_score = sum(
         value is not None
         for value in (
@@ -370,7 +378,15 @@ def _parameter_specificity(record: ParameterRecord) -> tuple[int, int]:
         )
     )
     maturity_score = 1 if record.maturity == "calibrated" else 0
+    if mode == "exploratory":
+        value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
+        exploratory_score = 1 if _is_exploratory_parameter_record(record) else 0
+        return selector_score, value_score, exploratory_score, maturity_score
     return selector_score, maturity_score
+
+
+def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:
+    return record.maturity == "exploratory_prior" or bool(record.provenance.get("exploratory_prior"))
 
 
 def _status(

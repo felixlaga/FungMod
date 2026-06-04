@@ -236,3 +236,30 @@ records:
       confidence_level: missing_from_selected_entry
       notes: Raw kinetic-law variable E has null start_value and unit '-' in the selected local snapshot.
     notes: Required enzyme concentration for enzyme-explicit homogeneous Michaelis-Menten assembly is absent from selected SABIO-RK EntryID 35622.
+
+  - record_id: exploratory_reaction_618_enzyme_concentration_beta_glucosidase_loguniform
+    name: Exploratory Reaction 618 beta-glucosidase concentration loguniform prior
+    maturity: exploratory_prior
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+      exploratory_prior: true
+    parameter_symbol: enzyme_concentration_beta_glucosidase
+    process_type: homogeneous_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: sabiork_beta_glucosidase_source
+    substrate_id: cellobiose
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: distribution
+      distribution: loguniform
+      parameters:
+        lower: 1.0e-6
+        upper: 1.0e-3
+      units: mM
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      notes: Not curated from SABIO-RK. Used only for exploratory sensitivity analysis because EntryID 35622 does not provide enzyme concentration.
+    notes: User-supplied exploratory enzyme concentration prior for Reaction 618 sensitivity analysis; not a literature-curated value.

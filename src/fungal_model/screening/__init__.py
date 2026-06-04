@@ -7,6 +7,7 @@ from fungal_model.screening.case_builder import (
 )
 from fungal_model.screening.ensemble import (
     EnsembleSample,
+    EnsembleSampleFailure,
     RegistryCaseEnsemble,
     RegistryScreenResult,
     RegistryScreenSimulationError,
@@ -25,6 +26,7 @@ __all__ = [
     "RegistryCaseBuildError",
     "RegistryCaseConfigMode",
     "EnsembleSample",
+    "EnsembleSampleFailure",
     "ModelabilityMode",
     "ModelabilityReport",
     "ModelabilityStatus",
