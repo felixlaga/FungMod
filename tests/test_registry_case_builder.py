@@ -13,6 +13,7 @@ from fungal_model.screening import (
     RegistryCaseBuildError,
     build_model_config_from_registry_case,
 )
+from fungal_model.screening.case_builder import get_registry_process_assembler
 from fungal_model.workflows import run_configured_model
 
 
@@ -129,6 +130,40 @@ def test_builder_currently_emits_toy_configs_only(tmp_path: Path) -> None:
             registry=registry,
             mode="scientific",  # type: ignore[arg-type]
         )
+
+
+def test_registry_process_assemblers_advertise_supported_roles() -> None:
+    surface = get_registry_process_assembler("surface_catalysis")
+    homogeneous = get_registry_process_assembler("homogeneous_michaelis_menten")
+
+    assert surface is not None
+    assert surface.required_parameter_roles == (
+        "surface_rate_constant",
+        "adsorption_constant",
+        "accessible_surface_area",
+    )
+    assert surface.deterministic_mode == "toy"
+    assert homogeneous is not None
+    assert homogeneous.required_parameter_roles == (
+        "km",
+        "kcat",
+        "substrate_initial_concentration",
+        "enzyme_initial_concentration",
+    )
+    assert homogeneous.deterministic_mode == "scientific"
+    assert get_registry_process_assembler("unsupported_process") is None
+
+
+def test_ensemble_uses_registry_process_assembler_api() -> None:
+    source = (ROOT / "src" / "fungal_model" / "screening" / "ensemble.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "_surface_catalysis_config_data" not in source
+    assert "_homogeneous_mm_config_data" not in source
+    assert "_select_compatibility" not in source
+    assert "get_registry_process_assembler" in source
+    assert "build_registry_process_config_data" in source
 
 
 def _modelable_registry(tmp_path: Path):

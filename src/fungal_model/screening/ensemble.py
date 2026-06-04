@@ -19,12 +19,10 @@ from fungal_model.registry.records import ParameterRecord, ProcessCompatibilityR
 from fungal_model.registry.store import FungModRegistry
 from fungal_model.results import SimulationResult
 from fungal_model.screening.case_builder import (
-    HOMOGENEOUS_MM_PARAMETER_ROLES,
     RegistryCaseBuildError,
-    SURFACE_CATALYSIS_PARAMETER_ROLES,
-    _homogeneous_mm_config_data,
-    _select_compatibility,
-    _surface_catalysis_config_data,
+    build_registry_process_config_data,
+    get_registry_process_assembler,
+    select_registry_case_compatibility,
 )
 from fungal_model.screening.modelability import ModelabilityReport, assess_modelability
 from fungal_model.workflows import run_configured_model
@@ -205,86 +203,26 @@ def _simulate_case_ensemble(
             "Registry case cannot be simulated as an exploratory ensemble because "
             f"modelability status is {report.status!r}. Report: {report.to_dict()}"
         )
-    compatibility = _select_compatibility(
+    compatibility = select_registry_case_compatibility(
         registry=registry,
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         report=report,
     )
-    handler = _ENSEMBLE_PROCESS_HANDLERS.get(compatibility.process_type)
-    if handler is None:
+    assembler = get_registry_process_assembler(compatibility.process_type)
+    if assembler is None:
         raise RegistryScreenSimulationError(
             "Exploratory screen does not support process_type "
             f"{compatibility.process_type!r}."
         )
-    return handler(
-        fungus_id=fungus_id,
-        substrate_id=substrate_id,
-        environment_id=environment_id,
-        registry=registry,
-        compatibility=compatibility,
-        report=report,
-        n_samples=n_samples,
-        rng=rng,
-        output_root=output_root,
-    )
-
-
-def _simulate_surface_catalysis_ensemble(
-    *,
-    fungus_id: str,
-    substrate_id: str,
-    environment_id: str,
-    registry: FungModRegistry,
-    compatibility: ProcessCompatibilityRecord,
-    report: ModelabilityReport,
-    n_samples: int,
-    rng: np.random.Generator,
-    output_root: Path,
-) -> RegistryCaseEnsemble:
     role_records = _resolve_role_records(
         registry=registry,
         compatibility=compatibility,
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
-        required_roles=SURFACE_CATALYSIS_PARAMETER_ROLES,
-        process_label="Surface-catalysis",
-    )
-    return _run_case_samples(
-        fungus_id=fungus_id,
-        substrate_id=substrate_id,
-        environment_id=environment_id,
-        registry=registry,
-        compatibility=compatibility,
-        report=report,
-        role_records=role_records,
-        n_samples=n_samples,
-        rng=rng,
-        output_root=output_root,
-    )
-
-
-def _simulate_homogeneous_michaelis_menten_ensemble(
-    *,
-    fungus_id: str,
-    substrate_id: str,
-    environment_id: str,
-    registry: FungModRegistry,
-    compatibility: ProcessCompatibilityRecord,
-    report: ModelabilityReport,
-    n_samples: int,
-    rng: np.random.Generator,
-    output_root: Path,
-) -> RegistryCaseEnsemble:
-    role_records = _resolve_role_records(
-        registry=registry,
-        compatibility=compatibility,
-        fungus_id=fungus_id,
-        substrate_id=substrate_id,
-        environment_id=environment_id,
-        required_roles=HOMOGENEOUS_MM_PARAMETER_ROLES,
-        process_label="Homogeneous Michaelis-Menten",
+        required_roles=assembler.required_parameter_roles,
+        process_label=assembler.process_label,
     )
     return _run_case_samples(
         fungus_id=fungus_id,
@@ -514,34 +452,16 @@ def _build_sample_config(
     sampled_records: Mapping[str, ParameterRecord],
     sample_dir: Path,
 ) -> ModelConfig:
-    substrate = registry.get_substrate(substrate_id)
     try:
-        if compatibility.process_type == "surface_catalysis":
-            data = _surface_catalysis_config_data(
-                registry=registry,
-                compatibility=compatibility,
-                substrate=substrate,
-                fungus_id=fungus_id,
-                substrate_id=substrate_id,
-                environment_id=environment_id,
-                parameter_records=sampled_records,
-                output_directory=str(sample_dir / "bundle"),
-            )
-        elif compatibility.process_type == "homogeneous_michaelis_menten":
-            data = _homogeneous_mm_config_data(
-                registry=registry,
-                compatibility=compatibility,
-                substrate=substrate,
-                fungus_id=fungus_id,
-                substrate_id=substrate_id,
-                environment_id=environment_id,
-                parameter_records=sampled_records,
-                output_directory=str(sample_dir / "bundle"),
-            )
-        else:
-            raise RegistryCaseBuildError(
-                f"Unsupported ensemble process_type {compatibility.process_type!r}."
-            )
+        data = build_registry_process_config_data(
+            registry=registry,
+            compatibility=compatibility,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            parameter_records=sampled_records,
+            output_directory=str(sample_dir / "bundle"),
+        )
     except RegistryCaseBuildError as exc:
         raise RegistryScreenSimulationError(str(exc)) from exc
     data["name"] = f"{data['name']} sample {sample_dir.name}"
@@ -794,12 +714,6 @@ def _validate_screen_inputs(
         raise RegistryScreenSimulationError(
             "fungus_ids, substrate_ids, and environment_ids must each contain at least one id."
         )
-
-
-_ENSEMBLE_PROCESS_HANDLERS = {
-    "surface_catalysis": _simulate_surface_catalysis_ensemble,
-    "homogeneous_michaelis_menten": _simulate_homogeneous_michaelis_menten_ensemble,
-}
 
 
 __all__ = [

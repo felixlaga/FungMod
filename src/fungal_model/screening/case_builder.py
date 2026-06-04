@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from fungal_model.io.model_config import ModelConfig
@@ -33,6 +34,18 @@ class RegistryCaseBuildError(ValueError):
     """Raised when a registry case cannot be converted into a model config."""
 
 
+@dataclass(frozen=True)
+class RegistryProcessAssembler:
+    """Config assembly metadata for one registry process type."""
+
+    process_type: str
+    process_label: str
+    required_parameter_roles: tuple[str, ...]
+    deterministic_mode: RegistryCaseConfigMode
+    unsupported_mode_message: str
+    config_data_builder: Callable[..., dict[str, Any]]
+
+
 def build_model_config_from_registry_case(
     *,
     fungus_id: str,
@@ -59,55 +72,32 @@ def build_model_config_from_registry_case(
             f"Report: {report.to_dict()}"
         )
 
-    compatibility = _select_compatibility(
+    compatibility = select_registry_case_compatibility(
         registry=registry,
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         report=report,
     )
-    builder = _PROCESS_CONFIG_BUILDERS.get(compatibility.process_type)
-    if builder is None:
+    assembler = get_registry_process_assembler(compatibility.process_type)
+    if assembler is None:
         raise RegistryCaseBuildError(
             "Registry case builder does not support process_type "
             f"{compatibility.process_type!r}."
         )
-    return builder(
+    if mode != assembler.deterministic_mode:
+        raise RegistryCaseBuildError(assembler.unsupported_mode_message)
+    parameter_records = _exact_role_parameters(
         registry=registry,
         compatibility=compatibility,
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
-        mode=mode,
-        output_directory=output_directory,
+        required_roles=assembler.required_parameter_roles,
+        process_label=assembler.process_label,
     )
-
-
-def _build_surface_catalysis_config(
-    *,
-    registry: FungModRegistry,
-    compatibility: ProcessCompatibilityRecord,
-    fungus_id: str,
-    substrate_id: str,
-    environment_id: str,
-    mode: RegistryCaseConfigMode,
-    output_directory: str | None,
-) -> ModelConfig:
-    if mode != "toy":
-        raise RegistryCaseBuildError(
-            "Surface-catalysis registry assembly currently only emits toy model configs."
-        )
-    parameter_records = _surface_catalysis_parameters(
+    config_data = build_registry_process_config_data(
         registry=registry,
         compatibility=compatibility,
-        fungus_id=fungus_id,
-        substrate_id=substrate_id,
-        environment_id=environment_id,
-    )
-    substrate = registry.get_substrate(substrate_id)
-    config_data = _surface_catalysis_config_data(
-        registry=registry,
-        compatibility=compatibility,
-        substrate=substrate,
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
@@ -117,29 +107,32 @@ def _build_surface_catalysis_config(
     return ModelConfig.from_mapping(config_data)
 
 
-def _build_homogeneous_mm_config(
+def get_registry_process_assembler(process_type: str) -> RegistryProcessAssembler | None:
+    """Return assembly metadata for a supported registry process type."""
+
+    return _REGISTRY_PROCESS_ASSEMBLERS.get(process_type)
+
+
+def build_registry_process_config_data(
     *,
     registry: FungModRegistry,
     compatibility: ProcessCompatibilityRecord,
     fungus_id: str,
     substrate_id: str,
     environment_id: str,
-    mode: RegistryCaseConfigMode,
+    parameter_records: Mapping[str, ParameterRecord],
     output_directory: str | None,
-) -> ModelConfig:
-    if mode != "scientific":
+) -> dict[str, Any]:
+    """Build raw model-config data for a supported registry process."""
+
+    assembler = get_registry_process_assembler(compatibility.process_type)
+    if assembler is None:
         raise RegistryCaseBuildError(
-            "Homogeneous Michaelis-Menten registry assembly requires mode='scientific'."
+            "Registry case builder does not support process_type "
+            f"{compatibility.process_type!r}."
         )
-    parameter_records = _homogeneous_mm_parameters(
-        registry=registry,
-        compatibility=compatibility,
-        fungus_id=fungus_id,
-        substrate_id=substrate_id,
-        environment_id=environment_id,
-    )
     substrate = registry.get_substrate(substrate_id)
-    config_data = _homogeneous_mm_config_data(
+    return assembler.config_data_builder(
         registry=registry,
         compatibility=compatibility,
         substrate=substrate,
@@ -149,10 +142,9 @@ def _build_homogeneous_mm_config(
         parameter_records=parameter_records,
         output_directory=output_directory,
     )
-    return ModelConfig.from_mapping(config_data)
 
 
-def _select_compatibility(
+def select_registry_case_compatibility(
     *,
     registry: FungModRegistry,
     fungus_id: str,
@@ -173,44 +165,6 @@ def _select_compatibility(
     raise RegistryCaseBuildError(
         "Modelability reported a modelable case, but no compatible process "
         "record could be selected for config assembly."
-    )
-
-
-def _surface_catalysis_parameters(
-    *,
-    registry: FungModRegistry,
-    compatibility: ProcessCompatibilityRecord,
-    fungus_id: str,
-    substrate_id: str,
-    environment_id: str,
-) -> Mapping[str, ParameterRecord]:
-    return _exact_role_parameters(
-        registry=registry,
-        compatibility=compatibility,
-        fungus_id=fungus_id,
-        substrate_id=substrate_id,
-        environment_id=environment_id,
-        required_roles=SURFACE_CATALYSIS_PARAMETER_ROLES,
-        process_label="Surface-catalysis",
-    )
-
-
-def _homogeneous_mm_parameters(
-    *,
-    registry: FungModRegistry,
-    compatibility: ProcessCompatibilityRecord,
-    fungus_id: str,
-    substrate_id: str,
-    environment_id: str,
-) -> Mapping[str, ParameterRecord]:
-    return _exact_role_parameters(
-        registry=registry,
-        compatibility=compatibility,
-        fungus_id=fungus_id,
-        substrate_id=substrate_id,
-        environment_id=environment_id,
-        required_roles=HOMOGENEOUS_MM_PARAMETER_ROLES,
-        process_label="Homogeneous Michaelis-Menten",
     )
 
 
@@ -853,14 +807,36 @@ def _validate_mode(mode: str) -> None:
         )
 
 
-_PROCESS_CONFIG_BUILDERS = {
-    "surface_catalysis": _build_surface_catalysis_config,
-    "homogeneous_michaelis_menten": _build_homogeneous_mm_config,
+_REGISTRY_PROCESS_ASSEMBLERS = {
+    "surface_catalysis": RegistryProcessAssembler(
+        process_type="surface_catalysis",
+        process_label="Surface-catalysis",
+        required_parameter_roles=SURFACE_CATALYSIS_PARAMETER_ROLES,
+        deterministic_mode="toy",
+        unsupported_mode_message=(
+            "Surface-catalysis registry assembly currently only emits toy model configs."
+        ),
+        config_data_builder=_surface_catalysis_config_data,
+    ),
+    "homogeneous_michaelis_menten": RegistryProcessAssembler(
+        process_type="homogeneous_michaelis_menten",
+        process_label="Homogeneous Michaelis-Menten",
+        required_parameter_roles=HOMOGENEOUS_MM_PARAMETER_ROLES,
+        deterministic_mode="scientific",
+        unsupported_mode_message=(
+            "Homogeneous Michaelis-Menten registry assembly requires mode='scientific'."
+        ),
+        config_data_builder=_homogeneous_mm_config_data,
+    ),
 }
 
 
 __all__ = [
     "RegistryCaseBuildError",
     "RegistryCaseConfigMode",
+    "RegistryProcessAssembler",
+    "build_registry_process_config_data",
     "build_model_config_from_registry_case",
+    "get_registry_process_assembler",
+    "select_registry_case_compatibility",
 ]
