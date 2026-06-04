@@ -1,0 +1,40 @@
+kind: dataset_candidate_review
+candidate_id: resa_buckin_2011_cellobiose_hydrolysis
+name: Resa and Buckin 2011 cellobiose hydrolysis time-course candidate
+status: selected_for_schema_review
+dataset_maturity: literature_raw
+source:
+  type: literature
+  citation: Resa P, Buckin V. Ultrasonic analysis of kinetic mechanism of hydrolysis of cellobiose by beta-glucosidase. Anal Biochem. 2011;415(1):1-11.
+  doi: 10.1016/j.ab.2011.03.003
+  url: https://pubmed.ncbi.nlm.nih.gov/21385562/
+  authors:
+    - Pablo Resa
+    - Vitaly Buckin
+  year: 2011
+  notes: PubMed abstract reports real-time HR-US monitoring of cellobiose hydrolysis by Aspergillus niger beta-glucosidase at 50 C and pH 4.9, including glucose release time profiles and agreement with a discontinuous glucose assay.
+intended_use:
+  purpose: Candidate source for future beta-glucosidase/cellobiose time-course comparison after full-text data availability, units, preprocessing, and uncertainty are reviewed.
+  measured_quantities:
+    - glucose released over time
+    - reaction-rate time profile
+  model_targets:
+    - beta_D_glucose_concentration
+    - cellobiose_concentration
+  not_for:
+    - immediate data ingestion
+    - calibration before observations are extracted and units are checked
+    - whole-fungus degradation claims
+    - secretion, uptake, biomass, oxygen, PET, or cellulose morphology models
+schema_gate:
+  requires_literature_schema: true
+  requires_units: true
+  requires_uncertainty: true
+  requires_preprocessing: true
+  requires_no_real_data_in_review: true
+review:
+  selected_by: FungMod REAL-002B candidate search
+  review_date: 2026-06-04
+  schema_result: not_run
+  decision_notes: Selected for schema review only because the abstract names continuous reaction-progress and glucose-release profiles. No figure values, tables, or observations have been extracted.
+notes: Candidate review only. This file intentionally contains no observations, measurement rows, CSV paths, extracted figure data, calibrated parameters, or validation claims.

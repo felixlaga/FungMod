@@ -12,3 +12,9 @@ uncertainties are explicit, and preprocessing is documented.
 
 The current fake review fixture is a schema test only. It is not a dataset and
 must not be interpreted as evidence.
+
+The Resa and Buckin 2011 review is a real literature candidate for future
+schema review. It contains source and intended-use metadata only. It does not
+contain extracted observations and must not be used for calibration or
+validation until a separate literature dataset file is created under
+`data/experiments/literature/`.

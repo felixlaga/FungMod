@@ -19,6 +19,7 @@ from fungal_model.data import (
 ROOT = Path(__file__).resolve().parents[1]
 CANDIDATE_DIR = ROOT / "data" / "experiments" / "candidate_reviews"
 FAKE_CANDIDATE = CANDIDATE_DIR / "fake_candidate_review.yml"
+RESA_BUCKIN_CANDIDATE = CANDIDATE_DIR / "resa_buckin_2011_cellobiose_hydrolysis_review.yml"
 LITERATURE_DIR = ROOT / "data" / "experiments" / "literature"
 
 
@@ -39,6 +40,22 @@ def test_candidate_review_to_dict_is_json_safe() -> None:
 
     assert "fake_schema_candidate_only" in encoded
     assert "schema-test-only" in encoded
+
+
+def test_real_time_course_candidate_review_loads_without_observations() -> None:
+    review = load_dataset_candidate_review(RESA_BUCKIN_CANDIDATE)
+
+    assert review.candidate_id == "resa_buckin_2011_cellobiose_hydrolysis"
+    assert review.status == "selected_for_schema_review"
+    assert review.dataset_maturity == "literature_raw"
+    assert review.source["doi"] == "10.1016/j.ab.2011.03.003"
+    assert "glucose released over time" in review.intended_use["measured_quantities"]
+    assert "beta_D_glucose_concentration" in review.intended_use["model_targets"]
+    assert review.schema_gate["requires_no_real_data_in_review"] is True
+    assert "observations" not in review.raw
+    assert "measurements" not in review.raw
+    assert "csv_path" not in review.raw
+    assert review.validate().passed
 
 
 def test_missing_kind_fails_candidate_review_schema() -> None:
@@ -110,7 +127,11 @@ def test_candidate_review_requires_no_real_data_schema_gate() -> None:
 def test_candidate_review_directory_contains_only_review_files() -> None:
     files = sorted(path.name for path in CANDIDATE_DIR.iterdir() if path.is_file())
 
-    assert files == ["README.md", "fake_candidate_review.yml"]
+    assert files == [
+        "README.md",
+        "fake_candidate_review.yml",
+        "resa_buckin_2011_cellobiose_hydrolysis_review.yml",
+    ]
 
 
 def test_literature_directory_still_contains_no_real_data_files() -> None:
