@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "page": 1,
+    "page_size": 1000,
+    "total_count": 2,
+    "total_pages": 1
+  },
+  "data": [
+    {
+      "EntryID": "fixture-1",
+      "SabioReactionID": "618",
+      "ReactionEquation": "Cellobiose + H2O = 2 beta-D-Glucose",
+      "EnzymeName": "beta-glucosidase"
+    },
+    {
+      "EntryID": "fixture-2",
+      "SabioReactionID": 618,
+      "ReactionEquation": "Cellobiose + H2O = 2 beta-D-Glucose",
+      "EnzymeName": "beta-glucosidase"
+    }
+  ]
+}
