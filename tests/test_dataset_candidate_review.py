@@ -73,6 +73,21 @@ def test_real_time_course_candidate_schema_review_blocks_ingestion_until_extract
     assert "measurements" not in schema_review
 
 
+def test_real_time_course_candidate_access_review_keeps_ingestion_blocked() -> None:
+    review = load_dataset_candidate_review(RESA_BUCKIN_CANDIDATE)
+    access_review = review.raw["access_review"]
+
+    assert access_review["decision"] == "keep_candidate_blocked_do_not_ingest"
+    assert access_review["access_status"] == "no_ingestable_observations_found"
+    assert access_review["supplementary_data_status"] == "not_found_in_public_checks"
+    assert access_review["observation_extraction_status"] == "blocked"
+    assert len(access_review["sources_checked"]) >= 2
+    assert "observations" not in access_review
+    assert "measurements" not in access_review
+    assert "data_file" not in access_review
+    assert "csv_path" not in access_review
+
+
 def test_missing_kind_fails_candidate_review_schema() -> None:
     data = _fake_candidate_data()
     data.pop("kind")
