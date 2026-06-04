@@ -784,7 +784,7 @@ def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
 
 
-def _parameter_specificity(record: ParameterRecord) -> tuple[int, int]:
+def _parameter_specificity(record: ParameterRecord) -> tuple[int, int, int]:
     selector_score = sum(
         value is not None
         for value in (
@@ -795,8 +795,9 @@ def _parameter_specificity(record: ParameterRecord) -> tuple[int, int]:
             record.environment_id,
         )
     )
+    value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
     maturity_score = 1 if record.maturity == "calibrated" else 0
-    return selector_score, maturity_score
+    return selector_score, value_score, maturity_score
 
 
 def _validate_mode(mode: str) -> None:

@@ -56,6 +56,57 @@ class SabioRKSelection:
 
 
 @dataclass(frozen=True)
+class SabioRKParameterRange:
+    """Literature-derived range for one kinetic parameter in a saved export."""
+
+    parameter_symbol: str
+    parameter_type: str
+    units: str
+    lower: float
+    upper: float
+    count: int
+    entry_ids: tuple[str, ...]
+    observations: tuple[Mapping[str, Any], ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "parameter_symbol": self.parameter_symbol,
+            "parameter_type": self.parameter_type,
+            "units": self.units,
+            "lower": self.lower,
+            "upper": self.upper,
+            "count": self.count,
+            "entry_ids": list(self.entry_ids),
+            "observations": [deepcopy(dict(observation)) for observation in self.observations],
+        }
+
+
+@dataclass(frozen=True)
+class SabioRKParameterRangeReport:
+    """Curated Km/kcat range report derived from a saved SABIO-RK export."""
+
+    source_reaction_id: str
+    source_export: str
+    criteria: Mapping[str, Any]
+    ranges: Mapping[str, SabioRKParameterRange]
+    included_entry_ids: tuple[str, ...]
+    excluded_entries: tuple[Mapping[str, str], ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_reaction_id": self.source_reaction_id,
+            "source_export": self.source_export,
+            "criteria": deepcopy(dict(self.criteria)),
+            "ranges": {
+                symbol: parameter_range.to_dict()
+                for symbol, parameter_range in self.ranges.items()
+            },
+            "included_entry_ids": list(self.included_entry_ids),
+            "excluded_entries": [dict(entry) for entry in self.excluded_entries],
+        }
+
+
+@dataclass(frozen=True)
 class _Features:
     entry_id: str
     reaction_id_match: bool
@@ -187,6 +238,93 @@ def write_sabiork_selection_outputs(selection: SabioRKSelection, output_dir: str
         encoding="utf-8",
     )
     return selected_path, report_path
+
+
+def curate_reaction_618_parameter_ranges(export: SabioRKExport) -> SabioRKParameterRangeReport:
+    """Curate Km/kcat ranges from eligible local Reaction 618 kinetic-law entries."""
+
+    observations_by_symbol: dict[str, list[dict[str, Any]]] = {
+        "Km_cellobiose": [],
+        "kcat_cellobiose": [],
+    }
+    included_entry_ids: list[str] = []
+    excluded_entries: list[Mapping[str, str]] = []
+    for index, entry in enumerate(export.entries):
+        candidate = _candidate(entry, index)
+        exclusion = _range_entry_exclusion(candidate)
+        if exclusion is not None:
+            excluded_entries.append({"entry_id": candidate.features.entry_id, "reason": exclusion})
+            continue
+        parameters = _parameters(entry)
+        km = _parameter_for_type(parameters, "Km", species_contains="Cellobiose")
+        kcat = _parameter_for_type(parameters, "kcat")
+        parameter_exclusion = _paired_parameter_exclusion(km=km, kcat=kcat)
+        if parameter_exclusion is not None:
+            excluded_entries.append(
+                {"entry_id": candidate.features.entry_id, "reason": parameter_exclusion}
+            )
+            continue
+        assert km is not None
+        assert kcat is not None
+        included_entry_ids.append(candidate.features.entry_id)
+        observations_by_symbol["Km_cellobiose"].append(
+            _range_observation(
+                entry=entry,
+                features=candidate.features,
+                parameter=km,
+                parameter_symbol="Km_cellobiose",
+                parameter_type="Km",
+            )
+        )
+        observations_by_symbol["kcat_cellobiose"].append(
+            _range_observation(
+                entry=entry,
+                features=candidate.features,
+                parameter=kcat,
+                parameter_symbol="kcat_cellobiose",
+                parameter_type="kcat",
+            )
+        )
+    ranges = {
+        symbol: _parameter_range(symbol=symbol, observations=observations)
+        for symbol, observations in observations_by_symbol.items()
+    }
+    return SabioRKParameterRangeReport(
+        source_reaction_id="618",
+        source_export=str(export.path),
+        criteria={
+            "reaction_id": "618",
+            "reaction": "Cellobiose to beta-D-Glucose",
+            "enzyme_name_contains": "beta-glucosidase",
+            "ec_number": "3.2.1.21",
+            "kinetic_law_type": "Michaelis-Menten",
+            "required_parameters": ["Km_cellobiose", "kcat_cellobiose"],
+            "accepted_units": {
+                "Km_cellobiose": "mM",
+                "kcat_cellobiose": "s^(-1)",
+            },
+            "unit_conversion": "none; source start_value and unit.name are preserved",
+        },
+        ranges=ranges,
+        included_entry_ids=tuple(included_entry_ids),
+        excluded_entries=tuple(excluded_entries),
+    )
+
+
+def write_sabiork_parameter_range_report(
+    report: SabioRKParameterRangeReport,
+    output_dir: str | Path,
+) -> Path:
+    """Write a JSON-safe SABIO-RK parameter range report."""
+
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    report_path = directory / "parameter_range_summary.json"
+    report_path.write_text(
+        json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return report_path
 
 
 def _candidate(entry: Mapping[str, Any], index: int) -> _Candidate:
@@ -443,6 +581,172 @@ def _parameter_has_value_and_unit(parameter: Mapping[str, Any]) -> bool:
     return any(value.strip() not in {"", "-"} for value in unit_values)
 
 
+def _range_entry_exclusion(candidate: _Candidate) -> str | None:
+    features = candidate.features
+    if candidate.hard_rejection is not None:
+        return candidate.hard_rejection
+    if not features.reaction_id_match:
+        return "reaction_id_not_618"
+    if not features.equation_match:
+        return "reaction_equation_not_cellobiose_to_beta_D_glucose"
+    if not features.enzyme_name_match:
+        return "enzyme_name_not_beta_glucosidase"
+    if not features.ec_number_match:
+        return "ec_number_not_3_2_1_21"
+    if not features.substrate_match:
+        return "substrate_not_cellobiose"
+    if not features.product_match:
+        return "product_not_beta_D_glucose_or_glucose"
+    if features.kinetic_law_type != "Michaelis-Menten":
+        return "kinetic_law_not_plain_michaelis_menten"
+    return None
+
+
+def _parameter_for_type(
+    parameters: Sequence[Mapping[str, Any]],
+    parameter_type: str,
+    *,
+    species_contains: str | None = None,
+) -> Mapping[str, Any] | None:
+    expected = parameter_type.strip().lower()
+    for parameter in parameters:
+        if _parameter_type_name(parameter).strip().lower() != expected:
+            continue
+        if species_contains is not None and not _contains_text(
+            _text_values(parameter.get("species")),
+            species_contains,
+        ):
+            continue
+        return parameter
+    return None
+
+
+def _paired_parameter_exclusion(
+    *,
+    km: Mapping[str, Any] | None,
+    kcat: Mapping[str, Any] | None,
+) -> str | None:
+    if km is None:
+        return "missing_Km_cellobiose"
+    if kcat is None:
+        return "missing_kcat"
+    if _parameter_numeric_value(km) is None:
+        return "missing_Km_cellobiose_value"
+    if _parameter_unit_name(km) != "mM":
+        return "unsupported_Km_cellobiose_units"
+    if _parameter_numeric_value(kcat) is None:
+        return "missing_kcat_value"
+    if _parameter_unit_name(kcat) != "s^(-1)":
+        return "unsupported_kcat_units"
+    return None
+
+
+def _range_observation(
+    *,
+    entry: Mapping[str, Any],
+    features: _Features,
+    parameter: Mapping[str, Any],
+    parameter_symbol: str,
+    parameter_type: str,
+) -> dict[str, Any]:
+    publication = entry.get("publication")
+    if not isinstance(publication, Mapping):
+        publication = {}
+    value = _parameter_numeric_value(parameter)
+    if value is None:
+        raise SabioRKParseError(
+            f"Eligible entry {features.entry_id} has no numeric {parameter_symbol} value."
+        )
+    return {
+        "entry_id": features.entry_id,
+        "parameter_symbol": parameter_symbol,
+        "parameter_type": parameter_type,
+        "value": value,
+        "units": _parameter_unit_name(parameter),
+        "organism": _organism_name(entry),
+        "enzyme_name": _enzyme_name(entry),
+        "ec_number": _ec_number(entry),
+        "kinetic_law_type": features.kinetic_law_type,
+        "ph": features.ph_value,
+        "temperature": features.temperature_value,
+        "temperature_unit": features.temperature_unit,
+        "publication_id": publication.get("publication_id"),
+        "pubmed_id": publication.get("pubmed_id"),
+        "source_field": "kineticlaw.parameter[].start_value",
+    }
+
+
+def _parameter_range(
+    *,
+    symbol: str,
+    observations: Sequence[Mapping[str, Any]],
+) -> SabioRKParameterRange:
+    if not observations:
+        raise SabioRKParseError(f"No observations available for {symbol}.")
+    values = [float(observation["value"]) for observation in observations]
+    units = str(observations[0]["units"])
+    if any(str(observation["units"]) != units for observation in observations):
+        raise SabioRKParseError(f"Mixed units are not allowed for {symbol}.")
+    parameter_type = str(observations[0]["parameter_type"])
+    return SabioRKParameterRange(
+        parameter_symbol=symbol,
+        parameter_type=parameter_type,
+        units=units,
+        lower=min(values),
+        upper=max(values),
+        count=len(values),
+        entry_ids=tuple(str(observation["entry_id"]) for observation in observations),
+        observations=tuple(deepcopy(dict(observation)) for observation in observations),
+    )
+
+
+def _parameter_numeric_value(parameter: Mapping[str, Any]) -> float | None:
+    for key in ("start_value", "value"):
+        if key in parameter:
+            return _as_float(parameter[key])
+    return None
+
+
+def _parameter_unit_name(parameter: Mapping[str, Any]) -> str | None:
+    unit = parameter.get("unit", parameter.get("units"))
+    if isinstance(unit, Mapping):
+        name = unit.get("name")
+        return None if name is None else str(name)
+    if unit is None:
+        return None
+    return str(unit)
+
+
+def _first_text(values: Sequence[str]) -> str | None:
+    for value in values:
+        if value.strip():
+            return value
+    return None
+
+
+def _organism_name(entry: Mapping[str, Any]) -> str | None:
+    general = entry.get("general")
+    if isinstance(general, Mapping):
+        organism = general.get("organism")
+        if isinstance(organism, Mapping) and organism.get("name") is not None:
+            return str(organism["name"])
+    return _first_text(_field_values(entry, ("organism",)))
+
+
+def _enzyme_name(entry: Mapping[str, Any]) -> str | None:
+    enzyme_description = entry.get("enzyme_description")
+    if isinstance(enzyme_description, Mapping) and enzyme_description.get("enzyme_name") is not None:
+        return str(enzyme_description["enzyme_name"])
+    return _first_text(_field_values(entry, ("enzyme_name", "EnzymeName")))
+
+
+def _ec_number(entry: Mapping[str, Any]) -> str | None:
+    enzyme_description = entry.get("enzyme_description")
+    if isinstance(enzyme_description, Mapping) and enzyme_description.get("ec_number") is not None:
+        return str(enzyme_description["ec_number"])
+    return _first_text(_field_values(entry, ("ec_number", "ECNumber")))
+
+
 def _reference_score(entry: Mapping[str, Any]) -> int:
     publication = entry.get("publication")
     if not isinstance(publication, Mapping):
@@ -574,9 +878,13 @@ def _has_value(value: Any) -> bool:
 
 __all__ = [
     "SabioRKExport",
+    "SabioRKParameterRange",
+    "SabioRKParameterRangeReport",
     "SabioRKParseError",
     "SabioRKSelection",
+    "curate_reaction_618_parameter_ranges",
     "load_sabiork_kinlaw_export",
     "select_reaction_618_candidate",
+    "write_sabiork_parameter_range_report",
     "write_sabiork_selection_outputs",
 ]

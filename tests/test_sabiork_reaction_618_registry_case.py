@@ -118,8 +118,18 @@ def test_parameter_records_preserve_exact_and_unknown_value_specs(tmp_path: Path
     exact_parameters = {
         record.parameter_symbol: record
         for record in parameter_records
-        if record.maturity != "exploratory_prior"
+        if record.maturity == "literature_processed"
     }
+    km_range_record = _parameter_record(
+        parameter_records,
+        symbol="Km_cellobiose",
+        maturity="literature_range",
+    )
+    kcat_range_record = _parameter_record(
+        parameter_records,
+        symbol="kcat_cellobiose",
+        maturity="literature_range",
+    )
     unknown_enzyme_record = _parameter_record(
         parameter_records,
         symbol=ENZYME_CONCENTRATION_SYMBOL,
@@ -137,6 +147,16 @@ def test_parameter_records_preserve_exact_and_unknown_value_specs(tmp_path: Path
     assert exact_parameters["kcat_cellobiose"].value.kind == "exact"
     assert exact_parameters["kcat_cellobiose"].value.value == pytest.approx(0.13)
     assert exact_parameters["kcat_cellobiose"].value.units == "s^(-1)"
+    assert km_range_record.value.kind == "range"
+    assert km_range_record.value.lower == pytest.approx(0.68)
+    assert km_range_record.value.upper == pytest.approx(114.0)
+    assert km_range_record.value.units == "mM"
+    assert km_range_record.value.confidence_level == "literature_range"
+    assert kcat_range_record.value.kind == "range"
+    assert kcat_range_record.value.lower == pytest.approx(0.13)
+    assert kcat_range_record.value.upper == pytest.approx(7.17)
+    assert kcat_range_record.value.units == "s^(-1)"
+    assert kcat_range_record.value.confidence_level == "literature_range"
     assert exact_parameters["initial_cellobiose_concentration"].value.kind == "exact"
     assert exact_parameters["initial_cellobiose_concentration"].value.value == pytest.approx(3.06)
     assert exact_parameters["initial_cellobiose_concentration"].value.units == "mM"
@@ -153,6 +173,8 @@ def test_parameter_records_preserve_exact_and_unknown_value_specs(tmp_path: Path
     assert exploratory_enzyme_record.provenance["exploratory_prior"] is True
     _assert_sabiork_provenance(exact_parameters["Km_cellobiose"].provenance)
     _assert_sabiork_provenance(exact_parameters["kcat_cellobiose"].provenance)
+    _assert_sabiork_range_provenance(km_range_record.provenance)
+    _assert_sabiork_range_provenance(kcat_range_record.provenance)
     _assert_sabiork_provenance(exact_parameters["initial_cellobiose_concentration"].provenance)
     _assert_sabiork_provenance(unknown_enzyme_record.provenance)
     _assert_sabiork_provenance(exploratory_enzyme_record.provenance)
@@ -397,7 +419,10 @@ def test_reaction_618_provenance_includes_sabiork_reaction_and_selected_entry() 
     ]
 
     for record in records:
-        _assert_sabiork_provenance(record.provenance)
+        if record.maturity == "literature_range":
+            _assert_sabiork_range_provenance(record.provenance)
+        else:
+            _assert_sabiork_provenance(record.provenance)
 
 
 def _registry_with_exact_enzyme_concentration(tmp_path: Path):
@@ -451,6 +476,14 @@ def _assert_sabiork_provenance(provenance) -> None:
     assert provenance["source_database"] == "SABIO-RK"
     assert provenance["source_reaction_id"] == REACTION_ID
     assert provenance["selected_kinlaw_entry_id"] == SELECTED_ENTRY_ID
+
+
+def _assert_sabiork_range_provenance(provenance) -> None:
+    assert provenance["source_database"] == "SABIO-RK"
+    assert provenance["source_reaction_id"] == REACTION_ID
+    assert "parameter_range_report" in provenance
+    assert len(provenance["included_kinlaw_entry_ids"]) == 15
+    assert SELECTED_ENTRY_ID in provenance["included_kinlaw_entry_ids"]
 
 
 def _parameter_record(records, *, symbol: str, maturity: str):

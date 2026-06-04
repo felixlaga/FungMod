@@ -9,8 +9,10 @@ import pytest
 
 from fungal_model.data.sabiork import (
     SabioRKParseError,
+    curate_reaction_618_parameter_ranges,
     load_sabiork_kinlaw_export,
     select_reaction_618_candidate,
+    write_sabiork_parameter_range_report,
 )
 
 
@@ -123,6 +125,63 @@ def test_saved_reaction_618_export_selects_reproducible_entry() -> None:
     assert selection.selected_entry_id == "35622"
     assert selection.missing_required_fields == ()
     assert selection.warnings == ()
+
+
+def test_saved_reaction_618_export_curates_literature_km_kcat_ranges() -> None:
+    export = load_sabiork_kinlaw_export(REAL_001_RAW_EXPORT)
+
+    report = curate_reaction_618_parameter_ranges(export)
+
+    assert report.included_entry_ids == (
+        "35622",
+        "38521",
+        "38523",
+        "38524",
+        "38525",
+        "38526",
+        "38527",
+        "39780",
+        "39781",
+        "39782",
+        "39783",
+        "39784",
+        "44879",
+        "44888",
+        "60725",
+    )
+    km_range = report.ranges["Km_cellobiose"]
+    kcat_range = report.ranges["kcat_cellobiose"]
+    assert km_range.count == 15
+    assert km_range.units == "mM"
+    assert km_range.lower == pytest.approx(0.68)
+    assert km_range.upper == pytest.approx(114.0)
+    assert kcat_range.count == 15
+    assert kcat_range.units == "s^(-1)"
+    assert kcat_range.lower == pytest.approx(0.13)
+    assert kcat_range.upper == pytest.approx(7.17)
+    assert any(
+        entry["entry_id"] == "38522"
+        and entry["reason"] == "kinetic_law_not_plain_michaelis_menten"
+        for entry in report.excluded_entries
+    )
+    assert any(
+        entry["entry_id"] == "39470"
+        and entry["reason"] == "ec_number_not_3_2_1_21"
+        for entry in report.excluded_entries
+    )
+
+
+def test_parameter_range_report_write_is_json_safe(tmp_path: Path) -> None:
+    export = load_sabiork_kinlaw_export(REAL_001_RAW_EXPORT)
+    report = curate_reaction_618_parameter_ranges(export)
+
+    path = write_sabiork_parameter_range_report(report, tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    assert path.name == "parameter_range_summary.json"
+    assert payload["ranges"]["Km_cellobiose"]["lower"] == pytest.approx(0.68)
+    assert payload["ranges"]["kcat_cellobiose"]["upper"] == pytest.approx(7.17)
+    json.dumps(payload)
 
 
 def _export_with_ids(tmp_path: Path, entry_ids: tuple[str, ...]):

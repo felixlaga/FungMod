@@ -382,7 +382,8 @@ def _parameter_specificity(record: ParameterRecord, *, mode: ModelabilityMode) -
         value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
         exploratory_score = 1 if _is_exploratory_parameter_record(record) else 0
         return selector_score, value_score, exploratory_score, maturity_score
-    return selector_score, maturity_score
+    value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
+    return selector_score, value_score, maturity_score
 
 
 def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:

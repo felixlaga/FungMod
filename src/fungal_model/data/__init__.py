@@ -49,10 +49,14 @@ from fungal_model.data.kinetic_records import (
 )
 from fungal_model.data.sabiork import (
     SabioRKExport,
+    SabioRKParameterRange,
+    SabioRKParameterRangeReport,
     SabioRKParseError,
     SabioRKSelection,
+    curate_reaction_618_parameter_ranges,
     load_sabiork_kinlaw_export,
     select_reaction_618_candidate,
+    write_sabiork_parameter_range_report,
     write_sabiork_selection_outputs,
 )
 from fungal_model.data.synthetic import (
@@ -94,9 +98,12 @@ __all__ = [
     "ResidualPoint",
     "ResidualSeries",
     "SabioRKExport",
+    "SabioRKParameterRange",
+    "SabioRKParameterRangeReport",
     "SabioRKParseError",
     "SabioRKSelection",
     "SyntheticDatasetGenerationError",
+    "curate_reaction_618_parameter_ranges",
     "evaluate_model_against_dataset",
     "generate_synthetic_dataset_from_result",
     "load_dataset_candidate_review",
@@ -106,5 +113,6 @@ __all__ = [
     "select_reaction_618_candidate",
     "validate_dataset_candidate_review",
     "validate_literature_dataset_metadata",
+    "write_sabiork_parameter_range_report",
     "write_sabiork_selection_outputs",
 ]
