@@ -31,6 +31,22 @@ from fungal_model.data.literature_schema import (
     LITERATURE_MATURITIES,
     validate_literature_dataset_metadata,
 )
+from fungal_model.data.kinetic_record_loaders import (
+    KineticRecordLoadError,
+    load_kinetic_record,
+)
+from fungal_model.data.kinetic_records import (
+    KINETIC_RECORD_KIND,
+    KineticConditions,
+    KineticCuration,
+    KineticEnzyme,
+    KineticLaw,
+    KineticParameter,
+    KineticReaction,
+    KineticRecord,
+    KineticRecordError,
+    KineticReference,
+)
 from fungal_model.data.sabiork import (
     SabioRKExport,
     SabioRKParseError,
@@ -57,6 +73,17 @@ __all__ = [
     "ExperimentalConditions",
     "ExperimentalSystem",
     "GaussianNoise",
+    "KINETIC_RECORD_KIND",
+    "KineticConditions",
+    "KineticCuration",
+    "KineticEnzyme",
+    "KineticLaw",
+    "KineticParameter",
+    "KineticReaction",
+    "KineticRecord",
+    "KineticRecordError",
+    "KineticRecordLoadError",
+    "KineticReference",
     "LITERATURE_MATURITIES",
     "MeasurementPoint",
     "MeasurementSeries",
@@ -74,6 +101,7 @@ __all__ = [
     "generate_synthetic_dataset_from_result",
     "load_dataset_candidate_review",
     "load_experiment_dataset",
+    "load_kinetic_record",
     "load_sabiork_kinlaw_export",
     "select_reaction_618_candidate",
     "validate_dataset_candidate_review",
