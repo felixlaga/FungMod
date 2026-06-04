@@ -143,12 +143,14 @@ def _run_summary(config: ModelConfig, result: SimulationResult) -> dict[str, Any
 
 
 def _configured_metadata(config: ModelConfig, result: SimulationResult) -> dict[str, Any]:
+    provenance = config.raw.get("provenance", {})
     return {
         "config_name": config.name,
         "config_path": "" if config.path is None else str(config.path),
         "mode": config.mode,
         "maturity": config.maturity,
         "kind": config.kind,
+        "provenance": dict(provenance) if isinstance(provenance, Mapping) else {},
         "result_name": result.name,
         "result_label": result.label,
         "model_version": result.model_version,

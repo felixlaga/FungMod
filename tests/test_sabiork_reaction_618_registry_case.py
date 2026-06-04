@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 from typing import Any, cast
@@ -7,8 +8,14 @@ from typing import Any, cast
 import pytest
 import yaml
 
+from fungal_model.io.model_config import ModelConfig
 from fungal_model.registry import load_registry
-from fungal_model.screening import assess_modelability
+from fungal_model.screening import (
+    RegistryCaseBuildError,
+    assess_modelability,
+    build_model_config_from_registry_case,
+)
+from fungal_model.workflows import run_configured_model
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +29,7 @@ PROCESS_RECORD_ID = "beta_glucosidase_cellobiose_homogeneous_mm"
 PROCESS_TYPE = "homogeneous_michaelis_menten"
 SELECTED_ENTRY_ID = "35622"
 REACTION_ID = "618"
+ENZYME_CONCENTRATION_SYMBOL = "enzyme_concentration_beta_glucosidase"
 
 
 def test_registry_loads_reaction_618_enzyme_source_record() -> None:
@@ -88,10 +96,17 @@ def test_registry_loads_homogeneous_michaelis_menten_compatibility_record() -> N
     assert len(records) == 1
     compatibility = records[0]
     assert compatibility.record_id == PROCESS_RECORD_ID
-    assert compatibility.required_parameters == ("Km_cellobiose", "kcat_cellobiose")
+    assert compatibility.required_parameters == (
+        "Km_cellobiose",
+        "kcat_cellobiose",
+        "initial_cellobiose_concentration",
+        ENZYME_CONCENTRATION_SYMBOL,
+    )
     assert compatibility.parameter_roles == {
         "km": "Km_cellobiose",
         "kcat": "kcat_cellobiose",
+        "substrate_initial_concentration": "initial_cellobiose_concentration",
+        "enzyme_initial_concentration": ENZYME_CONCENTRATION_SYMBOL,
     }
     assert compatibility.product_map_required
     _assert_sabiork_provenance(compatibility.provenance)
@@ -110,10 +125,32 @@ def test_parameter_records_preserve_exact_and_unknown_value_specs(tmp_path: Path
     assert exact_parameters["kcat_cellobiose"].value.kind == "exact"
     assert exact_parameters["kcat_cellobiose"].value.value == pytest.approx(0.13)
     assert exact_parameters["kcat_cellobiose"].value.units == "s^(-1)"
+    assert exact_parameters["initial_cellobiose_concentration"].value.kind == "exact"
+    assert exact_parameters["initial_cellobiose_concentration"].value.value == pytest.approx(3.06)
+    assert exact_parameters["initial_cellobiose_concentration"].value.units == "mM"
+    assert exact_parameters[ENZYME_CONCENTRATION_SYMBOL].value.kind == "unknown"
+    assert exact_parameters[ENZYME_CONCENTRATION_SYMBOL].value.units == "mM"
+    assert (
+        exact_parameters[ENZYME_CONCENTRATION_SYMBOL].value.confidence_level
+        == "missing_from_selected_entry"
+    )
     _assert_sabiork_provenance(exact_parameters["Km_cellobiose"].provenance)
     _assert_sabiork_provenance(exact_parameters["kcat_cellobiose"].provenance)
+    _assert_sabiork_provenance(exact_parameters["initial_cellobiose_concentration"].provenance)
+    _assert_sabiork_provenance(exact_parameters[ENZYME_CONCENTRATION_SYMBOL].provenance)
 
-    unknown_registry = _registry_with_unknown_parameter(tmp_path, "kcat_cellobiose")
+    unknown_registry = _registry_with_parameter_values(
+        tmp_path,
+        {
+            "kcat_cellobiose": {
+                "kind": "unknown",
+                "units": "s^(-1)",
+                "source": "SABIO-RK Reaction 618 selected kinetic law",
+                "confidence_level": "missing_from_selected_entry",
+                "notes": "Parameter required by FungMod but absent in selected SABIO-RK kinetic law.",
+            }
+        },
+    )
     unknown = unknown_registry.get_parameter_records(parameter_symbol="kcat_cellobiose")[0]
 
     assert unknown.value.kind == "unknown"
@@ -121,7 +158,7 @@ def test_parameter_records_preserve_exact_and_unknown_value_specs(tmp_path: Path
     assert unknown.value.confidence_level == "missing_from_selected_entry"
 
 
-def test_reaction_618_modelability_is_modelable_when_required_parameters_are_exact() -> None:
+def test_reaction_618_modelability_is_underparameterized_when_enzyme_concentration_is_unknown() -> None:
     registry = load_registry(REGISTRY_INDEX)
 
     report = assess_modelability(
@@ -132,17 +169,52 @@ def test_reaction_618_modelability_is_modelable_when_required_parameters_are_exa
         mode="scientific",
     )
 
-    assert report.status == "modelable"
+    assert report.status == "underparameterized"
     assert report.required_processes == (PROCESS_TYPE,)
-    assert report.required_parameters == ("Km_cellobiose", "kcat_cellobiose")
+    assert report.required_parameters == (
+        "Km_cellobiose",
+        "kcat_cellobiose",
+        "initial_cellobiose_concentration",
+        ENZYME_CONCENTRATION_SYMBOL,
+    )
     assert _has_item(report.known, "parameter", "Km_cellobiose")
     assert _has_item(report.known, "parameter", "kcat_cellobiose")
+    assert _has_item(report.known, "parameter", "initial_cellobiose_concentration")
+    assert _has_item(report.missing, "parameter", ENZYME_CONCENTRATION_SYMBOL)
+    assert not report.incompatible
+
+
+def test_reaction_618_modelability_is_modelable_when_required_values_are_exact(tmp_path: Path) -> None:
+    registry = _registry_with_exact_enzyme_concentration(tmp_path)
+
+    report = assess_modelability(
+        fungus_id=FUNGUS_ID,
+        substrate_id=SUBSTRATE_ID,
+        environment_id=ENVIRONMENT_ID,
+        registry=registry,
+        mode="scientific",
+    )
+
+    assert report.status == "modelable"
+    assert _has_item(report.known, "parameter", ENZYME_CONCENTRATION_SYMBOL)
     assert not report.missing
     assert not report.incompatible
 
 
 def test_reaction_618_modelability_is_underparameterized_when_required_value_is_unknown(tmp_path: Path) -> None:
-    registry = _registry_with_unknown_parameter(tmp_path, "kcat_cellobiose")
+    registry = _registry_with_parameter_values(
+        tmp_path,
+        {
+            ENZYME_CONCENTRATION_SYMBOL: _exact_enzyme_concentration_value(),
+            "kcat_cellobiose": {
+                "kind": "unknown",
+                "units": "s^(-1)",
+                "source": "SABIO-RK Reaction 618 selected kinetic law",
+                "confidence_level": "missing_from_selected_entry",
+                "notes": "Parameter required by FungMod but absent in selected SABIO-RK kinetic law.",
+            },
+        },
+    )
 
     report = assess_modelability(
         fungus_id=FUNGUS_ID,
@@ -155,6 +227,116 @@ def test_reaction_618_modelability_is_underparameterized_when_required_value_is_
     assert report.status == "underparameterized"
     assert _has_item(report.missing, "parameter", "kcat_cellobiose")
     assert "Measure or curate kcat_cellobiose" in report.suggested_experiments[0]
+
+
+def test_builder_refuses_default_reaction_618_when_enzyme_concentration_is_unknown() -> None:
+    registry = load_registry(REGISTRY_INDEX)
+
+    with pytest.raises(RegistryCaseBuildError, match=ENZYME_CONCENTRATION_SYMBOL):
+        build_model_config_from_registry_case(
+            fungus_id=FUNGUS_ID,
+            substrate_id=SUBSTRATE_ID,
+            environment_id=ENVIRONMENT_ID,
+            registry=registry,
+            mode="scientific",
+        )
+
+
+def test_builder_emits_valid_homogeneous_michaelis_menten_config_when_required_values_are_exact(
+    tmp_path: Path,
+) -> None:
+    registry = _registry_with_exact_enzyme_concentration(tmp_path)
+
+    config = build_model_config_from_registry_case(
+        fungus_id=FUNGUS_ID,
+        substrate_id=SUBSTRATE_ID,
+        environment_id=ENVIRONMENT_ID,
+        registry=registry,
+        mode="scientific",
+        output_directory=str(tmp_path / "outputs"),
+    )
+
+    assert isinstance(config, ModelConfig)
+    assert config.mode == "scientific"
+    assert config.maturity == "scientific"
+    assert config.validate().passed
+    process = config.processes[0]
+    assert process.process_type == PROCESS_TYPE
+    assert process.parameters["km"] == "Km_cellobiose"
+    assert process.parameters["kcat"] == "kcat_cellobiose"
+    assert process.parameters["rate_units"] == "mM / second"
+    _assert_sabiork_provenance(config.to_dict()["provenance"])
+
+
+def test_built_homogeneous_michaelis_menten_config_runs_and_preserves_sabiork_metadata(
+    tmp_path: Path,
+) -> None:
+    registry = _registry_with_exact_enzyme_concentration(tmp_path)
+    config = build_model_config_from_registry_case(
+        fungus_id=FUNGUS_ID,
+        substrate_id=SUBSTRATE_ID,
+        environment_id=ENVIRONMENT_ID,
+        registry=registry,
+        mode="scientific",
+        output_directory=str(tmp_path / "outputs"),
+    )
+    config_path = tmp_path / "sabiork_reaction_618_config.yml"
+    config_path.write_text(yaml.safe_dump(config.to_dict(), sort_keys=False), encoding="utf-8")
+
+    result = run_configured_model(config_path, output_dir=tmp_path / "bundle")
+
+    substrate = result.state("cellobiose_concentration").to("mM").magnitude
+    product = result.state("beta_D_glucose_concentration").to("mM").magnitude
+    assert substrate[-1] < substrate[0]
+    assert product[-1] > product[0]
+    metadata = json.loads((tmp_path / "bundle" / "configured_metadata.json").read_text(encoding="utf-8"))
+    _assert_sabiork_provenance(metadata["provenance"])
+    assert metadata["provenance"]["parameter_record_ids"]["km"] == "sabiork_reaction_618_Km_cellobiose"
+
+
+@pytest.mark.parametrize(
+    "value_spec",
+    [
+        {
+            "kind": "range",
+            "lower": 10.0,
+            "upper": 20.0,
+            "units": "mM",
+            "source": "SABIO-RK Reaction 618 selected kinetic law",
+            "confidence_level": "literature_curated",
+            "notes": "Local range fixture for deterministic-builder refusal.",
+        },
+        {
+            "kind": "distribution",
+            "distribution": "uniform",
+            "parameters": {"lower": 10.0, "upper": 20.0},
+            "units": "mM",
+            "source": "SABIO-RK Reaction 618 selected kinetic law",
+            "confidence_level": "literature_curated",
+            "notes": "Local distribution fixture for deterministic-builder refusal.",
+        },
+    ],
+)
+def test_deterministic_builder_refuses_uncertain_required_parameters(
+    tmp_path: Path,
+    value_spec: dict[str, Any],
+) -> None:
+    registry = _registry_with_parameter_values(
+        tmp_path,
+        {
+            ENZYME_CONCENTRATION_SYMBOL: _exact_enzyme_concentration_value(),
+            "Km_cellobiose": value_spec,
+        },
+    )
+
+    with pytest.raises(RegistryCaseBuildError, match="modelability status"):
+        build_model_config_from_registry_case(
+            fungus_id=FUNGUS_ID,
+            substrate_id=SUBSTRATE_ID,
+            environment_id=ENVIRONMENT_ID,
+            registry=registry,
+            mode="scientific",
+        )
 
 
 def test_reaction_618_provenance_includes_sabiork_reaction_and_selected_entry() -> None:
@@ -176,25 +358,39 @@ def test_reaction_618_provenance_includes_sabiork_reaction_and_selected_entry() 
         _assert_sabiork_provenance(record.provenance)
 
 
-def _registry_with_unknown_parameter(tmp_path: Path, parameter_symbol: str):
+def _registry_with_exact_enzyme_concentration(tmp_path: Path):
+    return _registry_with_parameter_values(
+        tmp_path,
+        {ENZYME_CONCENTRATION_SYMBOL: _exact_enzyme_concentration_value()},
+    )
+
+
+def _registry_with_parameter_values(tmp_path: Path, values_by_symbol: dict[str, dict[str, Any]]):
     registry_dir = _copy_registry(tmp_path)
     parameters_path = registry_dir / "parameters" / "parameter_records.yml"
     data = _yaml_mapping(parameters_path)
     records = cast(list[dict[str, Any]], data["records"])
+    missing = set(values_by_symbol)
     for record in records:
-        if record.get("parameter_symbol") == parameter_symbol and record.get("process_type") == PROCESS_TYPE:
-            record["value"] = {
-                "kind": "unknown",
-                "units": record["value"]["units"],
-                "source": "SABIO-RK Reaction 618 selected kinetic law",
-                "confidence_level": "missing_from_selected_entry",
-                "notes": "Parameter required by FungMod but absent in selected SABIO-RK kinetic law.",
-            }
-            break
-    else:
-        raise AssertionError(f"Missing parameter record {parameter_symbol}")
+        symbol = record.get("parameter_symbol")
+        if symbol in values_by_symbol and record.get("process_type") == PROCESS_TYPE:
+            record["value"] = values_by_symbol[str(symbol)]
+            missing.discard(str(symbol))
+    if missing:
+        raise AssertionError(f"Missing parameter record(s): {sorted(missing)}")
     parameters_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return load_registry(registry_dir / "registry_index.yml")
+
+
+def _exact_enzyme_concentration_value() -> dict[str, Any]:
+    return {
+        "kind": "exact",
+        "value": 0.01,
+        "units": "mM",
+        "source": "Local deterministic enzyme concentration fixture",
+        "confidence_level": "synthetic_control",
+        "notes": "Used only to exercise homogeneous builder mechanics; not a SABIO-RK value.",
+    }
 
 
 def _copy_registry(tmp_path: Path) -> Path:

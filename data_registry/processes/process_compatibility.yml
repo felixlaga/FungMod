@@ -41,8 +41,12 @@ records:
     required_parameters:
       - Km_cellobiose
       - kcat_cellobiose
+      - initial_cellobiose_concentration
+      - enzyme_concentration_beta_glucosidase
     parameter_roles:
       km: Km_cellobiose
       kcat: kcat_cellobiose
+      substrate_initial_concentration: initial_cellobiose_concentration
+      enzyme_initial_concentration: enzyme_concentration_beta_glucosidase
     product_map_required: true
     notes: First non-toy homogeneous enzyme-kinetics compatibility record.

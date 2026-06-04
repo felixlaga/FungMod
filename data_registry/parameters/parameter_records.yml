@@ -189,3 +189,50 @@ records:
       confidence_level: literature_curated
       notes: Curated from SABIO-RK. Original value and units preserved in kinetic_record.yml.
     notes: kcat for selected SABIO-RK EntryID 35622.
+
+  - record_id: sabiork_reaction_618_initial_cellobiose_concentration
+    name: SABIO-RK Reaction 618 initial cellobiose concentration
+    maturity: literature_processed
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+      selected_raw_entry: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/selected_kinlaw_entry_35622.json
+    parameter_symbol: initial_cellobiose_concentration
+    process_type: homogeneous_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: sabiork_beta_glucosidase_source
+    substrate_id: cellobiose
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: exact
+      value: 3.06
+      units: mM
+      source: SABIO-RK Reaction 618 selected kinetic law
+      confidence_level: literature_curated
+      notes: Raw kinetic-law variable S start_value for Cellobiose; end_value 76.5 mM is preserved only in the raw local snapshot.
+    notes: Initial Cellobiose concentration from selected SABIO-RK EntryID 35622 kinetic-law variable S.
+
+  - record_id: sabiork_reaction_618_enzyme_concentration_beta_glucosidase
+    name: SABIO-RK Reaction 618 beta-glucosidase concentration
+    maturity: literature_processed
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+      selected_raw_entry: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/selected_kinlaw_entry_35622.json
+    parameter_symbol: enzyme_concentration_beta_glucosidase
+    process_type: homogeneous_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: sabiork_beta_glucosidase_source
+    substrate_id: cellobiose
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: unknown
+      units: mM
+      source: SABIO-RK Reaction 618 selected kinetic law
+      confidence_level: missing_from_selected_entry
+      notes: Raw kinetic-law variable E has null start_value and unit '-' in the selected local snapshot.
+    notes: Required enzyme concentration for enzyme-explicit homogeneous Michaelis-Menten assembly is absent from selected SABIO-RK EntryID 35622.

@@ -33,3 +33,11 @@ enzyme-only soluble kinetic pilot; they are not a whole-fungus degradation
 model and do not imply secretion, uptake, biomass growth, oxygen limitation,
 PET chemistry, or cellulose surface morphology. Do not treat the toy records
 in this folder as empirical fungal, substrate, enzyme, or environmental data.
+
+The Reaction 618 homogeneous Michaelis-Menten compatibility requires exact
+Km, kcat, initial cellobiose concentration, and enzyme concentration records
+for deterministic assembly. The selected local SABIO-RK entry provides exact
+Km, kcat, and Cellobiose variable `S` start concentration, but the enzyme
+variable `E` has no start value. FungMod therefore stores the enzyme
+concentration as an explicit `unknown` `ValueSpec` and reports the default
+case as underparameterized rather than inventing a value.
