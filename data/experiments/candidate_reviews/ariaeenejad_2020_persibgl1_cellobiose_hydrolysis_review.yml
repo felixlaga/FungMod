@@ -42,8 +42,8 @@ schema_gate:
 review:
   selected_by: FungMod REAL-002E alternate candidate search
   review_date: 2026-06-05
-  schema_result: blocked_pending_digitization_and_time_unit_review
-  decision_notes: Selected as a public open-access alternative because it identifies a specific cellobiose hydrolysis time-course figure and assay conditions. It is blocked from ingestion because no machine-readable observation table was found, Figure 6 has not been digitized, uncertainty is not defined, and the text contains a time-unit inconsistency that must be resolved before creating an ExperimentDataset.
+  schema_result: blocked_time_axis_conflict
+  decision_notes: Selected as a public open-access alternative because it identifies a specific cellobiose hydrolysis time-course figure and assay conditions. REAL-002F keeps it blocked from ingestion and digitization because source text conflicts on the Figure 6 time axis, no machine-readable observation table was found, Figure 6 has not been digitized, and uncertainty is not defined.
 schema_review:
   review_type: literature_metadata_pre_ingestion
   reviewed_by: FungMod REAL-002E alternate-source schema review
@@ -102,4 +102,37 @@ access_review:
   decision: select_candidate_for_schema_review_do_not_ingest
   decision_notes: This alternate candidate is public and has a specific Figure 6 time-course target, but it is still not an ingested dataset because no local observation rows, CSV, uncertainty policy, or digitization metadata exist.
   next_action: Perform a dedicated Figure 6 digitization review or keep searching for a source with tabular or downloadable time-course observations.
+digitization_review:
+  review_type: figure_time_axis_pre_digitization_decision
+  reviewed_by: FungMod REAL-002F digitization gate
+  review_date: 2026-06-05
+  figure_or_table: Figure 6
+  sources_checked:
+    - name: Frontiers method text
+      url: https://www.frontiersin.org/journals/bioengineering-and-biotechnology/articles/10.3389/fbioe.2020.00813/full
+      result: Cellobiose hydrolysis method states samples were collected in 24-h intervals until 380 h.
+    - name: Frontiers result text
+      url: https://www.frontiersin.org/journals/bioengineering-and-biotechnology/articles/10.3389/fbioe.2020.00813/full
+      result: Result paragraph states final glucose concentration and says conversion reaches zero after 380 min.
+    - name: Frontiers Figure 6 caption
+      url: https://www.frontiersin.org/journals/bioengineering-and-biotechnology/articles/10.3389/fbioe.2020.00813/full
+      result: Figure 6 caption describes glucose yield after 380 h of biodegradation period.
+    - name: Frontiers result follow-up sentence
+      url: https://www.frontiersin.org/journals/bioengineering-and-biotechnology/articles/10.3389/fbioe.2020.00813/full
+      result: Result paragraph also describes glucose from 1 h to 380 h and little change after 300 h.
+  time_axis_resolution: unresolved_source_conflict
+  conflict_summary:
+    hour_based_evidence:
+      - method says 24-h intervals until 380 h
+      - Figure 6 caption says 380 h
+      - result text says from 1 h to 380 h
+      - result text says glucose did not decrease significantly after 300 h
+    minute_based_evidence:
+      - result text says conversion reaches zero after 380 min
+  digitization_status: blocked_do_not_digitize
+  experiment_dataset_decision: do_not_create
+  decision: blocked_time_axis_conflict_do_not_ingest
+  decision_notes: The repository cannot safely digitize Figure 6 or create a literature_raw ExperimentDataset while the source text contains conflicting time-axis units. Choosing hours by majority evidence would be an inference, not source-resolved metadata.
+  data_added: none
+  next_action: Seek author-supplied raw data, an erratum, a figure image with unambiguous axis labels, or a different source with tabular or machine-readable time-course observations.
 notes: Candidate review only. This file intentionally contains no observations, measurement rows, CSV paths, extracted figure data, calibrated parameters, or validation claims.

@@ -19,5 +19,6 @@ supplementary data.
 
 The Ariaeenejad 2020 PersiBGL1 review is a public open-access alternate
 candidate with a specific cellobiose hydrolysis figure target. It is still a
-review only: Figure 6 has not been digitized, the time-axis unit must be
-resolved, and no extracted observations have been added.
+review only: REAL-002F found unresolved source-text conflict in the Figure 6
+time axis, so the figure has not been digitized and no extracted observations
+have been added.

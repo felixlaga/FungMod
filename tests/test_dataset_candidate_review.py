@@ -98,7 +98,7 @@ def test_alternate_public_time_course_candidate_loads_without_observations() -> 
     assert review.status == "selected_for_schema_review"
     assert review.dataset_maturity == "literature_raw"
     assert review.source["doi"] == "10.3389/fbioe.2020.00813"
-    assert review.review["schema_result"] == "blocked_pending_digitization_and_time_unit_review"
+    assert review.review["schema_result"] == "blocked_time_axis_conflict"
     assert "glucose yield over time from cellobiose hydrolysis" in review.intended_use[
         "measured_quantities"
     ]
@@ -136,6 +136,26 @@ def test_alternate_public_candidate_requires_digitization_before_ingestion() -> 
     assert "measurements" not in schema_review
     assert "observations" not in access_review
     assert "measurements" not in access_review
+
+
+def test_alternate_public_candidate_digitization_review_blocks_time_axis_conflict() -> None:
+    review = load_dataset_candidate_review(ARIAEENEJAD_CANDIDATE)
+    digitization_review = review.raw["digitization_review"]
+    conflict_summary = digitization_review["conflict_summary"]
+
+    assert digitization_review["decision"] == "blocked_time_axis_conflict_do_not_ingest"
+    assert digitization_review["time_axis_resolution"] == "unresolved_source_conflict"
+    assert digitization_review["digitization_status"] == "blocked_do_not_digitize"
+    assert digitization_review["experiment_dataset_decision"] == "do_not_create"
+    assert digitization_review["data_added"] == "none"
+    assert "method says 24-h intervals until 380 h" in conflict_summary["hour_based_evidence"]
+    assert "result text says conversion reaches zero after 380 min" in conflict_summary[
+        "minute_based_evidence"
+    ]
+    assert "observations" not in digitization_review
+    assert "measurements" not in digitization_review
+    assert "data_file" not in digitization_review
+    assert "csv_path" not in digitization_review
 
 
 def test_missing_kind_fails_candidate_review_schema() -> None:
