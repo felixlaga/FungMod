@@ -31,3 +31,27 @@ records:
         confidence_level: testing
         notes: Oxygen is intentionally not represented in this toy R1 registry case.
     notes: Toy/development environment only; not empirical data.
+
+  - record_id: sabiork_reaction_618_selected_conditions
+    name: SABIO-RK Reaction 618 selected assay conditions
+    maturity: literature_processed
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: SABIO-RK Reaction 618 selected kinetic law
+        confidence_level: literature_curated
+        notes: Converted from original SABIO-RK temperature; original stored in KineticRecord.
+      ph:
+        kind: exact
+        value: 5.0
+        units: dimensionless
+        source: SABIO-RK Reaction 618 selected kinetic law
+        confidence_level: literature_curated
+        notes: SABIO-RK assay pH.
+    notes: Assay conditions for first real kinetic pilot.

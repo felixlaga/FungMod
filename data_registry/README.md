@@ -1,8 +1,8 @@
-# FungMod Toy Registry
+# FungMod Registry
 
-This registry is not a biological database. The current records are
-toy/development fixtures used to test registry loading, exact values, ranges,
-distributions, unknowns, and categorical compatibility records.
+This registry is not a biological database. It contains toy/development
+fixtures used to test registry loading and the first curated external
+enzyme-kinetics pilot for SABIO-RK Reaction 618.
 
 The registry layer is intended to support future modelability assessment and
 plug-and-play screening. It separates categorical facts, such as enzyme class
@@ -16,7 +16,7 @@ without introducing a substrate-specific workflow.
 
 Exploratory registry screens may sample `range` and `distribution` value specs
 to generate toy configured-model runs. These ensembles are uncertainty plumbing
-tests only unless the records have later been curated as real scientific data.
+tests only unless records explicitly carry curated scientific provenance.
 
 Value specifications may be:
 
@@ -26,7 +26,10 @@ Value specifications may be:
 - `unknown`: expected units may be known, but the value is not;
 - `not_applicable`: explicitly irrelevant, with notes explaining why.
 
-Real registry records will require provenance, literature metadata schema
+Curated registry records require provenance, literature metadata schema
 validation where paper-derived evidence is used, and review before they are
-added. Do not treat the toy records in this folder as empirical fungal,
-substrate, enzyme, or environmental data.
+used as scientific evidence. The SABIO-RK Reaction 618 records are an
+enzyme-only soluble kinetic pilot; they are not a whole-fungus degradation
+model and do not imply secretion, uptake, biomass growth, oxygen limitation,
+PET chemistry, or cellulose surface morphology. Do not treat the toy records
+in this folder as empirical fungal, substrate, enzyme, or environmental data.

@@ -141,3 +141,51 @@ records:
       confidence_level: testing
       notes: Artificial exact accessible surface area for case-builder tests only.
     notes: Toy/development parameter only; not empirical.
+
+  - record_id: sabiork_reaction_618_Km_cellobiose
+    name: SABIO-RK Reaction 618 Km for cellobiose
+    maturity: literature_processed
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+      kinetic_record: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/curated/kinetic_record.yml
+    parameter_symbol: Km_cellobiose
+    process_type: homogeneous_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: sabiork_beta_glucosidase_source
+    substrate_id: cellobiose
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: exact
+      value: 15.3
+      units: mM
+      source: SABIO-RK Reaction 618 selected kinetic law
+      confidence_level: literature_curated
+      notes: Curated from SABIO-RK. Original value and units preserved in kinetic_record.yml.
+    notes: Km for Cellobiose from selected SABIO-RK EntryID 35622.
+
+  - record_id: sabiork_reaction_618_kcat_cellobiose
+    name: SABIO-RK Reaction 618 kcat for cellobiose
+    maturity: literature_processed
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+      kinetic_record: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/curated/kinetic_record.yml
+    parameter_symbol: kcat_cellobiose
+    process_type: homogeneous_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: sabiork_beta_glucosidase_source
+    substrate_id: cellobiose
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: exact
+      value: 0.13
+      units: "s^(-1)"
+      source: SABIO-RK Reaction 618 selected kinetic law
+      confidence_level: literature_curated
+      notes: Curated from SABIO-RK. Original value and units preserved in kinetic_record.yml.
+    notes: kcat for selected SABIO-RK EntryID 35622.

@@ -25,3 +25,24 @@ records:
       accessible_surface_area: A_surface_exact
     product_map_required: true
     notes: Toy/development compatibility only; not a scientific process rule.
+
+  - record_id: beta_glucosidase_cellobiose_homogeneous_mm
+    name: beta-glucosidase on cellobiose homogeneous Michaelis-Menten
+    maturity: literature_metadata
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    required_bond_classes:
+      - beta_1_4_glycosidic
+    process_type: homogeneous_michaelis_menten
+    required_parameters:
+      - Km_cellobiose
+      - kcat_cellobiose
+    parameter_roles:
+      km: Km_cellobiose
+      kcat: kcat_cellobiose
+    product_map_required: true
+    notes: First non-toy homogeneous enzyme-kinetics compatibility record.

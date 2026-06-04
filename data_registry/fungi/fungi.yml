@@ -13,3 +13,18 @@ records:
     assimilable_products:
       - toy_sugar_product
     notes: Toy/development record only; not a real fungus or literature capability.
+
+  - record_id: sabiork_beta_glucosidase_source
+    name: SABIO-RK Reaction 618 beta-glucosidase source
+    maturity: literature_processed
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+    enzyme_classes:
+      - beta_glucosidase
+    assimilable_products: []
+    notes: >
+      Enzyme-source pseudo-record for a purified or recombinant enzyme
+      kinetics case. This is not a whole-fungus growth model and must not imply
+      secretion, uptake, biomass growth, or organism-level degradation.

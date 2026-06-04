@@ -31,3 +31,21 @@ records:
         confidence_level: testing
         notes: Artificial exact value for registry loader tests only.
     notes: Toy/development substrate only; not real cellulose data.
+
+  - record_id: cellobiose
+    name: Cellobiose
+    maturity: literature_metadata
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+      kegg_reaction: R00026
+      metanetx: MNXR146826
+    substrate_class: cellobiose
+    physical_state: dissolved
+    bond_classes:
+      - beta_1_4_glycosidic
+    products:
+      - beta_D_glucose
+    properties: {}
+    notes: Soluble disaccharide substrate for first SABIO-RK kinetic pilot.
