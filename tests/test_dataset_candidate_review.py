@@ -49,6 +49,7 @@ def test_real_time_course_candidate_review_loads_without_observations() -> None:
     assert review.status == "selected_for_schema_review"
     assert review.dataset_maturity == "literature_raw"
     assert review.source["doi"] == "10.1016/j.ab.2011.03.003"
+    assert review.review["schema_result"] == "blocked_missing_extraction_metadata"
     assert "glucose released over time" in review.intended_use["measured_quantities"]
     assert "beta_D_glucose_concentration" in review.intended_use["model_targets"]
     assert review.schema_gate["requires_no_real_data_in_review"] is True
@@ -56,6 +57,20 @@ def test_real_time_course_candidate_review_loads_without_observations() -> None:
     assert "measurements" not in review.raw
     assert "csv_path" not in review.raw
     assert review.validate().passed
+
+
+def test_real_time_course_candidate_schema_review_blocks_ingestion_until_extracted() -> None:
+    review = load_dataset_candidate_review(RESA_BUCKIN_CANDIDATE)
+    schema_review = review.raw["schema_review"]
+
+    assert schema_review["decision"] == "blocked_do_not_ingest"
+    assert "figure_or_table identifier for extractable observations" in schema_review[
+        "missing_for_experiment_dataset"
+    ]
+    assert "machine-readable observation CSV" in schema_review["missing_for_experiment_dataset"]
+    assert "full text or supplementary data" in schema_review["next_action"]
+    assert "observations" not in schema_review
+    assert "measurements" not in schema_review
 
 
 def test_missing_kind_fails_candidate_review_schema() -> None:

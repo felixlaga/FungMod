@@ -35,6 +35,35 @@ schema_gate:
 review:
   selected_by: FungMod REAL-002B candidate search
   review_date: 2026-06-04
-  schema_result: not_run
-  decision_notes: Selected for schema review only because the abstract names continuous reaction-progress and glucose-release profiles. No figure values, tables, or observations have been extracted.
+  schema_result: blocked_missing_extraction_metadata
+  decision_notes: Selected for schema review because the abstract names continuous reaction-progress and glucose-release profiles, but blocked from ingestion because no figure/table values, digitization metadata, uncertainty definition, or preprocessing record has been extracted.
+schema_review:
+  review_type: literature_metadata_pre_ingestion
+  reviewed_by: FungMod REAL-002C literature-schema review
+  review_date: 2026-06-04
+  evidence_checked:
+    - PubMed metadata and abstract at https://pubmed.ncbi.nlm.nih.gov/21385562/
+    - DOI metadata link 10.1016/j.ab.2011.03.003
+    - Repository literature-data contract in data/experiments/literature/README.md
+  available_metadata:
+    - citation
+    - DOI
+    - authors
+    - year
+    - organism and enzyme from abstract
+    - substrate and glucose-release time-profile description from abstract
+    - assay temperature and pH from abstract
+  missing_for_experiment_dataset:
+    - figure_or_table identifier for extractable observations
+    - extraction_method and extraction_tool
+    - extracted_by and extraction_date for observation values
+    - raw time and value units for extracted rows
+    - uncertainty definition for extracted observations
+    - digitization, table, or supplementary-data provenance
+    - unit-conversion notes
+    - preprocessing steps and excluded-point decisions
+    - machine-readable observation CSV
+  decision: blocked_do_not_ingest
+  decision_notes: The source remains promising, but the repository should not create an ExperimentDataset until the full text or supplementary material is reviewed and numeric observations can be extracted with explicit units, uncertainty policy, and preprocessing provenance.
+  next_action: Obtain the full text or supplementary data, identify the exact figure/table containing glucose release or reaction progress over time, then create a literature_raw ExperimentDataset only if all required metadata fields can be completed.
 notes: Candidate review only. This file intentionally contains no observations, measurement rows, CSV paths, extracted figure data, calibrated parameters, or validation claims.
