@@ -20,6 +20,9 @@ ROOT = Path(__file__).resolve().parents[1]
 CANDIDATE_DIR = ROOT / "data" / "experiments" / "candidate_reviews"
 FAKE_CANDIDATE = CANDIDATE_DIR / "fake_candidate_review.yml"
 RESA_BUCKIN_CANDIDATE = CANDIDATE_DIR / "resa_buckin_2011_cellobiose_hydrolysis_review.yml"
+ARIAEENEJAD_CANDIDATE = (
+    CANDIDATE_DIR / "ariaeenejad_2020_persibgl1_cellobiose_hydrolysis_review.yml"
+)
 LITERATURE_DIR = ROOT / "data" / "experiments" / "literature"
 
 
@@ -86,6 +89,53 @@ def test_real_time_course_candidate_access_review_keeps_ingestion_blocked() -> N
     assert "measurements" not in access_review
     assert "data_file" not in access_review
     assert "csv_path" not in access_review
+
+
+def test_alternate_public_time_course_candidate_loads_without_observations() -> None:
+    review = load_dataset_candidate_review(ARIAEENEJAD_CANDIDATE)
+
+    assert review.candidate_id == "ariaeenejad_2020_persibgl1_cellobiose_hydrolysis"
+    assert review.status == "selected_for_schema_review"
+    assert review.dataset_maturity == "literature_raw"
+    assert review.source["doi"] == "10.3389/fbioe.2020.00813"
+    assert review.review["schema_result"] == "blocked_pending_digitization_and_time_unit_review"
+    assert "glucose yield over time from cellobiose hydrolysis" in review.intended_use[
+        "measured_quantities"
+    ]
+    assert review.schema_gate["requires_no_real_data_in_review"] is True
+    assert "observations" not in review.raw
+    assert "measurements" not in review.raw
+    assert "data_file" not in review.raw
+    assert "csv_path" not in review.raw
+    assert review.validate().passed
+
+
+def test_alternate_public_candidate_requires_digitization_before_ingestion() -> None:
+    review = load_dataset_candidate_review(ARIAEENEJAD_CANDIDATE)
+    schema_review = review.raw["schema_review"]
+    access_review = review.raw["access_review"]
+    missing = schema_review["missing_for_experiment_dataset"]
+
+    assert schema_review["decision"] == "blocked_do_not_ingest"
+    assert schema_review["extractable_source"]["figure_or_table"] == "Figure 6"
+    assert "digitized time and glucose-yield rows from Figure 6" in missing
+    assert (
+        "resolved time-axis unit because method/caption use hours while nearby result text also says 380 min"
+        in missing
+    )
+    assert access_review["decision"] == "select_candidate_for_schema_review_do_not_ingest"
+    assert access_review["access_status"] == "public_full_text_has_digitizable_figure"
+    assert access_review["full_text_status"] == "open_access_html_and_pdf_available"
+    assert access_review["supplementary_data_status"] == (
+        "no_machine_readable_time_course_identified"
+    )
+    assert access_review["observation_extraction_status"] == (
+        "blocked_pending_digitization_and_time_unit_resolution"
+    )
+    assert "observations" not in schema_review
+    assert "measurements" not in schema_review
+    assert "observations" not in access_review
+    assert "measurements" not in access_review
 
 
 def test_missing_kind_fails_candidate_review_schema() -> None:
@@ -159,6 +209,7 @@ def test_candidate_review_directory_contains_only_review_files() -> None:
 
     assert files == [
         "README.md",
+        "ariaeenejad_2020_persibgl1_cellobiose_hydrolysis_review.yml",
         "fake_candidate_review.yml",
         "resa_buckin_2011_cellobiose_hydrolysis_review.yml",
     ]

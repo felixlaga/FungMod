@@ -13,8 +13,11 @@ uncertainties are explicit, and preprocessing is documented.
 The current fake review fixture is a schema test only. It is not a dataset and
 must not be interpreted as evidence.
 
-The Resa and Buckin 2011 review is a real literature candidate for future
-schema review. It contains source and intended-use metadata only. It does not
-contain extracted observations and must not be used for calibration or
-validation until a separate literature dataset file is created under
-`data/experiments/literature/`.
+The Resa and Buckin 2011 review is a real literature candidate that remains
+blocked because public checks did not find ingestible observations or
+supplementary data.
+
+The Ariaeenejad 2020 PersiBGL1 review is a public open-access alternate
+candidate with a specific cellobiose hydrolysis figure target. It is still a
+review only: Figure 6 has not been digitized, the time-axis unit must be
+resolved, and no extracted observations have been added.
