@@ -31,6 +31,14 @@ from fungal_model.data.literature_schema import (
     LITERATURE_MATURITIES,
     validate_literature_dataset_metadata,
 )
+from fungal_model.data.sabiork import (
+    SabioRKExport,
+    SabioRKParseError,
+    SabioRKSelection,
+    load_sabiork_kinlaw_export,
+    select_reaction_618_candidate,
+    write_sabiork_selection_outputs,
+)
 from fungal_model.data.synthetic import (
     GaussianNoise,
     SyntheticDatasetGenerationError,
@@ -58,11 +66,17 @@ __all__ = [
     "PreprocessingRecord",
     "ResidualPoint",
     "ResidualSeries",
+    "SabioRKExport",
+    "SabioRKParseError",
+    "SabioRKSelection",
     "SyntheticDatasetGenerationError",
     "evaluate_model_against_dataset",
     "generate_synthetic_dataset_from_result",
     "load_dataset_candidate_review",
     "load_experiment_dataset",
+    "load_sabiork_kinlaw_export",
+    "select_reaction_618_candidate",
     "validate_dataset_candidate_review",
     "validate_literature_dataset_metadata",
+    "write_sabiork_selection_outputs",
 ]

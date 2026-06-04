@@ -1,0 +1,180 @@
+{
+  "meta": {
+    "page": 1,
+    "page_size": 1000,
+    "total_count": 5,
+    "total_pages": 1
+  },
+  "data": [
+    {
+      "id": "unrelated_enzyme",
+      "reaction": {
+        "id": 618,
+        "equation": "Cellobiose + H2O = 2 beta-D-Glucose",
+        "species": [
+          {"role": "Substrate", "compound": {"name": "Cellobiose"}},
+          {"role": "Product", "compound": {"name": "beta-D-Glucose"}}
+        ]
+      },
+      "enzyme_description": {
+        "enzyme_name": "beta-mannosidase",
+        "ec_number": "3.2.1.25",
+        "wildtype": "Wildtype"
+      },
+      "experimental_conditions": {
+        "envvar_ph": {"start_value": 5},
+        "envvar_temperature": {"start_value": 30, "unit": "C"}
+      },
+      "kineticlaw": {
+        "kinlaw_type": {"name": "Michaelis-Menten"},
+        "parameter": [
+          {"type": {"name": "Km"}, "start_value": 2.0, "unit": {"name": "mM"}, "species": {"species_key": "Cellobiose"}},
+          {"type": {"name": "kcat"}, "start_value": 1.0, "unit": {"name": "s^(-1)"}}
+        ]
+      },
+      "publication": {
+        "pubmed_id": "1",
+        "title": "Fixture title",
+        "year": 2026,
+        "journal": "Fixture journal",
+        "author": ["Fixture Author"]
+      }
+    },
+    {
+      "id": "wrong_ec",
+      "reaction": {
+        "id": 618,
+        "equation": "Cellobiose + H2O = 2 beta-D-Glucose",
+        "species": [
+          {"role": "Substrate", "compound": {"name": "Cellobiose"}},
+          {"role": "Product", "compound": {"name": "beta-D-Glucose"}}
+        ]
+      },
+      "enzyme_description": {
+        "enzyme_name": "beta-glucosidase",
+        "ec_number": "3.2.1.74",
+        "wildtype": "Wildtype"
+      },
+      "experimental_conditions": {
+        "envvar_ph": {"start_value": 5},
+        "envvar_temperature": {"start_value": 30, "unit": "C"}
+      },
+      "kineticlaw": {
+        "kinlaw_type": {"name": "Michaelis-Menten"},
+        "parameter": [
+          {"type": {"name": "Km"}, "start_value": 2.0, "unit": {"name": "mM"}, "species": {"species_key": "Cellobiose"}},
+          {"type": {"name": "kcat"}, "start_value": 1.0, "unit": {"name": "s^(-1)"}}
+        ]
+      },
+      "publication": {
+        "pubmed_id": "1",
+        "title": "Fixture title",
+        "year": 2026,
+        "journal": "Fixture journal",
+        "author": ["Fixture Author"]
+      }
+    },
+    {
+      "id": "ph_dependent",
+      "reaction": {
+        "id": 618,
+        "equation": "Cellobiose + H2O = 2 beta-D-Glucose",
+        "species": [
+          {"role": "Substrate", "compound": {"name": "Cellobiose"}},
+          {"role": "Product", "compound": {"name": "beta-D-Glucose"}}
+        ]
+      },
+      "enzyme_description": {
+        "enzyme_name": "beta-glucosidase",
+        "ec_number": "3.2.1.21",
+        "wildtype": "Wildtype"
+      },
+      "experimental_conditions": {
+        "envvar_ph": {"start_value": 5},
+        "envvar_temperature": {"start_value": 30, "unit": "C"}
+      },
+      "kineticlaw": {
+        "kinlaw_type": {"name": "Michaelis-Menten (pH-dependent)"},
+        "parameter": [
+          {"type": {"name": "Km"}, "start_value": 2.0, "unit": {"name": "mM"}, "species": {"species_key": "Cellobiose"}},
+          {"type": {"name": "kcat"}, "start_value": 1.0, "unit": {"name": "s^(-1)"}}
+        ]
+      },
+      "publication": {
+        "pubmed_id": "1",
+        "title": "Fixture title",
+        "year": 2026,
+        "journal": "Fixture journal",
+        "author": ["Fixture Author"]
+      }
+    },
+    {
+      "id": "mutant_plain",
+      "reaction": {
+        "id": 618,
+        "equation": "Cellobiose + H2O = 2 beta-D-Glucose",
+        "species": [
+          {"role": "Substrate", "compound": {"name": "Cellobiose"}},
+          {"role": "Product", "compound": {"name": "beta-D-Glucose"}}
+        ]
+      },
+      "enzyme_description": {
+        "enzyme_name": "beta-glucosidase",
+        "ec_number": "3.2.1.21",
+        "wildtype": "Mutant"
+      },
+      "experimental_conditions": {
+        "envvar_ph": {"start_value": 5},
+        "envvar_temperature": {"start_value": 30, "unit": "C"}
+      },
+      "kineticlaw": {
+        "kinlaw_type": {"name": "Michaelis-Menten"},
+        "parameter": [
+          {"type": {"name": "Km"}, "start_value": 2.0, "unit": {"name": "mM"}, "species": {"species_key": "Cellobiose"}},
+          {"type": {"name": "kcat"}, "start_value": 1.0, "unit": {"name": "s^(-1)"}}
+        ]
+      },
+      "publication": {
+        "pubmed_id": "1",
+        "title": "Fixture title",
+        "year": 2026,
+        "journal": "Fixture journal",
+        "author": ["Fixture Author"]
+      }
+    },
+    {
+      "id": "selected_wildtype",
+      "reaction": {
+        "id": 618,
+        "equation": "Cellobiose + H2O = 2 beta-D-Glucose",
+        "species": [
+          {"role": "Substrate", "compound": {"name": "Cellobiose"}},
+          {"role": "Product", "compound": {"name": "beta-D-Glucose"}}
+        ]
+      },
+      "enzyme_description": {
+        "enzyme_name": "beta-glucosidase",
+        "ec_number": "3.2.1.21",
+        "wildtype": "Wildtype"
+      },
+      "experimental_conditions": {
+        "envvar_ph": {"start_value": 5},
+        "envvar_temperature": {"start_value": 30, "unit": "C"}
+      },
+      "kineticlaw": {
+        "kinlaw_type": {"name": "Michaelis-Menten"},
+        "parameter": [
+          {"type": {"name": "Km"}, "start_value": 2.0, "unit": {"name": "mM"}, "species": {"species_key": "Cellobiose"}},
+          {"type": {"name": "kcat"}, "start_value": 1.0, "unit": {"name": "s^(-1)"}}
+        ]
+      },
+      "publication": {
+        "pubmed_id": "1",
+        "title": "Fixture title",
+        "year": 2026,
+        "journal": "Fixture journal",
+        "author": ["Fixture Author"]
+      }
+    }
+  ]
+}
