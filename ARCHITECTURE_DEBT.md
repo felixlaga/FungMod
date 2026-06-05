@@ -1,4 +1,4 @@
-# Architecture Debt Register
+# Architecture Debt Register:
 
 This file is a containment mechanism, not permission to take shortcuts.
 
