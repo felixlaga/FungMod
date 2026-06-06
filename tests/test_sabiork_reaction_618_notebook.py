@@ -26,10 +26,11 @@ def test_sabiork_reaction_618_notebook_exists_and_imports_package_code() -> None
 
     assert notebook["nbformat"] == 4
     assert "SABIO-RK Reaction 618 beta-glucosidase pilot" in _markdown_source(notebook)
+    assert "from fungal_model.api import VirtualExperiment" in source
     assert "from fungal_model.registry import load_registry" in source
     assert "from fungal_model.data import load_kinetic_record" in source
-    assert "from fungal_model.screening import assess_modelability" in source
-    assert "simulate_screen" in source
+    assert "from fungal_model.screening import assess_modelability" not in source
+    assert "simulate_screen" not in source
     assert "build_model_config_from_registry_case" not in source
     assert "run_configured_model" not in source
 
@@ -78,7 +79,12 @@ def test_sabiork_reaction_618_notebook_executes_native_exploratory_screen(
     assert screen.case_results[0].modelability_report.status == "exploratory"
     assert len(screen.case_results[0].samples) == 32
     assert (screen_output_dir / "sampled_parameters.csv").exists()
-    assert (screen_output_dir / "final_states.csv").exists()
+    assert (screen_output_dir / "time_series_long.csv").exists()
+    assert (screen_output_dir / "final_metrics.csv").exists()
+    assert (screen_output_dir / "threshold_times.csv").exists()
+    assert (screen_output_dir / "summary_metrics.csv").exists()
+    assert (screen_output_dir / "provenance_table.csv").exists()
+    assert (screen_output_dir / "limitations_table.csv").exists()
 
 
 def _load_notebook() -> dict:

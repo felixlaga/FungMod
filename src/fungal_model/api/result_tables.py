@@ -1,0 +1,934 @@
+"""Standard CSV table generation for virtual experiments."""
+
+from __future__ import annotations
+
+import csv
+import json
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import yaml
+
+from fungal_model.api.metrics import (
+    DEGRADATION_THRESHOLDS,
+    summarize_numeric_values,
+    threshold_crossing_time,
+)
+from fungal_model.registry.records import ParameterRecord, RegistryRecord
+from fungal_model.registry.store import FungModRegistry
+from fungal_model.screening import (
+    EnsembleSample,
+    ModelabilityReport,
+    RegistryCaseEnsemble,
+    RegistryScreenResult,
+)
+from fungal_model.screening.case_builder import (
+    RegistryCaseBuildError,
+    get_registry_process_assembler,
+    select_registry_case_compatibility,
+)
+
+
+@dataclass(frozen=True)
+class WrittenTables:
+    """Paths written by the standard virtual-experiment table writer."""
+
+    paths: Mapping[str, str]
+
+    def to_dict(self) -> dict[str, str]:
+        return dict(self.paths)
+
+
+def write_standard_tables(
+    *,
+    screen_result: RegistryScreenResult,
+    registry: FungModRegistry,
+    preflight_reports: Sequence[ModelabilityReport],
+    output_dir: str | Path,
+) -> WrittenTables:
+    """Write API-001 biological output tables."""
+
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    reports_by_case = {
+        (report.fungus_id, report.substrate_id, report.environment_id): report
+        for report in preflight_reports
+    }
+    table_rows = _build_table_rows(
+        screen_result=screen_result,
+        registry=registry,
+        reports_by_case=reports_by_case,
+    )
+    paths = {
+        "modelability_preflight": destination / "modelability_preflight.csv",
+        "case_summary": destination / "case_summary.csv",
+        "time_series_long": destination / "time_series_long.csv",
+        "final_metrics": destination / "final_metrics.csv",
+        "threshold_times": destination / "threshold_times.csv",
+        "sampled_parameters": destination / "sampled_parameters.csv",
+        "summary_metrics": destination / "summary_metrics.csv",
+        "provenance_table": destination / "provenance_table.csv",
+        "limitations_table": destination / "limitations_table.csv",
+    }
+    _write_csv(paths["modelability_preflight"], table_rows["modelability_preflight"])
+    _write_csv(paths["case_summary"], table_rows["case_summary"])
+    _write_csv(paths["time_series_long"], table_rows["time_series_long"])
+    _write_csv(paths["final_metrics"], table_rows["final_metrics"])
+    _write_csv(paths["threshold_times"], table_rows["threshold_times"])
+    _write_csv(paths["sampled_parameters"], table_rows["sampled_parameters"])
+    _write_csv(paths["summary_metrics"], table_rows["summary_metrics"])
+    _write_csv(paths["provenance_table"], table_rows["provenance_table"])
+    _write_csv(paths["limitations_table"], table_rows["limitations_table"])
+    return WrittenTables(paths={name: str(path) for name, path in paths.items()})
+
+
+def _build_table_rows(
+    *,
+    screen_result: RegistryScreenResult,
+    registry: FungModRegistry,
+    reports_by_case: Mapping[tuple[str, str, str], ModelabilityReport],
+) -> dict[str, list[dict[str, Any]]]:
+    rows: dict[str, list[dict[str, Any]]] = {
+        "modelability_preflight": [],
+        "case_summary": [],
+        "time_series_long": [],
+        "final_metrics": [],
+        "threshold_times": [],
+        "sampled_parameters": [],
+        "summary_metrics": [],
+        "provenance_table": [],
+        "limitations_table": [],
+    }
+    for case_index, case in enumerate(screen_result.case_results):
+        context = _case_context(registry=registry, case=case, case_index=case_index)
+        report = reports_by_case.get(
+            (case.fungus_id, case.substrate_id, case.environment_id),
+            case.modelability_report,
+        )
+        role_records = _role_parameter_records(registry=registry, case=case)
+        rows["modelability_preflight"].append(_preflight_row(context, report))
+        rows["case_summary"].append(_case_summary_row(context, case, report))
+        rows["provenance_table"].extend(_provenance_rows(context, registry, case, report, role_records))
+        rows["limitations_table"].extend(_limitation_rows(context, case, report, role_records))
+        for sample in case.samples:
+            sample_context = _sample_context(context, sample)
+            state_roles = _state_roles(sample)
+            trajectory_rows = _read_trajectory(sample)
+            rate_rows = _read_process_rates(sample)
+            rows["time_series_long"].extend(
+                _time_series_rows(
+                    sample_context=sample_context,
+                    trajectory_rows=trajectory_rows,
+                    rate_rows=rate_rows,
+                    state_roles=state_roles,
+                )
+            )
+            rows["final_metrics"].extend(
+                _final_metric_rows(
+                    sample_context=sample_context,
+                    trajectory_rows=trajectory_rows,
+                    rate_rows=rate_rows,
+                    state_roles=state_roles,
+                )
+            )
+            rows["threshold_times"].extend(
+                _threshold_rows(
+                    sample_context=sample_context,
+                    trajectory_rows=trajectory_rows,
+                    state_roles=state_roles,
+                )
+            )
+            rows["sampled_parameters"].extend(
+                _sampled_parameter_rows(
+                    sample_context=sample_context,
+                    sample=sample,
+                    role_records=role_records,
+                )
+            )
+    rows["summary_metrics"] = _summary_metric_rows(rows["final_metrics"], rows["threshold_times"])
+    return rows
+
+
+def _case_context(
+    *,
+    registry: FungModRegistry,
+    case: RegistryCaseEnsemble,
+    case_index: int,
+) -> dict[str, Any]:
+    fungus = registry.get_fungus(case.fungus_id)
+    substrate = registry.get_substrate(case.substrate_id)
+    environment = registry.get_environment(case.environment_id)
+    env_values = _environment_values(environment.conditions)
+    return {
+        "case_id": f"case_{case_index:04d}",
+        "fungus_id": case.fungus_id,
+        "fungus_name": fungus.name,
+        "substrate_id": case.substrate_id,
+        "substrate_name": substrate.name,
+        "environment_id": case.environment_id,
+        "environment_name": environment.name,
+        "temperature_C": env_values["temperature_C"],
+        "ph": env_values["ph"],
+        "oxygen": env_values["oxygen"],
+        "process_type": case.process_type,
+    }
+
+
+def _environment_values(conditions: Mapping[str, Any]) -> dict[str, Any]:
+    temperature = conditions.get("temperature")
+    ph = conditions.get("ph")
+    oxygen = conditions.get("oxygen") or conditions.get("oxygen_concentration")
+    return {
+        "temperature_C": _temperature_c(temperature),
+        "ph": _condition_value(ph),
+        "oxygen": _oxygen_value(oxygen),
+    }
+
+
+def _temperature_c(value_spec: Any | None) -> Any:
+    if value_spec is None or getattr(value_spec, "value", None) is None:
+        return ""
+    value = float(value_spec.value)
+    units = str(getattr(value_spec, "units", "") or "")
+    if units.lower() in {"kelvin", "k"}:
+        return value - 273.15
+    return value
+
+
+def _condition_value(value_spec: Any | None) -> Any:
+    if value_spec is None:
+        return ""
+    if getattr(value_spec, "value", None) is not None:
+        return float(value_spec.value)
+    if getattr(value_spec, "lower", None) is not None and getattr(value_spec, "upper", None) is not None:
+        return f"{float(value_spec.lower)}..{float(value_spec.upper)}"
+    return getattr(value_spec, "kind", "") or ""
+
+
+def _oxygen_value(value_spec: Any | None) -> Any:
+    if value_spec is None:
+        return ""
+    if getattr(value_spec, "kind", "") == "not_applicable":
+        return "not_applicable"
+    return _condition_value(value_spec)
+
+
+def _sample_context(context: Mapping[str, Any], sample: EnsembleSample) -> dict[str, Any]:
+    data = dict(context)
+    data["sample_id"] = f"sample_{sample.sample_index:04d}"
+    data["sample_index"] = sample.sample_index
+    data["validation_passed"] = sample.validation_passed
+    return data
+
+
+def _preflight_row(context: Mapping[str, Any], report: ModelabilityReport) -> dict[str, Any]:
+    return {
+        **_case_columns(context),
+        "status": report.status,
+        "known_count": len(report.known),
+        "uncertain_count": len(report.uncertain),
+        "missing_count": len(report.missing),
+        "incompatible_count": len(report.incompatible),
+        "required_processes": ";".join(report.required_processes),
+        "candidate_processes": ";".join(report.candidate_processes),
+        "required_parameters": ";".join(report.required_parameters),
+        "suggested_experiments": "; ".join(report.suggested_experiments),
+    }
+
+
+def _case_summary_row(
+    context: Mapping[str, Any],
+    case: RegistryCaseEnsemble,
+    report: ModelabilityReport,
+) -> dict[str, Any]:
+    return {
+        **_case_columns(context),
+        "modelability_status": report.status,
+        "sample_count": len(case.samples),
+        "sample_failure_count": len(case.sample_failures),
+        "simulated": bool(case.samples),
+        "preflight_guardrail": "modelability",
+    }
+
+
+def _case_columns(context: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "case_id": context["case_id"],
+        "fungus_id": context["fungus_id"],
+        "fungus_name": context["fungus_name"],
+        "substrate_id": context["substrate_id"],
+        "substrate_name": context["substrate_name"],
+        "environment_id": context["environment_id"],
+        "environment_name": context["environment_name"],
+        "temperature_C": context["temperature_C"],
+        "ph": context["ph"],
+        "oxygen": context["oxygen"],
+        "process_type": context["process_type"],
+    }
+
+
+def _base_sample_columns(context: Mapping[str, Any]) -> dict[str, Any]:
+    data = _case_columns(context)
+    data.update(
+        {
+            "sample_id": context["sample_id"],
+            "sample_index": context["sample_index"],
+        }
+    )
+    return data
+
+
+def _state_roles(sample: EnsembleSample) -> dict[str, str]:
+    config_path = Path(sample.config_path)
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    process_configs = data.get("processes", []) if isinstance(data, Mapping) else []
+    if not process_configs:
+        return {}
+    states = process_configs[0].get("states", {})
+    if not isinstance(states, Mapping):
+        return {}
+    roles: dict[str, str] = {}
+    for role, state_name in states.items():
+        if isinstance(state_name, str):
+            roles[str(role)] = state_name
+    if "catalyst" in roles and "enzyme" not in roles:
+        roles["enzyme"] = roles["catalyst"]
+    return roles
+
+
+def _read_trajectory(sample: EnsembleSample) -> list[dict[str, str]]:
+    if sample.trajectory_path is None:
+        return []
+    return _read_csv(Path(sample.trajectory_path))
+
+
+def _read_process_rates(sample: EnsembleSample) -> list[dict[str, str]]:
+    path = Path(sample.output_directory) / "process_rates.csv"
+    if not path.exists():
+        return []
+    return _read_csv(path)
+
+
+def _time_series_rows(
+    *,
+    sample_context: Mapping[str, Any],
+    trajectory_rows: Sequence[Mapping[str, str]],
+    rate_rows: Sequence[Mapping[str, str]],
+    state_roles: Mapping[str, str],
+) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    if not trajectory_rows:
+        return output
+    state_names = _trajectory_state_names(trajectory_rows[0])
+    substrate_state = state_roles.get("substrate")
+    product_state = state_roles.get("product")
+    initial_substrate = _initial_state_value(trajectory_rows, substrate_state)
+    initial_product = _initial_state_value(trajectory_rows, product_state)
+    rate_by_index = _rate_by_index(rate_rows)
+    for index, row in enumerate(trajectory_rows):
+        base = {
+            **_base_sample_columns(sample_context),
+            "time_index": index,
+            "time": _float_or_blank(row.get("time")),
+            "time_units": row.get("time_units", ""),
+        }
+        for state_name in state_names:
+            output.append(
+                {
+                    **base,
+                    "state": state_name,
+                    "state_role": _role_for_state(state_name, state_roles),
+                    "value": _float_or_blank(row.get(state_name)),
+                    "units": row.get(f"{state_name}_units", ""),
+                    "source": "simulation_state",
+                }
+            )
+        if substrate_state is not None and initial_substrate is not None and initial_substrate != 0.0:
+            substrate_value = _optional_float(row.get(substrate_state))
+            if substrate_value is not None:
+                degraded_fraction = (initial_substrate - substrate_value) / initial_substrate
+                output.append(
+                    {
+                        **base,
+                        "state": "substrate_degraded_fraction",
+                        "state_role": "derived_substrate_loss",
+                        "value": degraded_fraction,
+                        "units": "dimensionless",
+                        "source": "derived_from_states",
+                    }
+                )
+        if product_state is not None and initial_product is not None:
+            product_value = _optional_float(row.get(product_state))
+            if product_value is not None:
+                output.append(
+                    {
+                        **base,
+                        "state": "product_formed",
+                        "state_role": "derived_product_release",
+                        "value": product_value - initial_product,
+                        "units": row.get(f"{product_state}_units", ""),
+                        "source": "derived_from_states",
+                    }
+                )
+        if index in rate_by_index:
+            rate = rate_by_index[index]
+            for state_name in ("degradation_rate", "product_release_rate"):
+                output.append(
+                    {
+                        **base,
+                        "state": state_name,
+                        "state_role": "derived_rate",
+                        "value": rate["value"],
+                        "units": rate["units"],
+                        "source": "simulation_process_rate",
+                    }
+                )
+    return output
+
+
+def _final_metric_rows(
+    *,
+    sample_context: Mapping[str, Any],
+    trajectory_rows: Sequence[Mapping[str, str]],
+    rate_rows: Sequence[Mapping[str, str]],
+    state_roles: Mapping[str, str],
+) -> list[dict[str, Any]]:
+    base = _base_sample_columns(sample_context)
+    if not trajectory_rows:
+        return [_metric_row(base, "trajectory_available", "", "not_applicable", "not_applicable", "No trajectory was written.")]
+    final_row = trajectory_rows[-1]
+    substrate_state = state_roles.get("substrate")
+    product_state = state_roles.get("product")
+    initial_substrate = _initial_state_value(trajectory_rows, substrate_state)
+    final_substrate = _optional_float(final_row.get(substrate_state or ""))
+    initial_product = _initial_state_value(trajectory_rows, product_state)
+    final_product = _optional_float(final_row.get(product_state or ""))
+    max_rate = _maximum_process_rate(rate_rows)
+    rows: list[dict[str, Any]] = []
+    if substrate_state is None or final_substrate is None:
+        rows.append(_metric_row(base, "final_substrate_remaining", "", "not_applicable", "not_applicable", "No substrate state mapping was available."))
+        rows.append(_metric_row(base, "final_substrate_degraded_fraction", "", "dimensionless", "not_applicable", "No substrate state mapping was available."))
+    else:
+        rows.append(
+            _metric_row(
+                base,
+                "final_substrate_remaining",
+                final_substrate,
+                final_row.get(f"{substrate_state}_units", ""),
+                "computed",
+                "",
+            )
+        )
+        if initial_substrate is None or initial_substrate == 0.0:
+            rows.append(_metric_row(base, "final_substrate_degraded_fraction", "", "dimensionless", "not_applicable", "Initial substrate was unavailable or zero."))
+        else:
+            rows.append(
+                _metric_row(
+                    base,
+                    "final_substrate_degraded_fraction",
+                    (initial_substrate - final_substrate) / initial_substrate,
+                    "dimensionless",
+                    "computed",
+                    "",
+                )
+            )
+    if product_state is None or final_product is None:
+        rows.append(_metric_row(base, "final_product_concentration", "", "not_applicable", "not_applicable", "No product state mapping was available."))
+        rows.append(_metric_row(base, "final_product_formed", "", "not_applicable", "not_applicable", "No product state mapping was available."))
+    else:
+        product_units = final_row.get(f"{product_state}_units", "")
+        rows.append(_metric_row(base, "final_product_concentration", final_product, product_units, "computed", ""))
+        if initial_product is None:
+            rows.append(_metric_row(base, "final_product_formed", "", product_units, "not_applicable", "Initial product was unavailable."))
+        else:
+            rows.append(_metric_row(base, "final_product_formed", final_product - initial_product, product_units, "computed", ""))
+    for metric_name in ("maximum_product_release_rate", "maximum_substrate_depletion_rate"):
+        if max_rate is None:
+            rows.append(_metric_row(base, metric_name, "", "not_applicable", "not_applicable", "No process-rate trajectory was available."))
+        else:
+            rows.append(_metric_row(base, metric_name, max_rate["value"], max_rate["units"], "computed", ""))
+    return rows
+
+
+def _threshold_rows(
+    *,
+    sample_context: Mapping[str, Any],
+    trajectory_rows: Sequence[Mapping[str, str]],
+    state_roles: Mapping[str, str],
+) -> list[dict[str, Any]]:
+    base = _base_sample_columns(sample_context)
+    substrate_state = state_roles.get("substrate")
+    if not trajectory_rows or substrate_state is None:
+        return [
+            _threshold_row(base, threshold, "", "not_applicable", "not_applicable", "No substrate trajectory was available.")
+            for threshold in DEGRADATION_THRESHOLDS
+        ]
+    initial_substrate = _initial_state_value(trajectory_rows, substrate_state)
+    if initial_substrate is None or initial_substrate == 0.0:
+        return [
+            _threshold_row(base, threshold, "", "not_applicable", "not_applicable", "Initial substrate was unavailable or zero.")
+            for threshold in DEGRADATION_THRESHOLDS
+        ]
+    time_values = [_optional_float(row.get("time")) for row in trajectory_rows]
+    substrate_values = [_optional_float(row.get(substrate_state)) for row in trajectory_rows]
+    if any(value is None for value in time_values) or any(value is None for value in substrate_values):
+        return [
+            _threshold_row(base, threshold, "", "not_applicable", "not_applicable", "Trajectory contains missing numeric values.")
+            for threshold in DEGRADATION_THRESHOLDS
+        ]
+    numeric_time_values = [float(value) for value in time_values if value is not None]
+    numeric_substrate_values = [float(value) for value in substrate_values if value is not None]
+    degraded = [
+        (initial_substrate - value) / initial_substrate
+        for value in numeric_substrate_values
+    ]
+    units = trajectory_rows[0].get("time_units", "")
+    rows: list[dict[str, Any]] = []
+    for threshold in DEGRADATION_THRESHOLDS:
+        crossing = threshold_crossing_time(
+            time_values=numeric_time_values,
+            degraded_fraction=degraded,
+            threshold=threshold,
+        )
+        if crossing is None:
+            rows.append(_threshold_row(base, threshold, "", units, "not_reached", "Threshold was not reached within the simulated time span."))
+        else:
+            rows.append(_threshold_row(base, threshold, crossing, units, "computed", ""))
+    return rows
+
+
+def _metric_row(
+    base: Mapping[str, Any],
+    metric: str,
+    value: Any,
+    units: str,
+    status: str,
+    notes: str,
+) -> dict[str, Any]:
+    return {
+        **base,
+        "metric": metric,
+        "value": value,
+        "units": units,
+        "status": status,
+        "notes": notes,
+    }
+
+
+def _threshold_row(
+    base: Mapping[str, Any],
+    threshold: float,
+    value: Any,
+    units: str,
+    status: str,
+    notes: str,
+) -> dict[str, Any]:
+    return {
+        **base,
+        "threshold_fraction": threshold,
+        "metric": f"time_to_{int(round(threshold * 100))}_percent_substrate_degradation",
+        "value": value,
+        "units": units,
+        "status": status,
+        "notes": notes,
+    }
+
+
+def _sampled_parameter_rows(
+    *,
+    sample_context: Mapping[str, Any],
+    sample: EnsembleSample,
+    role_records: Mapping[str, ParameterRecord],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for role, parameter in sample.parameters.items():
+        source_record = role_records.get(role)
+        value_kind = "" if source_record is None else source_record.value.kind
+        rows.append(
+            {
+                **_base_sample_columns(sample_context),
+                "role": role,
+                "symbol": parameter.get("symbol", ""),
+                "sampled_value": parameter.get("value", ""),
+                "units": parameter.get("units", ""),
+                "sampled_value_kind": "exact",
+                "source_record_id": "" if source_record is None else source_record.record_id,
+                "source_value_kind": value_kind,
+                "source_maturity": "" if source_record is None else source_record.maturity,
+                "source": "" if source_record is None else _value_source(source_record),
+                "confidence_level": "" if source_record is None else (source_record.value.confidence_level or ""),
+                "exploratory_prior": "" if source_record is None else _is_exploratory_record(source_record),
+                "notes": "" if source_record is None else source_record.notes,
+            }
+        )
+    return rows
+
+
+def _summary_metric_rows(
+    final_metric_rows: Sequence[Mapping[str, Any]],
+    threshold_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str, str], list[float]] = {}
+    for row in tuple(final_metric_rows) + tuple(threshold_rows):
+        if row.get("status") != "computed":
+            continue
+        value = _optional_float(row.get("value"))
+        if value is None:
+            continue
+        key = (str(row.get("case_id", "")), str(row.get("metric", "")), str(row.get("units", "")))
+        grouped.setdefault(key, []).append(value)
+    rows: list[dict[str, Any]] = []
+    for (case_id, metric, units), values in sorted(grouped.items()):
+        rows.append(
+            {
+                "case_id": case_id,
+                "metric": metric,
+                "units": units,
+                **summarize_numeric_values(values),
+            }
+        )
+    return rows
+
+
+def _provenance_rows(
+    context: Mapping[str, Any],
+    registry: FungModRegistry,
+    case: RegistryCaseEnsemble,
+    report: ModelabilityReport,
+    role_records: Mapping[str, ParameterRecord],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for record_type, record in (
+        ("fungus", registry.get_fungus(case.fungus_id)),
+        ("substrate", registry.get_substrate(case.substrate_id)),
+        ("environment", registry.get_environment(case.environment_id)),
+    ):
+        rows.append(_record_provenance_row(context, record_type, record, role="", symbol="", value_kind=""))
+    try:
+        compatibility = select_registry_case_compatibility(
+            registry=registry,
+            fungus_id=case.fungus_id,
+            substrate_id=case.substrate_id,
+            report=report,
+        )
+    except RegistryCaseBuildError:
+        compatibility = None
+    if compatibility is not None:
+        rows.append(_record_provenance_row(context, "process_compatibility", compatibility, role="", symbol="", value_kind=""))
+    for role, record in role_records.items():
+        rows.append(_record_provenance_row(context, "parameter", record, role=role, symbol=record.parameter_symbol, value_kind=record.value.kind))
+    for item in tuple(report.missing) + tuple(report.incompatible):
+        rows.append(
+            {
+                **_case_columns(context),
+                "record_type": item.item_type,
+                "record_id": item.details.get("record_id", item.item_id),
+                "role": "",
+                "symbol": item.item_id if item.item_type == "parameter" else "",
+                "maturity": "",
+                "value_kind": "missing" if item in report.missing else "incompatible",
+                "source": "",
+                "confidence_level": "",
+                "exploratory_prior": "",
+                "notes": item.message,
+                "provenance": json.dumps(item.details, sort_keys=True),
+            }
+        )
+    return rows
+
+
+def _record_provenance_row(
+    context: Mapping[str, Any],
+    record_type: str,
+    record: RegistryRecord | ParameterRecord,
+    *,
+    role: str,
+    symbol: str,
+    value_kind: str,
+) -> dict[str, Any]:
+    value = record.value if isinstance(record, ParameterRecord) else None
+    return {
+        **_case_columns(context),
+        "record_type": record_type,
+        "record_id": record.record_id,
+        "role": role,
+        "symbol": symbol,
+        "maturity": record.maturity,
+        "value_kind": value_kind,
+        "source": _value_source(record) if isinstance(record, ParameterRecord) else _provenance_source(record.provenance),
+        "confidence_level": "" if value is None else (value.confidence_level or ""),
+        "exploratory_prior": _is_exploratory_record(record) if isinstance(record, ParameterRecord) else "",
+        "notes": record.notes,
+        "provenance": json.dumps(dict(record.provenance), sort_keys=True),
+    }
+
+
+def _limitation_rows(
+    context: Mapping[str, Any],
+    case: RegistryCaseEnsemble,
+    report: ModelabilityReport,
+    role_records: Mapping[str, ParameterRecord],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for assumption in report.assumptions:
+        rows.append(_limitation_row(context, "preflight", "info", assumption, "modelability"))
+    for item in report.missing:
+        rows.append(_limitation_row(context, "missing_input", "blocking", item.message, item.item_id))
+    for item in report.incompatible:
+        rows.append(_limitation_row(context, "incompatible_input", "blocking", item.message, item.item_id))
+    if any(_is_exploratory_record(record) for record in role_records.values()):
+        rows.append(
+            _limitation_row(
+                context,
+                "exploratory_prior",
+                "important",
+                "Exploratory priors are simulation assumptions and must not be cited as literature-curated values.",
+                "parameter_records",
+            )
+        )
+    if case.process_type == "homogeneous_michaelis_menten":
+        rows.append(
+            _limitation_row(
+                context,
+                "not_modelled",
+                "important",
+                "This is an enzyme-source homogeneous kinetics simulation, not a whole-fungus growth, secretion, uptake, biomass, or respiration model.",
+                case.process_type,
+            )
+        )
+        rows.append(
+            _limitation_row(
+                context,
+                "not_modelled",
+                "important",
+                "The process is well-mixed and does not represent spatial gradients, solid-substrate accessibility, adsorption, or surface morphology.",
+                case.process_type,
+            )
+        )
+    return rows
+
+
+def _limitation_row(
+    context: Mapping[str, Any],
+    category: str,
+    severity: str,
+    limitation: str,
+    source: str,
+) -> dict[str, Any]:
+    return {
+        **_case_columns(context),
+        "category": category,
+        "severity": severity,
+        "limitation": limitation,
+        "source": source,
+    }
+
+
+def _role_parameter_records(
+    *,
+    registry: FungModRegistry,
+    case: RegistryCaseEnsemble,
+) -> dict[str, ParameterRecord]:
+    try:
+        compatibility = select_registry_case_compatibility(
+            registry=registry,
+            fungus_id=case.fungus_id,
+            substrate_id=case.substrate_id,
+            report=case.modelability_report,
+        )
+    except RegistryCaseBuildError:
+        return {}
+    assembler = get_registry_process_assembler(compatibility.process_type)
+    if assembler is None:
+        return {}
+    records: dict[str, ParameterRecord] = {}
+    for role in assembler.required_parameter_roles:
+        symbol = compatibility.parameter_roles.get(role)
+        if symbol is None:
+            continue
+        record = _best_case_parameter_record(
+            registry=registry,
+            parameter_symbol=symbol,
+            process_type=compatibility.process_type,
+            enzyme_class=compatibility.enzyme_class,
+            substrate_class=compatibility.substrate_class,
+            fungus_id=case.fungus_id,
+            substrate_id=case.substrate_id,
+            environment_id=case.environment_id,
+        )
+        if record is not None:
+            records[role] = record
+    return records
+
+
+def _best_case_parameter_record(
+    *,
+    registry: FungModRegistry,
+    parameter_symbol: str,
+    process_type: str,
+    enzyme_class: str,
+    substrate_class: str,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+) -> ParameterRecord | None:
+    candidates = [
+        record
+        for record in registry.parameters.values()
+        if record.parameter_symbol == parameter_symbol
+        and record.process_type == process_type
+        and _matches(record.enzyme_class, enzyme_class)
+        and _matches(record.substrate_class, substrate_class)
+        and _matches(record.fungus_id, fungus_id)
+        and _matches(record.substrate_id, substrate_id)
+        and _matches(record.environment_id, environment_id)
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=_parameter_record_priority)
+
+
+def _matches(record_value: str | None, requested: str) -> bool:
+    return record_value is None or record_value == requested
+
+
+def _parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int]:
+    selector_score = sum(
+        value is not None
+        for value in (
+            record.enzyme_class,
+            record.substrate_class,
+            record.fungus_id,
+            record.substrate_id,
+            record.environment_id,
+        )
+    )
+    value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
+    exploratory_score = 1 if _is_exploratory_record(record) else 0
+    return selector_score, value_score, exploratory_score
+
+
+def _trajectory_state_names(row: Mapping[str, str]) -> tuple[str, ...]:
+    return tuple(
+        name
+        for name in row
+        if name not in {"time", "time_units"} and not name.endswith("_units")
+    )
+
+
+def _role_for_state(state_name: str, state_roles: Mapping[str, str]) -> str:
+    for role, configured_state in state_roles.items():
+        if configured_state == state_name:
+            return "enzyme" if role == "catalyst" else role
+    return ""
+
+
+def _initial_state_value(
+    trajectory_rows: Sequence[Mapping[str, str]],
+    state_name: str | None,
+) -> float | None:
+    if not trajectory_rows or state_name is None:
+        return None
+    return _optional_float(trajectory_rows[0].get(state_name))
+
+
+def _rate_by_index(rate_rows: Sequence[Mapping[str, str]]) -> dict[int, dict[str, Any]]:
+    output: dict[int, dict[str, Any]] = {}
+    for row in rate_rows:
+        try:
+            index = int(str(row.get("index", "")))
+        except ValueError:
+            continue
+        value = _optional_float(row.get("value"))
+        if value is None:
+            continue
+        output[index] = {
+            "name": row.get("name", ""),
+            "value": value,
+            "units": row.get("units", ""),
+        }
+    return output
+
+
+def _maximum_process_rate(rate_rows: Sequence[Mapping[str, str]]) -> dict[str, Any] | None:
+    values: list[tuple[float, str]] = []
+    for row in rate_rows:
+        value = _optional_float(row.get("value"))
+        if value is not None:
+            values.append((value, row.get("units", "")))
+    if not values:
+        return None
+    value, units = max(values, key=lambda item: item[0])
+    return {"value": value, "units": units}
+
+
+def _value_source(record: ParameterRecord) -> str:
+    return record.value.source or _provenance_source(record.provenance)
+
+
+def _provenance_source(provenance: Mapping[str, Any]) -> str:
+    source = provenance.get("source")
+    if source is not None:
+        return str(source)
+    database = provenance.get("source_database")
+    reaction = provenance.get("source_reaction_id")
+    if database is not None and reaction is not None:
+        return f"{database} reaction {reaction}"
+    if database is not None:
+        return str(database)
+    return ""
+
+
+def _is_exploratory_record(record: ParameterRecord) -> bool:
+    return record.maturity == "exploratory_prior" or bool(record.provenance.get("exploratory_prior"))
+
+
+def _read_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = _fieldnames(rows)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: _csv_value(row.get(field)) for field in fieldnames})
+
+
+def _fieldnames(rows: Sequence[Mapping[str, Any]]) -> tuple[str, ...]:
+    ordered: dict[str, None] = {}
+    for row in rows:
+        for key in row:
+            ordered.setdefault(str(key), None)
+    return tuple(ordered)
+
+
+def _csv_value(value: Any) -> Any:
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, np.generic):
+        return value.item()
+    return "" if value is None else value
+
+
+def _optional_float(value: Any) -> float | None:
+    if value in {None, ""}:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _float_or_blank(value: Any) -> Any:
+    number = _optional_float(value)
+    return "" if number is None else number
+
+
+__all__ = ["WrittenTables", "write_standard_tables"]

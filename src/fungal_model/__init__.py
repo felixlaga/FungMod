@@ -19,6 +19,12 @@ from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.simulation import SolverSettings
 from fungal_model.entities import Environment
 from fungal_model.entities import Enzyme
+from fungal_model.api import (
+    DegradationScreenResult,
+    EnvironmentGrid,
+    VirtualExperiment,
+    VirtualExperimentError,
+)
 from fungal_model.fungi.base import Fungus
 from fungal_model.geometry import (
     Film1DGeometry,
@@ -122,10 +128,12 @@ __all__ = [
     "ConfiguredModelRunner",
     "ConfiguredOutputWriter",
     "ConfiguredProcessAssembler",
+    "DegradationScreenResult",
     "Enzyme",
     "EntityConfigRefs",
     "EquilibriumSurfaceCoverageModel",
     "Environment",
+    "EnvironmentGrid",
     "Film1DGeometry",
     "Fungus",
     "Geometry",
@@ -193,6 +201,8 @@ __all__ = [
     "ValidityDomain",
     "ValidatorConfig",
     "ValidatorRegistry",
+    "VirtualExperiment",
+    "VirtualExperimentError",
     "WaterActivityModifier",
     "WellMixedGeometry",
     "run_configured_model",
