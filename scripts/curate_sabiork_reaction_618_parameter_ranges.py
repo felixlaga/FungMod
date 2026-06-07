@@ -34,14 +34,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=None,
-        help="Directory for parameter_range_summary.json. Defaults to input parent.",
+        help="Directory for curated outputs. Defaults to sibling curated/ for raw snapshots.",
     )
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    output_dir = args.output_dir or args.input.parent
+    output_dir = args.output_dir or _default_output_dir(args.input)
     try:
         export = load_sabiork_kinlaw_export(args.input)
         report = curate_reaction_618_parameter_ranges(export)
@@ -52,6 +52,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"Included SABIO-RK EntryIDs: {', '.join(report.included_entry_ids)}")
     print(f"Saved parameter range report: {report_path}")
     return 0
+
+
+def _default_output_dir(input_path: Path) -> Path:
+    if input_path.parent.name == "raw":
+        return input_path.parent.parent / "curated"
+    return input_path.parent
 
 
 if __name__ == "__main__":

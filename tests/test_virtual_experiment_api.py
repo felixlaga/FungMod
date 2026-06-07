@@ -102,8 +102,14 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     ]
     assert enzyme_prior_rows
     assert all(row["source_value_kind"] == "distribution" for row in enzyme_prior_rows)
+    assert all(row["parameter_source_class"] == "user_supplied_exploratory_prior" for row in enzyme_prior_rows)
     assert all(row["exploratory_prior"] == "true" for row in enzyme_prior_rows)
     assert all(row["source"] == "user-supplied exploratory range" for row in enzyme_prior_rows)
+    assert any(
+        row["symbol"] == "Km_cellobiose"
+        and row["parameter_source_class"] == "selected_exact_value"
+        for row in sampled_rows
+    )
 
     assert any(row["record_type"] == "parameter" and row["value_kind"] == "exact" for row in provenance_rows)
     assert any(row["record_type"] == "parameter" and row["value_kind"] == "distribution" for row in provenance_rows)

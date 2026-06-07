@@ -629,6 +629,7 @@ def _sampled_parameter_rows(
                 "source_record_id": "" if source_record is None else source_record.record_id,
                 "source_value_kind": value_kind,
                 "source_maturity": "" if source_record is None else source_record.maturity,
+                "parameter_source_class": _parameter_source_class(source_record),
                 "source": "" if source_record is None else _value_source(source_record),
                 "confidence_level": "" if source_record is None else (source_record.value.confidence_level or ""),
                 "exploratory_prior": "" if source_record is None else _is_exploratory_record(source_record),
@@ -1040,6 +1041,20 @@ def _provenance_source(provenance: Mapping[str, Any]) -> str:
 
 def _is_exploratory_record(record: ParameterRecord) -> bool:
     return record.maturity == "exploratory_prior" or bool(record.provenance.get("exploratory_prior"))
+
+
+def _parameter_source_class(record: ParameterRecord | None) -> str:
+    if record is None:
+        return "unknown"
+    if record.value.kind == "unknown":
+        return "unknown"
+    if _is_exploratory_record(record):
+        return "user_supplied_exploratory_prior"
+    if record.maturity == "literature_range" or record.value.kind == "range":
+        return "literature_range"
+    if record.maturity == "literature_processed" and record.value.kind == "exact":
+        return "selected_exact_value"
+    return "unknown"
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
