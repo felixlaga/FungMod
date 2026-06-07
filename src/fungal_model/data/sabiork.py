@@ -790,7 +790,7 @@ def _range_groups(
     observations: Sequence[Mapping[str, Any]],
 ) -> dict[str, dict[str, dict[str, SabioRKParameterRange]]]:
     observation_tuple = tuple(observations)
-    groups: dict[str, dict[str, Sequence[Mapping[str, Any]]]] = {
+    groups: Mapping[str, Mapping[str, Sequence[Mapping[str, Any]]]] = {
         "all_eligible": {"all_eligible": observation_tuple},
         "by_organism": _group_by(observation_tuple, "organism"),
         "by_pH_exact": _group_by(observation_tuple, "ph", prefix="pH"),
@@ -870,10 +870,12 @@ def _parameter_range(
     units = str(numeric_observations[0].get(unit_key) or default_units)
     if any(str(observation.get(unit_key) or default_units) != units for observation in numeric_observations):
         raise SabioRKParseError(f"Mixed units are not allowed for {symbol}.")
-    value_entry_pairs = tuple(
-        (float(_as_float(observation.get(value_key))), str(observation["entry_id"]))
-        for observation in numeric_observations
-    )
+    value_entry_pairs: list[tuple[float, str]] = []
+    for observation in numeric_observations:
+        value = _as_float(observation.get(value_key))
+        if value is None:
+            continue
+        value_entry_pairs.append((value, str(observation["entry_id"])))
     values = tuple(value for value, _entry_id_value in value_entry_pairs)
     min_value, min_entry_id = min(value_entry_pairs, key=lambda item: item[0])
     max_value, max_entry_id = max(value_entry_pairs, key=lambda item: item[0])
