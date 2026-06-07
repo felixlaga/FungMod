@@ -1,6 +1,6 @@
 """Researcher-facing FungMod virtual-experiment API."""
 
-from fungal_model.api.environment_grid import EnvironmentGrid
+from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid
 from fungal_model.api.virtual_experiment import (
     DegradationScreenResult,
     VirtualExperiment,
@@ -10,6 +10,7 @@ from fungal_model.api.virtual_experiment import (
 
 __all__ = [
     "DegradationScreenResult",
+    "EnvironmentCase",
     "EnvironmentGrid",
     "VirtualExperiment",
     "VirtualExperimentError",

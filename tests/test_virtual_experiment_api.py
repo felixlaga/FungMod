@@ -44,10 +44,12 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "modelability_preflight.csv",
         "case_summary.csv",
         "time_series_long.csv",
+        "final_states.csv",
         "final_metrics.csv",
         "threshold_times.csv",
         "sampled_parameters.csv",
         "summary_metrics.csv",
+        "environment_summary.csv",
         "provenance_table.csv",
         "limitations_table.csv",
         "virtual_experiment_summary.json",
@@ -122,9 +124,10 @@ def test_virtual_experiment_accepts_environment_grid_registry_ids(tmp_path: Path
     assert Path(result.output_directory, "time_series_long.csv").exists()
 
 
-def test_environment_grid_numeric_values_are_not_silently_simulated() -> None:
-    with pytest.raises(NotImplementedError, match="registry IDs"):
-        EnvironmentGrid(temperature_C=[30.0], ph=[5.0], oxygen="aerobic").registry_ids()
+def test_environment_grid_numeric_values_generate_runtime_environment_ids() -> None:
+    grid = EnvironmentGrid(temperature_C=[30.0], ph=[5.0], oxygen="aerobic")
+
+    assert grid.registry_ids() == ("temp_30C_ph_5p0_aerobic",)
 
 
 def test_virtual_experiment_scientific_preflight_remains_underparameterized() -> None:

@@ -21,6 +21,7 @@ from fungal_model.entities import Environment
 from fungal_model.entities import Enzyme
 from fungal_model.api import (
     DegradationScreenResult,
+    EnvironmentCase,
     EnvironmentGrid,
     VirtualExperiment,
     VirtualExperimentError,
@@ -133,6 +134,7 @@ __all__ = [
     "EntityConfigRefs",
     "EquilibriumSurfaceCoverageModel",
     "Environment",
+    "EnvironmentCase",
     "EnvironmentGrid",
     "Film1DGeometry",
     "Fungus",

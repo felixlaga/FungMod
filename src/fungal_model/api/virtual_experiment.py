@@ -9,9 +9,10 @@ from itertools import product
 from pathlib import Path
 from typing import Any, Literal
 
-from fungal_model.api.environment_grid import EnvironmentGrid
+from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid
 from fungal_model.api.quicklook import write_quicklook_plots as write_quicklook_plot_files
 from fungal_model.api.result_tables import WrittenTables, write_standard_tables
+from fungal_model.registry.records import ParameterRecord
 from fungal_model.registry import FungModRegistry, load_registry
 from fungal_model.screening import (
     ModelabilityMode,
@@ -37,6 +38,7 @@ class VirtualExperiment:
     environment_ids: tuple[str, ...]
     registry: FungModRegistry
     registry_source: str = ""
+    environment_cases: tuple[EnvironmentCase, ...] = ()
 
     @classmethod
     def from_registry(
@@ -52,7 +54,12 @@ class VirtualExperiment:
         loaded_registry, registry_source = _load_registry_source(registry)
         fungus_ids = _string_tuple(fungi, field_name="fungi")
         substrate_ids = _string_tuple(substrates, field_name="substrates")
-        environment_ids = _environment_ids(environments)
+        environment_ids, environment_cases = _environment_inputs(environments)
+        if environment_cases:
+            loaded_registry = _registry_with_runtime_environment_overlay(
+                loaded_registry,
+                environment_cases=environment_cases,
+            )
         for fungus_id in fungus_ids:
             loaded_registry.get_fungus(fungus_id)
         for substrate_id in substrate_ids:
@@ -65,6 +72,7 @@ class VirtualExperiment:
             environment_ids=environment_ids,
             registry=loaded_registry,
             registry_source=registry_source,
+            environment_cases=environment_cases,
         )
 
     def preflight(self, *, mode: ModelabilityMode = "exploratory") -> tuple[ModelabilityReport, ...]:
@@ -137,9 +145,17 @@ class VirtualExperiment:
             "fungus_ids": list(self.fungus_ids),
             "substrate_ids": list(self.substrate_ids),
             "environment_ids": list(self.environment_ids),
+            "environment_cases": [case.to_dict() for case in self.environment_cases],
+            "case_count": self.case_count,
             "registry_id": self.registry.registry_id,
             "registry_source": self.registry_source,
         }
+
+    @property
+    def case_count(self) -> int:
+        """Return the fungus x substrate x environment case count."""
+
+        return len(self.fungus_ids) * len(self.substrate_ids) * len(self.environment_ids)
 
 
 @dataclass
@@ -217,14 +233,88 @@ def _string_tuple(values: Sequence[str] | str, *, field_name: str) -> tuple[str,
     return output
 
 
-def _environment_ids(environments: Sequence[str] | str | EnvironmentGrid) -> tuple[str, ...]:
+def _environment_inputs(environments: Sequence[str] | str | EnvironmentGrid) -> tuple[tuple[str, ...], tuple[EnvironmentCase, ...]]:
     if isinstance(environments, EnvironmentGrid):
+        environment_cases = environments.environment_cases()
         environment_ids = environments.registry_ids()
     else:
+        environment_cases = ()
         environment_ids = _string_tuple(environments, field_name="environments")
     if not environment_ids:
         raise VirtualExperimentError("environments must contain at least one registry ID.")
-    return environment_ids
+    return environment_ids, environment_cases
+
+
+def _registry_with_runtime_environment_overlay(
+    registry: FungModRegistry,
+    *,
+    environment_cases: tuple[EnvironmentCase, ...],
+) -> FungModRegistry:
+    runtime_parameters = tuple(
+        _runtime_environment_parameter_record(record, environment_case=environment_case)
+        for record in registry.parameters.values()
+        for environment_case in environment_cases
+        if record.environment_id is not None
+    )
+    provenance = {
+        **dict(registry.provenance),
+        "runtime_environment_grid_overlay": True,
+        "runtime_environment_ids": [case.environment_id for case in environment_cases],
+        "environment_effect_status": "metadata_only",
+        "notes": (
+            "Runtime EnvironmentGrid overlay. Generated environments and copied "
+            "parameter records are in-memory only and are not written to data_registry."
+        ),
+    }
+    return FungModRegistry.build(
+        registry_id=registry.registry_id,
+        version=registry.version,
+        maturity=registry.maturity,
+        provenance=provenance,
+        fungi=registry.fungi.values(),
+        enzyme_classes=registry.enzyme_classes.values(),
+        substrates=registry.substrates.values(),
+        environments=(*registry.environments.values(), *(case.to_record() for case in environment_cases)),
+        process_compatibility=registry.process_compatibility.values(),
+        parameters=(*registry.parameters.values(), *runtime_parameters),
+    )
+
+
+def _runtime_environment_parameter_record(
+    record: ParameterRecord,
+    *,
+    environment_case: EnvironmentCase,
+) -> ParameterRecord:
+    assert record.environment_id is not None
+    return ParameterRecord(
+        record_id=f"{record.record_id}__envgrid__{environment_case.environment_id}",
+        name=f"{record.name} runtime EnvironmentGrid reuse for {environment_case.environment_id}",
+        maturity=record.maturity,
+        provenance={
+            **dict(record.provenance),
+            "runtime_environment_grid_overlay": True,
+            "source_environment_id": record.environment_id,
+            "target_environment_id": environment_case.environment_id,
+            "environment_effect_status": "metadata_only",
+            "environment_response_model": "none",
+            "notes": (
+                "Parameter record reused for a runtime EnvironmentGrid case as "
+                "metadata-only context. Temperature and pH do not modify kinetics."
+            ),
+        },
+        notes=(
+            f"{record.notes} Runtime EnvironmentGrid reuse for "
+            f"{environment_case.environment_id}; no pH/temperature response law applied."
+        ),
+        parameter_symbol=record.parameter_symbol,
+        process_type=record.process_type,
+        enzyme_class=record.enzyme_class,
+        substrate_class=record.substrate_class,
+        fungus_id=record.fungus_id,
+        substrate_id=record.substrate_id,
+        environment_id=environment_case.environment_id,
+        value=record.value,
+    )
 
 
 def _validate_preflight_mode(mode: str) -> None:

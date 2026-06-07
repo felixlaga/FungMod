@@ -19,6 +19,28 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## ENV-001 Environment Grids for Virtual Experiments
+
+Date: 2026-06-07
+
+Status: `complete` for runtime environment-grid virtual-experiment support.
+
+Completed in this pass:
+
+- Added concrete `EnvironmentGrid` case generation for temperature, pH, and
+  oxygen labels.
+- Added runtime in-memory environment records and parameter-record overlay for
+  metadata-only environment grid simulations.
+- Extended virtual-experiment output tables with `environment_source` and
+  `environment_effect_status`.
+- Added `final_states.csv` and `environment_summary.csv`.
+- Documented that Reaction 618 grid runs do not apply a temperature or pH
+  response law; kinetics are reused as metadata-only context unless a future
+  response model or condition-specific parameters are active.
+
+See `foundation_progress/ENV_001_ENVIRONMENT_GRIDS.md` for scope,
+limitations, and output-table details.
+
 ## Foundation-First Reset: Milestone 1 Governance Gate
 
 Date: 2026-05-27
