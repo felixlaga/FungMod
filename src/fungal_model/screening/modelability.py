@@ -258,7 +258,7 @@ def assess_modelability(
         suggested_experiments=_suggested_experiments(missing),
         assumptions=(
             "Modelability assessment only; no ODE model is assembled or run.",
-            "Registry records are toy/development records unless curated otherwise.",
+            "Registry records may be toy, exploratory, or curated scientific records; mode-specific maturity rules decide how they are used.",
             f"Mode-specific classification used mode={mode!r}.",
         ),
     )

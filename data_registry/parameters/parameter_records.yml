@@ -142,6 +142,138 @@ records:
       notes: Artificial exact accessible surface area for case-builder tests only.
     notes: Toy/development parameter only; not empirical.
 
+  - record_id: bio001_cellulose_surface_rate_constant_prior
+    name: BIO-001 cellulose surface catalytic rate prior
+    maturity: exploratory_prior
+    provenance:
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-001
+      notes: User-supplied range for exercising the BIO-001 surface-catalysis virtual experiment; not literature-curated.
+    parameter_symbol: cellulose_surface_rate_constant
+    process_type: surface_catalysis
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    fungus_id: generic_cellulase_source
+    substrate_id: cellulose_film_generic
+    environment_id: bio001_cellulose_surface_pilot_environment
+    value:
+      kind: distribution
+      distribution: loguniform
+      parameters:
+        lower: 2.0e-8
+        upper: 6.0e-8
+      units: kilogram / meter ** 2 / second
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      notes: Not literature-curated; used only for BIO-001 exploratory surface-degradation simulations.
+    notes: Exploratory surface catalytic rate prior; not a measured cellulase kinetic value.
+
+  - record_id: bio001_cellulose_adsorption_constant_prior
+    name: BIO-001 cellulose enzyme-surface adsorption prior
+    maturity: exploratory_prior
+    provenance:
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-001
+      notes: User-supplied Langmuir-equilibrium adsorption range for BIO-001; not literature-curated.
+    parameter_symbol: cellulose_adsorption_constant
+    process_type: surface_catalysis
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    fungus_id: generic_cellulase_source
+    substrate_id: cellulose_film_generic
+    environment_id: bio001_cellulose_surface_pilot_environment
+    value:
+      kind: range
+      lower: 0.5
+      upper: 2.0
+      units: liter / mole
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      notes: Not literature-curated; used only for BIO-001 exploratory Langmuir coverage.
+    notes: Exploratory enzyme-surface adsorption prior; no dynamic adsorption state is modeled.
+
+  - record_id: bio001_cellulose_accessible_surface_area_prior
+    name: BIO-001 cellulose accessible surface area prior
+    maturity: exploratory_prior
+    provenance:
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-001
+      notes: User-supplied accessible-area range for BIO-001; not literature-curated.
+    parameter_symbol: cellulose_accessible_surface_area
+    process_type: surface_catalysis
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    fungus_id: generic_cellulase_source
+    substrate_id: cellulose_film_generic
+    environment_id: bio001_cellulose_surface_pilot_environment
+    value:
+      kind: range
+      lower: 0.3
+      upper: 0.7
+      units: meter ** 2
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      notes: Not literature-curated; treated as a constant accessible surface during each BIO-001 sample.
+    notes: Exploratory accessible-surface prior; BIO-001 does not model changing morphology or surface renewal.
+
+  - record_id: bio001_initial_cellulose_film_mass_prior
+    name: BIO-001 initial cellulose film mass prior
+    maturity: exploratory_prior
+    provenance:
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-001
+      notes: User-supplied initial substrate amount range for BIO-001; not literature-curated.
+    parameter_symbol: initial_cellulose_film_mass
+    process_type: surface_catalysis
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    fungus_id: generic_cellulase_source
+    substrate_id: cellulose_film_generic
+    environment_id: bio001_cellulose_surface_pilot_environment
+    value:
+      kind: range
+      lower: 8.0e-5
+      upper: 1.2e-4
+      units: kilogram
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      notes: Not literature-curated; used only to initialize BIO-001 exploratory samples.
+    notes: Exploratory initial cellulose-film mass prior.
+
+  - record_id: bio001_cellulase_initial_concentration_prior
+    name: BIO-001 initial cellulase concentration prior
+    maturity: exploratory_prior
+    provenance:
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-001
+      notes: User-supplied enzyme concentration range for BIO-001; not literature-curated.
+    parameter_symbol: cellulase_initial_concentration
+    process_type: surface_catalysis
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    fungus_id: generic_cellulase_source
+    substrate_id: cellulose_film_generic
+    environment_id: bio001_cellulose_surface_pilot_environment
+    value:
+      kind: range
+      lower: 0.5
+      upper: 1.5
+      units: mole / liter
+      source: user-supplied exploratory range
+      confidence_level: exploratory_assumption
+      notes: Not literature-curated; used only for BIO-001 exploratory sensitivity analysis.
+    notes: Exploratory initial cellulase concentration prior; not a secretion or biomass model.
+
   - record_id: sabiork_reaction_618_Km_cellobiose
     name: SABIO-RK Reaction 618 Km for cellobiose
     maturity: literature_processed

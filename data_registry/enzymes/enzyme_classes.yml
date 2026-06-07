@@ -16,6 +16,21 @@ records:
       - surface_catalysis
     notes: Toy/development enzyme class only; not a real literature capability.
 
+  - record_id: cellulase_generic
+    name: Generic cellulase-like enzyme class
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-001 controlled virtual-experiment scaffold.
+      confidence_level: exploratory_assumption
+      notes: Generic enzyme-class metadata for a cellulose surface-degradation virtual experiment; no precise kinetic values are claimed.
+    target_bond_classes:
+      - beta_1_4_glycosidic
+    compatible_substrate_classes:
+      - cellulose_film_generic
+    compatible_processes:
+      - surface_catalysis
+    notes: Generic cellulase-like capability for BIO-001 surface catalysis; not a calibrated enzyme preparation.
+
   - record_id: beta_glucosidase
     name: beta-glucosidase
     maturity: literature_metadata

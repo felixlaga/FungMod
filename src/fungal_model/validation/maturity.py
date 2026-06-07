@@ -10,7 +10,7 @@ from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.provenance import has_text
 from fungal_model.core.validators import ValidationResult
 
-VALID_RUN_MODES = frozenset({"toy", "scientific", "strict"})
+VALID_RUN_MODES = frozenset({"toy", "exploratory", "scientific", "strict"})
 NON_SCIENTIFIC_MATURITIES = frozenset({"toy", "framework_benchmark"})
 TOY_ONLY_PRODUCT_MAP_MATURITIES = frozenset({"toy", "framework_benchmark"})
 TOY_ONLY_TOKENS = ("toy", "framework", "benchmark", "artificial", "dummy", "testing")

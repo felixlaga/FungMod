@@ -26,6 +26,38 @@ records:
     product_map_required: true
     notes: Toy/development compatibility only; not a scientific process rule.
 
+  - record_id: bio001_cellulase_cellulose_film_surface_catalysis
+    name: BIO-001 cellulase on generic cellulose film surface catalysis
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-001 controlled virtual-experiment scaffold.
+      confidence_level: exploratory_assumption
+      bio_milestone: BIO-001
+      notes: Mechanistic process compatibility for the first insoluble cellulose-like surface-degradation pilot.
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    required_bond_classes:
+      - beta_1_4_glycosidic
+    process_type: surface_catalysis
+    required_parameters:
+      - cellulose_surface_rate_constant
+      - cellulose_adsorption_constant
+      - cellulose_accessible_surface_area
+      - initial_cellulose_film_mass
+      - cellulase_initial_concentration
+    parameter_roles:
+      surface_rate_constant: cellulose_surface_rate_constant
+      adsorption_constant: cellulose_adsorption_constant
+      accessible_surface_area: cellulose_accessible_surface_area
+      substrate_initial_amount: initial_cellulose_film_mass
+      enzyme_initial_concentration: cellulase_initial_concentration
+    product_map_required: true
+    notes: >
+      Surface-catalysis compatibility for BIO-001 only. It represents enzyme
+      action on accessible beta-1,4-glycosidic surface sites with soluble
+      product release; it does not represent whole-fungus growth, secretion,
+      uptake, oxygen limitation, or lignocellulose structure.
+
   - record_id: beta_glucosidase_cellobiose_homogeneous_mm
     name: beta-glucosidase on cellobiose homogeneous Michaelis-Menten
     maturity: literature_metadata

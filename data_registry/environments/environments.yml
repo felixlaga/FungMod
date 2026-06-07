@@ -32,6 +32,37 @@ records:
         notes: Oxygen is intentionally not represented in this toy R1 registry case.
     notes: Toy/development environment only; not empirical data.
 
+  - record_id: bio001_cellulose_surface_pilot_environment
+    name: BIO-001 cellulose surface pilot assay context
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-001 controlled virtual-experiment scaffold.
+      confidence_level: exploratory_assumption
+      environment_effect_status: metadata_only
+      notes: User-specified virtual-experiment context; no pH or temperature response law is applied.
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: user-supplied exploratory condition
+        confidence_level: exploratory_assumption
+        notes: Assay-context temperature for BIO-001 virtual experiment; not used by a calibrated response model.
+      ph:
+        kind: exact
+        value: 5.0
+        units: dimensionless
+        source: user-supplied exploratory condition
+        confidence_level: exploratory_assumption
+        notes: Assay-context pH for BIO-001 virtual experiment; not used by a calibrated response model.
+      oxygen_concentration:
+        kind: not_applicable
+        units: null
+        source: FungMod BIO-001 controlled virtual-experiment scaffold.
+        confidence_level: exploratory_assumption
+        notes: Oxygen limitation is not represented in the enzyme-mediated surface-degradation pilot.
+    notes: BIO-001 context only; environment is metadata and does not modify kinetics.
+
   - record_id: sabiork_reaction_618_selected_conditions
     name: SABIO-RK Reaction 618 selected assay conditions
     maturity: literature_processed

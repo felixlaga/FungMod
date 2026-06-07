@@ -14,6 +14,22 @@ records:
       - toy_sugar_product
     notes: Toy/development record only; not a real fungus or literature capability.
 
+  - record_id: generic_cellulase_source
+    name: Generic cellulase enzyme source
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-001 controlled virtual-experiment scaffold.
+      confidence_level: exploratory_assumption
+      notes: User-specified enzyme-source metadata for the first insoluble cellulose surface-degradation pilot; not a whole-fungus record.
+    enzyme_classes:
+      - cellulase_generic
+    assimilable_products: []
+    notes: >
+      Enzyme-source pseudo-record for an enzyme-mediated cellulose surface
+      degradation pilot. This is not a whole-fungus growth model and must not
+      imply secretion, uptake, biomass growth, oxygen limitation, or organism-
+      level degradation.
+
   - record_id: sabiork_beta_glucosidase_source
     name: SABIO-RK Reaction 618 beta-glucosidase source
     maturity: literature_processed

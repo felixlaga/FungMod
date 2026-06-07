@@ -325,7 +325,10 @@ def _resolve_role_records(
             f"for: {', '.join(missing_roles)}."
         )
     records: dict[str, ParameterRecord] = {}
-    for role in required_roles:
+    roles_to_resolve = tuple(
+        dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys()))
+    )
+    for role in roles_to_resolve:
         symbol = compatibility.parameter_roles[role]
         record = _best_exploratory_parameter_record(
             registry=registry,

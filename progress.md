@@ -19,6 +19,37 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## BIO-001 Cellulose Surface Degradation
+
+Date: 2026-06-07
+
+Status: `complete` for a first exploratory insoluble cellulose-like
+surface-degradation virtual experiment.
+
+Completed in this pass:
+
+- Added BIO-001 registry records for a generic cellulase enzyme source,
+  cellulase-like enzyme class, insoluble cellulose-film substrate, pilot assay
+  environment, and surface-catalysis process compatibility.
+- Added explicitly marked `exploratory_prior` parameter records for surface
+  catalytic rate, adsorption constant, accessible surface area, initial
+  cellulose-film mass, and initial cellulase concentration.
+- Reused the existing generic `SurfaceCatalysisProcess` and
+  `SurfaceCatalysisFactory`; no duplicate surface process was introduced.
+- Added exploratory configured-model mode support so sampled BIO-001 runs do
+  not need to masquerade as toy runs.
+- Extended virtual-experiment output tables with surface-specific degradation
+  metrics: solid substrate remaining/degraded fraction, accessible-site
+  fraction proxy, soluble product concentration, and final product yield.
+- Added BIO-001 limitations stating that this is enzyme-mediated surface
+  degradation, not whole-fungus growth, secretion, uptake, biomass, oxygen
+  limitation, or full lignocellulose modeling.
+- Added the executable notebook
+  `notebooks/07_bio001_cellulose_surface_virtual_experiment.ipynb`.
+
+See `foundation_progress/BIO_001_CELLULOSE_SURFACE_DEGRADATION.md` for scope,
+parameters, output tables, and limitations.
+
 ## DATA-002 SABIO-RK Reaction 618 Parameter Ranges
 
 Date: 2026-06-07

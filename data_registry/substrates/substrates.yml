@@ -32,6 +32,38 @@ records:
         notes: Artificial exact value for registry loader tests only.
     notes: Toy/development substrate only; not real cellulose data.
 
+  - record_id: cellulose_film_generic
+    name: Generic insoluble cellulose film
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-001 controlled virtual-experiment scaffold.
+      confidence_level: exploratory_assumption
+      notes: Generic cellulose-like solid substrate metadata for a surface-degradation pilot; not a literature dataset.
+    substrate_class: cellulose_film_generic
+    physical_state: solid_polymer
+    bond_classes:
+      - beta_1_4_glycosidic
+    products:
+      - soluble_cellulose_hydrolysis_product
+    properties:
+      accessible_surface_area:
+        kind: unknown
+        units: meter ** 2
+        source: user-supplied exploratory range
+        confidence_level: exploratory_assumption
+        notes: BIO-001 does not provide a literature-curated cellulose-film accessible surface area; simulation uses explicit exploratory parameter records.
+      accessible_site_fraction:
+        kind: unknown
+        units: dimensionless
+        source: user-supplied exploratory range
+        confidence_level: exploratory_assumption
+        notes: Accessible-site fraction is represented in BIO-001 output as a derived proportional proxy, not as an independently calibrated state.
+    notes: >
+      Generic insoluble cellulose-like film for BIO-001. The record captures
+      physical state, beta-1,4-glycosidic bond accessibility metadata, and
+      product class only; it does not claim measured surface area,
+      crystallinity, pore accessibility, or lignocellulose composition.
+
   - record_id: cellobiose
     name: Cellobiose
     maturity: literature_metadata

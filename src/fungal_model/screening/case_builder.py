@@ -188,7 +188,11 @@ def _exact_role_parameters(
         )
 
     resolved: dict[str, ParameterRecord] = {}
-    for role in required_roles:
+    roles_to_resolve = _roles_to_resolve(
+        compatibility=compatibility,
+        required_roles=required_roles,
+    )
+    for role in roles_to_resolve:
         symbol = compatibility.parameter_roles[role]
         record = _best_parameter_record(
             registry=registry,
@@ -228,54 +232,57 @@ def _surface_catalysis_config_data(
     parameter_records: Mapping[str, ParameterRecord],
     output_directory: str | None,
 ) -> dict[str, Any]:
-    substrate_state = "solid_substrate_amount"
-    product_state = "released_product_amount"
-    catalyst_state = "free_catalyst_concentration"
+    bio001 = _is_bio001_surface_case(compatibility)
+    substrate_state = "solid_substrate_remaining" if bio001 else "solid_substrate_amount"
+    product_state = "soluble_product_concentration" if bio001 else "released_product_amount"
+    catalyst_state = "free_enzyme_concentration" if bio001 else "free_catalyst_concentration"
     product_map_id = "registry_case_release_map"
     primary_bond = substrate.bond_classes[0]
+    substrate_initial = parameter_records.get("substrate_initial_amount")
+    catalyst_initial = parameter_records.get("enzyme_initial_concentration")
+    substrate_units = _record_units(substrate_initial, role="substrate_initial_amount") if substrate_initial is not None else "kilogram"
+    catalyst_units = _record_units(catalyst_initial, role="enzyme_initial_concentration") if catalyst_initial is not None else "mole / liter"
+    provenance = _surface_catalysis_provenance(
+        registry=registry,
+        compatibility=compatibility,
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        environment_id=environment_id,
+        parameter_records=parameter_records,
+        bio001=bio001,
+    )
     return {
         "kind": "model_config",
-        "name": f"toy registry case {fungus_id} on {substrate_id}",
-        "mode": "toy",
-        "maturity": "framework_benchmark",
-        "provenance": {
-            "source": "FungMod R3 toy registry case builder.",
-            "measurement_method": "software registry-to-config assembly test",
-            "confidence_level": "testing",
-            "notes": (
-                "Toy/development plug-and-play assembly fixture only; not "
-                "empirical evidence and not a biological model."
-            ),
-            "validity_range": "R3 framework tests only",
-            "units": "not_applicable",
-            "registry_id": registry.registry_id,
-            "fungus_id": fungus_id,
-            "substrate_id": substrate_id,
-            "environment_id": environment_id,
-            "process_compatibility_id": compatibility.record_id,
-        },
+        "name": _surface_config_name(fungus_id=fungus_id, substrate_id=substrate_id, bio001=bio001),
+        "mode": "exploratory" if bio001 else "toy",
+        "maturity": "exploratory" if bio001 else "framework_benchmark",
+        "provenance": provenance,
         "entities": {
             "geometry": {
                 "id": "geometry",
                 "loader": "well_mixed",
-                "data": _toy_geometry_data(),
+                "data": _bio001_geometry_data() if bio001 else _toy_geometry_data(),
             },
             "substrates": [
                 {
                     "id": substrate_id,
                     "loader": "generic_solid",
-                    "data": _generic_substrate_data(
+                    "data": _surface_substrate_data(
                         substrate=substrate,
                         enzyme_class=compatibility.enzyme_class,
+                        provenance=provenance,
+                        bio001=bio001,
                     ),
                 }
             ],
             "enzymes": [
                 {
                     "id": compatibility.enzyme_class,
-                    "data": _toy_enzyme_data(
+                    "data": _surface_enzyme_data(
                         compatibility=compatibility,
                         substrate=substrate,
+                        provenance=provenance,
+                        bio001=bio001,
                     ),
                 }
             ],
@@ -285,17 +292,29 @@ def _surface_catalysis_config_data(
                     "loader": "one_to_one",
                     "data": {
                         "kind": "product_map",
-                        "name": "toy registry one-to-one product release map",
+                        "name": (
+                            "BIO-001 cellulose soluble product release map"
+                            if bio001
+                            else "toy registry one-to-one product release map"
+                        ),
                         "product_map_type": "one_to_one",
-                        "maturity": "framework_benchmark",
+                        "maturity": "exploratory" if bio001 else "framework_benchmark",
                         "provenance": {
-                            "source": "FungMod R3 toy registry case builder.",
-                            "confidence_level": "testing",
-                            "notes": "Toy product map for config workflow tests only.",
+                            "source": provenance["source"],
+                            "confidence_level": provenance["confidence_level"],
+                            "notes": (
+                                "Mass-equivalent soluble product release map for BIO-001; not full cellulose stoichiometry."
+                                if bio001
+                                else "Toy product map for config workflow tests only."
+                            ),
                         },
                         "substrate_state": substrate_state,
                         "product_state": product_state,
-                        "notes": "Mass-equivalent toy map; not a chemical stoichiometry claim.",
+                        "notes": (
+                            "Mass-equivalent one-to-one map for the BIO-001 pilot; product is a soluble hydrolysis-product class."
+                            if bio001
+                            else "Mass-equivalent toy map; not a chemical stoichiometry claim."
+                        ),
                     },
                 }
             ],
@@ -304,7 +323,11 @@ def _surface_catalysis_config_data(
             {
                 "id": "registry_case_parameters",
                 "parameters": [
-                    _parameter_config(record, role=role)
+                    (
+                        _exploratory_surface_parameter_config(record, role=role)
+                        if bio001
+                        else _parameter_config(record, role=role)
+                    )
                     for role, record in parameter_records.items()
                 ],
             }
@@ -318,29 +341,47 @@ def _surface_catalysis_config_data(
                     "catalyst": catalyst_state,
                     "product": product_state,
                     "bond_type": primary_bond,
+                    "accessible_site_pool": "cellulose accessible beta-1,4-glycosidic surface" if bio001 else "configured accessible site pool",
                 },
                 "parameters": {
                     role: record.parameter_symbol
                     for role, record in parameter_records.items()
+                    if role in SURFACE_CATALYSIS_PARAMETER_ROLES
                 },
                 "product_map": product_map_id,
                 "assumptions": [
-                    "Toy registry case builder only.",
-                    "Uses the existing generic surface-catalysis factory without adding biology.",
+                    *(
+                        [
+                            "Enzyme-mediated insoluble cellulose surface degradation pilot.",
+                            "Accessible surface area is constant within each sample; surface renewal and morphology are not modeled.",
+                            "Soluble product release is represented by a mass-equivalent product class.",
+                        ]
+                        if bio001
+                        else [
+                            "Toy registry case builder only.",
+                            "Uses the existing generic surface-catalysis factory without adding biology.",
+                        ]
+                    ),
                 ],
             }
         ],
         "initial_state": {
             "states": {
-                substrate_state: {"value": 0.0001, "units": "kilogram"},
-                product_state: {"value": 0.0, "units": "kilogram"},
-                catalyst_state: {"value": 1.0, "units": "mole / liter"},
+                substrate_state: {
+                    "value": _record_exact_value(substrate_initial, role="substrate_initial_amount") if substrate_initial is not None else 0.0001,
+                    "units": substrate_units,
+                },
+                product_state: {"value": 0.0, "units": substrate_units},
+                catalyst_state: {
+                    "value": _record_exact_value(catalyst_initial, role="enzyme_initial_concentration") if catalyst_initial is not None else 1.0,
+                    "units": catalyst_units,
+                },
             }
         },
         "time": {
             "start": {"value": 0.0, "units": "second"},
-            "stop": {"value": 20.0, "units": "second"},
-            "points": 41,
+            "stop": {"value": 4000.0 if bio001 else 20.0, "units": "second"},
+            "points": 81 if bio001 else 41,
         },
         "validators": [
             {
@@ -363,6 +404,173 @@ def _surface_catalysis_config_data(
             "save": ["record", "validation_report"],
             "plots": ["state_trajectories"],
         },
+    }
+
+
+def _roles_to_resolve(
+    *,
+    compatibility: ProcessCompatibilityRecord,
+    required_roles: tuple[str, ...],
+) -> tuple[str, ...]:
+    return tuple(dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys())))
+
+
+def _is_bio001_surface_case(compatibility: ProcessCompatibilityRecord) -> bool:
+    return (
+        compatibility.provenance.get("bio_milestone") == "BIO-001"
+        or compatibility.record_id == "bio001_cellulase_cellulose_film_surface_catalysis"
+    )
+
+
+def _surface_config_name(*, fungus_id: str, substrate_id: str, bio001: bool) -> str:
+    if bio001:
+        return f"BIO-001 cellulose surface virtual experiment {fungus_id} on {substrate_id}"
+    return f"toy registry case {fungus_id} on {substrate_id}"
+
+
+def _surface_catalysis_provenance(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    parameter_records: Mapping[str, ParameterRecord],
+    bio001: bool,
+) -> dict[str, Any]:
+    if not bio001:
+        return {
+            "source": "FungMod R3 toy registry case builder.",
+            "measurement_method": "software registry-to-config assembly test",
+            "confidence_level": "testing",
+            "notes": (
+                "Toy/development plug-and-play assembly fixture only; not "
+                "empirical evidence and not a biological model."
+            ),
+            "validity_range": "R3 framework tests only",
+            "units": "not_applicable",
+            "registry_id": registry.registry_id,
+            "fungus_id": fungus_id,
+            "substrate_id": substrate_id,
+            "environment_id": environment_id,
+            "process_compatibility_id": compatibility.record_id,
+        }
+    return {
+        "source": "FungMod BIO-001 controlled virtual-experiment scaffold.",
+        "measurement_method": "registry assembly from user-supplied exploratory ValueSpec samples",
+        "confidence_level": "exploratory_assumption",
+        "validity_range": "BIO-001 cellulose surface-degradation pilot only",
+        "units": "not_applicable",
+        "bio_milestone": "BIO-001",
+        "registry_id": registry.registry_id,
+        "fungus_id": fungus_id,
+        "substrate_id": substrate_id,
+        "environment_id": environment_id,
+        "process_compatibility_id": compatibility.record_id,
+        "parameter_record_ids": {
+            role: record.record_id
+            for role, record in parameter_records.items()
+        },
+        "parameter_value_sources": {
+            role: record.value.source
+            for role, record in parameter_records.items()
+        },
+        "notes": (
+            "Exploratory enzyme-mediated insoluble cellulose surface-degradation "
+            "pilot. It is not a whole-fungus model and does not include secretion, "
+            "uptake, biomass growth, oxygen limitation, or full lignocellulose structure."
+        ),
+    }
+
+
+def _surface_substrate_data(
+    *,
+    substrate: SubstrateRecord,
+    enzyme_class: str,
+    provenance: Mapping[str, Any],
+    bio001: bool,
+) -> dict[str, Any]:
+    if not bio001:
+        return _generic_substrate_data(substrate=substrate, enzyme_class=enzyme_class)
+    return {
+        "kind": "substrate",
+        "name": substrate.name,
+        "substrate_type": "generic_solid",
+        "chemical_class": substrate.substrate_class,
+        "physical_state": _configured_physical_state(substrate.physical_state),
+        "bond_types": list(substrate.bond_classes),
+        "accessible_bonds": list(substrate.bond_classes),
+        "required_enzyme_classes": [enzyme_class],
+        "degradation_products": [
+            {
+                "name": product,
+                "source": provenance["source"],
+                "notes": "BIO-001 soluble cellulose hydrolysis-product class; not a full stoichiometric speciation model.",
+            }
+            for product in substrate.products
+        ],
+        "completeness": "partial",
+        "default_degradation_model": "heterogeneous_surface",
+        "water_activity_dependence": "unknown",
+        "provenance": {
+            "source": provenance["source"],
+            "confidence_level": provenance["confidence_level"],
+            "notes": "Generic insoluble cellulose-like film metadata for BIO-001 surface degradation.",
+        },
+        "parameters": [],
+    }
+
+
+def _surface_enzyme_data(
+    *,
+    compatibility: ProcessCompatibilityRecord,
+    substrate: SubstrateRecord,
+    provenance: Mapping[str, Any],
+    bio001: bool,
+) -> dict[str, Any]:
+    if not bio001:
+        return _toy_enzyme_data(compatibility=compatibility, substrate=substrate)
+    return {
+        "kind": "enzyme",
+        "name": "Generic cellulase-like enzyme source",
+        "enzyme_class": compatibility.enzyme_class,
+        "target_bond_types": list(compatibility.required_bond_classes),
+        "target_substrate_classes": [substrate.substrate_class],
+        "target_substrate_names": [substrate.name],
+        "validity_labels": ["exploratory_metadata", "surface_catalysis", "enzyme_mediated_cellulose_degradation"],
+        "provenance": {
+            "source": provenance["source"],
+            "measurement_method": provenance["measurement_method"],
+            "confidence_level": provenance["confidence_level"],
+            "notes": (
+                "Generic cellulase-like enzyme metadata for BIO-001. This does "
+                "not model secretion, uptake, biomass growth, or enzyme inactivation."
+            ),
+            "validity_range": provenance["validity_range"],
+            "units": "not_applicable",
+        },
+        "catalytic_parameters": [],
+        "adsorption_parameters": [],
+        "parameters": [],
+    }
+
+
+def _bio001_geometry_data() -> dict[str, Any]:
+    return {
+        "kind": "geometry",
+        "name": "BIO-001 well-mixed enzyme assay context",
+        "geometry_type": "well_mixed",
+        "provenance": {
+            "source": "FungMod BIO-001 controlled virtual-experiment scaffold.",
+            "measurement_method": "user-specified virtual-experiment context",
+            "confidence_level": "exploratory_assumption",
+            "notes": "Geometry context for an enzyme-mediated surface-degradation pilot; no spatial gradients are modeled.",
+            "validity_range": "BIO-001 cellulose surface-degradation pilot only",
+            "units": "not_applicable",
+        },
+        "volume": {"value": 100.0, "units": "milliliter"},
+        "surface_area": {"value": 0.5, "units": "meter ** 2"},
+        "parameters": [],
     }
 
 
@@ -659,6 +867,23 @@ def _parameter_config(record: ParameterRecord, *, role: str) -> dict[str, Any]:
         "notes": f"{record.notes} Registry case role: {role}. Toy/development only.",
         "measurement_method": "registry exact ValueSpec",
         "validity_range": "R3 toy registry case only",
+    }
+
+
+def _exploratory_surface_parameter_config(record: ParameterRecord, *, role: str) -> dict[str, Any]:
+    value = _record_exact_value(record, role=role)
+    return {
+        "name": record.name,
+        "symbol": record.parameter_symbol,
+        "value": value,
+        "units": _record_units(record, role=role),
+        "uncertainty": 0.0,
+        "source": record.value.source or _record_source(record),
+        "confidence_level": record.value.confidence_level
+        or record.provenance.get("confidence_level", "exploratory_assumption"),
+        "notes": f"{record.notes} Registry case role: {role}.",
+        "measurement_method": "sampled from user-supplied exploratory registry ValueSpec",
+        "validity_range": "BIO-001 cellulose surface-degradation pilot only",
     }
 
 

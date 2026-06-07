@@ -24,8 +24,8 @@ REQUIRED_MODEL_CONFIG_FIELDS = (
     "outputs",
 )
 
-VALID_MODEL_MODES = ("toy", "scientific", "strict")
-VALID_MODEL_MATURITIES = ("toy", "synthetic", "framework_benchmark", "scientific")
+VALID_MODEL_MODES = ("toy", "exploratory", "scientific", "strict")
+VALID_MODEL_MATURITIES = ("toy", "synthetic", "framework_benchmark", "exploratory", "scientific")
 
 
 class ModelConfigError(ValueError):

@@ -410,6 +410,27 @@ def _time_series_rows(
                         "source": "derived_from_states",
                     }
                 )
+                if _is_surface_case(sample_context):
+                    output.append(
+                        {
+                            **base,
+                            "state": "solid_substrate_degraded_fraction",
+                            "state_role": "derived_solid_substrate_loss",
+                            "value": degraded_fraction,
+                            "units": "dimensionless",
+                            "source": "derived_from_solid_substrate_state",
+                        }
+                    )
+                    output.append(
+                        {
+                            **base,
+                            "state": "accessible_site_fraction_remaining",
+                            "state_role": "derived_accessible_site_proxy",
+                            "value": substrate_value / initial_substrate,
+                            "units": "dimensionless",
+                            "source": "derived_from_solid_substrate_state",
+                        }
+                    )
         if product_state is not None and initial_product is not None:
             product_value = _optional_float(row.get(product_state))
             if product_value is not None:
@@ -485,16 +506,54 @@ def _final_metric_rows(
                     "",
                 )
             )
+            if _is_surface_case(sample_context):
+                final_fraction_remaining = final_substrate / initial_substrate
+                rows.append(
+                    _metric_row(
+                        base,
+                        "solid_substrate_remaining",
+                        final_substrate,
+                        final_row.get(f"{substrate_state}_units", ""),
+                        "computed",
+                        "",
+                    )
+                )
+                rows.append(
+                    _metric_row(
+                        base,
+                        "solid_substrate_degraded_fraction",
+                        1.0 - final_fraction_remaining,
+                        "dimensionless",
+                        "computed",
+                        "",
+                    )
+                )
+                rows.append(
+                    _metric_row(
+                        base,
+                        "accessible_site_fraction_remaining",
+                        final_fraction_remaining,
+                        "dimensionless",
+                        "computed",
+                        "Derived as proportional to remaining solid substrate; accessible surface is not dynamically renewed.",
+                    )
+                )
     if product_state is None or final_product is None:
         rows.append(_metric_row(base, "final_product_concentration", "", "not_applicable", "not_applicable", "No product state mapping was available."))
         rows.append(_metric_row(base, "final_product_formed", "", "not_applicable", "not_applicable", "No product state mapping was available."))
     else:
         product_units = final_row.get(f"{product_state}_units", "")
         rows.append(_metric_row(base, "final_product_concentration", final_product, product_units, "computed", ""))
+        if _is_surface_case(sample_context):
+            rows.append(_metric_row(base, "soluble_product_concentration", final_product, product_units, "computed", ""))
         if initial_product is None:
             rows.append(_metric_row(base, "final_product_formed", "", product_units, "not_applicable", "Initial product was unavailable."))
         else:
             rows.append(_metric_row(base, "final_product_formed", final_product - initial_product, product_units, "computed", ""))
+            if initial_substrate is None or initial_substrate == 0.0:
+                rows.append(_metric_row(base, "final_product_yield", "", "dimensionless", "not_applicable", "Initial substrate was unavailable or zero."))
+            else:
+                rows.append(_metric_row(base, "final_product_yield", (final_product - initial_product) / initial_substrate, "dimensionless", "computed", ""))
     for metric_name in ("maximum_product_release_rate", "maximum_substrate_depletion_rate"):
         if max_rate is None:
             rows.append(_metric_row(base, metric_name, "", "not_applicable", "not_applicable", "No process-rate trajectory was available."))
@@ -865,6 +924,25 @@ def _limitation_rows(
                 case.process_type,
             )
         )
+    if case.process_type == "surface_catalysis":
+        rows.append(
+            _limitation_row(
+                context,
+                "not_modelled",
+                "important",
+                "This is enzyme-mediated surface degradation of an insoluble substrate, not a whole-fungus growth, secretion, uptake, biomass, or oxygen-limitation model.",
+                case.process_type,
+            )
+        )
+        rows.append(
+            _limitation_row(
+                context,
+                "surface_accessibility",
+                "important",
+                "Accessible surface area is sampled as a constant parameter in each run; surface renewal, pore accessibility, crystallinity, and morphology changes are not modeled.",
+                case.process_type,
+            )
+        )
     return rows
 
 
@@ -902,7 +980,8 @@ def _role_parameter_records(
     if assembler is None:
         return {}
     records: dict[str, ParameterRecord] = {}
-    for role in assembler.required_parameter_roles:
+    roles = tuple(dict.fromkeys((*assembler.required_parameter_roles, *compatibility.parameter_roles.keys())))
+    for role in roles:
         symbol = compatibility.parameter_roles.get(role)
         if symbol is None:
             continue
@@ -981,6 +1060,10 @@ def _role_for_state(state_name: str, state_roles: Mapping[str, str]) -> str:
         if configured_state == state_name:
             return "enzyme" if role == "catalyst" else role
     return ""
+
+
+def _is_surface_case(context: Mapping[str, Any]) -> bool:
+    return context.get("process_type") == "surface_catalysis"
 
 
 def _initial_state_value(
