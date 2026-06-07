@@ -1,8 +1,9 @@
 # Synthetic Experiment Datasets
 
-Synthetic datasets are infrastructure fixtures generated from known benchmark
-models, equations, or saved model outputs. They are useful for loader,
-comparison, and future calibration tests because the intended signal is known.
+Synthetic datasets in this folder are internal infrastructure fixtures
+generated from known benchmark models, equations, or saved model outputs. They
+are useful for loader, comparison, and calibration tests because the intended
+signal is known.
 
 Synthetic datasets are not literature data and must not be described as
 empirical evidence. They may use toy model configs as generation inputs, but

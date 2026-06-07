@@ -52,6 +52,14 @@ def code_cells(notebook: dict) -> list[str]:
     ]
 
 
+def markdown_cells(notebook: dict) -> list[str]:
+    return [
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell.get("cell_type") == "markdown"
+    ]
+
+
 def test_required_notebooks_exist_and_import_package_code() -> None:
     for name in NOTEBOOKS:
         notebook = load_notebook(name)
@@ -60,6 +68,14 @@ def test_required_notebooks_exist_and_import_package_code() -> None:
         for pattern in PUBLIC_API_PATTERNS:
             assert pattern.search(source), f"{name} does not demonstrate required public API pattern {pattern.pattern!r}"
         assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
+
+
+def test_foundation_notebooks_are_labelled_software_test_only() -> None:
+    for name in NOTEBOOKS:
+        markdown = "\n".join(markdown_cells(load_notebook(name))).lower()
+
+        assert "software-test fixture only" in markdown
+        assert "not a researcher-facing scientific example" in markdown
 
 
 def test_notebooks_do_not_define_core_classes_or_rate_laws() -> None:

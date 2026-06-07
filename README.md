@@ -1,15 +1,19 @@
 # FungMod
 
-Before implementing any new feature, read:
-foundation_progress/00_START_HERE_FOUNDATION_FIRST.md
-foundation_progress/01_CODEX_NO_SHORTCUT_CONTRACT.md
-foundation_progress/02_GUARDRAILS_AND_TESTS_SPEC.md
-foundation_progress/11_MILESTONE_SEQUENCE_FOUNDATION_ONLY.md
+Before changing the codebase, start with the active directive:
 
-Do not implement real biology yet. First complete the foundation milestones: remove hardcoding, implement native model execution, implement generic configured workflows, add guardrails, and make the package architecture Atmodeller-grade.
+- `foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md`
 
+Historical foundation-first plans are archived under `old_progress/`. They are
+useful context, but the active goal is now the virtual-experiment engine:
+simulate degradation dynamics over time without hiding assumptions,
+uncertainty, provenance, missing inputs, or unsupported biology.
 
-FungMod is a scientific Python codebase for building a physically grounded fungal-substrate degradation model. The long-term target is a modular API that can simulate a fungus, substrate, environment, geometry, and parameter set without hiding assumptions or provenance.
+FungMod is a scientific Python codebase for building a physically grounded
+fungal- and enzyme-mediated substrate-degradation virtual-experiment engine.
+The long-term target is a modular API that can simulate a fungus or enzyme
+source, substrate, environment, and parameter set without inventing biological
+facts.
 
 This repository currently implements the validated foundation plus the first
 basic kinetics layer:
@@ -51,14 +55,17 @@ basic kinetics layer:
 - schema-checked config loaders with explicit unknown-value handling,
 - an optional PET plugin convenience helper that delegates to the generic
   configured workflow with an explicit plugin registry,
-- a minimal first-order `A -> B` benchmark example,
-- a homogeneous Michaelis-Menten toy-substrate benchmark example.
-- a PET surface-hydrolysis benchmark example.
-- a PET temperature/pH modifier benchmark example.
-- a fungal enzyme secretion and product-coupled growth benchmark example.
-- a 1D PET film enzyme-diffusion benchmark example.
+- software-test benchmark configs that are explicitly non-scientific;
+- a registry-backed exploratory virtual-experiment API for Reaction 618 and
+  the controlled BIO-001 surface-degradation pilot;
+- schema-versioned virtual-experiment output tables with provenance,
+  limitations, missing-parameter, suggested-experiment, and range-use fields.
 
-It does not yet implement full thermodynamic flux analysis, resolved intracellular metabolism, 2D/3D spatial models, calibration, or uncertainty propagation. Those stages are documented in `progress.md` and should be added only after the earlier layer has tests and validation.
+It does not yet implement full thermodynamic flux analysis, resolved intracellular
+metabolism, 2D/3D spatial models, publication-grade calibration against
+curated biological datasets, or global uncertainty analysis. Those stages are
+documented in `progress.md` and should be added only after the current virtual
+experiment layer has tests, provenance, and validation.
 
 ## Scientific Philosophy
 
@@ -97,23 +104,25 @@ Branch protection expectations are documented in `.github/BRANCH_PROTECTION.md`.
 The protected default branch should require pull requests, passing CI,
 up-to-date branches, no force pushes, and no unaudited direct bypass.
 
-## Run The Foundation Benchmarks
+## Run A Virtual Experiment
 
 ```python
-from fungal_model import run_configured_model
-from fungal_model.plugins.pet import pet_substrate_loader_registry
+from fungal_model import VirtualExperiment
 
-run_configured_model("data/model_configs/toy_homogeneous_ab.yml")
-run_configured_model("data/model_configs/toy_surface_dummy_non_pet.yml")
-run_configured_model(
-    "data/model_configs/toy_surface_pet_plugin.yml",
-    substrate_registry=pet_substrate_loader_registry(),
+study = VirtualExperiment.from_registry(
+    fungi=["sabiork_beta_glucosidase_source"],
+    substrates=["cellobiose"],
+    environments=["sabiork_reaction_618_selected_conditions"],
 )
+
+result = study.simulate(mode="exploratory", n_samples=128)
 ```
 
-Each configured run saves a plot, simulation record, validation report,
-assumptions file, process-build decisions, entity snapshots, and manifest under
-its configured `outputs/` directory unless an explicit `output_dir` is supplied.
+The standard output folder includes long-format time series, final states,
+final metrics, threshold times, sampled parameters, summary metrics,
+provenance, limitations, missing-parameter and suggested-experiment tables, and
+a versioned data dictionary/schema. Exploratory priors remain allowed, but the
+tables mark them as assumptions rather than literature-curated values.
 
 ## Foundation Public API
 
@@ -144,7 +153,9 @@ import `pet_substrate_loader_registry`, `PETSurfaceWorkflowConfig`, and
 
 ## Notebooks
 
-The `notebooks/examples/` folder contains the foundation notebook set:
+The `notebooks/examples/` folder contains software-test notebooks only. They
+exercise configured workflow plumbing and use toy fixtures; they are not
+researcher-facing scientific examples:
 
 - `00_quickstart.ipynb`
 - `01_config_entity_inspection.ipynb`
@@ -163,7 +174,13 @@ Top-level YAML configs live under `data/model_configs/`, `data/fungi/`,
 `fungal_model` as `load_fungus`, `load_substrate`, `load_enzyme`,
 `load_environment`, `load_geometry`, and `load_parameter_set`.
 
-Foundation model-config shells are available for:
+Toy and synthetic assets in `data/` are software-test or example fixtures, not
+scientific records. They remain available for tests and configured-workflow
+examples, but researcher-facing work should start from the registry-backed
+virtual-experiment API and inspect table provenance before interpreting any
+output.
+
+Internal software-test model-config shells include:
 
 - `data/model_configs/toy_homogeneous_ab.yml`
 - `data/model_configs/toy_surface_pet_plugin.yml`
@@ -241,17 +258,9 @@ configuration-facing artifacts:
 - `entity_snapshots/`
 - `output_manifest.json`
 
-Plugin-backed configs use the same function with explicit registry injection:
-
-```python
-from fungal_model import run_configured_model
-from fungal_model.plugins.pet import pet_substrate_loader_registry
-
-result = run_configured_model(
-    "data/model_configs/toy_surface_pet_plugin.yml",
-    substrate_registry=pet_substrate_loader_registry(),
-)
-```
+Plugin-backed configured runs use explicit registry injection. The bundled PET
+plugin config is an internal software-test fixture, not a scientific PET
+degradation record.
 
 The older PET convenience entry point now lives under
 `fungal_model.plugins.pet` and delegates to `run_configured_model`; the generic

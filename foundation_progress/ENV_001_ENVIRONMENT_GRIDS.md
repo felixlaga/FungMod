@@ -33,6 +33,11 @@ Generated grid environments are runtime metadata unless a later layer attaches
 an environmental response model. This distinction is written to output tables
 through `environment_source` and `environment_effect_status`.
 
+For metadata-only grids, `environment_summary.csv` also marks environment
+comparison, ranking, and response plotting as not allowed. Aggregate response
+metric columns are not populated for these rows because no environmental
+response model was applied.
+
 ## Reaction 618 Kinetics
 
 For SABIO-RK Reaction 618, the selected entry is scoped to 30 C and pH 5.0.
@@ -56,12 +61,15 @@ The standard tables include:
 - `oxygen`
 - `environment_source`
 - `environment_effect_status`
+- `environment_ranking_allowed`
+- `environment_response_plot_allowed`
+- `environment_guardrail`
 
 ## Remaining Limitations
 
 - Runtime grid environments are not persisted to the registry.
-- Metadata-only environment cases can compare output tables by context, but do
-  not claim environmental rate dependence.
+- Metadata-only environment cases can be inspected by context, but must not be
+  ranked or plotted as environmental rate-response models.
 - Broad literature ranges remain provenance/uncertainty records, not calibrated
   pH or temperature response curves.
 - Environment heatmap plots are not part of ENV-001; tables remain the primary

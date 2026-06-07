@@ -96,10 +96,38 @@ def test_load_exact_range_distribution_and_unknown_parameter_records() -> None:
 
     assert exact.value.kind == "exact"
     assert range_record.value.kind == "range"
+    assert range_record.allowed_use == "software_tests_only_not_scientific"
     assert distribution.value.kind == "distribution"
     assert distribution.value.distribution == "loguniform"
+    assert distribution.range_interpretation == "software_test_fixture_not_scientific_uncertainty"
     assert unknown.value.kind == "unknown"
+    assert unknown.allowed_use == "software_tests_only_not_scientific"
     assert exact_adsorption.value.kind == "exact"
+
+
+def test_parameter_records_expose_range_use_semantics() -> None:
+    registry = load_registry(REGISTRY_INDEX)
+
+    literature_range = registry.get_parameter_records(
+        parameter_symbol="Km_cellobiose",
+        maturity="literature_range",
+    )[0]
+    exploratory_prior = registry.get_parameter_records(
+        parameter_symbol="enzyme_concentration_beta_glucosidase",
+        maturity="exploratory_prior",
+    )[0]
+    selected_exact = registry.get_parameter_records(
+        parameter_symbol="Km_cellobiose",
+        maturity="literature_processed",
+    )[0]
+
+    assert literature_range.range_scope == "all_eligible"
+    assert literature_range.range_interpretation == "cross_entry_literature_spread_not_selected_entry_uncertainty"
+    assert literature_range.allowed_use == "exploratory_screening_only_not_calibrated_uncertainty_not_environment_response"
+    assert exploratory_prior.range_scope == "user_supplied_case_prior"
+    assert exploratory_prior.allowed_use == "exploratory_simulation_only_not_literature_curated"
+    assert selected_exact.range_scope == "not_applicable"
+    assert selected_exact.allowed_use == "scientific_or_exploratory_when_all_other_inputs_are_valid"
 
 
 def test_duplicate_record_ids_fail(tmp_path: Path) -> None:

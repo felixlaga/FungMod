@@ -1,9 +1,15 @@
 # FungMod Data
 
-This folder holds human-editable fixtures and, later, curated scientific data.
-The current data-infrastructure layer is intentionally synthetic-first: it
-tests provenance, units, residuals, output bundles, and calibration plumbing
-without adding real fungal biology or literature-derived values.
+This folder holds human-editable software-test fixtures, examples, and, later,
+curated scientific data. The current data-infrastructure layer is intentionally
+synthetic-first: it tests provenance, units, residuals, output bundles, and
+calibration plumbing without adding real fungal biology or literature-derived
+values.
+
+Researcher-facing scientific inputs should be treated as registry-backed
+records with explicit provenance and maturity. Files whose names or metadata
+say `toy`, `synthetic`, `framework_benchmark`, or `exploratory_prior` are not
+scientific evidence.
 
 ## Maturity Labels
 
@@ -21,7 +27,10 @@ Toy and synthetic data are not empirical evidence.
 ## Current Layout
 
 The foundation configs still keep some legacy top-level fixture files under
-folders such as `substrates/`, `enzymes/`, `geometries/`, and `parameters/`.
+folders such as `model_configs/`, `product_maps/`, `fungi/`, `substrates/`,
+`enzymes/`, `geometries/`, and `parameters/`. These are internal software-test
+or example fixtures unless their records explicitly declare curated scientific
+provenance.
 New experiment and calibration infrastructure is organized by maturity under:
 
 - `experiments/synthetic/`;

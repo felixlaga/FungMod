@@ -1,7 +1,10 @@
 # FungMod Progress
 
-This is the active progress ledger for the long-term architecture roadmap in
-`FungMod_long_term_architecture_roadmap.md`.
+This is the active progress ledger for the virtual-experiment directive in
+`foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md`.
+
+Historical foundation-first and long-term roadmap notes are archived under
+`old_progress/`; they are context, not the active starting point.
 
 Update this file whenever a feature, test, example, notebook, or architectural
 milestone changes. The goal is that a future reader can quickly answer:
@@ -18,6 +21,36 @@ Status key:
 - `partial`: useful infrastructure exists, but the roadmap stage is not fully complete.
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
+
+## CLEANUP-001 / SCHEMA-001 Researcher Output Semantics
+
+Date: 2026-06-07
+
+Status: `complete` for the scoped cleanup/schema hardening pass.
+
+Completed in this pass:
+
+- Made the central virtual-experiment directive the active README/progress
+  entry point.
+- Relabeled toy/synthetic configured assets and notebooks as software-test or
+  example fixtures, not scientific records.
+- Added versioned virtual-experiment output schema files:
+  `virtual_experiment_output_schema.json` and
+  `virtual_experiment_output_data_dictionary.csv`.
+- Added standard `missing_parameters.csv` and `suggested_experiments.csv`
+  tables to virtual-experiment output bundles.
+- Added `range_scope`, `range_interpretation`, and `allowed_use` semantics to
+  registry parameter records and sampled/provenance output tables without
+  removing exact, range, distribution, unknown, or exploratory-prior support.
+- Renamed BIO-001 mass-valued product output from concentration wording to
+  amount wording.
+- Marked BIO-001 accessible-site fraction as a derived proxy rather than a
+  modeled accessibility state.
+- Added metadata-only environment-grid guardrails so environment summaries are
+  explicitly non-rankable and non-plottable as response models unless an
+  active response model or condition-specific parameter status is present.
+
+No new data, new biology, or scientific-value edits were added.
 
 ## BIO-001 Cellulose Surface Degradation
 
@@ -40,7 +73,7 @@ Completed in this pass:
   not need to masquerade as toy runs.
 - Extended virtual-experiment output tables with surface-specific degradation
   metrics: solid substrate remaining/degraded fraction, accessible-site
-  fraction proxy, soluble product concentration, and final product yield.
+  fraction proxy, soluble product amount, and final product yield.
 - Added BIO-001 limitations stating that this is enzyme-mediated surface
   degradation, not whole-fungus growth, secretion, uptake, biomass, oxygen
   limitation, or full lignocellulose modeling.

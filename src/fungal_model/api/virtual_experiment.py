@@ -314,6 +314,9 @@ def _runtime_environment_parameter_record(
         substrate_id=record.substrate_id,
         environment_id=environment_case.environment_id,
         value=record.value,
+        range_scope=record.range_scope,
+        range_interpretation=record.range_interpretation,
+        allowed_use=record.allowed_use,
     )
 
 

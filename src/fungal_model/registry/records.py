@@ -230,6 +230,9 @@ class ParameterRecord(RegistryRecord):
     substrate_id: str | None = None
     environment_id: str | None = None
     value: ValueSpec = field(default_factory=lambda: ValueSpec(kind="unknown", units=None))
+    range_scope: str = ""
+    range_interpretation: str = ""
+    allowed_use: str = ""
 
     def validate(self) -> ValidationResult:
         issues = self._common_issues()
@@ -254,6 +257,9 @@ class ParameterRecord(RegistryRecord):
                 "substrate_id": self.substrate_id,
                 "environment_id": self.environment_id,
                 "value": self.value.to_dict(),
+                "range_scope": self.range_scope,
+                "range_interpretation": self.range_interpretation,
+                "allowed_use": self.allowed_use,
             }
         )
         return data

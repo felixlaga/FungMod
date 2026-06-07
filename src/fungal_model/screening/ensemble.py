@@ -442,6 +442,9 @@ def _sample_record(
             confidence_level=record.value.confidence_level or record.provenance.get("confidence_level"),
             notes=f"Sample {sample_index} from original ValueSpec kind {record.value.kind}.",
         ),
+        range_scope=record.range_scope,
+        range_interpretation=record.range_interpretation,
+        allowed_use=record.allowed_use,
     )
 
 

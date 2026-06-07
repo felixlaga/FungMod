@@ -17,6 +17,13 @@ from fungal_model.api.metrics import (
     summarize_numeric_values,
     threshold_crossing_time,
 )
+from fungal_model.api.output_schema import (
+    DATA_DICTIONARY_COLUMNS,
+    OUTPUT_SCHEMA_VERSION,
+    output_data_dictionary_rows,
+    output_schema_document,
+    table_fieldnames,
+)
 from fungal_model.registry.records import ParameterRecord, RegistryRecord
 from fungal_model.registry.store import FungModRegistry
 from fungal_model.screening import (
@@ -74,18 +81,22 @@ def write_standard_tables(
         "environment_summary": destination / "environment_summary.csv",
         "provenance_table": destination / "provenance_table.csv",
         "limitations_table": destination / "limitations_table.csv",
+        "missing_parameters": destination / "missing_parameters.csv",
+        "suggested_experiments": destination / "suggested_experiments.csv",
+        "output_data_dictionary": destination / "virtual_experiment_output_data_dictionary.csv",
+        "output_schema": destination / "virtual_experiment_output_schema.json",
     }
-    _write_csv(paths["modelability_preflight"], table_rows["modelability_preflight"])
-    _write_csv(paths["case_summary"], table_rows["case_summary"])
-    _write_csv(paths["time_series_long"], table_rows["time_series_long"])
-    _write_csv(paths["final_states"], table_rows["final_states"])
-    _write_csv(paths["final_metrics"], table_rows["final_metrics"])
-    _write_csv(paths["threshold_times"], table_rows["threshold_times"])
-    _write_csv(paths["sampled_parameters"], table_rows["sampled_parameters"])
-    _write_csv(paths["summary_metrics"], table_rows["summary_metrics"])
-    _write_csv(paths["environment_summary"], table_rows["environment_summary"])
-    _write_csv(paths["provenance_table"], table_rows["provenance_table"])
-    _write_csv(paths["limitations_table"], table_rows["limitations_table"])
+    for table_name, rows in table_rows.items():
+        _write_table(paths[table_name], table_name=table_name, rows=rows)
+    _write_csv(
+        paths["output_data_dictionary"],
+        output_data_dictionary_rows(),
+        fieldnames=DATA_DICTIONARY_COLUMNS,
+    )
+    paths["output_schema"].write_text(
+        json.dumps(output_schema_document(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return WrittenTables(paths={name: str(path) for name, path in paths.items()})
 
 
@@ -107,6 +118,8 @@ def _build_table_rows(
         "environment_summary": [],
         "provenance_table": [],
         "limitations_table": [],
+        "missing_parameters": [],
+        "suggested_experiments": [],
     }
     for case_index, case in enumerate(screen_result.case_results):
         report = reports_by_case.get(
@@ -124,6 +137,8 @@ def _build_table_rows(
         rows["case_summary"].append(_case_summary_row(context, case, report))
         rows["provenance_table"].extend(_provenance_rows(context, registry, case, report, role_records))
         rows["limitations_table"].extend(_limitation_rows(context, case, report, role_records))
+        rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
+        rows["suggested_experiments"].extend(_suggested_experiment_rows(context, report))
         for sample in case.samples:
             sample_context = _sample_context(context, sample)
             state_roles = _state_roles(sample)
@@ -181,7 +196,14 @@ def _case_context(
     substrate = registry.get_substrate(case.substrate_id)
     environment = registry.get_environment(case.environment_id)
     env_values = _environment_values(environment.conditions, environment.provenance)
+    environment_effect_status = _environment_effect_status(
+        environment_id=case.environment_id,
+        environment_provenance=environment.provenance,
+        role_records=role_records,
+    )
+    environment_policy = _environment_policy(environment_effect_status)
     return {
+        "output_schema_version": OUTPUT_SCHEMA_VERSION,
         "case_id": f"case_{case_index:04d}",
         "fungus_id": case.fungus_id,
         "fungus_name": fungus.name,
@@ -193,11 +215,8 @@ def _case_context(
         "ph": env_values["ph"],
         "oxygen": env_values["oxygen"],
         "environment_source": _environment_source(environment.provenance),
-        "environment_effect_status": _environment_effect_status(
-            environment_id=case.environment_id,
-            environment_provenance=environment.provenance,
-            role_records=role_records,
-        ),
+        "environment_effect_status": environment_effect_status,
+        **environment_policy,
         "process_type": case.process_type,
     }
 
@@ -264,6 +283,35 @@ def _environment_effect_status(
     return "metadata_only"
 
 
+def _environment_policy(environment_effect_status: str) -> dict[str, Any]:
+    if environment_effect_status == "metadata_only":
+        return {
+            "environment_response_model": "none",
+            "environment_comparison_allowed": False,
+            "environment_ranking_allowed": False,
+            "environment_response_plot_allowed": False,
+            "environment_guardrail": (
+                "Metadata-only environment cases cannot be ranked or plotted as "
+                "environmental response models."
+            ),
+        }
+    if environment_effect_status in {"condition_specific_parameters", "active_response_model"}:
+        return {
+            "environment_response_model": environment_effect_status,
+            "environment_comparison_allowed": True,
+            "environment_ranking_allowed": True,
+            "environment_response_plot_allowed": True,
+            "environment_guardrail": "Environment comparisons are allowed for this status with documented limitations.",
+        }
+    return {
+        "environment_response_model": "none",
+        "environment_comparison_allowed": False,
+        "environment_ranking_allowed": False,
+        "environment_response_plot_allowed": False,
+        "environment_guardrail": "No environment response interpretation is available for this case.",
+    }
+
+
 def _sample_context(context: Mapping[str, Any], sample: EnsembleSample) -> dict[str, Any]:
     data = dict(context)
     data["sample_id"] = f"sample_{sample.sample_index:04d}"
@@ -304,6 +352,7 @@ def _case_summary_row(
 
 def _case_columns(context: Mapping[str, Any]) -> dict[str, Any]:
     return {
+        "output_schema_version": context["output_schema_version"],
         "case_id": context["case_id"],
         "fungus_id": context["fungus_id"],
         "fungus_name": context["fungus_name"],
@@ -316,6 +365,11 @@ def _case_columns(context: Mapping[str, Any]) -> dict[str, Any]:
         "oxygen": context["oxygen"],
         "environment_source": context["environment_source"],
         "environment_effect_status": context["environment_effect_status"],
+        "environment_response_model": context["environment_response_model"],
+        "environment_comparison_allowed": context["environment_comparison_allowed"],
+        "environment_ranking_allowed": context["environment_ranking_allowed"],
+        "environment_response_plot_allowed": context["environment_response_plot_allowed"],
+        "environment_guardrail": context["environment_guardrail"],
         "process_type": context["process_type"],
     }
 
@@ -424,11 +478,11 @@ def _time_series_rows(
                     output.append(
                         {
                             **base,
-                            "state": "accessible_site_fraction_remaining",
+                            "state": "accessible_site_fraction_remaining_proxy",
                             "state_role": "derived_accessible_site_proxy",
                             "value": substrate_value / initial_substrate,
                             "units": "dimensionless",
-                            "source": "derived_from_solid_substrate_state",
+                            "source": "derived_proxy_from_solid_substrate_state",
                         }
                     )
         if product_state is not None and initial_product is not None:
@@ -531,10 +585,10 @@ def _final_metric_rows(
                 rows.append(
                     _metric_row(
                         base,
-                        "accessible_site_fraction_remaining",
+                        "accessible_site_fraction_remaining_proxy",
                         final_fraction_remaining,
                         "dimensionless",
-                        "computed",
+                        "derived_proxy",
                         "Derived as proportional to remaining solid substrate; accessible surface is not dynamically renewed.",
                     )
                 )
@@ -543,9 +597,10 @@ def _final_metric_rows(
         rows.append(_metric_row(base, "final_product_formed", "", "not_applicable", "not_applicable", "No product state mapping was available."))
     else:
         product_units = final_row.get(f"{product_state}_units", "")
-        rows.append(_metric_row(base, "final_product_concentration", final_product, product_units, "computed", ""))
+        product_metric = _final_product_metric_name(product_units)
+        rows.append(_metric_row(base, product_metric, final_product, product_units, "computed", ""))
         if _is_surface_case(sample_context):
-            rows.append(_metric_row(base, "soluble_product_concentration", final_product, product_units, "computed", ""))
+            rows.append(_metric_row(base, "soluble_product_amount", final_product, product_units, "computed", ""))
         if initial_product is None:
             rows.append(_metric_row(base, "final_product_formed", "", product_units, "not_applicable", "Initial product was unavailable."))
         else:
@@ -692,6 +747,9 @@ def _sampled_parameter_rows(
                 "source": "" if source_record is None else _value_source(source_record),
                 "confidence_level": "" if source_record is None else (source_record.value.confidence_level or ""),
                 "exploratory_prior": "" if source_record is None else _is_exploratory_record(source_record),
+                "range_scope": "" if source_record is None else source_record.range_scope,
+                "range_interpretation": "" if source_record is None else source_record.range_interpretation,
+                "allowed_use": "" if source_record is None else source_record.allowed_use,
                 "notes": "" if source_record is None else source_record.notes,
             }
         )
@@ -703,19 +761,29 @@ def _summary_metric_rows(
     threshold_rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     grouped: dict[tuple[str, str, str], list[float]] = {}
+    contexts: dict[str, Mapping[str, Any]] = {}
     for row in tuple(final_metric_rows) + tuple(threshold_rows):
+        case_id = str(row.get("case_id", ""))
+        if case_id:
+            contexts.setdefault(case_id, row)
         if row.get("status") != "computed":
             continue
         value = _optional_float(row.get("value"))
         if value is None:
             continue
-        key = (str(row.get("case_id", "")), str(row.get("metric", "")), str(row.get("units", "")))
+        key = (case_id, str(row.get("metric", "")), str(row.get("units", "")))
         grouped.setdefault(key, []).append(value)
     rows: list[dict[str, Any]] = []
     for (case_id, metric, units), values in sorted(grouped.items()):
+        context = contexts.get(case_id, {})
+        base = (
+            _case_columns(context)
+            if context
+            else {"output_schema_version": OUTPUT_SCHEMA_VERSION, "case_id": case_id}
+        )
         rows.append(
             {
-                "case_id": case_id,
+                **base,
                 "metric": metric,
                 "units": units,
                 **summarize_numeric_values(values),
@@ -771,24 +839,47 @@ def _environment_summary_rows(
     for environment_id, context in sorted(contexts.items()):
         degradation_summary = summarize_numeric_values(final_degradation.get(environment_id, ()))
         threshold_summary = summarize_numeric_values(time_to_50.get(environment_id, ()))
-        output.append(
-            {
-                "environment_id": environment_id,
-                "temperature_C": context.get("temperature_C", ""),
-                "ph": context.get("ph", ""),
-                "oxygen": context.get("oxygen", ""),
-                "environment_source": context.get("environment_source", ""),
-                "environment_effect_status": context.get("environment_effect_status", ""),
-                "n_cases": n_cases.get(environment_id, 0),
-                "n_samples": n_samples.get(environment_id, 0),
-                "n_successful_samples": n_successful.get(environment_id, 0),
-                "n_failed_samples": n_failed.get(environment_id, 0),
+        comparison_allowed = bool(context.get("environment_comparison_allowed"))
+        if comparison_allowed:
+            metric_status = "computed"
+            degradation_values = {
                 "median_final_substrate_degraded_fraction": degradation_summary["p50"],
                 "p05_final_substrate_degraded_fraction": degradation_summary["p05"],
                 "p95_final_substrate_degraded_fraction": degradation_summary["p95"],
                 "median_time_to_50_percent_degradation": threshold_summary["p50"],
                 "p05_time_to_50_percent_degradation": threshold_summary["p05"],
                 "p95_time_to_50_percent_degradation": threshold_summary["p95"],
+            }
+        else:
+            metric_status = "not_applicable_metadata_only"
+            degradation_values = {
+                "median_final_substrate_degraded_fraction": "",
+                "p05_final_substrate_degraded_fraction": "",
+                "p95_final_substrate_degraded_fraction": "",
+                "median_time_to_50_percent_degradation": "",
+                "p05_time_to_50_percent_degradation": "",
+                "p95_time_to_50_percent_degradation": "",
+            }
+        output.append(
+            {
+                "output_schema_version": OUTPUT_SCHEMA_VERSION,
+                "environment_id": environment_id,
+                "temperature_C": context.get("temperature_C", ""),
+                "ph": context.get("ph", ""),
+                "oxygen": context.get("oxygen", ""),
+                "environment_source": context.get("environment_source", ""),
+                "environment_effect_status": context.get("environment_effect_status", ""),
+                "environment_response_model": context.get("environment_response_model", ""),
+                "environment_comparison_allowed": context.get("environment_comparison_allowed", ""),
+                "environment_ranking_allowed": context.get("environment_ranking_allowed", ""),
+                "environment_response_plot_allowed": context.get("environment_response_plot_allowed", ""),
+                "environment_response_metric_status": metric_status,
+                "environment_guardrail": context.get("environment_guardrail", ""),
+                "n_cases": n_cases.get(environment_id, 0),
+                "n_samples": n_samples.get(environment_id, 0),
+                "n_successful_samples": n_successful.get(environment_id, 0),
+                "n_failed_samples": n_failed.get(environment_id, 0),
+                **degradation_values,
                 "limitations": "; ".join(limitations.get(environment_id, ())) or "not_applicable",
             }
         )
@@ -835,6 +926,9 @@ def _provenance_rows(
                 "source": "",
                 "confidence_level": "",
                 "exploratory_prior": "",
+                "range_scope": "",
+                "range_interpretation": "",
+                "allowed_use": "",
                 "notes": item.message,
                 "provenance": json.dumps(item.details, sort_keys=True),
             }
@@ -863,6 +957,9 @@ def _record_provenance_row(
         "source": _value_source(record) if isinstance(record, ParameterRecord) else _provenance_source(record.provenance),
         "confidence_level": "" if value is None else (value.confidence_level or ""),
         "exploratory_prior": _is_exploratory_record(record) if isinstance(record, ParameterRecord) else "",
+        "range_scope": record.range_scope if isinstance(record, ParameterRecord) else "",
+        "range_interpretation": record.range_interpretation if isinstance(record, ParameterRecord) else "",
+        "allowed_use": record.allowed_use if isinstance(record, ParameterRecord) else "",
         "notes": record.notes,
         "provenance": json.dumps(dict(record.provenance), sort_keys=True),
     }
@@ -884,7 +981,8 @@ def _limitation_rows(
                 (
                     "Environment is metadata/context only. The simulation used "
                     "the same kinetic parameter values across environments; no "
-                    "temperature or pH response law was applied."
+                    "temperature or pH response law was applied. Do not rank "
+                    "or plot these cases as environmental response models."
                 ),
                 "EnvironmentGrid",
             )
@@ -939,7 +1037,7 @@ def _limitation_rows(
                 context,
                 "surface_accessibility",
                 "important",
-                "Accessible surface area is sampled as a constant parameter in each run; surface renewal, pore accessibility, crystallinity, and morphology changes are not modeled.",
+                "Accessible surface area is sampled as a constant parameter in each run; accessible-site fraction outputs are derived proxies from remaining substrate, and surface renewal, pore accessibility, crystallinity, and morphology changes are not modeled.",
                 case.process_type,
             )
         )
@@ -960,6 +1058,88 @@ def _limitation_row(
         "limitation": limitation,
         "source": source,
     }
+
+
+def _missing_parameter_rows(
+    context: Mapping[str, Any],
+    report: ModelabilityReport,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in report.missing:
+        details = dict(item.details)
+        value = details.get("value")
+        value_data = value if isinstance(value, Mapping) else {}
+        record_id = str(details.get("record_id", "") or "")
+        missing_status = "explicit_unknown" if value_data.get("kind") == "unknown" else "absent"
+        rows.append(
+            {
+                **_case_columns(context),
+                "missing_item_type": item.item_type,
+                "parameter_symbol": item.item_id if item.item_type == "parameter" else "",
+                "source_record_id": record_id,
+                "expected_units": value_data.get("units", ""),
+                "missing_status": missing_status,
+                "message": item.message,
+                "suggested_experiment": _suggestion_for_missing_item(item),
+                "details": json.dumps(details, sort_keys=True),
+            }
+        )
+    for item in report.incompatible:
+        rows.append(
+            {
+                **_case_columns(context),
+                "missing_item_type": item.item_type,
+                "parameter_symbol": item.item_id if item.item_type == "parameter" else "",
+                "source_record_id": str(item.details.get("record_id", "") or ""),
+                "expected_units": "",
+                "missing_status": "incompatible",
+                "message": item.message,
+                "suggested_experiment": _suggestion_for_missing_item(item),
+                "details": json.dumps(item.details, sort_keys=True),
+            }
+        )
+    return rows
+
+
+def _suggested_experiment_rows(
+    context: Mapping[str, Any],
+    report: ModelabilityReport,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    suggestions = tuple(report.suggested_experiments)
+    if not suggestions:
+        suggestions = tuple(
+            _suggestion_for_missing_item(item)
+            for item in tuple(report.missing) + tuple(report.incompatible)
+            if _suggestion_for_missing_item(item)
+        )
+    for index, suggestion in enumerate(dict.fromkeys(suggestions)):
+        parameter_symbol = _parameter_symbol_for_suggestion(suggestion, report)
+        rows.append(
+            {
+                **_case_columns(context),
+                "suggestion_id": f"{context['case_id']}_suggestion_{index:03d}",
+                "parameter_symbol": parameter_symbol,
+                "suggested_experiment": suggestion,
+                "priority": "high" if parameter_symbol else "medium",
+                "rationale": "Required input is missing, explicitly unknown, or incompatible for this registry case.",
+                "allowed_use_after_resolution": "scientific_or_exploratory_when_recorded_with_provenance_and_units",
+            }
+        )
+    return rows
+
+
+def _suggestion_for_missing_item(item: Any) -> str:
+    if getattr(item, "item_type", "") == "parameter":
+        return f"Measure or curate {item.item_id} for the selected registry case."
+    return f"Resolve missing or incompatible {item.item_type}: {item.item_id}."
+
+
+def _parameter_symbol_for_suggestion(suggestion: str, report: ModelabilityReport) -> str:
+    for item in tuple(report.missing) + tuple(report.incompatible):
+        if item.item_type == "parameter" and item.item_id in suggestion:
+            return item.item_id
+    return ""
 
 
 def _role_parameter_records(
@@ -1066,6 +1246,20 @@ def _is_surface_case(context: Mapping[str, Any]) -> bool:
     return context.get("process_type") == "surface_catalysis"
 
 
+def _final_product_metric_name(product_units: str) -> str:
+    return "final_product_concentration" if _is_concentration_units(product_units) else "final_product_amount"
+
+
+def _is_concentration_units(units: str) -> bool:
+    text = units.strip().lower()
+    if text in {"mm", "millimolar", "molar", "mol / l", "mol/l", "mole / liter", "mole/liter"}:
+        return True
+    volume_tokens = ("liter", "litre", "l", "meter ** 3", "metre ** 3")
+    if "/" not in text:
+        return False
+    return any(token in text for token in volume_tokens)
+
+
 def _initial_state_value(
     trajectory_rows: Sequence[Mapping[str, str]],
     state_name: str | None,
@@ -1145,14 +1339,22 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
+def _write_table(path: Path, *, table_name: str, rows: Sequence[Mapping[str, Any]]) -> None:
+    _write_csv(path, rows, fieldnames=table_fieldnames(table_name, rows))
+
+
+def _write_csv(
+    path: Path,
+    rows: Sequence[Mapping[str, Any]],
+    fieldnames: Sequence[str] | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = _fieldnames(rows)
+    resolved_fieldnames = tuple(fieldnames) if fieldnames is not None else _fieldnames(rows)
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(handle, fieldnames=resolved_fieldnames, extrasaction="ignore")
         writer.writeheader()
         for row in rows:
-            writer.writerow({field: _csv_value(row.get(field)) for field in fieldnames})
+            writer.writerow({field: _csv_value(row.get(field)) for field in resolved_fieldnames})
 
 
 def _fieldnames(rows: Sequence[Mapping[str, Any]]) -> tuple[str, ...]:

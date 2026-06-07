@@ -105,6 +105,10 @@ def test_bio001_virtual_experiment_writes_surface_degradation_tables(tmp_path: P
         "sampled_parameters.csv",
         "provenance_table.csv",
         "limitations_table.csv",
+        "missing_parameters.csv",
+        "suggested_experiments.csv",
+        "virtual_experiment_output_data_dictionary.csv",
+        "virtual_experiment_output_schema.json",
     ):
         assert (output_dir / filename).exists(), filename
 
@@ -118,25 +122,34 @@ def test_bio001_virtual_experiment_writes_surface_degradation_tables(tmp_path: P
     states = {row["state"] for row in time_rows}
     assert {
         "solid_substrate_remaining",
-        "soluble_product_concentration",
+        "soluble_product_amount",
         "substrate_degraded_fraction",
         "solid_substrate_degraded_fraction",
-        "accessible_site_fraction_remaining",
+        "accessible_site_fraction_remaining_proxy",
         "degradation_rate",
         "product_release_rate",
     } <= states
+    assert "soluble_product_concentration" not in states
     assert not states.intersection({"fungal_biomass", "biomass", "uptake_flux", "respiration", "secretion_rate"})
 
     metrics = {row["metric"] for row in final_rows}
     assert {
         "solid_substrate_remaining",
         "solid_substrate_degraded_fraction",
-        "accessible_site_fraction_remaining",
-        "soluble_product_concentration",
+        "accessible_site_fraction_remaining_proxy",
+        "soluble_product_amount",
+        "final_product_amount",
         "final_product_yield",
         "maximum_product_release_rate",
         "maximum_substrate_depletion_rate",
     } <= metrics
+    assert "soluble_product_concentration" not in metrics
+    assert not any(row["metric"] == "final_product_concentration" and row["units"] == "kilogram" for row in final_rows)
+    assert any(
+        row["metric"] == "accessible_site_fraction_remaining_proxy"
+        and row["status"] == "derived_proxy"
+        for row in final_rows
+    )
     assert {row["threshold_fraction"] for row in threshold_rows} == {"0.1", "0.5", "0.9"}
     assert any(row["status"] == "computed" for row in threshold_rows)
     assert any(row["status"] == "not_reached" for row in threshold_rows)
@@ -152,6 +165,12 @@ def test_bio001_virtual_experiment_writes_surface_degradation_tables(tmp_path: P
     assert all(row["exploratory_prior"] == "true" for row in sampled_rows)
     assert all(row["source"] == "user-supplied exploratory range" for row in sampled_rows)
     assert all(row["source_record_id"].startswith("bio001_") for row in sampled_rows)
+    assert all(row["range_scope"] == "user_supplied_case_prior" for row in sampled_rows)
+    assert all(
+        row["range_interpretation"] == "user_supplied_exploratory_prior_not_literature_curated"
+        for row in sampled_rows
+    )
+    assert all(row["allowed_use"] == "exploratory_simulation_only_not_literature_curated" for row in sampled_rows)
 
     assert any(
         row["record_type"] == "parameter"
@@ -160,7 +179,7 @@ def test_bio001_virtual_experiment_writes_surface_degradation_tables(tmp_path: P
         for row in provenance_rows
     )
     assert any("not a whole-fungus growth" in row["limitation"] for row in limitation_rows)
-    assert any("Accessible surface area is sampled as a constant parameter" in row["limitation"] for row in limitation_rows)
+    assert any("derived proxies from remaining substrate" in row["limitation"] for row in limitation_rows)
     _assert_threshold_rows_match_trajectory(time_rows, threshold_rows)
 
 

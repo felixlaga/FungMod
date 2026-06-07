@@ -234,7 +234,7 @@ def _surface_catalysis_config_data(
 ) -> dict[str, Any]:
     bio001 = _is_bio001_surface_case(compatibility)
     substrate_state = "solid_substrate_remaining" if bio001 else "solid_substrate_amount"
-    product_state = "soluble_product_concentration" if bio001 else "released_product_amount"
+    product_state = "soluble_product_amount" if bio001 else "released_product_amount"
     catalyst_state = "free_enzyme_concentration" if bio001 else "free_catalyst_concentration"
     product_map_id = "registry_case_release_map"
     primary_bond = substrate.bond_classes[0]

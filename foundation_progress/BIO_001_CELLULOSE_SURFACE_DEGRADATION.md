@@ -43,11 +43,11 @@ The BIO-001 virtual experiment exposes:
 
 - `solid_substrate_remaining`;
 - `free_enzyme_concentration`;
-- `soluble_product_concentration`;
+- `soluble_product_amount`;
 - `substrate_degraded_fraction` derived from the solid substrate state;
 - `solid_substrate_degraded_fraction` derived from the solid substrate state;
-- `accessible_site_fraction_remaining` derived as a proportional proxy from the
-  remaining solid substrate.
+- `accessible_site_fraction_remaining_proxy` derived as a proportional proxy
+  from the remaining solid substrate.
 
 The model does not independently evolve accessible surface area or morphology.
 The accessible-site fraction is therefore reported as a derived proxy, with this
@@ -69,8 +69,8 @@ BIO-001-specific rows include:
 
 - `solid_substrate_remaining`;
 - `solid_substrate_degraded_fraction`;
-- `accessible_site_fraction_remaining`;
-- `soluble_product_concentration`;
+- `accessible_site_fraction_remaining_proxy`;
+- `soluble_product_amount`;
 - `final_product_yield`;
 - threshold times for 10%, 50%, and 90% substrate degradation;
 - maximum product release and substrate depletion rates.

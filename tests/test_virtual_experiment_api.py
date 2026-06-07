@@ -52,6 +52,10 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "environment_summary.csv",
         "provenance_table.csv",
         "limitations_table.csv",
+        "missing_parameters.csv",
+        "suggested_experiments.csv",
+        "virtual_experiment_output_data_dictionary.csv",
+        "virtual_experiment_output_schema.json",
         "virtual_experiment_summary.json",
     )
     for filename in required_files:
@@ -68,6 +72,9 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     summary_rows = _csv_rows(output_dir / "summary_metrics.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
     limitation_rows = _csv_rows(output_dir / "limitations_table.csv")
+    missing_rows = _csv_rows(output_dir / "missing_parameters.csv")
+    suggestion_rows = _csv_rows(output_dir / "suggested_experiments.csv")
+    dictionary_rows = _csv_rows(output_dir / "virtual_experiment_output_data_dictionary.csv")
 
     assert {"case_id", "sample_id", "fungus_id", "substrate_id", "environment_id", "time", "state", "value"}.issubset(
         time_rows[0]
@@ -105,16 +112,33 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert all(row["parameter_source_class"] == "user_supplied_exploratory_prior" for row in enzyme_prior_rows)
     assert all(row["exploratory_prior"] == "true" for row in enzyme_prior_rows)
     assert all(row["source"] == "user-supplied exploratory range" for row in enzyme_prior_rows)
+    assert all(row["range_scope"] == "user_supplied_case_prior" for row in enzyme_prior_rows)
+    assert all(
+        row["range_interpretation"] == "user_supplied_exploratory_prior_not_literature_curated"
+        for row in enzyme_prior_rows
+    )
+    assert all(row["allowed_use"] == "exploratory_simulation_only_not_literature_curated" for row in enzyme_prior_rows)
     assert any(
         row["symbol"] == "Km_cellobiose"
         and row["parameter_source_class"] == "selected_exact_value"
         for row in sampled_rows
     )
+    assert any(row["metric"] == "final_product_concentration" and row["fungus_id"] == FUNGUS_ID for row in summary_rows)
 
     assert any(row["record_type"] == "parameter" and row["value_kind"] == "exact" for row in provenance_rows)
     assert any(row["record_type"] == "parameter" and row["value_kind"] == "distribution" for row in provenance_rows)
     assert any("must not be cited as literature-curated" in row["limitation"] for row in limitation_rows)
     assert any("not a whole-fungus" in row["limitation"] for row in limitation_rows)
+    assert not missing_rows
+    assert not suggestion_rows
+    assert any(
+        row["table"] == "sampled_parameters" and row["column"] == "allowed_use"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "missing_parameters" and row["column"] == "expected_units"
+        for row in dictionary_rows
+    )
 
 
 def test_virtual_experiment_accepts_environment_grid_registry_ids(tmp_path: Path) -> None:

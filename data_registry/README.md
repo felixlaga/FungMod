@@ -14,9 +14,18 @@ surface-catalysis compatibility can map exact registry symbols to
 `surface_rate_constant`, `adsorption_constant`, and `accessible_surface_area`
 without introducing a substrate-specific workflow.
 
-Exploratory registry screens may sample `range` and `distribution` value specs
-to generate toy configured-model runs. These ensembles are uncertainty plumbing
-tests only unless records explicitly carry curated scientific provenance.
+Exploratory registry screens may sample `range` and `distribution` value specs.
+Those values remain first-class and must not be deleted, but every parameter
+record also carries or derives:
+
+- `range_scope`;
+- `range_interpretation`;
+- `allowed_use`.
+
+Use those fields to distinguish selected exact values, broad literature
+spreads, user-supplied exploratory priors, and software-test fixtures. A
+sampleable range is not automatically calibrated uncertainty, a literature
+claim, or an environmental response law.
 
 Value specifications may be:
 

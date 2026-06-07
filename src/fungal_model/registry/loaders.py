@@ -183,11 +183,13 @@ def _parameter_record(data: Mapping[str, Any]) -> ParameterRecord:
     value = data.get("value")
     if not isinstance(value, Mapping):
         value = {"kind": "unknown", "units": None, "notes": "Missing value specification."}
+    provenance = _provenance(data)
+    maturity = _maturity(data)
     return ParameterRecord(
         record_id=_record_id(data),
         name=_name(data),
-        maturity=_maturity(data),
-        provenance=_provenance(data),
+        maturity=maturity,
+        provenance=provenance,
         notes=_notes(data),
         parameter_symbol=str(data.get("parameter_symbol", "")),
         process_type=str(data.get("process_type", "")),
@@ -197,6 +199,9 @@ def _parameter_record(data: Mapping[str, Any]) -> ParameterRecord:
         substrate_id=_optional_str(data.get("substrate_id")),
         environment_id=_optional_str(data.get("environment_id")),
         value=ValueSpec.from_mapping(value),
+        range_scope=_range_scope(data, provenance=provenance, maturity=maturity, value=value),
+        range_interpretation=_range_interpretation(data, provenance=provenance, maturity=maturity, value=value),
+        allowed_use=_allowed_use(data, provenance=provenance, maturity=maturity, value=value),
     )
 
 
@@ -234,6 +239,74 @@ def _optional_str(value: Any) -> str | None:
         return None
     text = str(value)
     return text if text else None
+
+
+def _range_scope(
+    data: Mapping[str, Any],
+    *,
+    provenance: Mapping[str, Any],
+    maturity: str,
+    value: Mapping[str, Any],
+) -> str:
+    explicit = data.get("range_scope") or provenance.get("range_scope")
+    if explicit is not None:
+        return str(explicit)
+    value_kind = str(value.get("kind", ""))
+    if value_kind not in {"range", "distribution"}:
+        return "not_applicable"
+    if maturity == "exploratory_prior" or provenance.get("exploratory_prior"):
+        return "user_supplied_case_prior"
+    if maturity == "literature_range":
+        return "literature_record_set"
+    if maturity.startswith("toy"):
+        return "software_test_fixture"
+    return "unspecified_uncertain_value"
+
+
+def _range_interpretation(
+    data: Mapping[str, Any],
+    *,
+    provenance: Mapping[str, Any],
+    maturity: str,
+    value: Mapping[str, Any],
+) -> str:
+    explicit = data.get("range_interpretation") or provenance.get("range_interpretation")
+    if explicit is not None:
+        return str(explicit)
+    value_kind = str(value.get("kind", ""))
+    if value_kind not in {"range", "distribution"}:
+        return "not_applicable"
+    if maturity == "exploratory_prior" or provenance.get("exploratory_prior"):
+        return "user_supplied_exploratory_prior_not_literature_curated"
+    if maturity == "literature_range":
+        return "cross_entry_literature_spread_not_selected_entry_uncertainty"
+    if maturity.startswith("toy"):
+        return "software_test_fixture_not_scientific_uncertainty"
+    return "uncertain_value_requires_interpretation_before_scientific_use"
+
+
+def _allowed_use(
+    data: Mapping[str, Any],
+    *,
+    provenance: Mapping[str, Any],
+    maturity: str,
+    value: Mapping[str, Any],
+) -> str:
+    explicit = data.get("allowed_use") or provenance.get("allowed_use")
+    if explicit is not None:
+        return str(explicit)
+    value_kind = str(value.get("kind", ""))
+    if maturity.startswith("toy"):
+        return "software_tests_only_not_scientific"
+    if maturity == "exploratory_prior" or provenance.get("exploratory_prior"):
+        return "exploratory_simulation_only_not_literature_curated"
+    if maturity == "literature_range" or value_kind in {"range", "distribution"}:
+        return "exploratory_screening_only_not_calibrated_uncertainty_not_environment_response"
+    if value_kind == "unknown":
+        return "preflight_and_gap_analysis_only_requires_measurement_or_curation"
+    if maturity == "literature_processed" and value_kind == "exact":
+        return "scientific_or_exploratory_when_all_other_inputs_are_valid"
+    return "requires_record_specific_review"
 
 
 def _load_mapping(path: Path) -> Mapping[str, Any]:

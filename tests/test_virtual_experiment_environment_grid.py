@@ -54,6 +54,10 @@ def test_virtual_experiment_expands_environment_grid_and_writes_environment_tabl
         "environment_summary.csv",
         "provenance_table.csv",
         "limitations_table.csv",
+        "missing_parameters.csv",
+        "suggested_experiments.csv",
+        "virtual_experiment_output_data_dictionary.csv",
+        "virtual_experiment_output_schema.json",
     )
     for filename in required_files:
         assert (output_dir / filename).exists(), filename
@@ -70,17 +74,26 @@ def test_virtual_experiment_expands_environment_grid_and_writes_environment_tabl
         "oxygen",
         "environment_source",
         "environment_effect_status",
+        "environment_ranking_allowed",
+        "environment_response_plot_allowed",
     }
     assert required_environment_columns <= set(time_rows[0])
     assert {row["environment_id"] for row in summary_rows} == set(study.environment_ids)
     assert {row["environment_effect_status"] for row in summary_rows} == {"metadata_only"}
+    assert {row["environment_response_model"] for row in summary_rows} == {"none"}
+    assert {row["environment_comparison_allowed"] for row in summary_rows} == {"false"}
+    assert {row["environment_ranking_allowed"] for row in summary_rows} == {"false"}
+    assert {row["environment_response_plot_allowed"] for row in summary_rows} == {"false"}
+    assert {row["environment_response_metric_status"] for row in summary_rows} == {"not_applicable_metadata_only"}
+    assert all(row["median_final_substrate_degraded_fraction"] == "" for row in summary_rows)
+    assert all("cannot be ranked" in row["environment_guardrail"] for row in summary_rows)
     assert all(row["environment_source"] == "runtime_environment_grid" for row in summary_rows)
     assert all(row["n_cases"] == "1" for row in summary_rows)
     assert all(row["n_samples"] == "2" for row in summary_rows)
     assert all(row["n_successful_samples"] == "2" for row in summary_rows)
     assert all(row["n_failed_samples"] == "0" for row in summary_rows)
     assert any(
-        "no temperature or pH response law was applied" in row["limitation"]
+        "Do not rank or plot these cases as environmental response models" in row["limitation"]
         for row in limitation_rows
     )
     assert any(
