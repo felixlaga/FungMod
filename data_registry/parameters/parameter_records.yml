@@ -198,6 +198,8 @@ records:
       source_reaction_id: "618"
       source_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
       parameter_range_report: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/curated/parameter_range_summary.json
+      curation_file: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/curated/parameter_range_summary.json
+      range_scope: all_eligible
       included_kinlaw_entry_ids:
         - "35622"
         - "38521"
@@ -224,10 +226,10 @@ records:
       lower: 0.68
       upper: 114.0
       units: mM
-      source: SABIO-RK Reaction 618 local export literature range
+      source: SABIO-RK Reaction 618 multi-entry curation
       confidence_level: literature_range
-      notes: Range over 15 eligible local SABIO-RK Reaction 618 entries; not an exact selected-entry value and no unit conversion was applied.
-    notes: Literature-derived Km range for beta-glucosidase on cellobiose; scoped broadly across eligible local Reaction 618 entries.
+      notes: Broad literature range over 15 eligible local SABIO-RK Reaction 618 entries; not selected-entry uncertainty, not a calibrated pH/temperature response law, and no unit conversion was applied.
+    notes: Literature-derived Km range for beta-glucosidase on cellobiose; exploratory all-eligible scope across local Reaction 618 entries.
 
   - record_id: sabiork_reaction_618_literature_range_kcat_cellobiose
     name: SABIO-RK Reaction 618 literature range for kcat cellobiose
@@ -237,6 +239,8 @@ records:
       source_reaction_id: "618"
       source_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
       parameter_range_report: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/curated/parameter_range_summary.json
+      curation_file: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/curated/parameter_range_summary.json
+      range_scope: all_eligible
       included_kinlaw_entry_ids:
         - "35622"
         - "38521"
@@ -263,10 +267,10 @@ records:
       lower: 0.13
       upper: 7.17
       units: "s^(-1)"
-      source: SABIO-RK Reaction 618 local export literature range
+      source: SABIO-RK Reaction 618 multi-entry curation
       confidence_level: literature_range
-      notes: Range over 15 eligible local SABIO-RK Reaction 618 entries; not an exact selected-entry value and no unit conversion was applied.
-    notes: Literature-derived kcat range for beta-glucosidase on cellobiose; scoped broadly across eligible local Reaction 618 entries.
+      notes: Broad literature range over 15 eligible local SABIO-RK Reaction 618 entries; not selected-entry uncertainty, not a calibrated pH/temperature response law, and no unit conversion was applied.
+    notes: Literature-derived kcat range for beta-glucosidase on cellobiose; exploratory all-eligible scope across local Reaction 618 entries.
 
   - record_id: sabiork_reaction_618_initial_cellobiose_concentration
     name: SABIO-RK Reaction 618 initial cellobiose concentration

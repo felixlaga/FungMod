@@ -19,6 +19,33 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## DATA-002 SABIO-RK Reaction 618 Parameter Ranges
+
+Date: 2026-06-07
+
+Status: `complete` for local Reaction 618 multi-entry parameter-range curation.
+
+Completed in this pass:
+
+- Hardened the local SABIO-RK Reaction 618 beta-glucosidase/cellobiose curation
+  into eligible/excluded CSV tables plus JSON and Markdown parameter-range
+  summaries.
+- Preserved EntryID, organism, enzyme type, pH, temperature, buffer,
+  publication/PubMed metadata, source fields, and explicit exclusion reasons.
+- Added scoped Km/kcat ranges for all eligible entries, organism, exact pH,
+  exact temperature, organism+pH, wildtype-only, and mutant-only groups.
+- Marked sparse groups as `insufficient_n` instead of presenting them as robust
+  ranges.
+- Clarified registry provenance for the all-eligible `literature_range` Km and
+  kcat records without overwriting selected exact EntryID 35622 values, the
+  unknown enzyme concentration record, or the exploratory enzyme prior.
+- Extended virtual-experiment sampled-parameter tables with
+  `parameter_source_class` so outputs can distinguish selected exact values,
+  literature ranges, user-supplied exploratory priors, and unknown sources.
+
+See `foundation_progress/DATA_002_REACTION_618_PARAMETER_RANGES.md` for scope,
+limitations, curated outputs, and interpretation.
+
 ## ENV-001 Environment Grids for Virtual Experiments
 
 Date: 2026-06-07

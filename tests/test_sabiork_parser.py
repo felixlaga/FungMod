@@ -149,13 +149,14 @@ def test_saved_reaction_618_export_curates_literature_km_kcat_ranges() -> None:
         "44888",
         "60725",
     )
-    km_range = report.ranges["Km_cellobiose"]
-    kcat_range = report.ranges["kcat_cellobiose"]
+    km_range = report.ranges["all_eligible"]["all_eligible"]["Km_cellobiose"]
+    kcat_range = report.ranges["all_eligible"]["all_eligible"]["kcat_cellobiose"]
     assert km_range.count == 15
     assert km_range.units == "mM"
     assert km_range.lower == pytest.approx(0.68)
     assert km_range.upper == pytest.approx(114.0)
     assert kcat_range.count == 15
+    assert kcat_range.status == "ok"
     assert kcat_range.units == "s^(-1)"
     assert kcat_range.lower == pytest.approx(0.13)
     assert kcat_range.upper == pytest.approx(7.17)
@@ -179,8 +180,11 @@ def test_parameter_range_report_write_is_json_safe(tmp_path: Path) -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
 
     assert path.name == "parameter_range_summary.json"
-    assert payload["ranges"]["Km_cellobiose"]["lower"] == pytest.approx(0.68)
-    assert payload["ranges"]["kcat_cellobiose"]["upper"] == pytest.approx(7.17)
+    assert payload["ranges"]["all_eligible"]["all_eligible"]["Km_cellobiose"]["lower"] == pytest.approx(0.68)
+    assert payload["ranges"]["all_eligible"]["all_eligible"]["kcat_cellobiose"]["upper"] == pytest.approx(7.17)
+    assert (tmp_path / "reaction_618_eligible_entries.csv").exists()
+    assert (tmp_path / "reaction_618_excluded_entries.csv").exists()
+    assert (tmp_path / "parameter_range_summary.md").exists()
     json.dumps(payload)
 
 
