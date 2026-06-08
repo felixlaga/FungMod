@@ -1,0 +1,185 @@
+kind: fungmod_registry_records
+record_type: case_templates
+schema_version: "1"
+records:
+  - record_id: toy_surface_catalysis_registry_template
+    case_template_id: toy_surface_catalysis_registry_template
+    name: Toy surface-catalysis registry assembly template
+    maturity: toy_development
+    provenance:
+      source: FungMod R3 toy registry fixture.
+      confidence_level: testing
+      notes: Software-test assembly template for the existing toy surface-catalysis registry case.
+    schema_version: "1"
+    process_type: surface_catalysis
+    state_roles:
+      substrate: solid_substrate_amount
+      product: released_product_amount
+      catalyst: free_catalyst_concentration
+    initial_state_mapping:
+      substrate:
+        value: 0.0001
+        units: kilogram
+      product:
+        value: 0.0
+        units: kilogram
+      catalyst:
+        value: 1.0
+        units: mole / liter
+    product_map:
+      id: registry_case_release_map
+      product_map_type: one_to_one
+      substrate_state_role: substrate
+      product_state_role: product
+      stoichiometric_yield: 1.0
+      notes: Mass-equivalent toy map; not a chemical stoichiometry claim.
+    stoichiometric_yields:
+      product: 1.0
+    time_grid:
+      start: 0.0
+      stop: 20.0
+      points: 41
+      units: second
+    observable_roles:
+      - substrate
+      - product
+      - catalyst
+    output_state_roles:
+      substrate: solid_substrate_amount
+      product: released_product_amount
+      catalyst: free_catalyst_concentration
+    process_state_metadata:
+      bond_type: toy_beta_1_4_glycosidic
+      accessible_site_pool: configured accessible site pool
+    limitations:
+      - Toy registry case builder only.
+      - Uses the existing generic surface-catalysis factory without adding biology.
+    validity_notes:
+      - Software-test fixture only; not a scientific process rule.
+    notes: Toy template keeps legacy test behavior while exercising config-driven case assembly.
+
+  - record_id: bio001_cellulose_surface_catalysis_template
+    case_template_id: bio001_cellulose_surface_catalysis_template
+    name: BIO-001 cellulose surface-catalysis assembly template
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-001 controlled virtual-experiment scaffold.
+      confidence_level: exploratory_assumption
+      bio_milestone: BIO-001
+      notes: Assembly metadata for the existing BIO-001 enzyme-mediated cellulose surface-degradation pilot.
+    schema_version: "1"
+    process_type: surface_catalysis
+    state_roles:
+      substrate: solid_substrate_remaining
+      product: soluble_product_amount
+      catalyst: free_enzyme_concentration
+      accessibility_proxy: accessible_site_fraction_remaining_proxy
+    initial_state_mapping:
+      substrate:
+        parameter_role: substrate_initial_amount
+        units_from_role: substrate_initial_amount
+      product:
+        value: 0.0
+        units_from_role: substrate_initial_amount
+      catalyst:
+        parameter_role: enzyme_initial_concentration
+        units_from_role: enzyme_initial_concentration
+    product_map:
+      id: bio001_cellulose_surface_release_map
+      product_map_type: one_to_one
+      substrate_state_role: substrate
+      product_state_role: product
+      stoichiometric_yield: 1.0
+      notes: Mass-equivalent soluble product release map for BIO-001; not full cellulose stoichiometry.
+    stoichiometric_yields:
+      product: 1.0
+    time_grid:
+      start: 0.0
+      stop: 4000.0
+      points: 81
+      units: second
+    observable_roles:
+      - substrate
+      - product
+      - accessibility_proxy
+      - degradation_rate
+      - product_release_rate
+    output_state_roles:
+      substrate: solid_substrate_remaining
+      product: soluble_product_amount
+      enzyme: free_enzyme_concentration
+      accessibility_proxy: accessible_site_fraction_remaining_proxy
+    process_state_metadata:
+      bond_type: beta_1_4_glycosidic
+      accessible_site_pool: cellulose accessible beta-1,4-glycosidic surface
+    limitations:
+      - Enzyme-mediated insoluble cellulose surface degradation pilot.
+      - Accessible surface area is constant within each sample; surface renewal and morphology are not modeled.
+      - Soluble product release is represented by a mass-equivalent product class.
+    validity_notes:
+      - BIO-001 does not model whole-fungus growth, secretion, uptake, biomass, oxygen limitation, or lignocellulose structure.
+      - Time-grid values preserve the pre-ASSEMBLY-001 runtime defaults for existing BIO-001 tests and outputs.
+    notes: >
+      Template describes BIO-001 assembly only. It does not provide evidence
+      for parameter values or scientific validity beyond the linked registry
+      records and explicit exploratory priors.
+
+  - record_id: sabiork_reaction_618_homogeneous_mm_template
+    case_template_id: sabiork_reaction_618_homogeneous_mm_template
+    name: SABIO-RK Reaction 618 homogeneous Michaelis-Menten assembly template
+    maturity: literature_metadata
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+      notes: Assembly metadata for the existing local Reaction 618 beta-glucosidase cellobiose kinetic pilot.
+    schema_version: "1"
+    process_type: homogeneous_michaelis_menten
+    state_roles:
+      substrate: cellobiose_concentration
+      product: beta_D_glucose_concentration
+      enzyme: beta_glucosidase_concentration
+    initial_state_mapping:
+      substrate:
+        parameter_role: substrate_initial_concentration
+        units_from_role: substrate_initial_concentration
+      product:
+        value: 0.0
+        units_from_role: substrate_initial_concentration
+      enzyme:
+        parameter_role: enzyme_initial_concentration
+        units_from_role: enzyme_initial_concentration
+    product_map:
+      id: sabiork_reaction_618_product_map
+      product_map_type: stoichiometric
+      substrate_state_role: substrate
+      product_state_role: product
+      stoichiometric_yield: 2.0
+      notes: Reaction 618 stoichiometry metadata; the current homogeneous process still applies legacy one-state product contributions.
+    stoichiometric_yields:
+      product: 2.0
+    time_grid:
+      start: 0.0
+      stop: 1000.0
+      points: 101
+      units: second
+    observable_roles:
+      - substrate
+      - product
+      - enzyme
+      - degradation_rate
+      - product_release_rate
+    output_state_roles:
+      substrate: cellobiose_concentration
+      product: beta_D_glucose_concentration
+      enzyme: beta_glucosidase_concentration
+    limitations:
+      - Dissolved homogeneous Michaelis-Menten kinetics for the selected SABIO-RK entry.
+      - This is an enzyme-kinetics case, not a whole-fungus growth or uptake model.
+      - Stoichiometric yield is recorded as assembly metadata; the current homogeneous process contribution remains legacy one-to-one.
+    validity_notes:
+      - Template metadata does not resolve the missing selected-entry enzyme concentration.
+      - Time-grid values preserve the pre-ASSEMBLY-001 runtime defaults for existing Reaction 618 tests and outputs.
+    notes: >
+      Template describes how the local Reaction 618 registry case is assembled.
+      It does not fetch SABIO-RK data and does not create parameter evidence.

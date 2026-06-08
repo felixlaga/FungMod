@@ -317,6 +317,7 @@ def _registry_with_runtime_environment_overlay(
         environments=(*registry.environments.values(), *(case.to_record() for case in environment_cases)),
         process_compatibility=registry.process_compatibility.values(),
         parameters=(*registry.parameters.values(), *runtime_parameters),
+        case_templates=registry.case_templates.values(),
     )
 
 

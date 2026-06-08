@@ -4,6 +4,7 @@ from fungal_model.screening.case_builder import (
     RegistryCaseBuildError,
     RegistryCaseConfigMode,
     build_model_config_from_registry_case,
+    select_registry_case_template,
 )
 from fungal_model.screening.ensemble import (
     EnsembleSample,
@@ -37,5 +38,6 @@ __all__ = [
     "ScreenSimulationMode",
     "assess_modelability",
     "build_model_config_from_registry_case",
+    "select_registry_case_template",
     "simulate_screen",
 ]

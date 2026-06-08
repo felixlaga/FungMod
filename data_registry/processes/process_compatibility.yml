@@ -24,6 +24,7 @@ records:
       adsorption_constant: k_ads_unknown
       accessible_surface_area: A_surface_exact
     product_map_required: true
+    case_template_id: toy_surface_catalysis_registry_template
     notes: Toy/development compatibility only; not a scientific process rule.
 
   - record_id: bio001_cellulase_cellulose_film_surface_catalysis
@@ -52,6 +53,7 @@ records:
       substrate_initial_amount: initial_cellulose_film_mass
       enzyme_initial_concentration: cellulase_initial_concentration
     product_map_required: true
+    case_template_id: bio001_cellulose_surface_catalysis_template
     notes: >
       Surface-catalysis compatibility for BIO-001 only. It represents enzyme
       action on accessible beta-1,4-glycosidic surface sites with soluble
@@ -81,4 +83,5 @@ records:
       substrate_initial_concentration: initial_cellobiose_concentration
       enzyme_initial_concentration: enzyme_concentration_beta_glucosidase
     product_map_required: true
+    case_template_id: sabiork_reaction_618_homogeneous_mm_template
     notes: First non-toy homogeneous enzyme-kinetics compatibility record.

@@ -8,11 +8,12 @@ from typing import Any, Literal
 
 from fungal_model.io.model_config import ModelConfig
 from fungal_model.registry.records import (
+    CaseTemplateRecord,
     ParameterRecord,
     ProcessCompatibilityRecord,
     SubstrateRecord,
 )
-from fungal_model.registry.store import FungModRegistry
+from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.screening.modelability import ModelabilityReport, assess_modelability
 
 RegistryCaseConfigMode = Literal["toy", "scientific"]
@@ -41,6 +42,7 @@ class RegistryProcessAssembler:
     process_type: str
     process_label: str
     required_parameter_roles: tuple[str, ...]
+    required_state_roles: tuple[str, ...]
     deterministic_mode: RegistryCaseConfigMode
     unsupported_mode_message: str
     config_data_builder: Callable[..., dict[str, Any]]
@@ -131,10 +133,16 @@ def build_registry_process_config_data(
             "Registry case builder does not support process_type "
             f"{compatibility.process_type!r}."
         )
+    case_template = select_registry_case_template(
+        registry=registry,
+        compatibility=compatibility,
+        assembler=assembler,
+    )
     substrate = registry.get_substrate(substrate_id)
     return assembler.config_data_builder(
         registry=registry,
         compatibility=compatibility,
+        case_template=case_template,
         substrate=substrate,
         fungus_id=fungus_id,
         substrate_id=substrate_id,
@@ -142,6 +150,49 @@ def build_registry_process_config_data(
         parameter_records=parameter_records,
         output_directory=output_directory,
     )
+
+
+def select_registry_case_template(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    assembler: RegistryProcessAssembler | None = None,
+) -> CaseTemplateRecord:
+    """Return the explicit case-template record for one compatibility record."""
+
+    if not compatibility.case_template_id:
+        raise RegistryCaseBuildError(
+            "Process compatibility record "
+            f"{compatibility.record_id!r} does not declare case_template_id."
+        )
+    try:
+        template = registry.get_case_template(compatibility.case_template_id)
+    except RegistryLookupError as exc:
+        raise RegistryCaseBuildError(
+            "Process compatibility record "
+            f"{compatibility.record_id!r} references missing case template "
+            f"{compatibility.case_template_id!r}."
+        ) from exc
+    selected_assembler = assembler or get_registry_process_assembler(compatibility.process_type)
+    if selected_assembler is None:
+        raise RegistryCaseBuildError(
+            "Registry case builder does not support process_type "
+            f"{compatibility.process_type!r}."
+        )
+    if template.process_type != compatibility.process_type:
+        raise RegistryCaseBuildError(
+            "Case template process_type mismatch: "
+            f"template {template.case_template_id!r} uses {template.process_type!r}, "
+            f"but compatibility {compatibility.record_id!r} uses {compatibility.process_type!r}."
+        )
+    missing_roles = tuple(role for role in selected_assembler.required_state_roles if role not in template.state_roles)
+    if missing_roles:
+        raise RegistryCaseBuildError(
+            "Case template "
+            f"{template.case_template_id!r} is missing state role(s) required for "
+            f"{selected_assembler.process_label}: {', '.join(missing_roles)}."
+        )
+    return template
 
 
 def select_registry_case_compatibility(
@@ -221,10 +272,161 @@ def _exact_role_parameters(
     return resolved
 
 
+def _template_state(case_template: CaseTemplateRecord, role: str) -> str:
+    try:
+        return case_template.state_roles[role]
+    except KeyError as exc:
+        raise RegistryCaseBuildError(
+            f"Case template {case_template.case_template_id!r} is missing state role {role!r}."
+        ) from exc
+
+
+def _template_time_config(case_template: CaseTemplateRecord) -> dict[str, Any]:
+    time_grid = case_template.time_grid
+    return {
+        "start": {"value": float(time_grid["start"]), "units": str(time_grid["units"])},
+        "stop": {"value": float(time_grid["stop"]), "units": str(time_grid["units"])},
+        "points": int(time_grid["points"]),
+    }
+
+
+def _initial_state_from_template(
+    *,
+    case_template: CaseTemplateRecord,
+    parameter_records: Mapping[str, ParameterRecord],
+) -> dict[str, Any]:
+    states: dict[str, dict[str, Any]] = {}
+    for state_role, spec in case_template.initial_state_mapping.items():
+        state_name = _template_state(case_template, state_role)
+        states[state_name] = {
+            "value": _template_initial_value(spec, parameter_records=parameter_records),
+            "units": _template_initial_units(spec, parameter_records=parameter_records),
+        }
+    return {"states": states}
+
+
+def _template_initial_value(
+    spec: Mapping[str, Any],
+    *,
+    parameter_records: Mapping[str, ParameterRecord],
+) -> float:
+    parameter_role = spec.get("parameter_role")
+    if parameter_role is not None:
+        role = str(parameter_role)
+        return _record_exact_value(_template_parameter_record(parameter_records, role), role=role)
+    return float(spec["value"])
+
+
+def _template_initial_units(
+    spec: Mapping[str, Any],
+    *,
+    parameter_records: Mapping[str, ParameterRecord],
+) -> str:
+    units_from_role = spec.get("units_from_role")
+    if units_from_role is not None:
+        role = str(units_from_role)
+        return _record_units(_template_parameter_record(parameter_records, role), role=role)
+    return str(spec["units"])
+
+
+def _template_parameter_record(
+    parameter_records: Mapping[str, ParameterRecord],
+    role: str,
+) -> ParameterRecord:
+    try:
+        return parameter_records[role]
+    except KeyError as exc:
+        raise RegistryCaseBuildError(
+            f"Case template references parameter role {role!r}, but that role was not resolved."
+        ) from exc
+
+
+def _product_map_id(case_template: CaseTemplateRecord) -> str:
+    return str(case_template.product_map["id"])
+
+
+def _product_map_entity(
+    *,
+    case_template: CaseTemplateRecord,
+    provenance: Mapping[str, Any],
+    name: str,
+    maturity: str,
+) -> dict[str, Any]:
+    product_map_type = str(case_template.product_map["product_map_type"])
+    substrate_state = _template_state(case_template, str(case_template.product_map["substrate_state_role"]))
+    product_role = str(case_template.product_map["product_state_role"])
+    product_state = _template_state(case_template, product_role)
+    data: dict[str, Any] = {
+        "kind": "product_map",
+        "name": name,
+        "product_map_type": product_map_type,
+        "maturity": maturity,
+        "provenance": {
+            "source": provenance.get("source", provenance.get("source_database", "FungMod registry case template")),
+            "confidence_level": provenance.get("confidence_level", "registry_metadata"),
+            "notes": str(case_template.product_map.get("notes", "")),
+        },
+        "notes": str(case_template.product_map.get("notes", "")),
+    }
+    if product_map_type == "one_to_one":
+        data.update(
+            {
+                "substrate_state": substrate_state,
+                "product_state": product_state,
+            }
+        )
+    elif product_map_type == "stoichiometric":
+        data.update(
+            {
+                "reactants": {substrate_state: 1.0},
+                "products": {product_state: _template_product_yield(case_template, product_role)},
+            }
+        )
+    else:
+        raise RegistryCaseBuildError(
+            f"Unsupported product_map_type {product_map_type!r} in case template "
+            f"{case_template.case_template_id!r}."
+        )
+    return {
+        "id": _product_map_id(case_template),
+        "loader": product_map_type,
+        "data": data,
+    }
+
+
+def _template_product_yield(case_template: CaseTemplateRecord, product_role: str) -> float:
+    if product_role in case_template.stoichiometric_yields:
+        return float(case_template.stoichiometric_yields[product_role])
+    yield_value = case_template.product_map.get("stoichiometric_yield")
+    if yield_value is not None:
+        return float(yield_value)
+    raise RegistryCaseBuildError(
+        f"Case template {case_template.case_template_id!r} does not define a yield for product role {product_role!r}."
+    )
+
+
+def _case_template_config(case_template: CaseTemplateRecord) -> dict[str, Any]:
+    return {
+        "case_template_id": case_template.case_template_id,
+        "schema_version": case_template.schema_version,
+        "process_type": case_template.process_type,
+        "state_roles": dict(case_template.state_roles),
+        "observable_roles": list(case_template.observable_roles),
+        "output_state_roles": dict(case_template.output_state_roles),
+        "limitations": list(case_template.limitations),
+        "validity_notes": list(case_template.validity_notes),
+    }
+
+
+def _process_assumptions(case_template: CaseTemplateRecord, fallback: tuple[str, ...]) -> list[str]:
+    return list(case_template.limitations or fallback)
+
+
 def _surface_catalysis_config_data(
     *,
     registry: FungModRegistry,
     compatibility: ProcessCompatibilityRecord,
+    case_template: CaseTemplateRecord,
     substrate: SubstrateRecord,
     fungus_id: str,
     substrate_id: str,
@@ -233,18 +435,19 @@ def _surface_catalysis_config_data(
     output_directory: str | None,
 ) -> dict[str, Any]:
     bio001 = _is_bio001_surface_case(compatibility)
-    substrate_state = "solid_substrate_remaining" if bio001 else "solid_substrate_amount"
-    product_state = "soluble_product_amount" if bio001 else "released_product_amount"
-    catalyst_state = "free_enzyme_concentration" if bio001 else "free_catalyst_concentration"
-    product_map_id = "registry_case_release_map"
-    primary_bond = substrate.bond_classes[0]
-    substrate_initial = parameter_records.get("substrate_initial_amount")
-    catalyst_initial = parameter_records.get("enzyme_initial_concentration")
-    substrate_units = _record_units(substrate_initial, role="substrate_initial_amount") if substrate_initial is not None else "kilogram"
-    catalyst_units = _record_units(catalyst_initial, role="enzyme_initial_concentration") if catalyst_initial is not None else "mole / liter"
+    substrate_state = _template_state(case_template, "substrate")
+    product_state = _template_state(case_template, "product")
+    catalyst_state = _template_state(case_template, "catalyst")
+    product_map_id = _product_map_id(case_template)
+    primary_bond = str(case_template.process_state_metadata.get("bond_type") or substrate.bond_classes[0])
+    accessible_site_pool = str(
+        case_template.process_state_metadata.get("accessible_site_pool")
+        or "configured accessible site pool"
+    )
     provenance = _surface_catalysis_provenance(
         registry=registry,
         compatibility=compatibility,
+        case_template=case_template,
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
@@ -257,6 +460,7 @@ def _surface_catalysis_config_data(
         "mode": "exploratory" if bio001 else "toy",
         "maturity": "exploratory" if bio001 else "framework_benchmark",
         "provenance": provenance,
+        "case_template": _case_template_config(case_template),
         "entities": {
             "geometry": {
                 "id": "geometry",
@@ -287,36 +491,16 @@ def _surface_catalysis_config_data(
                 }
             ],
             "product_maps": [
-                {
-                    "id": product_map_id,
-                    "loader": "one_to_one",
-                    "data": {
-                        "kind": "product_map",
-                        "name": (
-                            "BIO-001 cellulose soluble product release map"
-                            if bio001
-                            else "toy registry one-to-one product release map"
-                        ),
-                        "product_map_type": "one_to_one",
-                        "maturity": "exploratory" if bio001 else "framework_benchmark",
-                        "provenance": {
-                            "source": provenance["source"],
-                            "confidence_level": provenance["confidence_level"],
-                            "notes": (
-                                "Mass-equivalent soluble product release map for BIO-001; not full cellulose stoichiometry."
-                                if bio001
-                                else "Toy product map for config workflow tests only."
-                            ),
-                        },
-                        "substrate_state": substrate_state,
-                        "product_state": product_state,
-                        "notes": (
-                            "Mass-equivalent one-to-one map for the BIO-001 pilot; product is a soluble hydrolysis-product class."
-                            if bio001
-                            else "Mass-equivalent toy map; not a chemical stoichiometry claim."
-                        ),
-                    },
-                }
+                _product_map_entity(
+                    case_template=case_template,
+                    provenance=provenance,
+                    name=(
+                        "BIO-001 cellulose soluble product release map"
+                        if bio001
+                        else "toy registry one-to-one product release map"
+                    ),
+                    maturity="exploratory" if bio001 else "framework_benchmark",
+                )
             ],
         },
         "parameters": [
@@ -341,7 +525,7 @@ def _surface_catalysis_config_data(
                     "catalyst": catalyst_state,
                     "product": product_state,
                     "bond_type": primary_bond,
-                    "accessible_site_pool": "cellulose accessible beta-1,4-glycosidic surface" if bio001 else "configured accessible site pool",
+                    "accessible_site_pool": accessible_site_pool,
                 },
                 "parameters": {
                     role: record.parameter_symbol
@@ -349,40 +533,27 @@ def _surface_catalysis_config_data(
                     if role in SURFACE_CATALYSIS_PARAMETER_ROLES
                 },
                 "product_map": product_map_id,
-                "assumptions": [
-                    *(
-                        [
-                            "Enzyme-mediated insoluble cellulose surface degradation pilot.",
-                            "Accessible surface area is constant within each sample; surface renewal and morphology are not modeled.",
-                            "Soluble product release is represented by a mass-equivalent product class.",
-                        ]
-                        if bio001
-                        else [
-                            "Toy registry case builder only.",
-                            "Uses the existing generic surface-catalysis factory without adding biology.",
-                        ]
+                "output_state_roles": dict(case_template.output_state_roles),
+                "assumptions": _process_assumptions(
+                    case_template,
+                    (
+                        "Enzyme-mediated insoluble cellulose surface degradation pilot.",
+                        "Accessible surface area is constant within each sample; surface renewal and morphology are not modeled.",
+                        "Soluble product release is represented by a mass-equivalent product class.",
+                    )
+                    if bio001
+                    else (
+                        "Toy registry case builder only.",
+                        "Uses the existing generic surface-catalysis factory without adding biology.",
                     ),
-                ],
+                ),
             }
         ],
-        "initial_state": {
-            "states": {
-                substrate_state: {
-                    "value": _record_exact_value(substrate_initial, role="substrate_initial_amount") if substrate_initial is not None else 0.0001,
-                    "units": substrate_units,
-                },
-                product_state: {"value": 0.0, "units": substrate_units},
-                catalyst_state: {
-                    "value": _record_exact_value(catalyst_initial, role="enzyme_initial_concentration") if catalyst_initial is not None else 1.0,
-                    "units": catalyst_units,
-                },
-            }
-        },
-        "time": {
-            "start": {"value": 0.0, "units": "second"},
-            "stop": {"value": 4000.0 if bio001 else 20.0, "units": "second"},
-            "points": 81 if bio001 else 41,
-        },
+        "initial_state": _initial_state_from_template(
+            case_template=case_template,
+            parameter_records=parameter_records,
+        ),
+        "time": _template_time_config(case_template),
         "validators": [
             {
                 "id": "non_negative_states",
@@ -432,6 +603,7 @@ def _surface_catalysis_provenance(
     *,
     registry: FungModRegistry,
     compatibility: ProcessCompatibilityRecord,
+    case_template: CaseTemplateRecord,
     fungus_id: str,
     substrate_id: str,
     environment_id: str,
@@ -454,6 +626,7 @@ def _surface_catalysis_provenance(
             "substrate_id": substrate_id,
             "environment_id": environment_id,
             "process_compatibility_id": compatibility.record_id,
+            "case_template_id": case_template.case_template_id,
         }
     return {
         "source": "FungMod BIO-001 controlled virtual-experiment scaffold.",
@@ -467,6 +640,7 @@ def _surface_catalysis_provenance(
         "substrate_id": substrate_id,
         "environment_id": environment_id,
         "process_compatibility_id": compatibility.record_id,
+        "case_template_id": case_template.case_template_id,
         "parameter_record_ids": {
             role: record.record_id
             for role, record in parameter_records.items()
@@ -578,6 +752,7 @@ def _homogeneous_mm_config_data(
     *,
     registry: FungModRegistry,
     compatibility: ProcessCompatibilityRecord,
+    case_template: CaseTemplateRecord,
     substrate: SubstrateRecord,
     fungus_id: str,
     substrate_id: str,
@@ -585,17 +760,16 @@ def _homogeneous_mm_config_data(
     parameter_records: Mapping[str, ParameterRecord],
     output_directory: str | None,
 ) -> dict[str, Any]:
-    substrate_state = "cellobiose_concentration"
-    product_state = "beta_D_glucose_concentration"
-    enzyme_state = "beta_glucosidase_concentration"
+    substrate_state = _template_state(case_template, "substrate")
+    product_state = _template_state(case_template, "product")
+    enzyme_state = _template_state(case_template, "enzyme")
     substrate_initial = parameter_records["substrate_initial_concentration"]
-    enzyme_initial = parameter_records["enzyme_initial_concentration"]
     substrate_units = _record_units(substrate_initial, role="substrate_initial_concentration")
-    enzyme_units = _record_units(enzyme_initial, role="enzyme_initial_concentration")
     rate_units = f"{substrate_units} / second"
     provenance = _homogeneous_mm_provenance(
         registry=registry,
         compatibility=compatibility,
+        case_template=case_template,
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
@@ -607,6 +781,7 @@ def _homogeneous_mm_config_data(
         "mode": "scientific",
         "maturity": "scientific",
         "provenance": provenance,
+        "case_template": _case_template_config(case_template),
         "entities": {
             "substrates": [
                 {
@@ -629,6 +804,14 @@ def _homogeneous_mm_config_data(
                     ),
                 }
             ],
+            "product_maps": [
+                _product_map_entity(
+                    case_template=case_template,
+                    provenance=provenance,
+                    name="SABIO-RK Reaction 618 cellobiose to beta-D-glucose product map",
+                    maturity="literature_metadata",
+                )
+            ],
         },
         "parameters": [
             {
@@ -648,38 +831,27 @@ def _homogeneous_mm_config_data(
                     "product": product_state,
                     "enzyme": enzyme_state,
                 },
+                "product_map": _product_map_id(case_template),
                 "parameters": {
                     "km": parameter_records["km"].parameter_symbol,
                     "kcat": parameter_records["kcat"].parameter_symbol,
                     "rate_units": rate_units,
                 },
-                "assumptions": [
-                    "Dissolved homogeneous Michaelis-Menten kinetics for the selected SABIO-RK entry.",
-                    "This is an enzyme-kinetics case, not a whole-fungus growth or uptake model.",
-                ],
+                "output_state_roles": dict(case_template.output_state_roles),
+                "assumptions": _process_assumptions(
+                    case_template,
+                    (
+                        "Dissolved homogeneous Michaelis-Menten kinetics for the selected SABIO-RK entry.",
+                        "This is an enzyme-kinetics case, not a whole-fungus growth or uptake model.",
+                    ),
+                ),
             }
         ],
-        "initial_state": {
-            "states": {
-                substrate_state: {
-                    "value": _record_exact_value(substrate_initial, role="substrate_initial_concentration"),
-                    "units": substrate_units,
-                },
-                product_state: {
-                    "value": 0.0,
-                    "units": substrate_units,
-                },
-                enzyme_state: {
-                    "value": _record_exact_value(enzyme_initial, role="enzyme_initial_concentration"),
-                    "units": enzyme_units,
-                },
-            }
-        },
-        "time": {
-            "start": {"value": 0.0, "units": "second"},
-            "stop": {"value": 1000.0, "units": "second"},
-            "points": 101,
-        },
+        "initial_state": _initial_state_from_template(
+            case_template=case_template,
+            parameter_records=parameter_records,
+        ),
+        "time": _template_time_config(case_template),
         "validators": [
             {
                 "id": "non_negative_concentrations",
@@ -933,6 +1105,7 @@ def _homogeneous_mm_provenance(
     *,
     registry: FungModRegistry,
     compatibility: ProcessCompatibilityRecord,
+    case_template: CaseTemplateRecord,
     fungus_id: str,
     substrate_id: str,
     environment_id: str,
@@ -954,6 +1127,7 @@ def _homogeneous_mm_provenance(
         "substrate_id": substrate_id,
         "environment_id": environment_id,
         "process_compatibility_id": compatibility.record_id,
+        "case_template_id": case_template.case_template_id,
         "parameter_record_ids": {
             role: record.record_id
             for role, record in parameter_records.items()
@@ -1038,6 +1212,7 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
         process_type="surface_catalysis",
         process_label="Surface-catalysis",
         required_parameter_roles=SURFACE_CATALYSIS_PARAMETER_ROLES,
+        required_state_roles=("substrate", "product", "catalyst"),
         deterministic_mode="toy",
         unsupported_mode_message=(
             "Surface-catalysis registry assembly currently only emits toy model configs."
@@ -1048,6 +1223,7 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
         process_type="homogeneous_michaelis_menten",
         process_label="Homogeneous Michaelis-Menten",
         required_parameter_roles=HOMOGENEOUS_MM_PARAMETER_ROLES,
+        required_state_roles=("substrate", "product", "enzyme"),
         deterministic_mode="scientific",
         unsupported_mode_message=(
             "Homogeneous Michaelis-Menten registry assembly requires mode='scientific'."
@@ -1065,4 +1241,5 @@ __all__ = [
     "build_model_config_from_registry_case",
     "get_registry_process_assembler",
     "select_registry_case_compatibility",
+    "select_registry_case_template",
 ]

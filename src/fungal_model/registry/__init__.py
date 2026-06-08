@@ -3,6 +3,7 @@
 from fungal_model.core.value_spec import ValueSpec, ValueSpecError
 from fungal_model.registry.loaders import RegistryLoadError, load_registry
 from fungal_model.registry.records import (
+    CaseTemplateRecord,
     EnzymeClassRecord,
     EnvironmentRecord,
     FungusRecord,
@@ -21,6 +22,7 @@ from fungal_model.registry.store import FungModRegistry, RegistryLookupError, Re
 
 __all__ = [
     "AmbiguousResolutionError",
+    "CaseTemplateRecord",
     "EnzymeClassRecord",
     "EnvironmentRecord",
     "FungModRegistry",

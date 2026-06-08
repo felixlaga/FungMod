@@ -10,6 +10,7 @@ import yaml
 
 from fungal_model.core.value_spec import ValueSpec
 from fungal_model.registry.records import (
+    CaseTemplateRecord,
     EnzymeClassRecord,
     EnvironmentRecord,
     FungusRecord,
@@ -54,6 +55,11 @@ def load_registry(path: str | Path) -> FungModRegistry:
                 _process_compatibility_record,
             ),
             parameters=_load_records(index_path, records, "parameters", _parameter_record),
+            case_templates=(
+                _load_records(index_path, records, "case_templates", _case_template_record)
+                if "case_templates" in records
+                else ()
+            ),
         )
     except KeyError as exc:
         raise RegistryLoadError(f"Registry index {index_path} is missing required field: {exc.args[0]}") from exc
@@ -156,6 +162,89 @@ def _process_compatibility_record(data: Mapping[str, Any]) -> ProcessCompatibili
         required_parameters=_tuple_of_strings(_sequence(data.get("required_parameters"))),
         parameter_roles={str(role): str(symbol) for role, symbol in parameter_roles.items()},
         product_map_required=bool(data.get("product_map_required", False)),
+        case_template_id=str(data.get("case_template_id", "") or ""),
+    )
+
+
+_COMMON_RECORD_FIELDS = {
+    "record_id",
+    "name",
+    "maturity",
+    "provenance",
+    "notes",
+    "display_name",
+    "scientific_name",
+    "aliases",
+    "external_refs",
+    "ec_number",
+    "database_ids",
+}
+
+_CASE_TEMPLATE_FIELDS = _COMMON_RECORD_FIELDS | {
+    "case_template_id",
+    "schema_version",
+    "process_type",
+    "state_roles",
+    "initial_state_mapping",
+    "product_map",
+    "stoichiometric_yields",
+    "time_grid",
+    "observable_roles",
+    "output_state_roles",
+    "process_state_metadata",
+    "limitations",
+    "validity_notes",
+}
+
+_INITIAL_STATE_MAPPING_FIELDS = {"parameter_role", "value", "units", "units_from_role", "notes"}
+_PRODUCT_MAP_FIELDS = {
+    "id",
+    "product_map_type",
+    "substrate_state_role",
+    "product_state_role",
+    "stoichiometric_yield",
+    "notes",
+}
+_TIME_GRID_FIELDS = {"start", "stop", "points", "units", "notes"}
+
+
+def _case_template_record(data: Mapping[str, Any]) -> CaseTemplateRecord:
+    _fail_on_unknown_fields(data, allowed=_CASE_TEMPLATE_FIELDS, label="case_template")
+    initial_state_mapping = _mapping(data.get("initial_state_mapping"))
+    for role, spec in initial_state_mapping.items():
+        if not isinstance(spec, Mapping):
+            continue
+        _fail_on_unknown_fields(
+            spec,
+            allowed=_INITIAL_STATE_MAPPING_FIELDS,
+            label=f"case_template.initial_state_mapping.{role}",
+        )
+    product_map = _mapping(data.get("product_map"))
+    _fail_on_unknown_fields(product_map, allowed=_PRODUCT_MAP_FIELDS, label="case_template.product_map")
+    time_grid = _mapping(data.get("time_grid"))
+    _fail_on_unknown_fields(time_grid, allowed=_TIME_GRID_FIELDS, label="case_template.time_grid")
+    return CaseTemplateRecord(
+        **_common_record_fields(data),
+        case_template_id=str(data.get("case_template_id", "") or ""),
+        schema_version=str(data.get("schema_version", "") or ""),
+        process_type=str(data.get("process_type", "") or ""),
+        state_roles={str(role): str(state) for role, state in _mapping(data.get("state_roles")).items()},
+        initial_state_mapping={
+            str(role): dict(spec)
+            for role, spec in initial_state_mapping.items()
+            if isinstance(spec, Mapping)
+        },
+        product_map=dict(product_map),
+        stoichiometric_yields={
+            str(role): float(value)
+            for role, value in _mapping(data.get("stoichiometric_yields")).items()
+        },
+        time_grid=dict(time_grid),
+        observable_roles=_tuple_of_strings(_sequence(data.get("observable_roles"))),
+        output_state_roles={str(role): str(state) for role, state in _mapping(data.get("output_state_roles")).items()},
+        process_state_metadata=dict(_mapping(data.get("process_state_metadata"))),
+        limitations=_tuple_of_strings(_sequence(data.get("limitations"))),
+        validity_notes=_tuple_of_strings(_sequence(data.get("validity_notes"))),
     )
 
 
@@ -240,6 +329,14 @@ def _optional_str(value: Any) -> str | None:
 
 def _mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
+
+
+def _fail_on_unknown_fields(data: Mapping[str, Any], *, allowed: set[str], label: str) -> None:
+    unknown = sorted(str(key) for key in data if str(key) not in allowed)
+    if unknown:
+        raise RegistryLoadError(
+            f"Unsupported {label} field(s): {', '.join(unknown)}."
+        )
 
 
 def _database_ids(value: Any) -> dict[str, tuple[str, ...]]:

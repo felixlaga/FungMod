@@ -14,6 +14,18 @@ def _tuple_of_strings(values: Sequence[Any] | None) -> tuple[str, ...]:
     return tuple(str(value) for value in (values or ()))
 
 
+CASE_TEMPLATE_SCHEMA_VERSION = "1"
+CASE_TEMPLATE_ALLOWED_STATE_ROLES = frozenset(
+    {
+        "substrate",
+        "product",
+        "enzyme",
+        "catalyst",
+        "accessibility_proxy",
+    }
+)
+
+
 @dataclass(frozen=True)
 class RegistryRecord:
     """Common metadata required for all registry records."""
@@ -201,6 +213,7 @@ class ProcessCompatibilityRecord(RegistryRecord):
     required_parameters: tuple[str, ...] = ()
     parameter_roles: Mapping[str, str] = field(default_factory=dict)
     product_map_required: bool = False
+    case_template_id: str = ""
 
     def validate(self) -> ValidationResult:
         issues = self._common_issues()
@@ -235,6 +248,83 @@ class ProcessCompatibilityRecord(RegistryRecord):
                 "required_parameters": list(self.required_parameters),
                 "parameter_roles": dict(self.parameter_roles),
                 "product_map_required": self.product_map_required,
+                "case_template_id": self.case_template_id,
+            }
+        )
+        return data
+
+
+@dataclass(frozen=True)
+class CaseTemplateRecord(RegistryRecord):
+    """Assembly-only template for turning a compatible registry case into states and outputs."""
+
+    case_template_id: str = ""
+    schema_version: str = CASE_TEMPLATE_SCHEMA_VERSION
+    process_type: str = ""
+    state_roles: Mapping[str, str] = field(default_factory=dict)
+    initial_state_mapping: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    product_map: Mapping[str, Any] = field(default_factory=dict)
+    stoichiometric_yields: Mapping[str, float] = field(default_factory=dict)
+    time_grid: Mapping[str, Any] = field(default_factory=dict)
+    observable_roles: tuple[str, ...] = ()
+    output_state_roles: Mapping[str, str] = field(default_factory=dict)
+    process_state_metadata: Mapping[str, Any] = field(default_factory=dict)
+    limitations: tuple[str, ...] = ()
+    validity_notes: tuple[str, ...] = ()
+
+    def validate(self) -> ValidationResult:
+        issues = self._common_issues()
+        if not self.case_template_id:
+            issues.append({"field": "case_template_id", "message": "Case template id is required."})
+        elif self.case_template_id != self.record_id:
+            issues.append(
+                {
+                    "field": "case_template_id",
+                    "message": "case_template_id must match record_id.",
+                    "details": {"case_template_id": self.case_template_id, "record_id": self.record_id},
+                }
+            )
+        if self.schema_version != CASE_TEMPLATE_SCHEMA_VERSION:
+            issues.append(
+                {
+                    "field": "schema_version",
+                    "message": f"Unsupported case-template schema version {self.schema_version!r}.",
+                }
+            )
+        if not self.process_type:
+            issues.append({"field": "process_type", "message": "Case template process_type is required."})
+        issues.extend(_case_template_state_role_issues(self.state_roles))
+        issues.extend(_case_template_initial_state_issues(self.initial_state_mapping, self.state_roles))
+        issues.extend(_case_template_product_map_issues(self.product_map, self.state_roles, self.stoichiometric_yields))
+        issues.extend(_case_template_time_grid_issues(self.time_grid))
+        issues.extend(_case_template_output_role_issues("observable_roles", self.observable_roles))
+        issues.extend(_case_template_state_role_issues(self.output_state_roles, field_name="output_state_roles"))
+        if not self.limitations:
+            issues.append({"field": "limitations", "message": "Case template limitations are required."})
+        if not self.validity_notes:
+            issues.append({"field": "validity_notes", "message": "Case template validity notes are required."})
+        return _validation_result(self.record_id, issues)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = super().to_dict()
+        data.update(
+            {
+                "case_template_id": self.case_template_id,
+                "schema_version": self.schema_version,
+                "process_type": self.process_type,
+                "state_roles": dict(self.state_roles),
+                "initial_state_mapping": {
+                    role: dict(spec)
+                    for role, spec in self.initial_state_mapping.items()
+                },
+                "product_map": dict(self.product_map),
+                "stoichiometric_yields": dict(self.stoichiometric_yields),
+                "time_grid": dict(self.time_grid),
+                "observable_roles": list(self.observable_roles),
+                "output_state_roles": dict(self.output_state_roles),
+                "process_state_metadata": dict(self.process_state_metadata),
+                "limitations": list(self.limitations),
+                "validity_notes": list(self.validity_notes),
             }
         )
         return data
@@ -296,7 +386,180 @@ def _validation_result(record_id: str, issues: list[dict[str, Any]]) -> Validati
     )
 
 
+def _case_template_state_role_issues(
+    state_roles: Mapping[str, str],
+    *,
+    field_name: str = "state_roles",
+) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    if not isinstance(state_roles, Mapping) or not state_roles:
+        return [{"field": field_name, "message": "Case template state roles are required."}]
+    for role, state_name in state_roles.items():
+        role_text = str(role).strip()
+        state_text = str(state_name).strip()
+        if not role_text:
+            issues.append({"field": field_name, "message": "State role names must be nonempty."})
+        if role_text and role_text not in CASE_TEMPLATE_ALLOWED_STATE_ROLES:
+            issues.append(
+                {
+                    "field": f"{field_name}.{role_text}",
+                    "message": "Unsupported case-template state role.",
+                    "details": {"allowed_roles": sorted(CASE_TEMPLATE_ALLOWED_STATE_ROLES)},
+                }
+            )
+        if not state_text:
+            issues.append({"field": f"{field_name}.{role_text}", "message": "State role values must be nonempty."})
+    return issues
+
+
+def _case_template_initial_state_issues(
+    initial_state_mapping: Mapping[str, Mapping[str, Any]],
+    state_roles: Mapping[str, str],
+) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    if not isinstance(initial_state_mapping, Mapping) or not initial_state_mapping:
+        return [{"field": "initial_state_mapping", "message": "Case template initial_state_mapping is required."}]
+    for role, spec in initial_state_mapping.items():
+        role_text = str(role).strip()
+        if role_text not in state_roles:
+            issues.append(
+                {
+                    "field": f"initial_state_mapping.{role_text}",
+                    "message": "Initial-state role must reference a state_roles key.",
+                }
+            )
+        if not isinstance(spec, Mapping):
+            issues.append(
+                {
+                    "field": f"initial_state_mapping.{role_text}",
+                    "message": "Initial-state mapping entries must be mappings.",
+                }
+            )
+            continue
+        has_parameter = bool(str(spec.get("parameter_role", "")).strip())
+        has_value = spec.get("value") is not None
+        if has_parameter == has_value:
+            issues.append(
+                {
+                    "field": f"initial_state_mapping.{role_text}",
+                    "message": "Initial-state mapping must define exactly one of parameter_role or value.",
+                }
+            )
+        has_units = bool(str(spec.get("units", "")).strip())
+        has_units_from_role = bool(str(spec.get("units_from_role", "")).strip())
+        if has_units == has_units_from_role:
+            issues.append(
+                {
+                    "field": f"initial_state_mapping.{role_text}",
+                    "message": "Initial-state mapping must define exactly one of units or units_from_role.",
+                }
+            )
+    return issues
+
+
+def _case_template_product_map_issues(
+    product_map: Mapping[str, Any],
+    state_roles: Mapping[str, str],
+    stoichiometric_yields: Mapping[str, float],
+) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    if "product" not in state_roles:
+        return issues
+    if not isinstance(product_map, Mapping) or not product_map:
+        return [{"field": "product_map", "message": "Case templates with product states require product_map."}]
+    for field_name in ("id", "product_map_type", "substrate_state_role", "product_state_role"):
+        if not str(product_map.get(field_name, "")).strip():
+            issues.append({"field": f"product_map.{field_name}", "message": "Product map field is required."})
+    for field_name in ("substrate_state_role", "product_state_role"):
+        role = str(product_map.get(field_name, "")).strip()
+        if role and role not in state_roles:
+            issues.append(
+                {
+                    "field": f"product_map.{field_name}",
+                    "message": "Product map state role must reference state_roles.",
+                }
+            )
+    product_map_type = str(product_map.get("product_map_type", "")).strip()
+    if product_map_type not in {"one_to_one", "stoichiometric"}:
+        issues.append(
+            {
+                "field": "product_map.product_map_type",
+                "message": "Product map type must be one_to_one or stoichiometric.",
+            }
+        )
+    if not isinstance(stoichiometric_yields, Mapping) or not stoichiometric_yields:
+        issues.append(
+            {
+                "field": "stoichiometric_yields",
+                "message": "Case templates with product states require stoichiometric_yields.",
+            }
+        )
+    for role, value in stoichiometric_yields.items():
+        role_text = str(role).strip()
+        if role_text not in state_roles:
+            issues.append(
+                {
+                    "field": f"stoichiometric_yields.{role_text}",
+                    "message": "Stoichiometric-yield role must reference state_roles.",
+                }
+            )
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            issues.append(
+                {
+                    "field": f"stoichiometric_yields.{role_text}",
+                    "message": "Stoichiometric yield must be numeric.",
+                }
+            )
+            continue
+        if numeric <= 0.0:
+            issues.append(
+                {
+                    "field": f"stoichiometric_yields.{role_text}",
+                    "message": "Stoichiometric yield must be positive.",
+                }
+            )
+    return issues
+
+
+def _case_template_time_grid_issues(time_grid: Mapping[str, Any]) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    if not isinstance(time_grid, Mapping) or not time_grid:
+        return [{"field": "time_grid", "message": "Case template time_grid is required."}]
+    for field_name in ("start", "stop", "points", "units"):
+        if time_grid.get(field_name) is None or str(time_grid.get(field_name)).strip() == "":
+            issues.append({"field": f"time_grid.{field_name}", "message": "Time-grid field is required."})
+    try:
+        start = float(str(time_grid.get("start", "")))
+        stop = float(str(time_grid.get("stop", "")))
+    except (TypeError, ValueError):
+        issues.append({"field": "time_grid", "message": "Time-grid start and stop must be numeric."})
+    else:
+        if stop <= start:
+            issues.append({"field": "time_grid.stop", "message": "Time-grid stop must be greater than start."})
+    try:
+        points = int(str(time_grid.get("points", "")))
+    except (TypeError, ValueError):
+        issues.append({"field": "time_grid.points", "message": "Time-grid points must be an integer."})
+    else:
+        if points < 2:
+            issues.append({"field": "time_grid.points", "message": "Time-grid points must be at least 2."})
+    return issues
+
+
+def _case_template_output_role_issues(field_name: str, roles: Sequence[str]) -> list[dict[str, Any]]:
+    if not roles:
+        return [{"field": field_name, "message": "Case template observable roles are required."}]
+    if any(not str(role).strip() for role in roles):
+        return [{"field": field_name, "message": "Case template observable roles must be nonempty."}]
+    return []
+
+
 __all__ = [
+    "CASE_TEMPLATE_ALLOWED_STATE_ROLES",
+    "CASE_TEMPLATE_SCHEMA_VERSION",
+    "CaseTemplateRecord",
     "EnzymeClassRecord",
     "EnvironmentRecord",
     "FungusRecord",

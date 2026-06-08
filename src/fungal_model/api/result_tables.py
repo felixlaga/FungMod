@@ -136,7 +136,7 @@ def _build_table_rows(
         rows["modelability_preflight"].append(_preflight_row(context, report))
         rows["case_summary"].append(_case_summary_row(context, case, report))
         rows["provenance_table"].extend(_provenance_rows(context, registry, case, report, role_records))
-        rows["limitations_table"].extend(_limitation_rows(context, case, report, role_records))
+        rows["limitations_table"].extend(_limitation_rows(context, registry, case, report, role_records))
         rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
         rows["suggested_experiments"].extend(_suggested_experiment_rows(context, report))
         for sample in case.samples:
@@ -388,6 +388,9 @@ def _base_sample_columns(context: Mapping[str, Any]) -> dict[str, Any]:
 def _state_roles(sample: EnsembleSample) -> dict[str, str]:
     config_path = Path(sample.config_path)
     data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    template_roles = _template_state_roles(data)
+    if template_roles:
+        return template_roles
     process_configs = data.get("processes", []) if isinstance(data, Mapping) else []
     if not process_configs:
         return {}
@@ -398,6 +401,25 @@ def _state_roles(sample: EnsembleSample) -> dict[str, str]:
     for role, state_name in states.items():
         if isinstance(state_name, str):
             roles[str(role)] = state_name
+    if "catalyst" in roles and "enzyme" not in roles:
+        roles["enzyme"] = roles["catalyst"]
+    return roles
+
+
+def _template_state_roles(data: Any) -> dict[str, str]:
+    if not isinstance(data, Mapping):
+        return {}
+    case_template = data.get("case_template")
+    if not isinstance(case_template, Mapping):
+        return {}
+    roles_data = case_template.get("output_state_roles") or case_template.get("state_roles")
+    if not isinstance(roles_data, Mapping):
+        return {}
+    roles = {
+        str(role): str(state_name)
+        for role, state_name in roles_data.items()
+        if isinstance(state_name, str) and state_name
+    }
     if "catalyst" in roles and "enzyme" not in roles:
         roles["enzyme"] = roles["catalyst"]
     return roles
@@ -911,6 +933,13 @@ def _provenance_rows(
         compatibility = None
     if compatibility is not None:
         rows.append(_record_provenance_row(context, "process_compatibility", compatibility, role="", symbol="", value_kind=""))
+        if compatibility.case_template_id:
+            try:
+                template = registry.get_case_template(compatibility.case_template_id)
+            except KeyError:
+                template = None
+            if template is not None:
+                rows.append(_record_provenance_row(context, "case_template", template, role="", symbol="", value_kind=""))
     for role, record in role_records.items():
         rows.append(_record_provenance_row(context, "parameter", record, role=role, symbol=record.parameter_symbol, value_kind=record.value.kind))
     for item in tuple(report.missing) + tuple(report.incompatible):
@@ -967,6 +996,7 @@ def _record_provenance_row(
 
 def _limitation_rows(
     context: Mapping[str, Any],
+    registry: FungModRegistry,
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     role_records: Mapping[str, ParameterRecord],
@@ -993,6 +1023,7 @@ def _limitation_rows(
         rows.append(_limitation_row(context, "missing_input", "blocking", item.message, item.item_id))
     for item in report.incompatible:
         rows.append(_limitation_row(context, "incompatible_input", "blocking", item.message, item.item_id))
+    rows.extend(_case_template_limitation_rows(context, registry=registry, case=case, report=report))
     if any(_is_exploratory_record(record) for record in role_records.values()):
         rows.append(
             _limitation_row(
@@ -1041,6 +1072,31 @@ def _limitation_rows(
                 case.process_type,
             )
         )
+    return rows
+
+
+def _case_template_limitation_rows(
+    context: Mapping[str, Any],
+    *,
+    registry: FungModRegistry,
+    case: RegistryCaseEnsemble,
+    report: ModelabilityReport,
+) -> list[dict[str, Any]]:
+    try:
+        compatibility = select_registry_case_compatibility(
+            registry=registry,
+            fungus_id=case.fungus_id,
+            substrate_id=case.substrate_id,
+            report=report,
+        )
+        template = registry.get_case_template(compatibility.case_template_id)
+    except (KeyError, RegistryCaseBuildError):
+        return []
+    rows: list[dict[str, Any]] = []
+    for limitation in template.limitations:
+        rows.append(_limitation_row(context, "case_template", "info", limitation, template.case_template_id))
+    for note in template.validity_notes:
+        rows.append(_limitation_row(context, "case_template_validity", "info", note, template.case_template_id))
     return rows
 
 

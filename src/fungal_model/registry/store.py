@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from fungal_model.registry.records import (
+    CaseTemplateRecord,
     EnzymeClassRecord,
     EnvironmentRecord,
     FungusRecord,
@@ -38,6 +39,7 @@ class FungModRegistry:
     environments: dict[str, EnvironmentRecord]
     process_compatibility: dict[str, ProcessCompatibilityRecord]
     parameters: dict[str, ParameterRecord]
+    case_templates: dict[str, CaseTemplateRecord]
 
     @classmethod
     def build(
@@ -53,6 +55,7 @@ class FungModRegistry:
         environments: Iterable[EnvironmentRecord],
         process_compatibility: Iterable[ProcessCompatibilityRecord],
         parameters: Iterable[ParameterRecord],
+        case_templates: Iterable[CaseTemplateRecord] = (),
     ) -> "FungModRegistry":
         return cls(
             registry_id=registry_id,
@@ -65,6 +68,7 @@ class FungModRegistry:
             environments=_records_by_id(environments, "environments"),
             process_compatibility=_records_by_id(process_compatibility, "process_compatibility"),
             parameters=_records_by_id(parameters, "parameters"),
+            case_templates=_records_by_id(case_templates, "case_templates"),
         )
 
     def get_fungus(self, record_id: str) -> FungusRecord:
@@ -78,6 +82,9 @@ class FungModRegistry:
 
     def get_environment(self, record_id: str) -> EnvironmentRecord:
         return _lookup(self.environments, record_id, "environment")
+
+    def get_case_template(self, record_id: str) -> CaseTemplateRecord:
+        return _lookup(self.case_templates, record_id, "case template")
 
     def get_process_compatibility(
         self,
@@ -146,6 +153,7 @@ class FungModRegistry:
                 "environments": [record.to_dict() for record in self.environments.values()],
                 "process_compatibility": [record.to_dict() for record in self.process_compatibility.values()],
                 "parameters": [record.to_dict() for record in self.parameters.values()],
+                "case_templates": [record.to_dict() for record in self.case_templates.values()],
             },
         }
 
