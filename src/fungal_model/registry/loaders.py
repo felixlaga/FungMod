@@ -96,11 +96,7 @@ def _resolve_registry_path(index_path: Path, value: str) -> Path:
 
 def _fungus_record(data: Mapping[str, Any]) -> FungusRecord:
     return FungusRecord(
-        record_id=_record_id(data),
-        name=_name(data),
-        maturity=_maturity(data),
-        provenance=_provenance(data),
-        notes=_notes(data),
+        **_common_record_fields(data),
         enzyme_classes=_tuple_of_strings(_sequence(data.get("enzyme_classes"))),
         assimilable_products=_tuple_of_strings(_sequence(data.get("assimilable_products"))),
     )
@@ -108,11 +104,7 @@ def _fungus_record(data: Mapping[str, Any]) -> FungusRecord:
 
 def _enzyme_class_record(data: Mapping[str, Any]) -> EnzymeClassRecord:
     return EnzymeClassRecord(
-        record_id=_record_id(data),
-        name=_name(data),
-        maturity=_maturity(data),
-        provenance=_provenance(data),
-        notes=_notes(data),
+        **_common_record_fields(data),
         target_bond_classes=_tuple_of_strings(_sequence(data.get("target_bond_classes"))),
         compatible_substrate_classes=_tuple_of_strings(_sequence(data.get("compatible_substrate_classes"))),
         compatible_processes=_tuple_of_strings(_sequence(data.get("compatible_processes"))),
@@ -124,11 +116,7 @@ def _substrate_record(data: Mapping[str, Any]) -> SubstrateRecord:
     if not isinstance(properties, Mapping):
         properties = {}
     return SubstrateRecord(
-        record_id=_record_id(data),
-        name=_name(data),
-        maturity=_maturity(data),
-        provenance=_provenance(data),
-        notes=_notes(data),
+        **_common_record_fields(data),
         substrate_class=str(data.get("substrate_class", "")),
         physical_state=str(data.get("physical_state", "")),
         bond_classes=_tuple_of_strings(_sequence(data.get("bond_classes"))),
@@ -146,11 +134,7 @@ def _environment_record(data: Mapping[str, Any]) -> EnvironmentRecord:
     if not isinstance(conditions, Mapping):
         conditions = {}
     return EnvironmentRecord(
-        record_id=_record_id(data),
-        name=_name(data),
-        maturity=_maturity(data),
-        provenance=_provenance(data),
-        notes=_notes(data),
+        **_common_record_fields(data),
         conditions={
             str(key): ValueSpec.from_mapping(value)
             for key, value in conditions.items()
@@ -164,11 +148,7 @@ def _process_compatibility_record(data: Mapping[str, Any]) -> ProcessCompatibili
     if not isinstance(parameter_roles, Mapping):
         parameter_roles = {}
     return ProcessCompatibilityRecord(
-        record_id=_record_id(data),
-        name=_name(data),
-        maturity=_maturity(data),
-        provenance=_provenance(data),
-        notes=_notes(data),
+        **_common_record_fields(data),
         enzyme_class=str(data.get("enzyme_class", "")),
         substrate_class=str(data.get("substrate_class", "")),
         required_bond_classes=_tuple_of_strings(_sequence(data.get("required_bond_classes"))),
@@ -186,11 +166,7 @@ def _parameter_record(data: Mapping[str, Any]) -> ParameterRecord:
     provenance = _provenance(data)
     maturity = _maturity(data)
     return ParameterRecord(
-        record_id=_record_id(data),
-        name=_name(data),
-        maturity=maturity,
-        provenance=provenance,
-        notes=_notes(data),
+        **_common_record_fields(data, maturity=maturity, provenance=provenance),
         parameter_symbol=str(data.get("parameter_symbol", "")),
         process_type=str(data.get("process_type", "")),
         enzyme_class=_optional_str(data.get("enzyme_class")),
@@ -203,6 +179,27 @@ def _parameter_record(data: Mapping[str, Any]) -> ParameterRecord:
         range_interpretation=_range_interpretation(data, provenance=provenance, maturity=maturity, value=value),
         allowed_use=_allowed_use(data, provenance=provenance, maturity=maturity, value=value),
     )
+
+
+def _common_record_fields(
+    data: Mapping[str, Any],
+    *,
+    maturity: str | None = None,
+    provenance: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "record_id": _record_id(data),
+        "name": _name(data),
+        "maturity": _maturity(data) if maturity is None else maturity,
+        "provenance": _provenance(data) if provenance is None else provenance,
+        "notes": _notes(data),
+        "display_name": _optional_str(data.get("display_name")) or "",
+        "scientific_name": _optional_str(data.get("scientific_name")) or "",
+        "aliases": _tuple_of_strings(_sequence(data.get("aliases"))),
+        "external_refs": _mapping(data.get("external_refs")),
+        "ec_number": _optional_str(data.get("ec_number")) or "",
+        "database_ids": _database_ids(data.get("database_ids")),
+    }
 
 
 def _record_id(data: Mapping[str, Any]) -> str:
@@ -239,6 +236,19 @@ def _optional_str(value: Any) -> str | None:
         return None
     text = str(value)
     return text if text else None
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _database_ids(value: Any) -> dict[str, tuple[str, ...]]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        str(key): _tuple_of_strings(_sequence(raw_values))
+        for key, raw_values in value.items()
+    }
 
 
 def _range_scope(

@@ -34,6 +34,10 @@ records:
 
   - record_id: cellulose_film_generic
     name: Generic insoluble cellulose film
+    display_name: cellulose film
+    aliases:
+      - cellulose film
+      - generic cellulose film
     maturity: exploratory_metadata
     provenance:
       source: FungMod BIO-001 controlled virtual-experiment scaffold.
@@ -66,6 +70,9 @@ records:
 
   - record_id: cellobiose
     name: Cellobiose
+    aliases:
+      - cellobiose substrate
+      - SABIO-RK Reaction 618 substrate
     maturity: literature_metadata
     provenance:
       source_database: SABIO-RK

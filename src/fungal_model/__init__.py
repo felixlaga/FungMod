@@ -61,6 +61,12 @@ from fungal_model.io import (
     ValidatorConfig,
     ValidatorRegistry,
 )
+from fungal_model.registry import (
+    AmbiguousResolutionError,
+    RegistryResolver,
+    ResolutionError,
+    ResolvedRecord,
+)
 from fungal_model.modifiers import (
     OxygenModifier,
     PHModifier,
@@ -119,6 +125,7 @@ __all__ = [
     "Assumption",
     "AccessibleSitePool",
     "AccessibleSurfaceAreaModel",
+    "AmbiguousResolutionError",
     "BondCleavageProcess",
     "BuildDecision",
     "CompatibilityIssue",
@@ -185,6 +192,9 @@ __all__ = [
     "ProductMapRegistry",
     "ProductReleaseMap",
     "RegistryLookupError",
+    "RegistryResolver",
+    "ResolutionError",
+    "ResolvedRecord",
     "RunRequest",
     "OxygenModifier",
     "PHModifier",

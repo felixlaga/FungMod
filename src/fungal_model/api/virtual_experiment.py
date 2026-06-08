@@ -13,7 +13,7 @@ from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid
 from fungal_model.api.quicklook import write_quicklook_plots as write_quicklook_plot_files
 from fungal_model.api.result_tables import WrittenTables, write_standard_tables
 from fungal_model.registry.records import ParameterRecord
-from fungal_model.registry import FungModRegistry, load_registry
+from fungal_model.registry import FungModRegistry, RegistryResolver, ResolvedRecord, load_registry
 from fungal_model.screening import (
     ModelabilityMode,
     ModelabilityReport,
@@ -39,6 +39,7 @@ class VirtualExperiment:
     registry: FungModRegistry
     registry_source: str = ""
     environment_cases: tuple[EnvironmentCase, ...] = ()
+    resolved_records: tuple[ResolvedRecord, ...] = ()
 
     @classmethod
     def from_registry(
@@ -48,13 +49,31 @@ class VirtualExperiment:
         substrates: Sequence[str] | str,
         environments: Sequence[str] | str | EnvironmentGrid,
         registry: str | Path | FungModRegistry = "data_registry/registry_index.yml",
+        resolve_names: bool = False,
     ) -> "VirtualExperiment":
-        """Create a virtual experiment from curated registry IDs."""
+        """Create a virtual experiment from curated registry IDs or opted-in aliases."""
 
         loaded_registry, registry_source = _load_registry_source(registry)
-        fungus_ids = _string_tuple(fungi, field_name="fungi")
-        substrate_ids = _string_tuple(substrates, field_name="substrates")
+        fungus_inputs = _string_tuple(fungi, field_name="fungi")
+        substrate_inputs = _string_tuple(substrates, field_name="substrates")
         environment_ids, environment_cases = _environment_inputs(environments)
+        resolved_records: tuple[ResolvedRecord, ...] = ()
+        if resolve_names:
+            resolver = RegistryResolver(loaded_registry)
+            fungus_resolutions = tuple(resolver.resolve_fungus(value) for value in fungus_inputs)
+            substrate_resolutions = tuple(resolver.resolve_substrate(value) for value in substrate_inputs)
+            environment_resolutions = (
+                ()
+                if environment_cases
+                else tuple(resolver.resolve_environment(value) for value in environment_ids)
+            )
+            fungus_ids = tuple(resolution.record_id for resolution in fungus_resolutions)
+            substrate_ids = tuple(resolution.record_id for resolution in substrate_resolutions)
+            environment_ids = tuple(resolution.record_id for resolution in environment_resolutions) or environment_ids
+            resolved_records = (*fungus_resolutions, *substrate_resolutions, *environment_resolutions)
+        else:
+            fungus_ids = fungus_inputs
+            substrate_ids = substrate_inputs
         if environment_cases:
             loaded_registry = _registry_with_runtime_environment_overlay(
                 loaded_registry,
@@ -73,6 +92,26 @@ class VirtualExperiment:
             registry=loaded_registry,
             registry_source=registry_source,
             environment_cases=environment_cases,
+            resolved_records=resolved_records,
+        )
+
+    @classmethod
+    def from_names(
+        cls,
+        *,
+        fungi: Sequence[str] | str,
+        substrates: Sequence[str] | str,
+        environments: Sequence[str] | str | EnvironmentGrid,
+        registry: str | Path | FungModRegistry = "data_registry/registry_index.yml",
+    ) -> "VirtualExperiment":
+        """Create a virtual experiment by resolving researcher-facing names and aliases."""
+
+        return cls.from_registry(
+            fungi=fungi,
+            substrates=substrates,
+            environments=environments,
+            registry=registry,
+            resolve_names=True,
         )
 
     def preflight(self, *, mode: ModelabilityMode = "exploratory") -> tuple[ModelabilityReport, ...]:
@@ -149,6 +188,7 @@ class VirtualExperiment:
             "case_count": self.case_count,
             "registry_id": self.registry.registry_id,
             "registry_source": self.registry_source,
+            "resolved_records": [record.to_dict() for record in self.resolved_records],
         }
 
     @property

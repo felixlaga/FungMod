@@ -23,6 +23,12 @@ class RegistryRecord:
     maturity: str
     provenance: Mapping[str, Any]
     notes: str
+    display_name: str = ""
+    scientific_name: str = ""
+    aliases: tuple[str, ...] = ()
+    external_refs: Mapping[str, Any] = field(default_factory=dict)
+    ec_number: str = ""
+    database_ids: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     def _common_issues(self) -> list[dict[str, Any]]:
         issues: list[dict[str, Any]] = []
@@ -43,13 +49,29 @@ class RegistryRecord:
         return _validation_result(self.record_id, issues)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "record_id": self.record_id,
             "name": self.name,
             "maturity": self.maturity,
             "provenance": dict(self.provenance),
             "notes": self.notes,
         }
+        if self.display_name:
+            data["display_name"] = self.display_name
+        if self.scientific_name:
+            data["scientific_name"] = self.scientific_name
+        if self.aliases:
+            data["aliases"] = list(self.aliases)
+        if self.external_refs:
+            data["external_refs"] = dict(self.external_refs)
+        if self.ec_number:
+            data["ec_number"] = self.ec_number
+        if self.database_ids:
+            data["database_ids"] = {
+                key: list(values)
+                for key, values in self.database_ids.items()
+            }
+        return data
 
 
 @dataclass(frozen=True)

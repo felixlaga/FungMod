@@ -16,6 +16,10 @@ records:
 
   - record_id: generic_cellulase_source
     name: Generic cellulase enzyme source
+    display_name: Generic cellulase source
+    aliases:
+      - generic cellulase source
+      - cellulase enzyme source
     maturity: exploratory_metadata
     provenance:
       source: FungMod BIO-001 controlled virtual-experiment scaffold.
@@ -32,6 +36,14 @@ records:
 
   - record_id: sabiork_beta_glucosidase_source
     name: SABIO-RK Reaction 618 beta-glucosidase source
+    display_name: beta-glucosidase source
+    aliases:
+      - beta-glucosidase source
+      - beta glucosidase source
+      - SABIO-RK beta-glucosidase source
+    database_ids:
+      sabiork_reaction:
+        - "618"
     maturity: literature_processed
     provenance:
       source_database: SABIO-RK

@@ -11,19 +11,29 @@ from fungal_model.registry.records import (
     RegistryRecord,
     SubstrateRecord,
 )
+from fungal_model.registry.resolver import (
+    AmbiguousResolutionError,
+    RegistryResolver,
+    ResolutionError,
+    ResolvedRecord,
+)
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError, RegistryValidationError
 
 __all__ = [
+    "AmbiguousResolutionError",
     "EnzymeClassRecord",
     "EnvironmentRecord",
     "FungModRegistry",
     "FungusRecord",
     "ParameterRecord",
     "ProcessCompatibilityRecord",
+    "RegistryResolver",
     "RegistryLoadError",
     "RegistryLookupError",
     "RegistryRecord",
     "RegistryValidationError",
+    "ResolutionError",
+    "ResolvedRecord",
     "SubstrateRecord",
     "ValueSpec",
     "ValueSpecError",

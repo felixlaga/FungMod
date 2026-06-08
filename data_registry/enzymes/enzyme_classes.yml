@@ -18,6 +18,10 @@ records:
 
   - record_id: cellulase_generic
     name: Generic cellulase-like enzyme class
+    display_name: generic cellulase-like enzyme class
+    aliases:
+      - generic cellulase class
+      - cellulase-like enzyme class
     maturity: exploratory_metadata
     provenance:
       source: FungMod BIO-001 controlled virtual-experiment scaffold.
@@ -33,6 +37,10 @@ records:
 
   - record_id: beta_glucosidase
     name: beta-glucosidase
+    ec_number: 3.2.1.21
+    aliases:
+      - beta glucosidase
+      - EC 3.2.1.21
     maturity: literature_metadata
     provenance:
       source_database: SABIO-RK

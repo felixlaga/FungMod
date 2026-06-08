@@ -34,6 +34,10 @@ records:
 
   - record_id: bio001_cellulose_surface_pilot_environment
     name: BIO-001 cellulose surface pilot assay context
+    display_name: BIO-001 cellulose surface pilot context
+    aliases:
+      - BIO-001 cellulose surface context
+      - 30C_pH5_cellulose_surface_context
     maturity: exploratory_metadata
     provenance:
       source: FungMod BIO-001 controlled virtual-experiment scaffold.
@@ -65,6 +69,11 @@ records:
 
   - record_id: sabiork_reaction_618_selected_conditions
     name: SABIO-RK Reaction 618 selected assay conditions
+    display_name: 30C pH5 assay conditions
+    aliases:
+      - 30C_pH5_assay
+      - 30 C pH 5 assay
+      - SABIO-RK Reaction 618 assay conditions
     maturity: literature_processed
     provenance:
       source_database: SABIO-RK
