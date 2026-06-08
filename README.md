@@ -3,6 +3,7 @@
 Before changing the codebase, start with the active directive:
 
 - `foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md`
+- `foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md`
 
 Historical foundation-first plans are archived under `old_progress/`. They are
 useful context, but the active goal is now the virtual-experiment engine:
@@ -59,7 +60,10 @@ basic kinetics layer:
 - a registry-backed exploratory virtual-experiment API for Reaction 618 and
   the controlled BIO-001 surface-degradation pilot;
 - schema-versioned virtual-experiment output tables with provenance,
-  limitations, missing-parameter, suggested-experiment, and range-use fields.
+  limitations, missing-parameter, suggested-experiment, and range-use fields;
+- an offline-first SABIO-RK source adapter that loads frozen kinetic-law
+  snapshots and writes review-only proposed records without mutating the
+  simulation registry.
 
 It does not yet implement full thermodynamic flux analysis, resolved intracellular
 metabolism, 2D/3D spatial models, publication-grade calibration against
@@ -193,6 +197,15 @@ Product maps live under `data/product_maps/` and are loaded through
 `load_product_map`. They carry configured state names and benchmark maturity
 metadata, so product release mappings do not have to be embedded in process
 code or a substrate-specific workflow.
+
+Source discovery is intentionally separate from simulation. `SabioRKSource`
+loads frozen SABIO-RK kinetic-law snapshots by default and can refresh only
+through an explicit live-fetch hook. Proposed product maps, parameter records,
+and process-compatibility records are written for human review under a proposal
+bundle; they are not silently committed into the simulation registry. Use
+`scripts/fetch_sabiork_kinlaw_entries.py` to freeze raw SABIO-RK exports and
+`scripts/propose_sabiork_source_records.py` to create review-only proposal
+artifacts from a frozen snapshot.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
 The current library provides factories for first-order, mass-action,
