@@ -25,6 +25,7 @@ from fungal_model.api import (
     EnvironmentGrid,
     VirtualExperiment,
     VirtualExperimentError,
+    virtual_experiment,
 )
 from fungal_model.fungi.base import Fungus
 from fungal_model.geometry import (
@@ -218,5 +219,6 @@ __all__ = [
     "WaterActivityModifier",
     "WellMixedGeometry",
     "run_configured_model",
+    "virtual_experiment",
     "__version__",
 ]

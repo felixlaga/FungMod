@@ -1,0 +1,308 @@
+from __future__ import annotations
+
+import shutil
+import socket
+from pathlib import Path
+from typing import Any, cast
+
+import pytest
+import yaml
+
+from fungal_model import EnvironmentGrid, VirtualExperiment, virtual_experiment
+from fungal_model.api import VirtualExperimentError
+from fungal_model.registry import AmbiguousResolutionError, ResolutionError
+
+
+ROOT = Path(__file__).resolve().parents[1]
+REGISTRY_INDEX = ROOT / "data_registry" / "registry_index.yml"
+
+FUNGUS_ID = "sabiork_beta_glucosidase_source"
+SUBSTRATE_ID = "cellobiose"
+ENVIRONMENT_ID = "sabiork_reaction_618_selected_conditions"
+ENZYME_CONCENTRATION_SYMBOL = "enzyme_concentration_beta_glucosidase"
+
+
+def test_virtual_experiment_top_level_works_with_exact_registry_ids() -> None:
+    study = virtual_experiment(
+        fungi=FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=REGISTRY_INDEX,
+    )
+
+    assert isinstance(study, VirtualExperiment)
+    assert study.fungus_ids == (FUNGUS_ID,)
+    assert study.substrate_ids == (SUBSTRATE_ID,)
+    assert study.environment_ids == (ENVIRONMENT_ID,)
+
+
+def test_virtual_experiment_top_level_works_with_aliases_and_names() -> None:
+    study = virtual_experiment(
+        fungi=["beta-glucosidase source"],
+        substrates=["cellobiose substrate"],
+        environments=["30 C pH 5 assay"],
+        registry=REGISTRY_INDEX,
+    )
+
+    assert study.fungus_ids == (FUNGUS_ID,)
+    assert study.substrate_ids == (SUBSTRATE_ID,)
+    assert study.environment_ids == (ENVIRONMENT_ID,)
+    assert {record.record_type for record in study.resolved_records} == {"fungus", "substrate", "environment"}
+
+
+def test_unknown_fungus_name_fails_clearly() -> None:
+    with pytest.raises(ResolutionError, match="Could not resolve fungus 'unknown source'") as exc_info:
+        virtual_experiment(
+            fungi="unknown source",
+            substrates="cellobiose",
+            environments=ENVIRONMENT_ID,
+            registry=REGISTRY_INDEX,
+        )
+
+    assert exc_info.value.record_type == "fungus"
+
+
+def test_unknown_substrate_name_fails_clearly() -> None:
+    with pytest.raises(ResolutionError, match="Could not resolve substrate 'unknown substrate'") as exc_info:
+        virtual_experiment(
+            fungi="beta-glucosidase source",
+            substrates="unknown substrate",
+            environments=ENVIRONMENT_ID,
+            registry=REGISTRY_INDEX,
+        )
+
+    assert exc_info.value.record_type == "substrate"
+
+
+def test_ambiguous_name_fails_clearly_and_lists_candidate_ids(tmp_path: Path) -> None:
+    registry_dir = _copy_registry(tmp_path)
+    fungi_path = registry_dir / "fungi" / "fungi.yml"
+    data = _yaml_mapping(fungi_path)
+    records = cast(list[dict[str, Any]], data["records"])
+    for record in records[:2]:
+        aliases = list(record.get("aliases") or [])
+        aliases.append("shared source alias")
+        record["aliases"] = aliases
+    fungi_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(AmbiguousResolutionError, match="toy_fungus_alpha") as exc_info:
+        virtual_experiment(
+            fungi="shared source alias",
+            substrates="cellobiose",
+            environments=ENVIRONMENT_ID,
+            registry=registry_dir / "registry_index.yml",
+        )
+
+    assert {candidate.record_id for candidate in exc_info.value.candidates} == {
+        "toy_fungus_alpha",
+        "generic_cellulase_source",
+    }
+
+
+def test_environment_grid_works_through_top_level_api(tmp_path: Path) -> None:
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose substrate",
+        environments=EnvironmentGrid(temperature_C=[20.0, 25.0], ph=[4.5], oxygen="aerobic"),
+        registry=REGISTRY_INDEX,
+    )
+
+    assert study.environment_ids == ("temp_20C_ph_4p5_aerobic", "temp_25C_ph_4p5_aerobic")
+    reports = study.preflight(mode="exploratory")
+    assert {report.status for report in reports} == {"exploratory"}
+    result = study.simulate(mode="exploratory", n_samples=1, seed=2, output_dir=tmp_path / "grid", quicklook=False)
+    assert len(result.screen_result.case_results) == 2
+
+
+def test_public_preflight_scientific_and_exploratory_modes() -> None:
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=REGISTRY_INDEX,
+    )
+
+    scientific = study.preflight(mode="scientific")[0]
+    exploratory = study.preflight(mode="exploratory")[0]
+
+    assert scientific.status == "underparameterized"
+    assert any(item.item_id == ENZYME_CONCENTRATION_SYMBOL for item in scientific.missing)
+    assert exploratory.status == "exploratory"
+    assert any(item.item_id == ENZYME_CONCENTRATION_SYMBOL for item in exploratory.uncertain)
+
+
+def test_simulate_exploratory_works_for_reaction_618(tmp_path: Path) -> None:
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=REGISTRY_INDEX,
+    )
+
+    result = study.simulate(mode="exploratory", n_samples=2, seed=4, output_dir=tmp_path / "exploratory", quicklook=False)
+
+    assert result.mode == "exploratory"
+    assert len(result.screen_result.case_results[0].samples) == 2
+    assert result.time_series()
+    assert result.final_metrics()
+    assert result.limitations()
+    assert Path(result.output_directory, "output_manifest.json").exists()
+    assert result.time_series()[0]["output_schema_version"]
+
+
+def test_simulate_scientific_rejects_reaction_618_when_enzyme_concentration_unknown(tmp_path: Path) -> None:
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=REGISTRY_INDEX,
+    )
+
+    with pytest.raises(VirtualExperimentError, match=ENZYME_CONCENTRATION_SYMBOL):
+        study.simulate(mode="scientific", output_dir=tmp_path / "scientific_blocked", quicklook=False)
+
+
+def test_simulate_scientific_succeeds_for_exact_local_fixture(tmp_path: Path) -> None:
+    registry = _registry_with_exact_enzyme_concentration(tmp_path)
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=registry / "registry_index.yml",
+    )
+
+    result = study.simulate(mode="scientific", output_dir=tmp_path / "scientific", quicklook=False)
+
+    assert result.mode == "scientific"
+    assert result.n_samples == 1
+    assert result.to_dict()["run_label"] == "scientific_exact_unvalidated"
+    assert len(result.screen_result.case_results[0].samples) == 1
+    assert any(row["state"] == "cellobiose_concentration" for row in result.time_series())
+    assert all(row["source_value_kind"] == "exact" for row in result.sampled_parameters())
+    assert not any(row["exploratory_prior"] == "true" for row in result.sampled_parameters())
+    manifest = _yaml_mapping(Path(result.output_directory) / "output_manifest.json")
+    assert manifest["run_label"] == "scientific_exact_unvalidated"
+    assert manifest["output_schema_version"]
+
+
+def test_scientific_mode_rejects_exploratory_priors(tmp_path: Path) -> None:
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=REGISTRY_INDEX,
+    )
+
+    scientific = study.preflight(mode="scientific")[0]
+    exploratory = study.preflight(mode="exploratory")[0]
+
+    assert any(item.item_id == ENZYME_CONCENTRATION_SYMBOL for item in scientific.missing)
+    assert not scientific.uncertain
+    assert any(item.item_id == ENZYME_CONCENTRATION_SYMBOL for item in exploratory.uncertain)
+    with pytest.raises(VirtualExperimentError, match="Scientific simulation requires exact"):
+        study.simulate(mode="scientific", output_dir=tmp_path / "blocked", quicklook=False)
+
+
+def test_scientific_mode_rejects_toy_scientific_inputs(tmp_path: Path) -> None:
+    registry = _modelable_toy_registry(tmp_path)
+    study = virtual_experiment(
+        fungi="toy_fungus_alpha",
+        substrates="toy_cellulose_like_solid",
+        environments="toy_lab_environment",
+        registry=registry / "registry_index.yml",
+    )
+
+    report = study.preflight(mode="scientific")[0]
+
+    assert report.status == "underparameterized"
+    assert any("toy or synthetic" in item.message for item in report.incompatible)
+    with pytest.raises(VirtualExperimentError, match="toy or synthetic"):
+        study.simulate(mode="scientific", output_dir=tmp_path / "toy_blocked", quicklook=False)
+
+
+def test_result_table_accessors_return_standard_tables(tmp_path: Path) -> None:
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=REGISTRY_INDEX,
+    )
+
+    result = study.simulate(mode="exploratory", n_samples=1, seed=6, output_dir=tmp_path / "accessors", quicklook=False)
+
+    assert result.time_series()[0]["state"]
+    assert result.final_metrics()[0]["metric"]
+    assert result.threshold_times()[0]["threshold_fraction"]
+    assert result.sampled_parameters()[0]["symbol"]
+    assert result.provenance()[0]["record_type"]
+    assert result.limitations()[0]["limitation"]
+    assert result.missing_parameters() == []
+    assert result.suggested_experiments() == []
+
+
+def test_no_live_external_api_call_occurs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def blocked_connect(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("VirtualExperiment simulation must not call live external APIs.")
+
+    monkeypatch.setattr(socket.socket, "connect", blocked_connect)
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=REGISTRY_INDEX,
+    )
+
+    result = study.simulate(mode="exploratory", n_samples=1, seed=8, output_dir=tmp_path / "offline", quicklook=False)
+
+    assert result.time_series()
+
+
+def _registry_with_exact_enzyme_concentration(tmp_path: Path) -> Path:
+    registry_dir = _copy_registry(tmp_path)
+    parameters_path = registry_dir / "parameters" / "parameter_records.yml"
+    data = _yaml_mapping(parameters_path)
+    records = cast(list[dict[str, Any]], data["records"])
+    for record in records:
+        if (
+            record.get("parameter_symbol") == ENZYME_CONCENTRATION_SYMBOL
+            and record.get("process_type") == "homogeneous_michaelis_menten"
+            and record.get("maturity") == "literature_processed"
+        ):
+            record["value"] = {
+                "kind": "exact",
+                "value": 0.01,
+                "units": "mM",
+                "source": "Local deterministic enzyme concentration fixture",
+                "confidence_level": "synthetic_control",
+                "notes": "Used only to exercise scientific-mode mechanics; not a SABIO-RK value.",
+            }
+            parameters_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            return registry_dir
+    raise AssertionError("Missing enzyme concentration record")
+
+
+def _modelable_toy_registry(tmp_path: Path) -> Path:
+    registry_dir = _copy_registry(tmp_path)
+    process_path = registry_dir / "processes" / "process_compatibility.yml"
+    data = _yaml_mapping(process_path)
+    records = cast(list[dict[str, Any]], data["records"])
+    records[0]["required_parameters"] = ["k_surface_exact", "k_ads_exact", "A_surface_exact"]
+    records[0]["parameter_roles"] = {
+        "surface_rate_constant": "k_surface_exact",
+        "adsorption_constant": "k_ads_exact",
+        "accessible_surface_area": "A_surface_exact",
+    }
+    process_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    return registry_dir
+
+
+def _copy_registry(tmp_path: Path) -> Path:
+    destination = tmp_path / "data_registry"
+    shutil.copytree(ROOT / "data_registry", destination)
+    return destination
+
+
+def _yaml_mapping(path: Path) -> dict[str, Any]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    return cast(dict[str, Any], data)

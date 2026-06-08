@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import csv
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from itertools import product
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid
+from fungal_model.api.output_schema import OUTPUT_SCHEMA_VERSION
 from fungal_model.api.quicklook import write_quicklook_plots as write_quicklook_plot_files
 from fungal_model.api.result_tables import WrittenTables, write_standard_tables
 from fungal_model.registry.records import ParameterRecord
@@ -22,7 +24,7 @@ from fungal_model.screening import (
     simulate_screen,
 )
 
-VirtualExperimentMode = Literal["exploratory"]
+VirtualExperimentMode = Literal["exploratory", "scientific"]
 
 
 class VirtualExperimentError(ValueError):
@@ -142,24 +144,34 @@ class VirtualExperiment:
         output_dir: str | Path = "outputs/virtual_experiment",
         quicklook: bool = True,
     ) -> "DegradationScreenResult":
-        """Run modelable/exploratory registry cases and write API-001 tables."""
+        """Run registry cases and write standard virtual-experiment tables."""
 
         _validate_simulation_mode(mode)
         reports = self.preflight(mode=mode)
-        blocked = tuple(report for report in reports if report.status not in {"modelable", "exploratory"})
+        allowed_statuses = {"modelable"} if mode == "scientific" else {"modelable", "exploratory"}
+        blocked = tuple(report for report in reports if report.status not in allowed_statuses)
         if blocked:
             statuses = ", ".join(report.summary() for report in blocked)
+            details = json.dumps([report.to_dict() for report in blocked], sort_keys=True)
+            if mode == "scientific":
+                message = (
+                    "Scientific simulation requires exact, non-exploratory, non-toy modelable cases. "
+                    "Scientific means exact with current registry records and implemented mechanisms; "
+                    "it does not mean experimentally validated."
+                )
+            else:
+                message = "Exploratory simulation can simulate only modelable or exploratory cases."
             raise VirtualExperimentError(
-                "VirtualExperiment can simulate only modelable or exploratory cases. "
-                f"Blocked preflight reports: {statuses}"
+                f"{message} Blocked preflight reports: {statuses}. Details: {details}"
             )
         root = Path(output_dir)
+        effective_n_samples = 1 if mode == "scientific" else n_samples
         screen = simulate_screen(
             fungus_ids=self.fungus_ids,
             substrate_ids=self.substrate_ids,
             environment_ids=self.environment_ids,
             registry=self.registry,
-            n_samples=n_samples,
+            n_samples=effective_n_samples,
             seed=seed,
             output_dir=root,
             mode=mode,
@@ -167,7 +179,7 @@ class VirtualExperiment:
         result = DegradationScreenResult(
             experiment=self,
             mode=mode,
-            n_samples=n_samples,
+            n_samples=effective_n_samples,
             seed=seed,
             output_directory=str(root),
             preflight_reports=reports,
@@ -177,6 +189,7 @@ class VirtualExperiment:
         if quicklook:
             result.write_quicklook_plots()
         result.write_summary()
+        result.write_manifest()
         return result
 
     def to_dict(self) -> dict[str, Any]:
@@ -224,6 +237,46 @@ class DegradationScreenResult:
         )
         return self.tables
 
+    def time_series(self) -> list[dict[str, str]]:
+        """Load the standard long-form time-series table without rerunning simulation."""
+
+        return self._table_rows("time_series_long", "time_series_long.csv")
+
+    def final_metrics(self) -> list[dict[str, str]]:
+        """Load the standard final-metrics table without rerunning simulation."""
+
+        return self._table_rows("final_metrics", "final_metrics.csv")
+
+    def threshold_times(self) -> list[dict[str, str]]:
+        """Load the standard threshold-times table without rerunning simulation."""
+
+        return self._table_rows("threshold_times", "threshold_times.csv")
+
+    def sampled_parameters(self) -> list[dict[str, str]]:
+        """Load the standard sampled-parameters table without rerunning simulation."""
+
+        return self._table_rows("sampled_parameters", "sampled_parameters.csv")
+
+    def provenance(self) -> list[dict[str, str]]:
+        """Load the standard provenance table without rerunning simulation."""
+
+        return self._table_rows("provenance_table", "provenance_table.csv")
+
+    def limitations(self) -> list[dict[str, str]]:
+        """Load the standard limitations table without rerunning simulation."""
+
+        return self._table_rows("limitations_table", "limitations_table.csv")
+
+    def missing_parameters(self) -> list[dict[str, str]]:
+        """Load the standard missing-parameters table without rerunning simulation."""
+
+        return self._table_rows("missing_parameters", "missing_parameters.csv")
+
+    def suggested_experiments(self) -> list[dict[str, str]]:
+        """Load the standard suggested-experiments table without rerunning simulation."""
+
+        return self._table_rows("suggested_experiments", "suggested_experiments.csv")
+
     def write_quicklook_plots(self, output_dir: str | Path | None = None) -> tuple[str, ...]:
         """Write optional quick-look plots from the standard tables."""
 
@@ -242,10 +295,41 @@ class DegradationScreenResult:
         destination.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return destination
 
+    def write_manifest(self, path: str | Path | None = None) -> Path:
+        """Write a self-describing output manifest for the virtual-experiment folder."""
+
+        destination = Path(path) if path is not None else Path(self.output_directory) / "output_manifest.json"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        root = destination.parent
+        files = sorted(
+            str(file_path.relative_to(root))
+            for file_path in root.rglob("*")
+            if file_path.is_file() and file_path != destination
+        )
+        manifest = {
+            "kind": "virtual_experiment_output_manifest",
+            "output_schema_version": OUTPUT_SCHEMA_VERSION,
+            "mode": self.mode,
+            "run_label": _run_label(self.mode),
+            "scientific_mode_note": (
+                "Scientific mode uses exact non-exploratory registry values and implemented process laws. "
+                "It is not a claim of experimental validation."
+            )
+            if self.mode == "scientific"
+            else "",
+            "output_directory": str(root),
+            "tables": None if self.tables is None else self.tables.to_dict(),
+            "quicklook_paths": list(self.quicklook_paths),
+            "files": [*files, destination.name],
+        }
+        destination.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return destination
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "experiment": self.experiment.to_dict(),
             "mode": self.mode,
+            "run_label": _run_label(self.mode),
             "n_samples": self.n_samples,
             "seed": self.seed,
             "output_directory": self.output_directory,
@@ -254,6 +338,41 @@ class DegradationScreenResult:
             "tables": None if self.tables is None else self.tables.to_dict(),
             "quicklook_paths": list(self.quicklook_paths),
         }
+
+    def _table_rows(self, table_name: str, filename: str) -> list[dict[str, str]]:
+        path = self._table_path(table_name, filename)
+        with path.open(newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle))
+
+    def _table_path(self, table_name: str, filename: str) -> Path:
+        if self.tables is not None:
+            table_path = self.tables.paths.get(table_name)
+            if table_path is not None:
+                return Path(table_path)
+        return Path(self.output_directory) / filename
+
+
+def virtual_experiment(
+    *,
+    fungi: Sequence[str] | str,
+    substrates: Sequence[str] | str,
+    environments: Sequence[str] | str | EnvironmentGrid,
+    registry: str | Path | FungModRegistry = "data_registry/registry_index.yml",
+) -> VirtualExperiment:
+    """Create a researcher-facing virtual experiment from registry IDs, names, or aliases."""
+
+    return VirtualExperiment.from_names(
+        fungi=fungi,
+        substrates=substrates,
+        environments=environments,
+        registry=registry,
+    )
+
+
+def _run_label(mode: VirtualExperimentMode) -> str:
+    if mode == "scientific":
+        return "scientific_exact_unvalidated"
+    return "exploratory_uncertainty_screen"
 
 
 def _load_registry_source(registry: str | Path | FungModRegistry) -> tuple[FungModRegistry, str]:
@@ -367,12 +486,8 @@ def _validate_preflight_mode(mode: str) -> None:
 
 
 def _validate_simulation_mode(mode: str) -> None:
-    if mode != "exploratory":
-        raise VirtualExperimentError(
-            "API-001 VirtualExperiment supports mode='exploratory' only. "
-            "Scientific deterministic virtual experiments require a later public API "
-            "that preserves exact-only modelability distinctions."
-        )
+    if mode not in {"exploratory", "scientific"}:
+        raise VirtualExperimentError("simulation mode must be one of: exploratory, scientific.")
 
 
 __all__ = [
@@ -380,4 +495,5 @@ __all__ = [
     "VirtualExperiment",
     "VirtualExperimentError",
     "VirtualExperimentMode",
+    "virtual_experiment",
 ]

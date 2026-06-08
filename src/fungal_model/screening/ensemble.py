@@ -27,11 +27,11 @@ from fungal_model.screening.case_builder import (
 from fungal_model.screening.modelability import ModelabilityReport, assess_modelability
 from fungal_model.workflows import run_configured_model
 
-ScreenSimulationMode = Literal["exploratory"]
+ScreenSimulationMode = Literal["exploratory", "scientific"]
 
 
 class RegistryScreenSimulationError(ValueError):
-    """Raised when an exploratory registry screen cannot be simulated."""
+    """Raised when a registry screen cannot be simulated."""
 
 
 @dataclass(frozen=True)
@@ -108,7 +108,7 @@ class RegistryCaseEnsemble:
 
 @dataclass(frozen=True)
 class RegistryScreenResult:
-    """Structured result for one exploratory registry screen."""
+    """Structured result for one registry screen."""
 
     mode: ScreenSimulationMode
     n_samples: int
@@ -145,7 +145,7 @@ def simulate_screen(
     output_dir: str | Path | None = None,
     mode: ScreenSimulationMode = "exploratory",
 ) -> RegistryScreenResult:
-    """Sample ValueSpec uncertainty and run toy configs for registry cases."""
+    """Run registry cases as sampled exploratory ensembles or exact scientific screens."""
 
     _validate_screen_inputs(
         fungus_ids=fungus_ids,
@@ -155,6 +155,8 @@ def simulate_screen(
         mode=mode,
     )
     root = Path(output_dir) if output_dir is not None else Path("outputs/registry_screen")
+    if mode == "scientific":
+        n_samples = 1
     rng = np.random.default_rng(seed)
     case_results: list[RegistryCaseEnsemble] = []
     for fungus_id, substrate_id, environment_id in product(fungus_ids, substrate_ids, environment_ids):
@@ -168,6 +170,7 @@ def simulate_screen(
                 n_samples=n_samples,
                 rng=np.random.default_rng(case_seed),
                 output_root=root,
+                mode=mode,
             )
         )
     result = RegistryScreenResult(
@@ -190,17 +193,19 @@ def _simulate_case_ensemble(
     n_samples: int,
     rng: np.random.Generator,
     output_root: Path,
+    mode: ScreenSimulationMode,
 ) -> RegistryCaseEnsemble:
     report = assess_modelability(
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
         registry=registry,
-        mode="exploratory",
+        mode=mode,
     )
-    if report.status not in {"modelable", "exploratory"}:
+    allowed_statuses = {"modelable"} if mode == "scientific" else {"modelable", "exploratory"}
+    if report.status not in allowed_statuses:
         raise RegistryScreenSimulationError(
-            "Registry case cannot be simulated as an exploratory ensemble because "
+            f"Registry case cannot be simulated in {mode!r} mode because "
             f"modelability status is {report.status!r}. Report: {report.to_dict()}"
         )
     compatibility = select_registry_case_compatibility(
@@ -212,10 +217,14 @@ def _simulate_case_ensemble(
     assembler = get_registry_process_assembler(compatibility.process_type)
     if assembler is None:
         raise RegistryScreenSimulationError(
-            "Exploratory screen does not support process_type "
+            f"{mode.capitalize()} screen does not support process_type "
             f"{compatibility.process_type!r}."
         )
-    role_records = _resolve_role_records(
+    role_records = (
+        _resolve_scientific_role_records
+        if mode == "scientific"
+        else _resolve_role_records
+    )(
         registry=registry,
         compatibility=compatibility,
         fungus_id=fungus_id,
@@ -224,6 +233,17 @@ def _simulate_case_ensemble(
         required_roles=assembler.required_parameter_roles,
         process_label=assembler.process_label,
     )
+    if mode == "scientific":
+        return _run_scientific_case_sample(
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            registry=registry,
+            compatibility=compatibility,
+            report=report,
+            role_records=role_records,
+            output_root=output_root,
+        )
     return _run_case_samples(
         fungus_id=fungus_id,
         substrate_id=substrate_id,
@@ -306,6 +326,63 @@ def _run_case_samples(
     )
 
 
+def _run_scientific_case_sample(
+    *,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    report: ModelabilityReport,
+    role_records: Mapping[str, ParameterRecord],
+    output_root: Path,
+) -> RegistryCaseEnsemble:
+    case_dir = output_root / f"{fungus_id}__{substrate_id}__{environment_id}"
+    sample_dir = case_dir / "sample_0000"
+    try:
+        config = _build_scientific_config(
+            registry=registry,
+            compatibility=compatibility,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            role_records=role_records,
+            sample_dir=sample_dir,
+        )
+        sample = _run_sample(
+            config=config,
+            sample_dir=sample_dir,
+            sample_index=0,
+            sampled_records=role_records,
+            trajectory_dir=case_dir / "trajectories",
+        )
+        failures: tuple[EnsembleSampleFailure, ...] = ()
+        samples = (sample,)
+    except Exception as exc:
+        failures = (
+            EnsembleSampleFailure(
+                sample_index=0,
+                output_directory=str(sample_dir),
+                error_type=type(exc).__name__,
+                message=str(exc),
+            ),
+        )
+        raise RegistryScreenSimulationError(
+            "Scientific exact sample failed for registry case "
+            f"{fungus_id} + {substrate_id} + {environment_id}. "
+            f"Failures: {[failure.to_dict() for failure in failures]}"
+        ) from exc
+    return RegistryCaseEnsemble(
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        environment_id=environment_id,
+        process_type=compatibility.process_type,
+        modelability_report=report,
+        samples=samples,
+        sample_failures=failures,
+    )
+
+
 def _resolve_role_records(
     *,
     registry: FungModRegistry,
@@ -357,6 +434,63 @@ def _resolve_role_records(
     return records
 
 
+def _resolve_scientific_role_records(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    required_roles: tuple[str, ...],
+    process_label: str,
+) -> Mapping[str, ParameterRecord]:
+    missing_roles = tuple(
+        role for role in required_roles if role not in compatibility.parameter_roles
+    )
+    if missing_roles:
+        raise RegistryScreenSimulationError(
+            f"{process_label} compatibility is missing parameter role mappings "
+            f"for: {', '.join(missing_roles)}."
+        )
+    records: dict[str, ParameterRecord] = {}
+    roles_to_resolve = tuple(
+        dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys()))
+    )
+    for role in roles_to_resolve:
+        symbol = compatibility.parameter_roles[role]
+        record = _best_scientific_parameter_record(
+            registry=registry,
+            parameter_symbol=symbol,
+            compatibility=compatibility,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+        )
+        if record is None:
+            raise RegistryScreenSimulationError(
+                f"No non-exploratory registry parameter record found for scientific role {role!r} "
+                f"and symbol {symbol!r}."
+            )
+        validation = record.value.validate(nonnegative=True)
+        if not validation.passed:
+            raise RegistryScreenSimulationError(
+                f"Parameter {symbol!r} for scientific role {role!r} failed ValueSpec validation: "
+                f"{validation.to_dict()}"
+            )
+        if not record.value.is_exact:
+            raise RegistryScreenSimulationError(
+                f"Scientific mode requires exact parameters; role {role!r} uses "
+                f"symbol {symbol!r} with ValueSpec kind {record.value.kind!r}."
+            )
+        blocker = _scientific_parameter_record_blocker(record)
+        if blocker is not None:
+            raise RegistryScreenSimulationError(
+                f"Scientific mode rejected parameter role {role!r} and symbol {symbol!r}: {blocker}"
+            )
+        records[role] = record
+    return records
+
+
 def _best_exploratory_parameter_record(
     *,
     registry: FungModRegistry,
@@ -382,6 +516,32 @@ def _best_exploratory_parameter_record(
     return max(candidates, key=_exploratory_parameter_specificity)
 
 
+def _best_scientific_parameter_record(
+    *,
+    registry: FungModRegistry,
+    parameter_symbol: str,
+    compatibility: ProcessCompatibilityRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+) -> ParameterRecord | None:
+    candidates = [
+        record
+        for record in registry.parameters.values()
+        if record.parameter_symbol == parameter_symbol
+        and record.process_type == compatibility.process_type
+        and not _is_exploratory_parameter_record(record)
+        and _matches(record.enzyme_class, compatibility.enzyme_class)
+        and _matches(record.substrate_class, compatibility.substrate_class)
+        and _matches(record.fungus_id, fungus_id)
+        and _matches(record.substrate_id, substrate_id)
+        and _matches(record.environment_id, environment_id)
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=_scientific_parameter_specificity)
+
+
 def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
 
@@ -400,6 +560,36 @@ def _exploratory_parameter_specificity(record: ParameterRecord) -> tuple[int, in
     value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
     exploratory_score = 1 if record.maturity == "exploratory_prior" or record.provenance.get("exploratory_prior") else 0
     return selector_score, value_score, exploratory_score
+
+
+def _scientific_parameter_specificity(record: ParameterRecord) -> tuple[int, int, int]:
+    selector_score = sum(
+        value is not None
+        for value in (
+            record.enzyme_class,
+            record.substrate_class,
+            record.fungus_id,
+            record.substrate_id,
+            record.environment_id,
+        )
+    )
+    value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
+    maturity_score = 1 if record.maturity == "calibrated" else 0
+    return selector_score, value_score, maturity_score
+
+
+def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:
+    return record.maturity == "exploratory_prior" or bool(record.provenance.get("exploratory_prior"))
+
+
+def _scientific_parameter_record_blocker(record: ParameterRecord) -> str | None:
+    maturity = record.maturity.casefold()
+    if maturity.startswith("toy") or maturity.startswith("synthetic"):
+        return "toy or synthetic parameter records are not scientific inputs"
+    allowed_use = record.allowed_use.casefold()
+    if "scientific" not in allowed_use:
+        return f"allowed_use={record.allowed_use!r} does not permit scientific use"
+    return None
 
 
 def _sample_role_records(
@@ -473,6 +663,39 @@ def _build_sample_config(
     data["name"] = f"{data['name']} sample {sample_dir.name}"
     data["provenance"]["screen_mode"] = "exploratory"
     data["provenance"]["sample_directory"] = str(sample_dir)
+    return ModelConfig.from_mapping(data)
+
+
+def _build_scientific_config(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    role_records: Mapping[str, ParameterRecord],
+    sample_dir: Path,
+) -> ModelConfig:
+    try:
+        data = build_registry_process_config_data(
+            registry=registry,
+            compatibility=compatibility,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            parameter_records=role_records,
+            output_directory=str(sample_dir / "bundle"),
+        )
+    except RegistryCaseBuildError as exc:
+        raise RegistryScreenSimulationError(str(exc)) from exc
+    data["name"] = f"{data['name']} scientific exact sample"
+    data["provenance"]["screen_mode"] = "scientific"
+    data["provenance"]["run_label"] = "scientific_exact_unvalidated"
+    data["provenance"]["sample_directory"] = str(sample_dir)
+    data["provenance"]["scientific_mode_note"] = (
+        "Scientific mode uses exact non-exploratory registry values and implemented "
+        "process laws. It is not a claim of experimental validation."
+    )
     return ModelConfig.from_mapping(data)
 
 
@@ -712,8 +935,8 @@ def _validate_screen_inputs(
     n_samples: int,
     mode: str,
 ) -> None:
-    if mode != "exploratory":
-        raise RegistryScreenSimulationError("R4 simulate_screen supports only mode='exploratory'.")
+    if mode not in {"exploratory", "scientific"}:
+        raise RegistryScreenSimulationError("simulate_screen supports only mode='exploratory' or mode='scientific'.")
     if n_samples < 1:
         raise RegistryScreenSimulationError("n_samples must be at least 1.")
     if not fungus_ids or not substrate_ids or not environment_ids:

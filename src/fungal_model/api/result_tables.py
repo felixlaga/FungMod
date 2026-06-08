@@ -126,7 +126,7 @@ def _build_table_rows(
             (case.fungus_id, case.substrate_id, case.environment_id),
             case.modelability_report,
         )
-        role_records = _role_parameter_records(registry=registry, case=case)
+        role_records = _role_parameter_records(registry=registry, case=case, mode=screen_result.mode)
         context = _case_context(
             registry=registry,
             case=case,
@@ -1202,6 +1202,7 @@ def _role_parameter_records(
     *,
     registry: FungModRegistry,
     case: RegistryCaseEnsemble,
+    mode: str,
 ) -> dict[str, ParameterRecord]:
     try:
         compatibility = select_registry_case_compatibility(
@@ -1230,6 +1231,7 @@ def _role_parameter_records(
             fungus_id=case.fungus_id,
             substrate_id=case.substrate_id,
             environment_id=case.environment_id,
+            mode=mode,
         )
         if record is not None:
             records[role] = record
@@ -1246,6 +1248,7 @@ def _best_case_parameter_record(
     fungus_id: str,
     substrate_id: str,
     environment_id: str,
+    mode: str,
 ) -> ParameterRecord | None:
     candidates = [
         record
@@ -1258,9 +1261,11 @@ def _best_case_parameter_record(
         and _matches(record.substrate_id, substrate_id)
         and _matches(record.environment_id, environment_id)
     ]
+    if mode == "scientific":
+        candidates = [record for record in candidates if not _is_exploratory_record(record)]
     if not candidates:
         return None
-    return max(candidates, key=_parameter_record_priority)
+    return max(candidates, key=_scientific_parameter_record_priority if mode == "scientific" else _parameter_record_priority)
 
 
 def _matches(record_value: str | None, requested: str) -> bool:
@@ -1281,6 +1286,22 @@ def _parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int]:
     value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
     exploratory_score = 1 if _is_exploratory_record(record) else 0
     return selector_score, value_score, exploratory_score
+
+
+def _scientific_parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int]:
+    selector_score = sum(
+        value is not None
+        for value in (
+            record.enzyme_class,
+            record.substrate_class,
+            record.fungus_id,
+            record.substrate_id,
+            record.environment_id,
+        )
+    )
+    value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
+    maturity_score = 1 if record.maturity == "calibrated" else 0
+    return selector_score, value_score, maturity_score
 
 
 def _trajectory_state_names(row: Mapping[str, str]) -> tuple[str, ...]:

@@ -285,6 +285,23 @@ def _classify_parameter(
         )
         return
     if record.value.is_exact:
+        if mode == "scientific":
+            blocker = _scientific_parameter_blocker(record)
+            if blocker is not None:
+                incompatible.append(
+                    _item(
+                        "parameter",
+                        record.parameter_symbol,
+                        blocker,
+                        {
+                            "record_id": record.record_id,
+                            "maturity": record.maturity,
+                            "allowed_use": record.allowed_use,
+                            "value": record.value.to_dict(),
+                        },
+                    )
+                )
+                return
         known.append(
             _item(
                 "parameter",
@@ -388,6 +405,16 @@ def _parameter_specificity(record: ParameterRecord, *, mode: ModelabilityMode) -
 
 def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:
     return record.maturity == "exploratory_prior" or bool(record.provenance.get("exploratory_prior"))
+
+
+def _scientific_parameter_blocker(record: ParameterRecord) -> str | None:
+    maturity = record.maturity.casefold()
+    if maturity.startswith("toy") or maturity.startswith("synthetic"):
+        return "Scientific mode rejects toy or synthetic parameter records."
+    allowed_use = record.allowed_use.casefold()
+    if "scientific" not in allowed_use:
+        return "Scientific mode requires parameter allowed_use to permit scientific use."
+    return None
 
 
 def _status(

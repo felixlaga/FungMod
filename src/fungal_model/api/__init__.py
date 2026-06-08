@@ -6,6 +6,7 @@ from fungal_model.api.virtual_experiment import (
     VirtualExperiment,
     VirtualExperimentError,
     VirtualExperimentMode,
+    virtual_experiment,
 )
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "VirtualExperiment",
     "VirtualExperimentError",
     "VirtualExperimentMode",
+    "virtual_experiment",
 ]

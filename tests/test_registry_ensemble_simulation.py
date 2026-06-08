@@ -110,17 +110,17 @@ def test_simulate_screen_rejects_unknown_underparameterized_case() -> None:
         )
 
 
-def test_simulate_screen_rejects_non_exploratory_mode(tmp_path: Path) -> None:
+def test_simulate_screen_rejects_unsupported_mode(tmp_path: Path) -> None:
     registry = _registry_with_surface_parameter(tmp_path, "k_surface_range")
 
-    with pytest.raises(RegistryScreenSimulationError, match="mode='exploratory'"):
+    with pytest.raises(RegistryScreenSimulationError, match="exploratory.*scientific"):
         simulate_screen(
             fungus_ids=["toy_fungus_alpha"],
             substrate_ids=["toy_cellulose_like_solid"],
             environment_ids=["toy_lab_environment"],
             registry=registry,
             n_samples=2,
-            mode="scientific",  # type: ignore[arg-type]
+            mode="strict",  # type: ignore[arg-type]
         )
 
 

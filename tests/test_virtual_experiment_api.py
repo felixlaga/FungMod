@@ -173,7 +173,7 @@ def test_virtual_experiment_scientific_preflight_remains_underparameterized() ->
     assert report.status == "underparameterized"
 
 
-def test_virtual_experiment_simulation_supports_exploratory_mode_only(tmp_path: Path) -> None:
+def test_virtual_experiment_scientific_simulation_rejects_underparameterized_reaction_618(tmp_path: Path) -> None:
     study = VirtualExperiment.from_registry(
         fungi=FUNGUS_ID,
         substrates=SUBSTRATE_ID,
@@ -181,8 +181,8 @@ def test_virtual_experiment_simulation_supports_exploratory_mode_only(tmp_path: 
         registry=REGISTRY_INDEX,
     )
 
-    with pytest.raises(VirtualExperimentError, match="mode='exploratory'"):
-        study.simulate(mode="scientific", output_dir=tmp_path / "blocked")  # type: ignore[arg-type]
+    with pytest.raises(VirtualExperimentError, match="Scientific simulation requires exact"):
+        study.simulate(mode="scientific", output_dir=tmp_path / "blocked")
 
 
 def _csv_rows(path: Path) -> list[dict[str, str]]:

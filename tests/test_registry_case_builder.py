@@ -119,10 +119,10 @@ def test_builder_rejects_uncertain_parameter_case(tmp_path: Path) -> None:
         )
 
 
-def test_builder_currently_emits_toy_configs_only(tmp_path: Path) -> None:
+def test_scientific_builder_rejects_toy_scientific_inputs(tmp_path: Path) -> None:
     registry = _modelable_registry(tmp_path)
 
-    with pytest.raises(RegistryCaseBuildError, match="only emits toy"):
+    with pytest.raises(RegistryCaseBuildError, match="toy or synthetic"):
         build_model_config_from_registry_case(
             fungus_id="toy_fungus_alpha",
             substrate_id="toy_cellulose_like_solid",
