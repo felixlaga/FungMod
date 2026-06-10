@@ -171,6 +171,16 @@ class HomogeneousMichaelisMentenFactory:
             for state in (states.get("substrate"), states.get("product"), states.get("enzyme"))
             if state is not None and state not in context.state_units
         )
+        product_map_id = getattr(process_config, "product_map", None)
+        if isinstance(product_map_id, str):
+            if product_map_id not in context.product_maps:
+                missing += (f"product_maps.{product_map_id}",)
+            else:
+                missing += tuple(
+                    f"state_units.{state}"
+                    for state in sorted(context.product_maps[product_map_id].species)
+                    if state not in context.state_units
+                )
         return _decision(self, missing_fields=missing)
 
     def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
@@ -179,10 +189,17 @@ class HomogeneousMichaelisMentenFactory:
         parameters = _mapping(process_config.parameters)
         substrate_state = str(states["substrate"])
         enzyme_state = None if states.get("enzyme") is None else str(states["enzyme"])
+        product_map_id = getattr(process_config, "product_map", None)
+        product_coefficients = (
+            context.product_maps[product_map_id].products
+            if isinstance(product_map_id, str) and product_map_id in context.product_maps
+            else None
+        )
         return HomogeneousMichaelisMentenProcess(
             name=process_config.id,
             substrate_state=substrate_state,
             product_state=None if states.get("product") is None else str(states["product"]),
+            product_coefficients=product_coefficients,
             substrate_units=context.state_units[substrate_state],
             enzyme_state=enzyme_state,
             enzyme_units=None if enzyme_state is None else context.state_units[enzyme_state],

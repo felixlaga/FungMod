@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -405,6 +406,16 @@ def _template_product_yield(case_template: CaseTemplateRecord, product_role: str
     )
 
 
+def _product_conserved_weight(case_template: CaseTemplateRecord, product_role: str) -> float:
+    yield_value = _template_product_yield(case_template, product_role)
+    if yield_value <= 0.0:
+        raise RegistryCaseBuildError(
+            f"Case template {case_template.case_template_id!r} defines a non-positive yield "
+            f"for product role {product_role!r}."
+        )
+    return 1.0 / yield_value
+
+
 def _case_template_config(case_template: CaseTemplateRecord) -> dict[str, Any]:
     return {
         "case_template_id": case_template.case_template_id,
@@ -420,6 +431,38 @@ def _case_template_config(case_template: CaseTemplateRecord) -> dict[str, Any]:
 
 def _process_assumptions(case_template: CaseTemplateRecord, fallback: tuple[str, ...]) -> list[str]:
     return list(case_template.limitations or fallback)
+
+
+def _template_config_name(
+    *,
+    case_template: CaseTemplateRecord,
+    fungus_id: str,
+    substrate_id: str,
+    fallback: str,
+) -> str:
+    template = case_template.process_state_metadata.get("config_name")
+    if template is None:
+        return fallback
+    return str(template).format(
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        case_template_id=case_template.case_template_id,
+    )
+
+
+def _template_config_mode(case_template: CaseTemplateRecord, *, fallback: str) -> str:
+    return str(case_template.process_state_metadata.get("config_mode", fallback))
+
+
+def _template_config_maturity(case_template: CaseTemplateRecord, *, fallback: str) -> str:
+    return str(case_template.process_state_metadata.get("config_maturity", fallback))
+
+
+def _template_geometry_data(case_template: CaseTemplateRecord, *, fallback: dict[str, Any]) -> dict[str, Any]:
+    geometry = case_template.process_state_metadata.get("geometry")
+    if isinstance(geometry, Mapping):
+        return deepcopy(dict(geometry))
+    return fallback
 
 
 def _surface_catalysis_config_data(
@@ -456,16 +499,24 @@ def _surface_catalysis_config_data(
     )
     return {
         "kind": "model_config",
-        "name": _surface_config_name(fungus_id=fungus_id, substrate_id=substrate_id, bio001=bio001),
-        "mode": "exploratory" if bio001 else "toy",
-        "maturity": "exploratory" if bio001 else "framework_benchmark",
+        "name": _template_config_name(
+            case_template=case_template,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            fallback=_surface_config_name(fungus_id=fungus_id, substrate_id=substrate_id, bio001=bio001),
+        ),
+        "mode": _template_config_mode(case_template, fallback="exploratory" if bio001 else "toy"),
+        "maturity": _template_config_maturity(case_template, fallback="exploratory" if bio001 else "framework_benchmark"),
         "provenance": provenance,
         "case_template": _case_template_config(case_template),
         "entities": {
             "geometry": {
                 "id": "geometry",
                 "loader": "well_mixed",
-                "data": _bio001_geometry_data() if bio001 else _toy_geometry_data(),
+                "data": _template_geometry_data(
+                    case_template,
+                    fallback=_bio001_geometry_data() if bio001 else _toy_geometry_data(),
+                ),
             },
             "substrates": [
                 {
@@ -565,7 +616,7 @@ def _surface_catalysis_config_data(
                 "validator_type": "mass_balance",
                 "conserved_weights": {
                     substrate_state: 1.0,
-                    product_state: 1.0,
+                    product_state: _product_conserved_weight(case_template, "product"),
                 },
             },
         ],
@@ -587,10 +638,7 @@ def _roles_to_resolve(
 
 
 def _is_bio001_surface_case(compatibility: ProcessCompatibilityRecord) -> bool:
-    return (
-        compatibility.provenance.get("bio_milestone") == "BIO-001"
-        or compatibility.record_id == "bio001_cellulase_cellulose_film_surface_catalysis"
-    )
+    return compatibility.provenance.get("bio_milestone") == "BIO-001"
 
 
 def _surface_config_name(*, fungus_id: str, substrate_id: str, bio001: bool) -> str:
@@ -777,9 +825,14 @@ def _homogeneous_mm_config_data(
     )
     return {
         "kind": "model_config",
-        "name": "SABIO-RK Reaction 618 beta-glucosidase cellobiose homogeneous Michaelis-Menten",
-        "mode": "scientific",
-        "maturity": "scientific",
+        "name": _template_config_name(
+            case_template=case_template,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            fallback="SABIO-RK Reaction 618 beta-glucosidase cellobiose homogeneous Michaelis-Menten",
+        ),
+        "mode": _template_config_mode(case_template, fallback="scientific"),
+        "maturity": _template_config_maturity(case_template, fallback="scientific"),
         "provenance": provenance,
         "case_template": _case_template_config(case_template),
         "entities": {
@@ -863,7 +916,7 @@ def _homogeneous_mm_config_data(
                 "validator_type": "mass_balance",
                 "conserved_weights": {
                     substrate_state: 1.0,
-                    product_state: 1.0,
+                    product_state: _product_conserved_weight(case_template, "product"),
                 },
             },
         ],

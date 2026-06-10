@@ -49,8 +49,30 @@ records:
       product: released_product_amount
       catalyst: free_catalyst_concentration
     process_state_metadata:
+      config_name: "toy registry case {fungus_id} on {substrate_id}"
+      config_mode: toy
+      config_maturity: framework_benchmark
+      public_path: false
       bond_type: toy_beta_1_4_glycosidic
       accessible_site_pool: configured accessible site pool
+      geometry:
+        kind: geometry
+        name: toy registry well-mixed 100 mL
+        geometry_type: well_mixed
+        provenance:
+          source: FungMod R3 toy registry case builder.
+          measurement_method: defined benchmark metadata
+          confidence_level: testing
+          notes: Template-owned toy geometry for registry-to-config workflow tests.
+          validity_range: R3 framework tests only
+          units: not_applicable
+        volume:
+          value: 100.0
+          units: milliliter
+        surface_area:
+          value: 0.1
+          units: meter ** 2
+        parameters: []
     limitations:
       - Toy registry case builder only.
       - Uses the existing generic surface-catalysis factory without adding biology.
@@ -110,8 +132,30 @@ records:
       enzyme: free_enzyme_concentration
       accessibility_proxy: accessible_site_fraction_remaining_proxy
     process_state_metadata:
+      config_name: "BIO-001 cellulose surface virtual experiment {fungus_id} on {substrate_id}"
+      config_mode: exploratory
+      config_maturity: exploratory
+      public_path: true
       bond_type: beta_1_4_glycosidic
       accessible_site_pool: cellulose accessible beta-1,4-glycosidic surface
+      geometry:
+        kind: geometry
+        name: BIO-001 well-mixed enzyme assay context
+        geometry_type: well_mixed
+        provenance:
+          source: FungMod BIO-001 controlled virtual-experiment scaffold.
+          measurement_method: user-specified virtual-experiment context
+          confidence_level: exploratory_assumption
+          notes: Geometry context for an enzyme-mediated surface-degradation pilot; no spatial gradients are modeled.
+          validity_range: BIO-001 cellulose surface-degradation pilot only
+          units: not_applicable
+        volume:
+          value: 100.0
+          units: milliliter
+        surface_area:
+          value: 0.5
+          units: meter ** 2
+        parameters: []
     limitations:
       - Enzyme-mediated insoluble cellulose surface degradation pilot.
       - Accessible surface area is constant within each sample; surface renewal and morphology are not modeled.
@@ -155,7 +199,7 @@ records:
       substrate_state_role: substrate
       product_state_role: product
       stoichiometric_yield: 2.0
-      notes: Reaction 618 stoichiometry metadata; the current homogeneous process still applies legacy one-state product contributions.
+      notes: Reaction 618 stoichiometry; homogeneous product dynamics use this 2:1 glucose yield.
     stoichiometric_yields:
       product: 2.0
     time_grid:
@@ -173,10 +217,15 @@ records:
       substrate: cellobiose_concentration
       product: beta_D_glucose_concentration
       enzyme: beta_glucosidase_concentration
+    process_state_metadata:
+      config_name: "SABIO-RK Reaction 618 beta-glucosidase cellobiose homogeneous Michaelis-Menten"
+      config_mode: scientific
+      config_maturity: scientific
+      public_path: true
     limitations:
       - Dissolved homogeneous Michaelis-Menten kinetics for the selected SABIO-RK entry.
       - This is an enzyme-kinetics case, not a whole-fungus growth or uptake model.
-      - Stoichiometric yield is recorded as assembly metadata; the current homogeneous process contribution remains legacy one-to-one.
+      - Stoichiometric yield drives product formation, but this remains an enzyme-kinetics case without growth or uptake.
     validity_notes:
       - Template metadata does not resolve the missing selected-entry enzyme concentration.
       - Time-grid values preserve the pre-ASSEMBLY-001 runtime defaults for existing Reaction 618 tests and outputs.

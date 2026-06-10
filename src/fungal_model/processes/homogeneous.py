@@ -263,6 +263,7 @@ class HomogeneousMichaelisMentenProcess(Process):
     enzyme_state: str | None
     enzyme_units: str | None
     kcat_symbol: str | None
+    product_coefficients: dict[str, float]
 
     def __init__(
         self,
@@ -277,6 +278,7 @@ class HomogeneousMichaelisMentenProcess(Process):
         enzyme_state: str | None = None,
         enzyme_units: str | None = None,
         kcat_symbol: str | None = None,
+        product_coefficients: Mapping[str, float] | None = None,
         source: str = "Generic homogeneous Michaelis-Menten process.",
         notes: str = "",
     ) -> None:
@@ -284,10 +286,13 @@ class HomogeneousMichaelisMentenProcess(Process):
             raise ValueError(
                 "Provide either vmax_symbol, or both enzyme_state and kcat_symbol."
             )
+        coefficients = _product_coefficients(product_state=product_state, product_coefficients=product_coefficients)
         required_states = [StateVariableSpec(substrate_state, substrate_units, role="substrate")]
         changed_states = [StateVariableSpec(substrate_state, substrate_units, role="reactant")]
-        if product_state is not None:
-            changed_states.append(StateVariableSpec(product_state, substrate_units, role="product"))
+        changed_states.extend(
+            StateVariableSpec(state_name, substrate_units, role="product")
+            for state_name in coefficients
+        )
         parameter_requirements = [
             ParameterRequirement(symbol=km_symbol, units=substrate_units, name="Michaelis constant")
         ]
@@ -330,6 +335,7 @@ class HomogeneousMichaelisMentenProcess(Process):
         object.__setattr__(self, "enzyme_state", enzyme_state)
         object.__setattr__(self, "enzyme_units", enzyme_units)
         object.__setattr__(self, "kcat_symbol", kcat_symbol)
+        object.__setattr__(self, "product_coefficients", coefficients)
 
     def rate(
         self,
@@ -367,16 +373,15 @@ class HomogeneousMichaelisMentenProcess(Process):
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
         contributions: dict[str, Quantity] = {self.substrate_state: cast(Quantity, -value)}
-        if self.product_state is not None:
-            contributions[self.product_state] = value
+        for state_name, coefficient in self.product_coefficients.items():
+            contributions[state_name] = coefficient * value
         return contributions
 
     def as_reaction(self) -> Reaction:
-        products = {} if self.product_state is None else {self.product_state: 1.0}
         return _reaction_from_process(
             self,
             reactants={self.substrate_state: 1.0},
-            products=products,
+            products=self.product_coefficients,
             rate_units=self.rate_units,
             source=self.source or "Generic homogeneous Michaelis-Menten process.",
             notes=self.notes,
@@ -392,6 +397,19 @@ def _signed_stoichiometry(
         name: float(products.get(name, 0.0) - reactants.get(name, 0.0))
         for name in species
     }
+
+
+def _product_coefficients(
+    *,
+    product_state: str | None,
+    product_coefficients: Mapping[str, float] | None,
+) -> dict[str, float]:
+    if product_coefficients is None:
+        return {} if product_state is None else {product_state: 1.0}
+    coefficients = {str(state): float(coefficient) for state, coefficient in product_coefficients.items()}
+    if product_state is not None and product_state not in coefficients:
+        coefficients[product_state] = 1.0
+    return coefficients
 
 
 __all__ = [
