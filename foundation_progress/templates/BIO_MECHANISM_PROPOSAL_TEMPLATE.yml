@@ -1,0 +1,58 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-XXX
+mechanism_id: reusable_process_mechanism_id
+general_process_family: reusable process mechanism family
+mathematical_law: >
+  State the reusable rate law or process law. This must describe a mechanism,
+  not a specific organism/substrate/environment case.
+state_variables:
+  - name: substrate_pool
+    role: substrate
+    units: amount_or_concentration_units
+  - name: product_pool
+    role: product
+    units: amount_or_concentration_units
+parameters:
+  - symbol: k_process
+    meaning: reusable process rate parameter
+    units: process_rate_units
+units:
+  state_units_policy: explicit units required for every state variable
+  parameter_units_policy: explicit units required for every parameter
+valid_substrate_classes:
+  - reusable_substrate_class
+valid_enzyme_or_source_classes:
+  - reusable_enzyme_or_source_class
+environment_variables:
+  - name: temperature
+    required: false
+    units: kelvin
+output_curves:
+  - substrate_remaining
+  - product_formed
+summary_metrics:
+  - final_substrate_remaining
+  - final_product_formed
+assumptions:
+  - Mechanism assumptions that apply across cases.
+not_in_scope:
+  - Organism-specific physiology, datasets, and demonstration cases.
+unknowns:
+  - Unknown mechanism limits requiring future curation.
+suggested_experiments:
+  - Experiments needed to estimate or validate parameters.
+blocking_failure_modes:
+  - Missing required state, parameter, unit, or validity-domain definition.
+tests_required:
+  - Unit test for rate-law limiting behavior.
+  - Configured workflow test with a CASE-* demo.
+  - Output-table provenance and limitation test.
+limitations:
+  - Proposal is a reusable mechanism scaffold until validated by data.
+demo_case:
+  case_id: CASE-XXX
+  purpose: Demonstrate the reusable BIO mechanism on one explicit case.
+  distinction: CASE-* records demonstrate the BIO mechanism but do not define it.
+data_dependencies:
+  - DATA-XXX
+validation_status: proposed

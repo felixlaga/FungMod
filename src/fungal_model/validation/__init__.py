@@ -21,15 +21,33 @@ from fungal_model.validation.maturity import (
     enforce_run_maturity,
     validate_run_maturity,
 )
+from fungal_model.validation.bio_readiness import (
+    BioReadinessIssue,
+    BioReadinessReport,
+    BioReadinessValidationError,
+    REQUIRED_BIO_MECHANISM_FIELDS,
+    enforce_bio_mechanism_proposal,
+    load_bio_mechanism_proposal,
+    validate_bio_mechanism_proposal,
+    validate_bio_mechanism_proposal_file,
+)
 
 __all__ = [
+    "BioReadinessIssue",
+    "BioReadinessReport",
+    "BioReadinessValidationError",
     "InvalidDataMaturityError",
     "LimitingCase",
     "LimitingCaseSuite",
     "MaturityIssue",
+    "REQUIRED_BIO_MECHANISM_FIELDS",
     "ValidationResult",
     "enforce_run_maturity",
+    "enforce_bio_mechanism_proposal",
+    "load_bio_mechanism_proposal",
     "validate_biomass_yield_limit",
+    "validate_bio_mechanism_proposal",
+    "validate_bio_mechanism_proposal_file",
     "validate_carbon_conservation",
     "validate_diffusion_smooths_gradient",
     "validate_mass_balance",

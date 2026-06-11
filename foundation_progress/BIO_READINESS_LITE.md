@@ -15,6 +15,8 @@ DATA-* = source/evidence/validation dataset
 ## Required proposal fields
 
 ```text
+proposal_kind
+milestone_id
 mechanism_id
 general_process_family
 mathematical_law
@@ -38,3 +40,28 @@ validation_status
 ```
 
 Reject organism-specific BIO mechanism IDs such as `pleurotus_cellulose_degradation`.
+
+## Machine-checkable gate
+
+Template:
+
+```text
+foundation_progress/templates/BIO_MECHANISM_PROPOSAL_TEMPLATE.yml
+```
+
+Validator:
+
+```bash
+python scripts/validate_bio_readiness_lite.py path/to/proposal.yml
+```
+
+The validator enforces:
+
+```text
+BIO-* proposals must describe reusable mechanisms.
+CASE-* IDs belong only in demo_case.
+DATA-* IDs belong only in data_dependencies.
+Organism-specific BIO mechanism identifiers are rejected.
+State variables, parameters, units, assumptions, limitations, tests, unknowns,
+and suggested experiments must be explicit.
+```
