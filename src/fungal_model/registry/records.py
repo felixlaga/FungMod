@@ -18,9 +18,12 @@ CASE_TEMPLATE_SCHEMA_VERSION = "1"
 CASE_TEMPLATE_ALLOWED_STATE_ROLES = frozenset(
     {
         "substrate",
+        "intermediate",
         "product",
         "enzyme",
         "catalyst",
+        "surface_catalyst",
+        "homogeneous_catalyst",
         "accessibility_proxy",
     }
 )

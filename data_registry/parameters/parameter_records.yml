@@ -477,3 +477,165 @@ records:
       confidence_level: exploratory_assumption
       notes: Not curated from SABIO-RK. Used only for exploratory sensitivity analysis because EntryID 35622 does not provide enzyme concentration.
     notes: User-supplied exploratory enzyme concentration prior for Reaction 618 sensitivity analysis; not a literature-curated value.
+
+  - record_id: bio002_initial_solid_cellulose_equivalent_concentration
+    name: BIO-002 initial solid cellulose-equivalent concentration
+    maturity: exploratory_prior
+    provenance:
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-002
+      measurement_method: explicit demo scaffold value
+      validity_range: BIO-002 cellulose-equivalent enzyme-chain demo only
+      notes: Not literature-curated; initializes the solid substrate as a cellobiose-equivalent concentration.
+    parameter_symbol: bio002_initial_solid_cellulose_equivalent_concentration
+    process_type: extracellular_enzyme_chain
+    enzyme_class: null
+    substrate_class: cellulose_film_generic
+    fungus_id: null
+    substrate_id: cellulose_film_generic
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: exact
+      value: 3.06
+      units: mM
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold
+      confidence_level: exploratory_assumption
+      notes: Explicit demo scaffold value; not a measured cellulose loading.
+    notes: Initial solid cellulose-like pool represented on a cellobiose-equivalent concentration basis.
+
+  - record_id: bio002_cellulase_initial_concentration
+    name: BIO-002 initial extracellular cellulase concentration
+    maturity: exploratory_prior
+    provenance:
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-002
+      measurement_method: explicit demo scaffold value
+      validity_range: BIO-002 cellulose-equivalent enzyme-chain demo only
+      notes: Not literature-curated; no secretion, production, uptake, or inactivation is modeled.
+    parameter_symbol: bio002_cellulase_initial_concentration
+    process_type: surface_catalysis
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    fungus_id: null
+    substrate_id: cellulose_film_generic
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: exact
+      value: 0.1
+      units: mM
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold
+      confidence_level: exploratory_assumption
+      notes: Explicit demo scaffold value for a fixed extracellular catalyst state.
+    notes: Constant initial cellulase catalyst concentration for the surface-release step.
+
+  - record_id: bio002_beta_glucosidase_initial_concentration
+    name: BIO-002 initial beta-glucosidase concentration
+    maturity: exploratory_prior
+    provenance:
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-002
+      measurement_method: explicit demo scaffold value
+      validity_range: BIO-002 cellulose-equivalent enzyme-chain demo only
+      notes: Not curated from SABIO-RK; used because selected Reaction 618 lacks enzyme concentration.
+    parameter_symbol: bio002_beta_glucosidase_initial_concentration
+    process_type: extracellular_enzyme_chain
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: null
+    substrate_id: cellobiose
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: exact
+      value: 0.02
+      units: mM
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold
+      confidence_level: exploratory_assumption
+      notes: Explicit demo scaffold value; not a literature-curated Reaction 618 enzyme concentration.
+    notes: Constant beta-glucosidase catalyst concentration for the homogeneous cellobiose hydrolysis step.
+
+  - record_id: bio002_cellulose_to_cellobiose_surface_rate
+    name: BIO-002 cellulose-equivalent to cellobiose surface-release rate
+    maturity: exploratory_prior
+    provenance:
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-002
+      measurement_method: explicit demo scaffold value
+      validity_range: BIO-002 cellulose-equivalent enzyme-chain demo only
+      notes: Not literature-curated; exercises the reusable surface-release law.
+    parameter_symbol: bio002_cellulose_to_cellobiose_surface_rate
+    process_type: surface_catalysis
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    fungus_id: null
+    substrate_id: cellulose_film_generic
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: exact
+      value: 0.003
+      units: mM / meter ** 2 / second
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold
+      confidence_level: exploratory_assumption
+      notes: Explicit demo scaffold value; not a measured cellulase surface rate.
+    notes: Surface release rate constant for the first BIO-002 chain step.
+
+  - record_id: bio002_cellulase_adsorption_constant
+    name: BIO-002 cellulase surface adsorption constant
+    maturity: exploratory_prior
+    provenance:
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-002
+      measurement_method: explicit demo scaffold value
+      validity_range: BIO-002 cellulose-equivalent enzyme-chain demo only
+      notes: Not literature-curated; supplies the generic Langmuir coverage model.
+    parameter_symbol: bio002_cellulase_adsorption_constant
+    process_type: surface_catalysis
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    fungus_id: null
+    substrate_id: cellulose_film_generic
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: exact
+      value: 10.0
+      units: 1 / mM
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold
+      confidence_level: exploratory_assumption
+      notes: Explicit demo scaffold value; not a measured adsorption constant.
+    notes: Adsorption constant for equilibrium surface coverage in the first BIO-002 chain step.
+
+  - record_id: bio002_cellulose_accessible_surface_area
+    name: BIO-002 cellulose accessible surface area
+    maturity: exploratory_prior
+    provenance:
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      bio_milestone: BIO-002
+      measurement_method: explicit demo scaffold value
+      validity_range: BIO-002 cellulose-equivalent enzyme-chain demo only
+      notes: Not literature-curated; treated as constant during each run.
+    parameter_symbol: bio002_cellulose_accessible_surface_area
+    process_type: surface_catalysis
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    fungus_id: null
+    substrate_id: cellulose_film_generic
+    environment_id: sabiork_reaction_618_selected_conditions
+    value:
+      kind: exact
+      value: 0.5
+      units: meter ** 2
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold
+      confidence_level: exploratory_assumption
+      notes: Explicit demo scaffold value; accessible surface is not dynamically evolved.
+    notes: Constant accessible surface area for the first BIO-002 chain step.

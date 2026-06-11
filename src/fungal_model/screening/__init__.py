@@ -6,6 +6,15 @@ from fungal_model.screening.case_builder import (
     build_model_config_from_registry_case,
     select_registry_case_template,
 )
+from fungal_model.screening.enzyme_chain import (
+    BIO002_ENZYME_CHAIN_TEMPLATE_ID,
+    EXTRACELLULAR_ENZYME_CHAIN_PROCESS_TYPE,
+    EnzymeChainAssemblyError,
+    EnzymeChainRunResult,
+    build_extracellular_enzyme_chain_config,
+    run_extracellular_enzyme_chain_demo,
+    write_enzyme_chain_standard_tables,
+)
 from fungal_model.screening.ensemble import (
     EnsembleSample,
     EnsembleSampleFailure,
@@ -26,8 +35,12 @@ from fungal_model.screening.modelability import (
 __all__ = [
     "RegistryCaseBuildError",
     "RegistryCaseConfigMode",
+    "BIO002_ENZYME_CHAIN_TEMPLATE_ID",
     "EnsembleSample",
     "EnsembleSampleFailure",
+    "EXTRACELLULAR_ENZYME_CHAIN_PROCESS_TYPE",
+    "EnzymeChainAssemblyError",
+    "EnzymeChainRunResult",
     "ModelabilityMode",
     "ModelabilityReport",
     "ModelabilityStatus",
@@ -37,7 +50,10 @@ __all__ = [
     "ReportItem",
     "ScreenSimulationMode",
     "assess_modelability",
+    "build_extracellular_enzyme_chain_config",
     "build_model_config_from_registry_case",
+    "run_extracellular_enzyme_chain_demo",
     "select_registry_case_template",
     "simulate_screen",
+    "write_enzyme_chain_standard_tables",
 ]

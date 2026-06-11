@@ -232,3 +232,183 @@ records:
     notes: >
       Template describes how the local Reaction 618 registry case is assembled.
       It does not fetch SABIO-RK data and does not create parameter evidence.
+
+  - record_id: bio002_extracellular_enzyme_chain_template
+    case_template_id: bio002_extracellular_enzyme_chain_template
+    name: BIO-002 reusable extracellular enzyme-chain degradation template
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+      confidence_level: exploratory_assumption
+      bio_milestone: BIO-002
+      notes: >
+        Assembly metadata for a reusable extracellular enzyme-chain mechanism.
+        The demo chain is solid cellulose-equivalent substrate to cellobiose to
+        beta-D-glucose; it is not organism-specific and is not a whole-fungus model.
+    schema_version: "1"
+    process_type: extracellular_enzyme_chain
+    state_roles:
+      substrate: solid_cellulose_equivalent_concentration
+      intermediate: cellobiose_concentration
+      product: beta_D_glucose_concentration
+      surface_catalyst: cellulase_concentration
+      homogeneous_catalyst: beta_glucosidase_concentration
+    initial_state_mapping:
+      substrate:
+        parameter_role: solid_substrate_initial_concentration
+        units_from_role: solid_substrate_initial_concentration
+      intermediate:
+        value: 0.0
+        units: mM
+      product:
+        value: 0.0
+        units: mM
+      surface_catalyst:
+        parameter_role: cellulase_initial_concentration
+        units_from_role: cellulase_initial_concentration
+      homogeneous_catalyst:
+        parameter_role: beta_glucosidase_initial_concentration
+        units_from_role: beta_glucosidase_initial_concentration
+    product_map:
+      id: bio002_cellobiose_to_glucose_map
+      product_map_type: stoichiometric
+      substrate_state_role: intermediate
+      product_state_role: product
+      stoichiometric_yield: 2.0
+      notes: Cellobiose hydrolysis produces two beta-D-glucose equivalents.
+    stoichiometric_yields:
+      intermediate: 1.0
+      product: 2.0
+    time_grid:
+      start: 0.0
+      stop: 4000.0
+      points: 81
+      units: second
+    observable_roles:
+      - substrate
+      - intermediate
+      - product
+      - surface_catalyst
+      - homogeneous_catalyst
+      - degradation_rate
+      - product_release_rate
+      - solid_substrate_degraded_fraction
+      - final_glucose_yield
+    output_state_roles:
+      substrate: solid_cellulose_equivalent_concentration
+      intermediate: cellobiose_concentration
+      product: beta_D_glucose_concentration
+      surface_catalyst: cellulase_concentration
+      homogeneous_catalyst: beta_glucosidase_concentration
+    process_state_metadata:
+      config_name: BIO-002 extracellular enzyme-chain cellulose-equivalent demo
+      config_mode: exploratory
+      config_maturity: exploratory
+      public_path: true
+      parameter_record_ids:
+        solid_substrate_initial_concentration: bio002_initial_solid_cellulose_equivalent_concentration
+        cellulase_initial_concentration: bio002_cellulase_initial_concentration
+        beta_glucosidase_initial_concentration: bio002_beta_glucosidase_initial_concentration
+        surface_rate_constant: bio002_cellulose_to_cellobiose_surface_rate
+        adsorption_constant: bio002_cellulase_adsorption_constant
+        accessible_surface_area: bio002_cellulose_accessible_surface_area
+        km: sabiork_reaction_618_Km_cellobiose
+        kcat: sabiork_reaction_618_kcat_cellobiose
+      product_maps:
+        - id: bio002_cellulose_to_cellobiose_map
+          name: BIO-002 cellulose-equivalent to cellobiose release map
+          product_map_type: stoichiometric
+          reactants:
+            substrate: 1.0
+          products:
+            intermediate: 1.0
+          notes: One cellulose-equivalent cleavage unit releases one cellobiose-equivalent intermediate.
+        - id: bio002_cellobiose_to_glucose_map
+          name: BIO-002 cellobiose to beta-D-glucose map
+          product_map_type: stoichiometric
+          reactants:
+            intermediate: 1.0
+          products:
+            product: 2.0
+          notes: Reuses the Reaction 618 stoichiometric glucose yield.
+      process_templates:
+        - id: bio002_surface_cellulose_to_cellobiose
+          process_type: surface_catalysis
+          state_roles:
+            substrate: substrate
+            catalyst: surface_catalyst
+            product: intermediate
+          fixed_states:
+            bond_type: beta_1_4_glycosidic
+            accessible_site_pool: cellulose beta-1,4-glycosidic accessible surface
+          parameter_roles:
+            surface_rate_constant: surface_rate_constant
+            adsorption_constant: adsorption_constant
+            accessible_surface_area: accessible_surface_area
+          fixed_parameters:
+            rate_units: mM / second
+          product_map: bio002_cellulose_to_cellobiose_map
+          assumptions:
+            - Solid cellulose-like substrate is represented as an explicit cellobiose-equivalent concentration pool.
+            - Accessible surface area is constant during each run; surface renewal and morphology are not modeled.
+        - id: bio002_cellobiose_to_glucose_mm
+          process_type: homogeneous_michaelis_menten
+          state_roles:
+            substrate: intermediate
+            product: product
+            enzyme: homogeneous_catalyst
+          parameter_roles:
+            km: km
+            kcat: kcat
+          fixed_parameters:
+            rate_units: mM / second
+          product_map: bio002_cellobiose_to_glucose_map
+          assumptions:
+            - Dissolved cellobiose hydrolysis uses the generic homogeneous Michaelis-Menten process.
+            - Stoichiometric product dynamics use two glucose equivalents per cellobiose consumed.
+      geometry:
+        kind: geometry
+        name: BIO-002 well-mixed extracellular enzyme-chain assay context
+        geometry_type: well_mixed
+        provenance:
+          source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+          measurement_method: explicit virtual-experiment context
+          confidence_level: exploratory_assumption
+          notes: Well-mixed assay context; no spatial gradients, transport limitation, or morphology evolution are modeled.
+          validity_range: BIO-002 enzyme-chain demo only
+          units: not_applicable
+        volume:
+          value: 100.0
+          units: milliliter
+        surface_area:
+          value: 0.5
+          units: meter ** 2
+        parameters: []
+      chain_outputs:
+        degraded_fraction_state: solid_substrate_degraded_fraction
+        glucose_yield_metric: final_glucose_yield
+        threshold_fractions:
+          - 0.1
+          - 0.5
+          - 0.9
+      suggested_experiments:
+        - id: bio002_timecourse_cellobiose_glucose
+          priority: high
+          description: Measure solid-substrate loss, cellobiose, and glucose over time for an extracellular enzyme mixture.
+          rationale: Needed to calibrate or validate the linked surface-release and homogeneous hydrolysis steps together.
+        - id: bio002_accessible_surface_area
+          priority: medium
+          description: Independently estimate accessible cellulose surface area for the assay material.
+          rationale: Surface release remains exploratory until accessible area is measured or constrained.
+    limitations:
+      - Reusable extracellular enzyme-chain mechanism only; not whole-fungus growth, secretion, uptake, or biomass.
+      - Solid cellulose-like substrate is represented as a cellobiose-equivalent concentration pool, not full cellulose morphology.
+      - Accessible surface area is constant; surface renewal, crystallinity, pore transport, and morphology evolution are not modeled.
+      - The first step uses exploratory scaffold parameters; only the cellobiose-to-glucose kinetic constants come from the local Reaction 618 registry records.
+      - No PET, lignin, full lignocellulose, organism-specific physiology, or environmental response law is represented.
+    validity_notes:
+      - BIO-002 demonstrates reusable process assembly and stoichiometric product dynamics, not experimental validation.
+      - Parameter values are suitable for exploratory software exercising and hypothesis generation only unless separately calibrated.
+    notes: >
+      Template describes a reusable extracellular enzyme chain assembled from
+      generic surface catalysis and homogeneous Michaelis-Menten process laws.
