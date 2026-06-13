@@ -20,6 +20,7 @@ from fungal_model.validation.bio_readiness import (
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_PATH = ROOT / "foundation_progress" / "templates" / "BIO_MECHANISM_PROPOSAL_TEMPLATE.yml"
+BIO002_PROPOSAL_PATH = ROOT / "foundation_progress" / "proposals" / "BIO_002_EXTRACELLULAR_ENZYME_CHAIN.yml"
 SCRIPT_PATH = ROOT / "scripts" / "validate_bio_readiness_lite.py"
 
 
@@ -119,6 +120,12 @@ def test_validator_loads_proposal_file(tmp_path: Path) -> None:
 
     assert report.passed
     assert report.proposal_path == str(path)
+
+
+def test_real_bio002_extracellular_enzyme_chain_proposal_passes_readiness() -> None:
+    report = validate_bio_mechanism_proposal_file(BIO002_PROPOSAL_PATH)
+
+    assert report.passed, report.to_dict()
 
 
 def _valid_proposal() -> dict[str, Any]:

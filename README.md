@@ -63,7 +63,10 @@ basic kinetics layer:
   limitations, missing-parameter, suggested-experiment, and range-use fields;
 - an offline-first SABIO-RK source adapter that loads frozen kinetic-law
   snapshots and writes review-only proposed records without mutating the
-  simulation registry.
+  simulation registry;
+- a registry-backed BIO-002 extracellular enzyme-chain assembler whose
+  stoichiometry, conserved quantities, entities, and output labels come from
+  template data rather than mechanism-code biological names.
 
 It does not yet implement full thermodynamic flux analysis, resolved intracellular
 metabolism, 2D/3D spatial models, publication-grade calibration against

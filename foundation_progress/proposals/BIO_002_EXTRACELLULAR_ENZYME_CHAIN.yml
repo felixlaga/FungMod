@@ -1,0 +1,105 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-002
+mechanism_id: extracellular_enzyme_chain
+general_process_family: extracellular two-step enzyme-chain degradation
+mathematical_law: >
+  A configured surface-catalysis step converts a substrate pool into a soluble
+  intermediate through an explicit product map, and a configured homogeneous
+  Michaelis-Menten step converts the intermediate into a soluble product through
+  a second explicit product map. Product dynamics and conserved-equivalent
+  checks use template-declared stoichiometric coefficients and conservation
+  weights.
+state_variables:
+  - name: substrate_pool
+    role: substrate
+    units: template-declared amount or concentration units
+  - name: soluble_intermediate_pool
+    role: intermediate
+    units: template-declared amount or concentration units compatible with the chain
+  - name: soluble_product_pool
+    role: product
+    units: template-declared amount or concentration units compatible with the chain
+  - name: surface_catalyst_pool
+    role: surface_catalyst
+    units: template-declared catalyst concentration units
+  - name: homogeneous_catalyst_pool
+    role: homogeneous_catalyst
+    units: template-declared catalyst concentration units
+parameters:
+  - symbol: surface_rate_constant
+    meaning: surface-catalysis rate coefficient for the first chain step
+    units: product-rate units per area
+  - symbol: adsorption_constant
+    meaning: equilibrium coverage parameter for the surface catalyst
+    units: inverse catalyst concentration
+  - symbol: accessible_surface_area
+    meaning: configured accessible surface area for the first chain step
+    units: area
+  - symbol: km
+    meaning: Michaelis constant for the soluble intermediate in the second step
+    units: intermediate concentration
+  - symbol: kcat
+    meaning: enzyme-explicit turnover coefficient for the second step
+    units: product-rate units per catalyst concentration
+units:
+  state_units_policy: explicit units required for every template state role
+  parameter_units_policy: exact registry records required for deterministic demo assembly
+  conservation_policy: conserved-equivalent weights must be declared and checked against each product map
+valid_substrate_classes:
+  - generic substrate pool with a declared surface step and compatible equivalent units
+  - soluble intermediate pool declared by template role
+  - soluble product pool declared by template role
+valid_enzyme_or_source_classes:
+  - generic extracellular surface catalyst
+  - generic soluble catalyst with a configured homogeneous rate law
+environment_variables:
+  - name: assay_context
+    required: false
+    units: template-defined geometry and condition metadata
+output_curves:
+  - template-labeled substrate state trajectory
+  - template-labeled intermediate state trajectory
+  - template-labeled product state trajectory
+  - template-labeled derived depletion fraction
+  - template-labeled conserved-equivalent product fraction
+summary_metrics:
+  - template-labeled final state metrics
+  - template-labeled final derived metrics
+  - configured process-rate maxima
+assumptions:
+  - The chain has exactly two configured process steps from substrate to intermediate to product.
+  - State roles, entity records, process sequence, product maps, and output labels are supplied by the template.
+  - Conserved-equivalent mass balance is meaningful only when the template declares compatible equivalent units.
+not_in_scope:
+  - Whole-organism growth, secretion, uptake, biomass, or physiology.
+  - Dataset curation or empirical parameter validation.
+  - Additional substrate chemistry or additional biological mechanisms.
+unknowns:
+  - Parameter values require separate evidence or exploratory registry records.
+  - Equivalent-unit compatibility must be reviewed for each demonstration template.
+  - Surface accessibility and catalyst availability may require future process extensions.
+suggested_experiments:
+  - Measure substrate, intermediate, and product time courses for a configured demonstration chain.
+  - Independently constrain first-step accessible surface area or equivalent exposure.
+  - Compare second-step soluble conversion against a curated enzyme-only time course.
+blocking_failure_modes:
+  - Missing state role, state unit, entity definition, process template, parameter record, or product map.
+  - Non-positive or non-finite stoichiometric coefficient or conservation weight.
+  - Conservation weights that are inconsistent with declared product-map stoichiometry.
+  - Output metrics that reference unknown state roles or undeclared derived series.
+tests_required:
+  - Existing demonstration chain preserves the selected two-to-one soluble-product stoichiometry.
+  - A second unrelated chain with different state names and non-default yields runs through the same assembler.
+  - Malformed chain templates fail with structured assembly errors.
+  - Output tables use configured labels rather than mechanism-code biological names.
+limitations:
+  - This is reusable software architecture and process-mechanism verification, not broad biological validation.
+  - The first configured surface step remains exploratory unless calibrated or constrained by evidence.
+  - The mechanism assumes a two-step extracellular chain and does not represent additional pathways.
+demo_case:
+  case_id: CASE-001
+  purpose: Demonstrate the reusable mechanism on one explicit substrate-to-product setup.
+  distinction: The demonstration supplies names, parameters, and labels; the mechanism supplies reusable assembly rules.
+data_dependencies:
+  - DATA-002
+validation_status: software_tested

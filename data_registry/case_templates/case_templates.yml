@@ -305,6 +305,99 @@ records:
       config_mode: exploratory
       config_maturity: exploratory
       public_path: true
+      entities:
+        geometry:
+          id: geometry
+          loader: well_mixed
+          data:
+            kind: geometry
+            name: BIO-002 well-mixed extracellular enzyme-chain assay context
+            geometry_type: well_mixed
+            provenance:
+              source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+              measurement_method: explicit virtual-experiment context
+              confidence_level: exploratory_assumption
+              notes: Well-mixed assay context; no spatial gradients, transport limitation, or morphology evolution are modeled.
+              validity_range: BIO-002 enzyme-chain demo only
+              units: not_applicable
+            volume:
+              value: 100.0
+              units: milliliter
+            surface_area:
+              value: 0.5
+              units: meter ** 2
+            parameters: []
+        substrates:
+          - id: cellulose_film_generic
+            loader: generic_solid
+            data:
+              kind: substrate
+              name: Generic insoluble cellulose-equivalent substrate
+              substrate_type: generic_solid
+              chemical_class: cellulose_film_generic
+              physical_state: solid_polymer
+              bond_types:
+                - beta_1_4_glycosidic
+              accessible_bonds:
+                - beta_1_4_glycosidic
+              required_enzyme_classes:
+                - cellulase_generic
+              degradation_products:
+                - name: cellobiose
+                  source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+                  notes: BIO-002 soluble intermediate in a cellulose-equivalent enzyme-chain scaffold.
+              completeness: partial
+              default_degradation_model: heterogeneous_surface
+              water_activity_dependence: unknown
+              provenance:
+                source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+                confidence_level: exploratory_assumption
+                notes: Solid substrate represented as an explicit cellobiose-equivalent concentration state.
+              parameters: []
+        enzymes:
+          - id: cellulase_generic
+            data:
+              kind: enzyme
+              name: Generic extracellular cellulase catalyst
+              enzyme_class: cellulase_generic
+              target_bond_types:
+                - beta_1_4_glycosidic
+              target_substrate_classes:
+                - cellulose_film_generic
+              target_substrate_names:
+                - Generic insoluble cellulose-equivalent substrate
+              validity_labels:
+                - BIO-002
+                - surface_cellobiose_release
+                - exploratory_metadata
+              provenance:
+                source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+                confidence_level: exploratory_assumption
+                notes: Explicit catalyst metadata; no secretion, uptake, biomass, or growth is represented.
+              catalytic_parameters: []
+              adsorption_parameters: []
+              parameters: []
+          - id: beta_glucosidase
+            data:
+              kind: enzyme
+              name: beta-glucosidase
+              enzyme_class: beta_glucosidase
+              target_bond_types:
+                - beta_1_4_glycosidic
+              target_substrate_classes:
+                - cellobiose
+              target_substrate_names:
+                - Cellobiose
+              validity_labels:
+                - BIO-002
+                - homogeneous_cellobiose_hydrolysis
+              provenance:
+                source: SABIO-RK Reaction 618 selected kinetic law and BIO-002 scaffold metadata.
+                confidence_level: literature_curated
+                notes: Enzyme metadata for cellobiose hydrolysis; no uptake or biomass is represented.
+              catalytic_parameters: []
+              adsorption_parameters: []
+              parameters: []
       parameter_record_ids:
         solid_substrate_initial_concentration: bio002_initial_solid_cellulose_equivalent_concentration
         cellulase_initial_concentration: bio002_cellulase_initial_concentration
@@ -366,31 +459,66 @@ records:
           assumptions:
             - Dissolved cellobiose hydrolysis uses the generic homogeneous Michaelis-Menten process.
             - Stoichiometric product dynamics use two glucose equivalents per cellobiose consumed.
-      geometry:
-        kind: geometry
-        name: BIO-002 well-mixed extracellular enzyme-chain assay context
-        geometry_type: well_mixed
-        provenance:
-          source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
-          measurement_method: explicit virtual-experiment context
-          confidence_level: exploratory_assumption
-          notes: Well-mixed assay context; no spatial gradients, transport limitation, or morphology evolution are modeled.
-          validity_range: BIO-002 enzyme-chain demo only
-          units: not_applicable
-        volume:
-          value: 100.0
-          units: milliliter
-        surface_area:
-          value: 0.5
-          units: meter ** 2
-        parameters: []
+      conservation:
+        id: cellobiose_equivalent_balance
+        closed_system: true
+        state_weights:
+          substrate: 1.0
+          intermediate: 1.0
+          product: 0.5
       chain_outputs:
-        degraded_fraction_state: solid_substrate_degraded_fraction
-        glucose_yield_metric: final_glucose_yield
-        threshold_fractions:
-          - 0.1
-          - 0.5
-          - 0.9
+        state_series:
+          - role: substrate
+            label: solid_substrate_remaining
+          - role: intermediate
+            label: cellobiose
+          - role: product
+            label: glucose
+          - role: surface_catalyst
+            label: cellulase
+          - role: homogeneous_catalyst
+            label: beta_glucosidase
+        derived_series:
+          - id: degraded_fraction
+            kind: fractional_depletion
+            role: substrate
+            label: solid_substrate_degraded_fraction
+            units: dimensionless
+            threshold_fractions:
+              - 0.1
+              - 0.5
+              - 0.9
+            notes: Fraction of the initial cellulose-equivalent substrate pool consumed.
+          - id: product_yield
+            kind: conserved_equivalent_fraction
+            role: product
+            denominator_role: substrate
+            label: glucose_yield
+            units: dimensionless
+            notes: Product converted to substrate-equivalent units using declared conservation weights.
+        final_metrics:
+          - id: final_substrate_remaining
+            kind: final_state
+            role: substrate
+            label: solid_substrate_remaining
+          - id: final_intermediate
+            kind: final_state
+            role: intermediate
+            label: cellobiose
+          - id: final_product
+            kind: final_state
+            role: product
+            label: glucose
+          - id: final_degraded_fraction
+            kind: final_derived
+            derived_series: degraded_fraction
+            label: solid_substrate_degraded_fraction
+          - id: final_product_yield
+            kind: final_derived
+            derived_series: product_yield
+            label: final_glucose_yield
+        process_rate_metrics:
+          include_maximum: true
       suggested_experiments:
         - id: bio002_timecourse_cellobiose_glucose
           priority: high

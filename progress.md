@@ -132,6 +132,59 @@ Completed in this pass:
 See `foundation_progress/ENV_001_ENVIRONMENT_GRIDS.md` for scope,
 limitations, and output-table details.
 
+## BIO-002-GENERICITY Extracellular Enzyme-Chain Hardening
+
+Date: 2026-06-13
+
+Status: `complete` for reusable two-step chain assembly and software
+verification.
+
+Completed in this pass:
+
+- Refactored `src/fungal_model/screening/enzyme_chain.py` so the generic
+  assembler reads entity definitions, loaders, state roles, state units,
+  initial states, catalyst states, process sequence, parameter-record IDs,
+  product-map IDs, stoichiometric coefficients, conservation weights, output
+  labels, limitations, and suggested experiments from registry/template data.
+- Moved the current cellulose-equivalent demonstration entity metadata,
+  conserved-equivalent definition, and standard-table output labels into
+  `data_registry/case_templates/case_templates.yml`.
+- Removed hardcoded product-yield and conserved-weight fallbacks from the
+  enzyme-chain table writer.
+- Added validation for malformed chain templates, including non-positive or
+  non-finite coefficients, empty required maps, unknown roles, missing units,
+  legacy product-state conflicts, missing conservation metadata, inconsistent
+  conservation weights, and invalid output references.
+- Added `tests/test_bio002_generic_chain_assembly.py`, with an unrelated
+  `polymer_X -> oligomer_Y -> monomer_Z` fixture using different entities,
+  states, catalyst names, parameters, output labels, yields `1.5` and `3.0`,
+  and conserved weights `1`, `2/3`, and `2/9`.
+- Added the machine-readable real mechanism proposal
+  `foundation_progress/proposals/BIO_002_EXTRACELLULAR_ENZYME_CHAIN.yml` and
+  a readiness test that validates the actual file.
+- Preserved the Reaction 618 behavior where beta-D-glucose formed is
+  approximately two times cellobiose consumed.
+
+Verification:
+
+- `.venv/bin/python -m pytest tests/test_pre_bio001_stoichiometry_and_assembly.py`
+  - Result: 4 passed.
+- `.venv/bin/python -m pytest tests/test_bio_readiness_lite.py`
+  - Result: 8 passed.
+- `.venv/bin/python -m pytest tests/test_bio002_extracellular_enzyme_chain.py`
+  - Result: 3 passed.
+- `.venv/bin/python -m pytest tests/test_bio002_generic_chain_assembly.py`
+  - Result: 11 passed.
+- `.venv/bin/python -m ruff check src tests`
+  - Result: all checks passed.
+- `.venv/bin/python -m pyright --pythonpath "$(.venv/bin/python -c 'import sys; print(sys.executable)')"`
+  - Result: 0 errors, 0 warnings, 0 informations.
+- `.venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing`
+  - Result: 540 passed; total coverage 84.30%, above the 80% gate.
+
+See `foundation_progress/BIO_002_ENZYME_CHAIN_DEGRADATION.md` for the generic
+contract, demonstration-specific data, failure modes, and limitations.
+
 ## Foundation-First Reset: Milestone 1 Governance Gate
 
 Date: 2026-05-27
