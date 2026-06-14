@@ -1,0 +1,866 @@
+schema_version: "1.0"
+catalogue_name: "FungMod Phase 1 current finding status"
+reviewed_commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+verified_at: "2026-06-14T11:31:47Z"
+source_documents:
+  - "AGENTS.md"
+  - "FUNGMOD_PHASE_1_REPOSITORY_TRUTH_AND_EXECUTION_HARDENING.md"
+  - "foundation_progress/validation/VALIDATION_001_DEEP_REPO_REVIEW.md"
+  - "foundation_progress/validation/VALIDATION_001_RISK_REGISTER.md"
+  - "foundation_progress/validation/VALIDATION_001_PROPOSED_CHANGES.md"
+  - "foundation_progress/VALIDATION_001_DEEP_REPO_REVIEW_SPEC.md"
+notes:
+  - "findings.yaml and priority_findings.txt were absent before this reconciliation; this catalogue is built from the audit artifacts present in foundation_progress/validation and the Phase 1 plan."
+  - "Resolved technical findings do not imply empirical scientific validation."
+findings:
+  - id: "P1-AUDIT-NATIVE-001"
+    original_severity: "critical"
+    current_severity: "none"
+    current_status: "stale"
+    title: "Native process-solver integration was identified as the immediate critical blocker"
+    original_claim: "The audit/Phase 1 plan says native process-solver integration was the immediate critical milestone and that current work needed to verify AssembledModel.run integration."
+    current_assessment: "The claim is stale for the current repository: configured workflow execution now calls AssembledModel.run, AssembledModel.run delegates to ProcessODESolver, and ProcessODESolver evaluates Process.rate and Process.contributions."
+    technical_status: "Implemented and guarded for supported well-mixed configured workflows."
+    scientific_status: "Native execution does not make any biological mechanism empirically validated."
+    evidence:
+      code:
+        - path: "src/fungal_model/workflows/configured_model.py"
+          symbols: ["ConfiguredModelRunner.run", "run_configured_model"]
+          explanation: "ConfiguredModelRunner.run assembles the configured model and calls assembly.model.run at the supported configured workflow boundary."
+        - path: "src/fungal_model/processes/assembly.py"
+          symbols: ["AssembledModel.run"]
+          explanation: "AssembledModel.run constructs a RunRequest and delegates to ProcessODESolver."
+        - path: "src/fungal_model/solvers/process_ode.py"
+          symbols: ["ProcessODESolver.run"]
+          explanation: "ProcessODESolver integrates process rates and process contributions through scipy.solve_ivp for well-mixed assembled models."
+      tests:
+        - path: "tests/test_guardrails_native_execution.py"
+          test_names: ["test_configured_workflow_calls_assembled_model_run", "test_high_level_workflows_do_not_construct_low_level_solvers_directly", "test_assembled_model_run_is_public_and_not_placeholder"]
+          explanation: "The tests prove the configured workflow calls AssembledModel.run and high-level workflows do not instantiate SimulationEngine, ReactionDiffusionEngine, or solve_ivp directly."
+        - path: "tests/test_native_assembled_model_run.py"
+          test_names: ["test_assembled_model_run_solves_first_order_benchmark", "test_assembled_model_run_solves_generic_surface_benchmark", "test_assembled_model_run_rejects_unsupported_geometry"]
+          explanation: "The tests exercise native first-order and generic surface execution and explicit unsupported-geometry failure."
+      documentation:
+        - path: "ARCHITECTURE_DEBT.md"
+          explanation: "FD-003 is recorded as resolved with ProcessODESolver as the exit condition."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_guardrails_native_execution.py tests/test_configured_model_workflow.py tests/test_native_assembled_model_run.py"
+    remaining_risk: "P1.3 still needs a full execution-entry-point map, but this original critical configured-workflow claim is not current."
+    recommended_next_action: "Proceed to P1.3 to map remaining supported and legacy execution entry points."
+
+  - id: "P1-AUDIT-LEGACY-REACTION-001"
+    original_severity: "high"
+    current_severity: "medium"
+    current_status: "partially_resolved"
+    title: "Legacy Reaction or SimulationEngine path may remain in use"
+    original_claim: "The audit required checking whether public paths still route through legacy Reaction or SimulationEngine execution."
+    current_assessment: "Supported configured workflows avoid direct legacy solver construction, but Reaction, SimulationEngine, and Process.as_reaction adapters still exist and are intentionally covered by low-level tests."
+    technical_status: "Resolved for high-level configured workflow paths; unresolved mapping remains for direct low-level APIs and adapters."
+    scientific_status: "Legacy low-level support is not itself a scientific defect, but unclear boundaries can confuse supported workflow claims."
+    evidence:
+      code:
+        - path: "src/fungal_model/core/simulation.py"
+          symbols: ["SimulationEngine"]
+          explanation: "The legacy ODE reaction engine remains as a low-level API."
+        - path: "src/fungal_model/processes/homogeneous.py"
+          symbols: ["FirstOrderDecayProcess.as_reaction", "MassActionProcess.as_reaction", "HomogeneousMichaelisMentenProcess.as_reaction"]
+          explanation: "Process-to-Reaction compatibility adapters remain."
+        - path: "src/fungal_model/processes/surface.py"
+          symbols: ["SurfaceCatalysisProcess.as_reaction"]
+          explanation: "A surface process adapter to Reaction remains."
+      tests:
+        - path: "tests/test_guardrails_native_execution.py"
+          test_names: ["test_high_level_workflows_do_not_construct_low_level_solvers_directly"]
+          explanation: "The public workflow guardrail excludes SimulationEngine, ReactionDiffusionEngine, and direct solve_ivp construction from configured workflow, PET plugin, and foundation notebook paths."
+        - path: "tests/test_reaction_engine.py"
+          test_names: ["build_first_order_engine"]
+          explanation: "Low-level SimulationEngine remains tested directly."
+      documentation:
+        - path: "FUNGMOD_PHASE_1_REPOSITORY_TRUTH_AND_EXECUTION_HARDENING.md"
+          explanation: "P1.3 and P1.4 are explicitly reserved for execution-path mapping and adapter retirement or containment."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_guardrails_native_execution.py tests/test_reaction_engine.py"
+    remaining_risk: "Adapters may still be usable outside the supported public workflow boundary until P1.3/P1.4 maps and contains them."
+    recommended_next_action: "Do not remove adapters in this task; map them in P1.3 and decide containment/removal in P1.4."
+
+  - id: "P1-AUDIT-VALIDATORS-001"
+    original_severity: "high"
+    current_severity: "none"
+    current_status: "resolved"
+    title: "Configured validators may not attach to native execution"
+    original_claim: "The audit required checking whether configured validators are attached and executed when using the native assembled model path."
+    current_assessment: "Configured validators are loaded into ConfiguredInputs, passed into ModelBuilder, stored on AssembledModel, and executed by ProcessODESolver after solving."
+    technical_status: "Implemented and tested."
+    scientific_status: "Validation checks are software guardrails; they do not prove empirical validity."
+    evidence:
+      code:
+        - path: "src/fungal_model/workflows/configured_inputs.py"
+          symbols: ["ConfiguredInputLoader.load"]
+          explanation: "Configured validators are built from model-config validator declarations."
+        - path: "src/fungal_model/workflows/configured_processes.py"
+          symbols: ["ConfiguredProcessAssembler.assemble"]
+          explanation: "Configured validators are passed into ModelBuilder."
+        - path: "src/fungal_model/solvers/process_ode.py"
+          symbols: ["ProcessODESolver.run"]
+          explanation: "The solver combines model validators and request validators and calls result.validate."
+      tests:
+        - path: "tests/test_configured_model_workflow.py"
+          test_names: ["test_generic_configured_runner_executes_all_foundation_benchmarks", "test_configured_output_records_generic_assembly_metadata"]
+          explanation: "The configured workflow tests assert validation results are present, pass, and are written to the configured output bundle."
+        - path: "tests/test_configured_workflow_failures.py"
+          test_names: ["test_strict_mode_rejects_failed_validator"]
+          explanation: "Strict configured runs raise when configured validators fail."
+      documentation:
+        - path: "README.md"
+          explanation: "README documents that run_configured_model executes through AssembledModel.run and validates the result."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_configured_model_workflow.py tests/test_configured_workflow_failures.py"
+    remaining_risk: "Validator coverage depends on configured validators and conserved weights; it is not a substitute for external validation data."
+    recommended_next_action: "Keep validator execution guardrails in the P1.3 native-path mapping."
+
+  - id: "P1-AUDIT-CONFIGURED-API-001"
+    original_severity: "high"
+    current_severity: "none"
+    current_status: "resolved"
+    title: "Configured-model API availability"
+    original_claim: "The audit scope required verifying whether run_configured_model and configured execution are actually available."
+    current_assessment: "run_configured_model is public, loads configs and registry-backed components, runs AssembledModel.run, validates the result, and writes configured output bundles."
+    technical_status: "Implemented and tested for homogeneous, dummy non-PET surface, and explicit PET plugin benchmark configs."
+    scientific_status: "The configured benchmark configs are framework tests and do not create scientific biology claims."
+    evidence:
+      code:
+        - path: "src/fungal_model/workflows/configured_model.py"
+          symbols: ["run_configured_model", "ConfiguredModelRunner.run"]
+          explanation: "Public configured-model entry point and runner implementation are present."
+        - path: "src/fungal_model/__init__.py"
+          symbols: ["run_configured_model"]
+          explanation: "run_configured_model is exported from the top-level package."
+      tests:
+        - path: "tests/test_configured_model_workflow.py"
+          test_names: ["test_generic_configured_runner_executes_all_foundation_benchmarks"]
+          explanation: "The test executes the generic configured runner for three foundation benchmark configs."
+        - path: "tests/test_guardrails_public_api.py"
+          test_names: ["test_foundation_public_api_names_exist"]
+          explanation: "The public API guardrail includes configured-model names."
+      documentation:
+        - path: "README.md"
+          explanation: "README lists run_configured_model in the foundation public API."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_configured_model_workflow.py tests/test_guardrails_public_api.py"
+    remaining_risk: "Configured-model API availability is not the same as researcher-friendly arbitrary-name simulation for every biological case."
+    recommended_next_action: "Keep configured API evidence in the current finding report; no code change is needed here."
+
+  - id: "P1-AUDIT-QA-001"
+    original_severity: "high"
+    current_severity: "informational"
+    current_status: "partially_resolved"
+    title: "Quality gates, test count, Ruff, Pyright, and coverage claims"
+    original_claim: "The audit and validation artifacts described an older test count and asked to verify CI, Ruff, Pyright, and coverage claims."
+    current_assessment: "Current CI runs Ruff, Pyright, and pytest with coverage; pyproject enforces an 80 percent coverage gate. The exact test count in old validation text is stale. Pyright remains intentionally basic with optional member access disabled as active architecture debt FD-005."
+    technical_status: "Quality gates are configured and tested; optional-member Pyright strictness remains an active ratchet."
+    scientific_status: "Passing quality gates does not validate biological predictions."
+    evidence:
+      code:
+        - path: "pyproject.toml"
+          symbols: ["tool.ruff", "tool.coverage.report"]
+          explanation: "Ruff is scoped to src/tests and coverage fail_under is configured at 80."
+        - path: "pyrightconfig.json"
+          symbols: ["typeCheckingMode", "reportOptionalMemberAccess"]
+          explanation: "Pyright is basic with several diagnostics enabled and optional member access still disabled."
+        - path: ".github/workflows/ci.yml"
+          symbols: ["Lint", "Type check", "Run tests with coverage"]
+          explanation: "CI runs python -m ruff check src tests, pyright, and pytest coverage."
+      tests:
+        - path: "tests/test_quality_config.py"
+          test_names: ["test_dev_quality_tools_are_declared", "test_quality_tool_configs_exist", "test_ci_runs_lint_typecheck_and_coverage"]
+          explanation: "The quality-config tests assert dev dependencies, pyright/ruff/coverage configuration, and CI command presence."
+      documentation:
+        - path: "ARCHITECTURE_DEBT.md"
+          explanation: "FD-005 records the remaining Pyright optional-value baseline."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_quality_config.py"
+        - ".venv/bin/python -m ruff check src tests"
+        - ".venv/bin/python -m pyright --pythonpath \"$(.venv/bin/python -c 'import sys; print(sys.executable)')\""
+        - ".venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing"
+    remaining_risk: "Old audit test-count numbers are stale; FD-005 remains a real typing ratchet."
+    recommended_next_action: "Keep FD-005 active until optional-member narrowing is completed."
+
+  - id: "P1-AUDIT-THERMO-001"
+    original_severity: "critical"
+    current_severity: "critical"
+    current_status: "confirmed"
+    title: "Full thermodynamic feasibility is not enforced by the solver"
+    original_claim: "Thermodynamic feasibility enforcement was missing or incomplete."
+    current_assessment: "The current repository records Gibbs free energy metadata and can report exergonic status, but the solver does not enforce thermodynamic feasibility constraints or thermodynamic flux analysis."
+    technical_status: "Metadata interface implemented; solver-level thermodynamic feasibility enforcement not implemented."
+    scientific_status: "Confirmed scientific blocker for publication-grade mechanistic claims where thermodynamic feasibility matters."
+    evidence:
+      code:
+        - path: "src/fungal_model/chemistry/thermodynamics.py"
+          symbols: ["GibbsFreeEnergyEstimate"]
+          explanation: "The module explicitly says it records metadata and does not enforce full thermodynamic flux analysis."
+        - path: "src/fungal_model/solvers/process_ode.py"
+          symbols: ["ProcessODESolver.run"]
+          explanation: "ProcessODESolver integrates rates and contributions without thermodynamic feasibility checks."
+      tests:
+        - path: "tests/test_stoichiometry_thermodynamics.py"
+          test_names: ["test_gibbs_free_energy_requires_provenance", "test_gibbs_free_energy_reports_exergonic_when_known"]
+          explanation: "Tests verify provenance and exergonic reporting, not solver blocking."
+      documentation:
+        - path: "README.md"
+          explanation: "README states Gibbs free energy values are metadata and full thermodynamic feasibility constraints are not yet enforced by the solver."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_stoichiometry_thermodynamics.py"
+    remaining_risk: "Simulations can remain numerically valid while thermodynamically unsupported."
+    recommended_next_action: "Keep as a confirmed scientific blocker; do not implement thermodynamic enforcement in this reconciliation task."
+
+  - id: "P1-AUDIT-BALANCE-001"
+    original_severity: "high"
+    current_severity: "medium"
+    current_status: "partially_resolved"
+    title: "Elemental, carbon, oxygen, and redox balance enforcement"
+    original_claim: "Elemental, carbon, oxygen, and redox balance enforcement needed current-state review."
+    current_assessment: "Elemental stoichiometry metadata, carbon conservation validation, oxygen limitation validation, and biomass-yield validation exist, but redox enforcement and universal automatic balance enforcement are not implemented."
+    technical_status: "Partially implemented as explicit validators and metadata interfaces."
+    scientific_status: "Scientific claims remain limited unless the relevant validators and conserved weights are configured for the case."
+    evidence:
+      code:
+        - path: "src/fungal_model/chemistry/stoichiometry.py"
+          symbols: ["StoichiometricReactionMetadata", "CarbonContent", "OxygenDemand"]
+          explanation: "Stoichiometric metadata and carbon/oxygen bookkeeping interfaces are implemented."
+        - path: "src/fungal_model/core/validators.py"
+          symbols: ["validate_carbon_conservation", "validate_oxygen_limitation", "validate_biomass_yield_limit"]
+          explanation: "Carbon, oxygen, and biomass-yield checks are available as explicit validators."
+        - path: "src/fungal_model/substrates/lignin.py"
+          symbols: ["LigninSubstrate"]
+          explanation: "Lignin metadata notes that redox chemistry, oxygen/redox dependence, and mediator chemistry are not modelled."
+      tests:
+        - path: "tests/test_stoichiometry_thermodynamics.py"
+          test_names: ["test_stoichiometric_reaction_metadata_detects_balanced_reaction", "test_carbon_conservation_fails_for_biomass_from_nowhere", "test_oxygen_limitation_fails_when_required_oxygen_exceeds_available"]
+          explanation: "Tests cover explicit balance and oxygen validators."
+        - path: "tests/test_configured_workflow_failures.py"
+          test_names: ["test_strict_mode_rejects_failed_validator"]
+          explanation: "Configured strict mode can reject failed validators."
+      documentation:
+        - path: "README.md"
+          explanation: "README states oxygen handling is a validation check, not a coupled oxygen state."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_stoichiometry_thermodynamics.py tests/test_configured_workflow_failures.py"
+    remaining_risk: "Redox and automatic universal balance enforcement remain absent; validators must be explicitly configured."
+    recommended_next_action: "Track as partially resolved and revisit only when a future scientific mechanism needs redox or automatic balance enforcement."
+
+  - id: "P1-AUDIT-ENV-001"
+    original_severity: "high"
+    current_severity: "medium"
+    current_status: "partially_resolved"
+    title: "Environmental response functions and validity-range enforcement"
+    original_claim: "Environmental response implementation and validation were missing or insufficient."
+    current_assessment: "Temperature, pH, oxygen, water-activity, and product-inhibition modifiers exist with unit checks and some validity warnings, and EnvironmentGrid metadata-only cases are guarded against ranking. These modifiers are not a global empirical environmental-response model for arbitrary registry screens."
+    technical_status: "Core modifier utilities and metadata-only environment-grid guardrails are implemented."
+    scientific_status: "Environment-grid output remains metadata-only unless active response models or condition-specific parameters are present."
+    evidence:
+      code:
+        - path: "src/fungal_model/modifiers/temperature.py"
+          symbols: ["TemperatureModifier"]
+          explanation: "Temperature modifier reads Environment.temperature and applies Arrhenius scaling."
+        - path: "src/fungal_model/modifiers/ph.py"
+          symbols: ["PHModifier"]
+          explanation: "pH modifier reads Environment.ph and applies Gaussian pH activity."
+        - path: "src/fungal_model/modifiers/oxygen.py"
+          symbols: ["OxygenModifier"]
+          explanation: "Oxygen modifier applies Monod-style oxygen limitation and documents no redox balance or gas transfer."
+        - path: "src/fungal_model/api/result_tables.py"
+          symbols: ["_environment_context", "_environment_summary_rows"]
+          explanation: "Metadata-only environment grid outputs mark ranking and response plotting as not allowed."
+      tests:
+        - path: "tests/test_environment_modifiers.py"
+          test_names: ["test_temperature_modifier_reads_environment_and_warns_outside_range", "test_ph_modifier_reads_environment", "test_water_activity_modifier_blocks_below_threshold", "test_oxygen_modifier_decreases_rate_when_oxygen_is_low"]
+          explanation: "Tests verify modifier behavior and validity warnings."
+        - path: "tests/test_virtual_experiment_environment_grid.py"
+          test_names: ["test_virtual_experiment_expands_environment_grid_and_writes_environment_tables"]
+          explanation: "Tests verify metadata-only environment grids cannot be ranked or plotted as response models."
+      documentation:
+        - path: "README.md"
+          explanation: "README documents environment modifiers and the limitation that environment grids do not imply active response laws."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_environment_modifiers.py tests/test_virtual_experiment_environment_grid.py"
+    remaining_risk: "Metadata grids and modifier utilities are not a validated temperature/pH/oxygen response model for every biological case."
+    recommended_next_action: "Keep environment-response scientific limitations visible; do not add new response functions in this task."
+
+  - id: "P1-AUDIT-SUBSTRATE-001"
+    original_severity: "high"
+    current_severity: "medium"
+    current_status: "stale"
+    title: "Only PET has implemented substrate support"
+    original_claim: "The audit required checking substrate coverage beyond PET and whether only PET has an implemented path."
+    current_assessment: "The technical 'only PET' claim is stale: universal substrate classes, generic substrate loaders, non-PET dummy surface configs, BIO-001 cellulose surface records, and BIO-002 enzyme-chain records/tests exist. Broad scientific validation across substrates remains limited."
+    technical_status: "Non-PET technical paths exist and are tested."
+    scientific_status: "Most non-PET substrates are metadata/framework support or exploratory; they are not empirically validated degradation models."
+    evidence:
+      code:
+        - path: "src/fungal_model/substrates/cellulose.py"
+          symbols: ["CelluloseSubstrate"]
+          explanation: "Cellulose substrate metadata class exists."
+        - path: "src/fungal_model/substrates/lignin.py"
+          symbols: ["LigninSubstrate"]
+          explanation: "Lignin substrate metadata class exists with explicit limitations."
+        - path: "src/fungal_model/io/registries.py"
+          symbols: ["default_substrate_loader_registry"]
+          explanation: "Default registry supports generic benchmark substrates; PET loading requires explicit plugin registry."
+      tests:
+        - path: "tests/test_universal_substrates.py"
+          test_names: ["test_universal_substrate_classes_report_metadata"]
+          explanation: "Tests cover non-PET substrate metadata classes."
+        - path: "tests/test_guardrails_config_generality.py"
+          test_names: ["test_generic_configured_model_runs_non_pet_and_pet_plugin_paths"]
+          explanation: "Tests require generic configured-model paths to work for non-PET and explicit PET plugin cases."
+        - path: "tests/test_bio001_surface_cellulose_virtual_experiment.py"
+          test_names: ["test_bio001_virtual_experiment_writes_surface_degradation_tables"]
+          explanation: "BIO-001 tests exercise an exploratory cellulose-like surface case."
+      documentation:
+        - path: "README.md"
+          explanation: "README lists PET, cellulose, lignin, starch, and chitin substrate classes and their limits."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_universal_substrates.py tests/test_guardrails_config_generality.py tests/test_bio001_surface_cellulose_virtual_experiment.py"
+    remaining_risk: "Substrate breadth is not publication-grade validation breadth."
+    recommended_next_action: "Keep substrate claims maturity-labelled and provenance-backed."
+
+  - id: "P1-AUDIT-BIO001-001"
+    original_severity: "high"
+    current_severity: "medium"
+    current_status: "partially_resolved"
+    title: "BIO-001 scope and output semantics"
+    original_claim: "BIO-001 had high-risk output semantics: product concentration wording with mass units and an accessibility output that could read as mechanistic."
+    current_assessment: "The product-state wording was fixed to soluble_product_amount and accessibility is now explicitly accessible_site_fraction_remaining_proxy with derived_proxy status. BIO-001 remains exploratory and not empirically validated."
+    technical_status: "High-risk naming issue resolved; proxy labelling implemented; no true dynamic accessibility mechanism implemented."
+    scientific_status: "BIO-001 is a controlled exploratory enzyme-mediated surface-degradation pilot, not a validated cellulose model or whole-fungus model."
+    evidence:
+      code:
+        - path: "src/fungal_model/api/result_tables.py"
+          symbols: ["_sample_time_series_rows", "_final_metric_rows"]
+          explanation: "BIO-001 output uses soluble_product_amount and accessible_site_fraction_remaining_proxy."
+        - path: "data_registry/case_templates/case_templates.yml"
+          symbols: ["bio001_cellulose_surface_template"]
+          explanation: "BIO-001 state roles are template data, including product amount and accessibility proxy roles."
+      tests:
+        - path: "tests/test_bio001_surface_cellulose_virtual_experiment.py"
+          test_names: ["test_bio001_virtual_experiment_writes_surface_degradation_tables"]
+          explanation: "Tests assert soluble_product_concentration is absent, soluble_product_amount is present, and accessibility rows have derived_proxy status."
+        - path: "tests/test_registry_case_templates.py"
+          test_names: ["test_bio001_template_records_surface_state_roles"]
+          explanation: "Tests assert template state roles include product amount and accessibility proxy names."
+      documentation:
+        - path: "progress.md"
+          explanation: "Progress records the BIO-001 output-semantics cleanup and limitations."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_bio001_surface_cellulose_virtual_experiment.py tests/test_registry_case_templates.py"
+    remaining_risk: "Accessibility remains a derived proxy and BIO-001 has no empirical cellulose validation data."
+    recommended_next_action: "Treat BIO-001 as exploratory until validation data and any true accessibility mechanism are added under a separate task."
+
+  - id: "P1-AUDIT-BIO002-001"
+    original_severity: "high"
+    current_severity: "medium"
+    current_status: "partially_resolved"
+    title: "BIO-002 scope and genericity"
+    original_claim: "BIO-002 needed review to ensure enzyme-chain logic was not hardcoded to cellulose/cellobiose/glucose and did not overclaim biology."
+    current_assessment: "The two-step extracellular enzyme-chain assembler is data/template-driven and has an unrelated polymer_X to oligomer_Y to monomer_Z genericity test. It remains a scoped two-step chain, not arbitrary pathway biology."
+    technical_status: "Generic two-step chain assembly is implemented and tested; arbitrary branching and arbitrary-length chains are not implemented."
+    scientific_status: "BIO-002 remains exploratory/proposal-backed and does not validate a real organismal degradation pathway."
+    evidence:
+      code:
+        - path: "src/fungal_model/screening/enzyme_chain.py"
+          symbols: ["build_extracellular_enzyme_chain_config", "write_enzyme_chain_standard_tables"]
+          explanation: "The assembler reads chain state roles, product maps, outputs, limitations, and suggested experiments from template data."
+        - path: "data_registry/case_templates/case_templates.yml"
+          symbols: ["bio002_extracellular_enzyme_chain_template"]
+          explanation: "BIO-002 chain metadata lives in registry template data."
+      tests:
+        - path: "tests/test_bio002_generic_chain_assembly.py"
+          test_names: ["test_second_unrelated_chain_assembles_runs_and_writes_tables", "test_generic_implementation_has_no_demo_biological_name_guardrail"]
+          explanation: "Tests prove a materially different non-specific chain can run and that implementation source avoids demo biological names."
+        - path: "tests/test_bio002_extracellular_enzyme_chain.py"
+          test_names: ["test_bio002_chain_writes_standard_tables"]
+          explanation: "Tests cover the BIO-002 demonstration path and standard-table outputs."
+      documentation:
+        - path: "foundation_progress/BIO_002_ENZYME_CHAIN_DEGRADATION.md"
+          explanation: "BIO-002 scope, generic contract, and limitations are documented."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_bio002_generic_chain_assembly.py tests/test_bio002_extracellular_enzyme_chain.py"
+    remaining_risk: "Arbitrary-length or branching process-chain biology remains out of scope."
+    recommended_next_action: "Keep BIO-002 scoped; address arbitrary chain topology only in a future dedicated design task."
+
+  - id: "P1-AUDIT-CHAIN-001"
+    original_severity: "high"
+    current_severity: "high"
+    current_status: "confirmed"
+    title: "Arbitrary-length and branching process chains are not implemented"
+    original_claim: "The audit required checking support for arbitrary-length and branching process chains."
+    current_assessment: "Current BIO-002 code supports a reusable two-step chain pattern, but there is no evidence of arbitrary-length or branching pathway assembly."
+    technical_status: "Confirmed missing capability beyond the scoped two-step chain."
+    scientific_status: "Complex extracellular pathway claims should not be made without explicit topology support, parameters, tests, and limitations."
+    evidence:
+      code:
+        - path: "src/fungal_model/screening/enzyme_chain.py"
+          symbols: ["ChainTemplateSpec", "build_extracellular_enzyme_chain_config"]
+          explanation: "The current assembler expects a defined chain template with surface and homogeneous steps, not an arbitrary graph solver."
+        - path: "data_registry/case_templates/case_templates.yml"
+          symbols: ["process_sequence"]
+          explanation: "Existing templates encode explicit process sequence data."
+      tests:
+        - path: "tests/test_bio002_generic_chain_assembly.py"
+          test_names: ["test_second_unrelated_chain_assembles_runs_and_writes_tables"]
+          explanation: "The genericity test covers a second two-step chain, not arbitrary-length or branching chains."
+      documentation:
+        - path: "README.md"
+          explanation: "README describes BIO-002 as an extracellular enzyme-chain assembler, not a general pathway graph engine."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_bio002_generic_chain_assembly.py"
+    remaining_risk: "Future multi-step biology could outgrow the current two-step assumptions."
+    recommended_next_action: "Track as a confirmed future architecture/science blocker; do not implement in P1.2."
+
+  - id: "V001-PC001"
+    original_severity: "critical"
+    current_severity: "high"
+    current_status: "partially_resolved"
+    title: "Add a versioned virtual-experiment output schema and data dictionary"
+    original_claim: "Each standard output table needed stable column definitions, units, maturity semantics, join keys, and not-applicable behavior."
+    current_assessment: "A versioned schema/data dictionary is implemented and written, and standard tables include many maturity/provenance fields. Some central-goal outputs, especially trajectory_quantiles.csv, remain absent, and output semantics still need scientific review."
+    technical_status: "Partially implemented with versioned schema and data dictionary."
+    scientific_status: "Schema presence improves inspectability but does not validate outputs empirically."
+    evidence:
+      code:
+        - path: "src/fungal_model/api/output_schema.py"
+          symbols: ["OUTPUT_SCHEMA_VERSION", "OUTPUT_TABLE_SCHEMAS", "output_schema_document", "output_data_dictionary_rows"]
+          explanation: "Defines versioned schemas and data-dictionary rows for standard virtual-experiment tables."
+        - path: "src/fungal_model/api/result_tables.py"
+          symbols: ["write_standard_tables"]
+          explanation: "Writes virtual_experiment_output_schema.json and virtual_experiment_output_data_dictionary.csv."
+      tests:
+        - path: "tests/test_virtual_experiment_api.py"
+          test_names: ["test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook"]
+          explanation: "Tests assert schema and data dictionary files exist and include key fields."
+        - path: "tests/test_api003_researcher_virtual_experiment.py"
+          test_names: ["test_simulate_exploratory_works_for_reaction_618"]
+          explanation: "Tests assert output_schema_version appears in standard table rows."
+      documentation:
+        - path: "progress.md"
+          explanation: "CLEANUP-001/SCHEMA-001 progress records schema files and output semantics hardening."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_virtual_experiment_api.py tests/test_api003_researcher_virtual_experiment.py"
+    remaining_risk: "trajectory_quantiles.csv remains absent and schema completeness should continue in later output-schema work."
+    recommended_next_action: "Finish remaining standard table coverage in a later schema/output task, not in P1.2."
+
+  - id: "V001-PC002"
+    original_severity: "high"
+    current_severity: "none"
+    current_status: "resolved"
+    title: "Add public VirtualExperiment.simulate(mode=\"scientific\") for exact modelable cases"
+    original_claim: "The public API simulated only exploratory ensembles while deterministic scientific assembly existed below the public API."
+    current_assessment: "VirtualExperimentMode now includes scientific, simulate(mode='scientific') is implemented, exact fixtures can run, and underparameterized/exploratory/toy cases are rejected."
+    technical_status: "Implemented and tested."
+    scientific_status: "Scientific mode means exact non-exploratory current registry values and implemented mechanisms; it explicitly does not mean experimentally validated."
+    evidence:
+      code:
+        - path: "src/fungal_model/api/virtual_experiment.py"
+          symbols: ["VirtualExperimentMode", "VirtualExperiment.simulate", "_run_label"]
+          explanation: "The public API accepts exploratory and scientific modes and labels scientific output as scientific_exact_unvalidated."
+        - path: "src/fungal_model/screening/ensemble.py"
+          symbols: ["simulate_screen", "_run_scientific_case_sample"]
+          explanation: "Scientific screen mode runs a single exact sample and rejects inappropriate parameter records."
+      tests:
+        - path: "tests/test_api003_researcher_virtual_experiment.py"
+          test_names: ["test_simulate_scientific_succeeds_for_exact_local_fixture", "test_scientific_mode_rejects_exploratory_priors", "test_scientific_mode_rejects_toy_scientific_inputs"]
+          explanation: "Tests prove success for an exact local fixture and rejections for unknown, exploratory, and toy inputs."
+        - path: "tests/test_virtual_experiment_api.py"
+          test_names: ["test_virtual_experiment_scientific_simulation_rejects_underparameterized_reaction_618"]
+          explanation: "Tests prove current Reaction 618 remains underparameterized for scientific simulation."
+      documentation:
+        - path: "README.md"
+          explanation: "README documents the virtual-experiment API and scientific limitations."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_api003_researcher_virtual_experiment.py tests/test_virtual_experiment_api.py"
+    remaining_risk: "Scientific mode remains exact/unvalidated and narrow; it is not publication validation."
+    recommended_next_action: "Keep exact/unvalidated labelling in outputs."
+
+  - id: "V001-PC003"
+    original_severity: "critical"
+    current_severity: "none"
+    current_status: "resolved"
+    title: "Rename or rederive BIO-001 soluble_product_concentration"
+    original_claim: "BIO-001 used a concentration word for a mass-equivalent product state with kilogram units."
+    current_assessment: "BIO-001 output now uses soluble_product_amount and final_product_amount; tests assert soluble_product_concentration is absent."
+    technical_status: "Resolved."
+    scientific_status: "The renaming prevents a key units/observable overclaim but does not validate BIO-001 against cellulose data."
+    evidence:
+      code:
+        - path: "src/fungal_model/api/result_tables.py"
+          symbols: ["_sample_time_series_rows", "_final_metric_rows"]
+          explanation: "Surface output rows use amount wording for product states and metrics."
+        - path: "data_registry/case_templates/case_templates.yml"
+          symbols: ["soluble_product_amount"]
+          explanation: "BIO-001 template state roles use soluble_product_amount."
+      tests:
+        - path: "tests/test_bio001_surface_cellulose_virtual_experiment.py"
+          test_names: ["test_bio001_virtual_experiment_writes_surface_degradation_tables"]
+          explanation: "Tests assert soluble_product_amount is present and soluble_product_concentration is absent from BIO-001 outputs."
+      documentation:
+        - path: "progress.md"
+          explanation: "Progress records the rename from concentration wording to amount wording."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_bio001_surface_cellulose_virtual_experiment.py"
+    remaining_risk: "BIO-001 remains exploratory and unvalidated."
+    recommended_next_action: "No P1.2 code action; preserve the guardrail."
+
+  - id: "V001-PC004"
+    original_severity: "high"
+    current_severity: "medium"
+    current_status: "partially_resolved"
+    title: "Make accessible-site output explicitly proxy-valued or implement a true state"
+    original_claim: "accessible_site_fraction_remaining sounded mechanistic but was derived from remaining substrate fraction."
+    current_assessment: "The output is now named accessible_site_fraction_remaining_proxy and marked as derived_proxy, but no true dynamic accessibility state or morphology model has been added."
+    technical_status: "Proxy labelling implemented; true accessibility mechanism absent."
+    scientific_status: "Accessibility claims must remain proxy-only."
+    evidence:
+      code:
+        - path: "src/fungal_model/api/result_tables.py"
+          symbols: ["_sample_time_series_rows", "_final_metric_rows"]
+          explanation: "The table writer emits accessible_site_fraction_remaining_proxy and derived_proxy status."
+        - path: "src/fungal_model/processes/surface.py"
+          symbols: ["AccessibleSurfaceAreaModel", "SurfaceCatalysisProcess"]
+          explanation: "The surface process uses accessible surface area but does not evolve morphology or accessibility state."
+      tests:
+        - path: "tests/test_bio001_surface_cellulose_virtual_experiment.py"
+          test_names: ["test_bio001_virtual_experiment_writes_surface_degradation_tables"]
+          explanation: "Tests assert proxy state/metric names and derived_proxy status."
+      documentation:
+        - path: "README.md"
+          explanation: "README states PET surface hydrolysis uses constant accessible surface area and documents model limits."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_bio001_surface_cellulose_virtual_experiment.py"
+    remaining_risk: "A true accessibility mechanism remains future work and must not be implied."
+    recommended_next_action: "Keep proxy wording until a sourced mechanism is proposed, implemented, and tested."
+
+  - id: "V001-PC005"
+    original_severity: "high"
+    current_severity: "none"
+    current_status: "resolved"
+    title: "Add first-class missing_parameters.csv and suggested_experiments.csv"
+    original_claim: "Missing inputs and suggested experiments were only embedded rather than first-class researcher outputs."
+    current_assessment: "The standard virtual-experiment output now writes missing_parameters.csv and suggested_experiments.csv, exposes accessors, and tests table presence."
+    technical_status: "Implemented and tested."
+    scientific_status: "The tables support honest experimental planning but do not validate model predictions."
+    evidence:
+      code:
+        - path: "src/fungal_model/api/result_tables.py"
+          symbols: ["write_standard_tables", "_missing_parameter_rows", "_suggested_experiment_rows"]
+          explanation: "The standard table writer includes first-class missing and suggested-experiment tables."
+        - path: "src/fungal_model/api/virtual_experiment.py"
+          symbols: ["DegradationScreenResult.missing_parameters", "DegradationScreenResult.suggested_experiments"]
+          explanation: "Result accessors load the new standard tables."
+      tests:
+        - path: "tests/test_virtual_experiment_api.py"
+          test_names: ["test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook"]
+          explanation: "Tests assert both files exist and are schema-documented."
+        - path: "tests/test_api003_researcher_virtual_experiment.py"
+          test_names: ["test_result_table_accessors_return_standard_tables"]
+          explanation: "Tests assert public result accessors for missing and suggested-experiment tables."
+      documentation:
+        - path: "README.md"
+          explanation: "README lists missing-parameter and suggested-experiment tables in standard output."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_virtual_experiment_api.py tests/test_api003_researcher_virtual_experiment.py"
+    remaining_risk: "Table content quality depends on modelability suggestions and may need future enrichment."
+    recommended_next_action: "No P1.2 code action."
+
+  - id: "V001-PC006"
+    original_severity: "high"
+    current_severity: "informational"
+    current_status: "resolved"
+    title: "Gate metadata-only environment comparisons"
+    original_claim: "ENV-001 metadata-only environment cases could be ranked or plotted as if they were active pH/temperature response models."
+    current_assessment: "Metadata-only environment summaries now mark comparison, ranking, and response plotting as false and leave aggregate response metrics blank/not applicable."
+    technical_status: "Implemented and tested for EnvironmentGrid outputs."
+    scientific_status: "There is still no claim of validated environmental response unless a future active response model or condition-specific parameters are present."
+    evidence:
+      code:
+        - path: "src/fungal_model/api/result_tables.py"
+          symbols: ["_environment_context", "_environment_summary_rows"]
+          explanation: "Metadata-only environment contexts disable comparison, ranking, and response plotting."
+        - path: "src/fungal_model/api/quicklook.py"
+          symbols: ["write_quicklook_plots"]
+          explanation: "Quicklook plots remain simple table-derived plots and do not add environment heatmaps for metadata-only grids."
+      tests:
+        - path: "tests/test_virtual_experiment_environment_grid.py"
+          test_names: ["test_virtual_experiment_expands_environment_grid_and_writes_environment_tables"]
+          explanation: "Tests assert metadata-only grids cannot be ranked or response-plotted and metrics are not applicable."
+      documentation:
+        - path: "progress.md"
+          explanation: "CLEANUP-001 records environment-grid guardrails as explicitly non-rankable and non-plottable unless response support exists."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_virtual_experiment_environment_grid.py"
+    remaining_risk: "Active environmental response models remain limited and unvalidated."
+    recommended_next_action: "Keep metadata-only guardrails; add response models only through a future sourced, tested mechanism task."
+
+  - id: "V001-PC011"
+    original_severity: "high"
+    current_severity: "medium"
+    current_status: "partially_resolved"
+    title: "Add explicit biology-readiness gate"
+    original_claim: "A test or checklist should prevent new biology milestones unless outputs, parameters, provenance, limitations, and validation status are defined."
+    current_assessment: "A BIO mechanism proposal template, validator, CLI, and tests exist, and BIO-002 proposal readiness is tested. Repository-wide merge enforcement for every future biology addition remains a process/CI concern."
+    technical_status: "Machine-checkable readiness scaffold implemented; full governance enforcement remains partial."
+    scientific_status: "Readiness checks reduce unsupported biology risk but do not validate mechanisms."
+    evidence:
+      code:
+        - path: "src/fungal_model/validation/bio_readiness.py"
+          symbols: ["validate_bio_mechanism_proposal", "enforce_bio_mechanism_proposal", "REQUIRED_BIO_MECHANISM_FIELDS"]
+          explanation: "BIO readiness validation enforces required proposal fields."
+        - path: "scripts/validate_bio_readiness_lite.py"
+          symbols: ["main"]
+          explanation: "CLI validates BIO proposal files."
+      tests:
+        - path: "tests/test_bio_readiness_lite.py"
+          test_names: ["test_bio_mechanism_proposal_template_is_machine_checkable", "test_incomplete_bio_proposal_is_rejected", "test_real_bio002_extracellular_enzyme_chain_proposal_passes_readiness"]
+          explanation: "Tests validate the template, rejection behavior, CLI, and real BIO-002 proposal."
+      documentation:
+        - path: "AGENTS.md"
+          explanation: "AGENTS defines the current biology rule: only implemented, provenance-backed, maturity-labelled, tested, limitation-honest biology may be added."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_bio_readiness_lite.py"
+    remaining_risk: "The readiness validator must be used consistently for future BIO work."
+    recommended_next_action: "Keep as partially resolved until future workflow/CI explicitly requires proposals for new biology milestones."
+
+  - id: "V001-PC012"
+    original_severity: "high"
+    current_severity: "informational"
+    current_status: "resolved"
+    title: "Add parameter-range interpretation fields"
+    original_claim: "ValueSpec.range did not encode whether ranges were cross-entry spreads, condition-specific ranges, posterior uncertainty, or user priors."
+    current_assessment: "ParameterRecord now exposes range_scope, range_interpretation, and allowed_use, and sampled/provenance outputs carry these fields."
+    technical_status: "Implemented and tested."
+    scientific_status: "Fields reduce misuse risk but do not make broad ranges calibrated uncertainty."
+    evidence:
+      code:
+        - path: "src/fungal_model/registry/records.py"
+          symbols: ["ParameterRecord"]
+          explanation: "Parameter records include range_scope, range_interpretation, and allowed_use fields."
+        - path: "src/fungal_model/api/result_tables.py"
+          symbols: ["_sampled_parameter_rows", "_provenance_rows"]
+          explanation: "Sampled parameter and provenance rows include range-use semantics."
+      tests:
+        - path: "tests/test_registry_loading.py"
+          test_names: ["test_parameter_records_expose_range_use_semantics"]
+          explanation: "Tests assert literature ranges, exploratory priors, and selected exact values expose expected range/use semantics."
+        - path: "tests/test_virtual_experiment_api.py"
+          test_names: ["test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook"]
+          explanation: "Tests assert sampled parameter rows include range_scope, range_interpretation, and allowed_use."
+      documentation:
+        - path: "progress.md"
+          explanation: "CLEANUP-001 records addition of range_scope, range_interpretation, and allowed_use semantics."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_registry_loading.py tests/test_virtual_experiment_api.py"
+    remaining_risk: "Downstream users can still misuse outputs if they ignore allowed_use and limitations."
+    recommended_next_action: "Keep allowed-use fields prominent in researcher-facing exports."
+
+  - id: "V001-R001"
+    original_severity: "high"
+    current_severity: "medium"
+    current_status: "partially_resolved"
+    title: "Exploratory priors may be mistaken for curated values"
+    original_claim: "Exploratory simulations produce full output tables that downstream users might cite without reading provenance."
+    current_assessment: "Outputs now carry source_maturity, parameter_source_class, exploratory_prior, range_interpretation, and allowed_use. The misuse risk remains if outputs are separated from limitations."
+    technical_status: "Labelling and provenance propagation are implemented; publication-export consent is not implemented."
+    scientific_status: "Exploratory priors remain assumptions, not empirical values."
+    evidence:
+      code:
+        - path: "src/fungal_model/api/result_tables.py"
+          symbols: ["_parameter_source_class", "_is_exploratory_record"]
+          explanation: "Table rows label user-supplied exploratory priors and allowed uses."
+        - path: "src/fungal_model/screening/modelability.py"
+          symbols: ["_classify_parameter", "_is_exploratory_parameter_record"]
+          explanation: "Exploratory parameter records are classified as uncertain for exploratory mode and blocked for scientific mode."
+      tests:
+        - path: "tests/test_virtual_experiment_api.py"
+          test_names: ["test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook"]
+          explanation: "Tests assert exploratory enzyme priors are labelled in sampled parameter outputs."
+        - path: "tests/test_bio001_surface_cellulose_virtual_experiment.py"
+          test_names: ["test_bio001_virtual_experiment_writes_surface_degradation_tables"]
+          explanation: "Tests assert all BIO-001 sampled parameters are labelled exploratory user-supplied priors."
+      documentation:
+        - path: "README.md"
+          explanation: "README states exploratory priors remain assumptions rather than literature-curated values."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_virtual_experiment_api.py tests/test_bio001_surface_cellulose_virtual_experiment.py"
+    remaining_risk: "No publication-export blocker currently forces users to acknowledge exploratory priors."
+    recommended_next_action: "Consider publication/export maturity gates in a later output-governance task."
+
+  - id: "V001-R013"
+    original_severity: "high"
+    current_severity: "critical"
+    current_status: "confirmed"
+    title: "BIO-001 has no empirical validation data"
+    original_claim: "BIO-001 uses exploratory priors and is not validated against cellulose hydrolysis data."
+    current_assessment: "This remains true. BIO-001 tests verify software behavior and output semantics, not empirical cellulose degradation."
+    technical_status: "BIO-001 executes and is guarded as exploratory."
+    scientific_status: "Confirmed scientific blocker for empirical cellulose degradation claims."
+    evidence:
+      code:
+        - path: "data_registry/parameters/parameter_records.yml"
+          symbols: ["bio001_*"]
+          explanation: "BIO-001 parameter records are maturity exploratory_prior and allowed for exploratory simulation only."
+        - path: "src/fungal_model/screening/case_builder.py"
+          symbols: ["_bio001_limitations"]
+          explanation: "BIO-001 limitations state it does not model whole-fungus growth, secretion, uptake, biomass, oxygen limitation, or full lignocellulose structure."
+      tests:
+        - path: "tests/test_bio001_surface_cellulose_virtual_experiment.py"
+          test_names: ["test_bio001_modelability_scientific_vs_exploratory_modes", "test_bio001_virtual_experiment_writes_surface_degradation_tables"]
+          explanation: "Tests assert scientific mode is underparameterized and exploratory mode uses exploratory-prior parameter records."
+      documentation:
+        - path: "foundation_progress/BIO_001_CELLULOSE_SURFACE_DEGRADATION.md"
+          explanation: "BIO-001 documentation states scope, parameters, and limitations."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_bio001_surface_cellulose_virtual_experiment.py"
+    remaining_risk: "Users may overinterpret exploratory cellulose-like outputs as empirical validation."
+    recommended_next_action: "Add validation data only through a future candidate-review, curated-dataset, and comparison workflow."
+
+  - id: "P1-AUDIT-CALIBRATION-001"
+    original_severity: "high"
+    current_severity: "high"
+    current_status: "partially_resolved"
+    title: "Calibration, validation, global sensitivity, and Bayesian calibration"
+    original_claim: "Calibration/validation, global sensitivity, and Bayesian calibration needed current-state review."
+    current_assessment: "Least-squares calibration exists for synthetic configured datasets with train/validation residuals; Monte Carlo uncertainty and local sensitivity exist. Bayesian calibration is an empty placeholder and Sobol/global sensitivity is not implemented. Empirical validation against external datasets remains absent."
+    technical_status: "Synthetic least-squares calibration, Monte Carlo, and local sensitivity are implemented; Bayesian/global sensitivity remain missing."
+    scientific_status: "Synthetic calibration validates machinery only, not biological predictions."
+    evidence:
+      code:
+        - path: "src/fungal_model/calibration/configured.py"
+          symbols: ["calibrate_configured_model", "CalibrationResult"]
+          explanation: "Configured calibration is explicitly synthetic-only and writes train/validation residual outputs."
+        - path: "src/fungal_model/calibration/bayesian.py"
+          symbols: ["__all__"]
+          explanation: "Bayesian calibration is an empty placeholder module."
+        - path: "src/fungal_model/uncertainty/sensitivity.py"
+          symbols: ["local_sensitivity"]
+          explanation: "Finite-difference local sensitivity is implemented."
+      tests:
+        - path: "tests/test_configured_synthetic_calibration.py"
+          test_names: ["test_configured_synthetic_calibration_recovers_first_order_rate", "test_configured_calibration_rejects_non_synthetic_dataset"]
+          explanation: "Tests verify synthetic-only calibration behavior and non-synthetic rejection."
+        - path: "tests/test_uncertainty_sensitivity.py"
+          test_names: ["test_monte_carlo_uniform_uncertainty_is_reproducible", "test_local_sensitivity_reports_normalized_ranking"]
+          explanation: "Tests cover Monte Carlo uncertainty and local sensitivity utilities."
+      documentation:
+        - path: "README.md"
+          explanation: "README states Bayesian calibration and global sensitivity are not implemented."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_configured_synthetic_calibration.py tests/test_uncertainty_sensitivity.py"
+    remaining_risk: "No Bayesian calibration, Sobol/global sensitivity, or empirical validation workflow is available."
+    recommended_next_action: "Keep this as a confirmed high scientific/analysis limitation until future validation-data and inference milestones."
+
+  - id: "P1-AUDIT-PROVENANCE-001"
+    original_severity: "high"
+    current_severity: "medium"
+    current_status: "partially_resolved"
+    title: "Provenance, maturity handling, and exploratory-prior consent"
+    original_claim: "Provenance and maturity handling needed review, including explicit exploratory-prior consent and labelling."
+    current_assessment: "Maturity policy, modelability classification, scientific/exploratory mode separation, range-use fields, and output labelling exist. There is no separate interactive consent or publication-export gate."
+    technical_status: "Strong provenance and maturity guardrails implemented; publication consent workflow absent."
+    scientific_status: "The system labels assumptions but cannot prevent misuse outside the generated outputs."
+    evidence:
+      code:
+        - path: "src/fungal_model/validation/maturity.py"
+          symbols: ["validate_run_maturity", "enforce_run_maturity"]
+          explanation: "Central maturity policy rejects toy/framework data in scientific or strict modes and checks required parameter metadata."
+        - path: "src/fungal_model/screening/modelability.py"
+          symbols: ["assess_modelability", "_scientific_parameter_blocker"]
+          explanation: "Modelability separates scientific exact requirements from exploratory uncertain records."
+        - path: "src/fungal_model/api/virtual_experiment.py"
+          symbols: ["VirtualExperiment.simulate"]
+          explanation: "Scientific mode blocks non-modelable and exploratory cases; exploratory mode is explicit."
+      tests:
+        - path: "tests/test_maturity_policy.py"
+          test_names: ["test_toy_config_fails_in_scientific_mode", "test_missing_validity_range_fails_in_scientific_mode", "test_strict_mode_rejects_missing_required_parameter_uncertainty_beyond_scientific"]
+          explanation: "Tests enforce maturity and provenance requirements."
+        - path: "tests/test_api003_researcher_virtual_experiment.py"
+          test_names: ["test_scientific_mode_rejects_exploratory_priors", "test_scientific_mode_rejects_toy_scientific_inputs"]
+          explanation: "Tests enforce public scientific-mode rejection of inappropriate records."
+      documentation:
+        - path: "AGENTS.md"
+          explanation: "AGENTS defines the biology rule and unknown/exploratory opt-in expectations."
+    verification:
+      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
+      verified_at: "2026-06-14T11:31:47Z"
+      commands_run:
+        - ".venv/bin/python -m pytest tests/test_maturity_policy.py tests/test_api003_researcher_virtual_experiment.py"
+    remaining_risk: "Users can still copy tables without limitations; no publication export consent gate exists."
+    recommended_next_action: "Consider explicit export/maturity acknowledgement only in a later API/output-governance task."

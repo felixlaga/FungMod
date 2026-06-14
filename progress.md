@@ -45,6 +45,27 @@ Completed in this pass:
 
 No scientific or numerical behavior changed. No biology was added.
 
+## Phase 1 Task 2 Audit Finding Reconciliation
+
+Date: 2026-06-14
+
+Status: `complete` for the scoped current-state finding catalogue.
+
+Completed in this pass:
+
+- Added `findings.yaml` as the machine-readable current finding-status
+  catalogue for critical/high audit claims.
+- Added `foundation_progress/validation/PHASE_1_CURRENT_FINDING_STATUS.md` as
+  the concise human-readable status matrix.
+- Classified stale and resolved technical audit claims separately from
+  confirmed scientific limitations.
+- Added `tests/test_findings_catalogue.py` to ensure the catalogue parses,
+  finding IDs remain unique, status/severity values are valid, required
+  evidence sections exist, and historical claims remain preserved.
+
+No production, scientific, numerical, or public API behavior changed. No audit
+finding resolutions were implemented in this task.
+
 ## CLEANUP-001 / SCHEMA-001 Researcher Output Semantics
 
 Date: 2026-06-07
