@@ -66,6 +66,34 @@ Completed in this pass:
 No production, scientific, numerical, or public API behavior changed. No audit
 finding resolutions were implemented in this task.
 
+## Phase 1 Task 3 Native Execution Path Verification
+
+Date: 2026-06-14
+
+Status: `complete` for the scoped native execution path verification.
+
+Completed in this pass:
+
+- Added `foundation_progress/validation/PHASE_1_NATIVE_EXECUTION_PATHS.md`
+  with the current execution-path matrix for configured workflows,
+  VirtualExperiment, plugin helpers, notebooks, calibration/uncertainty
+  wrappers, reaction-diffusion, and direct low-level solver APIs.
+- Strengthened `tests/test_guardrails_native_execution.py` so supported
+  configured well-mixed workflows fail if they instantiate the legacy
+  `SimulationEngine`, construct `Reaction` objects, or call concrete
+  `as_reaction()` adapters.
+- Added a configured validator trace proving validators loaded through
+  `ValidatorRegistry` execute after the native process solver returns a result.
+- Added a configured unsupported-geometry regression proving `film_1d`
+  configured geometry fails explicitly instead of silently changing solver
+  paths.
+- Recorded active process-to-Reaction compatibility adapters as `FD-006` in
+  `ARCHITECTURE_DEBT.md` for the P1.4 retirement/containment decision.
+
+No production, scientific, numerical, public API, or output semantics changed.
+The low-level `Reaction`, `SimulationEngine`, and `ReactionDiffusionEngine1D`
+APIs remain intentionally supported low-level surfaces.
+
 ## CLEANUP-001 / SCHEMA-001 Researcher Output Semantics
 
 Date: 2026-06-07

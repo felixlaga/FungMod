@@ -102,6 +102,32 @@ that plugin loading requires an explicit registry instead of a generic
 substrate-specific branch, and `tests/test_guardrails_public_api.py` keeps the
 public entry point non-placeholder.
 
+## FD-006 Process-to-Reaction compatibility adapters
+
+Status: active
+
+Reason: Several concrete `Process` classes still expose `as_reaction()`
+compatibility adapters that convert process-centered mechanisms into legacy
+`Reaction` objects. These adapters predate native `ProcessODESolver` execution
+and are still exercised by direct low-level process tests.
+
+Risk: Future high-level configured workflows could accidentally route native
+`Process` objects through `Reaction`/`SimulationEngine` if these adapters are
+treated as a main execution path instead of compatibility surface.
+
+Exit condition: P1.4 proves each adapter is either unused by supported public
+workflows and removes it, or explicitly isolates the adapter as legacy support
+for a documented low-level purpose.
+
+Removal milestone: Phase 1 Task 4, legacy adapter retirement.
+
+Tests protecting it: `tests/test_guardrails_native_execution.py` runs supported
+configured well-mixed configs with tripwires on `SimulationEngine`,
+`Reaction`, and every current concrete `as_reaction()` method. Direct
+low-level tests such as `tests/test_homogeneous_processes.py` and
+`tests/test_generic_surface_processes.py` still document the active adapter
+surface until P1.4 makes a final removal or containment decision.
+
 ## FD-005 Remaining Pyright optional-value baseline
 
 Status: active
