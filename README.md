@@ -1,14 +1,17 @@
 # FungMod
 
-Before changing the codebase, start with the active directive:
+Before changing the codebase, start with the root agent/developer contract and
+the active directive:
 
+- `AGENTS.md`
 - `foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md`
 - `foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md`
 
 Historical foundation-first plans are archived under `old_progress/`. They are
-useful context, but the active goal is now the virtual-experiment engine:
-simulate degradation dynamics over time without hiding assumptions,
-uncertainty, provenance, missing inputs, or unsupported biology.
+useful context only and are non-binding. The active goal is now the
+virtual-experiment engine: simulate degradation dynamics over time without
+hiding assumptions, uncertainty, provenance, missing inputs, or unsupported
+biology.
 
 FungMod is a scientific Python codebase for building a physically grounded
 fungal- and enzyme-mediated substrate-degradation virtual-experiment engine.
@@ -77,6 +80,11 @@ experiment layer has tests, provenance, and validation.
 ## Scientific Philosophy
 
 The model is designed to fail honestly. Physical quantities carry units. Parameters require provenance before a scientific simulation can run, unless a test explicitly sets `allow_unsourced_for_testing=True`. Missing values are represented as missing values rather than guessed numbers. Validation failures are returned as results, not hidden.
+
+Biology may be added only when the mechanism is explicitly implemented,
+provenance-backed, maturity-labelled, covered by tests, and honest about
+assumptions and limitations. Unsupported, invented, silently guessed, or falsely
+validated biology is forbidden.
 
 ## Install
 

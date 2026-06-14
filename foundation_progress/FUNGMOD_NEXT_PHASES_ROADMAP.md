@@ -18,6 +18,12 @@ FungMod should not become a pile of half-ingested datasets or half-implemented m
 
 The next phases should build the missing infrastructure needed for reliable biology.
 
+Status note: this roadmap contains phase gates that predate some current
+registry-backed BIO work. Before treating any phase as open or complete, verify
+against `progress.md`, code, and tests. Reconciling roadmap status is a Phase 1
+Task 2 responsibility; this document should not be used to override the current
+biology rule in `AGENTS.md`.
+
 ---
 
 # Current project status
@@ -77,24 +83,19 @@ The next phases bridge that gap.
 
 ---
 
-# Should FungMod start new biology now?
+# What rule governs biology work now?
 
 ## Short answer
 
-Not yet, except for tightly scoped biology that is required to test infrastructure.
+Biology may be added only when the mechanism is explicitly implemented,
+provenance-backed, maturity-labelled, covered by tests, and honest about
+assumptions and limitations. Unsupported, invented, silently guessed, or falsely
+validated biology is forbidden.
 
-Before adding more biology, FungMod should complete:
-
-```text
-SOURCE-001
-RESOLVE-001
-ASSEMBLY-001
-API-003
-CURATION-001
-BIO-READINESS
-```
-
-After those are done, FungMod can start new biology in a disciplined way.
+The roadmap phase gate below still needs reconciliation against current BIO-001
+and BIO-002 work in Phase 1 Task 2. Until that reconciliation is complete,
+verify the actual repository state from `progress.md`, code, and tests before
+deciding whether a specific biology task is unblocked.
 
 ## Why not immediately?
 
@@ -113,11 +114,12 @@ The current codebase can simulate registered cases, but arbitrary researcher-def
 - no-new-biology readiness gates.
 ```
 
-Adding biology before this risks creating hardcoded one-off cases.
+Adding unsupported biology before this risks creating hardcoded one-off cases.
 
-## When biology can start
+## When biology can proceed
 
-Biology can start after this roadmap reaches the biology-readiness gate:
+Biology can proceed only when the specific proposal satisfies the current
+biology rule and the applicable readiness gate:
 
 ```text
 A researcher can choose a known fungus/source ID or alias,
@@ -133,7 +135,7 @@ and FungMod can:
 6. state missing mechanisms or parameters honestly.
 ```
 
-Only then should new biology be added.
+Only then should the proposed biology be added or extended.
 
 ---
 
@@ -927,7 +929,7 @@ Complete when:
 
 ## Goal
 
-Before adding more biology, enforce a readiness gate.
+Before adding or extending biology, enforce a readiness gate.
 
 No new biological process should be added unless it has:
 
@@ -976,16 +978,22 @@ Complete when:
 - a new biology proposal cannot be merged without this checklist;
 - tests or CI check for required process metadata;
 - foundation_progress has a biology proposal template;
-- Codex is instructed not to add biology without passing the gate.
+- Codex is instructed to reject unsupported, invented, silently guessed, or
+  falsely validated biology.
 ```
 
 ---
 
-# Phase 8: BIO-002 — First New Biology After the Gate
+# Phase 8: BIO-002 — Biology Work Under The Gate
+
+Status note: this section predates the current BIO-002 records documented in
+`progress.md`. Phase 1 Task 2 must reconcile whether the prerequisites below are
+still roadmap gates, already satisfied, or superseded by current implementation
+evidence.
 
 ## When to start BIO-002
 
-Start BIO-002 only after:
+Start or extend BIO-002-class work only after:
 
 ```text
 SOURCE-001 complete
@@ -1217,11 +1225,11 @@ Use this exact order:
 10. BIO-003
 ```
 
-If time is limited, do the first four before any new biology.
+If time is limited, do the first four before expanding biology further.
 
 ---
 
-# Final answer to “Can we start biology after this?”
+# Final answer to "Can we start biology after this?"
 
 After SOURCE-001, RESOLVE-001, ASSEMBLY-001, API-003, CURATION-001, and BIO-READINESS:
 
@@ -1229,13 +1237,16 @@ After SOURCE-001, RESOLVE-001, ASSEMBLY-001, API-003, CURATION-001, and BIO-READ
 yes, carefully, if the biology proposal passes the BIO-READINESS gate.
 ```
 
-Before those:
+Before roadmap reconciliation:
 
 ```text
-not yet, except tiny biology only if needed to test the infrastructure.
+verify the specific task against progress.md, code, tests, and AGENTS.md.
 ```
 
-The project should not add new biological mechanisms until researchers can define existing registered cases cleanly and receive standard degradation outputs.
+The project should not add unsupported biological mechanisms. Any added or
+extended mechanism must be explicitly implemented, provenance-backed,
+maturity-labelled, covered by tests, and honest about assumptions and
+limitations.
 
 The next real biology should probably be:
 
@@ -1250,4 +1261,8 @@ not whole-fungus growth and not PET.
 
 # One-sentence directive
 
-Before adding any new biology, make sure FungMod can discover/source reaction data, resolve researcher names, assemble cases from registry/config schemas, run scientific and exploratory virtual experiments, and output degradation curves/tables without hardcoded case branches.
+Before adding or extending biology, make sure FungMod can discover/source
+reaction data, resolve researcher names, assemble cases from registry/config
+schemas, run scientific and exploratory virtual experiments, and output
+degradation curves/tables without hardcoded case branches, or document why the
+proposal is scoped narrowly enough to proceed under the current biology rule.

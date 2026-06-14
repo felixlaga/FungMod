@@ -6,6 +6,10 @@ This is the active progress ledger for the virtual-experiment directive in
 Historical foundation-first and long-term roadmap notes are archived under
 `old_progress/`; they are context, not the active starting point.
 
+Older dated entries in this ledger preserve the project state and wording from
+the time they were written. They do not override `AGENTS.md` or the current
+biology rule.
+
 Update this file whenever a feature, test, example, notebook, or architectural
 milestone changes. The goal is that a future reader can quickly answer:
 
@@ -21,6 +25,25 @@ Status key:
 - `partial`: useful infrastructure exists, but the roadmap stage is not fully complete.
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
+
+## Phase 1 Task 1 Instruction-Hierarchy Cleanup
+
+Date: 2026-06-14
+
+Status: `complete` for the scoped instruction/documentation guardrail cleanup.
+
+Completed in this pass:
+
+- Added root `AGENTS.md` as the binding Codex/contributor instruction
+  hierarchy.
+- Marked `old_progress/` as historical and non-binding while retaining the
+  archived restrictions as context.
+- Replaced active blanket biology-gate wording with the current rule: no
+  unsupported or invented biology, not no biology.
+- Added tests that protect the active instruction hierarchy without scanning
+  archived files as active instructions.
+
+No scientific or numerical behavior changed. No biology was added.
 
 ## CLEANUP-001 / SCHEMA-001 Researcher Output Semantics
 

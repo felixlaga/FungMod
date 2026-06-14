@@ -61,9 +61,14 @@ def test_foundation_complete_gate_exists_and_is_explicit() -> None:
     status = _foundation_status(gate)
 
     assert status in {"not complete", "complete"}
+    if "old_progress" in gate_path.parts:
+        archive_readme = gate_path.parent / "README.md"
+        archive_text = archive_readme.read_text(encoding="utf-8")
+        assert "historical" in archive_text.lower()
+        assert "non-binding" in archive_text.lower()
     assert "software foundation only" in gate
     assert "does not approve" in gate
-    assert "real fungal biology" in gate
+    assert "scientific mechanisms" in gate
 
 
 def test_complete_foundation_gate_requires_all_evidence() -> None:
