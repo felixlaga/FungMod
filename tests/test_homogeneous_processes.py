@@ -5,7 +5,6 @@ import pytest
 
 from fungal_model.core.errors import IncompatibleUnitsError
 from fungal_model.core.parameters import Parameter, ParameterSet
-from fungal_model.core.simulation import SimulationEngine
 from fungal_model.core.units import Q_, UnitError
 from fungal_model.core.validators import validate_mass_balance, validate_non_negative
 from fungal_model.processes import (
@@ -37,7 +36,7 @@ def parameter(
     )
 
 
-def test_first_order_process_runs_through_existing_reaction_engine() -> None:
+def test_first_order_process_runs_through_native_process_solver() -> None:
     process = FirstOrderDecayProcess(
         name="generic first-order A to B",
         substrate_state="A",
@@ -45,8 +44,9 @@ def test_first_order_process_runs_through_existing_reaction_engine() -> None:
         rate_constant_symbol="k",
         state_units="mole / liter",
     )
-    engine = SimulationEngine(
-        reactions=[process.as_reaction()],
+    model = ModelBuilder(
+        process_library=ProcessRegistry([process]),
+        requested_processes=("first_order_decay",),
         parameters=ParameterSet(
             [
                 parameter(
@@ -57,20 +57,22 @@ def test_first_order_process_runs_through_existing_reaction_engine() -> None:
                 )
             ]
         ),
-        species_units={"A": "mole / liter", "B": "mole / liter"},
-        assumptions=list(process.assumptions),
-    )
+        validators=[
+            validate_non_negative,
+            lambda result: validate_mass_balance(result, conserved_weights={"A": 1.0, "B": 1.0}),
+        ],
+    ).assemble()
 
-    result = engine.simulate(
+    result = model.run(
         initial_state={"A": Q_(1.0, "mole / liter"), "B": Q_(0.0, "mole / liter")},
         t_span=(Q_(0.0, "second"), Q_(5.0, "second")),
         t_eval=Q_(np.linspace(0.0, 5.0, 11), "second"),
     )
 
-    assert result.success
-    assert result.species["A"].magnitude[-1] < result.species["A"].magnitude[0]
-    assert validate_non_negative(result).passed
-    assert validate_mass_balance(result, conserved_weights={"A": 1.0, "B": 1.0}).passed
+    assert result.state("A").magnitude[-1] < result.state("A").magnitude[0]
+    assert result.state("B").magnitude[-1] > result.state("B").magnitude[0]
+    assert result.rate("generic first-order A to B").magnitude[0] > 0.0
+    assert all(validation.passed for validation in result.validation_results)
 
 
 def test_mass_action_process_rate_and_unit_checks() -> None:

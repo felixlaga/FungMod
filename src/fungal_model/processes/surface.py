@@ -8,7 +8,6 @@ from typing import Any
 
 import numpy as np
 
-from fungal_model.chemistry.reactions import Reaction
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
@@ -437,18 +436,6 @@ class SurfaceCatalysisProcess(Process):
             species: self.product_release_map.signed_coefficient(species) * value
             for species in self.product_release_map.species
         }
-
-    def as_reaction(self) -> Reaction:
-        return Reaction(
-            name=self.name,
-            reactants=self.product_release_map.reactants,
-            products=self.product_release_map.products,
-            rate_law=self.rate,
-            rate_units=self.rate_units,
-            assumptions=list(self.assumptions),
-            source=self.source or "Generic surface catalysis process.",
-            notes=self.notes,
-        )
 
     def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()

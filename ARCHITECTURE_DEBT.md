@@ -104,29 +104,30 @@ public entry point non-placeholder.
 
 ## FD-006 Process-to-Reaction compatibility adapters
 
-Status: active
+Status: resolved in Phase 1 Task 4
 
-Reason: Several concrete `Process` classes still expose `as_reaction()`
-compatibility adapters that convert process-centered mechanisms into legacy
-`Reaction` objects. These adapters predate native `ProcessODESolver` execution
-and are still exercised by direct low-level process tests.
+Reason: Several concrete `Process` classes exposed `as_reaction()`
+compatibility adapters that converted process-centered mechanisms into legacy
+`Reaction` objects. These adapters predated native `ProcessODESolver` execution
+and were later exercised only by direct low-level process tests.
 
 Risk: Future high-level configured workflows could accidentally route native
 `Process` objects through `Reaction`/`SimulationEngine` if these adapters are
 treated as a main execution path instead of compatibility surface.
 
-Exit condition: P1.4 proves each adapter is either unused by supported public
-workflows and removes it, or explicitly isolates the adapter as legacy support
-for a documented low-level purpose.
+Exit condition: met. P1.4 proved the adapters had no supported production
+workflow call sites, removed the concrete `as_reaction()` methods and shared
+helper, and rewrote adapter-dependent tests to use native process execution or
+direct `Reaction` construction where the retained low-level engine itself is
+being tested.
 
-Removal milestone: Phase 1 Task 4, legacy adapter retirement.
+Removal milestone: resolved in Phase 1 Task 4.
 
 Tests protecting it: `tests/test_guardrails_native_execution.py` runs supported
-configured well-mixed configs with tripwires on `SimulationEngine`,
-`Reaction`, and every current concrete `as_reaction()` method. Direct
-low-level tests such as `tests/test_homogeneous_processes.py` and
-`tests/test_generic_surface_processes.py` still document the active adapter
-surface until P1.4 makes a final removal or containment decision.
+configured well-mixed configs with tripwires on `SimulationEngine` and
+`Reaction`, and asserts process modules no longer define `as_reaction()` or
+`_reaction_from_process`. Direct low-level reaction-engine tests remain only
+where `Reaction` objects are constructed explicitly.
 
 ## FD-005 Remaining Pyright optional-value baseline
 

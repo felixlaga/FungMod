@@ -16,6 +16,8 @@ from fungal_model.processes import (
     AccessibleSitePool,
     AccessibleSurfaceAreaModel,
     LangmuirAdsorptionModel,
+    ModelBuilder,
+    ProcessRegistry,
     ProductReleaseMap,
     SurfaceCatalysisModel,
     SurfaceCatalysisProcess,
@@ -116,18 +118,20 @@ def test_surface_catalysis_rate_limiting_cases() -> None:
 
 def test_dummy_non_pet_surface_process_runs_mass_conserving_ode() -> None:
     process = dummy_surface_process()
-    engine = SimulationEngine(
-        reactions=[process.as_reaction()],
+    model = ModelBuilder(
+        process_library=ProcessRegistry([process]),
+        requested_processes=("surface_catalysis",),
         parameters=surface_parameters(),
-        species_units={
-            "cellulose_mass": "kilogram",
-            "soluble_product": "kilogram",
-            "E": "mole / liter",
-        },
-        assumptions=list(process.assumptions),
-    )
+        validators=[
+            validate_non_negative,
+            lambda result: validate_mass_balance(
+                result,
+                conserved_weights={"cellulose_mass": 1.0, "soluble_product": 1.0},
+            ),
+        ],
+    ).assemble()
 
-    result = engine.simulate(
+    result = model.run(
         initial_state={
             "cellulose_mass": Q_(1.0e-4, "kilogram"),
             "soluble_product": Q_(0.0, "kilogram"),
@@ -137,14 +141,10 @@ def test_dummy_non_pet_surface_process_runs_mass_conserving_ode() -> None:
         t_eval=Q_(np.linspace(0.0, 10.0, 11), "second"),
     )
 
-    assert result.success
-    assert result.species["cellulose_mass"].magnitude[-1] < result.species["cellulose_mass"].magnitude[0]
-    assert result.species["soluble_product"].magnitude[-1] > result.species["soluble_product"].magnitude[0]
-    assert validate_non_negative(result).passed
-    assert validate_mass_balance(
-        result,
-        conserved_weights={"cellulose_mass": 1.0, "soluble_product": 1.0},
-    ).passed
+    assert result.state("cellulose_mass").magnitude[-1] < result.state("cellulose_mass").magnitude[0]
+    assert result.state("soluble_product").magnitude[-1] > result.state("soluble_product").magnitude[0]
+    assert result.rate("dummy non-PET surface cleavage").magnitude[0] > 0.0
+    assert all(validation.passed for validation in result.validation_results)
 
 
 def test_generic_surface_process_module_contains_no_pet_imports() -> None:

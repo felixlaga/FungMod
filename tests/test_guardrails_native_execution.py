@@ -167,16 +167,26 @@ def test_assembled_model_run_is_public_and_not_placeholder() -> None:
     assert "placeholder" not in source.lower()
 
 
+def test_process_to_reaction_adapters_are_retired() -> None:
+    retired_adapter_classes = (
+        FirstOrderDecayProcess,
+        HomogeneousMichaelisMentenProcess,
+        MassActionProcess,
+        SurfaceCatalysisProcess,
+    )
+
+    for process_class in retired_adapter_classes:
+        assert not hasattr(process_class, "as_reaction")
+
+    for path in sorted((ROOT / "src" / "fungal_model" / "processes").glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        assert "def as_reaction" not in source
+        assert "_reaction_from_process" not in source
+
+
 def _forbid_legacy_reaction_execution(monkeypatch: pytest.MonkeyPatch) -> None:
     def forbidden(*_args, **_kwargs) -> None:
         raise AssertionError("configured public workflows must not use the legacy Reaction engine")
 
     monkeypatch.setattr(SimulationEngine, "__post_init__", forbidden)
     monkeypatch.setattr(Reaction, "__post_init__", forbidden)
-    for process_class in (
-        FirstOrderDecayProcess,
-        HomogeneousMichaelisMentenProcess,
-        MassActionProcess,
-        SurfaceCatalysisProcess,
-    ):
-        monkeypatch.setattr(process_class, "as_reaction", forbidden)

@@ -28,10 +28,6 @@ metabolism, growth physiology, or substrate-specific scientific mechanisms.
 - `FD-005`: Pyright optional-member-access remains disabled. This is a
   package-quality ratchet, not a foundation-blocking architecture debt and not
   permission to add biology.
-- `FD-006`: Process-to-Reaction compatibility adapters remain for the P1.4
-  retirement/containment decision. This is adapter-transition tracking, not a
-  foundation-blocking architecture debt and not permission to route configured
-  public workflows through the legacy reaction engine.
 
 ## Required Evidence
 

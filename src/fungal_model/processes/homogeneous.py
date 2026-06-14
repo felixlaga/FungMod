@@ -8,7 +8,6 @@ from typing import cast
 
 import numpy as np
 
-from fungal_model.chemistry.reactions import Reaction
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity, assert_compatible, require_quantity
@@ -42,27 +41,6 @@ def homogeneous_process_assumption() -> Assumption:
 def _ensure_non_negative(quantity: Quantity, name: str) -> None:
     if np.any(np.asarray(quantity.magnitude, dtype=float) < 0):
         raise ValueError(f"{name} must be non-negative.")
-
-
-def _reaction_from_process(
-    process: Process,
-    *,
-    reactants: Mapping[str, float],
-    products: Mapping[str, float],
-    rate_units: str,
-    source: str,
-    notes: str = "",
-) -> Reaction:
-    return Reaction(
-        name=process.name,
-        reactants=reactants,
-        products=products,
-        rate_law=process.rate,
-        rate_units=rate_units,
-        assumptions=list(process.assumptions),
-        source=source,
-        notes=notes,
-    )
 
 
 @dataclass(frozen=True, init=False)
@@ -140,17 +118,6 @@ class FirstOrderDecayProcess(Process):
         if self.product_state is not None:
             contributions[self.product_state] = value
         return contributions
-
-    def as_reaction(self) -> Reaction:
-        products = {} if self.product_state is None else {self.product_state: 1.0}
-        return _reaction_from_process(
-            self,
-            reactants={self.substrate_state: 1.0},
-            products=products,
-            rate_units=self.rate_units,
-            source=self.source or "Generic first-order homogeneous process.",
-            notes=self.notes,
-        )
 
 
 @dataclass(frozen=True, init=False)
@@ -238,16 +205,6 @@ class MassActionProcess(Process):
             species: coefficient * value
             for species, coefficient in _signed_stoichiometry(self.reactants, self.products).items()
         }
-
-    def as_reaction(self) -> Reaction:
-        return _reaction_from_process(
-            self,
-            reactants=self.reactants,
-            products=self.products,
-            rate_units=self.rate_units,
-            source=self.source or "Generic mass-action homogeneous process.",
-            notes=self.notes,
-        )
 
 
 @dataclass(frozen=True, init=False)
@@ -376,16 +333,6 @@ class HomogeneousMichaelisMentenProcess(Process):
         for state_name, coefficient in self.product_coefficients.items():
             contributions[state_name] = coefficient * value
         return contributions
-
-    def as_reaction(self) -> Reaction:
-        return _reaction_from_process(
-            self,
-            reactants={self.substrate_state: 1.0},
-            products=self.product_coefficients,
-            rate_units=self.rate_units,
-            source=self.source or "Generic homogeneous Michaelis-Menten process.",
-            notes=self.notes,
-        )
 
 
 def _signed_stoichiometry(

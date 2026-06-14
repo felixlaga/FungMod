@@ -94,6 +94,32 @@ No production, scientific, numerical, public API, or output semantics changed.
 The low-level `Reaction`, `SimulationEngine`, and `ReactionDiffusionEngine1D`
 APIs remain intentionally supported low-level surfaces.
 
+## Phase 1 Task 4 Legacy Adapter Retirement
+
+Date: 2026-06-14
+
+Status: `complete` for the scoped process-to-`Reaction` adapter retirement.
+
+Completed in this pass:
+
+- Removed concrete `as_reaction()` compatibility adapters from homogeneous and
+  surface process classes.
+- Removed the shared `_reaction_from_process` helper that existed only to build
+  legacy `Reaction` objects from `Process` objects.
+- Rewrote adapter-dependent process tests so they verify process execution
+  through native `ModelBuilder` / `AssembledModel.run()` instead of the legacy
+  `SimulationEngine`.
+- Kept direct low-level `Reaction`, `SimulationEngine`, and
+  `ReactionDiffusionEngine1D` APIs intact where they are intentionally
+  supported and tested.
+- Added `foundation_progress/validation/PHASE_1_LEGACY_ADAPTER_RETIREMENT.md`
+  and marked `FD-006` resolved in `ARCHITECTURE_DEBT.md`.
+- Strengthened native-execution guardrails so process modules cannot silently
+  reintroduce `as_reaction()` or `_reaction_from_process`.
+
+No supported configured numerical outputs, scientific assumptions, model
+parameters, solver settings, public configured APIs, or output schemas changed.
+
 ## CLEANUP-001 / SCHEMA-001 Researcher Output Semantics
 
 Date: 2026-06-07

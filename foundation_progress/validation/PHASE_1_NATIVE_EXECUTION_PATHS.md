@@ -19,8 +19,8 @@ change model parameters, or alter public API behavior.
   fails explicitly with `ProcessODESolver supports only well_mixed geometry`.
 - Direct `Reaction`/`SimulationEngine` and `ReactionDiffusionEngine1D` remain
   intentional low-level APIs.
-- Concrete `Process.as_reaction()` adapters remain active transitional
-  compatibility surface and are now recorded as `FD-006` architecture debt.
+- P1.4 follow-up: concrete `Process.as_reaction()` adapters were removed and
+  `FD-006` is resolved.
 
 ## Execution Path Matrix
 
@@ -44,7 +44,7 @@ change model parameters, or alter public API behavior.
 | `ProcessODESolver.run(...)` | Public native process ODE solver | Direct native process solver; evaluates `Process.rate(...)` and `Process.contributions(...)`, then calls SciPy `solve_ivp` | Well-mixed only; explicit error for other geometry types | Executes validators after result construction | Uses SciPy backend, not legacy FungMod `SimulationEngine` | `src/fungal_model/solvers/process_ode.py`, `tests/test_native_assembled_model_run.py` | Preserve |
 | `SimulationEngine.simulate(...)` with `Reaction` objects | Public low-level legacy reaction ODE API through `fungal_model.core` | Direct `Reaction`-based ODE engine using SciPy `solve_ivp` | Well-mixed species ODE; no geometry abstraction | No configured validator loading; callers validate separately | Intentional retained legacy/low-level API | `src/fungal_model/core/simulation.py`, `src/fungal_model/chemistry/reactions.py`, `tests/test_reaction_engine.py`, `tests/test_michaelis_menten.py`, `tests/test_fungal_dynamics.py` | Preserve as low-level API; do not classify obsolete in P1.3 |
 | `ReactionDiffusionEngine1D.simulate(...)` | Public low-level spatial transport API | Direct 1D method-of-lines reaction-diffusion engine using `Reaction` and SciPy `solve_ivp` | Explicit 1D uniform grid with boundary conditions; not integrated into configured `AssembledModel.run` | Spatial validators are caller/test applied, not configured validator registry | Intentional retained spatial low-level API | `src/fungal_model/transport/reaction_diffusion.py`, `tests/test_reaction_diffusion.py` | Preserve; future configured spatial routing must be explicit |
-| Concrete `Process.as_reaction()` adapters | Public/transitional compatibility methods on concrete process classes | Convert a process to a legacy `Reaction`; direct low-level tests can then run `SimulationEngine` | No native geometry handling; inherits low-level reaction limitations | No configured validator loading unless caller adds validation separately | Active transitional adapter dependency | `src/fungal_model/processes/homogeneous.py`, `src/fungal_model/processes/surface.py`, `tests/test_homogeneous_processes.py`, `tests/test_generic_surface_processes.py`, `ARCHITECTURE_DEBT.md#FD-006` | P1.4 must remove or explicitly isolate each adapter |
+| Retired process-to-`Reaction` adapters | Former public/transitional compatibility methods on concrete process classes | Removed in P1.4; process classes no longer convert themselves into legacy `Reaction` objects | Not applicable | Not applicable | None remaining in production process modules | `foundation_progress/validation/PHASE_1_LEGACY_ADAPTER_RETIREMENT.md`, `tests/test_guardrails_native_execution.py` | Preserve retirement guardrail |
 
 ## Call-Site Findings
 
@@ -60,10 +60,10 @@ reaction API, reaction-diffusion engine, and tests for those retained APIs.
 They are not used by `src/fungal_model/workflows`, `src/fungal_model/plugins/pet`,
 or supported example notebooks.
 
-`as_reaction()` exists on `FirstOrderDecayProcess`, `MassActionProcess`,
-`HomogeneousMichaelisMentenProcess`, and `SurfaceCatalysisProcess`. Current
-supported configured workflows do not call these adapters. Direct low-level
-tests still do, so the adapters are active transitional architecture debt.
+P1.4 removed `as_reaction()` from `FirstOrderDecayProcess`,
+`MassActionProcess`, `HomogeneousMichaelisMentenProcess`, and
+`SurfaceCatalysisProcess`. The direct low-level `Reaction` API remains
+available, but process classes no longer expose a compatibility bridge into it.
 
 ## Validator Trace
 
@@ -88,8 +88,7 @@ unsupported-geometry error instead of silently changing solver paths.
 `tests/test_guardrails_native_execution.py` now covers:
 
 - actual configured well-mixed benchmark runs with tripwires on
-  `SimulationEngine`, `Reaction`, and all current concrete `as_reaction()`
-  methods;
+  `SimulationEngine` and `Reaction`;
 - configured validator execution through a real `ValidatorRegistry`;
 - unsupported configured `film_1d` geometry failing explicitly before any
   legacy fallback path can be used;
@@ -98,8 +97,7 @@ unsupported-geometry error instead of silently changing solver paths.
 
 ## Remaining Architecture Debt
 
-`FD-006 Process-to-Reaction compatibility adapters` records the active
-transitional adapter surface. The direct low-level `Reaction`,
-`SimulationEngine`, and `ReactionDiffusionEngine1D` APIs are intentionally
-retained and are not classified as obsolete merely because native configured
-execution exists.
+P1.4 resolved `FD-006 Process-to-Reaction compatibility adapters` by removing
+the adapter surface. The direct low-level `Reaction`, `SimulationEngine`, and
+`ReactionDiffusionEngine1D` APIs are intentionally retained and are not
+classified as obsolete merely because native configured execution exists.
