@@ -28,7 +28,12 @@ def _quantity_to_dict(quantity: Quantity) -> dict[str, Any]:
 
 def _validation_to_dict(validation: ValidationResult | Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(validation, Mapping):
-        return dict(validation)
+        data = dict(validation)
+        passed = bool(data.get("passed"))
+        data.setdefault("status", "passed" if passed else "failed")
+        data.setdefault("severity", "info" if passed else "error")
+        data.setdefault("required", True)
+        return data
     return validation.to_dict()
 
 

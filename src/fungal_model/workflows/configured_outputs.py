@@ -165,8 +165,20 @@ def _validation_summary(result: SimulationResult) -> dict[str, Any]:
     return {
         "count": len(report),
         "passed": bool(report) and all(bool(item.get("passed")) for item in report),
+        "status_counts": _count_by_key(report, "status"),
+        "severity_counts": _count_by_key(report, "severity"),
+        "inconclusive": [item for item in report if item.get("status") == "inconclusive"],
+        "unsupported": [item for item in report if item.get("status") == "unsupported"],
         "failed": [item for item in report if not bool(item.get("passed"))],
     }
+
+
+def _count_by_key(report: list[dict[str, Any]], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in report:
+        value = str(item.get(key, "unknown"))
+        counts[value] = counts.get(value, 0) + 1
+    return counts
 
 
 def _run_environment() -> dict[str, Any]:

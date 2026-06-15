@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, cast, get_args
 
+from fungal_model.chemistry.stoichiometry import ElementalComposition, StoichiometricReactionMetadata, StoichiometricTerm
+from fungal_model.chemistry.thermodynamics import GibbsFreeEnergyEstimate
 from fungal_model.core.parameters import Parameter
 from fungal_model.core.units import Q_, Quantity
-from fungal_model.core.validators import validate_mass_balance, validate_non_negative
+from fungal_model.core.validators import (
+    validate_charge_balance,
+    validate_condition_specific_gibbs_feasibility,
+    validate_electron_balance,
+    validate_elemental_balance,
+    validate_mass_balance,
+    validate_non_negative,
+)
 from fungal_model.geometry import Film1DGeometry, WellMixedGeometry
 from fungal_model.processes import ProductReleaseMap
 from fungal_model.substrates.base import (
@@ -122,6 +131,10 @@ class ValidatorRegistry(_LoaderRegistry):
         registry = cls()
         registry.register("non_negative", load_non_negative_validator)
         registry.register("mass_balance", load_mass_balance_validator)
+        registry.register("elemental_balance", load_elemental_balance_validator)
+        registry.register("charge_balance", load_charge_balance_validator)
+        registry.register("redox_balance", load_redox_balance_validator)
+        registry.register("thermodynamic_metadata", load_thermodynamic_metadata_validator)
         return registry
 
 
@@ -248,6 +261,78 @@ def load_mass_balance_validator(data: Mapping[str, Any]) -> Callable[[Any], Any]
     )
 
 
+def load_elemental_balance_validator(data: Mapping[str, Any]) -> Callable[[Any], Any]:
+    reaction = _reaction_metadata_from_config(_mapping(data.get("reaction", data), field_name="reaction"))
+    absolute_tolerance = _optional_float(data.get("absolute_tolerance"))
+    required = bool(data.get("required", True))
+    allow_unsourced_for_testing = bool(data.get("allow_unsourced_for_testing", False))
+
+    def validator(result: Any) -> Any:
+        del result
+        return validate_elemental_balance(
+            reaction,
+            absolute_tolerance=absolute_tolerance,
+            required=required,
+            allow_unsourced_for_testing=allow_unsourced_for_testing,
+        )
+
+    return validator
+
+
+def load_charge_balance_validator(data: Mapping[str, Any]) -> Callable[[Any], Any]:
+    reaction = _reaction_metadata_from_config(_mapping(data.get("reaction", data), field_name="reaction"))
+    absolute_tolerance = _optional_float(data.get("absolute_tolerance"))
+    required = bool(data.get("required", True))
+    allow_unsourced_for_testing = bool(data.get("allow_unsourced_for_testing", False))
+
+    def validator(result: Any) -> Any:
+        del result
+        return validate_charge_balance(
+            reaction,
+            absolute_tolerance=absolute_tolerance,
+            required=required,
+            allow_unsourced_for_testing=allow_unsourced_for_testing,
+        )
+
+    return validator
+
+
+def load_redox_balance_validator(data: Mapping[str, Any]) -> Callable[[Any], Any]:
+    reaction = _reaction_metadata_from_config(_mapping(data.get("reaction", data), field_name="reaction"))
+    absolute_tolerance = _optional_float(data.get("absolute_tolerance"))
+    required = bool(data.get("required", True))
+    allow_unsourced_for_testing = bool(data.get("allow_unsourced_for_testing", False))
+
+    def validator(result: Any) -> Any:
+        del result
+        return validate_electron_balance(
+            reaction,
+            absolute_tolerance=absolute_tolerance,
+            required=required,
+            allow_unsourced_for_testing=allow_unsourced_for_testing,
+        )
+
+    return validator
+
+
+def load_thermodynamic_metadata_validator(data: Mapping[str, Any]) -> Callable[[Any], Any]:
+    estimate = _gibbs_estimate_from_config(_mapping(data.get("estimate", data), field_name="estimate"))
+    tolerance = _quantity(data.get("absolute_tolerance"))
+    required = bool(data.get("required", True))
+    allow_unsourced_for_testing = bool(data.get("allow_unsourced_for_testing", False))
+
+    def validator(result: Any) -> Any:
+        del result
+        return validate_condition_specific_gibbs_feasibility(
+            estimate,
+            absolute_tolerance=tolerance,
+            required=required,
+            allow_unsourced_for_testing=allow_unsourced_for_testing,
+        )
+
+    return validator
+
+
 def _quantity(data: Mapping[str, Any] | None) -> Quantity | None:
     if data is None:
         return None
@@ -275,6 +360,126 @@ def _clean_name(value: Any, *, field_name: str) -> str:
     return str(value)
 
 
+def _reaction_metadata_from_config(data: Mapping[str, Any]) -> StoichiometricReactionMetadata:
+    return StoichiometricReactionMetadata(
+        name=str(data.get("name") or data.get("reaction_name") or "configured static reaction"),
+        reactants=_terms_from_config(data.get("reactants", ()), field_name="reactants"),
+        products=_terms_from_config(data.get("products", ()), field_name="products"),
+        source=_source_from_mapping(data),
+        notes=str(data.get("notes", "")),
+    )
+
+
+def _terms_from_config(value: Any, *, field_name: str) -> tuple[StoichiometricTerm, ...]:
+    if not isinstance(value, Sequence) or isinstance(value, str | bytes):
+        raise ValueError(f"{field_name} must be a sequence of stoichiometric term mappings.")
+    terms: list[StoichiometricTerm] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"{field_name}[{index}] must be a mapping.")
+        terms.append(_term_from_config(item))
+    return tuple(terms)
+
+
+def _term_from_config(data: Mapping[str, Any]) -> StoichiometricTerm:
+    return StoichiometricTerm(
+        species=str(data["species"]),
+        coefficient=float(data.get("coefficient", 1.0)),
+        composition=_composition_from_config(data),
+        charge=None if data.get("charge") is None else float(data["charge"]),
+        charge_source=_optional_text(data.get("charge_source")),
+        electron_equivalents=(
+            None
+            if data.get("electron_equivalents") is None
+            else float(data["electron_equivalents"])
+        ),
+        electron_source=_optional_text(data.get("electron_source")),
+        notes=str(data.get("notes", "")),
+    )
+
+
+def _composition_from_config(data: Mapping[str, Any]) -> ElementalComposition | None:
+    composition_data = data.get("composition")
+    if isinstance(composition_data, Mapping):
+        source = _optional_text(composition_data.get("source"))
+        notes = str(composition_data.get("notes", ""))
+        if "elements" in composition_data:
+            return ElementalComposition.from_elements(
+                {str(key): float(value) for key, value in _mapping(composition_data["elements"], field_name="elements").items()},
+                source=source,
+                formula=str(composition_data.get("formula", "structured_element_counts")),
+                notes=notes,
+            )
+        if "formula" in composition_data:
+            return ElementalComposition.from_formula(
+                str(composition_data["formula"]),
+                source=source,
+                notes=notes,
+            )
+    if "elements" in data:
+        return ElementalComposition.from_elements(
+            {str(key): float(value) for key, value in _mapping(data["elements"], field_name="elements").items()},
+            source=_optional_text(data.get("composition_source")),
+            formula=str(data.get("formula", "structured_element_counts")),
+            notes=str(data.get("composition_notes", "")),
+        )
+    if data.get("formula") is not None:
+        return ElementalComposition.from_formula(
+            str(data["formula"]),
+            source=_optional_text(data.get("composition_source")),
+            notes=str(data.get("composition_notes", "")),
+        )
+    return None
+
+
+def _gibbs_estimate_from_config(data: Mapping[str, Any]) -> GibbsFreeEnergyEstimate:
+    delta_data = _mapping(data.get("delta_gibbs"), field_name="delta_gibbs")
+    return GibbsFreeEnergyEstimate(
+        reaction_name=str(data.get("reaction_name") or data.get("name") or "configured static reaction"),
+        delta_gibbs=Parameter.from_dict(delta_data),
+        conditions=_parameter_set_from_condition_config(data.get("conditions")),
+        source=_source_from_mapping(data),
+        notes=str(data.get("notes", "")),
+    )
+
+
+def _parameter_set_from_condition_config(value: Any) -> Any:
+    if value is None:
+        return parameter_set_from_config({"parameters": []})
+    if isinstance(value, Mapping):
+        if "parameters" in value:
+            return parameter_set_from_config(value)
+        return parameter_set_from_config({"parameters": [dict(value)]})
+    if isinstance(value, Sequence) and not isinstance(value, str | bytes):
+        return parameter_set_from_config({"parameters": list(value)})
+    raise ValueError("conditions must be a parameter mapping, parameters mapping, or sequence of parameter mappings.")
+
+
+def _source_from_mapping(data: Mapping[str, Any]) -> str | None:
+    provenance = data.get("provenance")
+    if isinstance(provenance, Mapping) and provenance.get("source") is not None:
+        return str(provenance["source"])
+    return _optional_text(data.get("source"))
+
+
+def _mapping(value: Any, *, field_name: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{field_name} must be a mapping.")
+    return value
+
+
+def _optional_text(value: Any) -> str | None:
+    if value is None or str(value).strip() == "":
+        return None
+    return str(value)
+
+
+def _optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    return float(value)
+
+
 __all__ = [
     "GeometryLoaderRegistry",
     "ProductMapRegistry",
@@ -286,8 +491,12 @@ __all__ = [
     "load_generic_dissolved_substrate",
     "load_generic_solid_substrate",
     "load_mass_balance_validator",
+    "load_charge_balance_validator",
+    "load_elemental_balance_validator",
+    "load_redox_balance_validator",
     "load_non_negative_validator",
     "load_one_to_one_product_map",
     "load_stoichiometric_product_map",
+    "load_thermodynamic_metadata_validator",
     "load_well_mixed_geometry",
 ]

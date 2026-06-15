@@ -80,7 +80,7 @@ class ConfiguredModelRunner:
         failed_validations = [
             validation
             for validation in result.validation_report()
-            if not bool(validation.get("passed"))
+            if _strict_validation_blocks(validation)
         ]
         if config.mode == "strict" and failed_validations:
             raise_configured_model_execution_error(
@@ -122,6 +122,20 @@ def run_configured_model(
         process_assembler=ConfiguredProcessAssembler(process_library=process_library),
     )
     return runner.run(config_path, output_dir=output_dir)
+
+
+def _strict_validation_blocks(validation: dict[str, object]) -> bool:
+    passed = bool(validation.get("passed"))
+    status = str(validation.get("status") or ("passed" if passed else "failed"))
+    severity = str(validation.get("severity") or ("info" if passed else "error"))
+    required = bool(validation.get("required", True))
+    if status == "inconclusive":
+        return required
+    if status == "unsupported":
+        return True
+    if status == "failed":
+        return severity in {"error", "blocker"} or required
+    return not passed and required
 
 
 __all__ = [

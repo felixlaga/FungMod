@@ -56,6 +56,29 @@ class ElementalComposition:
             raise ValueError(f"Unsupported chemical formula format: {formula!r}")
         return cls(formula=formula, elements=elements, source=source, notes=notes)
 
+    @classmethod
+    def from_elements(
+        cls,
+        elements: dict[str, float],
+        *,
+        source: str | None,
+        formula: str = "structured_element_counts",
+        notes: str = "",
+    ) -> "ElementalComposition":
+        """Create an explicit composition from structured element counts."""
+
+        if not elements:
+            raise ValueError("At least one element count must be provided.")
+        normalized: dict[str, float] = {}
+        for element, count in elements.items():
+            if not has_text(element):
+                raise ValueError("Element symbols must be provided.")
+            numeric_count = float(count)
+            if numeric_count < 0.0 or not np.isfinite(numeric_count):
+                raise ValueError("Element counts must be finite and non-negative.")
+            normalized[str(element)] = numeric_count
+        return cls(formula=formula, elements=normalized, source=source, notes=notes)
+
     def validate(self, *, allow_unsourced_for_testing: bool = False) -> None:
         if allow_unsourced_for_testing:
             return
@@ -78,10 +101,31 @@ class StoichiometricTerm:
     species: str
     coefficient: float
     composition: ElementalComposition | None = None
+    charge: float | None = None
+    charge_source: str | None = None
+    electron_equivalents: float | None = None
+    electron_source: str | None = None
+    notes: str = ""
 
     def __post_init__(self) -> None:
-        if self.coefficient < 0:
-            raise ValueError("Stoichiometric coefficients must be non-negative.")
+        if self.coefficient < 0 or not np.isfinite(self.coefficient):
+            raise ValueError("Stoichiometric coefficients must be finite and non-negative.")
+        if self.charge is not None and not np.isfinite(self.charge):
+            raise ValueError("Charge metadata must be finite when provided.")
+        if self.electron_equivalents is not None and not np.isfinite(self.electron_equivalents):
+            raise ValueError("Electron-equivalent metadata must be finite when provided.")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "species": self.species,
+            "coefficient": self.coefficient,
+            "composition": None if self.composition is None else self.composition.to_dict(),
+            "charge": self.charge,
+            "charge_source": self.charge_source,
+            "electron_equivalents": self.electron_equivalents,
+            "electron_source": self.electron_source,
+            "notes": self.notes,
+        }
 
 
 @dataclass(frozen=True)
@@ -104,14 +148,7 @@ class StoichiometricReactionMetadata:
     def element_balance(self) -> dict[str, float]:
         """Return products minus reactants for each element."""
 
-        balance: dict[str, float] = {}
-        for side, sign in ((self.reactants, -1.0), (self.products, 1.0)):
-            for term in side:
-                if term.composition is None:
-                    raise ValueError(f"Missing elemental composition for {term.species}.")
-                for element, count in term.composition.elements.items():
-                    balance[element] = balance.get(element, 0.0) + sign * term.coefficient * count
-        return balance
+        return element_balance_residual(self)
 
     def is_element_balanced(self, *, absolute_tolerance: float | None = None) -> bool:
         tolerance = (
@@ -125,25 +162,48 @@ class StoichiometricReactionMetadata:
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "reactants": [
-                {
-                    "species": term.species,
-                    "coefficient": term.coefficient,
-                    "composition": None if term.composition is None else term.composition.to_dict(),
-                }
-                for term in self.reactants
-            ],
-            "products": [
-                {
-                    "species": term.species,
-                    "coefficient": term.coefficient,
-                    "composition": None if term.composition is None else term.composition.to_dict(),
-                }
-                for term in self.products
-            ],
+            "reactants": [term.to_dict() for term in self.reactants],
+            "products": [term.to_dict() for term in self.products],
             "source": self.source,
             "notes": self.notes,
         }
+
+
+def element_balance_residual(reaction: StoichiometricReactionMetadata) -> dict[str, float]:
+    """Return products-minus-reactants elemental residuals for explicit metadata."""
+
+    balance: dict[str, float] = {}
+    for side, sign in ((reaction.reactants, -1.0), (reaction.products, 1.0)):
+        for term in side:
+            if term.composition is None:
+                raise ValueError(f"Missing elemental composition for {term.species}.")
+            for element, count in term.composition.elements.items():
+                balance[element] = balance.get(element, 0.0) + sign * term.coefficient * count
+    return balance
+
+
+def charge_balance_residual(reaction: StoichiometricReactionMetadata) -> float:
+    """Return products-minus-reactants charge residual for explicit metadata."""
+
+    residual = 0.0
+    for side, sign in ((reaction.reactants, -1.0), (reaction.products, 1.0)):
+        for term in side:
+            if term.charge is None:
+                raise ValueError(f"Missing charge metadata for {term.species}.")
+            residual += sign * term.coefficient * term.charge
+    return residual
+
+
+def electron_balance_residual(reaction: StoichiometricReactionMetadata) -> float:
+    """Return products-minus-reactants electron-equivalent residual."""
+
+    residual = 0.0
+    for side, sign in ((reaction.reactants, -1.0), (reaction.products, 1.0)):
+        for term in side:
+            if term.electron_equivalents is None:
+                raise ValueError(f"Missing electron-equivalent metadata for {term.species}.")
+            residual += sign * term.coefficient * term.electron_equivalents
+    return residual
 
 
 @dataclass(frozen=True)
@@ -230,4 +290,7 @@ __all__ = [
     "OxygenDemand",
     "StoichiometricReactionMetadata",
     "StoichiometricTerm",
+    "charge_balance_residual",
+    "electron_balance_residual",
+    "element_balance_residual",
 ]

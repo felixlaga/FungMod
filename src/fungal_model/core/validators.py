@@ -8,9 +8,18 @@ from typing import Any, cast
 
 import numpy as np
 
-from fungal_model.chemistry.stoichiometry import CarbonContent, OxygenDemand
+from fungal_model.chemistry.stoichiometry import (
+    CarbonContent,
+    DEFAULT_STOICHIOMETRIC_ABSOLUTE_TOLERANCE,
+    OxygenDemand,
+    StoichiometricReactionMetadata,
+    charge_balance_residual,
+    electron_balance_residual,
+    element_balance_residual,
+)
+from fungal_model.chemistry.thermodynamics import GibbsFreeEnergyEstimate
 from fungal_model.core.parameters import Parameter
-from fungal_model.core.provenance import UnknownParameterError
+from fungal_model.core.provenance import ProvenanceError, UnknownParameterError, has_text
 from fungal_model.core.units import Q_, Quantity, assert_compatible, is_quantity
 
 DEFAULT_VALIDATION_RELATIVE_TOLERANCE = Parameter(
@@ -25,6 +34,18 @@ DEFAULT_VALIDATION_RELATIVE_TOLERANCE = Parameter(
     measurement_method="software configuration",
 )
 
+DEFAULT_THERMODYNAMIC_ABSOLUTE_TOLERANCE = Parameter(
+    name="default thermodynamic absolute tolerance",
+    symbol="epsilon_delta_g",
+    value=0.0,
+    units="joule / mole",
+    uncertainty=None,
+    source="Numerical sign-boundary convention for static Gibbs metadata checks; not a measured value.",
+    confidence_level="testing",
+    notes="Used only to compare explicitly supplied condition-specific Gibbs estimates to the zero boundary.",
+    measurement_method="software configuration",
+)
+
 
 @dataclass(frozen=True)
 class ValidationResult:
@@ -34,14 +55,328 @@ class ValidationResult:
     passed: bool
     message: str
     details: dict[str, Any] = field(default_factory=dict)
+    status: str | None = None
+    severity: str | None = None
+    required: bool = True
 
     def to_dict(self) -> dict[str, Any]:
+        status = self.status or ("passed" if self.passed else "failed")
+        severity = self.severity or ("info" if self.passed else "error")
         return {
             "name": self.name,
+            "status": status,
             "passed": self.passed,
+            "severity": severity,
+            "required": self.required,
             "message": self.message,
             "details": self.details,
         }
+
+
+def validate_elemental_balance(
+    reaction: StoichiometricReactionMetadata,
+    *,
+    absolute_tolerance: float | None = None,
+    required: bool = True,
+    allow_unsourced_for_testing: bool = False,
+) -> ValidationResult:
+    """Validate explicit elemental stoichiometry metadata without inferring missing chemistry."""
+
+    tolerance = _stoichiometric_tolerance_value(absolute_tolerance)
+    base_details = _static_balance_details(
+        reaction,
+        residual_name="element_balance",
+        residual_units="atom equivalents per reaction event",
+        absolute_tolerance=tolerance,
+        absolute_tolerance_units="atom equivalents per reaction event",
+        required=required,
+    )
+    provenance_failure = _reaction_provenance_failure(
+        reaction,
+        allow_unsourced_for_testing=allow_unsourced_for_testing,
+    )
+    if provenance_failure is not None:
+        return _status_result(
+            name="elemental_balance",
+            status="failed",
+            message=str(provenance_failure),
+            required=required,
+            details={**base_details, "error_type": type(provenance_failure).__name__},
+        )
+    missing = _missing_compositions(reaction)
+    if missing:
+        return _status_result(
+            name="elemental_balance",
+            status="inconclusive",
+            message="Elemental balance is inconclusive because at least one participant lacks composition metadata.",
+            required=required,
+            details={**base_details, "missing_metadata": missing},
+        )
+    residuals = element_balance_residual(reaction)
+    max_abs_residual = max((abs(value) for value in residuals.values()), default=0.0)
+    passed = max_abs_residual <= tolerance
+    return _status_result(
+        name="elemental_balance",
+        status="passed" if passed else "failed",
+        message=(
+            "Elemental stoichiometry is balanced within tolerance."
+            if passed
+            else "Elemental stoichiometry is not balanced within tolerance."
+        ),
+        required=required,
+        details={
+            **base_details,
+            "residuals": {
+                element: {
+                    "residual_value": residual,
+                    "residual_units": "atom equivalents per reaction event",
+                }
+                for element, residual in sorted(residuals.items())
+            },
+            "max_abs_residual": max_abs_residual,
+            "max_relative_residual": None,
+        },
+    )
+
+
+def validate_charge_balance(
+    reaction: StoichiometricReactionMetadata,
+    *,
+    absolute_tolerance: float | None = None,
+    required: bool = True,
+    allow_unsourced_for_testing: bool = False,
+) -> ValidationResult:
+    """Validate explicit charge stoichiometry metadata without inferring charges."""
+
+    tolerance = _stoichiometric_tolerance_value(absolute_tolerance)
+    base_details = _static_balance_details(
+        reaction,
+        residual_name="charge_balance",
+        residual_units="elementary-charge equivalents per reaction event",
+        absolute_tolerance=tolerance,
+        absolute_tolerance_units="elementary-charge equivalents per reaction event",
+        required=required,
+    )
+    provenance_failure = _reaction_provenance_failure(
+        reaction,
+        allow_unsourced_for_testing=allow_unsourced_for_testing,
+    )
+    if provenance_failure is not None:
+        return _status_result(
+            name="charge_balance",
+            status="failed",
+            message=str(provenance_failure),
+            required=required,
+            details={**base_details, "error_type": type(provenance_failure).__name__},
+        )
+    missing = _missing_scalar_metadata(reaction, field_name="charge")
+    if missing:
+        return _status_result(
+            name="charge_balance",
+            status="inconclusive",
+            message="Charge balance is inconclusive because at least one participant lacks explicit charge metadata.",
+            required=required,
+            details={**base_details, "missing_metadata": missing},
+        )
+    missing_sources = _missing_scalar_sources(reaction, value_field="charge", source_field="charge_source")
+    if missing_sources and not allow_unsourced_for_testing:
+        return _status_result(
+            name="charge_balance",
+            status="failed",
+            message="Charge balance metadata is missing provenance for at least one participant.",
+            required=required,
+            details={**base_details, "missing_metadata": missing_sources},
+        )
+    residual = charge_balance_residual(reaction)
+    passed = abs(residual) <= tolerance
+    return _status_result(
+        name="charge_balance",
+        status="passed" if passed else "failed",
+        message=(
+            "Charge stoichiometry is balanced within tolerance."
+            if passed
+            else "Charge stoichiometry is not balanced within tolerance."
+        ),
+        required=required,
+        details={
+            **base_details,
+            "residual_value": residual,
+            "max_abs_residual": abs(residual),
+            "max_relative_residual": None,
+        },
+    )
+
+
+def validate_electron_balance(
+    reaction: StoichiometricReactionMetadata,
+    *,
+    absolute_tolerance: float | None = None,
+    required: bool = True,
+    allow_unsourced_for_testing: bool = False,
+) -> ValidationResult:
+    """Validate explicit electron-equivalent metadata without inferring redox chemistry."""
+
+    tolerance = _stoichiometric_tolerance_value(absolute_tolerance)
+    base_details = _static_balance_details(
+        reaction,
+        residual_name="electron_balance",
+        residual_units="electron equivalents per reaction event",
+        absolute_tolerance=tolerance,
+        absolute_tolerance_units="electron equivalents per reaction event",
+        required=required,
+    )
+    provenance_failure = _reaction_provenance_failure(
+        reaction,
+        allow_unsourced_for_testing=allow_unsourced_for_testing,
+    )
+    if provenance_failure is not None:
+        return _status_result(
+            name="electron_balance",
+            status="failed",
+            message=str(provenance_failure),
+            required=required,
+            details={**base_details, "error_type": type(provenance_failure).__name__},
+        )
+    missing = _missing_scalar_metadata(reaction, field_name="electron_equivalents")
+    if missing:
+        return _status_result(
+            name="electron_balance",
+            status="inconclusive",
+            message=(
+                "Electron/redox balance is inconclusive because at least one participant lacks "
+                "explicit electron-equivalent metadata."
+            ),
+            required=required,
+            details={**base_details, "missing_metadata": missing},
+        )
+    missing_sources = _missing_scalar_sources(
+        reaction,
+        value_field="electron_equivalents",
+        source_field="electron_source",
+    )
+    if missing_sources and not allow_unsourced_for_testing:
+        return _status_result(
+            name="electron_balance",
+            status="failed",
+            message="Electron/redox balance metadata is missing provenance for at least one participant.",
+            required=required,
+            details={**base_details, "missing_metadata": missing_sources},
+        )
+    residual = electron_balance_residual(reaction)
+    passed = abs(residual) <= tolerance
+    return _status_result(
+        name="electron_balance",
+        status="passed" if passed else "failed",
+        message=(
+            "Electron/redox stoichiometry is balanced within tolerance."
+            if passed
+            else "Electron/redox stoichiometry is not balanced within tolerance."
+        ),
+        required=required,
+        details={
+            **base_details,
+            "residual_value": residual,
+            "max_abs_residual": abs(residual),
+            "max_relative_residual": None,
+        },
+    )
+
+
+def validate_condition_specific_gibbs_feasibility(
+    estimate: GibbsFreeEnergyEstimate,
+    *,
+    absolute_tolerance: Quantity | None = None,
+    required: bool = True,
+    allow_unsourced_for_testing: bool = False,
+) -> ValidationResult:
+    """Validate an explicitly supplied condition-specific Gibbs estimate.
+
+    This is a static metadata check. It does not compute reaction quotients,
+    activities, or dynamic reaction Gibbs energy from a simulation trajectory.
+    """
+
+    tolerance = absolute_tolerance or DEFAULT_THERMODYNAMIC_ABSOLUTE_TOLERANCE.quantity
+    tolerance_quantity = assert_compatible(tolerance, "joule / mole", name="absolute_tolerance")
+    tolerance_value = float(tolerance_quantity.to("joule / mole").magnitude)
+    base_details = {
+        "reaction_name": estimate.reaction_name,
+        "residual_name": "condition_specific_delta_gibbs",
+        "residual_units": "joule / mole",
+        "absolute_tolerance": tolerance_value,
+        "absolute_tolerance_units": "joule / mole",
+        "relative_tolerance": None,
+        "scale_value": 1.0,
+        "scale_units": "joule / mole",
+        "required": required,
+        "dynamic_reaction_quotient": "not_evaluated",
+        "activity_model": "not_evaluated",
+        "provenance_refs": _gibbs_provenance_refs(estimate),
+        "evidence": {
+            "source": estimate.source,
+            "delta_gibbs_source": estimate.delta_gibbs.source,
+            "condition_symbols": [parameter.symbol for parameter in estimate.conditions],
+        },
+        "missing_metadata": [],
+    }
+    try:
+        estimate.validate(
+            allow_unsourced_for_testing=allow_unsourced_for_testing,
+            require_value=False,
+        )
+    except ProvenanceError as exc:
+        return _status_result(
+            name="thermodynamic_feasibility",
+            status="failed",
+            message=str(exc),
+            required=required,
+            details={**base_details, "error_type": type(exc).__name__},
+        )
+    if len(estimate.conditions) == 0:
+        return _status_result(
+            name="thermodynamic_feasibility",
+            status="inconclusive",
+            message="Thermodynamic metadata is inconclusive because no condition-specific metadata were supplied.",
+            required=required,
+            details={**base_details, "missing_metadata": ["condition_specific_conditions"]},
+        )
+    unknown_conditions = [parameter.symbol for parameter in estimate.conditions if parameter.quantity is None]
+    if unknown_conditions:
+        return _status_result(
+            name="thermodynamic_feasibility",
+            status="inconclusive",
+            message="Thermodynamic metadata is inconclusive because at least one condition value is unknown.",
+            required=required,
+            details={**base_details, "missing_metadata": [f"conditions.{symbol}" for symbol in unknown_conditions]},
+        )
+    if estimate.delta_gibbs.quantity is None:
+        return _status_result(
+            name="thermodynamic_feasibility",
+            status="inconclusive",
+            message="Thermodynamic metadata is inconclusive because delta G is explicitly unknown.",
+            required=required,
+            details={**base_details, "missing_metadata": ["delta_gibbs"]},
+        )
+    delta_g = estimate.value().to("joule / mole")
+    delta_g_value = float(delta_g.magnitude)
+    passed = delta_g_value <= tolerance_value
+    return _status_result(
+        name="thermodynamic_feasibility",
+        status="passed" if passed else "failed",
+        message=(
+            "Stored condition-specific Gibbs estimate is favorable within tolerance; "
+            "dynamic thermodynamic feasibility was not evaluated."
+            if passed
+            else "Stored condition-specific Gibbs estimate is unfavorable within tolerance; "
+            "dynamic thermodynamic feasibility was not evaluated."
+        ),
+        required=required,
+        details={
+            **base_details,
+            "residual_value": delta_g_value,
+            "max_abs_residual": abs(delta_g_value),
+            "max_relative_residual": None,
+        },
+    )
 
 
 def validate_non_negative(
@@ -313,6 +648,161 @@ def validate_biomass_yield_limit(
     )
 
 
+def _status_result(
+    *,
+    name: str,
+    status: str,
+    message: str,
+    details: dict[str, Any],
+    required: bool,
+) -> ValidationResult:
+    passed = status in {"passed", "not_applicable", "skipped"}
+    severity = _severity_for_status(status=status, required=required)
+    enriched_details = {
+        **details,
+        "status": status,
+        "severity": severity,
+        "required": required,
+    }
+    return ValidationResult(
+        name=name,
+        passed=passed,
+        status=status,
+        severity=severity,
+        required=required,
+        message=message,
+        details=enriched_details,
+    )
+
+
+def _severity_for_status(*, status: str, required: bool) -> str:
+    if status == "passed":
+        return "info"
+    if status == "inconclusive":
+        return "error" if required else "warning"
+    if status in {"failed", "unsupported"}:
+        return "error" if required else "warning"
+    return "info"
+
+
+def _stoichiometric_tolerance_value(absolute_tolerance: float | None) -> float:
+    if absolute_tolerance is None:
+        return float(DEFAULT_STOICHIOMETRIC_ABSOLUTE_TOLERANCE.quantity.magnitude)
+    tolerance = float(absolute_tolerance)
+    if tolerance < 0.0:
+        raise ValueError("absolute_tolerance must be non-negative.")
+    return tolerance
+
+
+def _static_balance_details(
+    reaction: StoichiometricReactionMetadata,
+    *,
+    residual_name: str,
+    residual_units: str,
+    absolute_tolerance: float,
+    absolute_tolerance_units: str,
+    required: bool,
+) -> dict[str, Any]:
+    return {
+        "reaction_name": reaction.name,
+        "residual_name": residual_name,
+        "residual_units": residual_units,
+        "absolute_tolerance": absolute_tolerance,
+        "absolute_tolerance_units": absolute_tolerance_units,
+        "relative_tolerance": None,
+        "scale_value": 1.0,
+        "scale_units": residual_units,
+        "time_of_max_residual": None,
+        "required": required,
+        "missing_metadata": [],
+        "provenance_refs": _reaction_provenance_refs(reaction),
+        "evidence": {
+            "reaction_source": reaction.source,
+            "reactants": [_term_evidence(term) for term in reaction.reactants],
+            "products": [_term_evidence(term) for term in reaction.products],
+        },
+    }
+
+
+def _reaction_provenance_failure(
+    reaction: StoichiometricReactionMetadata,
+    *,
+    allow_unsourced_for_testing: bool,
+) -> ProvenanceError | None:
+    try:
+        reaction.validate(allow_unsourced_for_testing=allow_unsourced_for_testing)
+    except ProvenanceError as exc:
+        return exc
+    return None
+
+
+def _missing_compositions(reaction: StoichiometricReactionMetadata) -> list[dict[str, str]]:
+    return [
+        {"species": term.species, "field": "composition"}
+        for term in (*reaction.reactants, *reaction.products)
+        if term.composition is None
+    ]
+
+
+def _missing_scalar_metadata(
+    reaction: StoichiometricReactionMetadata,
+    *,
+    field_name: str,
+) -> list[dict[str, str]]:
+    return [
+        {"species": term.species, "field": field_name}
+        for term in (*reaction.reactants, *reaction.products)
+        if getattr(term, field_name) is None
+    ]
+
+
+def _missing_scalar_sources(
+    reaction: StoichiometricReactionMetadata,
+    *,
+    value_field: str,
+    source_field: str,
+) -> list[dict[str, str]]:
+    return [
+        {"species": term.species, "field": source_field}
+        for term in (*reaction.reactants, *reaction.products)
+        if getattr(term, value_field) is not None and not has_text(getattr(term, source_field))
+    ]
+
+
+def _reaction_provenance_refs(reaction: StoichiometricReactionMetadata) -> list[str]:
+    refs: list[str] = []
+    if has_text(reaction.source):
+        refs.append(str(reaction.source))
+    for term in (*reaction.reactants, *reaction.products):
+        if term.composition is not None and has_text(term.composition.source):
+            refs.append(str(term.composition.source))
+        if has_text(term.charge_source):
+            refs.append(str(term.charge_source))
+        if has_text(term.electron_source):
+            refs.append(str(term.electron_source))
+    return sorted(set(refs))
+
+
+def _term_evidence(term: Any) -> dict[str, Any]:
+    return {
+        "species": term.species,
+        "coefficient": term.coefficient,
+        "composition_source": None if term.composition is None else term.composition.source,
+        "charge_source": term.charge_source,
+        "electron_source": term.electron_source,
+    }
+
+
+def _gibbs_provenance_refs(estimate: GibbsFreeEnergyEstimate) -> list[str]:
+    refs: list[str] = []
+    if has_text(estimate.source):
+        refs.append(str(estimate.source))
+    if has_text(estimate.delta_gibbs.source):
+        refs.append(str(estimate.delta_gibbs.source))
+    refs.extend(str(parameter.source) for parameter in estimate.conditions if has_text(parameter.source))
+    return sorted(set(refs))
+
+
 @dataclass
 class LimitingCase:
     """A named limiting case with executable setup and validation functions."""
@@ -355,12 +845,17 @@ class LimitingCaseSuite:
 
 
 __all__ = [
+    "DEFAULT_THERMODYNAMIC_ABSOLUTE_TOLERANCE",
     "DEFAULT_VALIDATION_RELATIVE_TOLERANCE",
     "LimitingCase",
     "LimitingCaseSuite",
     "ValidationResult",
     "validate_biomass_yield_limit",
     "validate_carbon_conservation",
+    "validate_charge_balance",
+    "validate_condition_specific_gibbs_feasibility",
+    "validate_electron_balance",
+    "validate_elemental_balance",
     "validate_mass_balance",
     "validate_non_negative",
     "validate_oxygen_limitation",

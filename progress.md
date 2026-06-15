@@ -26,6 +26,43 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## Phase 2 Task 2 Static Elemental and Thermodynamic Validator Foundation
+
+Date: 2026-06-15
+
+Status: `complete` for the scoped static validator foundation. The full
+thermodynamic feasibility blocker remains unresolved because dynamic reaction
+quotients, activities, activity coefficients, and solver-time thermodynamic
+constraints are still not implemented.
+
+Completed in this pass:
+
+- Extended `ValidationResult` with backward-compatible `status`, `severity`,
+  and `required` fields.
+- Added explicit metadata residual primitives for elemental, charge, and
+  electron-equivalent balance.
+- Added static validators for elemental balance, charge balance,
+  electron/redox balance, and condition-specific Gibbs feasibility.
+- Made missing composition, charge, electron-equivalent metadata, unknown
+  condition values, and unknown Gibbs values report `inconclusive` rather than
+  passed.
+- Made provenance failures report structured failed validation results.
+- Registered the new static validators through `ValidatorRegistry` for
+  explicit inline model-config use.
+- Extended configured-output validation summaries with status and severity
+  counts while preserving existing boolean `passed` behavior.
+- Preserved strict-mode rejection of confirmed failures and added handling for
+  required inconclusive/unsupported validation statuses.
+- Added tests for balanced/unbalanced synthetic reactions, missing metadata,
+  charge/electron checks, favorable/unfavorable/unknown Gibbs metadata,
+  provenance failure, config registry integration, exploratory versus strict
+  behavior, serialization, and existing validator compatibility.
+
+No dynamic thermodynamic validation, reaction-quotient calculation, activity
+model, activity coefficient, redox potential, biological data, literature
+value, process rate equation, solver equation, or real registry chemistry was
+added.
+
 ## Phase 2 Task 1 Thermodynamic and Balance Enforcement Design
 
 Date: 2026-06-15
