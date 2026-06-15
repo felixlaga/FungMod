@@ -4,7 +4,8 @@ Date: 2026-06-14
 
 Plan scope: P1.4 from `FUNGMOD_PHASE_1_REPOSITORY_TRUTH_AND_EXECUTION_HARDENING.md`.
 
-Review anchor: current working tree after P1.3 native execution verification.
+Review anchor: `2102710a54279574d7ef0bb2edf5ae19632e84ad`, after P1.3
+native execution verification and P1.4 adapter removal.
 
 This pass retires process-to-`Reaction` compatibility adapters only. It does
 not remove the low-level `Reaction` or `SimulationEngine` APIs and does not

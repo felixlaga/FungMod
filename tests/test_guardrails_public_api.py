@@ -8,14 +8,20 @@ import pytest
 import fungal_model
 import fungal_model.workflows as workflows
 from fungal_model import (
+    DegradationScreenResult,
+    EnvironmentCase,
+    EnvironmentGrid,
     Parameter,
     ParameterSet,
+    VirtualExperiment,
+    VirtualExperimentError,
     load_geometry,
     load_model_config,
     load_parameter_set,
     load_product_map,
     load_substrate,
     run_configured_model,
+    virtual_experiment,
 )
 from fungal_model.plugins import pet as pet_plugin
 from fungal_model.processes import (
@@ -49,6 +55,15 @@ FOUNDATION_PUBLIC_API = {
     "ParameterSet": ParameterSet,
 }
 
+RESEARCHER_PUBLIC_API = {
+    "VirtualExperiment": VirtualExperiment,
+    "virtual_experiment": virtual_experiment,
+    "EnvironmentGrid": EnvironmentGrid,
+    "EnvironmentCase": EnvironmentCase,
+    "DegradationScreenResult": DegradationScreenResult,
+    "VirtualExperimentError": VirtualExperimentError,
+}
+
 PET_PLUGIN_ONLY_NAMES = (
     "PETSurfaceWorkflowConfig",
     "pet_substrate_loader_registry",
@@ -70,6 +85,23 @@ def test_current_foundation_public_api_is_exported() -> None:
         "ParameterSet",
     }
     for name, expected in FOUNDATION_PUBLIC_API.items():
+        assert name in fungal_model.__all__
+        assert getattr(fungal_model, name) is expected
+        if name in class_names:
+            assert inspect.isclass(expected)
+        else:
+            assert callable(expected)
+
+
+def test_current_researcher_public_api_is_exported() -> None:
+    class_names = {
+        "VirtualExperiment",
+        "EnvironmentGrid",
+        "EnvironmentCase",
+        "DegradationScreenResult",
+        "VirtualExperimentError",
+    }
+    for name, expected in RESEARCHER_PUBLIC_API.items():
         assert name in fungal_model.__all__
         assert getattr(fungal_model, name) is expected
         if name in class_names:
@@ -102,9 +134,11 @@ def test_public_api_names_are_not_unfinished_placeholders() -> None:
         assert "todo" not in source
 
 
-def test_foundation_public_api_is_documented_in_readme() -> None:
+def test_public_api_is_documented_in_readme() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "## Foundation Public API" in readme
+    assert "## Public API" in readme
+    for name in RESEARCHER_PUBLIC_API:
+        assert f"`{name}`" in readme
     for name in FOUNDATION_PUBLIC_API:
         assert f"`{name}`" in readme
     assert "`run_pet_surface_integration`" in readme

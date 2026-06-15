@@ -1,20 +1,19 @@
 # Phase 1 Current Finding Status
 
-Reviewed commit: `3538d303c5fbeb1697c584b11d4b6b1109374223`
+Reviewed commit: `2102710a54279574d7ef0bb2edf5ae19632e84ad`
 
-Verified at: `2026-06-14T11:31:47Z`
+Verified at: `2026-06-15T12:26:20Z`
 
-This report summarizes the P1.2 reconciled critical/high audit claims. Detailed
-P1.2 evidence is in `findings.yaml`. Later Phase 1 task reports may supersede
-individual rows; for example, P1.4 resolved the process-to-`Reaction` adapter
-debt recorded here.
+This report summarizes the Phase 1 reconciled critical/high audit claims.
+Detailed current evidence is in `findings.yaml`; P1.3 and P1.4 superseded the
+initial P1.2 execution-path and process-to-`Reaction` adapter rows.
 
 ## Summary Table
 
 | ID | Original severity | Current status | Current severity | Evidence summary | Remaining scientific risk | Recommended next phase or task |
 | --- | --- | --- | --- | --- | --- | --- |
 | P1-AUDIT-NATIVE-001 | critical | stale | none | Configured workflow calls `AssembledModel.run`, which delegates to `ProcessODESolver`. | Native execution does not validate biology. | P1.3 execution-path mapping. |
-| P1-AUDIT-LEGACY-REACTION-001 | high | partially_resolved at P1.2; adapter debt resolved in P1.4 | medium at P1.2 | Public configured paths avoided direct legacy solver construction; P1.4 removed process-to-`Reaction` adapters. | Low-level `Reaction` APIs remain intentionally supported and must stay clearly separated from configured workflows. | See `PHASE_1_LEGACY_ADAPTER_RETIREMENT.md`. |
+| P1-AUDIT-LEGACY-REACTION-001 | high | resolved | none | Public configured paths avoid direct legacy solver construction; P1.3 mapped retained low-level APIs; P1.4 removed process-to-`Reaction` adapters. | Low-level `Reaction` APIs remain intentionally supported and must stay clearly separated from configured workflows. | Preserve native execution and adapter-retirement guardrails. |
 | P1-AUDIT-VALIDATORS-001 | high | resolved | none | Configured validators are loaded, attached, executed, and strict failures are tested. | Validators are software checks, not empirical validation. | Preserve guardrails in P1.3. |
 | P1-AUDIT-CONFIGURED-API-001 | high | resolved | none | `run_configured_model` is public, tested, and writes configured bundles. | Benchmark configs are not scientific biology. | No P1.2 action. |
 | P1-AUDIT-QA-001 | high | partially_resolved | informational | CI, Ruff, Pyright, and 80% coverage gate exist; Pyright optional-member debt remains. | Quality gates do not validate science. | Track FD-005. |

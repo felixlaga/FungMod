@@ -26,6 +26,35 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## Phase 1 Task 5 Documentation and Quality-Gate Synchronization
+
+Date: 2026-06-15
+
+Status: `complete` for the scoped documentation, audit-status, and Phase 1
+quality-gate synchronization.
+
+Completed in this pass:
+
+- Reconciled active README capability claims, public API documentation,
+  roadmap status notes, Phase 1 reports, and the machine-readable audit
+  catalogue with the post-P1.4 repository state.
+- Marked Phase 1 complete in
+  `FUNGMOD_PHASE_1_REPOSITORY_TRUTH_AND_EXECUTION_HARDENING.md` only after
+  verifying the instruction hierarchy, audit catalogue, native execution
+  guardrails, adapter retirement, Ruff, Pyright, full tests, and coverage gate.
+- Clarified that BIO-001/BIO-002 cellulose-related paths are implemented and
+  technically verified only for scoped exploratory pilots, not scientifically
+  validated default cellulose degradation.
+- Added a migration note for former `process.as_reaction()` users: use native
+  process execution or construct an explicit low-level `Reaction`.
+- Removed the unsupported tracked notebook checkpoint artifact.
+- Added focused documentation synchronization tests for public API docs,
+  capability labels, adapter-retirement wording, audit status, checkpoint
+  cleanup, and Phase 1 completion status.
+
+No scientific models, parameters, numerical methods, public APIs, runtime
+behavior, output schemas, or biology changed.
+
 ## Phase 1 Task 1 Instruction-Hierarchy Cleanup
 
 Date: 2026-06-14

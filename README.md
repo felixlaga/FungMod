@@ -139,12 +139,18 @@ provenance, limitations, missing-parameter and suggested-experiment tables, and
 a versioned data dictionary/schema. Exploratory priors remain allowed, but the
 tables mark them as assumptions rather than literature-curated values.
 
-## Foundation Public API
+## Public API
 
-The stable foundation API is intentionally generic-first. These names are
-supported from top-level `fungal_model` for config loading, model assembly,
-execution, and result inspection:
+The stable API is intentionally generic-first. These names are supported from
+top-level `fungal_model` for researcher-facing virtual experiments, config
+loading, model assembly, execution, and result inspection:
 
+- `VirtualExperiment`
+- `virtual_experiment`
+- `EnvironmentGrid`
+- `EnvironmentCase`
+- `DegradationScreenResult`
+- `VirtualExperimentError`
 - `run_configured_model`
 - `load_model_config`
 - `load_substrate`
@@ -161,10 +167,18 @@ execution, and result inspection:
 - `Parameter`
 - `ParameterSet`
 
+The same virtual-experiment names are also available from `fungal_model.api`.
 PET-specific convenience helpers are not part of the top-level public API.
 They live under `fungal_model.plugins.pet`, where plugin users can explicitly
 import `pet_substrate_loader_registry`, `PETSurfaceWorkflowConfig`, and
 `run_pet_surface_integration`.
+
+Former `process.as_reaction()` users should now choose one explicit path:
+build process-centered models through `ModelBuilder`, `AssembledModel.run()`,
+or `run_configured_model`; or construct a low-level
+`fungal_model.chemistry.reactions.Reaction` directly when using
+`SimulationEngine` or `ReactionDiffusionEngine1D`. Concrete `Process` classes
+no longer provide a process-to-`Reaction` adapter bridge.
 
 ## Notebooks
 
@@ -292,6 +306,19 @@ The older PET convenience entry point now lives under
 
 ## Current Limitations
 
+Current capability labels mean:
+
+- `implemented`: code exists for the stated scope.
+- `technically verified`: repository tests prove the software contract, not the
+  empirical biology.
+- `exploratory`: outputs are provenance-labelled assumptions, priors, ranges,
+  or controlled pilots.
+- `scientifically validated`: empirical validation data support the prediction
+  claim. FungMod does not currently bundle publication-grade validation for
+  arbitrary fungus/substrate/environment predictions.
+- `unsupported`: the mechanism or workflow should fail explicitly or remain
+  documented as future work.
+
 - Well-mixed ODE systems and an initial 1D reaction-diffusion engine are supported.
 - Michaelis-Menten kinetics currently means homogeneous dissolved-substrate kinetics only.
 - PET surface hydrolysis currently uses a minimal equilibrium Langmuir coverage model with constant accessible surface area.
@@ -304,7 +331,12 @@ The older PET convenience entry point now lives under
 - Gibbs free energy values are metadata with provenance; full thermodynamic feasibility constraints are not yet enforced by the solver.
 - Spatial modelling is currently 1D finite-volume method-of-lines only.
 - Stage 8 diffusion fields are unit-aware, but geometry is a simple uniform 1D grid; 2D, variable geometry, and true volume/area coupling are not implemented.
-- PET is the only substrate marked `partial`; cellulose, lignin, starch, and chitin are Stage 9 `placeholder` metadata classes with unknown physical parameters and no default degradation model.
+- PET is marked `partial`. Cellulose has narrow registry-backed exploratory
+  BIO-001/BIO-002 surface and enzyme-chain paths, but the generic
+  `CelluloseSubstrate` class remains Stage 9 placeholder metadata and is not a
+  validated default cellulose-degradation model. Lignin, starch, and chitin
+  remain Stage 9 placeholder metadata classes with unknown physical parameters
+  and no default degradation model.
 - Universal substrate modules record bond classes, required enzyme classes, and product classes, but they do not implement substrate-specific kinetics, accessibility models, thermodynamic constraints, or assimilation evidence.
 - Calibration utilities are generic least-squares tools; no literature data are bundled and no parameters are calibrated by default.
 - Monte Carlo and local sensitivity utilities require explicit uncertainty/perturbation specifications; Bayesian calibration and global sensitivity are not implemented.
@@ -313,8 +345,9 @@ The older PET convenience entry point now lives under
 - The generic configured workflow currently supports foundation process
   factories and well-mixed execution; unsupported process types and geometry
   fail before simulation.
-- The standardized `results.SimulationResult` is now native output for
-  `AssembledModel.run()` and still wraps older non-workflow adapters.
+- The standardized `results.SimulationResult` is native output for
+  `AssembledModel.run()` and is also produced by explicit low-level reaction
+  and reaction-diffusion APIs when those APIs are invoked directly.
 - Generic surface catalysis now exists, and PET composes it through a PET
   accessibility adapter, but resolved PET product chemistry and dynamic
   morphology remain future work.

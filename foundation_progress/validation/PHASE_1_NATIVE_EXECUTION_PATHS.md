@@ -4,8 +4,10 @@ Date: 2026-06-14
 
 Plan scope: P1.3 from `FUNGMOD_PHASE_1_REPOSITORY_TRUTH_AND_EXECUTION_HARDENING.md`.
 
-Review anchor: `3538d303c5fbeb1697c584b11d4b6b1109374223`, plus the P1.3
-validation tests and documentation added in this pass.
+Review anchor: P1.3 traced execution paths on
+`3538d303c5fbeb1697c584b11d4b6b1109374223`; P1.4 removed the process adapter
+bridge, and P1.5 reconciled this report against
+`2102710a54279574d7ef0bb2edf5ae19632e84ad`.
 
 This review traces code paths from public entry points to the concrete solver
 call. It intentionally does not remove adapters, change numerical methods,
@@ -35,7 +37,7 @@ change model parameters, or alter public API behavior.
 | `notebooks/examples/00_quickstart.ipynb`, `01_config_entity_inspection.ipynb`, `02_failure_report.ipynb`, `03_configured_outputs.ipynb` | Supported example notebooks | Import package public API and call `run_configured_model`; native configured path | Well-mixed example configs; failure example uses explicit configured failure handling | Same configured validator path when a run succeeds | None; guardrail test rejects direct low-level solver imports/calls | `tests/test_notebooks.py`, `notebooks/examples/*.ipynb` | Preserve notebook guardrails |
 | `notebooks/06_sabiork_reaction_618_beta_glucosidase.ipynb`, `notebooks/07_bio001_cellulose_surface_virtual_experiment.ipynb` | Supported researcher notebooks | Use `VirtualExperiment`; native through screening/configured path when simulation executes | Same as virtual-experiment generated configs | Same as virtual-experiment/configured path | None for supported path | `tests/test_sabiork_reaction_618_notebook.py`, `tests/test_bio001_notebook.py`, notebook code cells | Preserve |
 | `notebooks/09_sabiork_discovery_to_registry_proposal.ipynb` | Supported discovery notebook, non-execution proposal workflow | No model solver call in notebook code | Not applicable | Not applicable | None | Notebook code inspection; discovery tests | No native execution action |
-| `notebooks/.ipynb_checkpoints/06_sabiork_reaction_618_beta_glucosidase-checkpoint.ipynb` | Transitional tracked checkpoint artifact, not a supported public notebook contract | Contains stale checkpoint code references to `run_configured_model` / `simulate_screen`; not covered by notebook smoke tests | Not established | Not established | Transitional documentation artifact, not active solver support | `git ls-files notebooks/.ipynb_checkpoints/*`; notebook code scan | Reconcile or remove in P1.5 documentation sync, not P1.3 |
+| `notebooks/.ipynb_checkpoints/06_sabiork_reaction_618_beta_glucosidase-checkpoint.ipynb` | Removed tracked checkpoint artifact, not a supported public notebook contract | P1.5 removed the unsupported checkpoint; supported notebooks are listed separately and covered by notebook tests | Not applicable | Not applicable | None remaining | `git ls-files notebooks/.ipynb_checkpoints/*`; `tests/test_phase1_documentation_sync.py` | Keep checkpoint artifacts out of the tracked project |
 | `calibrate_configured_model(...)` | Public synthetic-only configured calibration wrapper | `calibrate_configured_model` -> `_run_with_parameters` -> `run_configured_model`; native configured path for model predictions | Same configured well-mixed support as source config | Same configured validator path for each configured run | None for configured calibration path | `src/fungal_model/calibration/configured.py`, `tests/test_configured_synthetic_calibration.py` | Preserve; Bayesian/global calibration remains out of scope |
 | `fit_least_squares(...)` | Public low-level calibration utility | Solver-agnostic callback utility; calls caller-provided `predict` function | Delegated to caller prediction function | Delegated to caller prediction function | None intrinsic | `src/fungal_model/calibration/fitting.py`, `tests/test_calibration.py` | Preserve as solver-agnostic utility |
 | `run_monte_carlo(...)` | Public uncertainty utility | Solver-agnostic callback utility; calls caller-provided `predict` function | Delegated to caller prediction function | Delegated to caller prediction function | None intrinsic | `src/fungal_model/uncertainty/monte_carlo.py`, `tests/test_uncertainty_sensitivity.py` | Preserve as solver-agnostic utility |

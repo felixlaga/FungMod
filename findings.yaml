@@ -1,7 +1,7 @@
 schema_version: "1.0"
 catalogue_name: "FungMod Phase 1 current finding status"
-reviewed_commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-verified_at: "2026-06-14T11:31:47Z"
+reviewed_commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+verified_at: "2026-06-15T12:26:20Z"
 source_documents:
   - "AGENTS.md"
   - "FUNGMOD_PHASE_1_REPOSITORY_TRUTH_AND_EXECUTION_HARDENING.md"
@@ -44,8 +44,8 @@ findings:
         - path: "ARCHITECTURE_DEBT.md"
           explanation: "FD-003 is recorded as resolved with ProcessODESolver as the exit condition."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_guardrails_native_execution.py tests/test_configured_model_workflow.py tests/test_native_assembled_model_run.py"
     remaining_risk: "P1.3 still needs a full execution-entry-point map, but this original critical configured-workflow claim is not current."
@@ -53,41 +53,43 @@ findings:
 
   - id: "P1-AUDIT-LEGACY-REACTION-001"
     original_severity: "high"
-    current_severity: "medium"
-    current_status: "partially_resolved"
+    current_severity: "none"
+    current_status: "resolved"
     title: "Legacy Reaction or SimulationEngine path may remain in use"
     original_claim: "The audit required checking whether public paths still route through legacy Reaction or SimulationEngine execution."
-    current_assessment: "Supported configured workflows avoid direct legacy solver construction, but Reaction, SimulationEngine, and Process.as_reaction adapters still exist and are intentionally covered by low-level tests."
-    technical_status: "Resolved for high-level configured workflow paths; unresolved mapping remains for direct low-level APIs and adapters."
-    scientific_status: "Legacy low-level support is not itself a scientific defect, but unclear boundaries can confuse supported workflow claims."
+    current_assessment: "Supported configured workflows avoid direct legacy solver construction, P1.3 mapped every supported execution path, and P1.4 removed concrete process-to-Reaction adapters. Reaction, SimulationEngine, and ReactionDiffusionEngine1D remain intentionally supported explicit low-level APIs."
+    technical_status: "Resolved for supported configured workflows and process adapter retirement; retained low-level APIs are documented as separate direct solver surfaces."
+    scientific_status: "Legacy low-level support is not itself a scientific defect. It remains separate from native configured execution and does not validate any biological mechanism."
     evidence:
       code:
         - path: "src/fungal_model/core/simulation.py"
           symbols: ["SimulationEngine"]
-          explanation: "The legacy ODE reaction engine remains as a low-level API."
+          explanation: "The reaction ODE engine remains as an explicit low-level API, not the configured workflow path."
         - path: "src/fungal_model/processes/homogeneous.py"
-          symbols: ["FirstOrderDecayProcess.as_reaction", "MassActionProcess.as_reaction", "HomogeneousMichaelisMentenProcess.as_reaction"]
-          explanation: "Process-to-Reaction compatibility adapters remain."
+          symbols: ["FirstOrderDecayProcess", "MassActionProcess", "HomogeneousMichaelisMentenProcess"]
+          explanation: "P1.4 removed concrete process-to-Reaction compatibility adapters from homogeneous process classes."
         - path: "src/fungal_model/processes/surface.py"
-          symbols: ["SurfaceCatalysisProcess.as_reaction"]
-          explanation: "A surface process adapter to Reaction remains."
+          symbols: ["SurfaceCatalysisProcess"]
+          explanation: "P1.4 removed the surface process adapter to Reaction."
       tests:
         - path: "tests/test_guardrails_native_execution.py"
-          test_names: ["test_high_level_workflows_do_not_construct_low_level_solvers_directly"]
-          explanation: "The public workflow guardrail excludes SimulationEngine, ReactionDiffusionEngine, and direct solve_ivp construction from configured workflow, PET plugin, and foundation notebook paths."
+          test_names: ["test_high_level_workflows_do_not_construct_low_level_solvers_directly", "test_process_modules_do_not_define_legacy_reaction_adapters"]
+          explanation: "The public workflow guardrail excludes low-level solver construction from supported workflow paths and asserts process modules no longer define as_reaction or _reaction_from_process."
         - path: "tests/test_reaction_engine.py"
           test_names: ["build_first_order_engine"]
-          explanation: "Low-level SimulationEngine remains tested directly."
+          explanation: "Low-level SimulationEngine remains tested directly with explicit Reaction construction."
       documentation:
-        - path: "FUNGMOD_PHASE_1_REPOSITORY_TRUTH_AND_EXECUTION_HARDENING.md"
-          explanation: "P1.3 and P1.4 are explicitly reserved for execution-path mapping and adapter retirement or containment."
+        - path: "foundation_progress/validation/PHASE_1_NATIVE_EXECUTION_PATHS.md"
+          explanation: "P1.3 maps supported native paths, explicit low-level legacy paths, and unsupported/transitional paths."
+        - path: "foundation_progress/validation/PHASE_1_LEGACY_ADAPTER_RETIREMENT.md"
+          explanation: "P1.4 records adapter removal evidence and the retained low-level API boundary."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_guardrails_native_execution.py tests/test_reaction_engine.py"
-    remaining_risk: "Adapters may still be usable outside the supported public workflow boundary until P1.3/P1.4 maps and contains them."
-    recommended_next_action: "Do not remove adapters in this task; map them in P1.3 and decide containment/removal in P1.4."
+    remaining_risk: "Future spatial or low-level reaction workflows must not reintroduce an implicit process-to-Reaction bridge without a documented, tested solver route."
+    recommended_next_action: "Preserve the native execution and adapter-retirement guardrails; use explicit low-level Reaction APIs only when that is the intended solver surface."
 
   - id: "P1-AUDIT-VALIDATORS-001"
     original_severity: "high"
@@ -120,8 +122,8 @@ findings:
         - path: "README.md"
           explanation: "README documents that run_configured_model executes through AssembledModel.run and validates the result."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_configured_model_workflow.py tests/test_configured_workflow_failures.py"
     remaining_risk: "Validator coverage depends on configured validators and conserved weights; it is not a substitute for external validation data."
@@ -149,14 +151,14 @@ findings:
           test_names: ["test_generic_configured_runner_executes_all_foundation_benchmarks"]
           explanation: "The test executes the generic configured runner for three foundation benchmark configs."
         - path: "tests/test_guardrails_public_api.py"
-          test_names: ["test_foundation_public_api_names_exist"]
+          test_names: ["test_current_foundation_public_api_is_exported"]
           explanation: "The public API guardrail includes configured-model names."
       documentation:
         - path: "README.md"
           explanation: "README lists run_configured_model in the foundation public API."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_configured_model_workflow.py tests/test_guardrails_public_api.py"
     remaining_risk: "Configured-model API availability is not the same as researcher-friendly arbitrary-name simulation for every biological case."
@@ -190,8 +192,8 @@ findings:
         - path: "ARCHITECTURE_DEBT.md"
           explanation: "FD-005 records the remaining Pyright optional-value baseline."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_quality_config.py"
         - ".venv/bin/python -m ruff check src tests"
@@ -225,8 +227,8 @@ findings:
         - path: "README.md"
           explanation: "README states Gibbs free energy values are metadata and full thermodynamic feasibility constraints are not yet enforced by the solver."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_stoichiometry_thermodynamics.py"
     remaining_risk: "Simulations can remain numerically valid while thermodynamically unsupported."
@@ -263,8 +265,8 @@ findings:
         - path: "README.md"
           explanation: "README states oxygen handling is a validation check, not a coupled oxygen state."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_stoichiometry_thermodynamics.py tests/test_configured_workflow_failures.py"
     remaining_risk: "Redox and automatic universal balance enforcement remain absent; validators must be explicitly configured."
@@ -304,8 +306,8 @@ findings:
         - path: "README.md"
           explanation: "README documents environment modifiers and the limitation that environment grids do not imply active response laws."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_environment_modifiers.py tests/test_virtual_experiment_environment_grid.py"
     remaining_risk: "Metadata grids and modifier utilities are not a validated temperature/pH/oxygen response model for every biological case."
@@ -345,8 +347,8 @@ findings:
         - path: "README.md"
           explanation: "README lists PET, cellulose, lignin, starch, and chitin substrate classes and their limits."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_universal_substrates.py tests/test_guardrails_config_generality.py tests/test_bio001_surface_cellulose_virtual_experiment.py"
     remaining_risk: "Substrate breadth is not publication-grade validation breadth."
@@ -380,8 +382,8 @@ findings:
         - path: "progress.md"
           explanation: "Progress records the BIO-001 output-semantics cleanup and limitations."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_bio001_surface_cellulose_virtual_experiment.py tests/test_registry_case_templates.py"
     remaining_risk: "Accessibility remains a derived proxy and BIO-001 has no empirical cellulose validation data."
@@ -415,8 +417,8 @@ findings:
         - path: "foundation_progress/BIO_002_ENZYME_CHAIN_DEGRADATION.md"
           explanation: "BIO-002 scope, generic contract, and limitations are documented."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_bio002_generic_chain_assembly.py tests/test_bio002_extracellular_enzyme_chain.py"
     remaining_risk: "Arbitrary-length or branching process-chain biology remains out of scope."
@@ -447,8 +449,8 @@ findings:
         - path: "README.md"
           explanation: "README describes BIO-002 as an extracellular enzyme-chain assembler, not a general pathway graph engine."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_bio002_generic_chain_assembly.py"
     remaining_risk: "Future multi-step biology could outgrow the current two-step assumptions."
@@ -482,8 +484,8 @@ findings:
         - path: "progress.md"
           explanation: "CLEANUP-001/SCHEMA-001 progress records schema files and output semantics hardening."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_virtual_experiment_api.py tests/test_api003_researcher_virtual_experiment.py"
     remaining_risk: "trajectory_quantiles.csv remains absent and schema completeness should continue in later output-schema work."
@@ -517,8 +519,8 @@ findings:
         - path: "README.md"
           explanation: "README documents the virtual-experiment API and scientific limitations."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_api003_researcher_virtual_experiment.py tests/test_virtual_experiment_api.py"
     remaining_risk: "Scientific mode remains exact/unvalidated and narrow; it is not publication validation."
@@ -549,8 +551,8 @@ findings:
         - path: "progress.md"
           explanation: "Progress records the rename from concentration wording to amount wording."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_bio001_surface_cellulose_virtual_experiment.py"
     remaining_risk: "BIO-001 remains exploratory and unvalidated."
@@ -581,8 +583,8 @@ findings:
         - path: "README.md"
           explanation: "README states PET surface hydrolysis uses constant accessible surface area and documents model limits."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_bio001_surface_cellulose_virtual_experiment.py"
     remaining_risk: "A true accessibility mechanism remains future work and must not be implied."
@@ -616,8 +618,8 @@ findings:
         - path: "README.md"
           explanation: "README lists missing-parameter and suggested-experiment tables in standard output."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_virtual_experiment_api.py tests/test_api003_researcher_virtual_experiment.py"
     remaining_risk: "Table content quality depends on modelability suggestions and may need future enrichment."
@@ -648,8 +650,8 @@ findings:
         - path: "progress.md"
           explanation: "CLEANUP-001 records environment-grid guardrails as explicitly non-rankable and non-plottable unless response support exists."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_virtual_experiment_environment_grid.py"
     remaining_risk: "Active environmental response models remain limited and unvalidated."
@@ -680,8 +682,8 @@ findings:
         - path: "AGENTS.md"
           explanation: "AGENTS defines the current biology rule: only implemented, provenance-backed, maturity-labelled, tested, limitation-honest biology may be added."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_bio_readiness_lite.py"
     remaining_risk: "The readiness validator must be used consistently for future BIO work."
@@ -715,8 +717,8 @@ findings:
         - path: "progress.md"
           explanation: "CLEANUP-001 records addition of range_scope, range_interpretation, and allowed_use semantics."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_registry_loading.py tests/test_virtual_experiment_api.py"
     remaining_risk: "Downstream users can still misuse outputs if they ignore allowed_use and limitations."
@@ -750,8 +752,8 @@ findings:
         - path: "README.md"
           explanation: "README states exploratory priors remain assumptions rather than literature-curated values."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_virtual_experiment_api.py tests/test_bio001_surface_cellulose_virtual_experiment.py"
     remaining_risk: "No publication-export blocker currently forces users to acknowledge exploratory priors."
@@ -782,8 +784,8 @@ findings:
         - path: "foundation_progress/BIO_001_CELLULOSE_SURFACE_DEGRADATION.md"
           explanation: "BIO-001 documentation states scope, parameters, and limitations."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_bio001_surface_cellulose_virtual_experiment.py"
     remaining_risk: "Users may overinterpret exploratory cellulose-like outputs as empirical validation."
@@ -820,8 +822,8 @@ findings:
         - path: "README.md"
           explanation: "README states Bayesian calibration and global sensitivity are not implemented."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_configured_synthetic_calibration.py tests/test_uncertainty_sensitivity.py"
     remaining_risk: "No Bayesian calibration, Sobol/global sensitivity, or empirical validation workflow is available."
@@ -858,8 +860,8 @@ findings:
         - path: "AGENTS.md"
           explanation: "AGENTS defines the biology rule and unknown/exploratory opt-in expectations."
     verification:
-      commit_sha: "3538d303c5fbeb1697c584b11d4b6b1109374223"
-      verified_at: "2026-06-14T11:31:47Z"
+      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
+      verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_maturity_policy.py tests/test_api003_researcher_virtual_experiment.py"
     remaining_risk: "Users can still copy tables without limitations; no publication export consent gate exists."

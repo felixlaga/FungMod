@@ -18,11 +18,12 @@ FungMod should not become a pile of half-ingested datasets or half-implemented m
 
 The next phases should build the missing infrastructure needed for reliable biology.
 
-Status note: this roadmap contains phase gates that predate some current
-registry-backed BIO work. Before treating any phase as open or complete, verify
-against `progress.md`, code, and tests. Reconciling roadmap status is a Phase 1
-Task 2 responsibility; this document should not be used to override the current
-biology rule in `AGENTS.md`.
+Status note: this roadmap contains phase gates that predate the current
+registry-backed BIO-001 and BIO-002 work. Phase 1 reconciliation verified that
+the active source of truth is `AGENTS.md`, `README.md`, `progress.md`,
+`ARCHITECTURE_DEBT.md`, the Phase 1 validation reports, code, and tests. This
+roadmap remains directional and must not override the current biology rule in
+`AGENTS.md` or reclassify exploratory BIO work as scientifically validated.
 
 ---
 
@@ -92,10 +93,10 @@ provenance-backed, maturity-labelled, covered by tests, and honest about
 assumptions and limitations. Unsupported, invented, silently guessed, or falsely
 validated biology is forbidden.
 
-The roadmap phase gate below still needs reconciliation against current BIO-001
-and BIO-002 work in Phase 1 Task 2. Until that reconciliation is complete,
-verify the actual repository state from `progress.md`, code, and tests before
-deciding whether a specific biology task is unblocked.
+The roadmap phase gates below are directional. Current BIO-001 and BIO-002
+work is implemented and technically verified for its scoped exploratory
+registry-backed pilots, but it is not publication-grade validation and does not
+unlock arbitrary unsupported fungus/substrate biology.
 
 ## Why not immediately?
 

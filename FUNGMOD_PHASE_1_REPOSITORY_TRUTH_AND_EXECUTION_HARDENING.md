@@ -1,8 +1,10 @@
 # FungMod Phase 1 — Repository Truth, Instruction Cleanup, and Native Execution Hardening
 
-**Status:** Proposed  
+**Status:** Complete
 **Priority:** Critical prerequisite  
 **Primary purpose:** Make the repository's active instructions, audit findings, documentation, and execution architecture agree with the code that actually exists before starting further scientific expansion.
+**Completed:** 2026-06-15 after P1.1-P1.5 reconciliation, adapter retirement,
+documentation synchronization, and local quality-gate verification.
 
 ## 1. Why this phase comes first
 
@@ -180,6 +182,8 @@ Do not remove the low-level `Reaction` engine merely because a native process so
 
 ## P1.5 — Documentation and quality-gate synchronization
 
+Status: complete in Phase 1 Task 5.
+
 Update:
 
 - `README.md`;
@@ -207,25 +211,27 @@ Resolve internal contradictions, for example where one section says cellulose is
 
 Phase 1 is complete only when:
 
-- [ ] `AGENTS.md` exists and defines the current binding rules.
-- [ ] `old_progress/` is explicitly archived and non-binding.
-- [ ] No active instruction contains a blanket prohibition on biology.
-- [ ] Active instructions prohibit unsupported or invented biology.
-- [ ] `findings.yaml` parses with a standard YAML parser.
-- [ ] All critical/high audit findings have current statuses and code evidence.
-- [ ] All supported configured well-mixed workflows use native process execution.
-- [ ] Legacy adapters are removed or explicitly contained.
-- [ ] Native-path regression tests exist.
-- [ ] README, progress, roadmap, and architecture debt agree.
-- [ ] Ruff passes.
-- [ ] Pyright passes under the repository configuration.
-- [ ] The full test suite passes.
-- [ ] Coverage remains at or above the repository gate.
-- [ ] The final Codex report lists changes, non-changes, remaining debt, tests, files, and risks.
+- [x] `AGENTS.md` exists and defines the current binding rules.
+- [x] `old_progress/` is explicitly archived and non-binding.
+- [x] No active instruction contains a blanket prohibition on biology.
+- [x] Active instructions prohibit unsupported or invented biology.
+- [x] `findings.yaml` parses with a standard YAML parser.
+- [x] All critical/high audit findings have current statuses and code evidence.
+- [x] All supported configured well-mixed workflows use native process execution.
+- [x] Legacy adapters are removed or explicitly contained.
+- [x] Native-path regression tests exist.
+- [x] README, progress, roadmap, and architecture debt agree.
+- [x] Ruff passes.
+- [x] Pyright passes under the repository configuration.
+- [x] The full test suite passes.
+- [x] Coverage remains at or above the repository gate.
+- [x] The final Codex report lists changes, non-changes, remaining debt, tests, files, and risks.
 
 ## 7. Required Codex report format
 
-Every task in this phase must end with:
+Every task in this phase must end with the information below. Individual task
+prompts may specialize the exact headings while preserving the same reporting
+content.
 
 ```text
 Summary:

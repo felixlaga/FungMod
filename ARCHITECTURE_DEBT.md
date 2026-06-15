@@ -7,6 +7,12 @@ ID, status, reason, risk, exit condition, removal milestone, and tests
 protecting the boundary. New foundation work should remove entries from this
 file, not normalize them.
 
+Current Phase 1 state: `FD-005` is the only active debt entry. `FD-006`
+process-to-`Reaction` adapter debt was resolved in Phase 1 Task 4; retained
+`Reaction`, `SimulationEngine`, and `ReactionDiffusionEngine1D` APIs are
+intentional explicit low-level APIs, not native configured workflow
+dependencies.
+
 ## FD-001 Legacy PET workflow in the generic workflow package
 
 Status: resolved in Milestone 9
