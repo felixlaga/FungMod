@@ -4,6 +4,7 @@ reviewed_commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
 verified_at: "2026-06-15T12:26:20Z"
 source_documents:
   - "AGENTS.md"
+  - "FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md"
   - "FUNGMOD_PHASE_1_REPOSITORY_TRUTH_AND_EXECUTION_HARDENING.md"
   - "foundation_progress/validation/VALIDATION_001_DEEP_REPO_REVIEW.md"
   - "foundation_progress/validation/VALIDATION_001_RISK_REGISTER.md"
@@ -12,6 +13,7 @@ source_documents:
 notes:
   - "findings.yaml and priority_findings.txt were absent before this reconciliation; this catalogue is built from the audit artifacts present in foundation_progress/validation and the Phase 1 plan."
   - "Resolved technical findings do not imply empirical scientific validation."
+  - "Phase 2 Task 1 adds an implementation design for the thermodynamic and balance blockers, but does not mark them resolved."
 findings:
   - id: "P1-AUDIT-NATIVE-001"
     original_severity: "critical"
@@ -208,7 +210,7 @@ findings:
     current_status: "confirmed"
     title: "Full thermodynamic feasibility is not enforced by the solver"
     original_claim: "Thermodynamic feasibility enforcement was missing or incomplete."
-    current_assessment: "The current repository records Gibbs free energy metadata and can report exergonic status, but the solver does not enforce thermodynamic feasibility constraints or thermodynamic flux analysis."
+    current_assessment: "The current repository records Gibbs free energy metadata and can report exergonic status, but the solver does not enforce thermodynamic feasibility constraints or thermodynamic flux analysis. FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md now defines the staged implementation plan without resolving this blocker."
     technical_status: "Metadata interface implemented; solver-level thermodynamic feasibility enforcement not implemented."
     scientific_status: "Confirmed scientific blocker for publication-grade mechanistic claims where thermodynamic feasibility matters."
     evidence:
@@ -226,13 +228,15 @@ findings:
       documentation:
         - path: "README.md"
           explanation: "README states Gibbs free energy values are metadata and full thermodynamic feasibility constraints are not yet enforced by the solver."
+        - path: "FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md"
+          explanation: "Phase 2 Task 1 distinguishes standard, condition-specific, and dynamic reaction Gibbs energy and defines staged enforcement milestones."
     verification:
       commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
       verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_stoichiometry_thermodynamics.py"
     remaining_risk: "Simulations can remain numerically valid while thermodynamically unsupported."
-    recommended_next_action: "Keep as a confirmed scientific blocker; do not implement thermodynamic enforcement in this reconciliation task."
+    recommended_next_action: "Use FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md as the implementation plan; keep this finding confirmed until enforcement milestones are implemented and tested."
 
   - id: "P1-AUDIT-BALANCE-001"
     original_severity: "high"
@@ -240,7 +244,7 @@ findings:
     current_status: "partially_resolved"
     title: "Elemental, carbon, oxygen, and redox balance enforcement"
     original_claim: "Elemental, carbon, oxygen, and redox balance enforcement needed current-state review."
-    current_assessment: "Elemental stoichiometry metadata, carbon conservation validation, oxygen limitation validation, and biomass-yield validation exist, but redox enforcement and universal automatic balance enforcement are not implemented."
+    current_assessment: "Elemental stoichiometry metadata, carbon conservation validation, oxygen limitation validation, and biomass-yield validation exist, but redox enforcement and universal automatic balance enforcement are not implemented. FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md now defines the staged implementation plan without resolving this blocker."
     technical_status: "Partially implemented as explicit validators and metadata interfaces."
     scientific_status: "Scientific claims remain limited unless the relevant validators and conserved weights are configured for the case."
     evidence:
@@ -264,13 +268,15 @@ findings:
       documentation:
         - path: "README.md"
           explanation: "README states oxygen handling is a validation check, not a coupled oxygen state."
+        - path: "FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md"
+          explanation: "Phase 2 Task 1 defines elemental, charge, and electron/redox balance semantics, unknown-data behavior, residual reporting, and mode gates."
     verification:
       commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
       verified_at: "2026-06-15T12:26:20Z"
       commands_run:
         - ".venv/bin/python -m pytest tests/test_stoichiometry_thermodynamics.py tests/test_configured_workflow_failures.py"
     remaining_risk: "Redox and automatic universal balance enforcement remain absent; validators must be explicitly configured."
-    recommended_next_action: "Track as partially resolved and revisit only when a future scientific mechanism needs redox or automatic balance enforcement."
+    recommended_next_action: "Use FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md for future validator/schema/API work; keep this finding partially resolved until redox and automatic balance enforcement are implemented and tested."
 
   - id: "P1-AUDIT-ENV-001"
     original_severity: "high"

@@ -26,6 +26,32 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## Phase 2 Task 1 Thermodynamic and Balance Enforcement Design
+
+Date: 2026-06-15
+
+Status: `complete` for the scoped implementation plan only. The confirmed
+thermodynamic feasibility and complete stoichiometric/redox enforcement
+blockers remain unresolved.
+
+Completed in this pass:
+
+- Added `FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md` as the
+  staged design for thermodynamic and balance enforcement.
+- Defined standard Gibbs energy, condition-specific Gibbs energy, and dynamic
+  reaction Gibbs energy as separate concepts.
+- Documented what FungMod can honestly enforce with current metadata and what
+  remains unsupported.
+- Specified elemental, charge, electron/redox, residual, tolerance, unit,
+  provenance, mode, assembly-time, post-simulation, schema, API, output,
+  migration, test, and milestone requirements.
+- Updated `findings.yaml` only to point `P1-AUDIT-THERMO-001` and
+  `P1-AUDIT-BALANCE-001` to the Phase 2 plan.
+
+No production thermodynamic enforcement, redox enforcement, formulas, charges,
+activity models, Gibbs values, biological data, solver behavior, public APIs,
+output schemas, numerical methods, or scientific claims changed.
+
 ## Phase 1 Task 5 Documentation and Quality-Gate Synchronization
 
 Date: 2026-06-15
