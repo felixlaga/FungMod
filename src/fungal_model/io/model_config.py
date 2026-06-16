@@ -396,6 +396,148 @@ class OutputConfig:
 
 
 @dataclass(frozen=True)
+class ChemicalSpeciesMetadataConfig:
+    """Optional static chemistry metadata for one configured species or pool."""
+
+    id: str
+    raw: Mapping[str, Any]
+
+    @classmethod
+    def from_mapping(
+        cls,
+        data: Mapping[str, Any],
+        *,
+        default_id: str | None = None,
+    ) -> "ChemicalSpeciesMetadataConfig":
+        identifier = str(data.get("id") or data.get("species_id") or default_id or "").strip()
+        if not identifier:
+            raise ModelConfigError("Chemical species metadata requires id or species_id.")
+        return cls(id=identifier, raw=deepcopy(dict(data)))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"id": self.id, **deepcopy(dict(self.raw))}
+
+
+@dataclass(frozen=True)
+class ChemistryMetadataConfig:
+    """Optional static chemistry metadata section preserved from model config."""
+
+    species: tuple[ChemicalSpeciesMetadataConfig, ...] = ()
+    raw: Mapping[str, Any] | None = None
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ChemistryMetadataConfig":
+        species_value = data.get("species", data)
+        if isinstance(species_value, Mapping):
+            species = tuple(
+                ChemicalSpeciesMetadataConfig.from_mapping(
+                    _mapping(species_data, field_name=f"chemistry_metadata.species.{species_id}"),
+                    default_id=str(species_id),
+                )
+                for species_id, species_data in species_value.items()
+            )
+        else:
+            species = tuple(
+                ChemicalSpeciesMetadataConfig.from_mapping(
+                    entry,
+                    default_id=None,
+                )
+                for entry in _as_sequence(species_value)
+            )
+        return cls(species=species, raw=deepcopy(dict(data)))
+
+    def to_dict(self) -> dict[str, Any]:
+        return deepcopy(dict(self.raw or {}))
+
+
+@dataclass(frozen=True)
+class ReactionParticipantMetadataConfig:
+    """Optional static reaction participant metadata preserved from config."""
+
+    species_id: str
+    coefficient: float
+    raw: Mapping[str, Any]
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ReactionParticipantMetadataConfig":
+        species_id = str(data.get("species") or data.get("species_id") or "").strip()
+        if not species_id:
+            raise ModelConfigError("Reaction participant metadata requires species or species_id.")
+        return cls(
+            species_id=species_id,
+            coefficient=float(data.get("coefficient", 1.0)),
+            raw=deepcopy(dict(data)),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "species_id": self.species_id,
+            "coefficient": self.coefficient,
+            **deepcopy(dict(self.raw)),
+        }
+
+
+@dataclass(frozen=True)
+class ReactionMetadataConfig:
+    """Optional static reaction metadata preserved from config."""
+
+    id: str
+    reactants: tuple[ReactionParticipantMetadataConfig, ...] = ()
+    products: tuple[ReactionParticipantMetadataConfig, ...] = ()
+    raw: Mapping[str, Any] | None = None
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ReactionMetadataConfig":
+        identifier = str(data.get("id") or data.get("reaction_id") or "").strip()
+        if not identifier:
+            raise ModelConfigError("Reaction metadata requires id or reaction_id.")
+        return cls(
+            id=identifier,
+            reactants=tuple(
+                ReactionParticipantMetadataConfig.from_mapping(item)
+                for item in _as_sequence(data.get("reactants", ()))
+            ),
+            products=tuple(
+                ReactionParticipantMetadataConfig.from_mapping(item)
+                for item in _as_sequence(data.get("products", ()))
+            ),
+            raw=deepcopy(dict(data)),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return deepcopy(dict(self.raw or {}))
+
+
+@dataclass(frozen=True)
+class BalanceCheckConfig:
+    """Optional static balance check request preserved from config."""
+
+    id: str
+    reaction_id: str
+    checks: tuple[str, ...] = ("elemental",)
+    required: bool = True
+    raw: Mapping[str, Any] | None = None
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any], *, index: int) -> "BalanceCheckConfig":
+        checks_value = data.get("checks", data.get("check_types", ("elemental",)))
+        if isinstance(checks_value, str):
+            checks = (checks_value,)
+        else:
+            checks = tuple(str(item) for item in _as_sequence_of_values(checks_value))
+        return cls(
+            id=str(data.get("id") or f"balance_check_{index}"),
+            reaction_id=str(data.get("reaction_id") or data.get("reaction") or ""),
+            checks=tuple(check.strip().lower() for check in checks) or ("elemental",),
+            required=bool(data.get("required", True)),
+            raw=deepcopy(dict(data)),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return deepcopy(dict(self.raw or {}))
+
+
+@dataclass(frozen=True)
 class ModelConfig:
     """Loaded generic model configuration."""
 
@@ -411,6 +553,9 @@ class ModelConfig:
     validators: tuple[ValidatorConfig, ...]
     outputs: OutputConfig
     raw: Mapping[str, Any]
+    chemistry_metadata: ChemistryMetadataConfig | None = None
+    reaction_metadata: tuple[ReactionMetadataConfig, ...] = ()
+    balance_checks: tuple[BalanceCheckConfig, ...] = ()
     path: Path | None = None
 
     @classmethod
@@ -437,6 +582,12 @@ class ModelConfig:
             validators=tuple(ValidatorConfig.from_mapping(item) for item in _as_sequence(data["validators"])),
             outputs=OutputConfig.from_mapping(data["outputs"]),
             raw=deepcopy(dict(data)),
+            chemistry_metadata=_optional_chemistry_metadata(data.get("chemistry_metadata")),
+            reaction_metadata=tuple(ReactionMetadataConfig.from_mapping(item) for item in _as_sequence(data.get("reaction_metadata", ()))),
+            balance_checks=tuple(
+                BalanceCheckConfig.from_mapping(item, index=index)
+                for index, item in enumerate(_as_sequence(data.get("balance_checks", ())))
+            ),
             path=None if path is None else Path(path),
         )
 
@@ -519,6 +670,9 @@ def validate_model_config_mapping(data: Mapping[str, Any]) -> ModelConfigValidat
 
 
 __all__ = [
+    "BalanceCheckConfig",
+    "ChemicalSpeciesMetadataConfig",
+    "ChemistryMetadataConfig",
     "ModelConfig",
     "ModelConfigError",
     "ModelConfigValidationResult",
@@ -528,6 +682,8 @@ __all__ = [
     "OutputConfig",
     "ParameterSetConfig",
     "ProcessConfig",
+    "ReactionMetadataConfig",
+    "ReactionParticipantMetadataConfig",
     "REQUIRED_MODEL_CONFIG_FIELDS",
     "TimeConfig",
     "VALID_MODEL_MATURITIES",
@@ -561,6 +717,14 @@ def _reference_tuple(value: Any) -> tuple[ConfigReference, ...]:
     )
 
 
+def _optional_chemistry_metadata(value: Any) -> ChemistryMetadataConfig | None:
+    if value is None:
+        return None
+    return ChemistryMetadataConfig.from_mapping(
+        _mapping(value, field_name="chemistry_metadata")
+    )
+
+
 def _as_sequence(value: Any) -> tuple[Mapping[str, Any], ...]:
     if value is None:
         return ()
@@ -569,3 +733,17 @@ def _as_sequence(value: Any) -> tuple[Mapping[str, Any], ...]:
     if not all(isinstance(item, Mapping) for item in value):
         raise ModelConfigError("Model config section entries must be mappings.")
     return tuple(value)
+
+
+def _as_sequence_of_values(value: Any) -> tuple[Any, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list | tuple):
+        raise ModelConfigError("Model config section must be a sequence.")
+    return tuple(value)
+
+
+def _mapping(value: Any, *, field_name: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ModelConfigError(f"{field_name} must be a mapping.")
+    return value

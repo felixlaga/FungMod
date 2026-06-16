@@ -23,6 +23,11 @@ from fungal_model.processes import (
 )
 from fungal_model.workflows.configured_errors import raise_configured_model_execution_error
 from fungal_model.workflows.configured_inputs import ConfiguredInputs
+from fungal_model.workflows.static_balance import (
+    blocking_static_balance_validations,
+    configured_static_balance_validations,
+    static_validation_callable,
+)
 
 
 @dataclass(frozen=True)
@@ -71,7 +76,42 @@ class ConfiguredProcessAssembler:
                 details={"decisions": [decision.to_dict() for decision in decisions]},
             )
         try:
+            static_balance_validations = configured_static_balance_validations(config)
+        except ValueError as exc:
+            raise_configured_model_execution_error(
+                config,
+                stage="model_assembly",
+                missing_capabilities=("static_balance_metadata",),
+                message=str(exc),
+                details={"error_type": type(exc).__name__},
+            )
+        blocking_validations = blocking_static_balance_validations(
+            mode=config.mode,
+            validations=static_balance_validations,
+        )
+        if blocking_validations:
+            raise_configured_model_execution_error(
+                config,
+                stage="model_assembly",
+                missing_capabilities=("static_balance_checks",),
+                message="Assembly-time static balance checks failed or were inconclusive.",
+                details={
+                    "assembly_static_balance_checks": [
+                        validation.to_dict()
+                        for validation in static_balance_validations
+                    ],
+                    "blocking_static_balance_checks": [
+                        validation.to_dict()
+                        for validation in blocking_validations
+                    ],
+                },
+            )
+        try:
             processes = library.build_processes(build_context, config.processes)
+            validators = (
+                *inputs.validators,
+                *(static_validation_callable(validation) for validation in static_balance_validations),
+            )
             model = ModelBuilder(
                 fungus=inputs.fungus,
                 substrates=inputs.substrates,
@@ -81,7 +121,7 @@ class ConfiguredProcessAssembler:
                 process_library=ProcessRegistry(processes),
                 parameters=inputs.parameters,
                 requested_processes=tuple(process.name for process in processes),
-                validators=inputs.validators,
+                validators=validators,
                 allow_unsourced_for_testing=config.mode == "toy",
             ).assemble()
         except ModelAssemblyError as exc:

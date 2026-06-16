@@ -2,6 +2,9 @@
 
 from .json_export import export_json
 from .model_config import (
+    BalanceCheckConfig,
+    ChemicalSpeciesMetadataConfig,
+    ChemistryMetadataConfig,
     ConfigReference,
     EntityConfigRefs,
     InitialStateConfig,
@@ -11,6 +14,8 @@ from .model_config import (
     OutputConfig,
     ParameterSetConfig,
     ProcessConfig,
+    ReactionMetadataConfig,
+    ReactionParticipantMetadataConfig,
     TimeConfig,
     ValidatorConfig,
     load_model_config,
@@ -42,6 +47,9 @@ from .yaml_loader import (
 )
 
 __all__ = [
+    "BalanceCheckConfig",
+    "ChemicalSpeciesMetadataConfig",
+    "ChemistryMetadataConfig",
     "SchemaValidationError",
     "SchemaValidationResult",
     "ConfigReference",
@@ -69,6 +77,8 @@ __all__ = [
     "ParameterSetConfig",
     "ProcessConfig",
     "ProductMapRegistry",
+    "ReactionMetadataConfig",
+    "ReactionParticipantMetadataConfig",
     "RegistryLookupError",
     "SubstrateLoaderRegistry",
     "validate_config",

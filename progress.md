@@ -26,6 +26,40 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## Phase 2 Tasks 3-4 Static Metadata Schema And Assembly-Time Balance Checks
+
+Date: 2026-06-16
+
+Status: `complete` for the scoped P2.3/P2.4 static metadata and
+assembly-time balance enforcement foundation. The full thermodynamic
+feasibility blocker remains unresolved because dynamic reaction quotients,
+activities, activity coefficients, redox potentials, and solver-time
+thermodynamic constraints are still not implemented.
+
+Completed in this pass:
+
+- Added optional model-config schema surfaces for `chemistry_metadata`,
+  `reaction_metadata`, and `balance_checks` while preserving existing config
+  compatibility and raw passthrough.
+- Added assembly-time static balance parsing for explicit configured species,
+  reaction participant, and reaction metadata.
+- Wired optional assembly-time elemental, charge, and electron/redox balance
+  checks into configured model assembly.
+- Made scientific and strict modes block required assembly-time static checks
+  that fail, are unsupported, or are inconclusive because metadata are absent.
+- Kept toy and exploratory runs non-blocking for these optional checks while
+  recording `failed` or `inconclusive` validation results in the existing
+  result/output validation path.
+- Added tests proving schema recognition, passing metadata-backed elemental,
+  charge, and electron-equivalent checks, exploratory inconclusive metadata
+  output, scientific blocking on failed balance, strict blocking on missing
+  reaction metadata, and unchanged existing configured-workflow behavior.
+
+No dynamic thermodynamic validation, reaction-quotient calculation, activity
+model, activity coefficient, redox potential, biological data, literature
+value, process rate equation, solver equation, or real registry chemistry was
+added.
+
 ## Phase 2 Task 2 Static Elemental and Thermodynamic Validator Foundation
 
 Date: 2026-06-15

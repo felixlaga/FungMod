@@ -24,7 +24,7 @@ from fungal_model.core.validators import (
     validate_elemental_balance,
     validate_non_negative,
 )
-from fungal_model.io import ValidatorRegistry
+from fungal_model.io import ValidatorRegistry, load_model_config
 from fungal_model.results import SimulationResult
 from fungal_model.core.simulation import SolverSettings
 from fungal_model.workflows import ConfiguredModelExecutionError
@@ -240,6 +240,134 @@ def test_strict_config_rejects_failed_static_validator(tmp_path: Path) -> None:
     assert failed["status"] == "failed"
 
 
+def test_configured_species_reaction_metadata_records_passed_assembly_checks(tmp_path: Path) -> None:
+    config = _configured_static_validator_config(mode="exploratory")
+    config.update(
+        _static_balance_sections(
+            reaction_id="synthetic_split",
+            product_coefficient=2.0,
+            checks=["elemental", "charge", "electron"],
+            species_metadata={
+                "x2_pool": {"formula": "X2", "charge": 0.0, "electron_equivalents": 0.0},
+                "x_pool": {"formula": "X", "charge": 0.0, "electron_equivalents": 0.0},
+            },
+        )
+    )
+    output_dir = tmp_path / "assembly_output"
+
+    result = run_configured_model(_write_config(tmp_path, config), output_dir=output_dir)
+
+    assembly_checks = _assembly_balance_checks(result.validation_report())
+    validators_json = json.loads((output_dir / "validators.json").read_text(encoding="utf-8"))
+    assert {row["name"] for row in assembly_checks} == {
+        "elemental_balance",
+        "charge_balance",
+        "electron_balance",
+    }
+    assert {row["status"] for row in assembly_checks} == {"passed"}
+    assert all(row["details"]["assembly_time"] is True for row in assembly_checks)
+    assert all(row["details"]["reaction_id"] == "synthetic_split" for row in assembly_checks)
+    assert validators_json["summary"]["status_counts"]["passed"] >= 4
+
+
+def test_model_config_exposes_static_balance_metadata_schema_sections(tmp_path: Path) -> None:
+    config = _configured_static_validator_config(mode="exploratory")
+    config.update(
+        _static_balance_sections(
+            reaction_id="schema_split",
+            product_coefficient=2.0,
+            checks=["elemental", "charge"],
+            species_metadata={
+                "x2_pool": {"formula": "X2", "charge": 0.0},
+                "x_pool": {"formula": "X", "charge": 0.0},
+            },
+        )
+    )
+
+    loaded = load_model_config(_write_config(tmp_path, config))
+
+    assert loaded.chemistry_metadata is not None
+    assert {species.id for species in loaded.chemistry_metadata.species} == {"x2_pool", "x_pool"}
+    assert loaded.reaction_metadata[0].id == "schema_split"
+    assert loaded.reaction_metadata[0].products[0].coefficient == pytest.approx(2.0)
+    assert loaded.balance_checks[0].checks == ("elemental", "charge")
+
+
+def test_exploratory_assembly_check_records_inconclusive_missing_composition(tmp_path: Path) -> None:
+    config = _configured_static_validator_config(mode="exploratory")
+    config.update(
+        _static_balance_sections(
+            reaction_id="missing_composition_split",
+            product_coefficient=2.0,
+            checks=["elemental"],
+            species_metadata={
+                "x2_pool": {},
+                "x_pool": {"formula": "X"},
+            },
+        )
+    )
+    output_dir = tmp_path / "exploratory_missing_output"
+
+    result = run_configured_model(_write_config(tmp_path, config), output_dir=output_dir)
+
+    assembly_check = _assembly_balance_checks(result.validation_report())[0]
+    validators_json = json.loads((output_dir / "validators.json").read_text(encoding="utf-8"))
+    assert assembly_check["status"] == "inconclusive"
+    assert assembly_check["passed"] is False
+    assert assembly_check["details"]["missing_metadata"] == [
+        {"species": "x2_pool", "field": "composition"}
+    ]
+    assert validators_json["summary"]["status_counts"]["inconclusive"] == 1
+    assert (output_dir / "output_manifest.json").exists()
+
+
+def test_scientific_required_assembly_check_blocks_unbalanced_reaction(tmp_path: Path) -> None:
+    config = _configured_static_validator_config(mode="scientific")
+    config.update(
+        _static_balance_sections(
+            reaction_id="unbalanced_split",
+            product_coefficient=1.0,
+            checks=["elemental"],
+            species_metadata={
+                "x2_pool": {"formula": "X2"},
+                "x_pool": {"formula": "X"},
+            },
+        )
+    )
+    output_dir = tmp_path / "scientific_unbalanced_output"
+
+    with pytest.raises(ConfiguredModelExecutionError) as error:
+        run_configured_model(_write_config(tmp_path, config), output_dir=output_dir)
+
+    assert error.value.report.stage == "model_assembly"
+    assert "static_balance_checks" in error.value.report.missing_capabilities
+    blocking = error.value.report.details["blocking_static_balance_checks"][0]
+    assert blocking["name"] == "elemental_balance"
+    assert blocking["status"] == "failed"
+    assert blocking["details"]["max_abs_residual"] == pytest.approx(1.0)
+    assert not (output_dir / "output_manifest.json").exists()
+
+
+def test_strict_required_assembly_check_blocks_missing_reaction_metadata(tmp_path: Path) -> None:
+    config = _configured_static_validator_config(mode="strict")
+    config["balance_checks"] = [
+        {
+            "id": "missing_reaction_balance",
+            "reaction_id": "not_declared",
+            "checks": ["elemental"],
+            "required": True,
+        }
+    ]
+
+    with pytest.raises(ConfiguredModelExecutionError) as error:
+        run_configured_model(_write_config(tmp_path, config), output_dir=tmp_path / "strict_missing_output")
+
+    blocking = error.value.report.details["blocking_static_balance_checks"][0]
+    assert error.value.report.stage == "model_assembly"
+    assert blocking["status"] == "inconclusive"
+    assert blocking["details"]["missing_metadata"] == ["reaction_metadata.not_declared"]
+
+
 def test_result_serialization_preserves_status_rich_validation(tmp_path: Path) -> None:
     validation = ValidationResult(
         name="synthetic_static_check",
@@ -402,7 +530,7 @@ def _configured_static_validator_config(*, mode: str) -> dict[str, Any]:
         "kind": "model_config",
         "name": f"{mode} static validator reference",
         "mode": mode,
-        "maturity": "scientific" if mode == "strict" else "exploratory",
+        "maturity": "scientific" if mode in {"scientific", "strict"} else "exploratory",
         "entities": {},
         "parameters": [
             {
@@ -452,6 +580,56 @@ def _configured_static_validator_config(*, mode: str) -> dict[str, Any]:
         ],
         "outputs": {},
     }
+
+
+def _static_balance_sections(
+    *,
+    reaction_id: str,
+    product_coefficient: float,
+    checks: list[str],
+    species_metadata: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    source = "Controlled reference dataset for configured static balance checks."
+    return {
+        "chemistry_metadata": {
+            "species": {
+                species_id: {
+                    "name": species_id,
+                    "source": source,
+                    "composition_source": source,
+                    "charge_source": source,
+                    "electron_source": source,
+                    **metadata,
+                }
+                for species_id, metadata in species_metadata.items()
+            }
+        },
+        "reaction_metadata": [
+            {
+                "id": reaction_id,
+                "name": reaction_id,
+                "source": source,
+                "reactants": [{"species": "x2_pool", "coefficient": 1.0}],
+                "products": [{"species": "x_pool", "coefficient": product_coefficient}],
+            }
+        ],
+        "balance_checks": [
+            {
+                "id": f"{reaction_id}_balance",
+                "reaction_id": reaction_id,
+                "checks": checks,
+                "required": True,
+            }
+        ],
+    }
+
+
+def _assembly_balance_checks(report: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in report
+        if row["details"].get("assembly_time") is True
+    ]
 
 
 def _write_config(tmp_path: Path, config: dict[str, Any]) -> Path:
