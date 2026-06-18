@@ -24,6 +24,8 @@ the active source of truth is `AGENTS.md`, `README.md`, `progress.md`,
 `ARCHITECTURE_DEBT.md`, the Phase 1 validation reports, code, and tests. This
 roadmap remains directional and must not override the current biology rule in
 `AGENTS.md` or reclassify exploratory BIO work as scientifically validated.
+The current PR queue and reconciled scoped phase status are tracked in
+`foundation_progress/ROADMAP_ORCHESTRATION_STATUS.md`.
 
 ---
 
@@ -43,6 +45,31 @@ As of this roadmap, FungMod has:
 - provenance/limitations/missing-parameter/suggested-experiment tables;
 - tests for Reaction 618, homogeneous MM, environment grids, DATA-002, BIO-001, notebooks, and virtual-experiment outputs.
 ```
+
+Additional scoped completions verified after the original phase text was
+written:
+
+```text
+- SOURCE-002 notebook-driven SABIO-RK discovery and registry-proposal workflow
+  is complete for offline fixtures, deterministic proposal writing, and
+  no-network tests;
+- RESOLVE-001 is complete for strict registry-backed exact and
+  case-insensitive alias resolution;
+- ASSEMBLY-001 case-template assembly basics are complete for current
+  Reaction 618 and BIO-001 cases, but partial relative to arbitrary reaction
+  onboarding;
+- API-003 is complete for existing registry records, aliases, environment
+  grids, scientific/exploratory modes, and table access;
+- BIO-READINESS-LITE is complete for the template, validator, and tests;
+- BIO-002 is complete for scoped reusable two-step enzyme-chain assembly and
+  software verification, but partial relative to broad pathway biology;
+- Phase 2 static balance checks are complete for scoped static metadata,
+  validators, assembly-time checks, and process-reaction binding, but partial
+  relative to dynamic thermodynamic feasibility.
+```
+
+The current next PR is CASE-001. Do not rebuild the completed scoped slices
+above unless code or tests contradict this status.
 
 The current API can run registered cases from internal registry IDs.
 
