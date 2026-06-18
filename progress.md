@@ -26,6 +26,32 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-01 Roadmap Orchestration And Phase Status Tracker
+
+Date: 2026-06-19
+
+Status: `complete` for the scoped documentation/status guardrail once PR-01 is
+merged.
+
+Completed in this pass:
+
+- Added `foundation_progress/ROADMAP_ORCHESTRATION_STATUS.md` as the active
+  orchestrated-PR workflow and phase-status tracker.
+- Recorded the maker/reviewer/comment-loop/merge/next-PR workflow.
+- Recorded the PR queue with PR-02 CASE-001 as the current next slice and
+  VALIDATION-DATA-001 queued after it.
+- Reconciled scoped completion/partial status for SOURCE-002, RESOLVE-001,
+  ASSEMBLY-001 case-template basics, API-003, BIO-READINESS-LITE, BIO-002, and
+  Phase 2 static balance checks.
+- Added completion rules requiring tests, active-doc updates, `progress.md`
+  updates, honest scope/limitations, no live external APIs in tests or
+  simulation, no unsupported biology, and no silent fallback constants.
+- Updated the active roadmap and next-steps document so future agents do not
+  rebuild already completed scoped slices or treat `old_progress/` as binding.
+
+No scientific models, parameters, numerical methods, public APIs, runtime
+behavior, output schemas, source adapters, registry records, or biology changed.
+
 ## Phase 2 Task 4b Process-Reaction Binding For Static Balance Checks
 
 Date: 2026-06-18
