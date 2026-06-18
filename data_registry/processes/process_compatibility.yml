@@ -60,6 +60,45 @@ records:
       product release; it does not represent whole-fungus growth, secretion,
       uptake, oxygen limitation, or lignocellulose structure.
 
+  - record_id: bio002_cellulase_cellulose_film_extracellular_chain
+    name: BIO-002 cellulase cellulose-equivalent extracellular enzyme chain
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+      confidence_level: exploratory_assumption
+      bio_milestone: BIO-002
+      notes: Compatibility for the existing CASE-001/BIO-002 cellulose-equivalent chain template.
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    required_bond_classes:
+      - beta_1_4_glycosidic
+    process_type: extracellular_enzyme_chain
+    required_parameters:
+      - bio002_initial_solid_cellulose_equivalent_concentration
+      - bio002_cellulase_initial_concentration
+      - bio002_beta_glucosidase_initial_concentration
+      - bio002_cellulose_to_cellobiose_surface_rate
+      - bio002_cellulase_adsorption_constant
+      - bio002_cellulose_accessible_surface_area
+      - Km_cellobiose
+      - kcat_cellobiose
+    parameter_roles:
+      solid_substrate_initial_concentration: bio002_initial_solid_cellulose_equivalent_concentration
+      cellulase_initial_concentration: bio002_cellulase_initial_concentration
+      beta_glucosidase_initial_concentration: bio002_beta_glucosidase_initial_concentration
+      surface_rate_constant: bio002_cellulose_to_cellobiose_surface_rate
+      adsorption_constant: bio002_cellulase_adsorption_constant
+      accessible_surface_area: bio002_cellulose_accessible_surface_area
+      km: Km_cellobiose
+      kcat: kcat_cellobiose
+    product_map_required: true
+    case_template_id: bio002_extracellular_enzyme_chain_template
+    notes: >
+      CASE-001/BIO-002 compatibility only. It exposes the existing two-step
+      enzyme-chain template through registry case selection; it does not add
+      whole-fungus growth, secretion, uptake, biomass, PET, lignin, full
+      lignocellulose, organism-specific physiology, or empirical validation.
+
   - record_id: beta_glucosidase_cellobiose_homogeneous_mm
     name: beta-glucosidase on cellobiose homogeneous Michaelis-Menten
     maturity: literature_metadata

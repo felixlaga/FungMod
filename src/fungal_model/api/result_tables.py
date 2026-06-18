@@ -25,7 +25,7 @@ from fungal_model.api.output_schema import (
     table_fieldnames,
 )
 from fungal_model.registry.records import ParameterRecord, RegistryRecord
-from fungal_model.registry.store import FungModRegistry
+from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.screening import (
     EnsembleSample,
     ModelabilityReport,
@@ -138,7 +138,7 @@ def _build_table_rows(
         rows["provenance_table"].extend(_provenance_rows(context, registry, case, report, role_records))
         rows["limitations_table"].extend(_limitation_rows(context, registry, case, report, role_records))
         rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
-        rows["suggested_experiments"].extend(_suggested_experiment_rows(context, report))
+        rows["suggested_experiments"].extend(_suggested_experiment_rows(context, registry, case, report))
         for sample in case.samples:
             sample_context = _sample_context(context, sample)
             state_roles = _state_roles(sample)
@@ -936,7 +936,7 @@ def _provenance_rows(
         if compatibility.case_template_id:
             try:
                 template = registry.get_case_template(compatibility.case_template_id)
-            except KeyError:
+            except RegistryLookupError:
                 template = None
             if template is not None:
                 rows.append(_record_provenance_row(context, "case_template", template, role="", symbol="", value_kind=""))
@@ -1090,7 +1090,7 @@ def _case_template_limitation_rows(
             report=report,
         )
         template = registry.get_case_template(compatibility.case_template_id)
-    except (KeyError, RegistryCaseBuildError):
+    except (RegistryLookupError, RegistryCaseBuildError):
         return []
     rows: list[dict[str, Any]] = []
     for limitation in template.limitations:
@@ -1159,6 +1159,8 @@ def _missing_parameter_rows(
 
 def _suggested_experiment_rows(
     context: Mapping[str, Any],
+    registry: FungModRegistry,
+    case: RegistryCaseEnsemble,
     report: ModelabilityReport,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
@@ -1180,6 +1182,48 @@ def _suggested_experiment_rows(
                 "priority": "high" if parameter_symbol else "medium",
                 "rationale": "Required input is missing, explicitly unknown, or incompatible for this registry case.",
                 "allowed_use_after_resolution": "scientific_or_exploratory_when_recorded_with_provenance_and_units",
+            }
+        )
+    rows.extend(_case_template_suggested_experiment_rows(context, registry=registry, case=case, report=report))
+    return rows
+
+
+def _case_template_suggested_experiment_rows(
+    context: Mapping[str, Any],
+    *,
+    registry: FungModRegistry,
+    case: RegistryCaseEnsemble,
+    report: ModelabilityReport,
+) -> list[dict[str, Any]]:
+    try:
+        compatibility = select_registry_case_compatibility(
+            registry=registry,
+            fungus_id=case.fungus_id,
+            substrate_id=case.substrate_id,
+            report=report,
+        )
+        template = registry.get_case_template(compatibility.case_template_id)
+    except (RegistryLookupError, RegistryCaseBuildError):
+        return []
+    suggestions = template.process_state_metadata.get("suggested_experiments", ())
+    if not isinstance(suggestions, Sequence) or isinstance(suggestions, str):
+        return []
+    rows: list[dict[str, Any]] = []
+    for index, suggestion in enumerate(suggestions):
+        if not isinstance(suggestion, Mapping):
+            continue
+        description = str(suggestion.get("description", "")).strip()
+        if not description:
+            continue
+        rows.append(
+            {
+                **_case_columns(context),
+                "suggestion_id": str(suggestion.get("id") or f"{context['case_id']}_template_suggestion_{index:03d}"),
+                "parameter_symbol": "",
+                "suggested_experiment": description,
+                "priority": str(suggestion.get("priority", "medium")),
+                "rationale": str(suggestion.get("rationale", "Suggested by the registry case template.")),
+                "allowed_use_after_resolution": "update_registry_records_and_re-run_as_exploratory_or_scientific_only_when_provenance_supports_it",
             }
         )
     return rows
@@ -1216,6 +1260,13 @@ def _role_parameter_records(
     assembler = get_registry_process_assembler(compatibility.process_type)
     if assembler is None:
         return {}
+    chain_records = _chain_template_role_records(
+        registry=registry,
+        compatibility=compatibility,
+        required_roles=assembler.required_parameter_roles,
+    )
+    if chain_records is not None:
+        return dict(chain_records)
     records: dict[str, ParameterRecord] = {}
     roles = tuple(dict.fromkeys((*assembler.required_parameter_roles, *compatibility.parameter_roles.keys())))
     for role in roles:
@@ -1233,6 +1284,35 @@ def _role_parameter_records(
             environment_id=case.environment_id,
             mode=mode,
         )
+        if record is not None:
+            records[role] = record
+    return records
+
+
+def _chain_template_role_records(
+    *,
+    registry: FungModRegistry,
+    compatibility: Any,
+    required_roles: tuple[str, ...],
+) -> Mapping[str, ParameterRecord] | None:
+    if compatibility.process_type != "extracellular_enzyme_chain":
+        return None
+    if not compatibility.case_template_id:
+        return {}
+    try:
+        template = registry.get_case_template(compatibility.case_template_id)
+    except RegistryLookupError:
+        return {}
+    parameter_ids = template.process_state_metadata.get("parameter_record_ids")
+    if not isinstance(parameter_ids, dict):
+        return {}
+    roles = tuple(dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys())))
+    records: dict[str, ParameterRecord] = {}
+    for role in roles:
+        record_id = parameter_ids.get(role)
+        if record_id is None:
+            continue
+        record = registry.parameters.get(str(record_id))
         if record is not None:
             records[role] = record
     return records

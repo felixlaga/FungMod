@@ -26,6 +26,38 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-02 CASE-001 Researcher-Facing Enzyme-Chain Virtual Experiment
+
+Date: 2026-06-19
+
+Status: `complete` for the scoped CASE-001 researcher-facing API path once
+PR-02 is merged.
+
+Completed in this pass:
+
+- Exposed the existing BIO-002 extracellular enzyme-chain template through the
+  top-level researcher-facing `virtual_experiment(...)` / `VirtualExperiment`
+  API using names and aliases for the generic cellulase source, cellulose film,
+  and 30 C pH 5 assay context.
+- Added registry compatibility metadata for the existing BIO-002 chain so the
+  CASE-001 path selects `extracellular_enzyme_chain` without requiring users to
+  call `run_extracellular_enzyme_chain_demo(...)` directly.
+- Taught modelability to choose the best supported implemented process path
+  when the same source/substrate class has multiple scoped alternatives, so
+  BIO-001 surface-catalysis metadata does not block the BIO-002 chain path.
+- Taught exploratory ensemble simulation and standard result tables to use the
+  BIO-002 template-owned parameter records and template suggested experiments.
+- Added CASE-001 coverage proving alias resolution, standard output files,
+  limitations, suggested experiments, no live socket use, and no unsupported
+  whole-fungus/PET/lignin output states or metrics.
+- Updated CASE-001 and orchestration docs to mark PR-02 complete once merged
+  and set PR-03 VALIDATION-DATA-001 as the next PR.
+
+No new biological mechanism, validation dataset, live external source call,
+invented parameter, whole-fungus growth, secretion, uptake, biomass, PET,
+lignin, full lignocellulose, organism-specific physiology, or empirical
+validation claim was added.
+
 ## PR-01 Roadmap Orchestration And Phase Status Tracker
 
 Date: 2026-06-19

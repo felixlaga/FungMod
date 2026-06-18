@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is CASE-001. Do not rebuild the completed scoped slices
-above unless code or tests contradict this status.
+The current next PR is VALIDATION-DATA-001 after PR-02. Do not rebuild the
+completed scoped slices above unless code or tests contradict this status.
 
 The current API can run registered cases from internal registry IDs.
 
