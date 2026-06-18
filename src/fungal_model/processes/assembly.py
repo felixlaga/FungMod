@@ -120,6 +120,7 @@ class AssemblyReport:
     missing_parameters: tuple[ParameterIssue, ...] = ()
     incompatible_units: tuple[ParameterIssue, ...] = ()
     incompatible_mechanisms: tuple[CompatibilityIssue, ...] = ()
+    static_balance_checks: tuple[Mapping[str, Any], ...] = ()
     warnings: tuple[str, ...] = ()
 
     @property
@@ -149,6 +150,9 @@ class AssemblyReport:
             ],
             "incompatible_mechanisms": [
                 issue.to_dict() for issue in self.incompatible_mechanisms
+            ],
+            "static_balance_checks": [
+                dict(check) for check in self.static_balance_checks
             ],
             "warnings": list(self.warnings),
         }
@@ -231,6 +235,7 @@ class ModelBuilder:
     requested_processes: Sequence[str] = ()
     state_variables: Sequence[StateVariableSpec] = ()
     validators: Sequence[Any] = ()
+    static_balance_checks: Sequence[Mapping[str, Any]] = ()
     solver_settings: SolverSettings = field(default_factory=SolverSettings)
     allow_unsourced_for_testing: bool = False
 
@@ -258,6 +263,7 @@ class ModelBuilder:
             missing_parameters=missing_parameters,
             incompatible_units=incompatible_units,
             incompatible_mechanisms=incompatible_mechanisms,
+            static_balance_checks=tuple(dict(check) for check in self.static_balance_checks),
         )
         if missing_processes:
             raise MissingProcessError("Model assembly failed: missing process.", report=report)

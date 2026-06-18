@@ -26,6 +26,39 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## Phase 2 Task 4b Process-Reaction Binding For Static Balance Checks
+
+Date: 2026-06-18
+
+Status: `complete` for the corrective P2.4b binding gate. Static balance
+checks can no longer pass merely because an unrelated declared reaction is
+balanced; requested checks must now bind explicit reaction metadata to the
+actual assembled process contributions through explicit process-state to
+chemical-species mappings.
+
+Completed in this pass:
+
+- Added explicit `process_id` and state-to-species binding support for
+  `balance_checks`.
+- Verified each requested assembly-time balance check against the assembled
+  process contribution signs and coefficients before running the chemical
+  residual validator.
+- Included process/reaction binding evidence, mapped process stoichiometry,
+  reaction stoichiometry, role checks, product-map evidence, tolerance, and
+  failure reasons in validation details.
+- Added static balance check evidence to successful `AssemblyReport` payloads.
+- Made required scientific/strict balance checks block on missing, unknown,
+  duplicated, contradictory, coefficient-mismatched, or unrelated bindings.
+- Kept configs without `balance_checks` unchanged.
+- Added adversarial tests proving a process `A -> B` cannot pass with
+  unrelated balanced metadata `X2 -> 2X`, plus missing/unknown/duplicated/
+  contradictory binding tests and a product-map-backed
+  homogeneous-Michaelis-Menten binding test.
+
+No trajectory-level balance validation, dynamic Gibbs calculation, activity
+model, redox potential, biological data, literature value, process rate
+equation, solver equation, or real registry chemistry was added.
+
 ## Phase 2 Tasks 3-4 Static Metadata Schema And Assembly-Time Balance Checks
 
 Date: 2026-06-16

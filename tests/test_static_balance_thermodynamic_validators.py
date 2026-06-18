@@ -245,10 +245,10 @@ def test_configured_species_reaction_metadata_records_passed_assembly_checks(tmp
     config.update(
         _static_balance_sections(
             reaction_id="synthetic_split",
-            product_coefficient=2.0,
+            product_coefficient=1.0,
             checks=["elemental", "charge", "electron"],
             species_metadata={
-                "x2_pool": {"formula": "X2", "charge": 0.0, "electron_equivalents": 0.0},
+                "x2_pool": {"formula": "X", "charge": 0.0, "electron_equivalents": 0.0},
                 "x_pool": {"formula": "X", "charge": 0.0, "electron_equivalents": 0.0},
             },
         )
@@ -267,6 +267,7 @@ def test_configured_species_reaction_metadata_records_passed_assembly_checks(tmp
     assert {row["status"] for row in assembly_checks} == {"passed"}
     assert all(row["details"]["assembly_time"] is True for row in assembly_checks)
     assert all(row["details"]["reaction_id"] == "synthetic_split" for row in assembly_checks)
+    assert all(row["details"]["binding"]["verified"] is True for row in assembly_checks)
     assert validators_json["summary"]["status_counts"]["passed"] >= 4
 
 
@@ -275,10 +276,10 @@ def test_model_config_exposes_static_balance_metadata_schema_sections(tmp_path: 
     config.update(
         _static_balance_sections(
             reaction_id="schema_split",
-            product_coefficient=2.0,
+            product_coefficient=1.0,
             checks=["elemental", "charge"],
             species_metadata={
-                "x2_pool": {"formula": "X2", "charge": 0.0},
+                "x2_pool": {"formula": "X", "charge": 0.0},
                 "x_pool": {"formula": "X", "charge": 0.0},
             },
         )
@@ -289,8 +290,10 @@ def test_model_config_exposes_static_balance_metadata_schema_sections(tmp_path: 
     assert loaded.chemistry_metadata is not None
     assert {species.id for species in loaded.chemistry_metadata.species} == {"x2_pool", "x_pool"}
     assert loaded.reaction_metadata[0].id == "schema_split"
-    assert loaded.reaction_metadata[0].products[0].coefficient == pytest.approx(2.0)
+    assert loaded.reaction_metadata[0].products[0].coefficient == pytest.approx(1.0)
+    assert loaded.balance_checks[0].process_id == "reference_conversion"
     assert loaded.balance_checks[0].checks == ("elemental", "charge")
+    assert loaded.balance_checks[0].state_species is not None
 
 
 def test_exploratory_assembly_check_records_inconclusive_missing_composition(tmp_path: Path) -> None:
@@ -298,8 +301,9 @@ def test_exploratory_assembly_check_records_inconclusive_missing_composition(tmp
     config.update(
         _static_balance_sections(
             reaction_id="missing_composition_split",
-            product_coefficient=2.0,
+            product_coefficient=1.0,
             checks=["elemental"],
+            required=False,
             species_metadata={
                 "x2_pool": {},
                 "x_pool": {"formula": "X"},
@@ -319,6 +323,91 @@ def test_exploratory_assembly_check_records_inconclusive_missing_composition(tmp
     ]
     assert validators_json["summary"]["status_counts"]["inconclusive"] == 1
     assert (output_dir / "output_manifest.json").exists()
+
+
+def test_scientific_required_binding_rejects_unrelated_balanced_reaction(tmp_path: Path) -> None:
+    config = _configured_static_validator_config(mode="scientific")
+    config.update(
+        _static_balance_sections(
+            reaction_id="unrelated_balanced_split",
+            product_coefficient=2.0,
+            checks=["elemental"],
+            state_species={
+                "source_amount": {"species": "a_pool", "role": "reactant"},
+                "product_amount": {"species": "b_pool", "role": "product"},
+            },
+            species_metadata={
+                "a_pool": {"formula": "A"},
+                "b_pool": {"formula": "B"},
+                "x2_pool": {"formula": "X2"},
+                "x_pool": {"formula": "X"},
+            },
+        )
+    )
+
+    with pytest.raises(ConfiguredModelExecutionError) as error:
+        run_configured_model(_write_config(tmp_path, config), output_dir=tmp_path / "unrelated_output")
+
+    blocking = error.value.report.details["blocking_static_balance_checks"][0]
+    failure_reasons = {
+        failure["reason"]
+        for failure in blocking["details"]["binding"]["failures"]
+    }
+    assert error.value.report.stage == "model_assembly"
+    assert blocking["status"] == "inconclusive"
+    assert "species_missing_from_reaction" in failure_reasons
+    assert "reaction_species_not_bound_to_process" in failure_reasons
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_reason"),
+    [
+        ("missing_process", "missing_process_reference"),
+        ("unknown_process", "unknown_process_reference"),
+        ("duplicated_state", "duplicate_state_mapping"),
+        ("contradictory_role", "declared_role_contradiction"),
+    ],
+)
+def test_scientific_required_binding_rejects_invalid_process_mappings(
+    tmp_path: Path,
+    mutation: str,
+    expected_reason: str,
+) -> None:
+    config = _configured_static_validator_config(mode="scientific")
+    config.update(
+        _static_balance_sections(
+            reaction_id="invalid_binding_reaction",
+            product_coefficient=1.0,
+            checks=["elemental"],
+            species_metadata={
+                "x2_pool": {"formula": "X"},
+                "x_pool": {"formula": "X"},
+            },
+        )
+    )
+    check = config["balance_checks"][0]
+    if mutation == "missing_process":
+        check.pop("process_id")
+    elif mutation == "unknown_process":
+        check["process_id"] = "not_assembled"
+    elif mutation == "duplicated_state":
+        check["state_species"] = [
+            {"state": "source_amount", "species": "x2_pool", "role": "reactant"},
+            {"state": "source_amount", "species": "x_pool", "role": "product"},
+        ]
+    elif mutation == "contradictory_role":
+        check["state_species"]["source_amount"]["role"] = "product"
+
+    with pytest.raises(ConfiguredModelExecutionError) as error:
+        run_configured_model(_write_config(tmp_path, config), output_dir=tmp_path / mutation)
+
+    blocking = error.value.report.details["blocking_static_balance_checks"][0]
+    reasons = {
+        failure["reason"]
+        for failure in blocking["details"]["binding"]["failures"]
+    }
+    assert error.value.report.stage == "model_assembly"
+    assert expected_reason in reasons
 
 
 def test_scientific_required_assembly_check_blocks_unbalanced_reaction(tmp_path: Path) -> None:
@@ -366,6 +455,28 @@ def test_strict_required_assembly_check_blocks_missing_reaction_metadata(tmp_pat
     assert error.value.report.stage == "model_assembly"
     assert blocking["status"] == "inconclusive"
     assert blocking["details"]["missing_metadata"] == ["reaction_metadata.not_declared"]
+
+
+def test_product_map_process_binding_records_product_map_evidence(tmp_path: Path) -> None:
+    config = _configured_mm_product_map_config()
+    output_dir = tmp_path / "mm_product_map_output"
+
+    result = run_configured_model(_write_config(tmp_path, config), output_dir=output_dir)
+
+    assembly_checks = _assembly_balance_checks(result.validation_report())
+    binding = assembly_checks[0]["details"]["binding"]
+    assembly_report = result.assembly_report.to_dict()
+    assert assembly_checks[0]["name"] == "elemental_balance"
+    assert assembly_checks[0]["status"] == "passed"
+    assert binding["verified"] is True
+    assert binding["process_type"] == "homogeneous_michaelis_menten"
+    assert binding["mapped_process_stoichiometry"] == {
+        "product_species": 2.0,
+        "substrate_species": -1.0,
+    }
+    assert binding["product_map"]["id"] == "split_product_map"
+    assert binding["product_map"]["data"]["products"] == {"product_amount": 2.0}
+    assert assembly_report["static_balance_checks"][0]["details"]["binding"]["verified"] is True
 
 
 def test_result_serialization_preserves_status_rich_validation(tmp_path: Path) -> None:
@@ -582,14 +693,150 @@ def _configured_static_validator_config(*, mode: str) -> dict[str, Any]:
     }
 
 
+def _configured_mm_product_map_config() -> dict[str, Any]:
+    source = "Controlled reference dataset for configured static balance checks."
+    return {
+        "kind": "model_config",
+        "name": "exploratory product map binding reference",
+        "mode": "exploratory",
+        "maturity": "exploratory",
+        "entities": {
+            "product_maps": [
+                {
+                    "id": "split_product_map",
+                    "loader": "stoichiometric",
+                    "data": {
+                        "kind": "product_map",
+                        "name": "controlled split product map",
+                        "product_map_type": "stoichiometric",
+                        "reactants": {"substrate_amount": 1.0},
+                        "products": {"product_amount": 2.0},
+                        "maturity": "exploratory",
+                        "provenance": {"source": source},
+                    },
+                }
+            ]
+        },
+        "parameters": [
+            {
+                "id": "mm_reference_parameters",
+                "parameters": [
+                    {
+                        "name": "reference Michaelis constant",
+                        "symbol": "Km_reference",
+                        "value": 1.0,
+                        "units": "mole / liter",
+                        "uncertainty": 0.0,
+                        "source": source,
+                        "confidence_level": "high",
+                        "notes": "Reference value for configured static balance checks.",
+                        "measurement_method": "defined reference value",
+                        "validity_range": "controlled reference domain",
+                    },
+                    {
+                        "name": "reference maximum rate",
+                        "symbol": "Vmax_reference",
+                        "value": 0.1,
+                        "units": "mole / liter / second",
+                        "uncertainty": 0.0,
+                        "source": source,
+                        "confidence_level": "high",
+                        "notes": "Reference value for configured static balance checks.",
+                        "measurement_method": "defined reference value",
+                        "validity_range": "controlled reference domain",
+                    },
+                ],
+            }
+        ],
+        "processes": [
+            {
+                "id": "mm_split",
+                "process_type": "homogeneous_michaelis_menten",
+                "states": {"substrate": "substrate_amount", "product": "product_amount"},
+                "parameters": {
+                    "km": "Km_reference",
+                    "vmax": "Vmax_reference",
+                    "rate_units": "mole / liter / second",
+                },
+                "product_map": "split_product_map",
+                "assumptions": ["reference software process"],
+            }
+        ],
+        "initial_state": {
+            "states": {
+                "substrate_amount": {"value": 1.0, "units": "mole / liter"},
+                "product_amount": {"value": 0.0, "units": "mole / liter"},
+            }
+        },
+        "time": {
+            "start": {"value": 0.0, "units": "second"},
+            "stop": {"value": 1.0, "units": "second"},
+            "points": 3,
+        },
+        "validators": [
+            {
+                "id": "non_negative_states",
+                "validator_type": "non_negative",
+                "species": ["substrate_amount", "product_amount"],
+            }
+        ],
+        "outputs": {},
+        "chemistry_metadata": {
+            "species": {
+                "substrate_species": {
+                    "name": "substrate_species",
+                    "formula": "X2",
+                    "source": source,
+                    "composition_source": source,
+                },
+                "product_species": {
+                    "name": "product_species",
+                    "formula": "X",
+                    "source": source,
+                    "composition_source": source,
+                },
+            }
+        },
+        "reaction_metadata": [
+            {
+                "id": "mm_split_reaction",
+                "name": "mm_split_reaction",
+                "source": source,
+                "reactants": [{"species": "substrate_species", "coefficient": 1.0}],
+                "products": [{"species": "product_species", "coefficient": 2.0}],
+            }
+        ],
+        "balance_checks": [
+            {
+                "id": "mm_split_balance",
+                "process_id": "mm_split",
+                "reaction_id": "mm_split_reaction",
+                "checks": ["elemental"],
+                "required": True,
+                "state_species": {
+                    "substrate_amount": {"species": "substrate_species", "role": "reactant"},
+                    "product_amount": {"species": "product_species", "role": "product"},
+                },
+            }
+        ],
+    }
+
+
 def _static_balance_sections(
     *,
     reaction_id: str,
     product_coefficient: float,
     checks: list[str],
     species_metadata: dict[str, dict[str, Any]],
+    process_id: str = "reference_conversion",
+    state_species: dict[str, Any] | None = None,
+    required: bool = True,
 ) -> dict[str, Any]:
     source = "Controlled reference dataset for configured static balance checks."
+    mappings = state_species or {
+        "source_amount": {"species": "x2_pool", "role": "reactant"},
+        "product_amount": {"species": "x_pool", "role": "product"},
+    }
     return {
         "chemistry_metadata": {
             "species": {
@@ -616,9 +863,11 @@ def _static_balance_sections(
         "balance_checks": [
             {
                 "id": f"{reaction_id}_balance",
+                "process_id": process_id,
                 "reaction_id": reaction_id,
                 "checks": checks,
-                "required": True,
+                "required": required,
+                "state_species": mappings,
             }
         ],
     }

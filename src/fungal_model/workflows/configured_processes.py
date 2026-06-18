@@ -76,7 +76,21 @@ class ConfiguredProcessAssembler:
                 details={"decisions": [decision.to_dict() for decision in decisions]},
             )
         try:
-            static_balance_validations = configured_static_balance_validations(config)
+            processes = library.build_processes(build_context, config.processes)
+        except ValueError as exc:
+            raise_configured_model_execution_error(
+                config,
+                stage="process_factory_build",
+                missing_capabilities=("process_factory_requirements",),
+                message=str(exc),
+                details={"error_type": type(exc).__name__},
+            )
+        try:
+            static_balance_validations = configured_static_balance_validations(
+                config,
+                processes=processes,
+                product_maps=inputs.product_maps,
+            )
         except ValueError as exc:
             raise_configured_model_execution_error(
                 config,
@@ -107,7 +121,6 @@ class ConfiguredProcessAssembler:
                 },
             )
         try:
-            processes = library.build_processes(build_context, config.processes)
             validators = (
                 *inputs.validators,
                 *(static_validation_callable(validation) for validation in static_balance_validations),
@@ -122,6 +135,10 @@ class ConfiguredProcessAssembler:
                 parameters=inputs.parameters,
                 requested_processes=tuple(process.name for process in processes),
                 validators=validators,
+                static_balance_checks=tuple(
+                    validation.to_dict()
+                    for validation in static_balance_validations
+                ),
                 allow_unsourced_for_testing=config.mode == "toy",
             ).assemble()
         except ModelAssemblyError as exc:

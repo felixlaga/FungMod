@@ -457,6 +457,8 @@ class ReactionParticipantMetadataConfig:
     species_id: str
     coefficient: float
     raw: Mapping[str, Any]
+    state_name: str | None = None
+    role: str | None = None
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "ReactionParticipantMetadataConfig":
@@ -466,6 +468,8 @@ class ReactionParticipantMetadataConfig:
         return cls(
             species_id=species_id,
             coefficient=float(data.get("coefficient", 1.0)),
+            state_name=None if data.get("state_name", data.get("state")) is None else str(data.get("state_name", data.get("state"))),
+            role=None if data.get("role") is None else str(data["role"]),
             raw=deepcopy(dict(data)),
         )
 
@@ -473,6 +477,8 @@ class ReactionParticipantMetadataConfig:
         return {
             "species_id": self.species_id,
             "coefficient": self.coefficient,
+            "state_name": self.state_name,
+            "role": self.role,
             **deepcopy(dict(self.raw)),
         }
 
@@ -514,7 +520,9 @@ class BalanceCheckConfig:
 
     id: str
     reaction_id: str
+    process_id: str | None = None
     checks: tuple[str, ...] = ("elemental",)
+    state_species: Mapping[str, Any] | tuple[Any, ...] | None = None
     required: bool = True
     raw: Mapping[str, Any] | None = None
 
@@ -528,7 +536,11 @@ class BalanceCheckConfig:
         return cls(
             id=str(data.get("id") or f"balance_check_{index}"),
             reaction_id=str(data.get("reaction_id") or data.get("reaction") or ""),
+            process_id=None if data.get("process_id", data.get("process")) is None else str(data.get("process_id", data.get("process"))),
             checks=tuple(check.strip().lower() for check in checks) or ("elemental",),
+            state_species=deepcopy(
+                data.get("state_species", data.get("state_to_species", data.get("state_mappings")))
+            ),
             required=bool(data.get("required", True)),
             raw=deepcopy(dict(data)),
         )
