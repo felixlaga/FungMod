@@ -55,6 +55,32 @@ exploratory output usefulness, such as richer assumption/range summaries,
 clearer missing-mechanism reporting, or broader generic mechanism selection
 without fungus-specific branches.
 
+## PRODUCT-001 Assumption Summary Output
+
+Date: 2026-06-19
+
+Status: `partial` for build-first exploratory virtual-experiment expansion.
+
+Completed in this pass:
+
+- Added `assumption_summary.csv` to the standard virtual-experiment output
+  bundle.
+- Added `DegradationScreenResult.assumption_summary()` for loading the table
+  without rerunning simulation.
+- Added versioned output-schema/data-dictionary coverage for the new table.
+- Populated the table with per-case modelability assumptions, uncertain inputs,
+  missing inputs, incompatibilities, and suggested follow-up experiments.
+- Added tests proving exploratory assumptions and uncertain parameter policies
+  are inspectable from standard outputs.
+
+No new biology, validation data, calibration routine, thermodynamic equation,
+entropy calculation, environmental response law, or empirical validation claim
+was added.
+
+Recommended next task: continue PRODUCT-001 by improving missing-mechanism and
+unsupported-case reporting for researcher-facing inputs, or proceed to a
+generic THERMO-003 feasibility slice if a small equation-backed scope is clear.
+
 ## PR-04 Build-First Roadmap Reframe
 
 Date: 2026-06-19
