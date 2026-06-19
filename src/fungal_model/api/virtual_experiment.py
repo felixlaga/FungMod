@@ -257,6 +257,11 @@ class DegradationScreenResult:
 
         return self._table_rows("sampled_parameters", "sampled_parameters.csv")
 
+    def modelability_items(self) -> list[dict[str, str]]:
+        """Load the standard modelability-items table without rerunning simulation."""
+
+        return self._table_rows("modelability_items", "modelability_items.csv")
+
     def assumption_summary(self) -> list[dict[str, str]]:
         """Load the standard assumption-summary table without rerunning simulation."""
 

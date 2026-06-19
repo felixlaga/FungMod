@@ -138,8 +138,9 @@ result = study.simulate(mode="exploratory", n_samples=128)
 
 The standard output folder includes long-format time series, final states,
 final metrics, threshold times, sampled parameters, summary metrics,
-assumption summaries, provenance, limitations, missing-parameter and
-suggested-experiment tables, and a versioned data dictionary/schema.
+modelability item reports, assumption summaries, provenance, limitations,
+missing-parameter and suggested-experiment tables, and a versioned data
+dictionary/schema.
 Exploratory priors remain allowed, but the tables mark them as assumptions
 rather than literature-curated values.
 

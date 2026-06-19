@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-04:
+Scoped status as of PR-05:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -14,7 +14,8 @@ CASE-001: complete once PR-02 is merged for the researcher-facing named API path
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: current next for build-first exploratory virtual-experiment
-expansion; partial after top-level environment_grid helper.
+expansion; partial after top-level environment_grid helper,
+assumption_summary.csv, and modelability_items.csv.
 THERMO-003: queued for dynamic thermodynamic and entropy constraints.
 BIO-003: queued for generic mechanism expansion after build-first simulator work.
 ```
@@ -34,9 +35,12 @@ missing-mechanism reports, and generic thermodynamic/entropy constraints. Do
 not advance validation again until the simulator outputs are mature enough that
 comparison to observations is meaningful.
 
-The first PRODUCT-001 implementation slice adds the top-level
-`environment_grid(...)` helper. It improves the target researcher workflow, but
-runtime pH, temperature, and oxygen grid values remain metadata-only unless an
-explicit response law or condition-specific parameter record is active.
+The first PRODUCT-001 implementation slices add the top-level
+`environment_grid(...)` helper plus `assumption_summary.csv` and
+`modelability_items.csv` outputs. They improve the target researcher workflow
+and make exploratory assumptions, uncertain inputs, and preflight facts easier
+to inspect, but runtime pH, temperature, and oxygen grid values remain
+metadata-only unless an explicit response law or condition-specific parameter
+record is active.
 
 `old_progress/` is historical and non-binding.
