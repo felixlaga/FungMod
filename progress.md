@@ -26,6 +26,35 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Environment Grid Helper
+
+Date: 2026-06-19
+
+Status: `partial` for build-first exploratory virtual-experiment expansion.
+
+Completed in this pass:
+
+- Added the top-level researcher-facing `environment_grid(...)` helper as a
+  convenience wrapper around `EnvironmentGrid`.
+- Exported the helper from `fungal_model.api` and top-level `fungal_model`.
+- Updated the README target workflow so researchers can pass runtime
+  temperature, pH, and oxygen grids directly into `virtual_experiment(...)`.
+- Added tests proving the helper works through the top-level API, standard
+  outputs still write, runtime environment cases remain `metadata_only`, and
+  the public API documentation/export guardrail includes the new helper.
+- Updated active roadmap/status docs to keep PRODUCT-001 partial and current.
+
+No new biology, validation data, pH response law, temperature response law,
+oxygen response law, thermodynamic equation, entropy calculation, numerical
+method, dataset, calibration routine, or empirical validation claim was added.
+Runtime environment-grid values remain metadata unless an explicit response law
+or condition-specific parameter record is active.
+
+Recommended next task: continue PRODUCT-001 with a small code PR that improves
+exploratory output usefulness, such as richer assumption/range summaries,
+clearer missing-mechanism reporting, or broader generic mechanism selection
+without fungus-specific branches.
+
 ## PR-04 Build-First Roadmap Reframe
 
 Date: 2026-06-19

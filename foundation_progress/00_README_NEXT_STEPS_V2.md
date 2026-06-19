@@ -14,7 +14,7 @@ CASE-001: complete once PR-02 is merged for the researcher-facing named API path
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: current next for build-first exploratory virtual-experiment
-expansion.
+expansion; partial after top-level environment_grid helper.
 THERMO-003: queued for dynamic thermodynamic and entropy constraints.
 BIO-003: queued for generic mechanism expansion after build-first simulator work.
 ```
@@ -33,5 +33,10 @@ degradation curves, uncertainty bands, provenance, limitations,
 missing-mechanism reports, and generic thermodynamic/entropy constraints. Do
 not advance validation again until the simulator outputs are mature enough that
 comparison to observations is meaningful.
+
+The first PRODUCT-001 implementation slice adds the top-level
+`environment_grid(...)` helper. It improves the target researcher workflow, but
+runtime pH, temperature, and oxygen grid values remain metadata-only unless an
+explicit response law or condition-specific parameter record is active.
 
 `old_progress/` is historical and non-binding.

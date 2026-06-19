@@ -25,6 +25,7 @@ from fungal_model.api import (
     EnvironmentGrid,
     VirtualExperiment,
     VirtualExperimentError,
+    environment_grid,
     virtual_experiment,
 )
 from fungal_model.fungi.base import Fungus
@@ -144,6 +145,7 @@ __all__ = [
     "Environment",
     "EnvironmentCase",
     "EnvironmentGrid",
+    "environment_grid",
     "Film1DGeometry",
     "Fungus",
     "Geometry",

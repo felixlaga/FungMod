@@ -8,7 +8,7 @@ from typing import Any, cast
 import pytest
 import yaml
 
-from fungal_model import EnvironmentGrid, VirtualExperiment, virtual_experiment
+from fungal_model import VirtualExperiment, environment_grid, virtual_experiment
 from fungal_model.api import VirtualExperimentError
 from fungal_model.registry import AmbiguousResolutionError, ResolutionError
 
@@ -103,15 +103,23 @@ def test_environment_grid_works_through_top_level_api(tmp_path: Path) -> None:
     study = virtual_experiment(
         fungi="beta-glucosidase source",
         substrates="cellobiose substrate",
-        environments=EnvironmentGrid(temperature_C=[20.0, 25.0], ph=[4.5], oxygen="aerobic"),
+        environments=environment_grid(temperature_C=[20.0, 25.0], ph=[4.5], oxygen="aerobic"),
         registry=REGISTRY_INDEX,
     )
 
     assert study.environment_ids == ("temp_20C_ph_4p5_aerobic", "temp_25C_ph_4p5_aerobic")
+    assert len(study.environment_cases) == 2
+    assert {case.environment_effect_status for case in study.environment_cases} == {"metadata_only"}
     reports = study.preflight(mode="exploratory")
     assert {report.status for report in reports} == {"exploratory"}
     result = study.simulate(mode="exploratory", n_samples=1, seed=2, output_dir=tmp_path / "grid", quicklook=False)
     assert len(result.screen_result.case_results) == 2
+    assert {row["environment_effect_status"] for row in result.provenance()} >= {"metadata_only"}
+    assert any(
+        "Temperature and pH do not modify kinetics" in row["limitation"]
+        or "Do not rank or plot these cases as environmental response models" in row["limitation"]
+        for row in result.limitations()
+    )
 
 
 def test_public_preflight_scientific_and_exploratory_modes() -> None:
