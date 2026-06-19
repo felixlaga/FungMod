@@ -62,10 +62,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-03: VALIDATION-DATA-001 first real time-course dataset and model comparison"
+    current_next = "PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is VALIDATION-DATA-001 after PR-02" in roadmap
+    assert "The current next PR is PRODUCT-001" in roadmap
 
     for text in (status, next_steps):
         assert "old_progress/" in text
@@ -76,23 +76,52 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "ROADMAP_ORCHESTRATION_STATUS.md" in roadmap
 
 
+def test_build_first_queue_defers_validation_without_deleting_it() -> None:
+    status = _read(STATUS_DOC)
+    next_steps = _read(NEXT_STEPS)
+    roadmap = _read(ACTIVE_ROADMAP)
+
+    current_next = "PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion"
+    for text in (status, next_steps):
+        assert f"Current next PR: **{current_next}**" in text
+        assert "Current next PR: **PR-03" not in text
+        assert "Current next PR: **PR-04" not in text
+
+    for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
+        assert phase in status
+        assert phase in next_steps
+        assert phase in roadmap
+
+    assert "Validation remains important" in status
+    assert "Real observations are required for validation/calibration/comparison claims" in status
+    assert "Validation data is important, but it should not block PRODUCT-001" in _read(
+        ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP_V2.md"
+    )
+    assert "VALIDATION-DATA-001: deferred; blocked/partial" in next_steps
+    assert "PR-08 | VALIDATION-DATA-001" in status
+
+
 def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:
     status = _read(STATUS_DOC)
     next_steps = _read(NEXT_STEPS)
     gate = _read(VALIDATION_GATE)
+    roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-03: VALIDATION-DATA-001 first real time-course dataset and model comparison"
+    current_next = "PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion"
     for text in (status, next_steps, gate):
         assert current_next in text
+        assert "PR-03" not in _current_next_lines(text)
         assert "PR-04" not in _current_next_lines(text)
 
-    assert "VALIDATION-DATA-001 first real time-course dataset | blocked/partial" in status
-    assert "VALIDATION-DATA-001: blocked/partial for ingestion" in next_steps
-    assert "Status: `blocked/partial` for ingestion." in gate
+    assert "VALIDATION-DATA-001 first real time-course dataset | deferred; blocked/partial" in status
+    assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
+    assert "Status: `deferred; blocked/partial` for ingestion." in gate
     assert "Status: `complete`" not in gate
     assert "does not complete VALIDATION-DATA-001" in gate
-    assert "Current next PR: **PR-04" not in status
-    assert "Current next PR: **PR-04" not in next_steps
+    assert "validation, calibration, or empirical comparison claims" in roadmap
+    assert "it should not block PRODUCT-001" in _read(
+        ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP_V2.md"
+    )
 
 
 def test_validation_data_gate_records_required_evidence_and_blockers() -> None:

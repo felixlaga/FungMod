@@ -68,8 +68,16 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is VALIDATION-DATA-001 after PR-02. Do not rebuild the
-completed scoped slices above unless code or tests contradict this status.
+The current next PR is PRODUCT-001 after the validation ingestion gate and
+build-first reframe. Do not rebuild the completed scoped slices above unless
+code or tests contradict this status.
+
+Validation remains important, but it is now deliberately deferred behind core
+simulator capability. Real time-course observations are needed before FungMod
+makes validation, calibration, or empirical comparison claims. They are not
+required before improving the virtual-experiment engine that generates
+exploratory degradation curves from implemented mechanisms, explicit
+assumptions, uncertainty ranges, provenance, and limitations.
 
 The current API can run registered cases from internal registry IDs.
 
@@ -1091,13 +1099,111 @@ uncertainty intervals
 
 ---
 
-# Phase 9: VALIDATION-DATA-001 — First Real Time-Course Validation Dataset
+# Phase 9: PRODUCT-001 — Build-First Exploratory Virtual-Experiment Expansion
+
+## Goal
+
+Make the researcher-facing virtual-experiment engine more useful before
+requiring validation data.
+
+Given a fungus or enzyme source, a substrate, and an environment or environment
+range, FungMod should produce honest exploratory degradation dynamics when the
+needed mechanisms and assumptions are available. It should fail explicitly when
+mechanisms, parameters, or compatibility records are missing.
+
+## Scope
+
+Prioritize:
+
+```text
+fungus_or_source + substrate + pH/temperature/oxygen/water-activity ranges
+implemented mechanism selection
+explicit exploratory prior/range use
+substrate remaining over time
+substrate mass loss over time
+product release over time
+degradation rate over time
+threshold times
+uncertainty intervals
+provenance
+limitations
+missing mechanisms and suggested follow-up experiments
+```
+
+Do not require a real observation table for this phase. Observations are useful
+later for validation and calibration, but PRODUCT-001 is about making the
+simulator itself more complete and honest.
+
+## Acceptance criteria
+
+Complete when:
+
+```text
+- a small build-first simulator capability is implemented in code;
+- the capability is generic or has a materially different non-specific test;
+- assumptions and exploratory priors are visible in output tables;
+- unsupported mechanisms remain explicit instead of guessed;
+- outputs include useful time-series or summary degradation metrics;
+- tests prove no validation or scientific certainty is claimed without data.
+```
+
+---
+
+# Phase 10: THERMO-003 — Dynamic Thermodynamic and Entropy Constraints
+
+## Goal
+
+Add more first-principles constraints so FungMod can avoid case-specific
+fungus models where general thermodynamic or entropy-based rules are the right
+abstraction.
+
+Examples of acceptable directions:
+
+```text
+dynamic reaction feasibility checks
+free-energy or affinity gates where equations and inputs exist
+irreversibility / entropy-production accounting where implemented explicitly
+redox or oxygen-coupling constraints where state variables are represented
+energy-dissipation limits on process rates where provenance is available
+```
+
+Do not emit thermodynamic state, entropy production, redox behavior, or
+organism-specific physiology unless the equations, parameters, provenance,
+maturity labels, and tests exist.
+
+---
+
+# Phase 11: BIO-003 — Generic Mechanism Expansion Through Process Laws
+
+## Goal
+
+Add more biology through reusable mechanism families, not ad hoc fungus-specific
+branches.
+
+Examples of acceptable directions:
+
+```text
+additional extracellular enzyme-chain motifs
+generic hydrolysis process families
+generic oxidative process components
+generic inhibition or environmental modifier laws
+mechanism proposals promoted only after implementation and tests
+```
+
+Every mechanism must remain provenance-backed, maturity-labelled, tested, and
+honest about assumptions and limitations.
+
+---
+
+# Deferred Phase: VALIDATION-DATA-001 — First Real Time-Course Validation Dataset
 
 ## Goal
 
 Add the first experimental time-course dataset to validate or compare against a virtual experiment.
 
-This is not required for every virtual experiment, but FungMod needs at least one real validation case.
+This is not required before building the simulator. FungMod still needs real
+validation cases later, but validation should happen after the relevant
+simulated outputs are mature enough that comparison is meaningful.
 
 ## Recommended validation target
 
@@ -1155,11 +1261,12 @@ Complete when:
 
 ---
 
-# Phase 10: BIO-003 — Whole-Fungus Minimal Growth Coupling
+# Later Phase: Whole-Fungus Minimal Growth Coupling
 
 ## When to start
 
-Only after enzyme-chain and validation-data phases.
+Only after build-first simulator work, generic mechanism expansion,
+thermodynamic/entropy constraints, and a specific scope decision.
 
 Whole-fungus biology should not be added casually.
 

@@ -26,6 +26,38 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-04 Build-First Roadmap Reframe
+
+Date: 2026-06-19
+
+Status: `complete` once merged for documentation and guardrail-test scope.
+
+Completed in this pass:
+
+- Reframed VALIDATION-DATA-001 as deferred validation/calibration work rather
+  than the blocker for all further repository progress.
+- Kept validation in the roadmap and preserved the ingestion gate: real
+  observations remain required before making validation, calibration, or
+  empirical comparison claims.
+- Set the current next PR to PRODUCT-001: build-first exploratory
+  virtual-experiment expansion.
+- Queued THERMO-003 for dynamic thermodynamic and entropy constraints and
+  BIO-003 for generic mechanism expansion through implemented, tested process
+  laws.
+- Added guardrail tests so active docs keep validation deferred, keep
+  PRODUCT-001 current, and require build-first work to preserve explicit
+  assumptions, uncertainty, provenance, limitations, and missing-mechanism
+  reporting.
+
+No scientific model, numerical method, runtime behavior, output schema, public
+API, dataset, validation observation, calibration routine, thermodynamic
+equation, entropy calculation, or biology implementation was added in this
+documentation reframe.
+
+Recommended next task: implement PRODUCT-001 as a small code PR that expands
+researcher-facing exploratory virtual experiments while keeping all assumptions
+and unsupported biology explicit.
+
 ## PR-03 VALIDATION-DATA-001 Ingestion Gate
 
 Date: 2026-06-19

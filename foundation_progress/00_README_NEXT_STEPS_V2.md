@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-02:
+Scoped status as of PR-04:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -11,16 +11,27 @@ PRE-BIO-001 / ASSEMBLY-001 basics: complete for current template-backed cases.
 BIO-READINESS-LITE: complete for the proposal template, validator, and tests.
 BIO-002: complete for scoped reusable two-step enzyme-chain assembly.
 CASE-001: complete once PR-02 is merged for the researcher-facing named API path.
-VALIDATION-DATA-001: blocked/partial for ingestion until a source-backed
-numeric time-course dataset satisfies the active gate.
+VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
+source-backed numeric time-course dataset satisfies the active gate.
+PRODUCT-001: current next for build-first exploratory virtual-experiment
+expansion.
+THERMO-003: queued for dynamic thermodynamic and entropy constraints.
+BIO-003: queued for generic mechanism expansion after build-first simulator work.
 ```
 
-Current next PR: **PR-03: VALIDATION-DATA-001 first real time-course dataset and model comparison**.
+Current next PR: **PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
-has no real observation table under `data/experiments/literature/`. PR-03
-remains current next until a separate ingestion PR adds source-backed numeric
-observations and model comparison artifacts.
+has no real observation table under `data/experiments/literature/`. That blocks
+validation, calibration, and empirical comparison claims; it does not block
+building the simulator.
+
+Build-first work should now improve FungMod as a virtual-experiment engine:
+broader researcher-facing inputs, explicit exploratory priors, richer
+degradation curves, uncertainty bands, provenance, limitations,
+missing-mechanism reports, and generic thermodynamic/entropy constraints. Do
+not advance validation again until the simulator outputs are mature enough that
+comparison to observations is meaningful.
 
 `old_progress/` is historical and non-binding.

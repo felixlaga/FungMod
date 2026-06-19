@@ -51,8 +51,17 @@ Notebook input
 5. CASE-001
    Cellulose-like enzyme-chain virtual experiment.
 
-6. VALIDATION-DATA-001
-   First real time-course dataset and model comparison.
+6. PRODUCT-001
+   Build-first exploratory virtual-experiment expansion.
+
+7. THERMO-003
+   Dynamic thermodynamic and entropy constraints.
+
+8. BIO-003
+   Generic mechanism expansion through reusable process laws.
+
+9. VALIDATION-DATA-001
+   Deferred first real time-course dataset and model comparison.
 ```
 
 Full CURATION-001 can wait.
@@ -191,9 +200,49 @@ study = virtual_experiment(
 result = study.simulate(mode="exploratory", n_samples=256)
 ```
 
+## PRODUCT-001
+
+Goal: improve the virtual-experiment product before requiring validation data.
+
+FungMod should generate honest exploratory degradation curves from implemented
+mechanisms, explicit assumptions, uncertainty ranges, provenance, limitations,
+and missing-mechanism reports.
+
+Prioritize:
+
+```text
+broader researcher-facing fungus/source + substrate + environment inputs
+explicit exploratory priors
+substrate remaining, product release, rates, threshold times
+uncertainty bands
+provenance and limitations
+missing mechanism / missing parameter reports
+```
+
+## THERMO-003
+
+Goal: add generic thermodynamic and entropy constraints where equations and
+inputs are implemented.
+
+Prefer first-principles checks over case-specific fungus models, but do not
+emit unsupported thermodynamic, redox, or entropy state.
+
+## BIO-003
+
+Goal: expand biology through reusable process laws.
+
+Good directions include generic hydrolysis, oxidative components, inhibition
+laws, environmental modifiers, and additional enzyme-chain motifs. Every
+mechanism must be provenance-backed, maturity-labelled, tested, and honest
+about limitations.
+
 ## VALIDATION-DATA-001
 
-Goal: add the first real time-course dataset for model comparison.
+Goal: add the first real time-course dataset for model comparison after the
+simulator outputs are mature enough to compare meaningfully.
+
+Validation data is important, but it should not block PRODUCT-001, THERMO-003,
+or generic BIO-003 build-out.
 
 Recommended targets:
 

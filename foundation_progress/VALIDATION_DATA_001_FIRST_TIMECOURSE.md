@@ -20,14 +20,14 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 ## Current Status
 
-Status: `blocked/partial` for ingestion.
+Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-03: VALIDATION-DATA-001 first real time-course dataset and model comparison**.
+Current next PR: **PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
-source-backed real time-course dataset in the repository. PR-03 remains the
-current next PR for real dataset ingestion and model comparison after this gate
-PR; this gate does not complete VALIDATION-DATA-001.
+source-backed real time-course dataset in the repository. Validation remains
+important, but it is deferred until the simulator can produce mature enough
+degradation outputs for comparison. This gate does not complete VALIDATION-DATA-001.
 
 ## Candidate Evidence Checked
 
@@ -128,7 +128,8 @@ schema, or biology changes in this gate PR.
 
 ## Next Action
 
-Find or obtain source-backed numeric time-course observations that satisfy the
-required evidence fields above. Then open a separate ingestion PR for
-VALIDATION-DATA-001 with the dataset, comparison workflow, limitations, and
-tests.
+First build out PRODUCT-001, THERMO-003, and generic BIO-003 simulator
+capability. Later, find or obtain source-backed numeric time-course
+observations that satisfy the required evidence fields above. Then open a
+separate ingestion PR for VALIDATION-DATA-001 with the dataset, comparison
+workflow, limitations, and tests.
