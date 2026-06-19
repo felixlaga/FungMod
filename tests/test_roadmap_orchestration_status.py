@@ -73,3 +73,21 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
 
     assert "ROADMAP_ORCHESTRATION_STATUS.md" in next_steps
     assert "ROADMAP_ORCHESTRATION_STATUS.md" in roadmap
+
+
+def test_pr03_validation_data_status_is_blocked_without_advancing_queue() -> None:
+    status = _read(STATUS_DOC)
+    next_steps = _read(NEXT_STEPS)
+    validation_doc = _read(ROOT / "foundation_progress" / "VALIDATION_DATA_001_FIRST_TIMECOURSE.md")
+
+    current_next = "PR-03: VALIDATION-DATA-001 first real time-course dataset and model comparison"
+    assert f"Current next PR: **{current_next}**" in status
+    assert f"Current next PR: **{current_next}**" in next_steps
+    assert "blocked pending ingestable source" in status
+    assert "blocked pending an ingestable public source" in next_steps
+    assert "Status: `blocked pending ingestable source`" in validation_doc
+    assert "must not resolve that conflict by inference or majority" in validation_doc
+    assert "VALIDATION-DATA-001 is not complete" in validation_doc
+    assert "PR-04" in status
+    assert "Current next PR: **PR-04" not in status
+    assert "Current next PR: **PR-04" not in next_steps

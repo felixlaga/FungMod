@@ -26,6 +26,31 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-03 VALIDATION-DATA-001 Source-Data Blocker And Guardrails
+
+Date: 2026-06-19
+
+Status: `blocked` pending an ingestable real time-course source.
+
+Completed in this pass:
+
+- Assessed PR-03 against the active requirement to add the first real
+  time-course dataset and model comparison only if source-data criteria are
+  satisfied.
+- Did not ingest the existing Resa/Buckin 2011 or Ariaeenejad 2020
+  beta-glucosidase/cellobiose candidate reviews because their documented
+  blockers remain unresolved.
+- Documented the PR-03 blocker in active roadmap/status docs and kept PR-03 as
+  the current next PR instead of advancing to PR-04.
+- Added focused guardrail coverage that prevents the known blocked candidates
+  from being represented as ingested `ExperimentDataset` records or as
+  completed/approved sources.
+
+No observation rows, raw/curated CSVs, digitized values, model-comparison
+outputs, biological mechanisms, parameters, calibration, validation claim,
+runtime external-source call, whole-fungus growth, secretion, uptake, biomass,
+PET, lignin, full lignocellulose, or organism-specific physiology was added.
+
 ## PR-02 CASE-001 Researcher-Facing Enzyme-Chain Virtual Experiment
 
 Date: 2026-06-19
