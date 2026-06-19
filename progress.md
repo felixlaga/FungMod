@@ -26,6 +26,43 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-03 VALIDATION-DATA-001 Ingestion Gate
+
+Date: 2026-06-19
+
+Status: `blocked/partial` for real-data ingestion.
+
+Completed in this pass:
+
+- Expanded `foundation_progress/VALIDATION_DATA_001_FIRST_TIMECOURSE.md` from
+  a stub into an active ingestion-gate/status document.
+- Recorded that the existing Resa/Buckin 2011 candidate review remains blocked
+  because no ingestable observation rows, observation CSV, extraction metadata,
+  uncertainty policy, or preprocessing/conversion record is present.
+- Recorded that the existing Ariaeenejad 2020 PersiBGL1 Frontiers candidate
+  remains blocked because no machine-readable time-course table exists locally
+  and the time axis has an unresolved source-text conflict between hour-based
+  evidence and one sentence saying 380 min.
+- Recorded the required evidence for a future ingestion PR: exact
+  figure/table/supplement identifier, observation rows, units,
+  extraction/transcription method, extractor/date, preprocessing/conversion
+  notes, uncertainty policy, and explicit limitations.
+- Updated the active orchestration and next-steps docs so PR-03 remains the
+  current next PR and PR-04 is not advanced.
+- Added focused tests proving the two real candidate reviews remain blocked and
+  data-free, `data/experiments/literature/` contains no real data files, and
+  active docs do not mark VALIDATION-DATA-001 complete or advance beyond PR-03.
+
+No dataset, `raw_data.csv`, `curated_data.csv`, `model_comparison.csv`,
+`residuals.csv`, `validation_report.md`, observation rows, literature CSV,
+scientific model, parameter, numerical method, runtime behavior, output schema,
+public API, external API call, or biology was added.
+
+Recommended next task: find or obtain source-backed numeric time-course
+observations satisfying the gate, then open a separate VALIDATION-DATA-001
+ingestion PR with dataset files, model-comparison artifacts, limitations, and
+tests.
+
 ## PR-02 CASE-001 Researcher-Facing Enzyme-Chain Virtual Experiment
 
 Date: 2026-06-19

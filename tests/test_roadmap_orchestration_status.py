@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STATUS_DOC = ROOT / "foundation_progress" / "ROADMAP_ORCHESTRATION_STATUS.md"
 NEXT_STEPS = ROOT / "foundation_progress" / "00_README_NEXT_STEPS_V2.md"
 ACTIVE_ROADMAP = ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP.md"
+VALIDATION_GATE = ROOT / "foundation_progress" / "VALIDATION_DATA_001_FIRST_TIMECOURSE.md"
 
 
 def _read(path: Path) -> str:
@@ -73,3 +74,63 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
 
     assert "ROADMAP_ORCHESTRATION_STATUS.md" in next_steps
     assert "ROADMAP_ORCHESTRATION_STATUS.md" in roadmap
+
+
+def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:
+    status = _read(STATUS_DOC)
+    next_steps = _read(NEXT_STEPS)
+    gate = _read(VALIDATION_GATE)
+
+    current_next = "PR-03: VALIDATION-DATA-001 first real time-course dataset and model comparison"
+    for text in (status, next_steps, gate):
+        assert current_next in text
+        assert "PR-04" not in _current_next_lines(text)
+
+    assert "VALIDATION-DATA-001 first real time-course dataset | blocked/partial" in status
+    assert "VALIDATION-DATA-001: blocked/partial for ingestion" in next_steps
+    assert "Status: `blocked/partial` for ingestion." in gate
+    assert "Status: `complete`" not in gate
+    assert "does not complete VALIDATION-DATA-001" in gate
+    assert "Current next PR: **PR-04" not in status
+    assert "Current next PR: **PR-04" not in next_steps
+
+
+def test_validation_data_gate_records_required_evidence_and_blockers() -> None:
+    gate = _read(VALIDATION_GATE)
+
+    for required_field in (
+        "figure_or_table_or_supplement_identifier",
+        "observation_rows",
+        "units",
+        "extraction_or_transcription_method",
+        "extractor_and_date",
+        "preprocessing_and_conversion_notes",
+        "uncertainty_policy",
+        "explicit_limitations",
+    ):
+        assert required_field in gate
+
+    for blocked_candidate_fact in (
+        "resa_buckin_2011_cellobiose_hydrolysis_review.yml",
+        "blocked_do_not_ingest",
+        "ariaeenejad_2020_persibgl1_cellobiose_hydrolysis_review.yml",
+        "blocked_time_axis_conflict_do_not_ingest",
+        "method used 24-h intervals until",
+        "Figure 6 caption says 380 h",
+        "one nearby result sentence says conversion reaches zero after 380 min",
+        "Choosing hours by majority evidence would be an inference",
+    ):
+        assert blocked_candidate_fact in gate
+
+    for excluded_artifact in (
+        "raw_data.csv",
+        "curated_data.csv",
+        "model_comparison.csv",
+        "residuals.csv",
+        "validation_report.md",
+    ):
+        assert excluded_artifact in gate
+
+
+def _current_next_lines(text: str) -> str:
+    return "\n".join(line for line in text.splitlines() if "Current next PR:" in line)
