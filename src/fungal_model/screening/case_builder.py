@@ -30,6 +30,16 @@ HOMOGENEOUS_MM_PARAMETER_ROLES = (
     "substrate_initial_concentration",
     "enzyme_initial_concentration",
 )
+EXTRACELLULAR_ENZYME_CHAIN_PARAMETER_ROLES = (
+    "solid_substrate_initial_concentration",
+    "cellulase_initial_concentration",
+    "beta_glucosidase_initial_concentration",
+    "surface_rate_constant",
+    "adsorption_constant",
+    "accessible_surface_area",
+    "km",
+    "kcat",
+)
 
 
 class RegistryCaseBuildError(ValueError):
@@ -1154,6 +1164,50 @@ def _record_source(record: ParameterRecord) -> str:
     return "FungMod registry record"
 
 
+def _extracellular_enzyme_chain_config_data(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    case_template: CaseTemplateRecord,
+    substrate: SubstrateRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    parameter_records: Mapping[str, ParameterRecord],
+    output_directory: str | None,
+) -> dict[str, Any]:
+    from fungal_model.screening.enzyme_chain import build_extracellular_enzyme_chain_config
+
+    config = build_extracellular_enzyme_chain_config(
+        registry=registry,
+        template_id=case_template.case_template_id,
+        output_directory=output_directory,
+    )
+    data = config.to_dict()
+    data["provenance"] = {
+        **dict(data.get("provenance", {})),
+        "registry_id": registry.registry_id,
+        "fungus_id": fungus_id,
+        "substrate_id": substrate_id,
+        "environment_id": environment_id,
+        "process_compatibility_id": compatibility.record_id,
+        "case_template_id": case_template.case_template_id,
+        "substrate_name": substrate.name,
+        "parameter_record_ids": {
+            role: record.record_id
+            for role, record in parameter_records.items()
+        },
+        "notes": (
+            "CASE-001 researcher-facing assembly of the existing BIO-002 extracellular "
+            "enzyme-chain template. This is cellulose-equivalent, exploratory, and not "
+            "a whole-fungus growth, secretion, uptake, biomass, PET, lignin, full "
+            "lignocellulose, organism-specific physiology, or empirical-validation model."
+        ),
+    }
+    data["outputs"]["directory"] = output_directory
+    return data
+
+
 def _homogeneous_mm_provenance(
     *,
     registry: FungModRegistry,
@@ -1282,6 +1336,18 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
             "Homogeneous Michaelis-Menten registry assembly requires mode='scientific'."
         ),
         config_data_builder=_homogeneous_mm_config_data,
+    ),
+    "extracellular_enzyme_chain": RegistryProcessAssembler(
+        process_type="extracellular_enzyme_chain",
+        process_label="Extracellular enzyme chain",
+        required_parameter_roles=EXTRACELLULAR_ENZYME_CHAIN_PARAMETER_ROLES,
+        required_state_roles=("substrate", "intermediate", "product", "surface_catalyst", "homogeneous_catalyst"),
+        deterministic_mode="toy",
+        unsupported_mode_message=(
+            "Extracellular enzyme-chain registry assembly currently emits the existing "
+            "exploratory CASE-001/BIO-002 template through exploratory screens."
+        ),
+        config_data_builder=_extracellular_enzyme_chain_config_data,
     ),
 }
 

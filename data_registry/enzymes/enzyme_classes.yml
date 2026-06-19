@@ -33,6 +33,7 @@ records:
       - cellulose_film_generic
     compatible_processes:
       - surface_catalysis
+      - extracellular_enzyme_chain
     notes: Generic cellulase-like capability for BIO-001 surface catalysis; not a calibrated enzyme preparation.
 
   - record_id: beta_glucosidase

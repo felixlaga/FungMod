@@ -61,10 +61,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-02: CASE-001 researcher-facing enzyme-chain virtual experiment from names"
+    current_next = "PR-03: VALIDATION-DATA-001 first real time-course dataset and model comparison"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is CASE-001" in roadmap
+    assert "The current next PR is VALIDATION-DATA-001 after PR-02" in roadmap
 
     for text in (status, next_steps):
         assert "old_progress/" in text

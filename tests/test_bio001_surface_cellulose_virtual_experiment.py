@@ -39,7 +39,8 @@ def test_bio001_registry_records_load_with_surface_metadata() -> None:
     assert substrate.bond_classes == ("beta_1_4_glycosidic",)
     assert "accessible_surface_area" in substrate.properties
     assert "accessible_site_fraction" in substrate.properties
-    assert enzyme.compatible_processes == (PROCESS_TYPE,)
+    assert PROCESS_TYPE in enzyme.compatible_processes
+    assert "extracellular_enzyme_chain" in enzyme.compatible_processes
     assert enzyme.target_bond_classes == ("beta_1_4_glycosidic",)
     assert compatibility.process_type == PROCESS_TYPE
     assert compatibility.parameter_roles["surface_rate_constant"] == "cellulose_surface_rate_constant"

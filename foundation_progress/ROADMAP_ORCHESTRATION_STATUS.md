@@ -30,13 +30,13 @@ Use this workflow for each roadmap PR:
 
 ## Phase And PR Queue
 
-Current next PR: **PR-02: CASE-001 researcher-facing enzyme-chain virtual experiment from names**.
+Current next PR: **PR-03: VALIDATION-DATA-001 first real time-course dataset and model comparison**.
 
 | PR | Phase or slice | Status | Scope boundary |
 | --- | --- | --- | --- |
-| PR-01 | Roadmap orchestration and phase status tracker | in progress | Documentation and focused guardrail tests only. No scientific or numerical behavior changes. |
-| PR-02 | CASE-001 researcher-facing enzyme-chain virtual experiment from names | next | Run the existing BIO-002 cellulose-like chain through the researcher-facing API and standard outputs. Do not add new biology or validation data. |
-| PR-03 | VALIDATION-DATA-001 first real time-course dataset and model comparison | queued | Add a sourced real dataset and comparison workflow without overclaiming validation. |
+| PR-01 | Roadmap orchestration and phase status tracker | complete once merged | Documentation and focused guardrail tests only. No scientific or numerical behavior changes. |
+| PR-02 | CASE-001 researcher-facing enzyme-chain virtual experiment from names | complete once merged | Existing BIO-002 cellulose-like chain is available through the researcher-facing API and standard outputs. No new biology or validation data. |
+| PR-03 | VALIDATION-DATA-001 first real time-course dataset and model comparison | next | Add a sourced real dataset and comparison workflow without overclaiming validation. |
 | PR-04 | Output/status hardening from active validation findings | queued | Address the next highest active output, provenance, or validation-status gap after PR-03, based on `findings.yaml` and active validation docs. |
 
 If a future orchestrator changes the queue, update this table, explain the
@@ -56,7 +56,7 @@ Status labels follow `progress.md`: `complete`, `partial`, `not started`, and
 | BIO-READINESS-LITE scaffold | complete for proposal template, validator, and tests | `foundation_progress/BIO_READINESS_LITE.md`, `foundation_progress/templates/BIO_MECHANISM_PROPOSAL_TEMPLATE.yml`, `scripts/validate_bio_readiness_lite.py`, `tests/test_bio_readiness_lite.py` | The scaffold is a gate; it does not approve unsupported mechanisms by itself. |
 | BIO-002 reusable two-step extracellular enzyme chain | complete for scoped reusable two-step chain assembly and software verification; partial relative to broad pathway biology | `foundation_progress/BIO_002_ENZYME_CHAIN_DEGRADATION.md`, `foundation_progress/proposals/BIO_002_EXTRACELLULAR_ENZYME_CHAIN.yml`, `tests/test_bio002_extracellular_enzyme_chain.py`, `tests/test_bio002_generic_chain_assembly.py` | No whole-fungus growth, secretion, uptake, biomass, PET, lignin, full lignocellulose, or organism-specific behavior. |
 | Phase 2 static balance checks | complete for scoped static metadata, validator, assembly-time balance checks, and corrective process-reaction binding; partial relative to dynamic thermodynamic feasibility | `FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md`, `progress.md`, `tests/test_static_balance_thermodynamic_validators.py` | No dynamic reaction quotients, activity model, redox potential model, or solver-time thermodynamic enforcement. |
-| CASE-001 cellulose-like enzyme-chain virtual experiment | not started as a researcher-facing PR slice | `foundation_progress/CASE_001_CELLULOSE_ENZYME_CHAIN_DEMO.md` | BIO-002 has a demo helper, but CASE-001 still needs the named researcher-facing API path and expected output proof. |
+| CASE-001 cellulose-like enzyme-chain virtual experiment | complete once PR-02 is merged for the scoped researcher-facing API path | `foundation_progress/CASE_001_CELLULOSE_ENZYME_CHAIN_DEMO.md`, `tests/test_case001_researcher_enzyme_chain_virtual_experiment.py` | This exposes the existing BIO-002 chain only; it is exploratory and not whole-fungus growth, secretion, uptake, biomass, PET, lignin, full lignocellulose, organism-specific physiology, or empirical validation. |
 | VALIDATION-DATA-001 first real time-course dataset | not started | `foundation_progress/VALIDATION_DATA_001_FIRST_TIMECOURSE.md` | Do not fabricate data or claim validation without a sourced dataset and explicit comparison limits. |
 
 ## How A Phase Is Marked Complete

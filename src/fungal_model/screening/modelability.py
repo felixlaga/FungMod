@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, Mapping
 
 from fungal_model.registry.records import (
     ParameterRecord,
@@ -205,37 +205,29 @@ def assess_modelability(
                         )
                     )
 
-    required_parameters: list[str] = []
-    for compatibility in compatibility_records:
-        required_parameters.extend(compatibility.required_parameters)
-        for symbol in compatibility.required_parameters:
-            record = _best_parameter_record(
-                registry=registry,
-                parameter_symbol=symbol,
-                compatibility=compatibility,
-                fungus_id=fungus_id,
-                substrate_id=substrate_id,
-                environment_id=environment_id,
-                mode=mode,
-            )
-            if record is None:
-                missing.append(
-                    _item(
-                        "parameter",
-                        symbol,
-                        "Required parameter is absent from the registry.",
-                        {"process_type": compatibility.process_type},
-                    )
+    selected_required_parameters: tuple[str, ...] = ()
+    selected_processes: tuple[str, ...] = tuple(record.process_type for record in compatibility_records)
+    if compatibility_records:
+        selected = max(
+            (
+                _evaluate_compatibility_parameters(
+                    registry=registry,
+                    compatibility=compatibility,
+                    fungus_id=fungus_id,
+                    substrate_id=substrate_id,
+                    environment_id=environment_id,
+                    mode=mode,
                 )
-                continue
-            _classify_parameter(
-                record=record,
-                mode=mode,
-                known=known,
-                uncertain=uncertain,
-                missing=missing,
-                incompatible=incompatible,
-            )
+                for compatibility in compatibility_records
+            ),
+            key=_compatibility_evaluation_priority,
+        )
+        known.extend(selected["known"])
+        uncertain.extend(selected["uncertain"])
+        missing.extend(selected["missing"])
+        incompatible.extend(selected["incompatible"])
+        selected_required_parameters = tuple(selected["required_parameters"])
+        selected_processes = (selected["compatibility"].process_type,)
 
     status = _status(
         compatibility_records=tuple(compatibility_records),
@@ -252,9 +244,9 @@ def assess_modelability(
         uncertain=tuple(uncertain),
         missing=tuple(missing),
         incompatible=tuple(incompatible),
-        required_processes=tuple(dict.fromkeys(record.process_type for record in compatibility_records)),
+        required_processes=tuple(dict.fromkeys(selected_processes)),
         candidate_processes=tuple(dict.fromkeys(candidate_processes)),
-        required_parameters=tuple(dict.fromkeys(required_parameters)),
+        required_parameters=selected_required_parameters,
         suggested_experiments=_suggested_experiments(missing),
         assumptions=(
             "Modelability assessment only; no ODE model is assembled or run.",
@@ -262,6 +254,78 @@ def assess_modelability(
             f"Mode-specific classification used mode={mode!r}.",
         ),
     )
+
+
+def _evaluate_compatibility_parameters(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    mode: ModelabilityMode,
+) -> dict[str, Any]:
+    known: list[ReportItem] = []
+    uncertain: list[ReportItem] = []
+    missing: list[ReportItem] = []
+    incompatible: list[ReportItem] = []
+    required_parameters = tuple(dict.fromkeys(compatibility.required_parameters))
+    for symbol in required_parameters:
+        record = _best_parameter_record(
+            registry=registry,
+            parameter_symbol=symbol,
+            compatibility=compatibility,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            mode=mode,
+        )
+        if record is None:
+            missing.append(
+                _item(
+                    "parameter",
+                    symbol,
+                    "Required parameter is absent from the registry.",
+                    {"process_type": compatibility.process_type},
+                )
+            )
+            continue
+        _classify_parameter(
+            record=record,
+            mode=mode,
+            known=known,
+            uncertain=uncertain,
+            missing=missing,
+            incompatible=incompatible,
+        )
+    status = _status(
+        compatibility_records=(compatibility,),
+        missing=tuple(missing),
+        incompatible=tuple(incompatible),
+        uncertain=tuple(uncertain),
+    )
+    return {
+        "compatibility": compatibility,
+        "known": known,
+        "uncertain": uncertain,
+        "missing": missing,
+        "incompatible": incompatible,
+        "required_parameters": required_parameters,
+        "status": status,
+    }
+
+
+def _compatibility_evaluation_priority(evaluation: Mapping[str, Any]) -> tuple[int, int, int]:
+    status_score = {
+        "modelable": 3,
+        "exploratory": 2,
+        "underparameterized": 1,
+        "unsupported": 0,
+    }[str(evaluation["status"])]
+    compatibility = evaluation["compatibility"]
+    template_score = 1 if getattr(compatibility, "case_template_id", "") else 0
+    known_score = len(evaluation["known"])
+    return status_score, template_score, known_score
 
 
 def _classify_parameter(
@@ -357,6 +421,14 @@ def _best_parameter_record(
     environment_id: str,
     mode: ModelabilityMode,
 ) -> ParameterRecord | None:
+    chain_record = _chain_template_parameter_record(
+        registry=registry,
+        compatibility=compatibility,
+        parameter_symbol=parameter_symbol,
+        environment_id=environment_id,
+    )
+    if chain_record is not None:
+        return chain_record
     candidates = [
         record
         for record in registry.parameters.values()
@@ -377,6 +449,33 @@ def _best_parameter_record(
     if not candidates:
         return None
     return max(candidates, key=lambda record: _parameter_specificity(record, mode=mode))
+
+
+def _chain_template_parameter_record(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    parameter_symbol: str,
+    environment_id: str,
+) -> ParameterRecord | None:
+    if compatibility.process_type != "extracellular_enzyme_chain" or not compatibility.case_template_id:
+        return None
+    try:
+        template = registry.get_case_template(compatibility.case_template_id)
+    except RegistryLookupError:
+        return None
+    parameter_ids = template.process_state_metadata.get("parameter_record_ids")
+    if not isinstance(parameter_ids, dict):
+        return None
+    for record_id in parameter_ids.values():
+        record = registry.parameters.get(str(record_id))
+        if (
+            record is not None
+            and record.parameter_symbol == parameter_symbol
+            and _matches(record.environment_id, environment_id)
+        ):
+            return record
+    return None
 
 
 def _matches(record_value: str | None, requested: str) -> bool:

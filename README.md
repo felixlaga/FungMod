@@ -69,7 +69,10 @@ basic kinetics layer:
   simulation registry;
 - a registry-backed BIO-002 extracellular enzyme-chain assembler whose
   stoichiometry, conserved quantities, entities, and output labels come from
-  template data rather than mechanism-code biological names.
+  template data rather than mechanism-code biological names;
+- a scoped CASE-001 researcher-facing path that runs the existing BIO-002
+  cellulose-equivalent enzyme-chain virtual experiment from names and aliases
+  through the top-level `virtual_experiment(...)` API.
 
 It does not yet implement full thermodynamic flux analysis, resolved intracellular
 metabolism, 2D/3D spatial models, publication-grade calibration against
@@ -138,6 +141,24 @@ final metrics, threshold times, sampled parameters, summary metrics,
 provenance, limitations, missing-parameter and suggested-experiment tables, and
 a versioned data dictionary/schema. Exploratory priors remain allowed, but the
 tables mark them as assumptions rather than literature-curated values.
+
+The scoped CASE-001 BIO-002 chain can also be run from researcher-facing names:
+
+```python
+from fungal_model import virtual_experiment
+
+study = virtual_experiment(
+    fungi="generic cellulase source",
+    substrates="cellulose film",
+    environments="30 C pH 5 assay",
+)
+
+result = study.simulate(mode="exploratory", n_samples=1)
+```
+
+This CASE-001 path is exploratory and enzyme-chain/cellulose-equivalent only.
+It is not whole-fungus growth, secretion, uptake, biomass, PET, lignin, full
+lignocellulose, organism-specific physiology, or empirical validation.
 
 ## Public API
 

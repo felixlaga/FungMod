@@ -16,7 +16,7 @@ import yaml
 from fungal_model.core.value_spec import ValueSpec
 from fungal_model.io.model_config import ModelConfig
 from fungal_model.registry.records import ParameterRecord, ProcessCompatibilityRecord
-from fungal_model.registry.store import FungModRegistry
+from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.results import SimulationResult
 from fungal_model.screening.case_builder import (
     RegistryCaseBuildError,
@@ -393,6 +393,16 @@ def _resolve_role_records(
     required_roles: tuple[str, ...],
     process_label: str,
 ) -> Mapping[str, ParameterRecord]:
+    chain_records = _chain_template_role_records(
+        registry=registry,
+        compatibility=compatibility,
+        required_roles=required_roles,
+        process_label=process_label,
+        environment_id=environment_id,
+        scientific=False,
+    )
+    if chain_records is not None:
+        return chain_records
     missing_roles = tuple(
         role for role in required_roles if role not in compatibility.parameter_roles
     )
@@ -444,6 +454,16 @@ def _resolve_scientific_role_records(
     required_roles: tuple[str, ...],
     process_label: str,
 ) -> Mapping[str, ParameterRecord]:
+    chain_records = _chain_template_role_records(
+        registry=registry,
+        compatibility=compatibility,
+        required_roles=required_roles,
+        process_label=process_label,
+        environment_id=environment_id,
+        scientific=True,
+    )
+    if chain_records is not None:
+        return chain_records
     missing_roles = tuple(
         role for role in required_roles if role not in compatibility.parameter_roles
     )
@@ -486,6 +506,89 @@ def _resolve_scientific_role_records(
         if blocker is not None:
             raise RegistryScreenSimulationError(
                 f"Scientific mode rejected parameter role {role!r} and symbol {symbol!r}: {blocker}"
+            )
+        records[role] = record
+    return records
+
+
+def _chain_template_role_records(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    required_roles: tuple[str, ...],
+    process_label: str,
+    environment_id: str,
+    scientific: bool,
+) -> Mapping[str, ParameterRecord] | None:
+    if compatibility.process_type != "extracellular_enzyme_chain":
+        return None
+    if not compatibility.case_template_id:
+        raise RegistryScreenSimulationError(
+            f"{process_label} compatibility {compatibility.record_id!r} lacks case_template_id."
+        )
+    try:
+        template = registry.get_case_template(compatibility.case_template_id)
+    except RegistryLookupError as exc:
+        raise RegistryScreenSimulationError(
+            f"{process_label} compatibility {compatibility.record_id!r} references missing "
+            f"case template {compatibility.case_template_id!r}."
+        ) from exc
+    parameter_ids = template.process_state_metadata.get("parameter_record_ids")
+    if not isinstance(parameter_ids, dict):
+        raise RegistryScreenSimulationError(
+            f"{process_label} template {template.case_template_id!r} lacks parameter_record_ids."
+        )
+    missing_roles = tuple(
+        role for role in required_roles if role not in compatibility.parameter_roles or role not in parameter_ids
+    )
+    if missing_roles:
+        raise RegistryScreenSimulationError(
+            f"{process_label} compatibility/template metadata is missing parameter role mappings "
+            f"for: {', '.join(missing_roles)}."
+        )
+    roles_to_resolve = tuple(dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys())))
+    records: dict[str, ParameterRecord] = {}
+    for role in roles_to_resolve:
+        record_id = str(parameter_ids[role])
+        record = registry.parameters.get(record_id)
+        if record is None:
+            raise RegistryScreenSimulationError(
+                f"{process_label} template {template.case_template_id!r} references missing "
+                f"parameter record {record_id!r} for role {role!r}."
+            )
+        if not _matches(record.environment_id, environment_id):
+            raise RegistryScreenSimulationError(
+                f"{process_label} template {template.case_template_id!r} parameter record "
+                f"{record_id!r} is scoped to environment {record.environment_id!r}, not {environment_id!r}."
+            )
+        expected_symbol = compatibility.parameter_roles[role]
+        if record.parameter_symbol != expected_symbol:
+            raise RegistryScreenSimulationError(
+                f"{process_label} role {role!r} expected symbol {expected_symbol!r}, "
+                f"but template record {record_id!r} uses {record.parameter_symbol!r}."
+            )
+        validation = record.value.validate(nonnegative=True)
+        if not validation.passed:
+            raise RegistryScreenSimulationError(
+                f"Parameter {record.parameter_symbol!r} for role {role!r} failed ValueSpec validation: "
+                f"{validation.to_dict()}"
+            )
+        if scientific:
+            if not record.value.is_exact:
+                raise RegistryScreenSimulationError(
+                    f"Scientific mode requires exact parameters; role {role!r} uses "
+                    f"symbol {record.parameter_symbol!r} with ValueSpec kind {record.value.kind!r}."
+                )
+            blocker = _scientific_parameter_record_blocker(record)
+            if blocker is not None:
+                raise RegistryScreenSimulationError(
+                    f"Scientific mode rejected parameter role {role!r} and symbol "
+                    f"{record.parameter_symbol!r}: {blocker}"
+                )
+        elif not record.value.is_exact and not record.value.is_uncertain:
+            raise RegistryScreenSimulationError(
+                f"Parameter role {role!r} uses ValueSpec kind {record.value.kind!r}, "
+                "which cannot be sampled for exploratory simulation."
             )
         records[role] = record
     return records
