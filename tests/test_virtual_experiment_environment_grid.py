@@ -44,6 +44,7 @@ def test_virtual_experiment_expands_environment_grid_and_writes_environment_tabl
 
     required_files = (
         "modelability_preflight.csv",
+        "modelability_items.csv",
         "case_summary.csv",
         "time_series_long.csv",
         "final_states.csv",

@@ -26,6 +26,33 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Modelability Items Output
+
+Date: 2026-06-19
+
+Status: `partial` for build-first exploratory virtual-experiment expansion.
+
+Completed in this pass:
+
+- Added `modelability_items.csv` to the standard virtual-experiment output
+  bundle.
+- Added `DegradationScreenResult.modelability_items()` for loading the table
+  without rerunning simulation.
+- Added versioned output-schema/data-dictionary coverage for the new table.
+- Populated the table with every per-case preflight fact: known, uncertain,
+  missing, and incompatible modelability items, including JSON details and
+  machine-readable allowed-use policy.
+- Added tests proving known process-compatibility facts and uncertain
+  exploratory parameter facts are inspectable from standard outputs.
+
+No new biology, validation data, calibration routine, thermodynamic equation,
+entropy calculation, environmental response law, unsupported-case simulation
+path, or empirical validation claim was added.
+
+Recommended next task: continue PRODUCT-001 with a report-writing path for
+blocked/unsupported preflight cases, or proceed to a generic THERMO-003
+feasibility slice if a small equation-backed scope is clear.
+
 ## PRODUCT-001 Environment Grid Helper
 
 Date: 2026-06-19

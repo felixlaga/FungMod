@@ -94,6 +94,25 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         ),
         primary_key=("case_id",),
     ),
+    "modelability_items": _table(
+        "Flat per-case modelability facts from preflight, including known, uncertain, missing, and incompatible items.",
+        (
+            *COMMON_CASE_COLUMNS,
+            _column("item_index", "Zero-based modelability item index within the case.", semantic_type="integer"),
+            _column(
+                "item_status",
+                "Modelability fact class.",
+                allowed_values="known; uncertain; missing; incompatible",
+            ),
+            _column("item_type", "Modelability item type."),
+            _column("item_id", "Stable item identifier from the modelability report.", semantic_type="identifier"),
+            _column("modelability_status", "Overall modelability status for the case."),
+            _column("message", "Human-readable modelability message."),
+            _column("details", "JSON details from the structured modelability item.", required=False),
+            _column("allowed_use", "Machine-readable policy for interpreting this item."),
+        ),
+        primary_key=("case_id", "item_index"),
+    ),
     "case_summary": _table(
         "One-row simulation summary per case.",
         (

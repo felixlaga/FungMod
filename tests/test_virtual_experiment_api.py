@@ -42,6 +42,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
 
     required_files = (
         "modelability_preflight.csv",
+        "modelability_items.csv",
         "case_summary.csv",
         "time_series_long.csv",
         "final_states.csv",
@@ -70,6 +71,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     final_metric_rows = _csv_rows(output_dir / "final_metrics.csv")
     threshold_rows = _csv_rows(output_dir / "threshold_times.csv")
     sampled_rows = _csv_rows(output_dir / "sampled_parameters.csv")
+    modelability_rows = _csv_rows(output_dir / "modelability_items.csv")
     assumption_rows = _csv_rows(output_dir / "assumption_summary.csv")
     summary_rows = _csv_rows(output_dir / "summary_metrics.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
@@ -120,6 +122,19 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         for row in enzyme_prior_rows
     )
     assert all(row["allowed_use"] == "exploratory_simulation_only_not_literature_curated" for row in enzyme_prior_rows)
+    assert result.modelability_items() == modelability_rows
+    assert any(
+        row["item_status"] == "known"
+        and row["item_type"] == "process_compatibility"
+        and row["allowed_use"] == "supports_case_interpretation"
+        for row in modelability_rows
+    )
+    assert any(
+        row["item_status"] == "uncertain"
+        and row["item_id"] == "enzyme_concentration_beta_glucosidase"
+        and row["allowed_use"] == "exploratory_simulation_only"
+        for row in modelability_rows
+    )
     assert result.assumption_summary() == assumption_rows
     assert any(
         row["row_type"] == "assumption"
@@ -152,6 +167,10 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     )
     assert any(
         row["table"] == "assumption_summary" and row["column"] == "allowed_use"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "modelability_items" and row["column"] == "allowed_use"
         for row in dictionary_rows
     )
     assert any(

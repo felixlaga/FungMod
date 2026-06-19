@@ -71,6 +71,7 @@ def write_standard_tables(
     )
     paths = {
         "modelability_preflight": destination / "modelability_preflight.csv",
+        "modelability_items": destination / "modelability_items.csv",
         "case_summary": destination / "case_summary.csv",
         "time_series_long": destination / "time_series_long.csv",
         "final_states": destination / "final_states.csv",
@@ -109,6 +110,7 @@ def _build_table_rows(
 ) -> dict[str, list[dict[str, Any]]]:
     rows: dict[str, list[dict[str, Any]]] = {
         "modelability_preflight": [],
+        "modelability_items": [],
         "case_summary": [],
         "time_series_long": [],
         "final_states": [],
@@ -136,6 +138,7 @@ def _build_table_rows(
             role_records=role_records,
         )
         rows["modelability_preflight"].append(_preflight_row(context, report))
+        rows["modelability_items"].extend(_modelability_item_rows(context, report))
         rows["case_summary"].append(_case_summary_row(context, case, report))
         rows["provenance_table"].extend(_provenance_rows(context, registry, case, report, role_records))
         rows["limitations_table"].extend(_limitation_rows(context, registry, case, report, role_records))
@@ -336,6 +339,46 @@ def _preflight_row(context: Mapping[str, Any], report: ModelabilityReport) -> di
         "required_parameters": ";".join(report.required_parameters),
         "suggested_experiments": "; ".join(report.suggested_experiments),
     }
+
+
+def _modelability_item_rows(context: Mapping[str, Any], report: ModelabilityReport) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    base = _case_columns(context)
+    item_index = 0
+    for item_status, items in (
+        ("known", report.known),
+        ("uncertain", report.uncertain),
+        ("missing", report.missing),
+        ("incompatible", report.incompatible),
+    ):
+        for item in items:
+            rows.append(
+                {
+                    **base,
+                    "item_index": item_index,
+                    "item_status": item_status,
+                    "item_type": item.item_type,
+                    "item_id": item.item_id,
+                    "modelability_status": report.status,
+                    "message": item.message,
+                    "details": json.dumps(item.details, sort_keys=True),
+                    "allowed_use": _modelability_item_allowed_use(item_status),
+                }
+            )
+            item_index += 1
+    return rows
+
+
+def _modelability_item_allowed_use(item_status: str) -> str:
+    if item_status == "known":
+        return "supports_case_interpretation"
+    if item_status == "uncertain":
+        return "exploratory_simulation_only"
+    if item_status == "missing":
+        return "blocks_scientific_simulation"
+    if item_status == "incompatible":
+        return "blocks_simulation"
+    return "not_applicable"
 
 
 def _case_summary_row(
