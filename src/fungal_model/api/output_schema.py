@@ -192,6 +192,20 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         primary_key=("case_id", "sample_id", "role"),
         join_keys=("case_id", "sample_id"),
     ),
+    "assumption_summary": _table(
+        "Per-case assumptions, uncertain inputs, blockers, and follow-up suggestions.",
+        (
+            *COMMON_CASE_COLUMNS,
+            _column("row_type", "Kind of summary row.", allowed_values="assumption; uncertain; missing; incompatible; suggested_experiment"),
+            _column("item_type", "Modelability item type or summary item family."),
+            _column("item_id", "Stable item identifier within the case.", semantic_type="identifier"),
+            _column("modelability_status", "Modelability status for the case."),
+            _column("message", "Human-readable assumption, uncertainty, blocker, or suggestion."),
+            _column("details", "JSON details for structured modelability items.", required=False),
+            _column("allowed_use", "Machine-readable policy for interpreting this row."),
+        ),
+        primary_key=("case_id", "row_type", "item_id"),
+    ),
     "summary_metrics": _table(
         "Per-case ensemble summary statistics for computed metrics.",
         (

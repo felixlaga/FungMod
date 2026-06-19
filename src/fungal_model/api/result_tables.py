@@ -77,6 +77,7 @@ def write_standard_tables(
         "final_metrics": destination / "final_metrics.csv",
         "threshold_times": destination / "threshold_times.csv",
         "sampled_parameters": destination / "sampled_parameters.csv",
+        "assumption_summary": destination / "assumption_summary.csv",
         "summary_metrics": destination / "summary_metrics.csv",
         "environment_summary": destination / "environment_summary.csv",
         "provenance_table": destination / "provenance_table.csv",
@@ -114,6 +115,7 @@ def _build_table_rows(
         "final_metrics": [],
         "threshold_times": [],
         "sampled_parameters": [],
+        "assumption_summary": [],
         "summary_metrics": [],
         "environment_summary": [],
         "provenance_table": [],
@@ -139,6 +141,7 @@ def _build_table_rows(
         rows["limitations_table"].extend(_limitation_rows(context, registry, case, report, role_records))
         rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
         rows["suggested_experiments"].extend(_suggested_experiment_rows(context, registry, case, report))
+        rows["assumption_summary"].extend(_assumption_summary_rows(context, report))
         for sample in case.samples:
             sample_context = _sample_context(context, sample)
             state_roles = _state_roles(sample)
@@ -348,6 +351,66 @@ def _case_summary_row(
         "simulated": bool(case.samples),
         "preflight_guardrail": "modelability",
     }
+
+
+def _assumption_summary_rows(context: Mapping[str, Any], report: ModelabilityReport) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    base = _case_columns(context)
+    for index, assumption in enumerate(report.assumptions):
+        rows.append(
+            {
+                **base,
+                "row_type": "assumption",
+                "item_type": "modelability_assumption",
+                "item_id": f"assumption_{index:02d}",
+                "modelability_status": report.status,
+                "message": assumption,
+                "details": "",
+                "allowed_use": "exploratory_context_not_validation",
+            }
+        )
+    for row_type, items in (
+        ("uncertain", report.uncertain),
+        ("missing", report.missing),
+        ("incompatible", report.incompatible),
+    ):
+        for item in items:
+            rows.append(
+                {
+                    **base,
+                    "row_type": row_type,
+                    "item_type": item.item_type,
+                    "item_id": item.item_id,
+                    "modelability_status": report.status,
+                    "message": item.message,
+                    "details": json.dumps(item.details, sort_keys=True),
+                    "allowed_use": _assumption_allowed_use(row_type),
+                }
+            )
+    for index, suggestion in enumerate(report.suggested_experiments):
+        rows.append(
+            {
+                **base,
+                "row_type": "suggested_experiment",
+                "item_type": "suggested_experiment",
+                "item_id": f"suggested_experiment_{index:02d}",
+                "modelability_status": report.status,
+                "message": suggestion,
+                "details": "",
+                "allowed_use": "follow_up_experiment_recommendation",
+            }
+        )
+    return rows
+
+
+def _assumption_allowed_use(row_type: str) -> str:
+    if row_type == "uncertain":
+        return "exploratory_simulation_only"
+    if row_type == "missing":
+        return "blocks_scientific_simulation"
+    if row_type == "incompatible":
+        return "blocks_simulation"
+    return "not_applicable"
 
 
 def _case_columns(context: Mapping[str, Any]) -> dict[str, Any]:

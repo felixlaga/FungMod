@@ -48,6 +48,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "final_metrics.csv",
         "threshold_times.csv",
         "sampled_parameters.csv",
+        "assumption_summary.csv",
         "summary_metrics.csv",
         "environment_summary.csv",
         "provenance_table.csv",
@@ -69,6 +70,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     final_metric_rows = _csv_rows(output_dir / "final_metrics.csv")
     threshold_rows = _csv_rows(output_dir / "threshold_times.csv")
     sampled_rows = _csv_rows(output_dir / "sampled_parameters.csv")
+    assumption_rows = _csv_rows(output_dir / "assumption_summary.csv")
     summary_rows = _csv_rows(output_dir / "summary_metrics.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
     limitation_rows = _csv_rows(output_dir / "limitations_table.csv")
@@ -118,6 +120,19 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         for row in enzyme_prior_rows
     )
     assert all(row["allowed_use"] == "exploratory_simulation_only_not_literature_curated" for row in enzyme_prior_rows)
+    assert result.assumption_summary() == assumption_rows
+    assert any(
+        row["row_type"] == "assumption"
+        and row["allowed_use"] == "exploratory_context_not_validation"
+        and "mode='exploratory'" in row["message"]
+        for row in assumption_rows
+    )
+    assert any(
+        row["row_type"] == "uncertain"
+        and row["item_id"] == "enzyme_concentration_beta_glucosidase"
+        and row["allowed_use"] == "exploratory_simulation_only"
+        for row in assumption_rows
+    )
     assert any(
         row["symbol"] == "Km_cellobiose"
         and row["parameter_source_class"] == "selected_exact_value"
@@ -133,6 +148,10 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert not suggestion_rows
     assert any(
         row["table"] == "sampled_parameters" and row["column"] == "allowed_use"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "assumption_summary" and row["column"] == "allowed_use"
         for row in dictionary_rows
     )
     assert any(

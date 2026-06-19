@@ -50,6 +50,7 @@ def test_virtual_experiment_expands_environment_grid_and_writes_environment_tabl
         "final_metrics.csv",
         "threshold_times.csv",
         "sampled_parameters.csv",
+        "assumption_summary.csv",
         "summary_metrics.csv",
         "environment_summary.csv",
         "provenance_table.csv",

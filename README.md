@@ -138,9 +138,10 @@ result = study.simulate(mode="exploratory", n_samples=128)
 
 The standard output folder includes long-format time series, final states,
 final metrics, threshold times, sampled parameters, summary metrics,
-provenance, limitations, missing-parameter and suggested-experiment tables, and
-a versioned data dictionary/schema. Exploratory priors remain allowed, but the
-tables mark them as assumptions rather than literature-curated values.
+assumption summaries, provenance, limitations, missing-parameter and
+suggested-experiment tables, and a versioned data dictionary/schema.
+Exploratory priors remain allowed, but the tables mark them as assumptions
+rather than literature-curated values.
 
 The scoped CASE-001 BIO-002 chain can also be run from researcher-facing names
 and a runtime environment grid:
