@@ -30,14 +30,26 @@ Use this workflow for each roadmap PR:
 
 ## Phase And PR Queue
 
-Current next PR: **PR-03: VALIDATION-DATA-001 first real time-course dataset and model comparison**.
+Current next PR: **PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion**.
+
+Validation remains important, but it is no longer allowed to block the core
+simulator roadmap. The current priority is to build the virtual-experiment
+engine so it can honestly generate degradation curves from implemented
+mechanisms, thermodynamic/entropy constraints, explicit assumptions, and
+uncertainty ranges. Real time-course observations are required later for
+calibration, validation, and empirical comparison claims; they are not required
+before improving the simulator itself.
 
 | PR | Phase or slice | Status | Scope boundary |
 | --- | --- | --- | --- |
 | PR-01 | Roadmap orchestration and phase status tracker | complete once merged | Documentation and focused guardrail tests only. No scientific or numerical behavior changes. |
 | PR-02 | CASE-001 researcher-facing enzyme-chain virtual experiment from names | complete once merged | Existing BIO-002 cellulose-like chain is available through the researcher-facing API and standard outputs. No new biology or validation data. |
-| PR-03 | VALIDATION-DATA-001 first real time-course dataset and model comparison | current next; blocked/partial after ingestion-gate documentation | Add a sourced real dataset and comparison workflow without overclaiming validation. This gate PR does not add the dataset or complete ingestion. |
-| PR-04 | Output/status hardening from active validation findings | queued | Address the next highest active output, provenance, or validation-status gap after PR-03, based on `findings.yaml` and active validation docs. |
+| PR-03 | VALIDATION-DATA-001 ingestion gate | complete for blocker/gate documentation; dataset ingestion deferred | The repo records why the known candidate sources are not ingestable. No dataset was added, and no validation claim was made. |
+| PR-04 | Build-first roadmap reframe | complete once merged | Documentation and focused guardrail tests only. Move validation behind simulator capability work without deleting validation from the roadmap. |
+| PR-05 | PRODUCT-001 build-first exploratory virtual-experiment expansion | current next | Expand the researcher-facing simulator toward the central product: broader fungus/source + substrate + environment inputs, explicit exploratory priors, complete degradation curves, uncertainty bands, provenance, limitations, and missing-mechanism reports. |
+| PR-06 | THERMO-003 dynamic thermodynamic and entropy constraints | queued | Add general thermodynamic feasibility, entropy/irreversibility accounting, or energy-dissipation constraints where they can be implemented generically and tested without fungus- or substrate-specific shortcuts. |
+| PR-07 | BIO-003 mechanism expansion through generic process laws | queued | Add more biology only as implemented, provenance-backed, maturity-labelled, tested process laws. Prefer reusable mechanism families over case-specific fungus branches. |
+| PR-08 | VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred | Add sourced observations only after simulator outputs are mature enough that comparison is meaningful. Validation, calibration, and empirical comparison claims require real observations. |
 
 If a future orchestrator changes the queue, update this table, explain the
 reason in `progress.md`, and keep the current-next-PR line machine-checkable.
@@ -57,7 +69,10 @@ Status labels follow `progress.md`: `complete`, `partial`, `not started`, and
 | BIO-002 reusable two-step extracellular enzyme chain | complete for scoped reusable two-step chain assembly and software verification; partial relative to broad pathway biology | `foundation_progress/BIO_002_ENZYME_CHAIN_DEGRADATION.md`, `foundation_progress/proposals/BIO_002_EXTRACELLULAR_ENZYME_CHAIN.yml`, `tests/test_bio002_extracellular_enzyme_chain.py`, `tests/test_bio002_generic_chain_assembly.py` | No whole-fungus growth, secretion, uptake, biomass, PET, lignin, full lignocellulose, or organism-specific behavior. |
 | Phase 2 static balance checks | complete for scoped static metadata, validator, assembly-time balance checks, and corrective process-reaction binding; partial relative to dynamic thermodynamic feasibility | `FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md`, `progress.md`, `tests/test_static_balance_thermodynamic_validators.py` | No dynamic reaction quotients, activity model, redox potential model, or solver-time thermodynamic enforcement. |
 | CASE-001 cellulose-like enzyme-chain virtual experiment | complete once PR-02 is merged for the scoped researcher-facing API path | `foundation_progress/CASE_001_CELLULOSE_ENZYME_CHAIN_DEMO.md`, `tests/test_case001_researcher_enzyme_chain_virtual_experiment.py` | This exposes the existing BIO-002 chain only; it is exploratory and not whole-fungus growth, secretion, uptake, biomass, PET, lignin, full lignocellulose, organism-specific physiology, or empirical validation. |
-| VALIDATION-DATA-001 first real time-course dataset | blocked/partial for ingestion | `foundation_progress/VALIDATION_DATA_001_FIRST_TIMECOURSE.md`, `data/experiments/candidate_reviews/resa_buckin_2011_cellobiose_hydrolysis_review.yml`, `data/experiments/candidate_reviews/ariaeenejad_2020_persibgl1_cellobiose_hydrolysis_review.yml`, `tests/test_dataset_candidate_review.py`, `tests/test_roadmap_orchestration_status.py` | The gate is documented, but no real dataset, observation CSV, model comparison, residual table, or validation report exists. Resa/Buckin is blocked by missing extractable observation rows and metadata; Ariaeenejad/Frontiers is blocked by unresolved time-axis conflict and missing machine-readable observations. Current next PR remains PR-03 until source-backed numeric observations are ingested in a separate PR. |
+| PRODUCT-001 build-first exploratory virtual-experiment expansion | current next | `README.md`, `foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md`, `foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md`, `tests/test_roadmap_orchestration_status.py` | Build simulator capability before validation. Outputs may be exploratory only when assumptions, ranges, provenance, uncertainty, missing mechanisms, and limitations remain explicit. |
+| THERMO-003 dynamic thermodynamic and entropy constraints | queued | `ARCHITECTURE_DEBT.md`, `tests/test_static_balance_thermodynamic_validators.py`, future thermodynamic tests | Prefer first-principles/generic constraints over case-specific fungus models, but do not emit unsupported thermodynamic state, entropy production, or redox behavior without implemented equations and tests. |
+| BIO-003 generic mechanism expansion | queued | `AGENTS.md`, `foundation_progress/BIO_READINESS_LITE.md`, `foundation_progress/proposals/`, future mechanism tests | Biology may expand only through explicit mechanisms with provenance, maturity labels, tests, and honest limitations. No fungus-specific branches in generic modules. |
+| VALIDATION-DATA-001 first real time-course dataset | deferred; blocked/partial for ingestion | `foundation_progress/VALIDATION_DATA_001_FIRST_TIMECOURSE.md`, `data/experiments/candidate_reviews/resa_buckin_2011_cellobiose_hydrolysis_review.yml`, `data/experiments/candidate_reviews/ariaeenejad_2020_persibgl1_cellobiose_hydrolysis_review.yml`, `tests/test_dataset_candidate_review.py`, `tests/test_roadmap_orchestration_status.py` | The gate is documented, but no real dataset, observation CSV, model comparison, residual table, or validation report exists. Real observations are required for validation/calibration/comparison claims, not for building exploratory simulator capability. |
 
 ## How A Phase Is Marked Complete
 
