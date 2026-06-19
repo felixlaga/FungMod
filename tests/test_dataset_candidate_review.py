@@ -23,6 +23,7 @@ RESA_BUCKIN_CANDIDATE = CANDIDATE_DIR / "resa_buckin_2011_cellobiose_hydrolysis_
 ARIAEENEJAD_CANDIDATE = (
     CANDIDATE_DIR / "ariaeenejad_2020_persibgl1_cellobiose_hydrolysis_review.yml"
 )
+REAL_CANDIDATES = (RESA_BUCKIN_CANDIDATE, ARIAEENEJAD_CANDIDATE)
 LITERATURE_DIR = ROOT / "data" / "experiments" / "literature"
 
 
@@ -158,6 +159,24 @@ def test_alternate_public_candidate_digitization_review_blocks_time_axis_conflic
     assert "csv_path" not in digitization_review
 
 
+def test_known_real_candidate_reviews_are_blocked_and_data_free() -> None:
+    reviews = [load_dataset_candidate_review(path) for path in REAL_CANDIDATES]
+
+    assert {review.candidate_id for review in reviews} == {
+        "resa_buckin_2011_cellobiose_hydrolysis",
+        "ariaeenejad_2020_persibgl1_cellobiose_hydrolysis",
+    }
+
+    decisions = []
+    for review in reviews:
+        assert review.validate().passed
+        assert review.review["schema_result"].startswith("blocked_")
+        decisions.append(review.raw["schema_review"]["decision"])
+        _assert_no_observation_payload_fields(review.raw)
+
+    assert decisions == ["blocked_do_not_ingest", "blocked_do_not_ingest"]
+
+
 def test_missing_kind_fails_candidate_review_schema() -> None:
     data = _fake_candidate_data()
     data.pop("kind")
@@ -253,3 +272,14 @@ def _fake_candidate_data() -> dict[str, Any]:
 
 def _has_issue(issues: list[dict[str, Any]], field: str) -> bool:
     return any(issue["field"] == field for issue in issues)
+
+
+def _assert_no_observation_payload_fields(value: Any) -> None:
+    forbidden_fields = {"observations", "measurements", "data_file", "csv_path"}
+    if isinstance(value, dict):
+        assert forbidden_fields.isdisjoint(value.keys())
+        for nested in value.values():
+            _assert_no_observation_payload_fields(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            _assert_no_observation_payload_fields(nested)
