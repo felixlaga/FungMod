@@ -142,15 +142,20 @@ provenance, limitations, missing-parameter and suggested-experiment tables, and
 a versioned data dictionary/schema. Exploratory priors remain allowed, but the
 tables mark them as assumptions rather than literature-curated values.
 
-The scoped CASE-001 BIO-002 chain can also be run from researcher-facing names:
+The scoped CASE-001 BIO-002 chain can also be run from researcher-facing names
+and a runtime environment grid:
 
 ```python
-from fungal_model import virtual_experiment
+from fungal_model import environment_grid, virtual_experiment
 
 study = virtual_experiment(
     fungi="generic cellulase source",
     substrates="cellulose film",
-    environments="30 C pH 5 assay",
+    environments=environment_grid(
+        temperature_C=[25, 30, 35],
+        ph=[4.5, 5.0, 5.5],
+        oxygen="aerobic",
+    ),
 )
 
 result = study.simulate(mode="exploratory", n_samples=1)
@@ -158,7 +163,9 @@ result = study.simulate(mode="exploratory", n_samples=1)
 
 This CASE-001 path is exploratory and enzyme-chain/cellulose-equivalent only.
 It is not whole-fungus growth, secretion, uptake, biomass, PET, lignin, full
-lignocellulose, organism-specific physiology, or empirical validation.
+lignocellulose, organism-specific physiology, or empirical validation. Runtime
+environment-grid values are metadata unless an explicit response law or
+condition-specific parameter record is active.
 
 ## Public API
 
@@ -169,6 +176,7 @@ loading, model assembly, execution, and result inspection:
 - `VirtualExperiment`
 - `virtual_experiment`
 - `EnvironmentGrid`
+- `environment_grid`
 - `EnvironmentCase`
 - `DegradationScreenResult`
 - `VirtualExperimentError`

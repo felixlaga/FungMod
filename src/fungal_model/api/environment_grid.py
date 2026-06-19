@@ -175,6 +175,27 @@ class EnvironmentGrid:
         }
 
 
+def environment_grid(
+    *,
+    temperature_C: Sequence[float] = (),
+    ph: Sequence[float] = (),
+    oxygen: Sequence[str] | str = (),
+    environment_ids: Sequence[str] | str = (),
+) -> EnvironmentGrid:
+    """Create a researcher-facing environment grid.
+
+    Numeric temperature and pH values are runtime metadata unless an explicit
+    response law or condition-specific parameter record is active.
+    """
+
+    return EnvironmentGrid(
+        environment_ids=environment_ids,
+        temperature_C=temperature_C,
+        ph=ph,
+        oxygen=oxygen,
+    )
+
+
 def _string_tuple(values: Sequence[str] | str) -> tuple[str, ...]:
     if isinstance(values, str):
         return (values,) if values else ()
@@ -209,4 +230,4 @@ def _safe_token(value: str) -> str:
     return clean or "unspecified"
 
 
-__all__ = ["EnvironmentCase", "EnvironmentEffectStatus", "EnvironmentGrid"]
+__all__ = ["EnvironmentCase", "EnvironmentEffectStatus", "EnvironmentGrid", "environment_grid"]
