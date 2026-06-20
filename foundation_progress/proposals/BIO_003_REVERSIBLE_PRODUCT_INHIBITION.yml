@@ -1,0 +1,81 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-003
+mechanism_id: reversible_product_inhibition
+general_process_family: generic reversible product inhibition modifier
+mathematical_law: >
+  A configured base process rate r_base is multiplied by an explicit
+  reversible inhibition activity factor a(P) = 1 / (1 + P / K_i), where P is
+  a configured product state and K_i is a positive inhibition constant with
+  units compatible with P. The modified process rate is r = r_base * a(P).
+  The mechanism is a generic modifier family, not a specific organism,
+  substrate, enzyme, or experiment.
+state_variables:
+  - name: product_pool
+    role: inhibitor_product
+    units: amount or concentration units declared by the configured case
+parameters:
+  - symbol: K_i
+    meaning: positive product inhibition constant for the configured product state
+    units: units compatible with the product_pool state
+units:
+  state_units_policy: explicit units required for the product state
+  parameter_units_policy: explicit K_i units must be compatible with the product state
+  activity_policy: product / K_i must be dimensionless
+valid_substrate_classes:
+  - any substrate class whose implemented process law produces an explicit product state
+valid_enzyme_or_source_classes:
+  - any implemented catalyst or source class whose configured process can be multiplied by a generic modifier
+environment_variables:
+  - name: product_state
+    required: true
+    units: amount or concentration units declared by the configured case
+output_curves:
+  - base process rate before product inhibition when available
+  - product-inhibition activity factor
+  - product-inhibited process rate
+  - affected substrate and product trajectories from the configured process
+summary_metrics:
+  - final product-inhibition activity factor
+  - minimum product-inhibition activity factor
+  - maximum inhibited process rate
+  - final affected substrate remaining
+  - final affected product formed
+assumptions:
+  - Product inhibition is reversible and single-product in this scoped mechanism.
+  - Product inhibition modifies an already implemented base process law rather than defining a new substrate-specific reaction.
+  - The configured product state and K_i must be explicit; missing values remain blocking or exploratory according to mode.
+not_in_scope:
+  - Competitive, uncompetitive, mixed, or multi-product inhibition mechanisms.
+  - Product toxicity, growth inhibition, secretion feedback, uptake, or biomass physiology.
+  - Organism-specific inhibition behavior.
+  - Dataset curation or empirical validation.
+unknowns:
+  - Which configured process families should expose pre- and post-modifier rates first.
+  - Which registry schema field should activate modifiers in researcher-facing virtual experiments.
+  - K_i values require separate curated records or explicit exploratory priors.
+suggested_experiments:
+  - Measure product time courses at multiple initial product concentrations to estimate K_i.
+  - Compare inhibited and uninhibited enzyme-only degradation time courses under the same pH and temperature.
+  - Record product-state units and enzyme loading so K_i can be interpreted without conversion guesses.
+blocking_failure_modes:
+  - Missing product state mapping.
+  - Missing, non-positive, or unit-incompatible K_i.
+  - Product state becomes negative.
+  - Base process does not expose a rate that can be modified without hidden assumptions.
+tests_required:
+  - Unit test that a(P) = 1 when P = 0 and decreases monotonically as P increases.
+  - Unit test that non-positive K_i and negative product state fail clearly.
+  - Configured workflow test on a homogeneous benchmark process.
+  - Second materially different non-specific test on a chain or surface-compatible process.
+  - Output-table test that active modifier assumptions, parameters, and limitations are visible.
+limitations:
+  - This proposal selects the next biology-mechanism target; it does not by itself activate product inhibition in virtual experiments.
+  - The existing low-level ProductInhibitionModifier is software-tested, but registry/configured virtual-experiment integration remains future work.
+  - Empirical interpretation requires evidence-backed K_i records or clearly marked exploratory priors.
+demo_case:
+  case_id: CASE-002
+  purpose: Demonstrate the reusable modifier on an explicit configured enzyme-mediated degradation setup after integration.
+  distinction: Demonstration records exercise the modifier; the mechanism proposal defines the reusable modifier family.
+data_dependencies:
+  - DATA-003
+validation_status: proposed

@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FungMod Final Goal PR Plan</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --ink: #1f2937;
+      --muted: #5b6472;
+      --line: #d8dee9;
+      --accent: #1f6feb;
+      --green: #137333;
+      --amber: #9a6700;
+      --red: #b42318;
+      --purple: #6f42c1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header {
+      padding: 36px 28px 24px;
+      background: #0f172a;
+      color: white;
+    }
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      letter-spacing: 0;
+    }
+    header p {
+      margin: 0;
+      max-width: 980px;
+      color: #dbe4f0;
+    }
+    main {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 0 0 18px;
+      padding: 20px;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 21px;
+    }
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 16px;
+    }
+    p { margin: 8px 0; }
+    code {
+      background: #eef2f7;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fbfcff;
+    }
+    .stat strong {
+      display: block;
+      font-size: 22px;
+      margin-bottom: 2px;
+    }
+    .stat span { color: var(--muted); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+    th {
+      background: #eef3fb;
+      font-weight: 650;
+    }
+    tr:nth-child(even) td { background: #fcfdff; }
+    ul { margin: 8px 0 8px 22px; padding: 0; }
+    li { margin: 4px 0; }
+    .ok { color: var(--green); font-weight: 650; }
+    .partial { color: var(--amber); font-weight: 650; }
+    .blocked { color: var(--red); font-weight: 650; }
+    .queued { color: var(--purple); font-weight: 650; }
+    .small { color: var(--muted); font-size: 13px; }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: #f1f6ff;
+      padding: 10px 12px;
+      margin: 12px 0;
+    }
+    .warning {
+      border-left-color: var(--amber);
+      background: #fff8e6;
+    }
+    .danger {
+      border-left-color: var(--red);
+      background: #fff1f0;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      table { font-size: 13px; }
+    }
+    @media (max-width: 640px) {
+      main { padding: 14px; }
+      header { padding: 28px 18px 20px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>FungMod Final Goal PR Plan</h1>
+    <p>
+      Build-first roadmap from the current repository state to a useful
+      registry-backed, uncertainty-aware virtual-experiment engine for fungal
+      and enzyme-mediated substrate degradation. Validation remains important,
+      but is intentionally scheduled after simulator capability is stronger.
+    </p>
+    <div class="meta">
+      <span class="pill">Generated: 2026-06-20</span>
+      <span class="pill">Repo commit: f6d6154</span>
+      <span class="pill">Mode: planning artifact only</span>
+      <span class="pill">No runtime/scientific behavior changed</span>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Current State</h2>
+      <div class="grid">
+        <div class="stat"><strong class="ok">598</strong><span>tests currently passing in the latest full suite reported by the PR loop</span></div>
+        <div class="stat"><strong class="partial">PRODUCT</strong><span>researcher-facing virtual experiment API is usable but still narrow</span></div>
+        <div class="stat"><strong class="partial">THERMO</strong><span>explicit-Q Gibbs/entropy diagnostics exist, but no solver-time enforcement</span></div>
+        <div class="stat"><strong class="queued">BIO</strong><span>BIO-003 generic mechanism expansion remains the largest open build-out</span></div>
+      </div>
+      <p>
+        FungMod already has a strong foundation: registry-backed cases,
+        uncertainty sampling, standard virtual-experiment tables, preflight
+        diagnostics, modelability outputs, explicit thermodynamic validators,
+        configured thermodynamic JSON/CSV summaries, and scoped notebooks for
+        Reaction 618 and BIO-001.
+      </p>
+      <p>
+        The biggest remaining gap is not validation data. The biggest gap is
+        breadth and depth of implemented virtual-experiment capability:
+        reusable biology process laws, richer environment/thermodynamics
+        integration, better researcher-facing reports, and notebooks that show
+        the project as a product rather than a set of internal fixtures.
+      </p>
+    </section>
+
+    <section>
+      <h2>2. What Still Blocks The Final Goal</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th>Current capability</th>
+            <th>Remaining gap</th>
+            <th>Completion signal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Researcher workflow</td>
+            <td>Top-level <code>virtual_experiment(...)</code>, <code>environment_grid(...)</code>, standard tables, quicklooks, preflight report.</td>
+            <td>Still narrow around existing registry cases; no polished report bundle; environment grids mostly metadata-only unless condition-specific records exist.</td>
+            <td>Researcher can run multiple source/substrate/environment cases and inspect curves, uncertainty, assumptions, and blocked cases without reading internals.</td>
+          </tr>
+          <tr>
+            <td>Generic biology</td>
+            <td>Homogeneous MM, surface catalysis, reusable two-step extracellular enzyme chain, product maps, modifiers.</td>
+            <td>No broad generic hydrolysis families, oxidative components, uptake/release coupling, enzyme decay/inactivation families, or multi-product chain motifs in researcher path.</td>
+            <td>BIO-003 mechanisms are implemented as reusable process laws with non-case-specific tests and maturity/provenance labels.</td>
+          </tr>
+          <tr>
+            <td>Thermodynamics and entropy</td>
+            <td>Static Gibbs checks; explicit reaction quotient Gibbs validator; entropy-production-per-mole diagnostics; configured JSON/CSV summaries.</td>
+            <td>No inferred activity model, no dynamic Q from simulation states, no redox-potential model, no solver-time thermodynamic feasibility gate.</td>
+            <td>Thermodynamic diagnostics can be attached to configured/registry cases and, later, constrain or flag process rates where equations and inputs exist.</td>
+          </tr>
+          <tr>
+            <td>Output product</td>
+            <td>CSV tables for time series, final states, metrics, thresholds, sampled parameters, provenance, limitations, assumptions, modelability, environment summaries.</td>
+            <td>No single human-readable report pack; no notebook-quality product report; limited thermodynamic and mechanism summaries in virtual-experiment standard tables.</td>
+            <td>Each run writes a self-contained report folder with machine-readable tables plus a concise HTML/Markdown report.</td>
+          </tr>
+          <tr>
+            <td>Notebooks</td>
+            <td>Software-test examples plus Reaction 618, BIO-001, SABIO-RK discovery notebooks.</td>
+            <td>No “product tour” notebook for the current API, no thermodynamic diagnostics notebook, no BIO-003 mechanism notebook, limited notebook index.</td>
+            <td>Notebook set teaches a researcher: define experiment, preflight, simulate, inspect uncertainty/provenance, understand limitations, propose next experiments.</td>
+          </tr>
+          <tr>
+            <td>Validation and calibration</td>
+            <td>Dataset loaders, candidate reviews, model comparison scaffolding, calibration utilities.</td>
+            <td>No real accepted time-course observation table and no model-vs-data report for degradation curves.</td>
+            <td>After simulator maturity: source-backed observation CSV, preprocessing notes, uncertainty policy, residuals, comparison report.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. Recommended PR Roadmap</h2>
+      <div class="callout">
+        <strong>Recommended next move:</strong> pivot from THERMO-003 output
+        polish into BIO-003, because the final goal needs more implemented
+        biology and process-law breadth. Keep each PR small and generic.
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>PR</th>
+            <th>Theme</th>
+            <th>Concrete scope</th>
+            <th>Tests / guardrails</th>
+            <th>Out of scope</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PR-14</td>
+            <td><span class="queued">BIO-003 proposal selection</span></td>
+            <td>Add a narrow BIO-003 proposal/status document choosing the first generic process-law family to implement: recommended target is generic reversible product inhibition or generic enzyme inactivation, because both are broadly reusable and already adjacent to existing modifiers/processes.</td>
+            <td>Guardrail test requiring BIO-003 docs to name equations, parameters, provenance/maturity requirements, non-specific test case, and explicit limitations.</td>
+            <td>No numerical behavior change; no mechanism implementation yet.</td>
+          </tr>
+          <tr>
+            <td>PR-15</td>
+            <td><span class="queued">BIO-003 generic process law 1</span></td>
+            <td>Implement the selected generic process law in core/process/modifier layer. Good first candidate: product inhibition as a generic modifier applicable to homogeneous and chain cases, with exact parameter requirements.</td>
+            <td>Unit tests with at least two materially different non-specific cases; no PET/cellulose/fungus-specific branch; provenance-required parameter tests.</td>
+            <td>No whole-fungus growth, no empirical validation, no silent default constants.</td>
+          </tr>
+          <tr>
+            <td>PR-16</td>
+            <td>BIO-003 registry/config integration</td>
+            <td>Expose the new generic process/modifier through configured model YAML and/or registry case assembly where explicit records exist.</td>
+            <td>Configured workflow tests; modelability reports missing parameters clearly; output limitations identify when modifier is active or unavailable.</td>
+            <td>No automatic guessing of missing inhibition/inactivation parameters.</td>
+          </tr>
+          <tr>
+            <td>PR-17</td>
+            <td>Virtual-experiment mechanism summaries</td>
+            <td>Add a <code>mechanism_summary.csv</code> or equivalent table describing active process laws, modifiers, thermodynamic validators, maturity, and limitations per case.</td>
+            <td>Output schema/data dictionary tests; standard output bundle tests; no scientific behavior change except reporting.</td>
+            <td>No new biology beyond reporting what is already implemented.</td>
+          </tr>
+          <tr>
+            <td>PR-18</td>
+            <td>Environment response law integration</td>
+            <td>Allow explicit temperature/pH/oxygen response modifiers in registry/config-driven virtual experiments when parameter records and validity ranges are present.</td>
+            <td>Tests proving runtime environment grid remains metadata-only unless an explicit response law is attached; tests for validity-range limitations.</td>
+            <td>No ranking environments when response is metadata-only.</td>
+          </tr>
+          <tr>
+            <td>PR-19</td>
+            <td>Thermodynamics linkage</td>
+            <td>Attach explicit thermodynamic validators to configured/registry case output bundles and virtual-experiment standard tables where Q/T metadata is provided.</td>
+            <td>Tests for <code>thermodynamic_summary.csv</code> presence in virtual-experiment outputs; no inferred Q.</td>
+            <td>No dynamic activity inference or solver-time enforcement yet.</td>
+          </tr>
+          <tr>
+            <td>PR-20</td>
+            <td>Researcher report bundle</td>
+            <td>Add <code>result.write_report(...)</code> or a report writer that creates a concise Markdown/HTML run report from existing tables: curves summary, assumptions, uncertainty, missing mechanisms, next experiments.</td>
+            <td>Golden-structure tests; schema/version tests; no long verbatim source text.</td>
+            <td>No new numerical model behavior.</td>
+          </tr>
+          <tr>
+            <td>PR-21</td>
+            <td>Notebook index and product tour</td>
+            <td>Add a notebook index plus a product-tour notebook using public APIs only: define virtual experiment, run preflight, simulate, inspect tables/plots, read assumptions and modelability rows.</td>
+            <td>Notebook guardrail tests: imports package code, no hidden rate laws/classes, local outputs via <code>FUNGMOD_NOTEBOOK_OUTPUT_ROOT</code>.</td>
+            <td>No scientific claims beyond exploratory examples.</td>
+          </tr>
+          <tr>
+            <td>PR-22</td>
+            <td>Thermodynamics notebook</td>
+            <td>Add an explicit thermodynamics/entropy notebook showing configured explicit-Q Gibbs validation and <code>thermodynamic_summary.json/csv</code>.</td>
+            <td>Notebook smoke test; synthetic/configured metadata clearly labelled; no inferred activities.</td>
+            <td>No validation against observations.</td>
+          </tr>
+          <tr>
+            <td>PR-23</td>
+            <td>BIO-003 mechanism notebook</td>
+            <td>Add a notebook for the first BIO-003 generic mechanism after implementation, showing how the mechanism changes outputs and limitations.</td>
+            <td>Notebook smoke test and guardrails against hidden implementation logic.</td>
+            <td>No organism-specific claims unless backed by records.</td>
+          </tr>
+          <tr>
+            <td>PR-24</td>
+            <td>Broader generic registry cases</td>
+            <td>Add at least one non-case-specific registry/config case that exercises the new BIO-003 process law on a different substrate/source class.</td>
+            <td>Modelability and simulation tests proving genericity; source/provenance/maturity labels required.</td>
+            <td>No toy data presented as scientific.</td>
+          </tr>
+          <tr>
+            <td>PR-25</td>
+            <td>Uncertainty and ranking guardrails</td>
+            <td>Improve ensemble uncertainty summaries and case ranking only where comparison is allowed by implemented response laws and comparable outputs.</td>
+            <td>Tests for blocked ranking on metadata-only environments; tests for p05/p50/p95 outputs and ranking policy columns.</td>
+            <td>No ranking unsupported or non-comparable cases.</td>
+          </tr>
+          <tr>
+            <td>PR-26</td>
+            <td>Validation readiness audit</td>
+            <td>Reassess whether outputs are mature enough for VALIDATION-DATA-001. Produce a readiness checklist mapped to actual output columns.</td>
+            <td>Documentation guardrail tests only.</td>
+            <td>No dataset ingestion yet.</td>
+          </tr>
+          <tr>
+            <td>PR-27</td>
+            <td>First real time-course dataset</td>
+            <td>Only after PR-26 passes: ingest one source-backed numeric time-course dataset with time, substrate/product observations, conditions, extraction notes, uncertainty policy, and limitations.</td>
+            <td>Dataset schema tests, candidate-review tests, comparison report tests.</td>
+            <td>No validation claim without explicit model comparison and residuals.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>4. Notebook Plan</h2>
+      <p>
+        The notebook set should become the product-facing path once the
+        underlying APIs are ready. Notebooks must import package code, avoid
+        hidden rate laws/classes, use local fixtures, and label exploratory or
+        synthetic examples honestly.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Notebook</th>
+            <th>When</th>
+            <th>Purpose</th>
+            <th>Guardrails</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>10_virtual_experiment_product_tour.ipynb</code></td>
+            <td>PR-21</td>
+            <td>Researcher-facing tour of names, environment grid, preflight, simulation, standard tables, quicklooks, assumptions, modelability rows.</td>
+            <td>Public API only; no hidden process logic; explicit exploratory warning.</td>
+          </tr>
+          <tr>
+            <td><code>11_explicit_thermodynamics_summary.ipynb</code></td>
+            <td>PR-22</td>
+            <td>Show explicit-Q Gibbs and entropy diagnostics through configured outputs and CSV/JSON summaries.</td>
+            <td>Synthetic/configured metadata only; no inferred Q/activity; no validation claim.</td>
+          </tr>
+          <tr>
+            <td><code>12_generic_mechanism_bio003.ipynb</code></td>
+            <td>After PR-15/16</td>
+            <td>Show the first BIO-003 generic process law in a virtual experiment and compare outputs with and without the mechanism.</td>
+            <td>Only after mechanism is implemented and tested; no notebook-defined equations.</td>
+          </tr>
+          <tr>
+            <td><code>13_missing_mechanism_to_experiment_plan.ipynb</code></td>
+            <td>After PR-17/20</td>
+            <td>Start from an unsupported/underparameterized case, write preflight report, inspect missing mechanisms/parameters, and produce suggested experiments.</td>
+            <td>No simulation of unsupported cases; no invented parameters.</td>
+          </tr>
+          <tr>
+            <td><code>14_validation_readiness_preview.ipynb</code></td>
+            <td>After PR-26</td>
+            <td>Show what a validation-ready output bundle contains before ingesting real observations.</td>
+            <td>Explicitly “readiness preview”, not validation.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>5. Phase Completion Criteria</h2>
+      <h3>PRODUCT-001 can be called complete when:</h3>
+      <ul>
+        <li>Researcher can run source/substrate/environment grids through the top-level API.</li>
+        <li>Outputs include degradation curves, product release, rates, threshold times, uncertainty summaries, provenance, assumptions, missing mechanisms, and limitations.</li>
+        <li>Blocked cases can write useful preflight/report outputs without simulating.</li>
+        <li>Environment ranking is allowed only when explicit response laws or condition-specific records make it meaningful.</li>
+      </ul>
+      <h3>THERMO-003 can be called complete for a scoped milestone when:</h3>
+      <ul>
+        <li>Explicit Gibbs/entropy diagnostics are available in configured and virtual-experiment outputs.</li>
+        <li>Missing Q/T/activity metadata remains explicit.</li>
+        <li>Any solver-time constraint is added only after a tested equation and required state mapping exist.</li>
+      </ul>
+      <h3>BIO-003 can be called complete for a scoped milestone when:</h3>
+      <ul>
+        <li>At least one new reusable process-law family is implemented in code.</li>
+        <li>It has provenance/maturity-labelled parameters and limitations.</li>
+        <li>It has tests using materially different non-specific cases.</li>
+        <li>It is exposed through configured and/or registry-backed virtual-experiment paths.</li>
+      </ul>
+      <h3>VALIDATION-DATA-001 should start only when:</h3>
+      <ul>
+        <li>The simulated output columns match a candidate observation table.</li>
+        <li>The candidate has source-backed numeric time-course rows and extraction/preprocessing notes.</li>
+        <li>The comparison report can state residuals and limitations without overclaiming.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Recommended Immediate Next PR</h2>
+      <div class="callout warning">
+        <strong>PR-14 recommendation:</strong> create the BIO-003 scope/proposal
+        PR before implementing more code. The proposal should choose one
+        generic mechanism family, likely product inhibition or enzyme
+        inactivation, and define exact equations, required parameters,
+        maturity labels, limitations, and two non-specific tests.
+      </div>
+      <p>
+        This keeps the project moving toward “more biology” without falling
+        into case-specific shortcuts or invented fungal physiology. It also
+        creates a clean basis for the first BIO-003 notebook.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

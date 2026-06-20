@@ -21,6 +21,9 @@ from fungal_model.validation.bio_readiness import (
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_PATH = ROOT / "foundation_progress" / "templates" / "BIO_MECHANISM_PROPOSAL_TEMPLATE.yml"
 BIO002_PROPOSAL_PATH = ROOT / "foundation_progress" / "proposals" / "BIO_002_EXTRACELLULAR_ENZYME_CHAIN.yml"
+BIO003_PROPOSAL_PATH = (
+    ROOT / "foundation_progress" / "proposals" / "BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml"
+)
 SCRIPT_PATH = ROOT / "scripts" / "validate_bio_readiness_lite.py"
 
 
@@ -126,6 +129,26 @@ def test_real_bio002_extracellular_enzyme_chain_proposal_passes_readiness() -> N
     report = validate_bio_mechanism_proposal_file(BIO002_PROPOSAL_PATH)
 
     assert report.passed, report.to_dict()
+
+
+def test_real_bio003_product_inhibition_proposal_passes_readiness() -> None:
+    report = validate_bio_mechanism_proposal_file(BIO003_PROPOSAL_PATH)
+
+    assert report.passed, report.to_dict()
+
+
+def test_real_bio003_product_inhibition_proposal_stays_generic_and_proposed() -> None:
+    proposal = yaml.safe_load(BIO003_PROPOSAL_PATH.read_text(encoding="utf-8"))
+
+    assert proposal["milestone_id"] == "BIO-003"
+    assert proposal["mechanism_id"] == "reversible_product_inhibition"
+    assert proposal["validation_status"] == "proposed"
+    assert "generic" in proposal["general_process_family"]
+    assert "1 / (1 + P / K_i)" in proposal["mathematical_law"]
+    assert "configured virtual-experiment integration remains future work" in " ".join(
+        proposal["limitations"]
+    )
+    assert "Organism-specific inhibition behavior" in " ".join(proposal["not_in_scope"])
 
 
 def _valid_proposal() -> dict[str, Any]:

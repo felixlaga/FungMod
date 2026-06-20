@@ -20,7 +20,8 @@ THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator;
 configured runs now summarize those diagnostics, but there are still no
 inferred activities or solver-time thermodynamic enforcement.
 Thermodynamic summaries are available as JSON and CSV when such validators run.
-BIO-003: queued for generic mechanism expansion after build-first simulator work.
+BIO-003: selected/proposed for generic reversible product inhibition as the
+first generic mechanism-family target; implementation is still pending.
 ```
 
 Current next PR: **PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion**.
@@ -45,5 +46,11 @@ blocked cases. They improve the target researcher workflow and make exploratory
 assumptions, uncertain inputs, and preflight facts easier to inspect, but
 runtime pH, temperature, and oxygen grid values remain metadata-only unless an
 explicit response law or condition-specific parameter record is active.
+
+The first BIO-003 target is generic reversible product inhibition. The
+selection is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
+machine-checkable `proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml`; it
+does not yet activate product inhibition in configured or registry-backed
+virtual experiments.
 
 `old_progress/` is historical and non-binding.
