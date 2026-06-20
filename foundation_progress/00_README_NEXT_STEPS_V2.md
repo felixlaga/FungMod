@@ -18,6 +18,8 @@ expansion; partial after top-level environment_grid helper,
 assumption_summary.csv, modelability_items.csv, and write_preflight_report.
 Virtual-experiment outputs now include mechanism_summary.csv for active process
 laws, maturity, assumptions, limitations, and provenance.
+Example notebooks now include `10_virtual_experiment_product_tour.ipynb` for a
+public-API virtual-experiment tour without validation claims.
 THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator;
 configured runs now summarize those diagnostics, but there are still no
 inferred activities or solver-time thermodynamic enforcement.

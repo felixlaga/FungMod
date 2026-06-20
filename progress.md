@@ -26,6 +26,30 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Public Virtual-Experiment Product Tour Notebook
+
+Date: 2026-06-20
+
+Status: `partial` for examples and notebooks.
+
+Completed in this pass:
+
+- Added `notebooks/examples/10_virtual_experiment_product_tour.ipynb`.
+- The notebook uses public APIs only: `virtual_experiment(...)`,
+  `environment_grid(...)`, `preflight(...)`, `simulate(...)`, and standard
+  table accessors.
+- The notebook inspects `mechanism_summary`, `assumption_summary`,
+  `limitations`, `final_metrics`, and `sampled_parameters`.
+- Added smoke tests proving the notebook executes with
+  `FUNGMOD_NOTEBOOK_OUTPUT_ROOT` and writes expected standard output tables.
+
+No scientific or numerical behavior, new biology, registry records,
+calibration routine, validation data, or empirical validation claim was added.
+
+Recommended next task: add a BIO-003-specific notebook after registry-backed
+product-inhibition case assembly exists, or add a thermodynamics/entropy
+notebook using configured explicit-Q Gibbs outputs.
+
 ## PRODUCT-001 Mechanism Summary Output Table
 
 Date: 2026-06-20
