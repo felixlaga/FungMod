@@ -136,6 +136,12 @@ study = VirtualExperiment.from_registry(
 result = study.simulate(mode="exploratory", n_samples=128)
 ```
 
+Blocked or scientific-mode cases can be inspected without running a model:
+
+```python
+study.write_preflight_report(mode="scientific")
+```
+
 The standard output folder includes long-format time series, final states,
 final metrics, threshold times, sampled parameters, summary metrics,
 modelability item reports, assumption summaries, provenance, limitations,

@@ -26,6 +26,33 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Preflight Report Writer
+
+Date: 2026-06-19
+
+Status: `partial` for build-first exploratory virtual-experiment expansion.
+
+Completed in this pass:
+
+- Added `VirtualExperiment.write_preflight_report(...)` so researcher-facing
+  inputs can write diagnostic modelability tables without assembling or running
+  a model.
+- Added `write_preflight_tables(...)` for preflight-only
+  `modelability_preflight.csv`, `modelability_items.csv`, and the versioned
+  data dictionary/schema.
+- Marked preflight-only rows with `environment_effect_status=preflight_only`
+  so they are not confused with simulated environment-response outputs.
+- Added tests proving a scientific-mode case that would be blocked by
+  `simulate(...)` still writes diagnostic preflight CSVs.
+
+No new biology, validation data, simulation fallback, calibration routine,
+thermodynamic equation, entropy calculation, environmental response law, or
+empirical validation claim was added. Blocked cases still do not simulate.
+
+Recommended next task: continue PRODUCT-001 with richer researcher-facing
+input coverage or start a generic THERMO-003 feasibility slice with explicit
+equations and tests.
+
 ## PRODUCT-001 Modelability Items Output
 
 Date: 2026-06-19

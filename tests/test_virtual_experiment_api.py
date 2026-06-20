@@ -223,6 +223,41 @@ def test_virtual_experiment_scientific_simulation_rejects_underparameterized_rea
         study.simulate(mode="scientific", output_dir=tmp_path / "blocked")
 
 
+def test_virtual_experiment_writes_preflight_report_for_blocked_scientific_case(tmp_path: Path) -> None:
+    study = VirtualExperiment.from_registry(
+        fungi=FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=REGISTRY_INDEX,
+    )
+
+    tables = study.write_preflight_report(
+        mode="scientific",
+        output_dir=tmp_path / "scientific_preflight_report",
+    )
+
+    output_dir = tmp_path / "scientific_preflight_report"
+    assert set(tables.paths) == {
+        "modelability_preflight",
+        "modelability_items",
+        "output_data_dictionary",
+        "output_schema",
+    }
+    assert (output_dir / "modelability_preflight.csv").exists()
+    assert (output_dir / "modelability_items.csv").exists()
+
+    preflight_rows = _csv_rows(output_dir / "modelability_preflight.csv")
+    item_rows = _csv_rows(output_dir / "modelability_items.csv")
+    assert preflight_rows[0]["status"] == "underparameterized"
+    assert preflight_rows[0]["environment_effect_status"] == "preflight_only"
+    assert any(
+        row["item_status"] == "missing"
+        and row["item_id"] == "enzyme_concentration_beta_glucosidase"
+        and row["allowed_use"] == "blocks_scientific_simulation"
+        for row in item_rows
+    )
+
+
 def _csv_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
