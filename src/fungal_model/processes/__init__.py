@@ -31,6 +31,7 @@ from .homogeneous import (
     MassActionProcess,
     homogeneous_process_assumption,
 )
+from .rate_modifiers import RateModifierProcess, product_inhibition_modifier_from_config
 from .registry import MissingProcessIssue, ProcessLibrary, ProcessRegistry
 from .surface import (
     AccessibleSitePool,
@@ -73,6 +74,7 @@ __all__ = [
     "ProcessMatch",
     "ProcessRegistry",
     "ProductReleaseMap",
+    "RateModifierProcess",
     "StateVariableSpec",
     "SurfaceCatalysisFactory",
     "SurfaceCatalysisModel",
@@ -80,6 +82,7 @@ __all__ = [
     "ValidityDomain",
     "default_foundation_factories",
     "homogeneous_process_assumption",
+    "product_inhibition_modifier_from_config",
     "surface_catalysis_assumption",
     "surface_catalysis_rate",
 ]

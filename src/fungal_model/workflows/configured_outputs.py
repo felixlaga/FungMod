@@ -180,8 +180,33 @@ def _configured_metadata(config: ModelConfig, result: SimulationResult) -> dict[
         "model_version": result.model_version,
         "state_count": len(result.states),
         "process_rate_count": len(result.process_rates),
+        "configured_process_modifiers": _configured_process_modifiers(config),
         "validation": _validation_summary(result),
     }
+
+
+def _configured_process_modifiers(config: ModelConfig) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for process in config.processes:
+        for index, modifier in enumerate(process.modifiers):
+            rows.append(
+                {
+                    "process_id": process.id,
+                    "modifier_index": index,
+                    "type": modifier.get("type", modifier.get("modifier_type", "")),
+                    "product_state": modifier.get("product_state", ""),
+                    "inhibition_constant": modifier.get(
+                        "inhibition_constant",
+                        modifier.get("inhibition_constant_symbol", modifier.get("K_i", "")),
+                    ),
+                    "maturity": "exploratory_configured_mechanism",
+                    "limitation": (
+                        "Single-product reversible inhibition only; configured "
+                        "only when product_state and positive unit-compatible K_i are explicit."
+                    ),
+                }
+            )
+    return rows
 
 
 def _validation_summary(result: SimulationResult) -> dict[str, Any]:

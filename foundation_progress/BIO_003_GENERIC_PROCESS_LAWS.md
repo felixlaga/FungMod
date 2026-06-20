@@ -1,6 +1,7 @@
 # BIO-003: Generic Mechanism Expansion Through Process Laws
 
-Status: `selected/proposed` for the first BIO-003 mechanism-family target.
+Status: `partial/software-tested` for the first BIO-003 mechanism-family
+target.
 
 BIO-003 should expand biology through reusable process laws and modifiers, not
 case-specific fungus, substrate, enzyme, or experiment branches.
@@ -20,22 +21,21 @@ foundation_progress/proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml
 ```
 
 This target was selected because the repository already contains a generic
-`ProductInhibitionModifier` with unit/provenance-aware behavior, but it is not
-yet promoted into the configured or registry-backed virtual-experiment path as
-a BIO-003 mechanism family.
+`ProductInhibitionModifier` with unit/provenance-aware behavior. It is now
+available to configured process assembly as an explicit generic rate modifier;
+registry-backed case assembly remains future work.
 
 ## Required next implementation scope
 
-The next implementation PR should:
+The next implementation PR after the configured support slice should:
 
-- expose reversible product inhibition through configured model inputs or the
-  registry-backed case assembly path;
-- require an explicit product state and a positive, unit-compatible `K_i`;
+- expose reversible product inhibition through registry-backed case assembly
+  where explicit records exist;
+- add researcher-facing virtual-experiment examples or notebooks that use only
+  public APIs;
 - keep missing or unknown `K_i` explicit rather than guessing a fallback;
-- write active modifier assumptions, parameters, provenance, and limitations
-  into configured and/or virtual-experiment outputs;
-- include at least two materially different non-specific tests, such as one
-  homogeneous benchmark case and one chain/surface-compatible case.
+- preserve output visibility for active modifier assumptions, parameters,
+  provenance, and limitations.
 
 ## What this does not permit
 
@@ -56,6 +56,5 @@ This scoped slice can be marked complete only when:
 - active roadmap/status docs identify reversible product inhibition as the next
   target;
 - tests ensure the selected mechanism remains generic and explicitly scoped;
-- no scientific or numerical behavior changes are introduced by the selection
-  PR itself.
-
+- configured workflow tests show the mechanism scales rates only when explicit
+  product-state and `K_i` inputs are provided.

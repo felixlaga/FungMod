@@ -2,10 +2,19 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from copy import deepcopy
 
 import pytest
+import yaml
 
-from fungal_model import Parameter, ParameterMergeError, ParameterSet, merge_parameter_sets, run_configured_model
+from fungal_model import (
+    ConfiguredModelExecutionError,
+    Parameter,
+    ParameterMergeError,
+    ParameterSet,
+    merge_parameter_sets,
+    run_configured_model,
+)
 from fungal_model.plugins.pet import pet_substrate_loader_registry
 from fungal_model.results import SimulationResult
 
@@ -87,6 +96,58 @@ def test_configured_output_bundle_contains_entity_snapshots(tmp_path) -> None:
         assert (output / entry["snapshot_path"]).exists()
 
 
+def test_configured_model_runs_with_explicit_product_inhibition_modifier(tmp_path) -> None:
+    config_path = _product_inhibited_homogeneous_config(tmp_path)
+
+    result = run_configured_model(config_path, output_dir=tmp_path / "product_inhibited")
+
+    assert "a_to_b" in result.process_rates
+    assumptions = json.loads((tmp_path / "product_inhibited" / "assumptions.json").read_text(encoding="utf-8"))
+    metadata = json.loads((tmp_path / "product_inhibited" / "configured_metadata.json").read_text(encoding="utf-8"))
+    process_config = json.loads((tmp_path / "product_inhibited" / "input_model_config.json").read_text(encoding="utf-8"))[
+        "processes"
+    ][0]
+    assert any(item["name"] == "reversible product inhibition modifier" for item in assumptions)
+    assert metadata["configured_process_modifiers"] == [
+        {
+            "process_id": "a_to_b",
+            "modifier_index": 0,
+            "type": "product_inhibition",
+            "product_state": "released_product_amount",
+            "inhibition_constant": "K_i_product",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Single-product reversible inhibition only; configured only when product_state "
+                "and positive unit-compatible K_i are explicit."
+            ),
+        }
+    ]
+    assert process_config["modifiers"][0]["type"] == "product_inhibition"
+
+
+def test_configured_product_inhibition_requires_explicit_inhibition_constant(tmp_path) -> None:
+    config_path = _product_inhibited_homogeneous_config(tmp_path, include_ki_parameter=False)
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "missing_ki")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "model_assembly"
+    assert "required_parameters" in report["missing_capabilities"]
+    assert "K_i_product" in json.dumps(report)
+
+
+def test_configured_product_inhibition_rejects_non_positive_inhibition_constant(tmp_path) -> None:
+    config_path = _product_inhibited_homogeneous_config(tmp_path, ki_value=0.0)
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "bad_ki")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "model_execution"
+    assert "Product inhibition constant must be positive" in report["message"]
+
+
 def test_parameter_merging_allows_identical_duplicates() -> None:
     first = ParameterSet([_parameter(symbol="k_merge", value=1.0)])
     second = ParameterSet([_parameter(symbol="k_merge", value=1.0)])
@@ -117,6 +178,42 @@ def _parameter(*, symbol: str, value: float) -> Parameter:
         notes="Artificial value for parameter-merge tests.",
         measurement_method="defined benchmark value",
     )
+
+
+def _product_inhibited_homogeneous_config(
+    tmp_path: Path,
+    *,
+    include_ki_parameter: bool = True,
+    ki_value: float = 0.35,
+) -> Path:
+    data = yaml.safe_load((MODEL_CONFIGS / "toy_homogeneous_ab.yml").read_text(encoding="utf-8"))
+    data = deepcopy(data)
+    parameters = data["parameters"][0]["parameters"]
+    if include_ki_parameter:
+        parameters.append(
+            {
+                "name": "toy product inhibition constant",
+                "symbol": "K_i_product",
+                "value": ki_value,
+                "units": "kilogram",
+                "uncertainty": 0.0,
+                "source": "FungMod generic product inhibition configured benchmark.",
+                "confidence_level": "testing",
+                "notes": "Artificial value for configured product-inhibition tests.",
+                "measurement_method": "defined benchmark value",
+                "validity_range": "framework tests only",
+            }
+        )
+    data["processes"][0]["modifiers"] = [
+        {
+            "type": "product_inhibition",
+            "product_state": "released_product_amount",
+            "inhibition_constant": "K_i_product",
+        }
+    ]
+    config_path = tmp_path / "toy_homogeneous_product_inhibition.yml"
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    return config_path
 
 
 def _expected_configured_output_files() -> tuple[str, ...]:

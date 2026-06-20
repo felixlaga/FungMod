@@ -116,13 +116,13 @@ def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> 
     for text in (status, next_steps, progress, bio003_doc, proposal):
         assert "reversible product inhibition" in text
 
-    assert "selected/proposed for reversible product inhibition" in status
-    assert "selected/proposed for generic reversible product inhibition" in next_steps
+    assert "partial/software-tested for configured reversible product inhibition" in status
+    assert "partial/software-tested for generic reversible product inhibition" in next_steps
     assert "ProductInhibitionModifier" in bio003_doc
-    assert "validation_status: proposed" in proposal
-    assert "does not yet activate product inhibition" in next_steps
-    assert "configured virtual-experiment integration remains future work" in proposal
-    assert "No scientific or numerical behavior" in progress
+    assert "validation_status: software_tested" in proposal
+    assert "Configured model processes can now opt into it" in next_steps
+    assert "registry-backed case assembly remains future work" in proposal
+    assert "No organism-specific inhibition behavior" in progress
 
 
 def test_final_goal_html_plan_records_pr_slices_and_notebook_candidates() -> None:

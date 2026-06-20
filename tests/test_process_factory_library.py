@@ -5,7 +5,10 @@ from pathlib import Path
 import pytest
 
 from fungal_model import load_model_config, load_product_map
+from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.errors import InvalidMechanismError
+from fungal_model.core.units import Q_
+from fungal_model.entities import Environment
 from fungal_model.io import ProcessConfig
 from fungal_model.processes import (
     FirstOrderDecayProcess,
@@ -14,6 +17,7 @@ from fungal_model.processes import (
     MassActionFactory,
     ProcessBuildContext,
     ProcessLibrary,
+    RateModifierProcess,
     SurfaceCatalysisFactory,
     SurfaceCatalysisProcess,
 )
@@ -183,9 +187,94 @@ def test_homogeneous_michaelis_menten_factory_builds_generic_process() -> None:
     assert process.vmax_symbol == "Vmax"
 
 
+def test_product_inhibition_modifier_wraps_generic_first_order_config() -> None:
+    process_config = ProcessConfig.from_mapping(
+        {
+            "id": "generic_product_inhibited_first_order",
+            "process_type": "first_order",
+            "states": {
+                "source": "S",
+                "product": "P",
+            },
+            "parameters": {
+                "rate_constant": "k_loss",
+            },
+            "modifiers": [
+                {
+                    "type": "product_inhibition",
+                    "product_state": "P",
+                    "inhibition_constant": "K_i_product",
+                }
+            ],
+        }
+    )
+    context = ProcessBuildContext(state_units={"S": "mole / liter", "P": "mole / liter"})
+
+    process = ProcessLibrary.default_foundation().build_processes(context, (process_config,))[0]
+
+    assert isinstance(process, RateModifierProcess)
+    assert process.process_type == "first_order_decay"
+    assert any(requirement.symbol == "K_i_product" for requirement in process.required_parameters)
+    base_rate = process.base_process.rate(
+        {"S": Q_(2.0, "mole / liter"), "P": Q_(0.0, "mole / liter")},
+        Q_(0.0, "second"),
+        _parameter_set(k_loss=(0.2, "1 / second"), K_i_product=(1.0, "mole / liter")),
+        Environment(name="test"),
+    )
+    inhibited_rate = process.rate(
+        {"S": Q_(2.0, "mole / liter"), "P": Q_(1.0, "mole / liter")},
+        Q_(0.0, "second"),
+        _parameter_set(k_loss=(0.2, "1 / second"), K_i_product=(1.0, "mole / liter")),
+        Environment(name="test"),
+    )
+
+    assert inhibited_rate.to(base_rate.units).magnitude == pytest.approx(base_rate.magnitude / 2.0)
+    assert process.contributions(inhibited_rate)["S"].magnitude == pytest.approx(-inhibited_rate.magnitude)
+
+
+def test_product_inhibition_modifier_wraps_generic_surface_config() -> None:
+    config = load_model_config(MODEL_CONFIGS / "toy_surface_dummy_non_pet.yml")
+    base_process_config = config.processes[0]
+    process_config = ProcessConfig.from_mapping(
+        {
+            **base_process_config.to_dict()["raw"],
+            "modifiers": [
+                {
+                    "type": "product_inhibition",
+                    "product_state": "released_product_amount",
+                    "inhibition_constant": "K_i_surface_product",
+                }
+            ],
+        }
+    )
+
+    process = ProcessLibrary.default_foundation().build_processes(_context(config), (process_config,))[0]
+
+    assert isinstance(process, RateModifierProcess)
+    assert isinstance(process.base_process, SurfaceCatalysisProcess)
+    assert any(requirement.symbol == "K_i_surface_product" for requirement in process.required_parameters)
+
+
 def test_factory_module_has_no_plugin_imports_or_domain_names() -> None:
     source = (ROOT / "src" / "fungal_model" / "processes" / "factories.py").read_text(encoding="utf-8")
 
     assert "PET" not in source
     assert "petase" not in source.lower()
     assert "substrates.pet" not in source
+
+
+def _parameter_set(**values: tuple[float, str]) -> ParameterSet:
+    return ParameterSet(
+        Parameter(
+            name=symbol,
+            symbol=symbol,
+            value=value,
+            units=units,
+            uncertainty=0.0,
+            source="FungMod product inhibition software test.",
+            confidence_level="testing",
+            notes="Artificial value for generic modifier tests.",
+            measurement_method="defined benchmark value",
+        )
+        for symbol, (value, units) in values.items()
+    )
