@@ -14,6 +14,10 @@ NOTEBOOKS = [
     "03_configured_outputs.ipynb",
 ]
 
+PRODUCT_NOTEBOOKS = [
+    "10_virtual_experiment_product_tour.ipynb",
+]
+
 
 NOTEBOOK_DIR = Path(__file__).resolve().parents[1] / "notebooks" / "examples"
 
@@ -79,10 +83,22 @@ def test_foundation_notebooks_are_labelled_software_test_only() -> None:
 
 
 def test_notebooks_do_not_define_core_classes_or_rate_laws() -> None:
-    for name in NOTEBOOKS:
+    for name in [*NOTEBOOKS, *PRODUCT_NOTEBOOKS]:
         source = "\n".join(code_cells(load_notebook(name)))
         for label, pattern in HIDDEN_IMPLEMENTATION_PATTERNS.items():
             assert not pattern.search(source), f"{name} contains hidden implementation pattern {label!r}"
+
+
+def test_product_tour_notebook_is_researcher_facing_but_unvalidated() -> None:
+    notebook = load_notebook("10_virtual_experiment_product_tour.ipynb")
+    markdown = "\n".join(markdown_cells(notebook)).lower()
+    source = "\n".join(code_cells(notebook))
+
+    assert "researcher-facing exploratory tour" in markdown
+    assert "not an empirical validation" in markdown
+    assert "virtual_experiment(" in source
+    assert "mechanism_summary()" in source
+    assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
 
 
 def test_quickstart_notebook_executes_smoke_path_with_temp_output(
@@ -119,6 +135,21 @@ def test_foundation_notebooks_execute_smoke_paths_with_temp_outputs(
 
     inspection_output = output_root / "03_configured_outputs"
     assert (inspection_output / "configured_metadata.json").exists()
+
+
+def test_product_tour_notebook_executes_smoke_path_with_temp_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "notebook_outputs"
+    monkeypatch.setenv("FUNGMOD_NOTEBOOK_OUTPUT_ROOT", str(output_root))
+    _execute_notebook("10_virtual_experiment_product_tour.ipynb")
+
+    output = output_root / "10_virtual_experiment_product_tour"
+    assert (output / "mechanism_summary.csv").exists()
+    assert (output / "assumption_summary.csv").exists()
+    assert (output / "limitations_table.csv").exists()
+    assert (output / "output_manifest.json").exists()
 
 
 def _execute_notebook(name: str) -> None:

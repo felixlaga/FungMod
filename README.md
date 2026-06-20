@@ -58,6 +58,8 @@ basic kinetics layer:
   assembly,
 - a top-level notebook set that imports package code rather than redefining
   core model logic,
+- a researcher-facing product-tour notebook for the public
+  `virtual_experiment(...)` API and standard output tables,
 - human-editable YAML config folders for fungi, substrates, enzymes,
   environments, geometries, parameters, and experiments,
 - schema-checked config loaders with explicit unknown-value handling,
@@ -227,18 +229,19 @@ no longer provide a process-to-`Reaction` adapter bridge.
 
 ## Notebooks
 
-The `notebooks/examples/` folder contains software-test notebooks only. They
-exercise configured workflow plumbing and use toy fixtures; they are not
-researcher-facing scientific examples:
+The `notebooks/examples/` folder contains software-test notebooks for
+configured workflow plumbing plus one researcher-facing exploratory product
+tour. The product tour is not empirical validation:
 
 - `00_quickstart.ipynb`
 - `01_config_entity_inspection.ipynb`
 - `02_failure_report.ipynb`
 - `03_configured_outputs.ipynb`
+- `10_virtual_experiment_product_tour.ipynb`
 
 Notebook tests check that notebooks import `fungal_model`, avoid defining core
 rate laws/classes or low-level solvers inline, and execute every foundation
-notebook smoke path.
+notebook smoke path plus the product-tour smoke path.
 
 ## Data And Configs
 
