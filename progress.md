@@ -26,6 +26,31 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Configured Thermodynamic Summary Output
+
+Date: 2026-06-20
+
+Status: `partial` for dynamic thermodynamic and entropy constraints.
+
+Completed in this pass:
+
+- Added `thermodynamic_summary.json` to configured-model output bundles when
+  thermodynamic validation results are present.
+- Summarized explicit reaction-quotient Gibbs rows, delta-G diagnostics,
+  entropy-production-per-mole diagnostics, provenance refs, and the supported
+  versus unsupported thermodynamic scope.
+- Added a configured workflow test proving an explicit-Q Gibbs validator writes
+  the summary and records it in the output manifest.
+
+No new biology, substrate-specific mechanism, fungus-specific branch, activity
+model, inferred reaction quotient, redox-potential model, solver-time
+thermodynamic enforcement, validation data, calibration routine, or empirical
+validation claim was added.
+
+Recommended next task: continue THERMO-003 by adding first-class CSV/standard
+table summaries for configured thermodynamics, or move to BIO-003 for a small
+generic process-law expansion.
+
 ## THERMO-003 Reaction-Quotient Gibbs Feasibility
 
 Date: 2026-06-20

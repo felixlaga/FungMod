@@ -94,6 +94,9 @@ class ConfiguredOutputWriter:
                 "summary": _validation_summary(result),
             },
         )
+        thermodynamic_summary = _thermodynamic_summary(result)
+        if thermodynamic_summary["count"] > 0:
+            _write_json(destination / "thermodynamic_summary.json", thermodynamic_summary)
         _write_json(destination / "merged_parameters.json", inputs.parameters.to_dict())
         _write_json(destination / "run_environment.json", _run_environment())
         _write_json(destination / "package_versions.json", _package_versions(result))
@@ -170,6 +173,77 @@ def _validation_summary(result: SimulationResult) -> dict[str, Any]:
         "inconclusive": [item for item in report if item.get("status") == "inconclusive"],
         "unsupported": [item for item in report if item.get("status") == "unsupported"],
         "failed": [item for item in report if not bool(item.get("passed"))],
+    }
+
+
+def _thermodynamic_summary(result: SimulationResult) -> dict[str, Any]:
+    thermodynamic_rows = [
+        item
+        for item in result.validation_report()
+        if _is_thermodynamic_validation(item)
+    ]
+    reaction_quotient_rows = [
+        item
+        for item in thermodynamic_rows
+        if item.get("name") == "reaction_quotient_thermodynamic_feasibility"
+    ]
+    return {
+        "kind": "configured_thermodynamic_summary",
+        "count": len(thermodynamic_rows),
+        "status_counts": _count_by_key(thermodynamic_rows, "status"),
+        "severity_counts": _count_by_key(thermodynamic_rows, "severity"),
+        "has_reaction_quotient_gibbs": bool(reaction_quotient_rows),
+        "has_solver_time_enforcement": False,
+        "supported_scope": (
+            "Explicit condition-specific and caller-supplied reaction-quotient "
+            "Gibbs metadata checks only."
+        ),
+        "unsupported_scope": (
+            "No inferred activity model, inferred reaction quotient, redox-potential "
+            "model, or solver-time thermodynamic enforcement."
+        ),
+        "rows": [_thermodynamic_summary_row(item) for item in thermodynamic_rows],
+    }
+
+
+def _is_thermodynamic_validation(item: Mapping[str, Any]) -> bool:
+    name = str(item.get("name", ""))
+    details = item.get("details", {})
+    return (
+        name in {"thermodynamic_feasibility", "reaction_quotient_thermodynamic_feasibility"}
+        or (
+            isinstance(details, Mapping)
+            and str(details.get("residual_name", "")).endswith("delta_gibbs")
+        )
+    )
+
+
+def _thermodynamic_summary_row(item: Mapping[str, Any]) -> dict[str, Any]:
+    details = item.get("details", {})
+    details_map = details if isinstance(details, Mapping) else {}
+    return {
+        "name": item.get("name", ""),
+        "status": item.get("status", ""),
+        "passed": bool(item.get("passed")),
+        "severity": item.get("severity", ""),
+        "required": bool(item.get("required")),
+        "message": item.get("message", ""),
+        "reaction_name": details_map.get("reaction_name", ""),
+        "residual_name": details_map.get("residual_name", ""),
+        "delta_gibbs": details_map.get("residual_value", ""),
+        "delta_gibbs_units": details_map.get("residual_units", ""),
+        "standard_delta_gibbs": details_map.get("standard_delta_gibbs", ""),
+        "reaction_quotient": details_map.get("reaction_quotient", ""),
+        "temperature_K": details_map.get("temperature_K", ""),
+        "rt_ln_q": details_map.get("rt_ln_q", ""),
+        "entropy_production_per_mole": details_map.get("entropy_production_per_mole", ""),
+        "entropy_production_units": details_map.get("entropy_production_units", ""),
+        "gibbs_equation": details_map.get("gibbs_equation", ""),
+        "entropy_equation": details_map.get("entropy_equation", ""),
+        "dynamic_reaction_quotient": details_map.get("dynamic_reaction_quotient", ""),
+        "activity_model": details_map.get("activity_model", ""),
+        "missing_metadata": details_map.get("missing_metadata", []),
+        "provenance_refs": details_map.get("provenance_refs", []),
     }
 
 

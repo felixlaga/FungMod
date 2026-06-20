@@ -272,6 +272,39 @@ def test_exploratory_config_records_inconclusive_static_validator(tmp_path: Path
     assert (output_dir / "output_manifest.json").exists()
 
 
+def test_configured_reaction_quotient_validator_writes_thermodynamic_summary(tmp_path: Path) -> None:
+    config = _configured_static_validator_config(mode="exploratory")
+    config["validators"].append(
+        {
+            "id": "explicit_q_gibbs",
+            "validator_type": "reaction_quotient_thermodynamic_metadata",
+            "estimate": _gibbs_config(-5.0),
+            "reaction_quotient": _parameter_config(symbol="Q_configured", value=1.0, units="dimensionless"),
+            "temperature": _parameter_config(symbol="T_configured_dynamic", value=298.15, units="kelvin"),
+        }
+    )
+    output_dir = tmp_path / "thermodynamic_summary_output"
+
+    result = run_configured_model(_write_config(tmp_path, config), output_dir=output_dir)
+
+    thermodynamic_validation = [
+        row
+        for row in result.validation_report()
+        if row["name"] == "reaction_quotient_thermodynamic_feasibility"
+    ][0]
+    summary = json.loads((output_dir / "thermodynamic_summary.json").read_text(encoding="utf-8"))
+    manifest = json.loads((output_dir / "output_manifest.json").read_text(encoding="utf-8"))
+    assert thermodynamic_validation["status"] == "passed"
+    assert summary["kind"] == "configured_thermodynamic_summary"
+    assert summary["count"] == 1
+    assert summary["has_reaction_quotient_gibbs"] is True
+    assert summary["has_solver_time_enforcement"] is False
+    assert "No inferred activity model" in summary["unsupported_scope"]
+    assert summary["rows"][0]["gibbs_equation"] == "delta_g = delta_g_standard + R*T*ln(Q)"
+    assert summary["rows"][0]["entropy_production_per_mole"] == pytest.approx(5000.0 / 298.15)
+    assert "thermodynamic_summary.json" in manifest["files"]
+
+
 def test_strict_config_rejects_failed_static_validator(tmp_path: Path) -> None:
     config = _configured_static_validator_config(mode="strict")
     config["validators"].append(
