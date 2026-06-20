@@ -68,6 +68,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert (output_dir / "figures" / "degradation_fraction_vs_time.png").exists()
 
     time_rows = _csv_rows(output_dir / "time_series_long.csv")
+    preflight_rows = _csv_rows(output_dir / "modelability_preflight.csv")
     final_metric_rows = _csv_rows(output_dir / "final_metrics.csv")
     threshold_rows = _csv_rows(output_dir / "threshold_times.csv")
     sampled_rows = _csv_rows(output_dir / "sampled_parameters.csv")
@@ -88,6 +89,10 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert any(row["state"] == "substrate_degraded_fraction" for row in time_rows)
     assert any(row["state"] == "product_formed" for row in time_rows)
     assert any(row["state"] == "degradation_rate" for row in time_rows)
+    assert preflight_rows[0]["assessment_mode"] == "exploratory"
+    assert preflight_rows[0]["simulation_allowed_for_mode"] == "true"
+    assert preflight_rows[0]["blocking_reason"] == "not_blocked"
+    assert preflight_rows[0]["recommended_next_action"] == "simulate_exploratory"
 
     computed_metrics = {
         row["metric"]
@@ -249,6 +254,10 @@ def test_virtual_experiment_writes_preflight_report_for_blocked_scientific_case(
     preflight_rows = _csv_rows(output_dir / "modelability_preflight.csv")
     item_rows = _csv_rows(output_dir / "modelability_items.csv")
     assert preflight_rows[0]["status"] == "underparameterized"
+    assert preflight_rows[0]["assessment_mode"] == "scientific"
+    assert preflight_rows[0]["simulation_allowed_for_mode"] == "false"
+    assert preflight_rows[0]["blocking_reason"] == "missing_inputs"
+    assert preflight_rows[0]["recommended_next_action"] == "measure_or_curate_missing_inputs"
     assert preflight_rows[0]["environment_effect_status"] == "preflight_only"
     assert any(
         row["item_status"] == "missing"

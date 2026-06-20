@@ -82,7 +82,15 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         "Preflight guardrail status before simulation.",
         (
             *COMMON_CASE_COLUMNS,
+            _column("assessment_mode", "Mode used for this preflight assessment.", allowed_values="scientific; exploratory; toy"),
             _column("status", "Modelability status for the case."),
+            _column(
+                "simulation_allowed_for_mode",
+                "Whether simulate(...) would accept this case in the assessed mode.",
+                semantic_type="boolean",
+            ),
+            _column("blocking_reason", "Machine-readable reason simulation is blocked, or not_blocked."),
+            _column("recommended_next_action", "Machine-readable next action suggested by the preflight policy."),
             _column("known_count", "Number of known modelability facts.", semantic_type="integer"),
             _column("uncertain_count", "Number of uncertain modelability facts.", semantic_type="integer"),
             _column("missing_count", "Number of missing modelability facts.", semantic_type="integer"),

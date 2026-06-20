@@ -48,6 +48,7 @@ def test_modelability_report_is_json_safe_and_has_summary() -> None:
     encoded = json.dumps(report.to_dict())
 
     assert "toy_fungus_alpha" in encoded
+    assert report.to_dict()["mode"] == "exploratory"
     assert "underparameterized" in report.summary()
 
 

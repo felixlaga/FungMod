@@ -147,6 +147,9 @@ final metrics, threshold times, sampled parameters, summary metrics,
 modelability item reports, assumption summaries, provenance, limitations,
 missing-parameter and suggested-experiment tables, and a versioned data
 dictionary/schema.
+Preflight tables include machine-readable simulation policy columns such as
+`simulation_allowed_for_mode`, `blocking_reason`, and
+`recommended_next_action`.
 Exploratory priors remain allowed, but the tables mark them as assumptions
 rather than literature-curated values.
 
