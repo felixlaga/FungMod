@@ -407,9 +407,12 @@ def _sample_context(context: Mapping[str, Any], sample: EnsembleSample) -> dict[
 
 
 def _preflight_row(context: Mapping[str, Any], report: ModelabilityReport) -> dict[str, Any]:
+    policy = _preflight_policy(report)
     return {
         **_case_columns(context),
+        "assessment_mode": report.mode,
         "status": report.status,
+        **policy,
         "known_count": len(report.known),
         "uncertain_count": len(report.uncertain),
         "missing_count": len(report.missing),
@@ -419,6 +422,63 @@ def _preflight_row(context: Mapping[str, Any], report: ModelabilityReport) -> di
         "required_parameters": ";".join(report.required_parameters),
         "suggested_experiments": "; ".join(report.suggested_experiments),
     }
+
+
+def _preflight_policy(report: ModelabilityReport) -> dict[str, Any]:
+    if report.mode == "scientific":
+        if report.status == "modelable":
+            return {
+                "simulation_allowed_for_mode": True,
+                "blocking_reason": "not_blocked",
+                "recommended_next_action": "simulate_scientific_unvalidated",
+            }
+        return {
+            "simulation_allowed_for_mode": False,
+            "blocking_reason": _blocking_reason(report),
+            "recommended_next_action": _recommended_next_action(report),
+        }
+    if report.mode == "exploratory":
+        if report.status in {"modelable", "exploratory"}:
+            return {
+                "simulation_allowed_for_mode": True,
+                "blocking_reason": "not_blocked",
+                "recommended_next_action": "simulate_exploratory",
+            }
+        return {
+            "simulation_allowed_for_mode": False,
+            "blocking_reason": _blocking_reason(report),
+            "recommended_next_action": _recommended_next_action(report),
+        }
+    return {
+        "simulation_allowed_for_mode": False,
+        "blocking_reason": "toy_preflight_only",
+        "recommended_next_action": "use_exploratory_or_scientific_mode_for_simulation",
+    }
+
+
+def _blocking_reason(report: ModelabilityReport) -> str:
+    if not report.candidate_processes:
+        return "unsupported_mechanism"
+    if report.missing:
+        return "missing_inputs"
+    if report.incompatible:
+        return "incompatible_inputs"
+    if report.uncertain and report.mode == "scientific":
+        return "uncertain_inputs_rejected_by_scientific_mode"
+    return "not_blocked"
+
+
+def _recommended_next_action(report: ModelabilityReport) -> str:
+    reason = _blocking_reason(report)
+    if reason == "missing_inputs":
+        return "measure_or_curate_missing_inputs"
+    if reason == "incompatible_inputs":
+        return "change_case_or_curate_compatible_mechanism"
+    if reason == "unsupported_mechanism":
+        return "add_generic_provenance_backed_mechanism"
+    if reason == "uncertain_inputs_rejected_by_scientific_mode":
+        return "use_exploratory_mode_or_curate_exact_scientific_inputs"
+    return "inspect_modelability_items"
 
 
 def _modelability_item_rows(context: Mapping[str, Any], report: ModelabilityReport) -> list[dict[str, Any]]:

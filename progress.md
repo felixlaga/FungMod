@@ -26,6 +26,30 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Preflight Policy Columns
+
+Date: 2026-06-20
+
+Status: `partial` for build-first exploratory virtual-experiment expansion.
+
+Completed in this pass:
+
+- Added explicit `mode` storage and serialization to `ModelabilityReport`.
+- Added `assessment_mode`, `simulation_allowed_for_mode`,
+  `blocking_reason`, and `recommended_next_action` columns to
+  `modelability_preflight.csv`.
+- Added versioned output-schema/data-dictionary coverage for the new columns.
+- Added tests proving exploratory cases advertise simulation eligibility and
+  blocked scientific preflight reports point to missing-input curation.
+
+No new biology, validation data, simulation behavior, calibration routine,
+thermodynamic equation, entropy calculation, environmental response law, or
+empirical validation claim was added.
+
+Recommended next task: continue PRODUCT-001 with richer researcher-facing input
+coverage or start THERMO-003 with a small generic feasibility equation and
+tests.
+
 ## PRODUCT-001 Preflight Report Writer
 
 Date: 2026-06-19

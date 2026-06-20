@@ -40,6 +40,7 @@ class ModelabilityReport:
     fungus_id: str
     substrate_id: str
     environment_id: str
+    mode: ModelabilityMode
     status: ModelabilityStatus
     known: tuple[ReportItem, ...]
     uncertain: tuple[ReportItem, ...]
@@ -56,6 +57,7 @@ class ModelabilityReport:
             "fungus_id": self.fungus_id,
             "substrate_id": self.substrate_id,
             "environment_id": self.environment_id,
+            "mode": self.mode,
             "status": self.status,
             "known": [item.to_dict() for item in self.known],
             "uncertain": [item.to_dict() for item in self.uncertain],
@@ -239,6 +241,7 @@ def assess_modelability(
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
+        mode=mode,
         status=status,
         known=tuple(known),
         uncertain=tuple(uncertain),
