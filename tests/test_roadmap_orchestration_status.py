@@ -52,7 +52,8 @@ def test_status_tracker_reconciles_completed_scoped_slices_without_overclaiming(
         "No fuzzy matching or automatic external fetch",
         "Scientific mode means exact non-exploratory inputs, not empirical validation",
         "No whole-fungus growth, secretion, uptake, biomass, PET, lignin",
-        "No dynamic reaction quotients, activity model, redox potential model",
+        "Explicit caller-supplied reaction-quotient Gibbs checks now exist",
+        "no inferred activity model, redox potential model, or solver-time thermodynamic enforcement",
     ):
         assert boundary in text
 

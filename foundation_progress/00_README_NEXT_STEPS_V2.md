@@ -16,7 +16,8 @@ source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: current next for build-first exploratory virtual-experiment
 expansion; partial after top-level environment_grid helper,
 assumption_summary.csv, modelability_items.csv, and write_preflight_report.
-THERMO-003: queued for dynamic thermodynamic and entropy constraints.
+THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator;
+no inferred activities or solver-time thermodynamic enforcement yet.
 BIO-003: queued for generic mechanism expansion after build-first simulator work.
 ```
 

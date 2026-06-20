@@ -8,6 +8,7 @@ from fungal_model.core.validators import (
     validate_biomass_yield_limit,
     validate_carbon_conservation,
     validate_oxygen_limitation,
+    validate_reaction_quotient_gibbs_feasibility,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "validate_biomass_yield_limit",
     "validate_carbon_conservation",
     "validate_oxygen_limitation",
+    "validate_reaction_quotient_gibbs_feasibility",
 ]
