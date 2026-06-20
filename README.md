@@ -67,7 +67,8 @@ basic kinetics layer:
 - a registry-backed exploratory virtual-experiment API for Reaction 618 and
   the controlled BIO-001 surface-degradation pilot;
 - schema-versioned virtual-experiment output tables with provenance,
-  limitations, missing-parameter, suggested-experiment, and range-use fields;
+  mechanism-summary, limitations, missing-parameter, suggested-experiment, and
+  range-use fields;
 - an offline-first SABIO-RK source adapter that loads frozen kinetic-law
   snapshots and writes review-only proposed records without mutating the
   simulation registry;
@@ -148,9 +149,9 @@ study.write_preflight_report(mode="scientific")
 
 The standard output folder includes long-format time series, final states,
 final metrics, threshold times, sampled parameters, summary metrics,
-modelability item reports, assumption summaries, provenance, limitations,
-missing-parameter and suggested-experiment tables, and a versioned data
-dictionary/schema.
+modelability item reports, assumption summaries, mechanism summaries,
+provenance, limitations, missing-parameter and suggested-experiment tables,
+and a versioned data dictionary/schema.
 Preflight tables include machine-readable simulation policy columns such as
 `simulation_allowed_for_mode`, `blocking_reason`, and
 `recommended_next_action`.

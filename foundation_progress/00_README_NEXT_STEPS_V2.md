@@ -16,6 +16,8 @@ source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: current next for build-first exploratory virtual-experiment
 expansion; partial after top-level environment_grid helper,
 assumption_summary.csv, modelability_items.csv, and write_preflight_report.
+Virtual-experiment outputs now include mechanism_summary.csv for active process
+laws, maturity, assumptions, limitations, and provenance.
 THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator;
 configured runs now summarize those diagnostics, but there are still no
 inferred activities or solver-time thermodynamic enforcement.

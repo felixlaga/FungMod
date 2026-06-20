@@ -97,6 +97,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert phase in next_steps
         assert phase in roadmap
 
+    assert "mechanism_summary.csv" in status
+    assert "mechanism_summary.csv" in next_steps
     assert "Validation remains important" in status
     assert "Real observations are required for validation/calibration/comparison claims" in status
     assert "Validation data is important, but it should not block PRODUCT-001" in _read(

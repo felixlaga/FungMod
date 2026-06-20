@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "1.0.0"
+OUTPUT_SCHEMA_VERSION = "1.1.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -232,6 +232,26 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("allowed_use", "Machine-readable policy for interpreting this row."),
         ),
         primary_key=("case_id", "row_type", "item_id"),
+    ),
+    "mechanism_summary": _table(
+        "Per-case implemented process laws, modifiers, maturity labels, and limitations.",
+        (
+            *COMMON_CASE_COLUMNS,
+            _column("mechanism_index", "Zero-based mechanism index within the case.", semantic_type="integer"),
+            _column("mechanism_kind", "Mechanism row kind.", allowed_values="process_law; rate_modifier; thermodynamic_validator"),
+            _column("mechanism_id", "Stable mechanism identifier.", semantic_type="identifier"),
+            _column("mechanism_family", "Reusable mechanism family."),
+            _column("active", "Whether this mechanism actively affected simulated rates or outputs.", semantic_type="boolean"),
+            _column("maturity", "Mechanism maturity label."),
+            _column("configured_by", "Registry/config source that selected this mechanism."),
+            _column("equation_or_law", "Short mathematical law or process description."),
+            _column("state_variables", "Semicolon-separated configured state variables."),
+            _column("parameters", "Semicolon-separated parameter roles or symbols."),
+            _column("assumptions", "Semicolon-separated mechanism assumptions."),
+            _column("limitations", "Semicolon-separated mechanism limitations."),
+            _column("provenance", "JSON provenance payload.", required=False),
+        ),
+        primary_key=("case_id", "mechanism_index"),
     ),
     "summary_metrics": _table(
         "Per-case ensemble summary statistics for computed metrics.",

@@ -53,6 +53,7 @@ def test_case001_researcher_names_run_bio002_chain_and_standard_outputs(
         "final_metrics.csv",
         "threshold_times.csv",
         "summary_metrics.csv",
+        "mechanism_summary.csv",
         "limitations_table.csv",
         "suggested_experiments.csv",
         "output_manifest.json",
@@ -64,6 +65,7 @@ def test_case001_researcher_names_run_bio002_chain_and_standard_outputs(
     final_rows = _csv_rows(output_dir / "final_metrics.csv")
     threshold_rows = _csv_rows(output_dir / "threshold_times.csv")
     limitation_rows = _csv_rows(output_dir / "limitations_table.csv")
+    mechanism_rows = _csv_rows(output_dir / "mechanism_summary.csv")
     suggestion_rows = _csv_rows(output_dir / "suggested_experiments.csv")
     sampled_rows = _csv_rows(output_dir / "sampled_parameters.csv")
 
@@ -87,6 +89,10 @@ def test_case001_researcher_names_run_bio002_chain_and_standard_outputs(
         "sabiork_reaction_618_Km_cellobiose",
         "sabiork_reaction_618_kcat_cellobiose",
     }
+    assert mechanism_rows[0]["mechanism_id"] == "extracellular_enzyme_chain"
+    assert mechanism_rows[0]["mechanism_family"] == "generic two-step extracellular enzyme chain"
+    assert mechanism_rows[0]["active"] == "true"
+    assert "surface_rate" in mechanism_rows[0]["parameters"]
 
     limitations_text = " ".join(row["limitation"] for row in limitation_rows)
     assert "not whole-fungus growth, secretion, uptake, or biomass" in limitations_text
