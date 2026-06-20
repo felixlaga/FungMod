@@ -26,6 +26,32 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Mechanism Summary Output Table
+
+Date: 2026-06-20
+
+Status: `partial` for build-first exploratory virtual-experiment expansion.
+
+Completed in this pass:
+
+- Added `mechanism_summary.csv` as a standard virtual-experiment output table.
+- Added the table to the versioned output schema and data dictionary, bumping
+  the virtual-experiment output schema to `1.1.0`.
+- Added `DegradationScreenResult.mechanism_summary()` to load the table through
+  the public API.
+- Populated one active process-law row per simulated case with mechanism kind,
+  family, maturity, configured-by source, equation/law summary, state-variable
+  roles, parameter roles/symbols, assumptions, limitations, and provenance.
+- Added tests for homogeneous Michaelis-Menten and BIO-002 enzyme-chain virtual
+  experiments.
+
+No scientific or numerical behavior, registry records, new biology,
+calibration routine, validation data, or empirical validation claim was added.
+
+Recommended next task: add a product-tour notebook or expose BIO-003 product
+inhibition through registry-backed case assembly so `mechanism_summary.csv`
+can show active rate modifiers as well as process laws.
+
 ## BIO-003 Configured Reversible Product Inhibition
 
 Date: 2026-06-20

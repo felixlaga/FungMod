@@ -282,6 +282,11 @@ class DegradationScreenResult:
 
         return self._table_rows("assumption_summary", "assumption_summary.csv")
 
+    def mechanism_summary(self) -> list[dict[str, str]]:
+        """Load the standard mechanism-summary table without rerunning simulation."""
+
+        return self._table_rows("mechanism_summary", "mechanism_summary.csv")
+
     def provenance(self) -> list[dict[str, str]]:
         """Load the standard provenance table without rerunning simulation."""
 

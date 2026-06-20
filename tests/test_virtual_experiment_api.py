@@ -50,6 +50,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "threshold_times.csv",
         "sampled_parameters.csv",
         "assumption_summary.csv",
+        "mechanism_summary.csv",
         "summary_metrics.csv",
         "environment_summary.csv",
         "provenance_table.csv",
@@ -74,6 +75,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     sampled_rows = _csv_rows(output_dir / "sampled_parameters.csv")
     modelability_rows = _csv_rows(output_dir / "modelability_items.csv")
     assumption_rows = _csv_rows(output_dir / "assumption_summary.csv")
+    mechanism_rows = _csv_rows(output_dir / "mechanism_summary.csv")
     summary_rows = _csv_rows(output_dir / "summary_metrics.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
     limitation_rows = _csv_rows(output_dir / "limitations_table.csv")
@@ -141,6 +143,14 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         for row in modelability_rows
     )
     assert result.assumption_summary() == assumption_rows
+    assert result.mechanism_summary() == mechanism_rows
+    assert mechanism_rows[0]["mechanism_kind"] == "process_law"
+    assert mechanism_rows[0]["mechanism_id"] == "homogeneous_michaelis_menten"
+    assert mechanism_rows[0]["mechanism_family"] == "generic homogeneous Michaelis-Menten process"
+    assert mechanism_rows[0]["active"] == "true"
+    assert mechanism_rows[0]["maturity"] == "software_tested_exploratory_parameterized"
+    assert "Km_cellobiose" in mechanism_rows[0]["parameters"]
+    assert "whole-fungus physiology" in mechanism_rows[0]["limitations"]
     assert any(
         row["row_type"] == "assumption"
         and row["allowed_use"] == "exploratory_context_not_validation"
@@ -172,6 +182,10 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     )
     assert any(
         row["table"] == "assumption_summary" and row["column"] == "allowed_use"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "mechanism_summary" and row["column"] == "mechanism_kind"
         for row in dictionary_rows
     )
     assert any(

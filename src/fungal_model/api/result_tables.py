@@ -79,6 +79,7 @@ def write_standard_tables(
         "threshold_times": destination / "threshold_times.csv",
         "sampled_parameters": destination / "sampled_parameters.csv",
         "assumption_summary": destination / "assumption_summary.csv",
+        "mechanism_summary": destination / "mechanism_summary.csv",
         "summary_metrics": destination / "summary_metrics.csv",
         "environment_summary": destination / "environment_summary.csv",
         "provenance_table": destination / "provenance_table.csv",
@@ -152,6 +153,7 @@ def _build_table_rows(
         "threshold_times": [],
         "sampled_parameters": [],
         "assumption_summary": [],
+        "mechanism_summary": [],
         "summary_metrics": [],
         "environment_summary": [],
         "provenance_table": [],
@@ -179,6 +181,7 @@ def _build_table_rows(
         rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
         rows["suggested_experiments"].extend(_suggested_experiment_rows(context, registry, case, report))
         rows["assumption_summary"].extend(_assumption_summary_rows(context, report))
+        rows["mechanism_summary"].extend(_mechanism_summary_rows(context, registry, case, report, role_records))
         for sample in case.samples:
             sample_context = _sample_context(context, sample)
             state_roles = _state_roles(sample)
@@ -594,6 +597,147 @@ def _assumption_allowed_use(row_type: str) -> str:
     if row_type == "incompatible":
         return "blocks_simulation"
     return "not_applicable"
+
+
+def _mechanism_summary_rows(
+    context: Mapping[str, Any],
+    registry: FungModRegistry,
+    case: RegistryCaseEnsemble,
+    report: ModelabilityReport,
+    role_records: Mapping[str, ParameterRecord],
+) -> list[dict[str, Any]]:
+    mechanism = _process_mechanism_descriptor(
+        context=context,
+        registry=registry,
+        case=case,
+        report=report,
+        role_records=role_records,
+    )
+    return [{**_case_columns(context), "mechanism_index": 0, **mechanism}]
+
+
+def _process_mechanism_descriptor(
+    *,
+    context: Mapping[str, Any],
+    registry: FungModRegistry,
+    case: RegistryCaseEnsemble,
+    report: ModelabilityReport,
+    role_records: Mapping[str, ParameterRecord],
+) -> dict[str, Any]:
+    process_type = str(context.get("process_type", case.process_type))
+    try:
+        compatibility = select_registry_case_compatibility(
+            registry=registry,
+            fungus_id=case.fungus_id,
+            substrate_id=case.substrate_id,
+            report=report,
+        )
+    except RegistryCaseBuildError:
+        compatibility = None
+    configured_by = (
+        getattr(compatibility, "case_template_id", "") or getattr(compatibility, "record_id", "")
+        if compatibility is not None
+        else ""
+    )
+    return {
+        "mechanism_kind": "process_law",
+        "mechanism_id": process_type,
+        "mechanism_family": _mechanism_family(process_type),
+        "active": bool(case.samples),
+        "maturity": _mechanism_maturity(process_type, role_records),
+        "configured_by": configured_by or "registry_compatibility",
+        "equation_or_law": _mechanism_law(process_type),
+        "state_variables": ";".join(_mechanism_state_variables(process_type)),
+        "parameters": ";".join(_mechanism_parameters(report, role_records)),
+        "assumptions": "; ".join(report.assumptions),
+        "limitations": "; ".join(_mechanism_limitations(process_type)),
+        "provenance": json.dumps(
+            {
+                "process_type": process_type,
+                "role_record_ids": {
+                    role: record.record_id for role, record in sorted(role_records.items())
+                },
+                "case_template_id": configured_by,
+            },
+            sort_keys=True,
+        ),
+    }
+
+
+def _mechanism_family(process_type: str) -> str:
+    if process_type == "homogeneous_michaelis_menten":
+        return "generic homogeneous Michaelis-Menten process"
+    if process_type == "surface_catalysis":
+        return "generic equilibrium surface catalysis"
+    if process_type == "extracellular_enzyme_chain":
+        return "generic two-step extracellular enzyme chain"
+    return "generic configured process law"
+
+
+def _mechanism_law(process_type: str) -> str:
+    if process_type == "homogeneous_michaelis_menten":
+        return "r = Vmax * S / (Km + S), or explicit-enzyme equivalent when configured"
+    if process_type == "surface_catalysis":
+        return "r = k_surface * theta(E, K_ads) * accessible_surface_area"
+    if process_type == "extracellular_enzyme_chain":
+        return "configured surface step followed by configured homogeneous product-conversion step"
+    return "configured process law"
+
+
+def _mechanism_state_variables(process_type: str) -> tuple[str, ...]:
+    if process_type == "homogeneous_michaelis_menten":
+        return ("substrate", "product", "enzyme_or_vmax")
+    if process_type == "surface_catalysis":
+        return ("solid_substrate", "free_catalyst", "product")
+    if process_type == "extracellular_enzyme_chain":
+        return ("substrate", "intermediate", "product", "surface_catalyst", "homogeneous_catalyst")
+    return ()
+
+
+def _mechanism_parameters(
+    report: ModelabilityReport,
+    role_records: Mapping[str, ParameterRecord],
+) -> tuple[str, ...]:
+    role_symbols = tuple(
+        f"{role}:{record.parameter_symbol}"
+        for role, record in sorted(role_records.items())
+    )
+    if role_symbols:
+        return role_symbols
+    return tuple(report.required_parameters)
+
+
+def _mechanism_maturity(process_type: str, role_records: Mapping[str, ParameterRecord]) -> str:
+    if not role_records:
+        return "software_tested_no_parameter_records"
+    maturities = {record.maturity for record in role_records.values()}
+    if maturities == {"literature_processed"}:
+        return "software_tested_literature_parameterized"
+    if "exploratory_prior" in maturities:
+        return "software_tested_exploratory_parameterized"
+    return "software_tested_mixed_parameter_maturity"
+
+
+def _mechanism_limitations(process_type: str) -> tuple[str, ...]:
+    if process_type == "homogeneous_michaelis_menten":
+        return (
+            "Well-mixed homogeneous process only.",
+            "Not a whole-fungus physiology, secretion, uptake, or biomass model.",
+            "No empirical validation claim is implied by simulation output.",
+        )
+    if process_type == "surface_catalysis":
+        return (
+            "Accessible surface area is explicit or sampled, not dynamically evolved.",
+            "No surface renewal, pore accessibility, crystallinity, or morphology dynamics.",
+            "No empirical validation claim is implied by simulation output.",
+        )
+    if process_type == "extracellular_enzyme_chain":
+        return (
+            "Exactly the configured chain steps are represented.",
+            "No whole-fungus growth, secretion, uptake, or biomass model.",
+            "No empirical validation claim is implied by simulation output.",
+        )
+    return ("No empirical validation claim is implied by simulation output.",)
 
 
 def _case_columns(context: Mapping[str, Any]) -> dict[str, Any]:
