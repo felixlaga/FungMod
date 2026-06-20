@@ -67,10 +67,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion"
+    current_next = "PR-06: THERMO-003 thermodynamics and entropy diagnostics notebook"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PRODUCT-001" in roadmap
+    assert "The current next PR is a scoped THERMO-003 thermodynamics and entropy" in roadmap
+    assert "diagnostics notebook" in roadmap
 
     for text in (status, next_steps):
         assert "old_progress/" in text
@@ -86,7 +87,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion"
+    current_next = "PR-06: THERMO-003 thermodynamics and entropy diagnostics notebook"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -101,6 +102,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "mechanism_summary.csv" in next_steps
     assert "10_virtual_experiment_product_tour.ipynb" in status
     assert "10_virtual_experiment_product_tour.ipynb" in next_steps
+    assert "11_thermodynamics_entropy_diagnostics.ipynb" in status
+    assert "11_thermodynamics_entropy_diagnostics.ipynb" in next_steps
+    assert "thermodynamic_summary.json" in status
+    assert "thermodynamic_summary.csv" in status
     assert "Validation remains important" in status
     assert "Real observations are required for validation/calibration/comparison claims" in status
     assert "Validation data is important, but it should not block PRODUCT-001" in _read(
@@ -148,8 +153,8 @@ def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion"
-    for text in (status, next_steps, gate):
+    current_next = "PR-06: THERMO-003 thermodynamics and entropy diagnostics notebook"
+    for text in (status, next_steps):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
         assert "PR-04" not in _current_next_lines(text)
