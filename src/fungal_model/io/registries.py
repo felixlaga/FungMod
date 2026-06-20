@@ -17,6 +17,7 @@ from fungal_model.core.validators import (
     validate_elemental_balance,
     validate_mass_balance,
     validate_non_negative,
+    validate_reaction_quotient_gibbs_feasibility,
 )
 from fungal_model.geometry import Film1DGeometry, WellMixedGeometry
 from fungal_model.processes import ProductReleaseMap
@@ -135,6 +136,7 @@ class ValidatorRegistry(_LoaderRegistry):
         registry.register("charge_balance", load_charge_balance_validator)
         registry.register("redox_balance", load_redox_balance_validator)
         registry.register("thermodynamic_metadata", load_thermodynamic_metadata_validator)
+        registry.register("reaction_quotient_thermodynamic_metadata", load_reaction_quotient_thermodynamic_validator)
         return registry
 
 
@@ -333,6 +335,28 @@ def load_thermodynamic_metadata_validator(data: Mapping[str, Any]) -> Callable[[
     return validator
 
 
+def load_reaction_quotient_thermodynamic_validator(data: Mapping[str, Any]) -> Callable[[Any], Any]:
+    estimate = _gibbs_estimate_from_config(_mapping(data.get("estimate", data), field_name="estimate"))
+    reaction_quotient = Parameter.from_dict(_mapping(data.get("reaction_quotient"), field_name="reaction_quotient"))
+    temperature = Parameter.from_dict(_mapping(data.get("temperature"), field_name="temperature"))
+    tolerance = _quantity(data.get("absolute_tolerance"))
+    required = bool(data.get("required", True))
+    allow_unsourced_for_testing = bool(data.get("allow_unsourced_for_testing", False))
+
+    def validator(result: Any) -> Any:
+        del result
+        return validate_reaction_quotient_gibbs_feasibility(
+            standard_estimate=estimate,
+            reaction_quotient=reaction_quotient,
+            temperature=temperature,
+            absolute_tolerance=tolerance,
+            required=required,
+            allow_unsourced_for_testing=allow_unsourced_for_testing,
+        )
+
+    return validator
+
+
 def _quantity(data: Mapping[str, Any] | None) -> Quantity | None:
     if data is None:
         return None
@@ -498,5 +522,6 @@ __all__ = [
     "load_one_to_one_product_map",
     "load_stoichiometric_product_map",
     "load_thermodynamic_metadata_validator",
+    "load_reaction_quotient_thermodynamic_validator",
     "load_well_mixed_geometry",
 ]

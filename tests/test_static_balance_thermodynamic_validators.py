@@ -23,6 +23,7 @@ from fungal_model.core.validators import (
     validate_electron_balance,
     validate_elemental_balance,
     validate_non_negative,
+    validate_reaction_quotient_gibbs_feasibility,
 )
 from fungal_model.io import ValidatorRegistry, load_model_config
 from fungal_model.results import SimulationResult
@@ -127,6 +128,51 @@ def test_condition_specific_gibbs_validator_reports_favorable_and_unfavorable_es
     assert unfavorable_result.details["residual_value"] == pytest.approx(2000.0)
 
 
+def test_reaction_quotient_gibbs_validator_applies_rt_ln_q_and_entropy() -> None:
+    validation = validate_reaction_quotient_gibbs_feasibility(
+        standard_estimate=_gibbs_estimate(-1.0),
+        reaction_quotient=_parameter(symbol="Q_reaction", value=2.0, units="dimensionless"),
+        temperature=_parameter(symbol="T_dynamic", value=298.15, units="kelvin"),
+    )
+
+    expected_rt_ln_q = 8.31446261815324 * 298.15 * 0.6931471805599453
+    expected_delta_g = -1000.0 + expected_rt_ln_q
+
+    assert not validation.passed
+    assert validation.to_dict()["status"] == "failed"
+    assert validation.details["rt_ln_q"] == pytest.approx(expected_rt_ln_q)
+    assert validation.details["residual_value"] == pytest.approx(expected_delta_g)
+    assert validation.details["entropy_production_per_mole"] == pytest.approx(
+        -expected_delta_g / 298.15
+    )
+    assert validation.details["dynamic_reaction_quotient"] == "explicit_parameter"
+    assert validation.details["activity_model"] == "caller_supplied_dimensionless_reaction_quotient"
+
+
+def test_reaction_quotient_gibbs_validator_reports_favorable_q_case() -> None:
+    validation = validate_reaction_quotient_gibbs_feasibility(
+        standard_estimate=_gibbs_estimate(-5.0),
+        reaction_quotient=_parameter(symbol="Q_reaction", value=1.0, units="dimensionless"),
+        temperature=_parameter(symbol="T_dynamic", value=298.15, units="kelvin"),
+    )
+
+    assert validation.passed
+    assert validation.details["residual_value"] == pytest.approx(-5000.0)
+    assert validation.details["entropy_production_per_mole"] == pytest.approx(5000.0 / 298.15)
+
+
+def test_reaction_quotient_gibbs_validator_rejects_nonpositive_q() -> None:
+    validation = validate_reaction_quotient_gibbs_feasibility(
+        standard_estimate=_gibbs_estimate(-5.0),
+        reaction_quotient=_parameter(symbol="Q_reaction", value=0.0, units="dimensionless"),
+        temperature=_parameter(symbol="T_dynamic", value=298.15, units="kelvin"),
+    )
+
+    assert not validation.passed
+    assert validation.to_dict()["status"] == "failed"
+    assert validation.details["invalid_metadata"] == ["reaction_quotient_nonpositive"]
+
+
 def test_unknown_condition_specific_gibbs_is_inconclusive() -> None:
     validation = validate_condition_specific_gibbs_feasibility(_gibbs_estimate(None))
 
@@ -177,9 +223,18 @@ def test_validator_registry_loads_static_balance_and_thermodynamic_validators() 
             "estimate": _gibbs_config(-3.0),
         }
     )
+    reaction_quotient = registry.load(
+        {
+            "validator_type": "reaction_quotient_thermodynamic_metadata",
+            "estimate": _gibbs_config(-5.0),
+            "reaction_quotient": _parameter_config(symbol="Q_configured", value=1.0, units="dimensionless"),
+            "temperature": _parameter_config(symbol="T_configured_dynamic", value=298.15, units="kelvin"),
+        }
+    )
 
     assert elemental(object()).to_dict()["status"] == "passed"
     assert thermo(object()).to_dict()["status"] == "passed"
+    assert reaction_quotient(object()).to_dict()["status"] == "passed"
 
 
 def test_exploratory_config_records_inconclusive_static_validator(tmp_path: Path) -> None:
@@ -633,6 +688,22 @@ def _gibbs_config(value_kj_per_mol: float | None) -> dict[str, Any]:
                 }
             ]
         },
+    }
+
+
+def _parameter_config(*, symbol: str, value: float | None, units: str) -> dict[str, Any]:
+    source = "Configured synthetic Phase 2 Gibbs fixture; no scientific claim."
+    return {
+        "name": f"configured {symbol}",
+        "symbol": symbol,
+        "value": value,
+        "units": units,
+        "uncertainty": 0.0 if value is not None else None,
+        "source": source,
+        "confidence_level": "medium",
+        "notes": "Configured synthetic value used only for validator tests.",
+        "measurement_method": "defined fixture value",
+        "validity_range": "configured validator tests",
     }
 
 

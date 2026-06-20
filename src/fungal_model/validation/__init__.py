@@ -13,6 +13,7 @@ from fungal_model.core.validators import (
     validate_mass_balance,
     validate_non_negative,
     validate_oxygen_limitation,
+    validate_reaction_quotient_gibbs_feasibility,
 )
 from fungal_model.validation.spatial import (
     validate_diffusion_smooths_gradient,
@@ -62,6 +63,7 @@ __all__ = [
     "validate_no_flux_spatial_integral_conserved",
     "validate_non_negative",
     "validate_oxygen_limitation",
+    "validate_reaction_quotient_gibbs_feasibility",
     "validate_run_maturity",
     "validate_spatial_average_close_to_expected",
 ]

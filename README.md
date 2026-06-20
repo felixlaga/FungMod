@@ -34,6 +34,8 @@ basic kinetics layer:
 - minimal fungal metadata, enzyme secretion, enzyme decay, maintenance, and product-coupled biomass growth,
 - stoichiometric and thermodynamic metadata interfaces,
 - carbon conservation, oxygen limitation, and biomass-yield validation checks,
+- explicit reaction-quotient Gibbs feasibility and entropy-production
+  diagnostics for caller-supplied dimensionless Q metadata,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - least-squares calibration utilities with train/validation residual reporting,

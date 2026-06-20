@@ -47,6 +47,19 @@ DEFAULT_THERMODYNAMIC_ABSOLUTE_TOLERANCE = Parameter(
 )
 
 
+IDEAL_GAS_CONSTANT = Parameter(
+    name="molar gas constant",
+    symbol="R",
+    value=8.31446261815324,
+    units="joule / mole / kelvin",
+    uncertainty=0.0,
+    source="2019 SI definition/CODATA exact molar gas constant.",
+    confidence_level="high",
+    notes="Used only in explicit reaction-quotient Gibbs calculations.",
+    measurement_method="physical constant",
+)
+
+
 @dataclass(frozen=True)
 class ValidationResult:
     """Structured result of a validation check."""
@@ -375,6 +388,128 @@ def validate_condition_specific_gibbs_feasibility(
             "residual_value": delta_g_value,
             "max_abs_residual": abs(delta_g_value),
             "max_relative_residual": None,
+        },
+    )
+
+
+def validate_reaction_quotient_gibbs_feasibility(
+    *,
+    standard_estimate: GibbsFreeEnergyEstimate,
+    reaction_quotient: Parameter,
+    temperature: Parameter,
+    absolute_tolerance: Quantity | None = None,
+    required: bool = True,
+    allow_unsourced_for_testing: bool = False,
+) -> ValidationResult:
+    """Validate explicitly supplied reaction-quotient Gibbs feasibility.
+
+    Computes ``delta_g = delta_g_standard + R * T * ln(Q)`` from explicit,
+    provenance-backed inputs. This does not infer activities, concentrations,
+    or reaction quotients from a trajectory.
+    """
+
+    tolerance = absolute_tolerance or DEFAULT_THERMODYNAMIC_ABSOLUTE_TOLERANCE.quantity
+    tolerance_quantity = assert_compatible(tolerance, "joule / mole", name="absolute_tolerance")
+    tolerance_value = float(tolerance_quantity.to("joule / mole").magnitude)
+    base_details = {
+        "reaction_name": standard_estimate.reaction_name,
+        "residual_name": "reaction_quotient_delta_gibbs",
+        "residual_units": "joule / mole",
+        "absolute_tolerance": tolerance_value,
+        "absolute_tolerance_units": "joule / mole",
+        "relative_tolerance": None,
+        "scale_value": 1.0,
+        "scale_units": "joule / mole",
+        "required": required,
+        "dynamic_reaction_quotient": "explicit_parameter",
+        "activity_model": "caller_supplied_dimensionless_reaction_quotient",
+        "gibbs_equation": "delta_g = delta_g_standard + R*T*ln(Q)",
+        "entropy_equation": "entropy_production_per_mole = -delta_g / T",
+        "provenance_refs": _gibbs_provenance_refs(standard_estimate)
+        + _parameter_provenance_refs(reaction_quotient, temperature, IDEAL_GAS_CONSTANT),
+        "missing_metadata": [],
+    }
+    try:
+        standard_estimate.validate(
+            allow_unsourced_for_testing=allow_unsourced_for_testing,
+            require_value=False,
+        )
+        reaction_quotient.validate_provenance(allow_unsourced_for_testing=allow_unsourced_for_testing)
+        temperature.validate_provenance(allow_unsourced_for_testing=allow_unsourced_for_testing)
+    except ProvenanceError as exc:
+        return _status_result(
+            name="reaction_quotient_thermodynamic_feasibility",
+            status="failed",
+            message=str(exc),
+            required=required,
+            details={**base_details, "error_type": type(exc).__name__},
+        )
+    standard_quantity = standard_estimate.delta_gibbs.quantity
+    quotient_quantity = reaction_quotient.quantity
+    temperature_quantity = temperature.quantity
+    missing = []
+    if standard_quantity is None:
+        missing.append("delta_gibbs_standard")
+    if quotient_quantity is None:
+        missing.append("reaction_quotient")
+    if temperature_quantity is None:
+        missing.append("temperature")
+    if missing:
+        return _status_result(
+            name="reaction_quotient_thermodynamic_feasibility",
+            status="inconclusive",
+            message="Reaction-quotient Gibbs feasibility is inconclusive because required metadata are unknown.",
+            required=required,
+            details={**base_details, "missing_metadata": missing},
+        )
+    standard_delta_g = assert_compatible(standard_quantity, "joule / mole", name=standard_estimate.delta_gibbs.symbol).to("joule / mole")
+    q_value = float(assert_compatible(quotient_quantity, "dimensionless", name=reaction_quotient.symbol).magnitude)
+    temperature_k = float(assert_compatible(temperature_quantity, "kelvin", name=temperature.symbol).to("kelvin").magnitude)
+    if q_value <= 0.0:
+        return _status_result(
+            name="reaction_quotient_thermodynamic_feasibility",
+            status="failed",
+            message="Reaction quotient must be positive for ln(Q).",
+            required=required,
+            details={**base_details, "invalid_metadata": ["reaction_quotient_nonpositive"], "reaction_quotient": q_value},
+        )
+    if temperature_k <= 0.0:
+        return _status_result(
+            name="reaction_quotient_thermodynamic_feasibility",
+            status="failed",
+            message="Temperature must be positive in kelvin for reaction-quotient Gibbs feasibility.",
+            required=required,
+            details={**base_details, "invalid_metadata": ["temperature_nonpositive"], "temperature_K": temperature_k},
+        )
+    gas_constant_quantity = IDEAL_GAS_CONSTANT.quantity
+    assert gas_constant_quantity is not None
+    gas_constant = float(gas_constant_quantity.to("joule / mole / kelvin").magnitude)
+    rt_ln_q = gas_constant * temperature_k * float(np.log(q_value))
+    delta_g_value = float(standard_delta_g.magnitude) + rt_ln_q
+    entropy_production = -delta_g_value / temperature_k
+    passed = delta_g_value <= tolerance_value
+    return _status_result(
+        name="reaction_quotient_thermodynamic_feasibility",
+        status="passed" if passed else "failed",
+        message=(
+            "Reaction-quotient Gibbs estimate is favorable within tolerance."
+            if passed
+            else "Reaction-quotient Gibbs estimate is unfavorable within tolerance."
+        ),
+        required=required,
+        details={
+            **base_details,
+            "standard_delta_gibbs": float(standard_delta_g.magnitude),
+            "standard_delta_gibbs_units": "joule / mole",
+            "reaction_quotient": q_value,
+            "temperature_K": temperature_k,
+            "rt_ln_q": rt_ln_q,
+            "rt_ln_q_units": "joule / mole",
+            "residual_value": delta_g_value,
+            "max_abs_residual": abs(delta_g_value),
+            "max_relative_residual": None,
+            "entropy_production_per_mole": entropy_production,
+            "entropy_production_units": "joule / mole / kelvin",
         },
     )
 
@@ -803,6 +938,10 @@ def _gibbs_provenance_refs(estimate: GibbsFreeEnergyEstimate) -> list[str]:
     return sorted(set(refs))
 
 
+def _parameter_provenance_refs(*parameters: Parameter) -> list[str]:
+    return sorted({str(parameter.source) for parameter in parameters if has_text(parameter.source)})
+
+
 @dataclass
 class LimitingCase:
     """A named limiting case with executable setup and validation functions."""
@@ -859,4 +998,5 @@ __all__ = [
     "validate_mass_balance",
     "validate_non_negative",
     "validate_oxygen_limitation",
+    "validate_reaction_quotient_gibbs_feasibility",
 ]

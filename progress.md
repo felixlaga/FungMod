@@ -26,6 +26,34 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Reaction-Quotient Gibbs Feasibility
+
+Date: 2026-06-20
+
+Status: `partial` for dynamic thermodynamic and entropy constraints.
+
+Completed in this pass:
+
+- Added `validate_reaction_quotient_gibbs_feasibility(...)`, a generic
+  equation-backed validator for explicitly supplied reaction quotient metadata:
+  `delta_g = delta_g_standard + R*T*ln(Q)`.
+- Added entropy-production-per-mole reporting as `-delta_g / T`.
+- Added a named, sourced ideal-gas constant parameter rather than a silent
+  fallback constant.
+- Added configured-validator registry support through
+  `reaction_quotient_thermodynamic_metadata`.
+- Added tests for favorable, unfavorable, invalid, and config-loaded synthetic
+  reaction-quotient Gibbs cases.
+
+No new biology, substrate-specific mechanism, fungus-specific branch, activity
+model, inferred reaction quotient, redox-potential model, solver-time
+thermodynamic enforcement, validation data, calibration routine, or empirical
+validation claim was added.
+
+Recommended next task: continue THERMO-003 by connecting explicit
+reaction-quotient checks to configured output bundles, or return to
+PRODUCT-001/BIO-003 for broader generic mechanism coverage.
+
 ## PRODUCT-001 Preflight Policy Columns
 
 Date: 2026-06-20
