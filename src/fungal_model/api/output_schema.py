@@ -46,7 +46,7 @@ COMMON_CASE_COLUMNS = (
     _column(
         "environment_effect_status",
         "How environment fields affected the model.",
-        allowed_values="metadata_only; condition_specific_parameters; active_response_model; not_applicable",
+        allowed_values="metadata_only; condition_specific_parameters; active_response_model; preflight_only; not_applicable",
     ),
     _column("environment_response_model", "Active environment-response model identifier, or none."),
     _column("environment_comparison_allowed", "Whether environment-level outcome comparisons are scientifically supported."),

@@ -13,7 +13,7 @@ from typing import Any, Literal
 from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid
 from fungal_model.api.output_schema import OUTPUT_SCHEMA_VERSION
 from fungal_model.api.quicklook import write_quicklook_plots as write_quicklook_plot_files
-from fungal_model.api.result_tables import WrittenTables, write_standard_tables
+from fungal_model.api.result_tables import WrittenTables, write_preflight_tables, write_standard_tables
 from fungal_model.registry.records import ParameterRecord
 from fungal_model.registry import FungModRegistry, RegistryResolver, ResolvedRecord, load_registry
 from fungal_model.screening import (
@@ -133,6 +133,21 @@ class VirtualExperiment:
                 self.substrate_ids,
                 self.environment_ids,
             )
+        )
+
+    def write_preflight_report(
+        self,
+        *,
+        mode: ModelabilityMode = "exploratory",
+        output_dir: str | Path = "outputs/virtual_experiment_preflight",
+    ) -> WrittenTables:
+        """Write preflight-only diagnostic tables without assembling or running a model."""
+
+        reports = self.preflight(mode=mode)
+        return write_preflight_tables(
+            registry=self.registry,
+            preflight_reports=reports,
+            output_dir=output_dir,
         )
 
     def simulate(

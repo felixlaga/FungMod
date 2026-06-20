@@ -102,6 +102,40 @@ def write_standard_tables(
     return WrittenTables(paths={name: str(path) for name, path in paths.items()})
 
 
+def write_preflight_tables(
+    *,
+    registry: FungModRegistry,
+    preflight_reports: Sequence[ModelabilityReport],
+    output_dir: str | Path,
+) -> WrittenTables:
+    """Write preflight-only modelability tables without simulating."""
+
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    table_rows = _build_preflight_table_rows(
+        registry=registry,
+        preflight_reports=preflight_reports,
+    )
+    paths = {
+        "modelability_preflight": destination / "modelability_preflight.csv",
+        "modelability_items": destination / "modelability_items.csv",
+        "output_data_dictionary": destination / "virtual_experiment_output_data_dictionary.csv",
+        "output_schema": destination / "virtual_experiment_output_schema.json",
+    }
+    for table_name, rows in table_rows.items():
+        _write_table(paths[table_name], table_name=table_name, rows=rows)
+    _write_csv(
+        paths["output_data_dictionary"],
+        output_data_dictionary_rows(),
+        fieldnames=DATA_DICTIONARY_COLUMNS,
+    )
+    paths["output_schema"].write_text(
+        json.dumps(output_schema_document(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return WrittenTables(paths={name: str(path) for name, path in paths.items()})
+
+
 def _build_table_rows(
     *,
     screen_result: RegistryScreenResult,
@@ -191,6 +225,22 @@ def _build_table_rows(
     return rows
 
 
+def _build_preflight_table_rows(
+    *,
+    registry: FungModRegistry,
+    preflight_reports: Sequence[ModelabilityReport],
+) -> dict[str, list[dict[str, Any]]]:
+    rows: dict[str, list[dict[str, Any]]] = {
+        "modelability_preflight": [],
+        "modelability_items": [],
+    }
+    for case_index, report in enumerate(preflight_reports):
+        context = _preflight_context(registry=registry, report=report, case_index=case_index)
+        rows["modelability_preflight"].append(_preflight_row(context, report))
+        rows["modelability_items"].extend(_modelability_item_rows(context, report))
+    return rows
+
+
 def _case_context(
     *,
     registry: FungModRegistry,
@@ -224,6 +274,36 @@ def _case_context(
         "environment_effect_status": environment_effect_status,
         **environment_policy,
         "process_type": case.process_type,
+    }
+
+
+def _preflight_context(
+    *,
+    registry: FungModRegistry,
+    report: ModelabilityReport,
+    case_index: int,
+) -> dict[str, Any]:
+    fungus = registry.get_fungus(report.fungus_id)
+    substrate = registry.get_substrate(report.substrate_id)
+    environment = registry.get_environment(report.environment_id)
+    env_values = _environment_values(environment.conditions, environment.provenance)
+    environment_policy = _environment_policy("preflight_only")
+    return {
+        "output_schema_version": OUTPUT_SCHEMA_VERSION,
+        "case_id": f"case_{case_index:04d}",
+        "fungus_id": report.fungus_id,
+        "fungus_name": fungus.name,
+        "substrate_id": report.substrate_id,
+        "substrate_name": substrate.name,
+        "environment_id": report.environment_id,
+        "environment_name": environment.name,
+        "temperature_C": env_values["temperature_C"],
+        "ph": env_values["ph"],
+        "oxygen": env_values["oxygen"],
+        "environment_source": _environment_source(environment.provenance),
+        "environment_effect_status": "preflight_only",
+        **environment_policy,
+        "process_type": ";".join(report.required_processes),
     }
 
 

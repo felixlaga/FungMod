@@ -15,7 +15,7 @@ VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: current next for build-first exploratory virtual-experiment
 expansion; partial after top-level environment_grid helper,
-assumption_summary.csv, and modelability_items.csv.
+assumption_summary.csv, modelability_items.csv, and write_preflight_report.
 THERMO-003: queued for dynamic thermodynamic and entropy constraints.
 BIO-003: queued for generic mechanism expansion after build-first simulator work.
 ```
@@ -37,10 +37,10 @@ comparison to observations is meaningful.
 
 The first PRODUCT-001 implementation slices add the top-level
 `environment_grid(...)` helper plus `assumption_summary.csv` and
-`modelability_items.csv` outputs. They improve the target researcher workflow
-and make exploratory assumptions, uncertain inputs, and preflight facts easier
-to inspect, but runtime pH, temperature, and oxygen grid values remain
-metadata-only unless an explicit response law or condition-specific parameter
-record is active.
+`modelability_items.csv` outputs, plus a `write_preflight_report(...)` path for
+blocked cases. They improve the target researcher workflow and make exploratory
+assumptions, uncertain inputs, and preflight facts easier to inspect, but
+runtime pH, temperature, and oxygen grid values remain metadata-only unless an
+explicit response law or condition-specific parameter record is active.
 
 `old_progress/` is historical and non-binding.
