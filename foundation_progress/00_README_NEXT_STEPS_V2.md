@@ -19,6 +19,7 @@ assumption_summary.csv, modelability_items.csv, and write_preflight_report.
 THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator;
 configured runs now summarize those diagnostics, but there are still no
 inferred activities or solver-time thermodynamic enforcement.
+Thermodynamic summaries are available as JSON and CSV when such validators run.
 BIO-003: queued for generic mechanism expansion after build-first simulator work.
 ```
 

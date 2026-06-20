@@ -36,7 +36,7 @@ basic kinetics layer:
 - carbon conservation, oxygen limitation, and biomass-yield validation checks,
 - explicit reaction-quotient Gibbs feasibility and entropy-production
   diagnostics for caller-supplied dimensionless Q metadata,
-- configured thermodynamic summary outputs for explicit Gibbs/entropy
+- configured thermodynamic JSON/CSV summary outputs for explicit Gibbs/entropy
   validation diagnostics,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,

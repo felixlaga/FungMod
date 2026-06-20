@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 import json
@@ -97,6 +98,10 @@ class ConfiguredOutputWriter:
         thermodynamic_summary = _thermodynamic_summary(result)
         if thermodynamic_summary["count"] > 0:
             _write_json(destination / "thermodynamic_summary.json", thermodynamic_summary)
+            _write_csv(
+                destination / "thermodynamic_summary.csv",
+                thermodynamic_summary["rows"],
+            )
         _write_json(destination / "merged_parameters.json", inputs.parameters.to_dict())
         _write_json(destination / "run_environment.json", _run_environment())
         _write_json(destination / "package_versions.json", _package_versions(result))
@@ -119,6 +124,22 @@ def _mass_balance_weights(config: ModelConfig) -> Mapping[str, float] | None:
 def _write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, sort_keys=True, default=_json_default) + "\n", encoding="utf-8")
+
+
+def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = list(rows[0]) if rows else ()
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: _csv_value(value) for key, value in row.items()})
+
+
+def _csv_value(value: Any) -> Any:
+    if isinstance(value, (list, dict, tuple)):
+        return json.dumps(value, sort_keys=True, default=_json_default)
+    return value
 
 
 def _run_summary(config: ModelConfig, result: SimulationResult) -> dict[str, Any]:
