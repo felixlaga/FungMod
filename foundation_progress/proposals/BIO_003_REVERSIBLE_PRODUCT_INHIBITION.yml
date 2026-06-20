@@ -69,8 +69,8 @@ tests_required:
   - Second materially different non-specific test on a chain or surface-compatible process.
   - Output-table test that active modifier assumptions, parameters, and limitations are visible.
 limitations:
-  - This proposal selects the next biology-mechanism target; it does not by itself activate product inhibition in virtual experiments.
-  - The existing low-level ProductInhibitionModifier is software-tested, but registry/configured virtual-experiment integration remains future work.
+  - This mechanism is software-tested for explicit configured process modifiers, but registry-backed case assembly remains future work.
+  - Configured support requires explicit product_state and a positive unit-compatible K_i; no fallback inhibition constants are inferred.
   - Empirical interpretation requires evidence-backed K_i records or clearly marked exploratory priors.
 demo_case:
   case_id: CASE-002
@@ -78,4 +78,4 @@ demo_case:
   distinction: Demonstration records exercise the modifier; the mechanism proposal defines the reusable modifier family.
 data_dependencies:
   - DATA-003
-validation_status: proposed
+validation_status: software_tested

@@ -26,6 +26,37 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## BIO-003 Configured Reversible Product Inhibition
+
+Date: 2026-06-20
+
+Status: `partial/software-tested` for the first BIO-003 generic mechanism
+family.
+
+Completed in this pass:
+
+- Added a generic `RateModifierProcess` wrapper that scales any configured
+  process rate with explicit reusable modifiers.
+- Added configured process `modifiers` support for `type: product_inhibition`
+  with explicit `product_state` and `inhibition_constant`.
+- Required the product state to exist and required `K_i` as a positive,
+  unit-compatible parameter through the existing assembly/solver checks.
+- Added configured output metadata for active process modifiers, including
+  maturity and limitation text.
+- Added non-specific tests for homogeneous first-order and generic surface
+  configured processes, plus full configured-run tests proving active
+  assumptions/output metadata, missing-`K_i`, and non-positive-`K_i` failure
+  behavior.
+- Updated the BIO-003 proposal from `proposed` to `software_tested`.
+
+No organism-specific inhibition behavior, substrate-specific shortcut,
+registry-backed case assembly, validation data, calibration routine, empirical
+validation claim, or fallback inhibition constant was added.
+
+Recommended next task: expose configured product inhibition through
+registry-backed case assembly or add the first public API/notebook example that
+shows outputs with and without the modifier while preserving limitations.
+
 ## BIO-003 Reversible Product Inhibition Scope Selection
 
 Date: 2026-06-20

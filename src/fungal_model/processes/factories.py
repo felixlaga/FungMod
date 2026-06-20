@@ -12,6 +12,10 @@ from fungal_model.processes.homogeneous import (
     HomogeneousMichaelisMentenProcess,
     MassActionProcess,
 )
+from fungal_model.processes.rate_modifiers import (
+    RateModifierProcess,
+    product_inhibition_modifier_from_config,
+)
 from fungal_model.processes.surface import (
     AccessibleSitePool,
     AccessibleSurfaceAreaModel,
@@ -99,7 +103,7 @@ class FirstOrderFactory:
         parameters = _mapping(process_config.parameters)
         source_state = str(states["source"])
         product_state = None if states.get("product") is None else str(states["product"])
-        return FirstOrderDecayProcess(
+        process = FirstOrderDecayProcess(
             name=process_config.id,
             substrate_state=source_state,
             product_state=product_state,
@@ -108,6 +112,7 @@ class FirstOrderFactory:
             source=context.source,
             notes="Built from generic first-order process config.",
         )
+        return _apply_rate_modifiers(context, process_config, process)
 
 
 @dataclass(frozen=True)
@@ -139,7 +144,7 @@ class MassActionFactory:
         states = _mapping(process_config.states)
         parameters = _mapping(process_config.parameters)
         species = set(states["reactants"]) | set(states["products"])
-        return MassActionProcess(
+        process = MassActionProcess(
             name=process_config.id,
             reactants={str(name): float(value) for name, value in states["reactants"].items()},
             products={str(name): float(value) for name, value in states["products"].items()},
@@ -150,6 +155,7 @@ class MassActionFactory:
             source=context.source,
             notes="Built from generic mass-action process config.",
         )
+        return _apply_rate_modifiers(context, process_config, process)
 
 
 @dataclass(frozen=True)
@@ -195,7 +201,7 @@ class HomogeneousMichaelisMentenFactory:
             if isinstance(product_map_id, str) and product_map_id in context.product_maps
             else None
         )
-        return HomogeneousMichaelisMentenProcess(
+        process = HomogeneousMichaelisMentenProcess(
             name=process_config.id,
             substrate_state=substrate_state,
             product_state=None if states.get("product") is None else str(states["product"]),
@@ -210,6 +216,7 @@ class HomogeneousMichaelisMentenFactory:
             source=context.source,
             notes="Built from generic homogeneous Michaelis-Menten process config.",
         )
+        return _apply_rate_modifiers(context, process_config, process)
 
 
 @dataclass(frozen=True)
@@ -248,7 +255,7 @@ class SurfaceCatalysisFactory:
         catalyst_state = str(states["catalyst"])
         product_map = context.product_maps[str(process_config.product_map)]
         substrate_units = context.state_units[substrate_state]
-        return SurfaceCatalysisProcess(
+        process = SurfaceCatalysisProcess(
             name=process_config.id,
             substrate_state=substrate_state,
             enzyme_state=catalyst_state,
@@ -277,6 +284,7 @@ class SurfaceCatalysisFactory:
             source=context.source,
             notes="Built from generic surface-catalysis process config.",
         )
+        return _apply_rate_modifiers(context, process_config, process)
 
 
 def default_foundation_factories() -> tuple[ProcessFactory, ...]:
@@ -316,6 +324,32 @@ def _decision(
 def _require_buildable(decision: BuildDecision) -> None:
     if not decision.can_build:
         raise ValueError(f"Process factory cannot build config: {decision.to_dict()}")
+
+
+def _apply_rate_modifiers(
+    context: ProcessBuildContext,
+    process_config: Any,
+    process: Process,
+) -> Process:
+    modifiers = tuple(
+        _build_rate_modifier(context, modifier_config)
+        for modifier_config in getattr(process_config, "modifiers", ()) or ()
+    )
+    if not modifiers:
+        return process
+    return RateModifierProcess(
+        base_process=process,
+        rate_modifiers=modifiers,
+        notes=f"{process.notes} Explicit generic rate modifiers configured.".strip(),
+    )
+
+
+def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> Any:
+    mapping = _mapping(modifier_config)
+    modifier_type = str(mapping.get("type") or mapping.get("modifier_type") or "").strip()
+    if modifier_type == "product_inhibition":
+        return product_inhibition_modifier_from_config(mapping, state_units=context.state_units)
+    raise ValueError(f"Unsupported rate modifier type: {modifier_type!r}.")
 
 
 def _missing_config_fields(process_config: Any, fields: Sequence[str]) -> tuple[str, ...]:

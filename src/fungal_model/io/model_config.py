@@ -219,6 +219,7 @@ class ProcessConfig:
     states: Mapping[str, Any]
     parameters: Mapping[str, Any]
     product_map: str | Mapping[str, Any] | None = None
+    modifiers: tuple[Mapping[str, Any], ...] = ()
     assumptions: tuple[str, ...] = ()
     raw: Mapping[str, Any] | None = None
 
@@ -236,6 +237,7 @@ class ProcessConfig:
             states=deepcopy(data.get("states", {})),
             parameters=deepcopy(data.get("parameters", {})),
             product_map=deepcopy(data.get("product_map")),
+            modifiers=tuple(deepcopy(item) for item in data.get("modifiers", ()) or ()),
             assumptions=tuple(str(item) for item in data.get("assumptions", ()) or ()),
             raw=deepcopy(dict(data)),
         )
@@ -248,6 +250,8 @@ class ProcessConfig:
             invalid.append(f"{self.id}.states")
         if not isinstance(self.parameters, Mapping):
             invalid.append(f"{self.id}.parameters")
+        if not isinstance(self.modifiers, tuple) or any(not isinstance(item, Mapping) for item in self.modifiers):
+            invalid.append(f"{self.id}.modifiers")
         if invalid:
             return ModelConfigValidationResult(
                 passed=False,
@@ -263,6 +267,7 @@ class ProcessConfig:
             "states": deepcopy(dict(self.states)),
             "parameters": deepcopy(dict(self.parameters)),
             "product_map": deepcopy(self.product_map),
+            "modifiers": deepcopy(list(self.modifiers)),
             "assumptions": list(self.assumptions),
             "raw": deepcopy(dict(self.raw or {})),
         }

@@ -142,12 +142,10 @@ def test_real_bio003_product_inhibition_proposal_stays_generic_and_proposed() ->
 
     assert proposal["milestone_id"] == "BIO-003"
     assert proposal["mechanism_id"] == "reversible_product_inhibition"
-    assert proposal["validation_status"] == "proposed"
+    assert proposal["validation_status"] == "software_tested"
     assert "generic" in proposal["general_process_family"]
     assert "1 / (1 + P / K_i)" in proposal["mathematical_law"]
-    assert "configured virtual-experiment integration remains future work" in " ".join(
-        proposal["limitations"]
-    )
+    assert "registry-backed case assembly remains future work" in " ".join(proposal["limitations"])
     assert "Organism-specific inhibition behavior" in " ".join(proposal["not_in_scope"])
 
 
