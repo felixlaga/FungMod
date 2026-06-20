@@ -8,6 +8,10 @@ STATUS_DOC = ROOT / "foundation_progress" / "ROADMAP_ORCHESTRATION_STATUS.md"
 NEXT_STEPS = ROOT / "foundation_progress" / "00_README_NEXT_STEPS_V2.md"
 ACTIVE_ROADMAP = ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP.md"
 VALIDATION_GATE = ROOT / "foundation_progress" / "VALIDATION_DATA_001_FIRST_TIMECOURSE.md"
+PROGRESS_LEDGER = ROOT / "progress.md"
+BIO003_DOC = ROOT / "foundation_progress" / "BIO_003_GENERIC_PROCESS_LAWS.md"
+BIO003_PROPOSAL = ROOT / "foundation_progress" / "proposals" / "BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml"
+FINAL_GOAL_PLAN = ROOT / "foundation_progress" / "FUNGMOD_FINAL_GOAL_PR_PLAN_2026_06_20.html"
 
 
 def _read(path: Path) -> str:
@@ -100,6 +104,38 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     )
     assert "VALIDATION-DATA-001: deferred; blocked/partial" in next_steps
     assert "PR-08 | VALIDATION-DATA-001" in status
+
+
+def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> None:
+    status = _read(STATUS_DOC)
+    next_steps = _read(NEXT_STEPS)
+    progress = _read(PROGRESS_LEDGER)
+    bio003_doc = _read(BIO003_DOC)
+    proposal = _read(BIO003_PROPOSAL)
+
+    for text in (status, next_steps, progress, bio003_doc, proposal):
+        assert "reversible product inhibition" in text
+
+    assert "selected/proposed for reversible product inhibition" in status
+    assert "selected/proposed for generic reversible product inhibition" in next_steps
+    assert "ProductInhibitionModifier" in bio003_doc
+    assert "validation_status: proposed" in proposal
+    assert "does not yet activate product inhibition" in next_steps
+    assert "configured virtual-experiment integration remains future work" in proposal
+    assert "No scientific or numerical behavior" in progress
+
+
+def test_final_goal_html_plan_records_pr_slices_and_notebook_candidates() -> None:
+    html = _read(FINAL_GOAL_PLAN)
+
+    for phrase in (
+        "PR-14 recommendation",
+        "BIO-003 proposal selection",
+        "Notebook Plan",
+        "BIO-003 mechanism notebook",
+        "VALIDATION-DATA-001 should start only when",
+    ):
+        assert phrase in html
 
 
 def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:

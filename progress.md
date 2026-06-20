@@ -26,6 +26,35 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## BIO-003 Reversible Product Inhibition Scope Selection
+
+Date: 2026-06-20
+
+Status: `selected/proposed` for the first BIO-003 generic mechanism-family
+target.
+
+Completed in this pass:
+
+- Added `foundation_progress/BIO_003_GENERIC_PROCESS_LAWS.md` to record the
+  selected first BIO-003 target.
+- Added the machine-checkable
+  `foundation_progress/proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml`
+  proposal.
+- Selected generic reversible product inhibition as the next implementation
+  target because the low-level `ProductInhibitionModifier` already exists, but
+  configured/registry-backed virtual-experiment integration is not complete.
+- Added the final-goal HTML PR plan as an active planning artifact:
+  `foundation_progress/FUNGMOD_FINAL_GOAL_PR_PLAN_2026_06_20.html`.
+
+No scientific or numerical behavior, configured workflow behavior, registry
+records, simulation outputs, biology implementation, validation data,
+calibration routine, or empirical validation claim was added.
+
+Recommended next task: implement BIO-003 reversible product inhibition
+integration as a small code PR with explicit product-state mapping, positive
+unit-compatible `K_i`, output limitations, and at least two materially
+different non-specific tests.
+
 ## THERMO-003 Configured Thermodynamic Summary CSV
 
 Date: 2026-06-20
