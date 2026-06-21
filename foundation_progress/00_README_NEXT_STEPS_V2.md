@@ -19,9 +19,11 @@ Virtual-experiment outputs now include mechanism_summary.csv for active process
 laws, maturity, assumptions, limitations, and provenance.
 Example notebooks now include `10_virtual_experiment_product_tour.ipynb` for a
 public-API virtual-experiment tour without validation claims.
-THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator;
-configured runs now summarize those diagnostics, but there are still no
-inferred activities or solver-time thermodynamic enforcement.
+THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator
+and configured entropy-production-rate metadata diagnostic; configured runs
+now summarize those diagnostics, but there are still no inferred activities,
+concentrations, redox potentials, electron balances, or solver-time
+thermodynamic enforcement.
 Thermodynamic summaries are available as JSON and CSV when such validators run.
 Example notebooks now include
 `11_thermodynamics_entropy_diagnostics.ipynb` for configured explicit-Q Gibbs
@@ -55,11 +57,12 @@ assumptions, uncertain inputs, and preflight facts easier to inspect, but
 runtime pH, temperature, and oxygen grid values remain metadata-only unless an
 explicit response law or condition-specific parameter record is active.
 
-The current THERMO-003 notebook slice should remain configured-output focused:
-explicit caller-supplied dimensionless Q, temperature, and standard Gibbs
-metadata in; `thermodynamic_summary.json` and `.csv` out. It must not infer
-activities, reaction quotients, redox potentials, validation evidence, or
-solver-time thermodynamic enforcement.
+The current THERMO-003 slices should remain configured-output focused:
+explicit caller-supplied dimensionless Q, temperature, standard Gibbs,
+condition-specific delta G, and reaction extent-rate metadata in;
+`thermodynamic_summary.json` and `.csv` out. They must not infer activities,
+reaction quotients, concentrations, redox potentials, electron balances,
+validation evidence, or solver-time thermodynamic enforcement.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the

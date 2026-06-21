@@ -71,8 +71,10 @@ written:
 The current next PR is a scoped THERMO-003 thermodynamics and entropy
 diagnostics notebook after the validation ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices, and configured thermodynamic JSON/CSV
-outputs. Do not rebuild the completed scoped slices above unless code or tests
-contradict this status.
+outputs. THERMO-003 is also partial after a configured
+entropy-production-rate metadata diagnostic from explicit delta-G,
+reaction-extent-rate, and temperature inputs. Do not rebuild the completed
+scoped slices above unless code or tests contradict this status.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
@@ -1172,6 +1174,13 @@ energy-dissipation limits on process rates where provenance is available
 Do not emit thermodynamic state, entropy production, redox behavior, or
 organism-specific physiology unless the equations, parameters, provenance,
 maturity labels, and tests exist.
+
+Current scoped support remains metadata-only: explicit reaction-quotient Gibbs
+diagnostics use caller-supplied Q/T metadata, and explicit entropy-production
+rate diagnostics use caller-supplied condition-specific delta G, reaction
+extent rate, and temperature metadata. These checks do not infer activities,
+reaction quotients, concentrations, redox potentials, electron balances, or
+solver-time thermodynamic feasibility.
 
 ---
 

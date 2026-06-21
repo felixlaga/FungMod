@@ -23,6 +23,7 @@ from fungal_model.core.validators import (
     validate_condition_specific_gibbs_feasibility,
     validate_electron_balance,
     validate_elemental_balance,
+    validate_entropy_production_rate,
     validate_non_negative,
     validate_reaction_quotient_gibbs_feasibility,
 )
@@ -162,6 +163,68 @@ def test_reaction_quotient_gibbs_validator_reports_favorable_q_case() -> None:
     assert validation.details["entropy_production_per_mole"] == pytest.approx(5000.0 / 298.15)
 
 
+def test_entropy_production_rate_validator_reports_positive_explicit_metadata() -> None:
+    validation = validate_entropy_production_rate(
+        condition_specific_delta_gibbs=_parameter(symbol="dG_condition", value=-10.0, units="kilojoule / mole"),
+        reaction_extent_rate=_parameter(symbol="xi_dot", value=2.0, units="millimole / second"),
+        temperature=_parameter(symbol="T_entropy_rate", value=298.15, units="kelvin"),
+    )
+
+    expected_rate = 20.0 / 298.15
+
+    assert validation.passed
+    assert validation.to_dict()["status"] == "passed"
+    assert validation.details["entropy_production_rate"] == pytest.approx(expected_rate)
+    assert validation.details["entropy_production_rate_units"] == "joule / second / kelvin"
+    assert validation.details["condition_specific_delta_gibbs"] == pytest.approx(-10000.0)
+    assert validation.details["reaction_extent_rate"] == pytest.approx(0.002)
+    assert validation.details["solver_time_enforcement"] == "not_evaluated"
+    assert "No inferred activities" in validation.details["unsupported_scope"]
+
+
+def test_entropy_production_rate_validator_fails_negative_explicit_metadata() -> None:
+    validation = validate_entropy_production_rate(
+        condition_specific_delta_gibbs=_parameter(symbol="dG_condition", value=5.0, units="kilojoule / mole"),
+        reaction_extent_rate=_parameter(symbol="xi_dot", value=1.0, units="millimole / second"),
+        temperature=_parameter(symbol="T_entropy_rate", value=298.15, units="kelvin"),
+    )
+
+    assert not validation.passed
+    assert validation.to_dict()["status"] == "failed"
+    assert validation.details["entropy_production_rate"] == pytest.approx(-5.0 / 298.15)
+
+
+def test_entropy_production_rate_validator_rejects_invalid_temperature_and_units() -> None:
+    nonpositive_temperature = validate_entropy_production_rate(
+        condition_specific_delta_gibbs=_parameter(symbol="dG_condition", value=-5.0, units="kilojoule / mole"),
+        reaction_extent_rate=_parameter(symbol="xi_dot", value=1.0, units="millimole / second"),
+        temperature=_parameter(symbol="T_entropy_rate", value=0.0, units="kelvin"),
+    )
+    invalid_extent_units = validate_entropy_production_rate(
+        condition_specific_delta_gibbs=_parameter(symbol="dG_condition", value=-5.0, units="kilojoule / mole"),
+        reaction_extent_rate=_parameter(symbol="xi_dot", value=1.0, units="meter"),
+        temperature=_parameter(symbol="T_entropy_rate", value=298.15, units="kelvin"),
+    )
+
+    assert not nonpositive_temperature.passed
+    assert nonpositive_temperature.details["invalid_metadata"] == ["temperature_nonpositive"]
+    assert not invalid_extent_units.passed
+    assert invalid_extent_units.details["error_type"] == "UnitError"
+    assert "incompatible" in invalid_extent_units.message
+
+
+def test_entropy_production_rate_validator_reports_missing_quantity_as_inconclusive() -> None:
+    validation = validate_entropy_production_rate(
+        condition_specific_delta_gibbs=_parameter(symbol="dG_condition", value=None, units="kilojoule / mole"),
+        reaction_extent_rate=_parameter(symbol="xi_dot", value=1.0, units="millimole / second"),
+        temperature=_parameter(symbol="T_entropy_rate", value=298.15, units="kelvin"),
+    )
+
+    assert not validation.passed
+    assert validation.to_dict()["status"] == "inconclusive"
+    assert validation.details["missing_metadata"] == ["condition_specific_delta_gibbs"]
+
+
 def test_reaction_quotient_gibbs_validator_rejects_nonpositive_q() -> None:
     validation = validate_reaction_quotient_gibbs_feasibility(
         standard_estimate=_gibbs_estimate(-5.0),
@@ -232,10 +295,27 @@ def test_validator_registry_loads_static_balance_and_thermodynamic_validators() 
             "temperature": _parameter_config(symbol="T_configured_dynamic", value=298.15, units="kelvin"),
         }
     )
+    entropy_rate = registry.load(
+        {
+            "validator_type": "entropy_production_rate_metadata",
+            "condition_specific_delta_gibbs": _parameter_config(
+                symbol="dG_entropy_rate",
+                value=-5.0,
+                units="kilojoule / mole",
+            ),
+            "reaction_extent_rate": _parameter_config(
+                symbol="xi_dot_configured",
+                value=1.0,
+                units="millimole / second",
+            ),
+            "temperature": _parameter_config(symbol="T_configured_entropy_rate", value=298.15, units="kelvin"),
+        }
+    )
 
     assert elemental(object()).to_dict()["status"] == "passed"
     assert thermo(object()).to_dict()["status"] == "passed"
     assert reaction_quotient(object()).to_dict()["status"] == "passed"
+    assert entropy_rate(object()).to_dict()["status"] == "passed"
 
 
 def test_exploratory_config_records_inconclusive_static_validator(tmp_path: Path) -> None:
@@ -308,6 +388,55 @@ def test_configured_reaction_quotient_validator_writes_thermodynamic_summary(tmp
     assert csv_rows[0]["name"] == "reaction_quotient_thermodynamic_feasibility"
     assert csv_rows[0]["gibbs_equation"] == "delta_g = delta_g_standard + R*T*ln(Q)"
     assert float(csv_rows[0]["entropy_production_per_mole"]) == pytest.approx(5000.0 / 298.15)
+    assert "thermodynamic_summary.json" in manifest["files"]
+    assert "thermodynamic_summary.csv" in manifest["files"]
+
+
+def test_configured_entropy_production_rate_validator_writes_thermodynamic_summary(tmp_path: Path) -> None:
+    config = _configured_static_validator_config(mode="exploratory")
+    config["validators"].append(
+        {
+            "id": "explicit_entropy_rate",
+            "validator_type": "entropy_production_rate_metadata",
+            "condition_specific_delta_gibbs": _parameter_config(
+                symbol="dG_entropy_rate_configured",
+                value=-10.0,
+                units="kilojoule / mole",
+            ),
+            "reaction_extent_rate": _parameter_config(
+                symbol="xi_dot_configured",
+                value=2.0,
+                units="millimole / second",
+            ),
+            "temperature": _parameter_config(symbol="T_entropy_rate_configured", value=298.15, units="kelvin"),
+        }
+    )
+    output_dir = tmp_path / "entropy_rate_summary_output"
+
+    result = run_configured_model(_write_config(tmp_path, config), output_dir=output_dir)
+
+    entropy_rate_validation = [
+        row
+        for row in result.validation_report()
+        if row["name"] == "entropy_production_rate_metadata"
+    ][0]
+    summary = json.loads((output_dir / "thermodynamic_summary.json").read_text(encoding="utf-8"))
+    with (output_dir / "thermodynamic_summary.csv").open(newline="", encoding="utf-8") as handle:
+        csv_rows = list(csv.DictReader(handle))
+    manifest = json.loads((output_dir / "output_manifest.json").read_text(encoding="utf-8"))
+
+    assert entropy_rate_validation["status"] == "passed"
+    assert summary["has_entropy_production_rate"] is True
+    assert summary["has_solver_time_enforcement"] is False
+    assert "concentration model" in summary["unsupported_scope"]
+    assert summary["rows"][0]["entropy_equation"] == (
+        "entropy_production_rate = -condition_specific_delta_gibbs * "
+        "reaction_extent_rate / temperature"
+    )
+    assert summary["rows"][0]["entropy_production_rate"] == pytest.approx(20.0 / 298.15)
+    assert csv_rows[0]["name"] == "entropy_production_rate_metadata"
+    assert float(csv_rows[0]["entropy_production_rate"]) == pytest.approx(20.0 / 298.15)
+    assert csv_rows[0]["solver_time_enforcement"] == "not_evaluated"
     assert "thermodynamic_summary.json" in manifest["files"]
     assert "thermodynamic_summary.csv" in manifest["files"]
 

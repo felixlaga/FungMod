@@ -15,6 +15,7 @@ from fungal_model.core.validators import (
     validate_condition_specific_gibbs_feasibility,
     validate_electron_balance,
     validate_elemental_balance,
+    validate_entropy_production_rate,
     validate_mass_balance,
     validate_non_negative,
     validate_reaction_quotient_gibbs_feasibility,
@@ -137,6 +138,7 @@ class ValidatorRegistry(_LoaderRegistry):
         registry.register("redox_balance", load_redox_balance_validator)
         registry.register("thermodynamic_metadata", load_thermodynamic_metadata_validator)
         registry.register("reaction_quotient_thermodynamic_metadata", load_reaction_quotient_thermodynamic_validator)
+        registry.register("entropy_production_rate_metadata", load_entropy_production_rate_validator)
         return registry
 
 
@@ -357,6 +359,32 @@ def load_reaction_quotient_thermodynamic_validator(data: Mapping[str, Any]) -> C
     return validator
 
 
+def load_entropy_production_rate_validator(data: Mapping[str, Any]) -> Callable[[Any], Any]:
+    condition_specific_delta_gibbs = Parameter.from_dict(
+        _mapping(data.get("condition_specific_delta_gibbs"), field_name="condition_specific_delta_gibbs")
+    )
+    reaction_extent_rate = Parameter.from_dict(
+        _mapping(data.get("reaction_extent_rate"), field_name="reaction_extent_rate")
+    )
+    temperature = Parameter.from_dict(_mapping(data.get("temperature"), field_name="temperature"))
+    tolerance = _quantity(data.get("absolute_tolerance"))
+    required = bool(data.get("required", True))
+    allow_unsourced_for_testing = bool(data.get("allow_unsourced_for_testing", False))
+
+    def validator(result: Any) -> Any:
+        del result
+        return validate_entropy_production_rate(
+            condition_specific_delta_gibbs=condition_specific_delta_gibbs,
+            reaction_extent_rate=reaction_extent_rate,
+            temperature=temperature,
+            absolute_tolerance=tolerance,
+            required=required,
+            allow_unsourced_for_testing=allow_unsourced_for_testing,
+        )
+
+    return validator
+
+
 def _quantity(data: Mapping[str, Any] | None) -> Quantity | None:
     if data is None:
         return None
@@ -517,6 +545,7 @@ __all__ = [
     "load_mass_balance_validator",
     "load_charge_balance_validator",
     "load_elemental_balance_validator",
+    "load_entropy_production_rate_validator",
     "load_redox_balance_validator",
     "load_non_negative_validator",
     "load_one_to_one_product_map",
