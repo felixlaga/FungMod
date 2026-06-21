@@ -14,6 +14,7 @@ from fungal_model import ConfiguredModelExecutionError, VirtualExperiment
 from fungal_model.registry import load_registry
 from fungal_model.screening import (
     EnzymeChainAssemblyError,
+    RegistryCaseBuildError,
     build_extracellular_enzyme_chain_config,
     build_model_config_from_registry_case,
 )
@@ -175,6 +176,84 @@ def test_registry_product_inhibition_rejects_non_positive_ki_without_fallback(tm
     assert "Product inhibition constant must be positive" in report["message"]
 
 
+def test_one_process_registry_template_emits_configured_product_inhibition_modifier(tmp_path: Path) -> None:
+    registry_dir = _registry_with_reaction618_process_modifier(tmp_path)
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    config = build_model_config_from_registry_case(
+        fungus_id=REACTION_FUNGUS_ID,
+        substrate_id=REACTION_SUBSTRATE_ID,
+        environment_id=REACTION_ENVIRONMENT_ID,
+        registry=registry,
+        mode="scientific",
+        output_directory=str(tmp_path / "one_process_outputs"),
+    )
+    config_path = tmp_path / "one_process_product_inhibition.yml"
+    config_path.write_text(yaml.safe_dump(config.to_dict(), sort_keys=False), encoding="utf-8")
+    result = run_configured_model(config_path, output_dir=tmp_path / "one_process_outputs")
+    metadata = json.loads((tmp_path / "one_process_outputs" / "configured_metadata.json").read_text(encoding="utf-8"))
+
+    assert result.solver_metadata["success"] is True
+    assert config.to_dict()["processes"][0]["modifiers"] == [
+        {
+            "type": "product_inhibition",
+            "product_state": "beta_D_glucose_concentration",
+            "inhibition_constant": "K_i_reaction618_product_fixture",
+        }
+    ]
+    assert metadata["configured_process_modifiers"] == [
+        {
+            "process_id": "sabiork_reaction_618_homogeneous_mm",
+            "modifier_index": 0,
+            "type": "product_inhibition",
+            "product_state": "beta_D_glucose_concentration",
+            "inhibition_constant": "K_i_reaction618_product_fixture",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Single-product reversible inhibition only; configured only when product_state "
+                "and positive unit-compatible K_i are explicit."
+            ),
+        }
+    ]
+
+
+def test_one_process_registry_product_inhibition_requires_explicit_ki_record(tmp_path: Path) -> None:
+    registry_dir = _registry_with_reaction618_process_modifier(tmp_path, include_ki_record=False)
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(RegistryCaseBuildError, match="product_inhibition_constant"):
+        build_model_config_from_registry_case(
+            fungus_id=REACTION_FUNGUS_ID,
+            substrate_id=REACTION_SUBSTRATE_ID,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            registry=registry,
+            mode="scientific",
+            output_directory=str(tmp_path / "missing_one_process_ki"),
+        )
+
+
+def test_one_process_registry_product_inhibition_rejects_non_positive_ki(tmp_path: Path) -> None:
+    registry_dir = _registry_with_reaction618_process_modifier(tmp_path, ki_value=0.0)
+    registry = load_registry(registry_dir / "registry_index.yml")
+    config = build_model_config_from_registry_case(
+        fungus_id=REACTION_FUNGUS_ID,
+        substrate_id=REACTION_SUBSTRATE_ID,
+        environment_id=REACTION_ENVIRONMENT_ID,
+        registry=registry,
+        mode="scientific",
+        output_directory=str(tmp_path / "bad_one_process_ki"),
+    )
+    config_path = tmp_path / "bad_one_process_ki.yml"
+    config_path.write_text(yaml.safe_dump(config.to_dict(), sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "bad_one_process_ki")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "model_execution"
+    assert "Product inhibition constant must be positive" in report["message"]
+
+
 def test_output_tables_preserve_template_biological_states_and_metrics(tmp_path: Path) -> None:
     output_dir = tmp_path / "reaction_618_tables"
     study = VirtualExperiment.from_registry(
@@ -312,6 +391,100 @@ def _registry_with_bio002_product_inhibition(
             },
         )
         parameter_path.write_text(yaml.safe_dump(parameter_data, sort_keys=False), encoding="utf-8")
+    return registry_dir
+
+
+def _registry_with_reaction618_process_modifier(
+    tmp_path: Path,
+    *,
+    include_ki_record: bool = True,
+    ki_value: float = 2.0,
+) -> Path:
+    registry_dir = _copy_registry(tmp_path)
+
+    template_path = registry_dir / "case_templates" / "case_templates.yml"
+    template_data = _yaml_mapping(template_path)
+    for record in cast(list[dict[str, Any]], template_data["records"]):
+        if record["record_id"] == "sabiork_reaction_618_homogeneous_mm_template":
+            record["process_state_metadata"]["process_modifiers"] = [
+                {
+                    "type": "product_inhibition",
+                    "product_state_role": "product",
+                    "inhibition_constant_role": "product_inhibition_constant",
+                }
+            ]
+            break
+    else:
+        raise AssertionError("Missing Reaction 618 case template")
+    template_path.write_text(yaml.safe_dump(template_data, sort_keys=False), encoding="utf-8")
+
+    compatibility_path = registry_dir / "processes" / "process_compatibility.yml"
+    compatibility_data = _yaml_mapping(compatibility_path)
+    for record in cast(list[dict[str, Any]], compatibility_data["records"]):
+        if record["record_id"] == "beta_glucosidase_cellobiose_homogeneous_mm":
+            record["required_parameters"].append("K_i_reaction618_product_fixture")
+            record["parameter_roles"]["product_inhibition_constant"] = "K_i_reaction618_product_fixture"
+            break
+    else:
+        raise AssertionError("Missing Reaction 618 process compatibility")
+    compatibility_path.write_text(yaml.safe_dump(compatibility_data, sort_keys=False), encoding="utf-8")
+
+    parameter_path = registry_dir / "parameters" / "parameter_records.yml"
+    parameter_data = _yaml_mapping(parameter_path)
+    parameter_records = cast(list[dict[str, Any]], parameter_data["records"])
+    for record in parameter_records:
+        if (
+            record.get("parameter_symbol") == ENZYME_CONCENTRATION_SYMBOL
+            and record.get("process_type") == "homogeneous_michaelis_menten"
+            and record.get("maturity") == "literature_processed"
+        ):
+            record["value"] = {
+                "kind": "exact",
+                "value": 0.01,
+                "units": "mM",
+                "source": "Local deterministic enzyme concentration fixture",
+                "confidence_level": "synthetic_control",
+                "notes": "Used only to exercise homogeneous builder mechanics; not a SABIO-RK value.",
+            }
+            break
+    else:
+        raise AssertionError("Missing enzyme concentration record")
+
+    if include_ki_record:
+        parameter_records.insert(
+            0,
+            {
+                "record_id": "reaction618_product_inhibition_constant_fixture",
+                "name": "Reaction 618 product inhibition K_i fixture",
+                "maturity": "software_test_fixture",
+                "provenance": {
+                    "source": "FungMod one-process product-inhibition software test fixture.",
+                    "confidence_level": "testing",
+                    "bio_milestone": "BIO-003",
+                    "notes": "Artificial K_i value used only to verify one-process registry-template modifier assembly.",
+                },
+                "parameter_symbol": "K_i_reaction618_product_fixture",
+                "process_type": "homogeneous_michaelis_menten",
+                "enzyme_class": None,
+                "substrate_class": None,
+                "fungus_id": None,
+                "substrate_id": None,
+                "environment_id": None,
+                "value": {
+                    "kind": "exact",
+                    "value": ki_value,
+                    "units": "mM",
+                    "source": "FungMod one-process product-inhibition software test fixture.",
+                    "confidence_level": "testing",
+                    "notes": "Artificial value for one-process configured product-inhibition tests; not validation data.",
+                },
+                "range_scope": "software_test_fixture",
+                "range_interpretation": "configured mechanics only",
+                "allowed_use": "scientific_builder_software_testing_only_not_scientific_validation",
+                "notes": "Fixture K_i for proving explicit one-process registry-backed product-inhibition assembly.",
+            },
+        )
+    parameter_path.write_text(yaml.safe_dump(parameter_data, sort_keys=False), encoding="utf-8")
     return registry_dir
 
 
