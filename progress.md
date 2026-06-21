@@ -26,6 +26,40 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Configured Entropy-Production-Rate Diagnostic
+
+Date: 2026-06-21
+
+Status: `partial` for dynamic thermodynamic and entropy constraints.
+
+Completed in this pass:
+
+- Added `validate_entropy_production_rate(...)`, a generic configured metadata
+  diagnostic for
+  `entropy_production_rate = -condition_specific_delta_gibbs * reaction_extent_rate / temperature`.
+- Required explicit provenance-backed `Parameter` inputs for
+  condition-specific delta G, reaction extent rate, and temperature, with unit
+  checks for energy per mole, mole per time, and kelvin.
+- Added configured-validator registry support through
+  `entropy_production_rate_metadata`.
+- Extended configured `thermodynamic_summary.json` and
+  `thermodynamic_summary.csv` rows with entropy-production-rate fields while
+  preserving existing reaction-quotient Gibbs fields.
+- Added focused synthetic tests for positive and negative entropy-production
+  rate cases, invalid temperature and units, missing quantities, registry
+  loading, and configured JSON/CSV outputs.
+
+No new biology, substrate-specific mechanism, fungus-specific branch, inferred
+activity model, inferred reaction quotient, concentration model,
+redox-potential model, electron-balance model, solver-time thermodynamic
+enforcement, validation data, calibration routine, or empirical validation
+claim was added.
+
+Recommended next task: continue THERMO-003 only if another small generic
+first-principles diagnostic has explicit configured inputs and tests, or move
+to BIO-003 registry-backed case assembly for the already software-tested
+product inhibition mechanism.
+
 ## THERMO-003 Thermodynamics And Entropy Diagnostics Notebook
 
 Date: 2026-06-20

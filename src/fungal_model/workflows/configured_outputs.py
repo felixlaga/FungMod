@@ -233,20 +233,26 @@ def _thermodynamic_summary(result: SimulationResult) -> dict[str, Any]:
         for item in thermodynamic_rows
         if item.get("name") == "reaction_quotient_thermodynamic_feasibility"
     ]
+    entropy_rate_rows = [
+        item
+        for item in thermodynamic_rows
+        if item.get("name") == "entropy_production_rate_metadata"
+    ]
     return {
         "kind": "configured_thermodynamic_summary",
         "count": len(thermodynamic_rows),
         "status_counts": _count_by_key(thermodynamic_rows, "status"),
         "severity_counts": _count_by_key(thermodynamic_rows, "severity"),
         "has_reaction_quotient_gibbs": bool(reaction_quotient_rows),
+        "has_entropy_production_rate": bool(entropy_rate_rows),
         "has_solver_time_enforcement": False,
         "supported_scope": (
             "Explicit condition-specific and caller-supplied reaction-quotient "
-            "Gibbs metadata checks only."
+            "Gibbs metadata checks plus configured entropy-production-rate diagnostics only."
         ),
         "unsupported_scope": (
-            "No inferred activity model, inferred reaction quotient, redox-potential "
-            "model, or solver-time thermodynamic enforcement."
+            "No inferred activity model, inferred reaction quotient, concentration model, "
+            "redox-potential model, electron-balance model, or solver-time thermodynamic enforcement."
         ),
         "rows": [_thermodynamic_summary_row(item) for item in thermodynamic_rows],
     }
@@ -256,7 +262,12 @@ def _is_thermodynamic_validation(item: Mapping[str, Any]) -> bool:
     name = str(item.get("name", ""))
     details = item.get("details", {})
     return (
-        name in {"thermodynamic_feasibility", "reaction_quotient_thermodynamic_feasibility"}
+        name
+        in {
+            "thermodynamic_feasibility",
+            "reaction_quotient_thermodynamic_feasibility",
+            "entropy_production_rate_metadata",
+        }
         or (
             isinstance(details, Mapping)
             and str(details.get("residual_name", "")).endswith("delta_gibbs")
@@ -267,6 +278,10 @@ def _is_thermodynamic_validation(item: Mapping[str, Any]) -> bool:
 def _thermodynamic_summary_row(item: Mapping[str, Any]) -> dict[str, Any]:
     details = item.get("details", {})
     details_map = details if isinstance(details, Mapping) else {}
+    residual_name = details_map.get("residual_name", "")
+    is_gibbs_residual = str(residual_name).endswith("delta_gibbs")
+    residual_value = details_map.get("residual_value", "")
+    residual_units = details_map.get("residual_units", "")
     return {
         "name": item.get("name", ""),
         "status": item.get("status", ""),
@@ -275,19 +290,28 @@ def _thermodynamic_summary_row(item: Mapping[str, Any]) -> dict[str, Any]:
         "required": bool(item.get("required")),
         "message": item.get("message", ""),
         "reaction_name": details_map.get("reaction_name", ""),
-        "residual_name": details_map.get("residual_name", ""),
-        "delta_gibbs": details_map.get("residual_value", ""),
-        "delta_gibbs_units": details_map.get("residual_units", ""),
+        "residual_name": residual_name,
+        "residual_value": residual_value,
+        "residual_units": residual_units,
+        "delta_gibbs": residual_value if is_gibbs_residual else "",
+        "delta_gibbs_units": residual_units if is_gibbs_residual else "",
         "standard_delta_gibbs": details_map.get("standard_delta_gibbs", ""),
         "reaction_quotient": details_map.get("reaction_quotient", ""),
         "temperature_K": details_map.get("temperature_K", ""),
         "rt_ln_q": details_map.get("rt_ln_q", ""),
         "entropy_production_per_mole": details_map.get("entropy_production_per_mole", ""),
         "entropy_production_units": details_map.get("entropy_production_units", ""),
+        "condition_specific_delta_gibbs": details_map.get("condition_specific_delta_gibbs", ""),
+        "condition_specific_delta_gibbs_units": details_map.get("condition_specific_delta_gibbs_units", ""),
+        "reaction_extent_rate": details_map.get("reaction_extent_rate", ""),
+        "reaction_extent_rate_units": details_map.get("reaction_extent_rate_units", ""),
+        "entropy_production_rate": details_map.get("entropy_production_rate", ""),
+        "entropy_production_rate_units": details_map.get("entropy_production_rate_units", ""),
         "gibbs_equation": details_map.get("gibbs_equation", ""),
         "entropy_equation": details_map.get("entropy_equation", ""),
         "dynamic_reaction_quotient": details_map.get("dynamic_reaction_quotient", ""),
         "activity_model": details_map.get("activity_model", ""),
+        "solver_time_enforcement": details_map.get("solver_time_enforcement", ""),
         "missing_metadata": details_map.get("missing_metadata", []),
         "provenance_refs": details_map.get("provenance_refs", []),
     }

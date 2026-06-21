@@ -20,7 +20,7 @@ from fungal_model.chemistry.stoichiometry import (
 from fungal_model.chemistry.thermodynamics import GibbsFreeEnergyEstimate
 from fungal_model.core.parameters import Parameter
 from fungal_model.core.provenance import ProvenanceError, UnknownParameterError, has_text
-from fungal_model.core.units import Q_, Quantity, assert_compatible, is_quantity
+from fungal_model.core.units import Q_, Quantity, UnitError, assert_compatible, is_quantity
 
 DEFAULT_VALIDATION_RELATIVE_TOLERANCE = Parameter(
     name="default validation relative tolerance",
@@ -43,6 +43,19 @@ DEFAULT_THERMODYNAMIC_ABSOLUTE_TOLERANCE = Parameter(
     source="Numerical sign-boundary convention for static Gibbs metadata checks; not a measured value.",
     confidence_level="testing",
     notes="Used only to compare explicitly supplied condition-specific Gibbs estimates to the zero boundary.",
+    measurement_method="software configuration",
+)
+
+
+DEFAULT_ENTROPY_PRODUCTION_RATE_ABSOLUTE_TOLERANCE = Parameter(
+    name="default entropy production rate absolute tolerance",
+    symbol="epsilon_entropy_rate",
+    value=0.0,
+    units="joule / second / kelvin",
+    uncertainty=None,
+    source="Numerical sign-boundary convention for configured entropy-production-rate metadata checks.",
+    confidence_level="testing",
+    notes="Used only to compare explicitly supplied entropy-production-rate diagnostics to the zero boundary.",
     measurement_method="software configuration",
 )
 
@@ -510,6 +523,158 @@ def validate_reaction_quotient_gibbs_feasibility(
             "max_relative_residual": None,
             "entropy_production_per_mole": entropy_production,
             "entropy_production_units": "joule / mole / kelvin",
+        },
+    )
+
+
+def validate_entropy_production_rate(
+    *,
+    condition_specific_delta_gibbs: Parameter,
+    reaction_extent_rate: Parameter,
+    temperature: Parameter,
+    absolute_tolerance: Quantity | None = None,
+    required: bool = True,
+    allow_unsourced_for_testing: bool = False,
+) -> ValidationResult:
+    """Validate configured entropy-production-rate metadata from explicit inputs.
+
+    Computes ``entropy_production_rate = -delta_g * reaction_extent_rate / T``
+    from caller-supplied, provenance-backed quantities. This is a metadata
+    diagnostic only; it does not infer concentrations, activities, reaction
+    quotients, redox potentials, or solver-time thermodynamic feasibility.
+    """
+
+    tolerance = absolute_tolerance or DEFAULT_ENTROPY_PRODUCTION_RATE_ABSOLUTE_TOLERANCE.quantity
+    tolerance_quantity = assert_compatible(tolerance, "joule / second / kelvin", name="absolute_tolerance")
+    tolerance_value = float(tolerance_quantity.to("joule / second / kelvin").magnitude)
+    base_details = {
+        "reaction_name": "configured explicit entropy-production-rate diagnostic",
+        "residual_name": "entropy_production_rate",
+        "residual_units": "joule / second / kelvin",
+        "absolute_tolerance": tolerance_value,
+        "absolute_tolerance_units": "joule / second / kelvin",
+        "relative_tolerance": None,
+        "scale_value": 1.0,
+        "scale_units": "joule / second / kelvin",
+        "required": required,
+        "dynamic_reaction_quotient": "not_evaluated",
+        "activity_model": "not_evaluated",
+        "solver_time_enforcement": "not_evaluated",
+        "entropy_equation": "entropy_production_rate = -condition_specific_delta_gibbs * reaction_extent_rate / temperature",
+        "supported_scope": (
+            "Configured entropy-production-rate diagnostic from explicit condition-specific delta G, "
+            "reaction extent rate, and temperature metadata."
+        ),
+        "unsupported_scope": (
+            "No inferred activities, reaction quotients, concentrations, redox potentials, electron balances, "
+            "thermodynamic feasibility, or solver-time enforcement."
+        ),
+        "provenance_refs": _parameter_provenance_refs(
+            condition_specific_delta_gibbs,
+            reaction_extent_rate,
+            temperature,
+        ),
+        "evidence": {
+            "condition_specific_delta_gibbs_source": condition_specific_delta_gibbs.source,
+            "reaction_extent_rate_source": reaction_extent_rate.source,
+            "temperature_source": temperature.source,
+            "input_symbols": [
+                condition_specific_delta_gibbs.symbol,
+                reaction_extent_rate.symbol,
+                temperature.symbol,
+            ],
+        },
+        "missing_metadata": [],
+    }
+    try:
+        condition_specific_delta_gibbs.validate_provenance(
+            allow_unsourced_for_testing=allow_unsourced_for_testing
+        )
+        reaction_extent_rate.validate_provenance(allow_unsourced_for_testing=allow_unsourced_for_testing)
+        temperature.validate_provenance(allow_unsourced_for_testing=allow_unsourced_for_testing)
+    except ProvenanceError as exc:
+        return _status_result(
+            name="entropy_production_rate_metadata",
+            status="failed",
+            message=str(exc),
+            required=required,
+            details={**base_details, "error_type": type(exc).__name__},
+        )
+    delta_g_quantity = condition_specific_delta_gibbs.quantity
+    extent_rate_quantity = reaction_extent_rate.quantity
+    temperature_quantity = temperature.quantity
+    missing = []
+    if delta_g_quantity is None:
+        missing.append("condition_specific_delta_gibbs")
+    if extent_rate_quantity is None:
+        missing.append("reaction_extent_rate")
+    if temperature_quantity is None:
+        missing.append("temperature")
+    if missing:
+        return _status_result(
+            name="entropy_production_rate_metadata",
+            status="inconclusive",
+            message="Entropy-production-rate metadata are inconclusive because required quantities are unknown.",
+            required=required,
+            details={**base_details, "missing_metadata": missing},
+        )
+    try:
+        delta_g = assert_compatible(
+            delta_g_quantity,
+            "joule / mole",
+            name=condition_specific_delta_gibbs.symbol,
+        ).to("joule / mole")
+        extent_rate = assert_compatible(
+            extent_rate_quantity,
+            "mole / second",
+            name=reaction_extent_rate.symbol,
+        ).to("mole / second")
+        temperature_k = float(
+            assert_compatible(temperature_quantity, "kelvin", name=temperature.symbol)
+            .to("kelvin")
+            .magnitude
+        )
+    except UnitError as exc:
+        return _status_result(
+            name="entropy_production_rate_metadata",
+            status="failed",
+            message=str(exc),
+            required=required,
+            details={**base_details, "error_type": type(exc).__name__},
+        )
+    if temperature_k <= 0.0:
+        return _status_result(
+            name="entropy_production_rate_metadata",
+            status="failed",
+            message="Temperature must be positive in kelvin for entropy-production-rate diagnostics.",
+            required=required,
+            details={**base_details, "invalid_metadata": ["temperature_nonpositive"], "temperature_K": temperature_k},
+        )
+    delta_g_value = float(delta_g.magnitude)
+    extent_rate_value = float(extent_rate.magnitude)
+    entropy_rate = -delta_g_value * extent_rate_value / temperature_k
+    passed = entropy_rate >= -tolerance_value
+    return _status_result(
+        name="entropy_production_rate_metadata",
+        status="passed" if passed else "failed",
+        message=(
+            "Configured entropy-production-rate diagnostic is non-negative within tolerance."
+            if passed
+            else "Configured entropy-production-rate diagnostic is negative within tolerance."
+        ),
+        required=required,
+        details={
+            **base_details,
+            "condition_specific_delta_gibbs": delta_g_value,
+            "condition_specific_delta_gibbs_units": "joule / mole",
+            "reaction_extent_rate": extent_rate_value,
+            "reaction_extent_rate_units": "mole / second",
+            "temperature_K": temperature_k,
+            "residual_value": entropy_rate,
+            "max_abs_residual": abs(entropy_rate),
+            "max_relative_residual": None,
+            "entropy_production_rate": entropy_rate,
+            "entropy_production_rate_units": "joule / second / kelvin",
         },
     )
 
@@ -984,6 +1149,7 @@ class LimitingCaseSuite:
 
 
 __all__ = [
+    "DEFAULT_ENTROPY_PRODUCTION_RATE_ABSOLUTE_TOLERANCE",
     "DEFAULT_THERMODYNAMIC_ABSOLUTE_TOLERANCE",
     "DEFAULT_VALIDATION_RELATIVE_TOLERANCE",
     "LimitingCase",
@@ -995,6 +1161,7 @@ __all__ = [
     "validate_condition_specific_gibbs_feasibility",
     "validate_electron_balance",
     "validate_elemental_balance",
+    "validate_entropy_production_rate",
     "validate_mass_balance",
     "validate_non_negative",
     "validate_oxygen_limitation",

@@ -35,7 +35,7 @@ basic kinetics layer:
 - stoichiometric and thermodynamic metadata interfaces,
 - carbon conservation, oxygen limitation, and biomass-yield validation checks,
 - explicit reaction-quotient Gibbs feasibility and entropy-production
-  diagnostics for caller-supplied dimensionless Q metadata,
+  diagnostics for caller-supplied dimensionless Q and entropy-rate metadata,
 - configured thermodynamic JSON/CSV summary outputs for explicit Gibbs/entropy
   validation diagnostics,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
