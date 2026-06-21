@@ -68,9 +68,11 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PRODUCT-001 after the validation ingestion gate and
-build-first reframe. Do not rebuild the completed scoped slices above unless
-code or tests contradict this status.
+The current next PR is a scoped THERMO-003 thermodynamics and entropy
+diagnostics notebook after the validation ingestion gate, build-first reframe,
+PRODUCT-001 public API/output slices, and configured thermodynamic JSON/CSV
+outputs. Do not rebuild the completed scoped slices above unless code or tests
+contradict this status.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

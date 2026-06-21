@@ -26,6 +26,36 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Thermodynamics And Entropy Diagnostics Notebook
+
+Date: 2026-06-20
+
+Status: `partial` for dynamic thermodynamic and entropy constraints.
+
+Completed in this pass:
+
+- Added `notebooks/examples/11_thermodynamics_entropy_diagnostics.ipynb`.
+- The notebook builds a tiny configured software-test model from the existing
+  toy homogeneous benchmark, adds an explicit
+  `reaction_quotient_thermodynamic_metadata` validator, runs
+  `run_configured_model(...)`, and inspects `thermodynamic_summary.json` and
+  `thermodynamic_summary.csv`.
+- Added notebook tests proving the file exists, imports public package code,
+  avoids thermodynamics/core implementation internals, executes under
+  `FUNGMOD_NOTEBOOK_OUTPUT_ROOT`, and writes both thermodynamic summary files.
+- Reconciled active README and roadmap-status docs so THERMO-003 example
+  coverage is visible in the current queue.
+
+No scientific or numerical behavior, new biology, inferred activity model,
+inferred reaction quotient, redox-potential model, solver-time thermodynamic
+enforcement, validation data, calibration routine, or empirical validation
+claim was added.
+
+Recommended next task: continue THERMO-003 only with another small generic
+constraint that has explicit configured inputs and tests, or return to BIO-003
+registry-backed case assembly for the already software-tested product
+inhibition mechanism.
+
 ## PRODUCT-001 Public Virtual-Experiment Product Tour Notebook
 
 Date: 2026-06-20

@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-05:
+Scoped status as of PR-06:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -13,8 +13,7 @@ BIO-002: complete for scoped reusable two-step enzyme-chain assembly.
 CASE-001: complete once PR-02 is merged for the researcher-facing named API path.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
-PRODUCT-001: current next for build-first exploratory virtual-experiment
-expansion; partial after top-level environment_grid helper,
+PRODUCT-001: partial after top-level environment_grid helper,
 assumption_summary.csv, modelability_items.csv, and write_preflight_report.
 Virtual-experiment outputs now include mechanism_summary.csv for active process
 laws, maturity, assumptions, limitations, and provenance.
@@ -24,12 +23,16 @@ THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator;
 configured runs now summarize those diagnostics, but there are still no
 inferred activities or solver-time thermodynamic enforcement.
 Thermodynamic summaries are available as JSON and CSV when such validators run.
+Example notebooks now include
+`11_thermodynamics_entropy_diagnostics.ipynb` for configured explicit-Q Gibbs
+and entropy-output inspection without validation claims or solver-time
+enforcement.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier; registry-backed case assembly remains
 pending.
 ```
 
-Current next PR: **PR-05: PRODUCT-001 build-first exploratory virtual-experiment expansion**.
+Current next PR: **PR-06: THERMO-003 thermodynamics and entropy diagnostics notebook**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -51,6 +54,12 @@ blocked cases. They improve the target researcher workflow and make exploratory
 assumptions, uncertain inputs, and preflight facts easier to inspect, but
 runtime pH, temperature, and oxygen grid values remain metadata-only unless an
 explicit response law or condition-specific parameter record is active.
+
+The current THERMO-003 notebook slice should remain configured-output focused:
+explicit caller-supplied dimensionless Q, temperature, and standard Gibbs
+metadata in; `thermodynamic_summary.json` and `.csv` out. It must not infer
+activities, reaction quotients, redox potentials, validation evidence, or
+solver-time thermodynamic enforcement.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the

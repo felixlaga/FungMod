@@ -230,18 +230,22 @@ no longer provide a process-to-`Reaction` adapter bridge.
 ## Notebooks
 
 The `notebooks/examples/` folder contains software-test notebooks for
-configured workflow plumbing plus one researcher-facing exploratory product
-tour. The product tour is not empirical validation:
+configured workflow plumbing, configured thermodynamic-output inspection, plus
+one researcher-facing exploratory product tour. The product tour is not
+empirical validation:
 
 - `00_quickstart.ipynb`
 - `01_config_entity_inspection.ipynb`
 - `02_failure_report.ipynb`
 - `03_configured_outputs.ipynb`
 - `10_virtual_experiment_product_tour.ipynb`
+- `11_thermodynamics_entropy_diagnostics.ipynb`
 
 Notebook tests check that notebooks import `fungal_model`, avoid defining core
-rate laws/classes or low-level solvers inline, and execute every foundation
-notebook smoke path plus the product-tour smoke path.
+rate laws/classes or low-level solvers inline, and execute every foundation,
+product-tour, and thermodynamic-output smoke path. The thermodynamics notebook
+uses configured explicit-Q Gibbs metadata only; it does not infer activities,
+reaction quotients, redox potentials, or solver-time thermodynamic enforcement.
 
 ## Data And Configs
 
