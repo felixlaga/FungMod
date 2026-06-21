@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import shutil
 import socket
 from pathlib import Path
@@ -9,9 +10,13 @@ from typing import Any, cast
 import pytest
 import yaml
 
-from fungal_model import VirtualExperiment
+from fungal_model import ConfiguredModelExecutionError, VirtualExperiment
 from fungal_model.registry import load_registry
-from fungal_model.screening import build_model_config_from_registry_case
+from fungal_model.screening import (
+    EnzymeChainAssemblyError,
+    build_extracellular_enzyme_chain_config,
+    build_model_config_from_registry_case,
+)
 from fungal_model.screening.ensemble import simulate_screen
 from fungal_model.workflows import run_configured_model
 
@@ -97,6 +102,79 @@ def test_bio001_assembles_and_simulates_from_template(tmp_path: Path) -> None:
     assert {"solid_substrate_remaining", "soluble_product_amount", "free_enzyme_concentration"} <= set(sample.final_states)
 
 
+def test_registry_chain_template_emits_configured_product_inhibition_modifier(tmp_path: Path) -> None:
+    registry_dir = _registry_with_bio002_product_inhibition(tmp_path)
+    output_dir = tmp_path / "bio003_registry_product_inhibition"
+
+    study = VirtualExperiment.from_registry(
+        fungi=BIO_FUNGUS_ID,
+        substrates=BIO_SUBSTRATE_ID,
+        environments=REACTION_ENVIRONMENT_ID,
+        registry=registry_dir / "registry_index.yml",
+    )
+    result = study.simulate(mode="exploratory", n_samples=1, seed=31, output_dir=output_dir, quicklook=False)
+    sample = result.screen_result.case_results[0].samples[0]
+    config_data = _yaml_mapping(Path(sample.config_path))
+    sample_output = Path(sample.output_directory)
+    metadata = json.loads((sample_output / "configured_metadata.json").read_text(encoding="utf-8"))
+    assumptions = json.loads((sample_output / "assumptions.json").read_text(encoding="utf-8"))
+    mechanism_rows = _csv_rows(output_dir / "mechanism_summary.csv")
+
+    inhibited_process = config_data["processes"][1]
+    assert inhibited_process["id"] == "bio002_cellobiose_to_glucose_mm"
+    assert inhibited_process["modifiers"] == [
+        {
+            "type": "product_inhibition",
+            "product_state": "beta_D_glucose_concentration",
+            "inhibition_constant": "K_i_bio003_product_fixture",
+        }
+    ]
+    assert metadata["configured_process_modifiers"] == [
+        {
+            "process_id": "bio002_cellobiose_to_glucose_mm",
+            "modifier_index": 0,
+            "type": "product_inhibition",
+            "product_state": "beta_D_glucose_concentration",
+            "inhibition_constant": "K_i_bio003_product_fixture",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Single-product reversible inhibition only; configured only when product_state "
+                "and positive unit-compatible K_i are explicit."
+            ),
+        }
+    ]
+    assert any(item["name"] == "reversible product inhibition modifier" for item in assumptions)
+    assert any(
+        row["mechanism_kind"] == "rate_modifier"
+        and row["mechanism_id"] == "product_inhibition"
+        and row["parameters"] == "inhibition_constant:K_i_bio003_product_fixture"
+        for row in mechanism_rows
+    )
+
+
+def test_registry_product_inhibition_requires_explicit_ki_record(tmp_path: Path) -> None:
+    registry_dir = _registry_with_bio002_product_inhibition(tmp_path, include_ki_record=False)
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="Unknown parameter record"):
+        build_extracellular_enzyme_chain_config(registry=registry)
+
+
+def test_registry_product_inhibition_rejects_non_positive_ki_without_fallback(tmp_path: Path) -> None:
+    registry_dir = _registry_with_bio002_product_inhibition(tmp_path, ki_value=0.0)
+    registry = load_registry(registry_dir / "registry_index.yml")
+    config = build_extracellular_enzyme_chain_config(registry=registry, output_directory=tmp_path / "bad_ki")
+    config_path = tmp_path / "bad_ki.yml"
+    config_path.write_text(yaml.safe_dump(config.to_dict(), sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "bad_ki")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "model_execution"
+    assert "Product inhibition constant must be positive" in report["message"]
+
+
 def test_output_tables_preserve_template_biological_states_and_metrics(tmp_path: Path) -> None:
     output_dir = tmp_path / "reaction_618_tables"
     study = VirtualExperiment.from_registry(
@@ -166,6 +244,75 @@ def test_config_driven_case_assembly_uses_no_live_external_api(monkeypatch: pyte
         seed=9,
         output_dir=tmp_path / "screen",
     )
+
+
+def _registry_with_bio002_product_inhibition(
+    tmp_path: Path,
+    *,
+    include_ki_record: bool = True,
+    ki_value: float = 2.0,
+) -> Path:
+    registry_dir = _copy_registry(tmp_path)
+    template_path = registry_dir / "case_templates" / "case_templates.yml"
+    template_data = _yaml_mapping(template_path)
+    records = cast(list[dict[str, Any]], template_data["records"])
+    for record in records:
+        if record["record_id"] == "bio002_extracellular_enzyme_chain_template":
+            metadata = record["process_state_metadata"]
+            metadata["parameter_record_ids"]["product_inhibition_constant"] = "bio003_fixture_product_inhibition_constant"
+            metadata["process_templates"][1]["modifiers"] = [
+                {
+                    "type": "product_inhibition",
+                    "product_state_role": "product",
+                    "inhibition_constant_role": "product_inhibition_constant",
+                }
+            ]
+            record["limitations"].append(
+                "Optional BIO-003 software-test product inhibition uses a configured K_i fixture only; it is not validation data."
+            )
+            break
+    else:
+        raise AssertionError("Missing BIO-002 chain template")
+    template_path.write_text(yaml.safe_dump(template_data, sort_keys=False), encoding="utf-8")
+
+    if include_ki_record:
+        parameter_path = registry_dir / "parameters" / "parameter_records.yml"
+        parameter_data = _yaml_mapping(parameter_path)
+        cast(list[dict[str, Any]], parameter_data["records"]).insert(
+            0,
+            {
+                "record_id": "bio003_fixture_product_inhibition_constant",
+                "name": "BIO-003 configured product inhibition K_i fixture",
+                "maturity": "toy_development",
+                "provenance": {
+                    "source": "FungMod BIO-003 registry product-inhibition software test fixture.",
+                    "confidence_level": "testing",
+                    "bio_milestone": "BIO-003",
+                    "notes": "Artificial K_i value used only to verify registry-backed modifier assembly.",
+                },
+                "parameter_symbol": "K_i_bio003_product_fixture",
+                "process_type": "homogeneous_michaelis_menten",
+                "enzyme_class": None,
+                "substrate_class": None,
+                "fungus_id": None,
+                "substrate_id": None,
+                "environment_id": None,
+                "value": {
+                    "kind": "exact",
+                    "value": ki_value,
+                    "units": "mM",
+                    "source": "FungMod BIO-003 registry product-inhibition software test fixture.",
+                    "confidence_level": "testing",
+                    "notes": "Artificial value for configured product-inhibition tests; not validation data.",
+                },
+                "range_scope": "software_test_fixture",
+                "range_interpretation": "configured mechanics only",
+                "allowed_use": "software_testing_only_not_scientific_validation",
+                "notes": "Fixture K_i for proving explicit registry-backed product-inhibition assembly.",
+            },
+        )
+        parameter_path.write_text(yaml.safe_dump(parameter_data, sort_keys=False), encoding="utf-8")
+    return registry_dir
 
 
 def _registry_with_exact_enzyme_concentration(tmp_path: Path):

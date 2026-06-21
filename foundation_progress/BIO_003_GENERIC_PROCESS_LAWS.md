@@ -22,15 +22,14 @@ foundation_progress/proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml
 
 This target was selected because the repository already contains a generic
 `ProductInhibitionModifier` with unit/provenance-aware behavior. It is now
-available to configured process assembly as an explicit generic rate modifier;
-registry-backed case assembly remains future work.
+available to configured process assembly as an explicit generic rate modifier,
+and registry-backed case templates can expose it when explicit product-state
+and `K_i` parameter records exist.
 
 ## Required next implementation scope
 
-The next implementation PR after the configured support slice should:
+The next implementation PR after this registry-backed assembly slice should:
 
-- expose reversible product inhibition through registry-backed case assembly
-  where explicit records exist;
 - add researcher-facing virtual-experiment examples or notebooks that use only
   public APIs;
 - keep missing or unknown `K_i` explicit rather than guessing a fallback;
@@ -58,3 +57,6 @@ This scoped slice can be marked complete only when:
 - tests ensure the selected mechanism remains generic and explicitly scoped;
 - configured workflow tests show the mechanism scales rates only when explicit
   product-state and `K_i` inputs are provided.
+- registry-backed case-assembly tests show explicit template modifier records
+  flow into configured outputs and `mechanism_summary.csv` without fallback
+  inhibition constants.

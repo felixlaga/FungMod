@@ -68,8 +68,9 @@ tests_required:
   - Configured workflow test on a homogeneous benchmark process.
   - Second materially different non-specific test on a chain or surface-compatible process.
   - Output-table test that active modifier assumptions, parameters, and limitations are visible.
+  - Registry-backed case-assembly test where explicit modifier and K_i records emit configured process modifiers.
 limitations:
-  - This mechanism is software-tested for explicit configured process modifiers, but registry-backed case assembly remains future work.
+  - This mechanism is software-tested for explicit configured process modifiers and registry-backed case assembly where explicit records exist.
   - Configured support requires explicit product_state and a positive unit-compatible K_i; no fallback inhibition constants are inferred.
   - Empirical interpretation requires evidence-backed K_i records or clearly marked exploratory priors.
 demo_case:

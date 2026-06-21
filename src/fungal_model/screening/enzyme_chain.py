@@ -513,9 +513,63 @@ def _process_config(
         "states": states,
         "parameters": parameters,
         "product_map": product_map,
+        "modifiers": _process_modifiers(spec, chain=chain, process_id=process_id),
         "output_state_roles": dict(chain.state_roles),
         "assumptions": [str(item) for item in spec.get("assumptions", ()) or ()],
     }
+
+
+def _process_modifiers(
+    spec: Mapping[str, Any],
+    *,
+    chain: ChainTemplateSpec,
+    process_id: str,
+) -> list[dict[str, Any]]:
+    modifiers: list[dict[str, Any]] = []
+    for index, modifier in enumerate(
+        _mapping_sequence(spec.get("modifiers"), field_name=f"process_template {process_id}.modifiers", allow_empty=True)
+    ):
+        modifier_type = _required_text(
+            modifier,
+            "type",
+            field_name=f"process_template {process_id}.modifiers[{index}]",
+        )
+        if modifier_type != "product_inhibition":
+            raise EnzymeChainAssemblyError(
+                f"Process template {process_id!r} declares unsupported modifier type {modifier_type!r}."
+            )
+        product_role = _required_text(
+            modifier,
+            "product_state_role",
+            field_name=f"process_template {process_id}.modifiers[{index}]",
+        )
+        try:
+            product_state = chain.state_roles[product_role]
+        except KeyError as exc:
+            raise EnzymeChainAssemblyError(
+                f"Process template {process_id!r} product_inhibition modifier references unknown "
+                f"product_state_role {product_role!r}."
+            ) from exc
+        inhibition_role = _required_text(
+            modifier,
+            "inhibition_constant_role",
+            field_name=f"process_template {process_id}.modifiers[{index}]",
+        )
+        try:
+            inhibition_constant = chain.parameter_records[inhibition_role].parameter_symbol
+        except KeyError as exc:
+            raise EnzymeChainAssemblyError(
+                f"Process template {process_id!r} product_inhibition modifier references unknown "
+                f"inhibition_constant_role {inhibition_role!r}."
+            ) from exc
+        modifiers.append(
+            {
+                "type": "product_inhibition",
+                "product_state": product_state,
+                "inhibition_constant": inhibition_constant,
+            }
+        )
+    return modifiers
 
 
 def _validate_product_map_ids(template: CaseTemplateRecord, specs: Sequence[Mapping[str, Any]]) -> None:
@@ -602,6 +656,43 @@ def _validate_process_templates(
                 f"Template {template.case_template_id!r} process {process_id!r} references unknown product map "
                 f"{product_map!r}."
             )
+        for index, modifier in enumerate(
+            _mapping_sequence(
+                spec.get("modifiers"),
+                field_name=f"process_template {process_id}.modifiers",
+                allow_empty=True,
+            )
+        ):
+            modifier_type = _required_text(
+                modifier,
+                "type",
+                field_name=f"process_template {process_id}.modifiers[{index}]",
+            )
+            if modifier_type != "product_inhibition":
+                raise EnzymeChainAssemblyError(
+                    f"Template {template.case_template_id!r} process {process_id!r} declares unsupported "
+                    f"modifier type {modifier_type!r}."
+                )
+            product_role = _required_text(
+                modifier,
+                "product_state_role",
+                field_name=f"process_template {process_id}.modifiers[{index}]",
+            )
+            if product_role not in state_roles:
+                raise EnzymeChainAssemblyError(
+                    f"Template {template.case_template_id!r} process {process_id!r} modifier references unknown "
+                    f"product_state_role {product_role!r}."
+                )
+            inhibition_role = _required_text(
+                modifier,
+                "inhibition_constant_role",
+                field_name=f"process_template {process_id}.modifiers[{index}]",
+            )
+            if inhibition_role not in parameter_records:
+                raise EnzymeChainAssemblyError(
+                    f"Template {template.case_template_id!r} process {process_id!r} modifier references unknown "
+                    f"inhibition_constant_role {inhibition_role!r}."
+                )
 
 
 def _conservation_spec(
@@ -1238,8 +1329,12 @@ def _mapping(value: Any, *, field_name: str, allow_empty: bool = False) -> Mappi
     raise EnzymeChainAssemblyError(f"{field_name} must be a mapping.")
 
 
-def _mapping_sequence(value: Any, *, field_name: str) -> tuple[Mapping[str, Any], ...]:
+def _mapping_sequence(value: Any, *, field_name: str, allow_empty: bool = False) -> tuple[Mapping[str, Any], ...]:
+    if allow_empty and value is None:
+        return ()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)) or not value:
+        if allow_empty and value == []:
+            return ()
         raise EnzymeChainAssemblyError(f"{field_name} must be a non-empty sequence.")
     if not all(isinstance(item, Mapping) for item in value):
         raise EnzymeChainAssemblyError(f"{field_name} entries must be mappings.")
