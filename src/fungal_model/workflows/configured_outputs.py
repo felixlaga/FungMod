@@ -278,6 +278,10 @@ def _is_thermodynamic_validation(item: Mapping[str, Any]) -> bool:
 def _thermodynamic_summary_row(item: Mapping[str, Any]) -> dict[str, Any]:
     details = item.get("details", {})
     details_map = details if isinstance(details, Mapping) else {}
+    residual_name = details_map.get("residual_name", "")
+    is_gibbs_residual = str(residual_name).endswith("delta_gibbs")
+    residual_value = details_map.get("residual_value", "")
+    residual_units = details_map.get("residual_units", "")
     return {
         "name": item.get("name", ""),
         "status": item.get("status", ""),
@@ -286,9 +290,11 @@ def _thermodynamic_summary_row(item: Mapping[str, Any]) -> dict[str, Any]:
         "required": bool(item.get("required")),
         "message": item.get("message", ""),
         "reaction_name": details_map.get("reaction_name", ""),
-        "residual_name": details_map.get("residual_name", ""),
-        "delta_gibbs": details_map.get("residual_value", ""),
-        "delta_gibbs_units": details_map.get("residual_units", ""),
+        "residual_name": residual_name,
+        "residual_value": residual_value,
+        "residual_units": residual_units,
+        "delta_gibbs": residual_value if is_gibbs_residual else "",
+        "delta_gibbs_units": residual_units if is_gibbs_residual else "",
         "standard_delta_gibbs": details_map.get("standard_delta_gibbs", ""),
         "reaction_quotient": details_map.get("reaction_quotient", ""),
         "temperature_K": details_map.get("temperature_K", ""),

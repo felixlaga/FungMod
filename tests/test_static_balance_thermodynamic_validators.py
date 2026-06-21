@@ -385,9 +385,13 @@ def test_configured_reaction_quotient_validator_writes_thermodynamic_summary(tmp
     assert "No inferred activity model" in summary["unsupported_scope"]
     assert summary["rows"][0]["gibbs_equation"] == "delta_g = delta_g_standard + R*T*ln(Q)"
     assert summary["rows"][0]["entropy_production_per_mole"] == pytest.approx(5000.0 / 298.15)
+    assert summary["rows"][0]["delta_gibbs"] == pytest.approx(-5000.0)
+    assert summary["rows"][0]["residual_value"] == pytest.approx(-5000.0)
     assert csv_rows[0]["name"] == "reaction_quotient_thermodynamic_feasibility"
     assert csv_rows[0]["gibbs_equation"] == "delta_g = delta_g_standard + R*T*ln(Q)"
     assert float(csv_rows[0]["entropy_production_per_mole"]) == pytest.approx(5000.0 / 298.15)
+    assert float(csv_rows[0]["delta_gibbs"]) == pytest.approx(-5000.0)
+    assert float(csv_rows[0]["residual_value"]) == pytest.approx(-5000.0)
     assert "thermodynamic_summary.json" in manifest["files"]
     assert "thermodynamic_summary.csv" in manifest["files"]
 
@@ -434,8 +438,16 @@ def test_configured_entropy_production_rate_validator_writes_thermodynamic_summa
         "reaction_extent_rate / temperature"
     )
     assert summary["rows"][0]["entropy_production_rate"] == pytest.approx(20.0 / 298.15)
+    assert summary["rows"][0]["residual_value"] == pytest.approx(20.0 / 298.15)
+    assert summary["rows"][0]["residual_units"] == "joule / second / kelvin"
+    assert summary["rows"][0]["delta_gibbs"] == ""
+    assert summary["rows"][0]["delta_gibbs_units"] == ""
     assert csv_rows[0]["name"] == "entropy_production_rate_metadata"
     assert float(csv_rows[0]["entropy_production_rate"]) == pytest.approx(20.0 / 298.15)
+    assert float(csv_rows[0]["residual_value"]) == pytest.approx(20.0 / 298.15)
+    assert csv_rows[0]["residual_units"] == "joule / second / kelvin"
+    assert csv_rows[0]["delta_gibbs"] == ""
+    assert csv_rows[0]["delta_gibbs_units"] == ""
     assert csv_rows[0]["solver_time_enforcement"] == "not_evaluated"
     assert "thermodynamic_summary.json" in manifest["files"]
     assert "thermodynamic_summary.csv" in manifest["files"]
