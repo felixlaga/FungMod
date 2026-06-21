@@ -154,10 +154,11 @@ def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:
     roadmap = _read(ACTIVE_ROADMAP)
 
     current_next = "PR-06: THERMO-003 thermodynamics and entropy diagnostics notebook"
-    for text in (status, next_steps):
+    for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
         assert "PR-04" not in _current_next_lines(text)
+        assert "PR-05" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset | deferred; blocked/partial" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
