@@ -26,6 +26,41 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## BIO-003 Researcher-Facing Product Inhibition Example
+
+Date: 2026-06-21
+
+Status: `partial/software-tested` for broad BIO-003; complete for the scoped
+researcher-facing example gap on the selected reversible-product-inhibition
+target once this PR is merged.
+
+Completed in this pass:
+
+- Added `notebooks/examples/12_reversible_product_inhibition_example.ipynb`.
+- Added `fungal_model.examples.prepare_reversible_product_inhibition_example_registry(...)`
+  to prepare an explicit copied example registry fixture with a
+  provenance-labelled exploratory `K_i`.
+- The notebook compares inhibited and uninhibited exploratory virtual
+  experiments through `virtual_experiment(...)`, then inspects
+  `mechanism_summary.csv`, configured metadata, limitations, and final metrics.
+- Added focused tests proving the example runs offline through public
+  researcher-facing names, exposes the active `product_inhibition` rate
+  modifier, records the example as non-validation data, and reduces final
+  product concentration relative to the uninhibited deterministic run.
+- Extended notebook smoke tests so the new example executes under
+  `FUNGMOD_NOTEBOOK_OUTPUT_ROOT`.
+
+No generic/core process behavior, numerical solver behavior, organism-specific
+inhibition behavior, substrate-specific shortcut, competitive/uncompetitive/
+mixed/multi-product inhibition, toxicity, uptake, secretion, biomass,
+physiology, validation data, calibration routine, empirical comparison claim,
+or fallback inhibition constant was added.
+
+Recommended next task: after this PR is reviewed and merged, select the next
+small BIO-003 mechanism-family candidate only if it can be implemented with
+explicit provenance, maturity labels, tests, and honest limitations; otherwise
+return to PRODUCT-001 output ergonomics or deferred validation-data gate work.
+
 ## THERMO-003 Configured Entropy-Production-Rate Diagnostic
 
 Date: 2026-06-21

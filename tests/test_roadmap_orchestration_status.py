@@ -104,6 +104,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "10_virtual_experiment_product_tour.ipynb" in next_steps
     assert "11_thermodynamics_entropy_diagnostics.ipynb" in status
     assert "11_thermodynamics_entropy_diagnostics.ipynb" in next_steps
+    assert "12_reversible_product_inhibition_example.ipynb" in status
+    assert "12_reversible_product_inhibition_example.ipynb" in next_steps
     assert "thermodynamic_summary.json" in status
     assert "thermodynamic_summary.csv" in status
     assert "Validation remains important" in status
@@ -131,6 +133,10 @@ def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> 
     assert "validation_status: software_tested" in proposal
     assert "Configured model processes can now opt into it" in next_steps
     assert "registry-backed case assembly" in progress
+    assert "complete for the scoped" in progress
+    assert "researcher-facing example gap on the selected reversible-product-inhibition" in progress
+    assert "researcher-facing example for this reversible-product-inhibition target" in next_steps
+    assert "covered by `notebooks/examples/12_reversible_product_inhibition_example.ipynb`" in next_steps
     assert "No organism-specific inhibition behavior" in progress
 
 

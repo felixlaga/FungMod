@@ -1208,9 +1208,13 @@ honest about assumptions and limitations.
 Current scoped BIO-003 status: generic reversible product inhibition is
 software-tested for configured process modifiers and registry-backed
 case-template assembly when explicit product-state and positive unit-compatible
-`K_i` records exist. This does not add organism-specific inhibition behavior,
-toxicity, uptake, secretion, biomass, physiology, calibration, validation, or
-fallback inhibition constants.
+`K_i` records exist. The scoped researcher-facing example notebook
+`notebooks/examples/12_reversible_product_inhibition_example.ipynb` now
+compares inhibited and uninhibited exploratory virtual experiments and shows
+where to inspect mechanism summaries, configured metadata, limitations, and
+final metrics. This does not add organism-specific inhibition behavior,
+toxicity, uptake, secretion, biomass, physiology, calibration, validation,
+multi-product inhibition, or fallback inhibition constants.
 
 ---
 
