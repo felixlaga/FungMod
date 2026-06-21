@@ -613,7 +613,80 @@ def _mechanism_summary_rows(
         report=report,
         role_records=role_records,
     )
-    return [{**_case_columns(context), "mechanism_index": 0, **mechanism}]
+    rows = [{**_case_columns(context), "mechanism_index": 0, **mechanism}]
+    rows.extend(_rate_modifier_mechanism_rows(context=context, case=case, start_index=len(rows)))
+    return rows
+
+
+def _rate_modifier_mechanism_rows(
+    *,
+    context: Mapping[str, Any],
+    case: RegistryCaseEnsemble,
+    start_index: int,
+) -> list[dict[str, Any]]:
+    if not case.samples:
+        return []
+    config_path = Path(case.samples[0].config_path)
+    if not config_path.exists():
+        return []
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    if not isinstance(data, Mapping):
+        return []
+    process_configs = data.get("processes", [])
+    if not isinstance(process_configs, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for process in process_configs:
+        if not isinstance(process, Mapping):
+            continue
+        process_id = str(process.get("id", ""))
+        modifiers = process.get("modifiers", [])
+        if not isinstance(modifiers, list):
+            continue
+        for modifier in modifiers:
+            if not isinstance(modifier, Mapping):
+                continue
+            modifier_type = str(modifier.get("type") or modifier.get("modifier_type") or "")
+            if modifier_type != "product_inhibition":
+                continue
+            product_state = str(modifier.get("product_state", ""))
+            inhibition_constant = str(
+                modifier.get("inhibition_constant")
+                or modifier.get("inhibition_constant_symbol")
+                or modifier.get("K_i")
+                or ""
+            )
+            rows.append(
+                {
+                    **_case_columns(context),
+                    "mechanism_index": start_index + len(rows),
+                    "mechanism_kind": "rate_modifier",
+                    "mechanism_id": modifier_type,
+                    "mechanism_family": "generic reversible product inhibition modifier",
+                    "active": True,
+                    "maturity": "software_tested_exploratory_configured_mechanism",
+                    "configured_by": process_id,
+                    "equation_or_law": "rate_multiplier = 1 / (1 + product / K_i)",
+                    "state_variables": f"inhibitor_product:{product_state}",
+                    "parameters": f"inhibition_constant:{inhibition_constant}",
+                    "assumptions": "Configured only when product_state and positive unit-compatible K_i are explicit.",
+                    "limitations": (
+                        "Single-product reversible inhibition only; no competitive, uncompetitive, mixed, "
+                        "toxicity, uptake, secretion, biomass, physiology, calibration, or validation claim."
+                    ),
+                    "provenance": json.dumps(
+                        {
+                            "process_id": process_id,
+                            "modifier_type": modifier_type,
+                            "product_state": product_state,
+                            "inhibition_constant": inhibition_constant,
+                            "source": "assembled_model_config",
+                        },
+                        sort_keys=True,
+                    ),
+                }
+            )
+    return rows
 
 
 def _process_mechanism_descriptor(

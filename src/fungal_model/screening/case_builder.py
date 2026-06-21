@@ -443,6 +443,56 @@ def _process_assumptions(case_template: CaseTemplateRecord, fallback: tuple[str,
     return list(case_template.limitations or fallback)
 
 
+def _template_process_modifiers(
+    *,
+    case_template: CaseTemplateRecord,
+    parameter_records: Mapping[str, ParameterRecord],
+) -> list[dict[str, Any]]:
+    modifiers = case_template.process_state_metadata.get("process_modifiers")
+    if modifiers is None:
+        return []
+    if not isinstance(modifiers, list) or any(not isinstance(item, Mapping) for item in modifiers):
+        raise RegistryCaseBuildError(
+            f"Case template {case_template.case_template_id!r} process_modifiers must be a sequence of mappings."
+        )
+    configured: list[dict[str, Any]] = []
+    for index, modifier in enumerate(modifiers):
+        modifier_type = str(modifier.get("type", "")).strip()
+        if modifier_type != "product_inhibition":
+            raise RegistryCaseBuildError(
+                f"Case template {case_template.case_template_id!r} declares unsupported modifier type "
+                f"{modifier_type!r}."
+            )
+        product_role = str(modifier.get("product_state_role", "")).strip()
+        if not product_role:
+            raise RegistryCaseBuildError(
+                f"Case template {case_template.case_template_id!r} process_modifiers[{index}] requires "
+                "product_state_role."
+            )
+        product_state = _template_state(case_template, product_role)
+        inhibition_role = str(modifier.get("inhibition_constant_role", "")).strip()
+        if not inhibition_role:
+            raise RegistryCaseBuildError(
+                f"Case template {case_template.case_template_id!r} process_modifiers[{index}] requires "
+                "inhibition_constant_role."
+            )
+        try:
+            inhibition_constant = parameter_records[inhibition_role].parameter_symbol
+        except KeyError as exc:
+            raise RegistryCaseBuildError(
+                f"Case template {case_template.case_template_id!r} modifier references unresolved "
+                f"inhibition_constant_role {inhibition_role!r}."
+            ) from exc
+        configured.append(
+            {
+                "type": "product_inhibition",
+                "product_state": product_state,
+                "inhibition_constant": inhibition_constant,
+            }
+        )
+    return configured
+
+
 def _template_config_name(
     *,
     case_template: CaseTemplateRecord,
@@ -594,6 +644,10 @@ def _surface_catalysis_config_data(
                     if role in SURFACE_CATALYSIS_PARAMETER_ROLES
                 },
                 "product_map": product_map_id,
+                "modifiers": _template_process_modifiers(
+                    case_template=case_template,
+                    parameter_records=parameter_records,
+                ),
                 "output_state_roles": dict(case_template.output_state_roles),
                 "assumptions": _process_assumptions(
                     case_template,
@@ -900,6 +954,10 @@ def _homogeneous_mm_config_data(
                     "kcat": parameter_records["kcat"].parameter_symbol,
                     "rate_units": rate_units,
                 },
+                "modifiers": _template_process_modifiers(
+                    case_template=case_template,
+                    parameter_records=parameter_records,
+                ),
                 "output_state_roles": dict(case_template.output_state_roles),
                 "assumptions": _process_assumptions(
                     case_template,

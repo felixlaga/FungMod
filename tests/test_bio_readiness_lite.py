@@ -145,8 +145,15 @@ def test_real_bio003_product_inhibition_proposal_stays_generic_and_proposed() ->
     assert proposal["validation_status"] == "software_tested"
     assert "generic" in proposal["general_process_family"]
     assert "1 / (1 + P / K_i)" in proposal["mathematical_law"]
-    assert "registry-backed case assembly remains future work" in " ".join(proposal["limitations"])
-    assert "Organism-specific inhibition behavior" in " ".join(proposal["not_in_scope"])
+    limitations = " ".join(proposal["limitations"])
+    not_in_scope = " ".join(proposal["not_in_scope"])
+    assert "registry-backed case assembly where explicit records exist" in limitations
+    assert "positive unit-compatible K_i" in limitations
+    assert "no fallback inhibition constants are inferred" in limitations
+    assert "evidence-backed K_i records or clearly marked exploratory priors" in limitations
+    assert "not a specific organism, substrate, enzyme, or experiment" in proposal["mathematical_law"]
+    assert "Organism-specific inhibition behavior" in not_in_scope
+    assert "Dataset curation or empirical validation" in not_in_scope
 
 
 def _valid_proposal() -> dict[str, Any]:

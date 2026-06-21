@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-06:
+Scoped status as of PR-07:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -30,11 +30,11 @@ Example notebooks now include
 and entropy-output inspection without validation claims or solver-time
 enforcement.
 BIO-003: partial/software-tested for generic reversible product inhibition as
-an explicit configured process modifier; registry-backed case assembly remains
-pending.
+an explicit configured process modifier and registry-backed case-template
+assembly when explicit product-state and K_i records exist.
 ```
 
-Current next PR: **PR-06: THERMO-003 thermodynamics and entropy diagnostics notebook**.
+Current next PR: **PR-07: BIO-003 registry-backed product inhibition assembly**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -68,7 +68,9 @@ The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
 machine-checkable `proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml`.
 Configured model processes can now opt into it with explicit `product_state`
-and positive unit-compatible `K_i`; registry-backed case assembly and
-researcher-facing examples remain pending.
+and positive unit-compatible `K_i`. Registry-backed case templates can now
+carry explicit product-inhibition modifiers into configured runs and standard
+mechanism summaries when product-state and `K_i` records exist; researcher-facing
+examples remain pending.
 
 `old_progress/` is historical and non-binding.

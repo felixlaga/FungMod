@@ -46,6 +46,7 @@ def test_second_unrelated_chain_assembles_runs_and_writes_tables(tmp_path: Path)
         "x_surface_to_y_fixture",
         "y_to_z_homogeneous_fixture",
     ]
+    assert all(process.modifiers == () for process in config.processes)
     product_maps = {reference.id: reference.data for reference in config.entities.product_maps}
     assert product_maps["x_to_y_fixture_map"]["products"] == {"oligomer_y_pool": 1.5}
     assert product_maps["y_to_z_fixture_map"]["products"] == {"monomer_z_pool": 3.0}

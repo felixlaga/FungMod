@@ -71,6 +71,9 @@ basic kinetics layer:
 - schema-versioned virtual-experiment output tables with provenance,
   mechanism-summary, limitations, missing-parameter, suggested-experiment, and
   range-use fields;
+- mechanism summaries that can expose active configured rate modifiers such as
+  explicit reversible product inhibition when registry-backed case templates
+  provide product-state and positive unit-compatible `K_i` records;
 - an offline-first SABIO-RK source adapter that loads frozen kinetic-law
   snapshots and writes review-only proposed records without mutating the
   simulation registry;

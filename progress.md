@@ -60,6 +60,37 @@ first-principles diagnostic has explicit configured inputs and tests, or move
 to BIO-003 registry-backed case assembly for the already software-tested
 product inhibition mechanism.
 
+## BIO-003 Registry-Backed Product Inhibition Assembly
+
+Date: 2026-06-21
+
+Status: `partial/software-tested` for registry-backed assembly of the first
+BIO-003 generic mechanism family where explicit records exist.
+
+Completed in this pass:
+
+- Extended registry-backed case-template assembly so explicit product
+  inhibition modifier metadata maps into configured process `modifiers`.
+- Supported chain process-template modifiers with explicit
+  `product_state_role` and `inhibition_constant_role`, and one-process
+  registry templates through `process_state_metadata.process_modifiers`.
+- Added `mechanism_summary.csv` rate-modifier rows for active assembled
+  product-inhibition modifiers in virtual-experiment outputs.
+- Added focused copied-registry tests proving explicit registry template
+  records emit configured modifiers, configured outputs expose modifier
+  metadata, standard mechanism summaries show the active rate modifier, missing
+  K_i records fail explicitly, non-positive K_i fails without fallback, and an
+  unrelated non-specific chain remains unaffected.
+
+No organism-specific inhibition behavior, substrate-specific shortcut,
+competitive/uncompetitive/mixed inhibition, toxicity, uptake, secretion,
+biomass, physiology, validation data, calibration routine, empirical
+comparison claim, or fallback inhibition constant was added.
+
+Recommended next task: add a public BIO-003 example or notebook that compares
+explicit inhibited and uninhibited exploratory runs while preserving the
+configured-mechanics and no-validation limitations.
+
 ## THERMO-003 Thermodynamics And Entropy Diagnostics Notebook
 
 Date: 2026-06-20
