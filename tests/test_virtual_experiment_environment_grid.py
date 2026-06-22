@@ -54,6 +54,7 @@ def test_virtual_experiment_expands_environment_grid_and_writes_environment_tabl
         "assumption_summary.csv",
         "summary_metrics.csv",
         "environment_summary.csv",
+        "comparison_summary.csv",
         "provenance_table.csv",
         "limitations_table.csv",
         "missing_parameters.csv",
@@ -66,6 +67,7 @@ def test_virtual_experiment_expands_environment_grid_and_writes_environment_tabl
 
     time_rows = _csv_rows(output_dir / "time_series_long.csv")
     summary_rows = _csv_rows(output_dir / "environment_summary.csv")
+    comparison_rows = _csv_rows(output_dir / "comparison_summary.csv")
     limitation_rows = _csv_rows(output_dir / "limitations_table.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
 
@@ -89,6 +91,18 @@ def test_virtual_experiment_expands_environment_grid_and_writes_environment_tabl
     assert {row["environment_response_metric_status"] for row in summary_rows} == {"not_applicable_metadata_only"}
     assert all(row["median_final_substrate_degraded_fraction"] == "" for row in summary_rows)
     assert all("cannot be ranked" in row["environment_guardrail"] for row in summary_rows)
+    assert {row["comparison_allowed"] for row in comparison_rows} == {"false"}
+    assert {row["ranking_allowed"] for row in comparison_rows} == {"false"}
+    assert all("cannot be ranked" in row["ranking_blocking_reason"] for row in comparison_rows)
+    assert {row["recommended_next_action"] for row in comparison_rows} == {
+        "inspect_source_rows_only_do_not_rank_or_plot_as_response"
+    }
+    assert any(
+        row["source_table"] == "final_metrics"
+        and row["source_metric"] == "final_substrate_degraded_fraction"
+        and row["value"]
+        for row in comparison_rows
+    )
     assert all(row["environment_source"] == "runtime_environment_grid" for row in summary_rows)
     assert all(row["n_cases"] == "1" for row in summary_rows)
     assert all(row["n_samples"] == "2" for row in summary_rows)

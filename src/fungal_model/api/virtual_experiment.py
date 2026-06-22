@@ -288,6 +288,11 @@ class DegradationScreenResult:
 
         return self._table_rows("mechanism_summary", "mechanism_summary.csv")
 
+    def comparison_summary(self) -> list[dict[str, str]]:
+        """Load the guarded screen-comparison summary without rerunning simulation."""
+
+        return self._table_rows("comparison_summary", "comparison_summary.csv")
+
     def provenance(self) -> list[dict[str, str]]:
         """Load the standard provenance table without rerunning simulation."""
 

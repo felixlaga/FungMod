@@ -53,6 +53,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "mechanism_summary.csv",
         "summary_metrics.csv",
         "environment_summary.csv",
+        "comparison_summary.csv",
         "provenance_table.csv",
         "limitations_table.csv",
         "missing_parameters.csv",
@@ -77,6 +78,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assumption_rows = _csv_rows(output_dir / "assumption_summary.csv")
     mechanism_rows = _csv_rows(output_dir / "mechanism_summary.csv")
     summary_rows = _csv_rows(output_dir / "summary_metrics.csv")
+    comparison_rows = _csv_rows(output_dir / "comparison_summary.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
     limitation_rows = _csv_rows(output_dir / "limitations_table.csv")
     missing_rows = _csv_rows(output_dir / "missing_parameters.csv")
@@ -112,6 +114,25 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert {row["threshold_fraction"] for row in threshold_rows} == {"0.1", "0.5", "0.9"}
     assert any(row["metric"] == "time_to_10_percent_substrate_degradation" for row in threshold_rows)
     assert any(row["metric"] == "final_product_concentration" and row["count"] == "6" for row in summary_rows)
+    assert result.comparison_summary() == comparison_rows
+    assert any(
+        row["source_table"] == "final_metrics"
+        and row["source_metric"] == "final_product_concentration"
+        and row["comparable_group_id"] == "final_metrics|final_product_concentration|millimolar"
+        for row in comparison_rows
+    )
+    assert any(
+        row["source_table"] == "threshold_times"
+        and row["source_metric"] == "time_to_10_percent_substrate_degradation"
+        and row["threshold_fraction"] == "0.1"
+        for row in comparison_rows
+    )
+    assert {"comparison_allowed", "ranking_allowed", "ranking_blocking_reason", "recommended_next_action"} <= set(
+        comparison_rows[0]
+    )
+    assert {row["recommended_next_action"] for row in comparison_rows} == {
+        "side_by_side_comparison_and_guarded_ranking_allowed"
+    }
 
     enzyme_prior_rows = [
         row
@@ -186,6 +207,10 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     )
     assert any(
         row["table"] == "mechanism_summary" and row["column"] == "mechanism_kind"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "comparison_summary" and row["column"] == "ranking_blocking_reason"
         for row in dictionary_rows
     )
     assert any(

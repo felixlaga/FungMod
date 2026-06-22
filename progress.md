@@ -30,7 +30,8 @@ Status key:
 
 Date: 2026-06-22
 
-Status: `partial` for researcher-facing report/output ergonomics.
+Status: `complete` for the scoped PR-10 report-folder index/navigation slice;
+PRODUCT-001 remains `partial` for broader researcher-facing output ergonomics.
 
 Completed in this pass:
 
@@ -46,16 +47,54 @@ Completed in this pass:
   claims are introduced.
 - Updated active README and roadmap/status docs so the current-next slice moves
   from the merged PR-09 HTML wrapper to PR-10 PRODUCT-001 report-folder
-  index/navigation, with validation-data ingestion deferred to PR-11.
+  index/navigation, with validation-data ingestion deferred behind the next
+  build-first output ergonomics slice.
 
 No biological mechanism, numerical model, solver behavior, registry records,
 calibration routine, validation data, empirical comparison claim, notebook
 logic, inferred science, or hidden report logic was added.
 
 Recommended next task: after this presentation-only index slice is reviewed and
-merged, either continue PRODUCT-001 screen-comparison ergonomics if it remains
-derived from standard outputs, or start PR-11 validation-data work only when a
+merged, continue PR-11 PRODUCT-001 screen-comparison ergonomics if it remains
+derived from standard outputs, or start PR-12 validation-data work only when a
 source-backed numeric time-course dataset satisfies the active ingestion gate.
+
+## PRODUCT-001 Screen Comparison Summary
+
+Date: 2026-06-22
+
+Status: `partial` for researcher-facing screen-comparison ergonomics.
+
+Completed in this pass:
+
+- Added `comparison_summary.csv` as a standard virtual-experiment output table
+  derived from existing `final_metrics.csv`, `threshold_times.csv`, and
+  environment guardrail rows.
+- Added `DegradationScreenResult.comparison_summary()` for loading the guarded
+  comparison summary without rerunning simulations.
+- Added machine-readable comparison and ranking guardrail columns including
+  `comparison_allowed`, `ranking_allowed`, `ranking_blocking_reason`, and
+  `recommended_next_action`.
+- Preserved existing standard-output units and metadata-only environment
+  guardrails; runtime environment grids that are metadata-only remain blocked
+  from ranking or environmental-response plot interpretation.
+- Updated the versioned output schema and data dictionary to `1.2.0`, and
+  included `comparison_summary.csv` in report-folder table links.
+- Updated active README and roadmap/status docs so PR-10 is complete for
+  report-folder index/navigation, this slice is PR-11 PRODUCT-001
+  screen-comparison summary ergonomics, and VALIDATION-DATA-001 remains
+  deferred as PR-12.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+calibration routine, validation data, empirical comparison claim, notebook
+logic, inferred science, environment response law, ranking of metadata-only
+environment cases, or hidden report logic was added.
+
+Recommended next task: after this derived-output ergonomics slice is reviewed
+and merged, continue build-first PRODUCT-001 only if the next slice remains
+derived from existing standard outputs, or start PR-12 validation-data work
+only when a source-backed numeric time-course dataset satisfies the active
+ingestion gate.
 
 ## PRODUCT-001 HTML Virtual-Experiment Report Wrapper
 

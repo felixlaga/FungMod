@@ -82,6 +82,7 @@ def write_standard_tables(
         "mechanism_summary": destination / "mechanism_summary.csv",
         "summary_metrics": destination / "summary_metrics.csv",
         "environment_summary": destination / "environment_summary.csv",
+        "comparison_summary": destination / "comparison_summary.csv",
         "provenance_table": destination / "provenance_table.csv",
         "limitations_table": destination / "limitations_table.csv",
         "missing_parameters": destination / "missing_parameters.csv",
@@ -156,6 +157,7 @@ def _build_table_rows(
         "mechanism_summary": [],
         "summary_metrics": [],
         "environment_summary": [],
+        "comparison_summary": [],
         "provenance_table": [],
         "limitations_table": [],
         "missing_parameters": [],
@@ -224,6 +226,12 @@ def _build_table_rows(
         final_metric_rows=rows["final_metrics"],
         threshold_rows=rows["threshold_times"],
         limitation_rows=rows["limitations_table"],
+    )
+    rows["comparison_summary"] = _comparison_summary_rows(
+        case_summary_rows=rows["case_summary"],
+        final_metric_rows=rows["final_metrics"],
+        threshold_rows=rows["threshold_times"],
+        environment_summary_rows=rows["environment_summary"],
     )
     return rows
 
@@ -1369,6 +1377,92 @@ def _environment_summary_rows(
             }
         )
     return output
+
+
+def _comparison_summary_rows(
+    *,
+    case_summary_rows: Sequence[Mapping[str, Any]],
+    final_metric_rows: Sequence[Mapping[str, Any]],
+    threshold_rows: Sequence[Mapping[str, Any]],
+    environment_summary_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    contexts = {str(row.get("case_id", "")): row for row in case_summary_rows if row.get("case_id")}
+    environment_rows = {
+        str(row.get("environment_id", "")): row for row in environment_summary_rows if row.get("environment_id")
+    }
+    output: list[dict[str, Any]] = []
+    for source_table, source_rows in (
+        ("final_metrics", final_metric_rows),
+        ("threshold_times", threshold_rows),
+    ):
+        for row in source_rows:
+            case_id = str(row.get("case_id", ""))
+            context = contexts.get(case_id, row)
+            environment = environment_rows.get(str(row.get("environment_id", "")), {})
+            comparison_allowed = _truthy(
+                row.get("environment_comparison_allowed", environment.get("environment_comparison_allowed", False))
+            )
+            ranking_allowed = _truthy(
+                row.get("environment_ranking_allowed", environment.get("environment_ranking_allowed", False))
+            )
+            guardrail = str(row.get("environment_guardrail", environment.get("environment_guardrail", "")) or "")
+            threshold_fraction = str(row.get("threshold_fraction", "")) if source_table == "threshold_times" else ""
+            metric = str(row.get("metric", ""))
+            units = str(row.get("units", ""))
+            output.append(
+                {
+                    **_base_sample_columns(row if row.get("sample_id") else context),
+                    "comparison_scope": "screen_output_row",
+                    "source_table": source_table,
+                    "source_metric": metric,
+                    "threshold_fraction": threshold_fraction,
+                    "value": row.get("value", ""),
+                    "units": units,
+                    "source_status": row.get("status", ""),
+                    "source_notes": row.get("notes", ""),
+                    "comparable_group_id": _comparison_group_id(source_table, metric, units),
+                    "comparison_allowed": comparison_allowed,
+                    "ranking_allowed": ranking_allowed,
+                    "ranking_blocking_reason": "" if ranking_allowed else _ranking_blocking_reason(guardrail),
+                    "recommended_next_action": _comparison_next_action(
+                        comparison_allowed=comparison_allowed,
+                        ranking_allowed=ranking_allowed,
+                    ),
+                }
+            )
+    return sorted(
+        output,
+        key=lambda item: (
+            str(item.get("comparable_group_id", "")),
+            str(item.get("case_id", "")),
+            str(item.get("sample_id", "")),
+            str(item.get("threshold_fraction", "")),
+        ),
+    )
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() == "true"
+
+
+def _comparison_group_id(source_table: str, metric: str, units: str) -> str:
+    return "|".join((source_table, metric, units or "not_applicable"))
+
+
+def _ranking_blocking_reason(guardrail: str) -> str:
+    if guardrail:
+        return guardrail
+    return "Ranking is not allowed for this row by the standard output guardrails."
+
+
+def _comparison_next_action(*, comparison_allowed: bool, ranking_allowed: bool) -> str:
+    if ranking_allowed:
+        return "side_by_side_comparison_and_guarded_ranking_allowed"
+    if comparison_allowed:
+        return "inspect_side_by_side_without_ranking"
+    return "inspect_source_rows_only_do_not_rank_or_plot_as_response"
 
 
 def _provenance_rows(
