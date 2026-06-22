@@ -26,15 +26,20 @@ available to configured process assembly as an explicit generic rate modifier,
 and registry-backed case templates can expose it when explicit product-state
 and `K_i` parameter records exist.
 
-## Required next implementation scope
+## Researcher-facing example coverage
 
-The next implementation PR after this registry-backed assembly slice should:
+The scoped reversible-product-inhibition target now has a researcher-facing
+example notebook:
 
-- add researcher-facing virtual-experiment examples or notebooks that use only
-  public APIs;
-- keep missing or unknown `K_i` explicit rather than guessing a fallback;
-- preserve output visibility for active modifier assumptions, parameters,
-  provenance, and limitations.
+```text
+notebooks/examples/12_reversible_product_inhibition_example.ipynb
+```
+
+The notebook uses public virtual-experiment APIs, compares inhibited and
+uninhibited exploratory runs, and inspects `mechanism_summary.csv`,
+configured metadata, limitations, and final degradation/product metrics. Its
+example registry uses an explicit provenance-labelled exploratory `K_i`
+fixture and does not supply validation data.
 
 ## What this does not permit
 
@@ -60,3 +65,6 @@ This scoped slice can be marked complete only when:
 - registry-backed case-assembly tests show explicit template modifier records
   flow into configured outputs and `mechanism_summary.csv` without fallback
   inhibition constants.
+- notebook/example tests show the researcher-facing virtual-experiment example
+  executes through public APIs and exposes the active modifier in standard
+  output tables.

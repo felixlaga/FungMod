@@ -32,9 +32,14 @@ enforcement.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier and registry-backed case-template
 assembly when explicit product-state and K_i records exist.
+The scoped reversible-product-inhibition target now has a public example
+notebook, `12_reversible_product_inhibition_example.ipynb`, that compares
+inhibited and uninhibited exploratory virtual experiments and inspects
+mechanism summaries, configured metadata, limitations, and final metrics
+without validation claims.
 ```
 
-Current next PR: **PR-07: BIO-003 registry-backed product inhibition assembly**.
+Current next PR: **PR-07: BIO-003 researcher-facing product inhibition example**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -70,7 +75,9 @@ machine-checkable `proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml`.
 Configured model processes can now opt into it with explicit `product_state`
 and positive unit-compatible `K_i`. Registry-backed case templates can now
 carry explicit product-inhibition modifiers into configured runs and standard
-mechanism summaries when product-state and `K_i` records exist; researcher-facing
-examples remain pending.
+mechanism summaries when product-state and `K_i` records exist. The scoped
+researcher-facing example for this reversible-product-inhibition target is
+covered by `notebooks/examples/12_reversible_product_inhibition_example.ipynb`;
+broad BIO-003 remains partial.
 
 `old_progress/` is historical and non-binding.

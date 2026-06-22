@@ -68,10 +68,11 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-07 BIO-003 registry-backed product
-inhibition assembly slice after the validation ingestion gate, build-first
-reframe, PRODUCT-001 public API/output slices, and THERMO-003 configured
-thermodynamic/entropy diagnostics to date. THERMO-003 remains partial after
+The current next PR is a scoped PR-07 BIO-003 researcher-facing product
+inhibition example slice after the registry-backed product-inhibition assembly,
+validation ingestion gate, build-first reframe, PRODUCT-001 public API/output
+slices, and THERMO-003 configured thermodynamic/entropy diagnostics to date.
+THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and a configured-output
 diagnostics notebook. Do not rebuild the completed scoped slices above unless
@@ -1208,9 +1209,13 @@ honest about assumptions and limitations.
 Current scoped BIO-003 status: generic reversible product inhibition is
 software-tested for configured process modifiers and registry-backed
 case-template assembly when explicit product-state and positive unit-compatible
-`K_i` records exist. This does not add organism-specific inhibition behavior,
-toxicity, uptake, secretion, biomass, physiology, calibration, validation, or
-fallback inhibition constants.
+`K_i` records exist. The scoped researcher-facing example notebook
+`notebooks/examples/12_reversible_product_inhibition_example.ipynb` now
+compares inhibited and uninhibited exploratory virtual experiments and shows
+where to inspect mechanism summaries, configured metadata, limitations, and
+final metrics. This does not add organism-specific inhibition behavior,
+toxicity, uptake, secretion, biomass, physiology, calibration, validation,
+multi-product inhibition, or fallback inhibition constants.
 
 ---
 

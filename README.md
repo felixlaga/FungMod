@@ -243,12 +243,18 @@ empirical validation:
 - `03_configured_outputs.ipynb`
 - `10_virtual_experiment_product_tour.ipynb`
 - `11_thermodynamics_entropy_diagnostics.ipynb`
+- `12_reversible_product_inhibition_example.ipynb`
 
 Notebook tests check that notebooks import `fungal_model`, avoid defining core
 rate laws/classes or low-level solvers inline, and execute every foundation,
 product-tour, and thermodynamic-output smoke path. The thermodynamics notebook
 uses configured explicit-Q Gibbs metadata only; it does not infer activities,
 reaction quotients, redox potentials, or solver-time thermodynamic enforcement.
+The product-inhibition notebook demonstrates the generic reversible
+`1 / (1 + P / K_i)` modifier through the public virtual-experiment API and
+standard output tables with an explicit exploratory example `K_i`; it is not
+validation, calibration, toxicity, uptake, secretion, biomass, whole-fungus
+physiology, or multi-product inhibition evidence.
 
 ## Data And Configs
 

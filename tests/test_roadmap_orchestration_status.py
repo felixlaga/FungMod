@@ -67,11 +67,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-07: BIO-003 registry-backed product inhibition assembly"
+    current_next = "PR-07: BIO-003 researcher-facing product inhibition example"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is a scoped PR-07 BIO-003 registry-backed product" in roadmap
-    assert "inhibition assembly slice" in roadmap
+    assert "The current next PR is a scoped PR-07 BIO-003 researcher-facing product" in roadmap
+    assert "inhibition example slice" in roadmap
 
     for text in (status, next_steps):
         assert "old_progress/" in text
@@ -87,7 +87,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-07: BIO-003 registry-backed product inhibition assembly"
+    current_next = "PR-07: BIO-003 researcher-facing product inhibition example"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -104,6 +104,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "10_virtual_experiment_product_tour.ipynb" in next_steps
     assert "11_thermodynamics_entropy_diagnostics.ipynb" in status
     assert "11_thermodynamics_entropy_diagnostics.ipynb" in next_steps
+    assert "12_reversible_product_inhibition_example.ipynb" in status
+    assert "12_reversible_product_inhibition_example.ipynb" in next_steps
     assert "thermodynamic_summary.json" in status
     assert "thermodynamic_summary.csv" in status
     assert "Validation remains important" in status
@@ -131,6 +133,10 @@ def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> 
     assert "validation_status: software_tested" in proposal
     assert "Configured model processes can now opt into it" in next_steps
     assert "registry-backed case assembly" in progress
+    assert "complete for the scoped" in progress
+    assert "researcher-facing example gap on the selected reversible-product-inhibition" in progress
+    assert "researcher-facing example for this reversible-product-inhibition target" in next_steps
+    assert "covered by `notebooks/examples/12_reversible_product_inhibition_example.ipynb`" in next_steps
     assert "No organism-specific inhibition behavior" in progress
 
 
@@ -153,7 +159,7 @@ def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-07: BIO-003 registry-backed product inhibition assembly"
+    current_next = "PR-07: BIO-003 researcher-facing product inhibition example"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
