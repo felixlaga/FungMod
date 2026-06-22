@@ -1,8 +1,11 @@
-"""Markdown report rendering for virtual-experiment standard outputs."""
+"""Report rendering for virtual-experiment standard outputs."""
 
 from __future__ import annotations
 
 import csv
+import html
+import os
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -27,15 +30,32 @@ def write_virtual_experiment_report(
     table_dir: str | Path,
     output_dir: str | Path,
     quicklook_paths: Sequence[str] = (),
+    include_html: bool = False,
 ) -> Path:
-    """Write a deterministic Markdown report from existing standard tables."""
+    """Write a deterministic Markdown report from existing standard tables.
+
+    When requested, also write an HTML sidecar derived from the Markdown report
+    and the same standard table/quicklook paths.
+    """
 
     table_root = Path(table_dir)
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     report_path = destination / "virtual_experiment_report.md"
     tables = {name: _read_rows(table_root / filename) for name, filename in TABLE_FILENAMES.items()}
-    report_path.write_text(_render_report(tables=tables, quicklook_paths=quicklook_paths), encoding="utf-8")
+    markdown = _render_report(tables=tables, quicklook_paths=quicklook_paths)
+    report_path.write_text(markdown, encoding="utf-8")
+    if include_html:
+        html_path = destination / "virtual_experiment_report.html"
+        html_path.write_text(
+            _render_html_report(
+                markdown=markdown,
+                table_root=table_root,
+                output_dir=destination,
+                quicklook_paths=quicklook_paths,
+            ),
+            encoding="utf-8",
+        )
     return report_path
 
 
@@ -244,6 +264,111 @@ def _quicklook_lines(paths: Sequence[str]) -> list[str]:
     if not paths:
         return ["No quicklook figure paths were recorded. Generate them with `write_quicklook_plots(...)` if needed."]
     return [f"- `{path}`" for path in paths]
+
+
+def _render_html_report(
+    *,
+    markdown: str,
+    table_root: Path,
+    output_dir: Path,
+    quicklook_paths: Sequence[str],
+) -> str:
+    body = _markdown_to_html_body(markdown)
+    table_links = _table_link_items(table_root=table_root, output_dir=output_dir)
+    quicklook_links = _quicklook_link_items(quicklook_paths, output_dir=output_dir)
+    return "\n".join(
+        [
+            "<!doctype html>",
+            '<html lang="en">',
+            "<head>",
+            '  <meta charset="utf-8">',
+            "  <title>FungMod Virtual-Experiment Report</title>",
+            "  <style>",
+            "    body { font-family: system-ui, sans-serif; line-height: 1.5; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }",
+            "    code { background: #f3f4f6; padding: 0.1rem 0.25rem; border-radius: 0.25rem; }",
+            "    a { color: #075985; }",
+            "    h1, h2 { line-height: 1.2; }",
+            "  </style>",
+            "</head>",
+            "<body>",
+            body,
+            "<h2>Standard output tables</h2>",
+            "<ul>",
+            *table_links,
+            "</ul>",
+            "<h2>Quicklook figure files</h2>",
+            "<ul>",
+            *quicklook_links,
+            "</ul>",
+            "</body>",
+            "</html>",
+            "",
+        ]
+    )
+
+
+def _markdown_to_html_body(markdown: str) -> str:
+    html_lines: list[str] = []
+    in_list = False
+    for line in markdown.splitlines():
+        if line.startswith("- "):
+            if not in_list:
+                html_lines.append("<ul>")
+                in_list = True
+            html_lines.append(f"  <li>{_html_inline(line[2:])}</li>")
+            continue
+        if in_list:
+            html_lines.append("</ul>")
+            in_list = False
+        if line.startswith("# "):
+            html_lines.append(f"<h1>{_html_inline(line[2:])}</h1>")
+        elif line.startswith("## "):
+            html_lines.append(f"<h2>{_html_inline(line[3:])}</h2>")
+        elif line:
+            html_lines.append(f"<p>{_html_inline(line)}</p>")
+    if in_list:
+        html_lines.append("</ul>")
+    return "\n".join(html_lines)
+
+
+def _html_inline(text: str) -> str:
+    parts = re.split(r"(`[^`]*`)", text)
+    rendered = []
+    for part in parts:
+        if part.startswith("`") and part.endswith("`") and len(part) >= 2:
+            rendered.append(f"<code>{html.escape(part[1:-1])}</code>")
+        else:
+            rendered.append(html.escape(part))
+    return "".join(rendered)
+
+
+def _table_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
+    items = []
+    for name, filename in TABLE_FILENAMES.items():
+        table_path = table_root / filename
+        if table_path.exists():
+            href = html.escape(_href_for(path=table_path, output_dir=output_dir), quote=True)
+            label = html.escape(filename)
+            items.append(f'  <li><a href="{href}">{label}</a> ({html.escape(name)})</li>')
+    if not items:
+        return ["  <li>No standard CSV tables were present.</li>"]
+    return items
+
+
+def _quicklook_link_items(paths: Sequence[str], *, output_dir: Path) -> list[str]:
+    if not paths:
+        return ["  <li>No quicklook figure paths were recorded.</li>"]
+    return [
+        f'  <li><a href="{html.escape(_href_for(path=Path(path), output_dir=output_dir), quote=True)}">'
+        f"{html.escape(Path(path).name or path)}</a></li>"
+        for path in paths
+    ]
+
+
+def _href_for(*, path: Path, output_dir: Path) -> str:
+    target = path if path.is_absolute() else Path.cwd() / path
+    base = output_dir if output_dir.is_absolute() else Path.cwd() / output_dir
+    return Path(os.path.relpath(target, base)).as_posix()
 
 
 def _value(row: Mapping[str, str], field: str, *, fallback_field: str | None = None) -> str:
