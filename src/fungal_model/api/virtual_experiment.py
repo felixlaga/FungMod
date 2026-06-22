@@ -13,6 +13,7 @@ from typing import Any, Literal
 from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid
 from fungal_model.api.output_schema import OUTPUT_SCHEMA_VERSION
 from fungal_model.api.quicklook import write_quicklook_plots as write_quicklook_plot_files
+from fungal_model.api.report import write_virtual_experiment_report
 from fungal_model.api.result_tables import WrittenTables, write_preflight_tables, write_standard_tables
 from fungal_model.registry.records import ParameterRecord
 from fungal_model.registry import FungModRegistry, RegistryResolver, ResolvedRecord, load_registry
@@ -324,6 +325,20 @@ class DegradationScreenResult:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return destination
+
+    def write_report(self, output_dir: str | Path | None = None) -> Path:
+        """Write a Markdown report from existing standard output tables."""
+
+        if self.tables is None:
+            self.write_tables()
+        destination = Path(output_dir) if output_dir is not None else Path(self.output_directory) / "report"
+        report_path = write_virtual_experiment_report(
+            table_dir=self.output_directory,
+            output_dir=destination,
+            quicklook_paths=self.quicklook_paths,
+        )
+        self.write_manifest()
+        return report_path
 
     def write_manifest(self, path: str | Path | None = None) -> Path:
         """Write a self-describing output manifest for the virtual-experiment folder."""

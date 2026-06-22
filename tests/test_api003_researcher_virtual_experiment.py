@@ -248,6 +248,41 @@ def test_result_table_accessors_return_standard_tables(tmp_path: Path) -> None:
     assert result.suggested_experiments() == []
 
 
+def test_result_write_report_renders_standard_table_facts_without_validation_claims(tmp_path: Path) -> None:
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=REGISTRY_INDEX,
+    )
+
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=7,
+        output_dir=tmp_path / "report",
+        quicklook=False,
+    )
+
+    report_path = result.write_report()
+    report = report_path.read_text(encoding="utf-8")
+
+    assert report_path == Path(result.output_directory) / "report" / "virtual_experiment_report.md"
+    assert "# FungMod Virtual-Experiment Report" in report
+    assert "generated from existing FungMod standard output tables" in report
+    assert "not an additional validation, calibration, or empirical comparison" in report
+    assert "sabiork_beta_glucosidase_source" in report
+    assert "cellobiose" in report
+    assert "final_product_concentration" in report
+    assert "time_to_10_percent_substrate_degradation" in report
+    assert "homogeneous_michaelis_menten" in report
+    assert "whole-fungus physiology" in report
+    assert "user_supplied_exploratory_prior" in report
+    assert "empirically validated" not in report.lower()
+    assert "calibrated against observations" not in report.lower()
+    assert (Path(result.output_directory) / "output_manifest.json").exists()
+
+
 def test_no_live_external_api_call_occurs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     def blocked_connect(*_args: Any, **_kwargs: Any) -> None:
         raise AssertionError("VirtualExperiment simulation must not call live external APIs.")

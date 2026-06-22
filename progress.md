@@ -61,6 +61,37 @@ small BIO-003 mechanism-family candidate only if it can be implemented with
 explicit provenance, maturity labels, tests, and honest limitations; otherwise
 return to PRODUCT-001 output ergonomics or deferred validation-data gate work.
 
+## PRODUCT-001 Virtual-Experiment Report Writer
+
+Date: 2026-06-22
+
+Status: `partial` for researcher-facing report/output ergonomics.
+
+Completed in this pass:
+
+- Added `DegradationScreenResult.write_report(...)` as a public result method
+  that writes a deterministic Markdown report under `report/` by default.
+- Added an internal report renderer that reads existing standard output tables:
+  preflight/modelability, case summary, final metrics, threshold times,
+  sampled parameters, mechanism summary, assumption summary, provenance,
+  limitations, missing parameters, suggested experiments, and optional
+  quicklook figure paths.
+- Added focused Reaction 618 API coverage proving the report is written,
+  includes table-derived facts and limitation language, exposes exploratory
+  parameter assumptions, and does not make positive validation or calibration
+  claims.
+- Updated active roadmap/status docs to move the current next PR from the
+  merged PR-07 BIO-003 example to this scoped PRODUCT-001 report-writer slice.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+calibration routine, validation data, empirical comparison claim, notebook
+logic, or inferred science was added.
+
+Recommended next task: add a small HTML wrapper around the Markdown report or
+improve report navigation only if it remains a presentation layer over standard
+tables; otherwise continue PRODUCT-001 output ergonomics toward researcher
+screen comparison reports.
+
 ## THERMO-003 Configured Entropy-Production-Rate Diagnostic
 
 Date: 2026-06-21

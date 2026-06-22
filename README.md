@@ -162,6 +162,12 @@ Preflight tables include machine-readable simulation policy columns such as
 `recommended_next_action`.
 Exploratory priors remain allowed, but the tables mark them as assumptions
 rather than literature-curated values.
+Results can also render a deterministic Markdown report from those standard
+tables without adding validation or calibration claims:
+
+```python
+result.write_report("outputs/report/")
+```
 
 The scoped CASE-001 BIO-002 chain can also be run from researcher-facing names
 and a runtime environment grid:
