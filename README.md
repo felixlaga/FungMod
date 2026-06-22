@@ -154,14 +154,18 @@ study.write_preflight_report(mode="scientific")
 
 The standard output folder includes long-format time series, final states,
 final metrics, threshold times, sampled parameters, summary metrics,
-modelability item reports, assumption summaries, mechanism summaries,
-provenance, limitations, missing-parameter and suggested-experiment tables,
-and a versioned data dictionary/schema.
+guarded screen-comparison summaries, modelability item reports, assumption
+summaries, mechanism summaries, provenance, limitations, missing-parameter and
+suggested-experiment tables, and a versioned data dictionary/schema.
 Preflight tables include machine-readable simulation policy columns such as
 `simulation_allowed_for_mode`, `blocking_reason`, and
 `recommended_next_action`.
 Exploratory priors remain allowed, but the tables mark them as assumptions
 rather than literature-curated values.
+`comparison_summary.csv` indexes existing final-metric and threshold rows for
+researcher-facing side-by-side inspection while preserving standard
+environment comparison/ranking guardrails; metadata-only runtime environment
+grids remain explicitly blocked from ranking or response-plot interpretation.
 Results can also render a deterministic Markdown report from those standard
 tables without adding validation or calibration claims. Optional HTML artifacts
 can be written beside the Markdown report for browser viewing: an HTML sidecar

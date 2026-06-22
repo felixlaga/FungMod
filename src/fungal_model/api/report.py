@@ -18,6 +18,7 @@ TABLE_FILENAMES = {
     "sampled_parameters": "sampled_parameters.csv",
     "mechanism_summary": "mechanism_summary.csv",
     "assumption_summary": "assumption_summary.csv",
+    "comparison_summary": "comparison_summary.csv",
     "provenance_table": "provenance_table.csv",
     "limitations_table": "limitations_table.csv",
     "missing_parameters": "missing_parameters.csv",

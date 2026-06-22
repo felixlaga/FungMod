@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "1.1.0"
+OUTPUT_SCHEMA_VERSION = "1.2.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -299,6 +299,28 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         ),
         primary_key=("environment_id",),
         join_keys=("environment_id",),
+    ),
+    "comparison_summary": _table(
+        "Guarded screen-comparison index over existing final-metric and threshold rows.",
+        (
+            *COMMON_CASE_COLUMNS,
+            *SAMPLE_COLUMNS,
+            _column("comparison_scope", "Comparison scope represented by this row."),
+            _column("source_table", "Standard output table that supplied this row."),
+            _column("source_metric", "Metric from the source row."),
+            _column("threshold_fraction", "Threshold fraction for threshold rows.", required=False, units_policy="dimensionless", semantic_type="number"),
+            _column("value", "Source row value when present.", required=False, semantic_type="number"),
+            _column("units", "Source row units."),
+            _column("source_status", "Status from the source row."),
+            _column("source_notes", "Notes from the source row.", required=False),
+            _column("comparable_group_id", "Stable group ID for rows with the same source table, metric, and units."),
+            _column("comparison_allowed", "Whether side-by-side comparison is allowed for this row.", semantic_type="boolean"),
+            _column("ranking_allowed", "Whether this row may be ranked against peer rows.", semantic_type="boolean"),
+            _column("ranking_blocking_reason", "Reason ranking is blocked, or blank when ranking is allowed.", required=False),
+            _column("recommended_next_action", "Machine-readable recommendation for interpreting this row."),
+        ),
+        primary_key=("case_id", "sample_id", "source_table", "source_metric", "threshold_fraction"),
+        join_keys=("case_id", "sample_id"),
     ),
     "provenance_table": _table(
         "Registry and parameter provenance rows used by each case.",
