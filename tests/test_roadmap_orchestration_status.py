@@ -67,11 +67,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-08: PRODUCT-001 virtual-experiment report writer"
+    current_next = "PR-09: PRODUCT-001 HTML report wrapper"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is a scoped PR-08 PRODUCT-001 virtual-experiment report" in roadmap
-    assert "writer slice" in roadmap
+    assert "The current next PR is a scoped PR-09 PRODUCT-001 HTML report wrapper slice" in roadmap
+    assert "PR-08 Markdown report writer" in roadmap
 
     for text in (status, next_steps):
         assert "old_progress/" in text
@@ -87,11 +87,12 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-08: PRODUCT-001 virtual-experiment report writer"
+    current_next = "PR-09: PRODUCT-001 HTML report wrapper"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
         assert "Current next PR: **PR-04" not in text
+        assert "Current next PR: **PR-08" not in text
         assert "Current next PR: **PR-07" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
@@ -102,7 +103,9 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "mechanism_summary.csv" in status
     assert "mechanism_summary.csv" in next_steps
     assert "DegradationScreenResult.write_report(...)" in next_steps
+    assert "include_html=True" in next_steps
     assert "write_report(...)" in status
+    assert "include_html=True" in status
     assert "10_virtual_experiment_product_tour.ipynb" in status
     assert "10_virtual_experiment_product_tour.ipynb" in next_steps
     assert "11_thermodynamics_entropy_diagnostics.ipynb" in status
@@ -118,7 +121,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     )
     assert "VALIDATION-DATA-001: deferred; blocked/partial" in next_steps
     assert "PR-08 | PRODUCT-001 virtual-experiment report writer" in status
-    assert "PR-09 | VALIDATION-DATA-001" in status
+    assert "PR-09 | PRODUCT-001 HTML report wrapper" in status
+    assert "PR-10 | VALIDATION-DATA-001" in status
 
 
 def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> None:
@@ -163,12 +167,13 @@ def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-08: PRODUCT-001 virtual-experiment report writer"
+    current_next = "PR-09: PRODUCT-001 HTML report wrapper"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
         assert "PR-04" not in _current_next_lines(text)
         assert "PR-05" not in _current_next_lines(text)
+        assert "PR-08" not in _current_next_lines(text)
         assert "PR-07" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset | deferred; blocked/partial" in status

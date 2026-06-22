@@ -163,10 +163,12 @@ Preflight tables include machine-readable simulation policy columns such as
 Exploratory priors remain allowed, but the tables mark them as assumptions
 rather than literature-curated values.
 Results can also render a deterministic Markdown report from those standard
-tables without adding validation or calibration claims:
+tables without adding validation or calibration claims. An optional HTML
+sidecar can be written beside the Markdown report for browser viewing; it is a
+presentation wrapper over the same report and standard tables:
 
 ```python
-result.write_report("outputs/report/")
+result.write_report("outputs/report/", include_html=True)
 ```
 
 The scoped CASE-001 BIO-002 chain can also be run from researcher-facing names

@@ -26,6 +26,36 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 HTML Virtual-Experiment Report Wrapper
+
+Date: 2026-06-22
+
+Status: `partial` for researcher-facing report/output ergonomics.
+
+Completed in this pass:
+
+- Extended `DegradationScreenResult.write_report(..., include_html=True)` so it
+  still writes and returns the deterministic Markdown report while also writing
+  `virtual_experiment_report.html` beside it when requested.
+- Added a small stdlib HTML renderer derived from the Markdown report and the
+  same standard table/quicklook paths, with HTML escaping and relative links to
+  existing CSV tables and optional quicklook figures.
+- Added focused tests proving Markdown output remains the primary report,
+  HTML output is opt-in, table-derived content is escaped deterministically,
+  standard table and quicklook links are present, and no validation or
+  calibration claims are introduced.
+- Updated active README and roadmap/status docs so the current-next slice moves
+  from the merged Markdown writer to this PRODUCT-001 HTML wrapper.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+calibration routine, validation data, empirical comparison claim, notebook
+logic, or inferred science was added.
+
+Recommended next task: continue PRODUCT-001 report-folder navigation or
+screen-comparison ergonomics only if it remains a presentation layer over
+standard output tables; otherwise keep validation-data ingestion deferred until
+source-backed observations exist.
+
 ## BIO-003 Researcher-Facing Product Inhibition Example
 
 Date: 2026-06-21
@@ -87,10 +117,9 @@ No biological mechanism, numerical model, solver behavior, registry records,
 calibration routine, validation data, empirical comparison claim, notebook
 logic, or inferred science was added.
 
-Recommended next task: add a small HTML wrapper around the Markdown report or
-improve report navigation only if it remains a presentation layer over standard
-tables; otherwise continue PRODUCT-001 output ergonomics toward researcher
-screen comparison reports.
+Recommended next task: continue PRODUCT-001 report/output ergonomics only if it
+remains a presentation layer over standard tables; otherwise continue toward
+researcher screen comparison reports.
 
 ## THERMO-003 Configured Entropy-Production-Rate Diagnostic
 

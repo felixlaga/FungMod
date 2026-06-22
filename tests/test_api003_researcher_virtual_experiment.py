@@ -11,6 +11,7 @@ import yaml
 
 from fungal_model import VirtualExperiment, environment_grid, virtual_experiment
 from fungal_model.api import VirtualExperimentError
+from fungal_model.api.report import write_virtual_experiment_report
 from fungal_model.registry import AmbiguousResolutionError, ResolutionError
 
 
@@ -291,6 +292,99 @@ def test_result_write_report_renders_standard_table_facts_without_validation_cla
     assert (Path(result.output_directory) / "output_manifest.json").exists()
 
 
+def test_result_write_report_can_write_html_sidecar_without_changing_markdown_contract(tmp_path: Path) -> None:
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=REGISTRY_INDEX,
+    )
+
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=9,
+        output_dir=tmp_path / "html_report",
+        quicklook=False,
+    )
+
+    report_path = result.write_report(include_html=True)
+    html_path = report_path.with_suffix(".html")
+    html = html_path.read_text(encoding="utf-8")
+
+    assert report_path == Path(result.output_directory) / "report" / "virtual_experiment_report.md"
+    assert html_path == Path(result.output_directory) / "report" / "virtual_experiment_report.html"
+    assert "# FungMod Virtual-Experiment Report" in report_path.read_text(encoding="utf-8")
+    assert "<h1>FungMod Virtual-Experiment Report</h1>" in html
+    assert 'href="../case_summary.csv"' in html
+    assert 'href="../final_metrics.csv"' in html
+    assert "not an additional validation, calibration, or empirical comparison" in html
+    assert "empirically validated" not in html.lower()
+    assert "calibrated against observations" not in html.lower()
+    assert "report/virtual_experiment_report.html" in (
+        Path(result.output_directory) / "output_manifest.json"
+    ).read_text(encoding="utf-8")
+
+
+def test_html_report_escapes_table_content_and_links_figures_deterministically(tmp_path: Path) -> None:
+    table_dir = tmp_path / "tables"
+    table_dir.mkdir()
+    _write_csv(
+        table_dir / "case_summary.csv",
+        [
+            {
+                "case_id": "case_<script>alert(1)</script>",
+                "fungus_id": "source & enzyme",
+                "substrate_id": "cellobiose",
+                "environment_id": "30C_pH5",
+                "modelability_status": "exploratory",
+            }
+        ],
+    )
+    _write_csv(
+        table_dir / "final_metrics.csv",
+        [
+            {
+                "case_id": "case_1",
+                "sample_id": "sample_0",
+                "metric": "final_product_concentration",
+                "value": "1.0",
+                "units": "mM",
+                "status": "computed",
+            }
+        ],
+    )
+    figure_path = tmp_path / "figures" / "quicklook<1>.png"
+    figure_path.parent.mkdir()
+    figure_path.write_bytes(b"placeholder")
+
+    report_path = write_virtual_experiment_report(
+        table_dir=table_dir,
+        output_dir=tmp_path / "report",
+        quicklook_paths=(str(figure_path),),
+        include_html=True,
+    )
+    html_path = report_path.with_suffix(".html")
+    first_html = html_path.read_text(encoding="utf-8")
+
+    write_virtual_experiment_report(
+        table_dir=table_dir,
+        output_dir=tmp_path / "report",
+        quicklook_paths=(str(figure_path),),
+        include_html=True,
+    )
+
+    assert report_path.exists()
+    assert html_path.exists()
+    assert html_path.read_text(encoding="utf-8") == first_html
+    assert "<script>alert(1)</script>" not in first_html
+    assert "case_&lt;script&gt;alert(1)&lt;/script&gt;" in first_html
+    assert "source &amp; enzyme" in first_html
+    assert 'href="../tables/case_summary.csv"' in first_html
+    assert "quicklook&lt;1&gt;.png" in first_html
+    assert "validation, calibration, or empirical comparison" in first_html
+
+
 def test_no_live_external_api_call_occurs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     def blocked_connect(*_args: Any, **_kwargs: Any) -> None:
         raise AssertionError("VirtualExperiment simulation must not call live external APIs.")
@@ -356,6 +450,14 @@ def _copy_registry(tmp_path: Path) -> Path:
 def _csv_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
+    assert rows
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def _yaml_mapping(path: Path) -> dict[str, Any]:
