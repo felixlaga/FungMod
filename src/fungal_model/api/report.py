@@ -31,11 +31,12 @@ def write_virtual_experiment_report(
     output_dir: str | Path,
     quicklook_paths: Sequence[str] = (),
     include_html: bool = False,
+    include_index: bool = False,
 ) -> Path:
     """Write a deterministic Markdown report from existing standard tables.
 
     When requested, also write an HTML sidecar derived from the Markdown report
-    and the same standard table/quicklook paths.
+    and a folder index derived from the same standard artifact paths.
     """
 
     table_root = Path(table_dir)
@@ -52,6 +53,18 @@ def write_virtual_experiment_report(
                 markdown=markdown,
                 table_root=table_root,
                 output_dir=destination,
+                quicklook_paths=quicklook_paths,
+            ),
+            encoding="utf-8",
+        )
+    if include_index:
+        index_path = destination / "index.html"
+        index_path.write_text(
+            _render_report_folder_index(
+                table_root=table_root,
+                report_dir=destination,
+                markdown_path=report_path,
+                html_path=destination / "virtual_experiment_report.html" if include_html else None,
                 quicklook_paths=quicklook_paths,
             ),
             encoding="utf-8",
@@ -307,6 +320,62 @@ def _render_html_report(
     )
 
 
+def _render_report_folder_index(
+    *,
+    table_root: Path,
+    report_dir: Path,
+    markdown_path: Path,
+    html_path: Path | None,
+    quicklook_paths: Sequence[str],
+) -> str:
+    report_links = _report_link_items(
+        report_dir=report_dir,
+        markdown_path=markdown_path,
+        html_path=html_path,
+    )
+    manifest_links = _manifest_link_items(table_root=table_root, report_dir=report_dir)
+    table_links = _table_link_items(table_root=table_root, output_dir=report_dir)
+    quicklook_links = _quicklook_link_items(quicklook_paths, output_dir=report_dir)
+    return "\n".join(
+        [
+            "<!doctype html>",
+            '<html lang="en">',
+            "<head>",
+            '  <meta charset="utf-8">',
+            "  <title>FungMod Virtual-Experiment Output Index</title>",
+            "  <style>",
+            "    body { font-family: system-ui, sans-serif; line-height: 1.5; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }",
+            "    a { color: #075985; }",
+            "    h1, h2 { line-height: 1.2; }",
+            "  </style>",
+            "</head>",
+            "<body>",
+            "<h1>FungMod Virtual-Experiment Output Index</h1>",
+            "<p>This index links existing output artifacts only. It does not add validation, calibration, "
+            "empirical comparison, or scientific interpretation.</p>",
+            "<h2>Reports</h2>",
+            "<ul>",
+            *report_links,
+            "</ul>",
+            "<h2>Output manifest</h2>",
+            "<ul>",
+            *manifest_links,
+            "</ul>",
+            "<h2>Standard CSV tables</h2>",
+            "<ul>",
+            *table_links,
+            "</ul>",
+            "<h2>Quicklook figures</h2>",
+            "<ul>",
+            *quicklook_links,
+            "</ul>",
+            "</body>",
+            "</html>",
+            "",
+        ]
+    )
+
+
 def _markdown_to_html_body(markdown: str) -> str:
     html_lines: list[str] = []
     in_list = False
@@ -342,14 +411,47 @@ def _html_inline(text: str) -> str:
     return "".join(rendered)
 
 
+def _report_link_items(*, report_dir: Path, markdown_path: Path, html_path: Path | None) -> list[str]:
+    links = [
+        _link_item(
+            path=markdown_path,
+            base_dir=report_dir,
+            label="virtual_experiment_report.md",
+            description="Markdown report",
+        )
+    ]
+    if html_path is not None and html_path.exists():
+        links.append(
+            _link_item(
+                path=html_path,
+                base_dir=report_dir,
+                label="virtual_experiment_report.html",
+                description="Optional HTML report sidecar",
+            )
+        )
+    return links
+
+
+def _manifest_link_items(*, table_root: Path, report_dir: Path) -> list[str]:
+    manifest_path = table_root / "output_manifest.json"
+    if not manifest_path.exists():
+        return ["  <li>No output manifest was present.</li>"]
+    return [
+        _link_item(
+            path=manifest_path,
+            base_dir=report_dir,
+            label="output_manifest.json",
+            description="Output manifest",
+        )
+    ]
+
+
 def _table_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
     items = []
     for name, filename in TABLE_FILENAMES.items():
         table_path = table_root / filename
         if table_path.exists():
-            href = html.escape(_href_for(path=table_path, output_dir=output_dir), quote=True)
-            label = html.escape(filename)
-            items.append(f'  <li><a href="{href}">{label}</a> ({html.escape(name)})</li>')
+            items.append(_link_item(path=table_path, base_dir=output_dir, label=filename, description=name))
     if not items:
         return ["  <li>No standard CSV tables were present.</li>"]
     return items
@@ -359,15 +461,21 @@ def _quicklook_link_items(paths: Sequence[str], *, output_dir: Path) -> list[str
     if not paths:
         return ["  <li>No quicklook figure paths were recorded.</li>"]
     return [
-        f'  <li><a href="{html.escape(_href_for(path=Path(path), output_dir=output_dir), quote=True)}">'
-        f"{html.escape(Path(path).name or path)}</a></li>"
+        _link_item(path=Path(path), base_dir=output_dir, label=Path(path).name or path)
         for path in paths
     ]
 
 
-def _href_for(*, path: Path, output_dir: Path) -> str:
+def _link_item(*, path: Path, base_dir: Path, label: str, description: str = "") -> str:
+    href = html.escape(_href_for(path=path, base_dir=base_dir), quote=True)
+    rendered_label = html.escape(label)
+    rendered_description = f" ({html.escape(description)})" if description else ""
+    return f'  <li><a href="{href}">{rendered_label}</a>{rendered_description}</li>'
+
+
+def _href_for(*, path: Path, base_dir: Path) -> str:
     target = path if path.is_absolute() else Path.cwd() / path
-    base = output_dir if output_dir.is_absolute() else Path.cwd() / output_dir
+    base = base_dir if base_dir.is_absolute() else Path.cwd() / base_dir
     return Path(os.path.relpath(target, base)).as_posix()
 
 

@@ -326,11 +326,18 @@ class DegradationScreenResult:
         destination.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return destination
 
-    def write_report(self, output_dir: str | Path | None = None, *, include_html: bool = False) -> Path:
+    def write_report(
+        self,
+        output_dir: str | Path | None = None,
+        *,
+        include_html: bool = False,
+        include_index: bool = False,
+    ) -> Path:
         """Write a Markdown report from existing standard output tables.
 
         Set ``include_html=True`` to also write ``virtual_experiment_report.html``
-        beside the Markdown report.
+        beside the Markdown report. Set ``include_index=True`` to write
+        ``index.html`` navigation for the report folder.
         """
 
         if self.tables is None:
@@ -341,6 +348,7 @@ class DegradationScreenResult:
             output_dir=destination,
             quicklook_paths=self.quicklook_paths,
             include_html=include_html,
+            include_index=include_index,
         )
         self.write_manifest()
         return report_path

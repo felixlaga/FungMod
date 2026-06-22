@@ -68,11 +68,12 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-09 PRODUCT-001 HTML report wrapper slice
+The current next PR is a scoped PR-10 PRODUCT-001 report-folder index/navigation slice
 after the registry-backed product-inhibition assembly and researcher-facing
 example, validation ingestion gate, build-first reframe, PRODUCT-001 public
-API/output slices including the PR-08 Markdown report writer, and THERMO-003
-configured thermodynamic/entropy diagnostics to date.
+API/output slices including the PR-08 Markdown report writer and
+PR-09 HTML report wrapper, and THERMO-003 configured thermodynamic/entropy
+diagnostics to date.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and a configured-output
