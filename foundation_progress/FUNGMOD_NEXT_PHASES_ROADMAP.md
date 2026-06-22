@@ -68,10 +68,11 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-07 BIO-003 researcher-facing product
-inhibition example slice after the registry-backed product-inhibition assembly,
-validation ingestion gate, build-first reframe, PRODUCT-001 public API/output
-slices, and THERMO-003 configured thermodynamic/entropy diagnostics to date.
+The current next PR is a scoped PR-08 PRODUCT-001 virtual-experiment report
+writer slice after the registry-backed product-inhibition assembly and
+researcher-facing example, validation ingestion gate, build-first reframe,
+PRODUCT-001 public API/output slices, and THERMO-003 configured
+thermodynamic/entropy diagnostics to date.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and a configured-output
@@ -1134,6 +1135,7 @@ uncertainty intervals
 provenance
 limitations
 missing mechanisms and suggested follow-up experiments
+researcher-facing reports generated from standard output tables
 ```
 
 Do not require a real observation table for this phase. Observations are useful
@@ -1150,6 +1152,7 @@ Complete when:
 - assumptions and exploratory priors are visible in output tables;
 - unsupported mechanisms remain explicit instead of guessed;
 - outputs include useful time-series or summary degradation metrics;
+- report/output ergonomics remain a presentation layer over standard tables;
 - tests prove no validation or scientific certainty is claimed without data.
 ```
 

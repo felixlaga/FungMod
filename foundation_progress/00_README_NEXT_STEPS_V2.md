@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-07:
+Scoped status as of PR-08:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -14,7 +14,8 @@ CASE-001: complete once PR-02 is merged for the researcher-facing named API path
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
-assumption_summary.csv, modelability_items.csv, and write_preflight_report.
+assumption_summary.csv, modelability_items.csv, write_preflight_report, and
+the scoped `DegradationScreenResult.write_report(...)` Markdown report writer.
 Virtual-experiment outputs now include mechanism_summary.csv for active process
 laws, maturity, assumptions, limitations, and provenance.
 Example notebooks now include `10_virtual_experiment_product_tour.ipynb` for a
@@ -39,7 +40,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-07: BIO-003 researcher-facing product inhibition example**.
+Current next PR: **PR-08: PRODUCT-001 virtual-experiment report writer**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -61,6 +62,10 @@ blocked cases. They improve the target researcher workflow and make exploratory
 assumptions, uncertain inputs, and preflight facts easier to inspect, but
 runtime pH, temperature, and oxygen grid values remain metadata-only unless an
 explicit response law or condition-specific parameter record is active.
+The current report-writer slice adds `DegradationScreenResult.write_report(...)`
+as a presentation layer over existing standard tables and optional quicklook
+paths; it must not add biological mechanisms, solver behavior, validation data,
+calibration, empirical-comparison claims, or hidden scientific logic.
 
 The current THERMO-003 slices should remain configured-output focused:
 explicit caller-supplied dimensionless Q, temperature, standard Gibbs,
