@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-09:
+Scoped status as of PR-10:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -14,11 +14,13 @@ CASE-001: complete once PR-02 is merged for the researcher-facing named API path
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
-assumption_summary.csv, modelability_items.csv, write_preflight_report, and
-the scoped `DegradationScreenResult.write_report(...)` Markdown report writer.
-The current HTML-wrapper slice keeps Markdown as the primary report and adds an
-opt-in escaped HTML sidecar with links to standard CSV tables and optional
-quicklook figures.
+assumption_summary.csv, modelability_items.csv, write_preflight_report, the
+scoped `DegradationScreenResult.write_report(...)` Markdown report writer, and
+the PR-09 HTML report wrapper. The PR-09 `include_html=True` option keeps
+Markdown as the primary report and adds an opt-in escaped HTML sidecar. The
+current report-folder index/navigation slice keeps that contract and adds an
+opt-in escaped `index.html` with links to existing report files, standard CSV
+tables, `output_manifest.json`, and optional quicklook figures.
 Virtual-experiment outputs now include mechanism_summary.csv for active process
 laws, maturity, assumptions, limitations, and provenance.
 Example notebooks now include `10_virtual_experiment_product_tour.ipynb` for a
@@ -43,7 +45,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-09: PRODUCT-001 HTML report wrapper**.
+Current next PR: **PR-10: PRODUCT-001 report-folder index/navigation**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -65,12 +67,12 @@ blocked cases. They improve the target researcher workflow and make exploratory
 assumptions, uncertain inputs, and preflight facts easier to inspect, but
 runtime pH, temperature, and oxygen grid values remain metadata-only unless an
 explicit response law or condition-specific parameter record is active.
-The current HTML-wrapper slice extends
-`DegradationScreenResult.write_report(..., include_html=True)` as a
-presentation layer over the existing Markdown report, standard tables, and
-optional quicklook paths; it must not add biological mechanisms, solver
-behavior, validation data, calibration, empirical-comparison claims, or hidden
-scientific logic.
+The current report-folder index/navigation slice extends
+`DegradationScreenResult.write_report(..., include_index=True)` as a
+presentation layer over the existing Markdown report, optional HTML sidecar,
+standard tables, `output_manifest.json`, and optional quicklook paths; it must
+not add biological mechanisms, solver behavior, validation data, calibration,
+empirical-comparison claims, or hidden scientific logic.
 
 The current THERMO-003 slices should remain configured-output focused:
 explicit caller-supplied dimensionless Q, temperature, standard Gibbs,

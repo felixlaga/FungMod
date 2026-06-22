@@ -26,6 +26,37 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Report-Folder Index Navigation
+
+Date: 2026-06-22
+
+Status: `partial` for researcher-facing report/output ergonomics.
+
+Completed in this pass:
+
+- Extended `DegradationScreenResult.write_report(..., include_index=True)` so it
+  still writes and returns the deterministic Markdown report while optionally
+  writing `report/index.html` navigation for the output folder.
+- Added a deterministic stdlib HTML index that links existing report artifacts,
+  standard CSV tables, `output_manifest.json`, and optional quicklook figures
+  when present.
+- Added focused tests proving default Markdown and HTML-sidecar behavior remain
+  unchanged, the index is opt-in, HTML is escaped, relative links work for
+  absolute and relative output directories, and no validation or calibration
+  claims are introduced.
+- Updated active README and roadmap/status docs so the current-next slice moves
+  from the merged PR-09 HTML wrapper to PR-10 PRODUCT-001 report-folder
+  index/navigation, with validation-data ingestion deferred to PR-11.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+calibration routine, validation data, empirical comparison claim, notebook
+logic, inferred science, or hidden report logic was added.
+
+Recommended next task: after this presentation-only index slice is reviewed and
+merged, either continue PRODUCT-001 screen-comparison ergonomics if it remains
+derived from standard outputs, or start PR-11 validation-data work only when a
+source-backed numeric time-course dataset satisfies the active ingestion gate.
+
 ## PRODUCT-001 HTML Virtual-Experiment Report Wrapper
 
 Date: 2026-06-22

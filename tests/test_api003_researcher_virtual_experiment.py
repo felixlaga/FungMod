@@ -290,6 +290,7 @@ def test_result_write_report_renders_standard_table_facts_without_validation_cla
     assert "empirically validated" not in report.lower()
     assert "calibrated against observations" not in report.lower()
     assert (Path(result.output_directory) / "output_manifest.json").exists()
+    assert not (Path(result.output_directory) / "report" / "index.html").exists()
 
 
 def test_result_write_report_can_write_html_sidecar_without_changing_markdown_contract(tmp_path: Path) -> None:
@@ -324,6 +325,47 @@ def test_result_write_report_can_write_html_sidecar_without_changing_markdown_co
     assert "report/virtual_experiment_report.html" in (
         Path(result.output_directory) / "output_manifest.json"
     ).read_text(encoding="utf-8")
+    assert not (Path(result.output_directory) / "report" / "index.html").exists()
+
+
+def test_result_write_report_can_write_report_folder_index_over_existing_artifacts(tmp_path: Path) -> None:
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=REGISTRY_INDEX,
+    )
+
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=10,
+        output_dir=tmp_path / "indexed_report",
+        quicklook=False,
+    )
+    quicklook_path = Path(result.output_directory) / "figures" / "quicklook<summary>.png"
+    quicklook_path.parent.mkdir()
+    quicklook_path.write_bytes(b"placeholder")
+    result.quicklook_paths = (str(quicklook_path),)
+
+    report_path = result.write_report(include_html=True, include_index=True)
+    index_path = report_path.with_name("index.html")
+    index = index_path.read_text(encoding="utf-8")
+
+    assert report_path == Path(result.output_directory) / "report" / "virtual_experiment_report.md"
+    assert index_path == Path(result.output_directory) / "report" / "index.html"
+    assert "<h1>FungMod Virtual-Experiment Output Index</h1>" in index
+    assert 'href="virtual_experiment_report.md"' in index
+    assert 'href="virtual_experiment_report.html"' in index
+    assert 'href="../output_manifest.json"' in index
+    assert 'href="../case_summary.csv"' in index
+    assert 'href="../final_metrics.csv"' in index
+    assert 'href="../figures/quicklook&lt;summary&gt;.png"' in index
+    assert "links existing output artifacts only" in index
+    assert "validation, calibration, empirical comparison, or scientific interpretation" in index
+    assert "empirically validated" not in index.lower()
+    assert "calibrated against observations" not in index.lower()
+    assert "report/index.html" in (Path(result.output_directory) / "output_manifest.json").read_text(encoding="utf-8")
 
 
 def test_html_report_escapes_table_content_and_links_figures_deterministically(tmp_path: Path) -> None:
@@ -354,6 +396,7 @@ def test_html_report_escapes_table_content_and_links_figures_deterministically(t
             }
         ],
     )
+    (table_dir / "output_manifest.json").write_text('{"kind": "test_manifest"}\n', encoding="utf-8")
     figure_path = tmp_path / "figures" / "quicklook<1>.png"
     figure_path.parent.mkdir()
     figure_path.write_bytes(b"placeholder")
@@ -363,26 +406,38 @@ def test_html_report_escapes_table_content_and_links_figures_deterministically(t
         output_dir=tmp_path / "report",
         quicklook_paths=(str(figure_path),),
         include_html=True,
+        include_index=True,
     )
     html_path = report_path.with_suffix(".html")
+    index_path = report_path.with_name("index.html")
     first_html = html_path.read_text(encoding="utf-8")
+    first_index = index_path.read_text(encoding="utf-8")
 
     write_virtual_experiment_report(
         table_dir=table_dir,
         output_dir=tmp_path / "report",
         quicklook_paths=(str(figure_path),),
         include_html=True,
+        include_index=True,
     )
 
     assert report_path.exists()
     assert html_path.exists()
+    assert index_path.exists()
     assert html_path.read_text(encoding="utf-8") == first_html
+    assert index_path.read_text(encoding="utf-8") == first_index
     assert "<script>alert(1)</script>" not in first_html
     assert "case_&lt;script&gt;alert(1)&lt;/script&gt;" in first_html
     assert "source &amp; enzyme" in first_html
     assert 'href="../tables/case_summary.csv"' in first_html
     assert "quicklook&lt;1&gt;.png" in first_html
     assert "validation, calibration, or empirical comparison" in first_html
+    assert 'href="virtual_experiment_report.md"' in first_index
+    assert 'href="virtual_experiment_report.html"' in first_index
+    assert 'href="../tables/output_manifest.json"' in first_index
+    assert 'href="../tables/case_summary.csv"' in first_index
+    assert 'href="../figures/quicklook&lt;1&gt;.png"' in first_index
+    assert "validation, calibration, empirical comparison, or scientific interpretation" in first_index
 
 
 def test_html_report_uses_report_relative_links_for_relative_inputs(
@@ -403,6 +458,7 @@ def test_html_report_uses_report_relative_links_for_relative_inputs(
             }
         ],
     )
+    (table_dir / "output_manifest.json").write_text('{"kind": "test_manifest"}\n', encoding="utf-8")
     figure_path = Path("outputs") / "figures" / "quicklook.png"
     figure_path.parent.mkdir()
     figure_path.write_bytes(b"placeholder")
@@ -412,13 +468,22 @@ def test_html_report_uses_report_relative_links_for_relative_inputs(
         output_dir=Path("outputs") / "report",
         quicklook_paths=(str(figure_path),),
         include_html=True,
+        include_index=True,
     )
 
     html = report_path.with_suffix(".html").read_text(encoding="utf-8")
+    index = report_path.with_name("index.html").read_text(encoding="utf-8")
     assert 'href="../case_summary.csv"' in html
     assert 'href="../figures/quicklook.png"' in html
     assert 'href="outputs/case_summary.csv"' not in html
     assert 'href="outputs/figures/quicklook.png"' not in html
+    assert 'href="virtual_experiment_report.md"' in index
+    assert 'href="virtual_experiment_report.html"' in index
+    assert 'href="../output_manifest.json"' in index
+    assert 'href="../case_summary.csv"' in index
+    assert 'href="../figures/quicklook.png"' in index
+    assert 'href="outputs/output_manifest.json"' not in index
+    assert 'href="outputs/case_summary.csv"' not in index
 
 
 def test_no_live_external_api_call_occurs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
