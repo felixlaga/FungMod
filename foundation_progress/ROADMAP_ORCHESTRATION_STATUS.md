@@ -30,7 +30,7 @@ Use this workflow for each roadmap PR:
 
 ## Phase And PR Queue
 
-Current next PR: **PR-07: BIO-003 registry-backed product inhibition assembly**.
+Current next PR: **PR-07: BIO-003 researcher-facing product inhibition example**.
 
 Validation remains important, but it is no longer allowed to block the core
 simulator roadmap. The current priority is to build the virtual-experiment
@@ -48,7 +48,7 @@ before improving the simulator itself.
 | PR-04 | Build-first roadmap reframe | complete once merged | Documentation and focused guardrail tests only. Move validation behind simulator capability work without deleting validation from the roadmap. |
 | PR-05 | PRODUCT-001 build-first exploratory virtual-experiment expansion | partial after environment-grid helper, assumption-summary outputs, modelability-item outputs, preflight report writer, preflight policy columns, mechanism-summary outputs, and a product-tour notebook | Expand the researcher-facing simulator toward the central product: broader fungus/source + substrate + environment inputs, explicit exploratory priors, complete degradation curves, uncertainty bands, provenance, limitations, and missing-mechanism reports. |
 | PR-06 | THERMO-003 dynamic thermodynamic and entropy constraints | complete for the scoped explicit-Q/entropy diagnostics notebook and configured-output diagnostics to date; broader THERMO-003 remains partial | Add general thermodynamic feasibility, entropy/irreversibility accounting, or energy-dissipation constraints where they can be implemented generically and tested without fungus- or substrate-specific shortcuts. |
-| PR-07 | BIO-003 mechanism expansion through generic process laws | current next; partial/software-tested for configured and registry-backed reversible product inhibition where explicit records exist | Add more biology only as implemented, provenance-backed, maturity-labelled, tested process laws. Prefer reusable mechanism families over case-specific fungus branches. |
+| PR-07 | BIO-003 mechanism expansion through generic process laws | current next; partial/software-tested for configured and registry-backed reversible product inhibition where explicit records exist, with this PR adding the scoped researcher-facing example | Add more biology only as implemented, provenance-backed, maturity-labelled, tested process laws. Prefer reusable mechanism families over case-specific fungus branches. |
 | PR-08 | VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred | Add sourced observations only after simulator outputs are mature enough that comparison is meaningful. Validation, calibration, and empirical comparison claims require real observations. |
 
 If a future orchestrator changes the queue, update this table, explain the

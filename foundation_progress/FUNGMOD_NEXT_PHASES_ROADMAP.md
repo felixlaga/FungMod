@@ -68,10 +68,11 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-07 BIO-003 registry-backed product
-inhibition assembly slice after the validation ingestion gate, build-first
-reframe, PRODUCT-001 public API/output slices, and THERMO-003 configured
-thermodynamic/entropy diagnostics to date. THERMO-003 remains partial after
+The current next PR is a scoped PR-07 BIO-003 researcher-facing product
+inhibition example slice after the registry-backed product-inhibition assembly,
+validation ingestion gate, build-first reframe, PRODUCT-001 public API/output
+slices, and THERMO-003 configured thermodynamic/entropy diagnostics to date.
+THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and a configured-output
 diagnostics notebook. Do not rebuild the completed scoped slices above unless

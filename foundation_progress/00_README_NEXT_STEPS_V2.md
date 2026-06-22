@@ -39,7 +39,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-07: BIO-003 registry-backed product inhibition assembly**.
+Current next PR: **PR-07: BIO-003 researcher-facing product inhibition example**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
