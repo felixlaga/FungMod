@@ -366,9 +366,9 @@ def _quicklook_link_items(paths: Sequence[str], *, output_dir: Path) -> list[str
 
 
 def _href_for(*, path: Path, output_dir: Path) -> str:
-    if path.is_absolute():
-        return Path(os.path.relpath(path, output_dir)).as_posix()
-    return path.as_posix()
+    target = path if path.is_absolute() else Path.cwd() / path
+    base = output_dir if output_dir.is_absolute() else Path.cwd() / output_dir
+    return Path(os.path.relpath(target, base)).as_posix()
 
 
 def _value(row: Mapping[str, str], field: str, *, fallback_field: str | None = None) -> str:

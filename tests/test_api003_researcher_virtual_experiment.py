@@ -385,6 +385,42 @@ def test_html_report_escapes_table_content_and_links_figures_deterministically(t
     assert "validation, calibration, or empirical comparison" in first_html
 
 
+def test_html_report_uses_report_relative_links_for_relative_inputs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    table_dir = Path("outputs")
+    table_dir.mkdir()
+    _write_csv(
+        table_dir / "case_summary.csv",
+        [
+            {
+                "case_id": "case_1",
+                "fungus_id": "source",
+                "substrate_id": "cellobiose",
+                "environment_id": "30C_pH5",
+                "modelability_status": "exploratory",
+            }
+        ],
+    )
+    figure_path = Path("outputs") / "figures" / "quicklook.png"
+    figure_path.parent.mkdir()
+    figure_path.write_bytes(b"placeholder")
+
+    report_path = write_virtual_experiment_report(
+        table_dir=table_dir,
+        output_dir=Path("outputs") / "report",
+        quicklook_paths=(str(figure_path),),
+        include_html=True,
+    )
+
+    html = report_path.with_suffix(".html").read_text(encoding="utf-8")
+    assert 'href="../case_summary.csv"' in html
+    assert 'href="../figures/quicklook.png"' in html
+    assert 'href="outputs/case_summary.csv"' not in html
+    assert 'href="outputs/figures/quicklook.png"' not in html
+
+
 def test_no_live_external_api_call_occurs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     def blocked_connect(*_args: Any, **_kwargs: Any) -> None:
         raise AssertionError("VirtualExperiment simulation must not call live external APIs.")
