@@ -166,12 +166,19 @@ def _metric_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
 def _threshold_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
     if not rows:
         return ["No threshold-time rows were present in the standard tables."]
-    return [
-        f"- `{_value(row, 'case_id')}` sample `{_value(row, 'sample_id')}` threshold "
-        f"{_value(row, 'threshold_fraction')} (`{_value(row, 'metric')}`): `{_value(row, 'status')}` "
-        f"at {_value(row, 'time')} {_value(row, 'units')}. {_value(row, 'note')}".rstrip()
-        for row in rows[:12]
-    ]
+    lines = []
+    for row in rows[:12]:
+        value = _value(row, "value")
+        units = _value(row, "units")
+        timing = f" at {value} {units}".rstrip() if value else ""
+        notes = _value(row, "notes")
+        suffix = f" {notes}" if notes else ""
+        lines.append(
+            f"- `{_value(row, 'case_id')}` sample `{_value(row, 'sample_id')}` threshold "
+            f"{_value(row, 'threshold_fraction')} (`{_value(row, 'metric')}`): "
+            f"`{_value(row, 'status')}`{timing}.{suffix}"
+        )
+    return lines
 
 
 def _mechanism_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
@@ -202,7 +209,7 @@ def _sampled_parameter_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
         return ["No sampled-parameter rows were present in the standard tables."]
     lines = []
     for row in rows[:12]:
-        value = _value(row, "value")
+        value = _value(row, "sampled_value")
         units = _value(row, "units")
         source_class = _value(row, "parameter_source_class")
         allowed_use = _value(row, "allowed_use")
