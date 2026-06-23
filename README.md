@@ -60,6 +60,9 @@ basic kinetics layer:
   core model logic,
 - a researcher-facing product-tour notebook for the public
   `virtual_experiment(...)` API and standard output tables,
+- a researcher-facing screen-comparison notebook that writes report artifacts
+  and inspects `comparison_summary.csv` guardrails without ranking
+  metadata-only environment grids,
 - human-editable YAML config folders for fungi, substrates, enzymes,
   environments, geometries, parameters, and experiments,
 - schema-checked config loaders with explicit unknown-value handling,
@@ -200,6 +203,10 @@ It is not whole-fungus growth, secretion, uptake, biomass, PET, lignin, full
 lignocellulose, organism-specific physiology, or empirical validation. Runtime
 environment-grid values are metadata unless an explicit response law or
 condition-specific parameter record is active.
+
+For a complete public-API walkthrough of guarded screen comparisons, report
+artifacts, and metadata-only environment-grid limitations, see
+`notebooks/examples/13_screen_comparison_summary_example.ipynb`.
 
 ## Public API
 
