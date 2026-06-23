@@ -26,6 +26,46 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Entropy-Production-Rate Notebook Coverage
+
+Date: 2026-06-23
+
+Status: `complete` for the scoped PR-13 notebook-coverage slice;
+THERMO-003 remains `partial` for broader dynamic thermodynamic and entropy
+constraints.
+
+Completed in this pass:
+
+- Extended `notebooks/examples/11_thermodynamics_entropy_diagnostics.ipynb`
+  so the configured-output fixture demonstrates both existing explicit
+  reaction-quotient Gibbs metadata and existing entropy-production-rate
+  metadata.
+- The notebook still uses public configured workflow APIs and package-written
+  `thermodynamic_summary.json` / `thermodynamic_summary.csv` outputs; it does
+  not implement thermodynamic equations inside notebook cells.
+- Added notebook smoke assertions proving the configured summary reports
+  `has_entropy_production_rate`, the entropy-rate equation, positive explicit
+  entropy-production-rate values, `joule / second / kelvin` units, and
+  `solver_time_enforcement == not_evaluated`.
+- Updated active README and roadmap/status docs so PR-12 is complete for the
+  PRODUCT-001 comparison/report-output notebook, this slice is PR-13
+  THERMO-003 entropy-production-rate notebook coverage, and
+  VALIDATION-DATA-001 remains deferred as PR-14.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+calibration routine, validation data, empirical comparison claim, inferred
+thermodynamics, inferred activities, inferred reaction quotients, inferred
+concentrations, redox-potential model, electron-balance model, solver-time
+thermodynamic enforcement, or notebook-only scientific implementation was
+added.
+
+Recommended next task: after this notebook-coverage slice is reviewed and
+merged, continue THERMO-003 only with another small generic constraint or
+output slice that uses explicit configured metadata and tests, continue
+PRODUCT-001 if the slice improves researcher-facing simulator capability from
+existing outputs, or start PR-14 validation-data work only when a
+source-backed numeric time-course dataset satisfies the active ingestion gate.
+
 ## PRODUCT-001 Screen Comparison Summary Example Notebook
 
 Date: 2026-06-23
@@ -51,7 +91,8 @@ Completed in this pass:
 - Updated active README and roadmap/status docs so PR-11 is complete for
   screen-comparison summary ergonomics, this example notebook is PR-12
   PRODUCT-001 comparison/report-output example notebook, and
-  VALIDATION-DATA-001 remains deferred as PR-13.
+  VALIDATION-DATA-001 remains deferred as PR-14 after the next build-first
+  THERMO-003 entropy-rate notebook slice.
 
 No biological mechanism, numerical model, solver behavior, registry records,
 calibration routine, validation data, empirical comparison claim, notebook-only
@@ -59,10 +100,11 @@ scientific implementation, inferred science, environment response law, ranking
 of metadata-only environment cases, or hidden report logic was added.
 
 Recommended next task: after this example-notebook slice is reviewed and
-merged, continue build-first PRODUCT-001 only if the next slice improves
-researcher-facing simulator capability from existing outputs, or start PR-13
-validation-data work only when a source-backed numeric time-course dataset
-satisfies the active ingestion gate.
+merged, continue PR-13 THERMO-003 entropy-production-rate notebook coverage
+without adding new thermodynamic behavior, continue build-first PRODUCT-001
+only if the next slice improves researcher-facing simulator capability from
+existing outputs, or start validation-data work only when a source-backed
+numeric time-course dataset satisfies the active ingestion gate.
 
 ## PRODUCT-001 Report-Folder Index Navigation
 

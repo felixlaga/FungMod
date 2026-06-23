@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-12:
+Scoped status as of PR-13:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -22,7 +22,7 @@ remain opt-in presentation layers over existing standard outputs.
 The completed screen-comparison summary slice adds `comparison_summary.csv` as
 a derived index over existing final-metric and threshold rows with explicit
 comparison/ranking guardrail columns.
-The current comparison/report-output example-notebook slice demonstrates the
+The completed comparison/report-output example-notebook slice demonstrates the
 public workflow for writing reports and inspecting those guardrails without
 ranking metadata-only environment grids.
 Virtual-experiment outputs now include mechanism_summary.csv for active process
@@ -32,16 +32,18 @@ public-API virtual-experiment tour without validation claims.
 Example notebooks also include
 `13_screen_comparison_summary_example.ipynb` for public-API report-output and
 guarded `comparison_summary.csv` inspection without validation claims.
-THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator
-and configured entropy-production-rate metadata diagnostic; configured runs
-now summarize those diagnostics, but there are still no inferred activities,
+THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator,
+configured entropy-production-rate metadata diagnostic, configured
+thermodynamic JSON/CSV summaries, and notebook coverage for both explicit-Q and
+entropy-rate output rows; there are still no inferred activities,
 concentrations, redox potentials, electron balances, or solver-time
 thermodynamic enforcement.
 Thermodynamic summaries are available as JSON and CSV when such validators run.
 Example notebooks now include
 `11_thermodynamics_entropy_diagnostics.ipynb` for configured explicit-Q Gibbs
-and entropy-output inspection without validation claims or solver-time
-enforcement.
+and entropy-production-rate output inspection without validation claims or
+solver-time enforcement, including the `has_entropy_production_rate` summary
+flag.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier and registry-backed case-template
 assembly when explicit product-state and K_i records exist.
@@ -52,7 +54,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-12: PRODUCT-001 comparison/report-output example notebook**.
+Current next PR: **PR-13: THERMO-003 entropy-production-rate notebook coverage**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -76,12 +78,12 @@ runtime pH, temperature, and oxygen grid values remain metadata-only unless an
 explicit response law or condition-specific parameter record is active.
 The completed screen-comparison summary slice adds `comparison_summary.csv` and
 `DegradationScreenResult.comparison_summary()` as a derived view over existing
-standard output rows. The current example-notebook slice must preserve
+standard output rows. The completed example-notebook slice preserves
 metadata-only environment guardrails and must not add biological mechanisms,
 solver behavior, validation data, calibration, empirical-comparison claims,
 unsupported ranking, inferred environment response, or hidden scientific logic.
 
-The current THERMO-003 slices should remain configured-output focused:
+The current THERMO-003 slice should remain configured-output focused:
 explicit caller-supplied dimensionless Q, temperature, standard Gibbs,
 condition-specific delta G, and reaction extent-rate metadata in;
 `thermodynamic_summary.json` and `.csv` out. They must not infer activities,
