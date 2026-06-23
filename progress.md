@@ -26,6 +26,44 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Screen Comparison Summary Example Notebook
+
+Date: 2026-06-23
+
+Status: `complete` for the scoped PR-12 example-notebook slice;
+PRODUCT-001 remains `partial` for broader researcher-facing output ergonomics.
+
+Completed in this pass:
+
+- Added `notebooks/examples/13_screen_comparison_summary_example.ipynb` as a
+  public-API example for running an existing virtual experiment, writing
+  standard outputs, writing Markdown/HTML/index report artifacts, and
+  inspecting `comparison_summary.csv`.
+- The notebook demonstrates metadata-only runtime environment-grid guardrails
+  through `comparison_allowed`, `ranking_allowed`,
+  `ranking_blocking_reason`, and `recommended_next_action` columns rather than
+  ranking cases or plotting environmental response.
+- Added notebook smoke coverage proving the example writes
+  `comparison_summary.csv`, `output_manifest.json`,
+  `virtual_experiment_report.md`, `virtual_experiment_report.html`, and
+  `report/index.html`, and that metadata-only rows remain blocked from
+  comparison/ranking use.
+- Updated active README and roadmap/status docs so PR-11 is complete for
+  screen-comparison summary ergonomics, this example notebook is PR-12
+  PRODUCT-001 comparison/report-output example notebook, and
+  VALIDATION-DATA-001 remains deferred as PR-13.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+calibration routine, validation data, empirical comparison claim, notebook-only
+scientific implementation, inferred science, environment response law, ranking
+of metadata-only environment cases, or hidden report logic was added.
+
+Recommended next task: after this example-notebook slice is reviewed and
+merged, continue build-first PRODUCT-001 only if the next slice improves
+researcher-facing simulator capability from existing outputs, or start PR-13
+validation-data work only when a source-backed numeric time-course dataset
+satisfies the active ingestion gate.
+
 ## PRODUCT-001 Report-Folder Index Navigation
 
 Date: 2026-06-22
@@ -63,7 +101,9 @@ source-backed numeric time-course dataset satisfies the active ingestion gate.
 
 Date: 2026-06-22
 
-Status: `partial` for researcher-facing screen-comparison ergonomics.
+Status: `complete` for the scoped PR-11 screen-comparison summary ergonomics
+slice; PRODUCT-001 remains `partial` for broader researcher-facing output
+ergonomics.
 
 Completed in this pass:
 
@@ -83,7 +123,7 @@ Completed in this pass:
 - Updated active README and roadmap/status docs so PR-10 is complete for
   report-folder index/navigation, this slice is PR-11 PRODUCT-001
   screen-comparison summary ergonomics, and VALIDATION-DATA-001 remains
-  deferred as PR-12.
+  deferred behind the next build-first slice.
 
 No biological mechanism, numerical model, solver behavior, registry records,
 calibration routine, validation data, empirical comparison claim, notebook
@@ -91,10 +131,10 @@ logic, inferred science, environment response law, ranking of metadata-only
 environment cases, or hidden report logic was added.
 
 Recommended next task: after this derived-output ergonomics slice is reviewed
-and merged, continue build-first PRODUCT-001 only if the next slice remains
-derived from existing standard outputs, or start PR-12 validation-data work
-only when a source-backed numeric time-course dataset satisfies the active
-ingestion gate.
+and merged, continue PR-12 PRODUCT-001 comparison/report-output example
+notebook work if it remains derived from existing standard outputs, or start
+PR-13 validation-data work only when a source-backed numeric time-course
+dataset satisfies the active ingestion gate.
 
 ## PRODUCT-001 HTML Virtual-Experiment Report Wrapper
 

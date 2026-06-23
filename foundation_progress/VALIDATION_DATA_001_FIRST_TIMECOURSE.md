@@ -22,11 +22,11 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-11: PRODUCT-001 screen-comparison summary ergonomics**.
+Current next PR: **PR-12: PRODUCT-001 comparison/report-output example notebook**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
-important, but it is deferred as PR-12 until the simulator can produce mature
+important, but it is deferred as PR-13 until the simulator can produce mature
 enough degradation outputs for comparison. This gate does not complete VALIDATION-DATA-001.
 
 ## Candidate Evidence Checked

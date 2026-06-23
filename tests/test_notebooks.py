@@ -17,6 +17,7 @@ NOTEBOOKS = [
 
 PRODUCT_NOTEBOOKS = [
     "10_virtual_experiment_product_tour.ipynb",
+    "13_screen_comparison_summary_example.ipynb",
 ]
 
 THERMODYNAMIC_NOTEBOOKS = [
@@ -110,6 +111,27 @@ def test_product_tour_notebook_is_researcher_facing_but_unvalidated() -> None:
     assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
 
 
+def test_screen_comparison_notebook_is_researcher_facing_but_unvalidated() -> None:
+    notebook = load_notebook("13_screen_comparison_summary_example.ipynb")
+    markdown = "\n".join(markdown_cells(notebook)).lower()
+    source = "\n".join(code_cells(notebook))
+
+    assert notebook["nbformat"] == 4
+    assert "researcher-facing exploratory example" in markdown
+    assert "not an empirical validation" in markdown
+    assert "metadata-only environment grid" in markdown
+    assert "must not rank" in markdown
+    assert "virtual_experiment(" in source
+    assert "environment_grid(" in source
+    assert "write_report(" in source
+    assert "include_html=True" in source
+    assert "include_index=True" in source
+    assert "comparison_summary()" in source
+    assert "comparison_summary.csv" in source
+    assert "ranking_blocking_reason" in source
+    assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
+
+
 def test_thermodynamics_entropy_notebook_uses_configured_outputs_only() -> None:
     notebook = load_notebook("11_thermodynamics_entropy_diagnostics.ipynb")
     markdown = "\n".join(markdown_cells(notebook)).lower()
@@ -197,6 +219,39 @@ def test_product_tour_notebook_executes_smoke_path_with_temp_outputs(
     assert (output / "assumption_summary.csv").exists()
     assert (output / "limitations_table.csv").exists()
     assert (output / "output_manifest.json").exists()
+
+
+def test_screen_comparison_notebook_executes_smoke_path_with_temp_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "notebook_outputs"
+    monkeypatch.setenv("FUNGMOD_NOTEBOOK_OUTPUT_ROOT", str(output_root))
+    _execute_notebook("13_screen_comparison_summary_example.ipynb")
+
+    output = output_root / "13_screen_comparison_summary_example"
+    comparison_rows = _csv_rows(output / "comparison_summary.csv")
+    assert (output / "output_manifest.json").exists()
+    assert (output / "report" / "virtual_experiment_report.md").exists()
+    assert (output / "report" / "virtual_experiment_report.html").exists()
+    assert (output / "report" / "index.html").exists()
+    index_text = (output / "report" / "index.html").read_text(encoding="utf-8")
+    assert "comparison_summary.csv" in index_text
+    assert comparison_rows
+    required_columns = {
+        "comparison_allowed",
+        "ranking_allowed",
+        "ranking_blocking_reason",
+        "recommended_next_action",
+    }
+    assert required_columns.issubset(comparison_rows[0])
+    assert {row["comparison_allowed"] for row in comparison_rows} == {"false"}
+    assert {row["ranking_allowed"] for row in comparison_rows} == {"false"}
+    assert all("cannot be ranked" in row["ranking_blocking_reason"] for row in comparison_rows)
+    assert {
+        row["recommended_next_action"]
+        for row in comparison_rows
+    } == {"inspect_source_rows_only_do_not_rank_or_plot_as_response"}
 
 
 def test_thermodynamics_entropy_notebook_executes_smoke_path_with_temp_outputs(

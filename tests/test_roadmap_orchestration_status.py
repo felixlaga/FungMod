@@ -67,10 +67,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-11: PRODUCT-001 screen-comparison summary ergonomics"
+    current_next = "PR-12: PRODUCT-001 comparison/report-output example notebook"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is a scoped PR-11 PRODUCT-001 screen-comparison summary" in roadmap
+    assert "The current next PR is a scoped PR-12 PRODUCT-001 comparison/report-output" in roadmap
+    assert "PR-11 screen-comparison summary ergonomics" in roadmap
     assert "PR-10 report-folder index/navigation" in roadmap
 
     for text in (status, next_steps):
@@ -87,7 +88,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-11: PRODUCT-001 screen-comparison summary ergonomics"
+    current_next = "PR-12: PRODUCT-001 comparison/report-output example notebook"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -96,6 +97,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-07" not in text
         assert "Current next PR: **PR-09" not in text
         assert "Current next PR: **PR-10" not in text
+        assert "Current next PR: **PR-11" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -108,6 +110,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "comparison_summary.csv" in next_steps
     assert "DegradationScreenResult.comparison_summary()" in next_steps
     assert "ranking_blocking_reason" in status
+    assert "13_screen_comparison_summary_example.ipynb" in status
+    assert "13_screen_comparison_summary_example.ipynb" in next_steps
     assert "DegradationScreenResult.write_report(...)" in next_steps
     assert "include_html=True" in next_steps
     assert "include_index=True" in next_steps
@@ -132,7 +136,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-09 | PRODUCT-001 HTML report wrapper" in status
     assert "PR-10 | PRODUCT-001 report-folder index/navigation" in status
     assert "PR-11 | PRODUCT-001 screen-comparison summary ergonomics" in status
-    assert "PR-12 | VALIDATION-DATA-001" in status
+    assert "PR-12 | PRODUCT-001 comparison/report-output example notebook" in status
+    assert "PR-13 | VALIDATION-DATA-001" in status
 
 
 def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> None:
@@ -177,7 +182,7 @@ def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-11: PRODUCT-001 screen-comparison summary ergonomics"
+    current_next = "PR-12: PRODUCT-001 comparison/report-output example notebook"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -187,11 +192,12 @@ def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:
         assert "PR-07" not in _current_next_lines(text)
         assert "PR-09" not in _current_next_lines(text)
         assert "PR-10" not in _current_next_lines(text)
+        assert "PR-11" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset | deferred; blocked/partial" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
     assert "Status: `deferred; blocked/partial` for ingestion." in gate
-    assert "deferred as PR-12" in gate
+    assert "deferred as PR-13" in gate
     assert "Status: `complete`" not in gate
     assert "does not complete VALIDATION-DATA-001" in gate
     assert "validation, calibration, or empirical comparison claims" in roadmap

@@ -68,12 +68,13 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-11 PRODUCT-001 screen-comparison summary
-ergonomics slice after the registry-backed product-inhibition assembly and
+The current next PR is a scoped PR-12 PRODUCT-001 comparison/report-output
+example notebook slice after the registry-backed product-inhibition assembly and
 researcher-facing example, validation ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
-writer, PR-09 HTML report wrapper, and PR-10 report-folder index/navigation,
-and THERMO-003 configured thermodynamic/entropy diagnostics to date.
+writer, PR-09 HTML report wrapper, PR-10 report-folder index/navigation, and
+PR-11 screen-comparison summary ergonomics, and THERMO-003 configured
+thermodynamic/entropy diagnostics to date.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and a configured-output

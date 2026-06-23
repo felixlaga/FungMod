@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-11:
+Scoped status as of PR-12:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -19,13 +19,19 @@ scoped `DegradationScreenResult.write_report(...)` Markdown report writer, the
 PR-09 HTML report wrapper, and the PR-10 report-folder index/navigation slice.
 The PR-09 `include_html=True` option and PR-10 `include_index=True` option
 remain opt-in presentation layers over existing standard outputs.
-The current screen-comparison summary slice adds `comparison_summary.csv` as a
-derived index over existing final-metric and threshold rows with explicit
+The completed screen-comparison summary slice adds `comparison_summary.csv` as
+a derived index over existing final-metric and threshold rows with explicit
 comparison/ranking guardrail columns.
+The current comparison/report-output example-notebook slice demonstrates the
+public workflow for writing reports and inspecting those guardrails without
+ranking metadata-only environment grids.
 Virtual-experiment outputs now include mechanism_summary.csv for active process
 laws, maturity, assumptions, limitations, and provenance.
 Example notebooks now include `10_virtual_experiment_product_tour.ipynb` for a
 public-API virtual-experiment tour without validation claims.
+Example notebooks also include
+`13_screen_comparison_summary_example.ipynb` for public-API report-output and
+guarded `comparison_summary.csv` inspection without validation claims.
 THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator
 and configured entropy-production-rate metadata diagnostic; configured runs
 now summarize those diagnostics, but there are still no inferred activities,
@@ -46,7 +52,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-11: PRODUCT-001 screen-comparison summary ergonomics**.
+Current next PR: **PR-12: PRODUCT-001 comparison/report-output example notebook**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -68,12 +74,12 @@ blocked cases. They improve the target researcher workflow and make exploratory
 assumptions, uncertain inputs, and preflight facts easier to inspect, but
 runtime pH, temperature, and oxygen grid values remain metadata-only unless an
 explicit response law or condition-specific parameter record is active.
-The current screen-comparison summary slice adds `comparison_summary.csv` and
+The completed screen-comparison summary slice adds `comparison_summary.csv` and
 `DegradationScreenResult.comparison_summary()` as a derived view over existing
-standard output rows. It must preserve metadata-only environment guardrails and
-must not add biological mechanisms, solver behavior, validation data,
-calibration, empirical-comparison claims, unsupported ranking, inferred
-environment response, or hidden scientific logic.
+standard output rows. The current example-notebook slice must preserve
+metadata-only environment guardrails and must not add biological mechanisms,
+solver behavior, validation data, calibration, empirical-comparison claims,
+unsupported ranking, inferred environment response, or hidden scientific logic.
 
 The current THERMO-003 slices should remain configured-output focused:
 explicit caller-supplied dimensionless Q, temperature, standard Gibbs,
