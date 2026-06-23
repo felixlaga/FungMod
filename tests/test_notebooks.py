@@ -141,9 +141,14 @@ def test_thermodynamics_entropy_notebook_uses_configured_outputs_only() -> None:
     assert "software-test fixture only" in markdown
     assert "not a researcher-facing scientific example" in markdown
     assert "does not infer activities" in markdown
+    assert "does not infer activities, reaction quotients, concentrations" in markdown
     assert "solver time" in markdown
     assert "run_configured_model(" in source
     assert "reaction_quotient_thermodynamic_metadata" in source
+    assert "entropy_production_rate_metadata" in source
+    assert "entropy_production_rate" in source
+    assert "condition_specific_delta_gibbs" in source
+    assert "reaction_extent_rate" in source
     assert "thermodynamic_summary.json" in source
     assert "thermodynamic_summary.csv" in source
     assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
@@ -266,11 +271,26 @@ def test_thermodynamics_entropy_notebook_executes_smoke_path_with_temp_outputs(
     summary = json.loads((output / "thermodynamic_summary.json").read_text(encoding="utf-8"))
     assert (output / "thermodynamic_summary.csv").exists()
     assert summary["kind"] == "configured_thermodynamic_summary"
-    assert summary["count"] == 1
+    assert summary["count"] == 2
     assert summary["has_reaction_quotient_gibbs"] is True
+    assert summary["has_entropy_production_rate"] is True
     assert summary["has_solver_time_enforcement"] is False
-    assert summary["rows"][0]["gibbs_equation"] == "delta_g = delta_g_standard + R*T*ln(Q)"
+    rows_by_name = {row["name"]: row for row in summary["rows"]}
+    assert rows_by_name["reaction_quotient_thermodynamic_feasibility"]["gibbs_equation"] == (
+        "delta_g = delta_g_standard + R*T*ln(Q)"
+    )
+    entropy_rate_row = rows_by_name["entropy_production_rate_metadata"]
+    assert entropy_rate_row["entropy_equation"] == (
+        "entropy_production_rate = -condition_specific_delta_gibbs * "
+        "reaction_extent_rate / temperature"
+    )
+    assert entropy_rate_row["entropy_production_rate"] > 0
+    assert entropy_rate_row["entropy_production_rate_units"] == "joule / second / kelvin"
+    csv_rows_by_name = {row["name"]: row for row in _csv_rows(output / "thermodynamic_summary.csv")}
+    assert csv_rows_by_name["entropy_production_rate_metadata"]["solver_time_enforcement"] == "not_evaluated"
+    assert float(csv_rows_by_name["entropy_production_rate_metadata"]["entropy_production_rate"]) > 0
     assert "No inferred activity model" in summary["unsupported_scope"]
+    assert "concentration model" in summary["unsupported_scope"]
 
 
 def test_product_inhibition_notebook_executes_smoke_path_with_temp_outputs(
