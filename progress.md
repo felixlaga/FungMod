@@ -26,6 +26,39 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Entropy-Budget Notebook Inspection
+
+Date: 2026-06-29
+
+Status: `complete` for the scoped PR-15 notebook-inspection slice once merged;
+THERMO-003 remains `partial` for broader dynamic thermodynamic and entropy
+constraints.
+
+Completed in this pass:
+
+- Extended `notebooks/examples/11_thermodynamics_entropy_diagnostics.ipynb`
+  so it inspects the package-generated entropy-budget fields in
+  `thermodynamic_summary.json`.
+- The notebook now displays `has_entropy_budget`, `entropy_budget_status`,
+  evaluated and negative counts, units, total, and limitations from the JSON
+  summary while confirming CSV output remains row-level diagnostics.
+- Updated notebook tests so the static notebook contract and execution smoke
+  path both prove the entropy-budget fields are visible and remain JSON-only.
+- Updated active README and roadmap/status docs so PR-15 is complete for the
+  scoped notebook-inspection slice, PR-16 is the next build-first PRODUCT-001
+  uncertainty-band output ergonomics target, and VALIDATION-DATA-001 remains
+  deferred to PR-17.
+
+No source code, numerical model, solver behavior, biological mechanism,
+registry record, validation dataset, calibration routine, empirical comparison
+claim, inferred thermodynamics, inferred activity/reaction-quotient model,
+solver-time thermodynamic enforcement, or output schema was added.
+
+Recommended next task: implement PR-16 as a small PRODUCT-001 slice that
+surfaces existing explicit uncertainty/range metadata more clearly in standard
+outputs or reports without validation data, calibration, empirical comparison,
+inferred environment responses, or silent fallback constants.
+
 ## PR-14 Post-Merge Current-Next Rollover
 
 Date: 2026-06-29

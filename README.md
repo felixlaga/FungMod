@@ -269,9 +269,10 @@ empirical validation:
 Notebook tests check that notebooks import `fungal_model`, avoid defining core
 rate laws/classes or low-level solvers inline, and execute every foundation,
 product-tour, and thermodynamic-output smoke path. The thermodynamics notebook
-uses configured explicit-Q Gibbs and entropy-production-rate metadata only; it
-does not infer activities, reaction quotients, concentrations, redox
-potentials, or solver-time thermodynamic enforcement.
+uses configured explicit-Q Gibbs and entropy-production-rate metadata only and
+inspects the configured entropy-budget JSON summary; it does not infer
+activities, reaction quotients, concentrations, redox potentials, or
+solver-time thermodynamic enforcement.
 The product-inhibition notebook demonstrates the generic reversible
 `1 / (1 + P / K_i)` modifier through the public virtual-experiment API and
 standard output tables with an explicit exploratory example `K_i`; it is not

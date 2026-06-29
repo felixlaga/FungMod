@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-14 after merge:
+Scoped status as of PR-15 after merge:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -45,10 +45,11 @@ The JSON summary includes `has_entropy_budget`,
 `entropy_budget_status` fields while leaving missing or non-numeric
 entropy-rate metadata unevaluated rather than treating it as zero.
 Example notebooks now include
-`11_thermodynamics_entropy_diagnostics.ipynb` for configured explicit-Q Gibbs
-and entropy-production-rate output inspection without validation claims or
-solver-time enforcement, including the `has_entropy_production_rate` summary
-flag.
+`11_thermodynamics_entropy_diagnostics.ipynb` for configured explicit-Q Gibbs,
+entropy-production-rate, and entropy-budget output inspection without
+validation claims or solver-time enforcement, including the
+`has_entropy_production_rate`, `has_entropy_budget`, and
+`entropy_budget_status` summary fields.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier and registry-backed case-template
 assembly when explicit product-state and K_i records exist.
@@ -59,7 +60,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-15: THERMO-003 entropy-budget output notebook inspection**.
+Current next PR: **PR-16: PRODUCT-001 uncertainty-band output ergonomics**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -88,15 +89,16 @@ metadata-only environment guardrails and must not add biological mechanisms,
 solver behavior, validation data, calibration, empirical-comparison claims,
 unsupported ranking, inferred environment response, or hidden scientific logic.
 
-The current THERMO-003 slice should remain configured-output focused:
-explicit caller-supplied dimensionless Q, temperature, standard Gibbs,
-condition-specific delta G, and reaction extent-rate metadata in;
-`thermodynamic_summary.json` and `.csv` out. The next PR should make the
-new entropy-budget JSON fields visible in the researcher-facing diagnostics
-notebook/report path without adding new equations or notebook-only scientific
-logic. It must not infer activities, reaction quotients, concentrations,
-redox potentials, electron balances,
-validation evidence, or solver-time thermodynamic enforcement.
+THERMO-003 configured-output diagnostics should remain explicit metadata in and
+`thermodynamic_summary.json`/`.csv` out. The completed notebook inspection path
+must not infer activities, reaction quotients, concentrations, redox potentials,
+electron balances, validation evidence, or solver-time thermodynamic
+enforcement.
+
+The current PRODUCT-001 slice should improve uncertainty/range output
+ergonomics using existing explicit uncertainty metadata only. It must not add
+validation data, calibration, empirical-comparison claims, inferred environment
+responses, or silent fallback constants.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
