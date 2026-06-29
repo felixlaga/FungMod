@@ -13,7 +13,7 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -238,6 +238,7 @@ def _thermodynamic_summary(result: SimulationResult) -> dict[str, Any]:
         for item in thermodynamic_rows
         if item.get("name") == "entropy_production_rate_metadata"
     ]
+    entropy_budget = _entropy_budget_summary(entropy_rate_rows)
     return {
         "kind": "configured_thermodynamic_summary",
         "count": len(thermodynamic_rows),
@@ -245,6 +246,7 @@ def _thermodynamic_summary(result: SimulationResult) -> dict[str, Any]:
         "severity_counts": _count_by_key(thermodynamic_rows, "severity"),
         "has_reaction_quotient_gibbs": bool(reaction_quotient_rows),
         "has_entropy_production_rate": bool(entropy_rate_rows),
+        **entropy_budget,
         "has_solver_time_enforcement": False,
         "supported_scope": (
             "Explicit condition-specific and caller-supplied reaction-quotient "
@@ -257,6 +259,50 @@ def _thermodynamic_summary(result: SimulationResult) -> dict[str, Any]:
         "rows": [_thermodynamic_summary_row(item) for item in thermodynamic_rows],
     }
 
+
+def _entropy_budget_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    values: list[float] = []
+    for row in rows:
+        details = row.get("details", {})
+        if not isinstance(details, Mapping):
+            continue
+        if details.get("entropy_production_rate_units") != "joule / second / kelvin":
+            continue
+        value = details.get("entropy_production_rate")
+        if isinstance(value, bool) or not isinstance(value, (int, float, np.integer, np.floating)):
+            continue
+        numeric_value = float(cast(float, value))
+        if np.isfinite(numeric_value):
+            values.append(numeric_value)
+
+    negative_count = sum(1 for value in values if value < 0.0)
+    if not values:
+        status = "not_evaluated"
+    elif negative_count:
+        status = "negative_entropy_production_rate_detected"
+    else:
+        status = "non_negative"
+
+    return {
+        "has_entropy_budget": bool(values),
+        "entropy_budget_scope": (
+            "Aggregate over explicit configured entropy_production_rate_metadata rows "
+            "with numeric entropy_production_rate values and units exactly "
+            "joule / second / kelvin."
+        ),
+        "entropy_budget_units": "joule / second / kelvin",
+        "entropy_budget_total": sum(values) if values else None,
+        "entropy_budget_minimum": min(values) if values else None,
+        "entropy_budget_negative_count": negative_count,
+        "entropy_budget_evaluated_count": len(values),
+        "entropy_budget_status": status,
+        "entropy_budget_limitations": (
+            "Missing, non-numeric, or differently unitized entropy-rate values are "
+            "left unevaluated and are not treated as zero. This is a configured "
+            "metadata summary only; it does not infer thermodynamic quantities or "
+            "enforce solver-time feasibility."
+        ),
+    }
 
 def _is_thermodynamic_validation(item: Mapping[str, Any]) -> bool:
     name = str(item.get("name", ""))

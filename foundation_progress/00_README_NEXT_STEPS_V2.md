@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-13:
+Scoped status as of PR-14:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -34,11 +34,16 @@ Example notebooks also include
 guarded `comparison_summary.csv` inspection without validation claims.
 THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator,
 configured entropy-production-rate metadata diagnostic, configured
-thermodynamic JSON/CSV summaries, and notebook coverage for both explicit-Q and
-entropy-rate output rows; there are still no inferred activities,
+thermodynamic JSON/CSV summaries, notebook coverage for both explicit-Q and
+entropy-rate output rows, and a configured entropy-budget JSON summary over
+numeric explicit entropy-rate rows; there are still no inferred activities,
 concentrations, redox potentials, electron balances, or solver-time
 thermodynamic enforcement.
 Thermodynamic summaries are available as JSON and CSV when such validators run.
+The JSON summary includes `has_entropy_budget`,
+`entropy_budget_evaluated_count`, `entropy_budget_negative_count`, and
+`entropy_budget_status` fields while leaving missing or non-numeric
+entropy-rate metadata unevaluated rather than treating it as zero.
 Example notebooks now include
 `11_thermodynamics_entropy_diagnostics.ipynb` for configured explicit-Q Gibbs
 and entropy-production-rate output inspection without validation claims or
@@ -54,7 +59,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-13: THERMO-003 entropy-production-rate notebook coverage**.
+Current next PR: **PR-14: THERMO-003 configured entropy-budget summary**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still

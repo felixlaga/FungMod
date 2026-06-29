@@ -431,6 +431,14 @@ def test_configured_entropy_production_rate_validator_writes_thermodynamic_summa
 
     assert entropy_rate_validation["status"] == "passed"
     assert summary["has_entropy_production_rate"] is True
+    assert summary["has_entropy_budget"] is True
+    assert summary["entropy_budget_units"] == "joule / second / kelvin"
+    assert summary["entropy_budget_total"] == pytest.approx(20.0 / 298.15)
+    assert summary["entropy_budget_minimum"] == pytest.approx(20.0 / 298.15)
+    assert summary["entropy_budget_negative_count"] == 0
+    assert summary["entropy_budget_evaluated_count"] == 1
+    assert summary["entropy_budget_status"] == "non_negative"
+    assert "not treated as zero" in summary["entropy_budget_limitations"]
     assert summary["has_solver_time_enforcement"] is False
     assert "concentration model" in summary["unsupported_scope"]
     assert summary["rows"][0]["entropy_equation"] == (
@@ -449,8 +457,89 @@ def test_configured_entropy_production_rate_validator_writes_thermodynamic_summa
     assert csv_rows[0]["delta_gibbs"] == ""
     assert csv_rows[0]["delta_gibbs_units"] == ""
     assert csv_rows[0]["solver_time_enforcement"] == "not_evaluated"
+    assert "entropy_budget_total" not in csv_rows[0]
     assert "thermodynamic_summary.json" in manifest["files"]
     assert "thermodynamic_summary.csv" in manifest["files"]
+
+
+def test_configured_entropy_budget_reports_mixed_explicit_rate_rows(tmp_path: Path) -> None:
+    config = _configured_static_validator_config(mode="exploratory")
+    config["validators"].extend(
+        [
+            {
+                "id": "positive_explicit_entropy_rate",
+                "validator_type": "entropy_production_rate_metadata",
+                "condition_specific_delta_gibbs": _parameter_config(
+                    symbol="dG_entropy_rate_positive",
+                    value=-10.0,
+                    units="kilojoule / mole",
+                ),
+                "reaction_extent_rate": _parameter_config(
+                    symbol="xi_dot_positive",
+                    value=2.0,
+                    units="millimole / second",
+                ),
+                "temperature": _parameter_config(symbol="T_entropy_rate_positive", value=298.15, units="kelvin"),
+            },
+            {
+                "id": "negative_explicit_entropy_rate",
+                "validator_type": "entropy_production_rate_metadata",
+                "condition_specific_delta_gibbs": _parameter_config(
+                    symbol="dG_entropy_rate_negative",
+                    value=5.0,
+                    units="kilojoule / mole",
+                ),
+                "reaction_extent_rate": _parameter_config(
+                    symbol="xi_dot_negative",
+                    value=1.0,
+                    units="millimole / second",
+                ),
+                "temperature": _parameter_config(symbol="T_entropy_rate_negative", value=298.15, units="kelvin"),
+            },
+            {
+                "id": "missing_explicit_entropy_rate",
+                "validator_type": "entropy_production_rate_metadata",
+                "condition_specific_delta_gibbs": _parameter_config(
+                    symbol="dG_entropy_rate_missing",
+                    value=None,
+                    units="kilojoule / mole",
+                ),
+                "reaction_extent_rate": _parameter_config(
+                    symbol="xi_dot_missing",
+                    value=1.0,
+                    units="millimole / second",
+                ),
+                "temperature": _parameter_config(symbol="T_entropy_rate_missing", value=298.15, units="kelvin"),
+            },
+        ]
+    )
+    output_dir = tmp_path / "entropy_budget_summary_output"
+
+    result = run_configured_model(_write_config(tmp_path, config), output_dir=output_dir)
+
+    entropy_rows = [
+        row
+        for row in result.validation_report()
+        if row["name"] == "entropy_production_rate_metadata"
+    ]
+    summary = json.loads((output_dir / "thermodynamic_summary.json").read_text(encoding="utf-8"))
+    with (output_dir / "thermodynamic_summary.csv").open(newline="", encoding="utf-8") as handle:
+        csv_rows = list(csv.DictReader(handle))
+
+    assert [row["status"] for row in entropy_rows] == ["passed", "failed", "inconclusive"]
+    assert summary["count"] == 3
+    assert summary["has_entropy_production_rate"] is True
+    assert summary["has_entropy_budget"] is True
+    assert summary["entropy_budget_scope"].startswith("Aggregate over explicit configured")
+    assert summary["entropy_budget_units"] == "joule / second / kelvin"
+    assert summary["entropy_budget_total"] == pytest.approx(15.0 / 298.15)
+    assert summary["entropy_budget_minimum"] == pytest.approx(-5.0 / 298.15)
+    assert summary["entropy_budget_negative_count"] == 1
+    assert summary["entropy_budget_evaluated_count"] == 2
+    assert summary["entropy_budget_status"] == "negative_entropy_production_rate_detected"
+    assert "does not infer thermodynamic quantities" in summary["entropy_budget_limitations"]
+    assert len(csv_rows) == 3
+    assert all("entropy_budget_status" not in row for row in csv_rows)
 
 
 def test_strict_config_rejects_failed_static_validator(tmp_path: Path) -> None:

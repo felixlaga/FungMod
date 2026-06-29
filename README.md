@@ -37,7 +37,7 @@ basic kinetics layer:
 - explicit reaction-quotient Gibbs feasibility and entropy-production
   diagnostics for caller-supplied dimensionless Q and entropy-rate metadata,
 - configured thermodynamic JSON/CSV summary outputs for explicit Gibbs/entropy
-  validation diagnostics,
+  validation diagnostics, including an aggregate explicit entropy-rate budget,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - least-squares calibration utilities with train/validation residual reporting,

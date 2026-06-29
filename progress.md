@@ -26,6 +26,44 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Configured Entropy-Budget Summary
+
+Date: 2026-06-23
+
+Status: `complete` for the scoped PR-14 configured entropy-budget summary
+slice; THERMO-003 remains `partial` for broader dynamic thermodynamic and
+entropy constraints.
+
+Completed in this pass:
+
+- Extended configured `thermodynamic_summary.json` with a top-level
+  explicit-metadata-only entropy-production budget over existing
+  `entropy_production_rate_metadata` validation rows.
+- The budget includes only numeric `entropy_production_rate` values whose
+  units are exactly `joule / second / kelvin`; missing, non-numeric, non-finite,
+  or differently unitized rows remain unevaluated and are not treated as zero.
+- Added focused configured-output tests for a single positive entropy-rate row
+  and a mixed positive/negative/missing entropy-rate run, including aggregate
+  total, minimum, evaluated count, negative count, status, and unchanged CSV
+  row schema.
+- Updated active README and roadmap/status docs so PR-13 is complete for the
+  entropy-production-rate notebook coverage, this slice is PR-14 THERMO-003
+  configured entropy-budget summary, and VALIDATION-DATA-001 is deferred to
+  PR-15.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+calibration routine, validation data, empirical comparison claim, inferred
+thermodynamics, inferred activities, inferred reaction quotients, inferred
+concentrations, redox-potential model, electron-balance model, solver-time
+thermodynamic enforcement, notebook-only scientific implementation, or CSV row
+schema change was added.
+
+Recommended next task: after this configured entropy-budget summary slice is
+reviewed and merged, either continue build-first simulator capability with a
+small explicit-metadata-only THERMO/PRODUCT slice, or start PR-15
+VALIDATION-DATA-001 only if a source-backed numeric time-course dataset
+satisfies the active ingestion gate.
+
 ## THERMO-003 Entropy-Production-Rate Notebook Coverage
 
 Date: 2026-06-23
@@ -50,7 +88,8 @@ Completed in this pass:
 - Updated active README and roadmap/status docs so PR-12 is complete for the
   PRODUCT-001 comparison/report-output notebook, this slice is PR-13
   THERMO-003 entropy-production-rate notebook coverage, and
-  VALIDATION-DATA-001 remains deferred as PR-14.
+  the next build-first THERMO-003 slice is PR-14 before
+  VALIDATION-DATA-001.
 
 No biological mechanism, numerical model, solver behavior, registry records,
 calibration routine, validation data, empirical comparison claim, inferred
@@ -63,8 +102,8 @@ Recommended next task: after this notebook-coverage slice is reviewed and
 merged, continue THERMO-003 only with another small generic constraint or
 output slice that uses explicit configured metadata and tests, continue
 PRODUCT-001 if the slice improves researcher-facing simulator capability from
-existing outputs, or start PR-14 validation-data work only when a
-source-backed numeric time-course dataset satisfies the active ingestion gate.
+existing outputs, or start validation-data work only when a source-backed
+numeric time-course dataset satisfies the active ingestion gate.
 
 ## PRODUCT-001 Screen Comparison Summary Example Notebook
 
@@ -91,8 +130,8 @@ Completed in this pass:
 - Updated active README and roadmap/status docs so PR-11 is complete for
   screen-comparison summary ergonomics, this example notebook is PR-12
   PRODUCT-001 comparison/report-output example notebook, and
-  VALIDATION-DATA-001 remains deferred as PR-14 after the next build-first
-  THERMO-003 entropy-rate notebook slice.
+  VALIDATION-DATA-001 remains deferred behind the next build-first THERMO-003
+  entropy-rate slices.
 
 No biological mechanism, numerical model, solver behavior, registry records,
 calibration routine, validation data, empirical comparison claim, notebook-only
@@ -175,8 +214,8 @@ environment cases, or hidden report logic was added.
 Recommended next task: after this derived-output ergonomics slice is reviewed
 and merged, continue PR-12 PRODUCT-001 comparison/report-output example
 notebook work if it remains derived from existing standard outputs, or start
-PR-13 validation-data work only when a source-backed numeric time-course
-dataset satisfies the active ingestion gate.
+validation-data work only when a source-backed numeric time-course dataset
+satisfies the active ingestion gate.
 
 ## PRODUCT-001 HTML Virtual-Experiment Report Wrapper
 
