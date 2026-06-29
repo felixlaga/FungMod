@@ -158,6 +158,7 @@ study.write_preflight_report(mode="scientific")
 The standard output folder includes long-format time series, final states,
 final metrics, threshold times, sampled parameters, summary metrics,
 guarded screen-comparison summaries, uncertainty/range summaries,
+trajectory quantile summaries,
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
@@ -174,6 +175,11 @@ grids remain explicitly blocked from ranking or response-plot interpretation.
 sample-output quantiles with explicit interpretation guardrails; it is not
 validation, calibration, empirical confidence intervals, or an inferred
 environment-response model.
+`trajectory_quantiles.csv` summarizes existing `time_series_long.csv` sample
+rows into p05/p50/p95 trajectory bands with explicit allowed-use and
+interpretation guardrails; it is not validation data, calibration evidence,
+empirical confidence intervals, posterior uncertainty, or new simulation
+behavior.
 Results can also render a deterministic Markdown report from those standard
 tables without adding validation or calibration claims. Optional HTML artifacts
 can be written beside the Markdown report for browser viewing: an HTML sidecar

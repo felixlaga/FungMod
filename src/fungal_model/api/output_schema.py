@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "1.3.0"
+OUTPUT_SCHEMA_VERSION = "1.4.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -348,6 +348,29 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("interpretation_guardrail", "Human-readable guardrail preventing validation/calibration overclaims."),
         ),
         primary_key=("case_id", "summary_type", "target_id", "source_table", "source_metric", "source_record_id"),
+    ),
+    "trajectory_quantiles": _table(
+        "Derived trajectory quantile bands over existing time_series_long rows.",
+        (
+            *COMMON_CASE_COLUMNS,
+            _column("time_index", "Zero-based index in the simulated time grid.", semantic_type="integer"),
+            _column("time", "Simulation time represented by this quantile row.", units_policy="time_units", semantic_type="number"),
+            _column("time_units", "Units for the time column."),
+            _column("state", "State or derived observable name summarized from time_series_long."),
+            _column("state_role", "Semantic role for the state or observable."),
+            _column("source_table", "Standard output table that supplied the values."),
+            _column("source_metric", "Source value summarized from the source table."),
+            _column("source", "Source class from time_series_long."),
+            _column("units", "Units for p05/p50/p95."),
+            _column("count", "Number of finite numeric sample rows summarized.", semantic_type="integer"),
+            _column("p05", "5th percentile over existing sample time-series values.", semantic_type="number"),
+            _column("p50", "Median over existing sample time-series values.", semantic_type="number"),
+            _column("p95", "95th percentile over existing sample time-series values.", semantic_type="number"),
+            _column("allowed_use", "Machine-readable allowed-use policy for the summarized values."),
+            _column("trajectory_band_status", "Machine-readable status for how the trajectory band was produced."),
+            _column("interpretation_guardrail", "Human-readable guardrail preventing validation/calibration overclaims."),
+        ),
+        primary_key=("case_id", "time_index", "state", "state_role", "source", "units"),
     ),
     "provenance_table": _table(
         "Registry and parameter provenance rows used by each case.",

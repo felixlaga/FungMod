@@ -20,6 +20,7 @@ TABLE_FILENAMES = {
     "assumption_summary": "assumption_summary.csv",
     "comparison_summary": "comparison_summary.csv",
     "uncertainty_summary": "uncertainty_summary.csv",
+    "trajectory_quantiles": "trajectory_quantiles.csv",
     "provenance_table": "provenance_table.csv",
     "limitations_table": "limitations_table.csv",
     "missing_parameters": "missing_parameters.csv",
@@ -93,6 +94,7 @@ def _render_report(
     mechanisms = tables["mechanism_summary"]
     sampled_parameters = tables["sampled_parameters"]
     uncertainty_summary = tables["uncertainty_summary"]
+    trajectory_quantiles = tables["trajectory_quantiles"]
     assumptions = tables["assumption_summary"]
     provenance = tables["provenance_table"]
     limitations = tables["limitations_table"]
@@ -132,6 +134,10 @@ def _render_report(
         "## Uncertainty and range summary",
         "",
         *_uncertainty_summary_lines(uncertainty_summary),
+        "",
+        "## Trajectory quantile bands",
+        "",
+        *_trajectory_quantile_lines(trajectory_quantiles),
         "",
         "## Assumptions",
         "",
@@ -272,6 +278,24 @@ def _uncertainty_summary_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
             f"- `{_value(row, 'summary_type')}` `{_value(row, 'target_id')}`: "
             f"p05={_value(row, 'p05')} p50={_value(row, 'p50')} p95={_value(row, 'p95')} "
             f"{_value(row, 'units')}; status `{_value(row, 'uncertainty_band_status')}`; "
+            f"allowed use `{_value(row, 'allowed_use')}`."
+        )
+    return lines
+
+
+def _trajectory_quantile_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
+    if not rows:
+        return ["No trajectory-quantile rows were present in the standard tables."]
+    lines = [
+        "These rows summarize existing `time_series_long.csv` sample values only. "
+        "They are not validation data, calibration results, empirical confidence intervals, or posterior uncertainty."
+    ]
+    for row in rows[:12]:
+        lines.append(
+            f"- `{_value(row, 'case_id')}` `{_value(row, 'state')}` at "
+            f"{_value(row, 'time')} {_value(row, 'time_units')}: "
+            f"p05={_value(row, 'p05')} p50={_value(row, 'p50')} p95={_value(row, 'p95')} "
+            f"{_value(row, 'units')}; count={_value(row, 'count')}; "
             f"allowed use `{_value(row, 'allowed_use')}`."
         )
     return lines

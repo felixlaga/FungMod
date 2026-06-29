@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-15 after merge:
+Scoped status as of PR-17 after merge:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -60,7 +60,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-17: PRODUCT-001 trajectory-quantile output ergonomics**.
+Current next PR: **PR-18: PRODUCT-001 trajectory-quantile example and quicklook ergonomics**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -95,6 +95,14 @@ sampled-parameter and summary-metric rows. It preserves allowed-use,
 uncertainty-band status, and interpretation guardrails and must not be read as
 validation, calibration, empirical confidence intervals, posterior
 uncertainty, inferred environment response, or solver/model behavior.
+The completed trajectory-quantile output ergonomics slice adds
+`trajectory_quantiles.csv` and
+`DegradationScreenResult.trajectory_quantiles()` as a derived view over
+existing `time_series_long.csv` sample rows. It preserves allowed-use,
+trajectory-band status, and interpretation guardrails and must not be read as
+validation data, calibration evidence, empirical confidence intervals,
+posterior uncertainty, inferred environment response, or solver/model
+behavior.
 
 THERMO-003 configured-output diagnostics should remain explicit metadata in and
 `thermodynamic_summary.json`/`.csv` out. The completed notebook inspection path
@@ -102,10 +110,11 @@ must not infer activities, reaction quotients, concentrations, redox potentials,
 electron balances, validation evidence, or solver-time thermodynamic
 enforcement.
 
-The current PRODUCT-001 slice should improve trajectory-level quantile or band
-output ergonomics using existing time-series sample rows only. It must not add
-validation data, calibration, empirical-comparison claims, inferred environment
-responses, solver/model changes, or silent fallback constants.
+The current PRODUCT-001 slice should improve trajectory-quantile inspection
+and quicklook ergonomics from existing standard output tables only. It must
+not add validation data, calibration, empirical-comparison claims, inferred
+environment responses, solver/model changes, hidden notebook science, or
+silent fallback constants.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
