@@ -26,6 +26,36 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-14 Post-Merge Current-Next Rollover
+
+Date: 2026-06-29
+
+Status: `complete` for the scoped docs/tests-only rollover once merged.
+
+Completed in this pass:
+
+- Marked the merged PR-14 configured entropy-budget summary as complete in the
+  active orchestrator queue.
+- Advanced the machine-checkable current-next target to PR-15 THERMO-003
+  entropy-budget output notebook inspection so the next build-first slice makes
+  the new JSON budget fields visible in a researcher-facing diagnostics path.
+- Kept VALIDATION-DATA-001 deferred and moved its future queue slot to PR-16;
+  validation still requires source-backed numeric time-course observations and
+  must not be presented as complete by this rollover.
+- Updated the roadmap/status contract tests so active docs and the validation
+  gate agree on the current-next line and do not point back to completed PR-14
+  in current-next wording.
+
+No source code, numerical behavior, solver behavior, notebook behavior,
+biological mechanism, registry record, validation dataset, calibration routine,
+empirical comparison claim, inferred thermodynamics, or output schema was
+changed.
+
+Recommended next task: implement PR-15 as a small notebook/report-output slice
+that inspects the configured entropy-budget JSON fields from explicit metadata
+only, with no new equations, inferred thermodynamics, validation data, or
+solver-time enforcement.
+
 ## THERMO-003 Configured Entropy-Budget Summary
 
 Date: 2026-06-23

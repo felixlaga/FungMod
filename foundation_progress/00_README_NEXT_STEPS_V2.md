@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-14:
+Scoped status as of PR-14 after merge:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -59,7 +59,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-14: THERMO-003 configured entropy-budget summary**.
+Current next PR: **PR-15: THERMO-003 entropy-budget output notebook inspection**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -91,8 +91,11 @@ unsupported ranking, inferred environment response, or hidden scientific logic.
 The current THERMO-003 slice should remain configured-output focused:
 explicit caller-supplied dimensionless Q, temperature, standard Gibbs,
 condition-specific delta G, and reaction extent-rate metadata in;
-`thermodynamic_summary.json` and `.csv` out. They must not infer activities,
-reaction quotients, concentrations, redox potentials, electron balances,
+`thermodynamic_summary.json` and `.csv` out. The next PR should make the
+new entropy-budget JSON fields visible in the researcher-facing diagnostics
+notebook/report path without adding new equations or notebook-only scientific
+logic. It must not infer activities, reaction quotients, concentrations,
+redox potentials, electron balances,
 validation evidence, or solver-time thermodynamic enforcement.
 
 The first BIO-003 target is generic reversible product inhibition. The
