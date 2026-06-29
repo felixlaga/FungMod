@@ -26,6 +26,42 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Uncertainty-Band Output Ergonomics
+
+Date: 2026-06-29
+
+Status: `complete` for the scoped PR-16 derived-output/report ergonomics
+slice once merged; PRODUCT-001 remains `partial` for broader
+researcher-facing output ergonomics.
+
+Completed in this pass:
+
+- Added `uncertainty_summary.csv` as a standard virtual-experiment output
+  table derived from existing sampled-parameter rows and per-case
+  `summary_metrics.csv` quantiles.
+- Added `DegradationScreenResult.uncertainty_summary()` for loading the
+  uncertainty/range summary without rerunning simulations.
+- Updated the Markdown report, optional HTML sidecar, and report-folder index
+  so the new standard table is visible while preserving explicit
+  interpretation guardrails.
+- Updated the versioned output schema and data dictionary to `1.3.0`, including
+  machine-readable allowed-use and uncertainty-band status columns.
+- Updated active README and roadmap/status docs so PR-16 is complete for the
+  scoped uncertainty-output ergonomics slice, PR-17 is the next build-first
+  PRODUCT-001 trajectory-quantile output ergonomics target, and
+  VALIDATION-DATA-001 remains deferred to PR-18 or later.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+validation data, calibration routine, empirical comparison claim, inferred
+environment response, posterior uncertainty claim, silent fallback constant, or
+notebook-only scientific implementation was added.
+
+Recommended next task: implement PR-17 as a small build-first PRODUCT-001 slice
+that derives trajectory-level quantile or band outputs from existing
+`time_series_long.csv` sample rows with explicit guardrails, without validation
+data, calibration, empirical comparison, inferred environment responses, or
+solver/model changes.
+
 ## THERMO-003 Entropy-Budget Notebook Inspection
 
 Date: 2026-06-29

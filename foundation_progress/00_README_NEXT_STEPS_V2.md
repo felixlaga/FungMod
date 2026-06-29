@@ -60,7 +60,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-16: PRODUCT-001 uncertainty-band output ergonomics**.
+Current next PR: **PR-17: PRODUCT-001 trajectory-quantile output ergonomics**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -88,6 +88,13 @@ standard output rows. The completed example-notebook slice preserves
 metadata-only environment guardrails and must not add biological mechanisms,
 solver behavior, validation data, calibration, empirical-comparison claims,
 unsupported ranking, inferred environment response, or hidden scientific logic.
+The completed uncertainty-output ergonomics slice adds
+`uncertainty_summary.csv` and
+`DegradationScreenResult.uncertainty_summary()` as a derived view over existing
+sampled-parameter and summary-metric rows. It preserves allowed-use,
+uncertainty-band status, and interpretation guardrails and must not be read as
+validation, calibration, empirical confidence intervals, posterior
+uncertainty, inferred environment response, or solver/model behavior.
 
 THERMO-003 configured-output diagnostics should remain explicit metadata in and
 `thermodynamic_summary.json`/`.csv` out. The completed notebook inspection path
@@ -95,10 +102,10 @@ must not infer activities, reaction quotients, concentrations, redox potentials,
 electron balances, validation evidence, or solver-time thermodynamic
 enforcement.
 
-The current PRODUCT-001 slice should improve uncertainty/range output
-ergonomics using existing explicit uncertainty metadata only. It must not add
+The current PRODUCT-001 slice should improve trajectory-level quantile or band
+output ergonomics using existing time-series sample rows only. It must not add
 validation data, calibration, empirical-comparison claims, inferred environment
-responses, or silent fallback constants.
+responses, solver/model changes, or silent fallback constants.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the

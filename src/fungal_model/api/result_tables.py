@@ -83,6 +83,7 @@ def write_standard_tables(
         "summary_metrics": destination / "summary_metrics.csv",
         "environment_summary": destination / "environment_summary.csv",
         "comparison_summary": destination / "comparison_summary.csv",
+        "uncertainty_summary": destination / "uncertainty_summary.csv",
         "provenance_table": destination / "provenance_table.csv",
         "limitations_table": destination / "limitations_table.csv",
         "missing_parameters": destination / "missing_parameters.csv",
@@ -158,6 +159,7 @@ def _build_table_rows(
         "summary_metrics": [],
         "environment_summary": [],
         "comparison_summary": [],
+        "uncertainty_summary": [],
         "provenance_table": [],
         "limitations_table": [],
         "missing_parameters": [],
@@ -232,6 +234,10 @@ def _build_table_rows(
         final_metric_rows=rows["final_metrics"],
         threshold_rows=rows["threshold_times"],
         environment_summary_rows=rows["environment_summary"],
+    )
+    rows["uncertainty_summary"] = _uncertainty_summary_rows(
+        sampled_parameter_rows=rows["sampled_parameters"],
+        summary_metric_rows=rows["summary_metrics"],
     )
     return rows
 
@@ -1283,6 +1289,112 @@ def _summary_metric_rows(
             }
         )
     return rows
+
+
+def _uncertainty_summary_rows(
+    *,
+    sampled_parameter_rows: Sequence[Mapping[str, Any]],
+    summary_metric_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    parameter_groups: dict[tuple[str, str, str, str, str], list[Mapping[str, Any]]] = {}
+    for row in sampled_parameter_rows:
+        key = (
+            str(row.get("case_id", "")),
+            str(row.get("role", "")),
+            str(row.get("symbol", "")),
+            str(row.get("source_record_id", "")),
+            str(row.get("units", "")),
+        )
+        parameter_groups.setdefault(key, []).append(row)
+    for (case_id, role, symbol, source_record_id, units), parameter_rows in sorted(parameter_groups.items()):
+        values = [_optional_float(row.get("sampled_value")) for row in parameter_rows]
+        numeric_values = [value for value in values if value is not None]
+        if not numeric_values:
+            continue
+        first = parameter_rows[0]
+        summary = summarize_numeric_values(numeric_values)
+        context = dict(first)
+        rows.append(
+            {
+                **_case_columns(context),
+                "summary_type": "sampled_parameter_distribution",
+                "target_id": symbol or role,
+                "target_label": role,
+                "source_table": "sampled_parameters",
+                "source_metric": "sampled_value",
+                "units": units,
+                "count": summary["count"],
+                "p05": summary["p05"],
+                "p50": summary["p50"],
+                "p95": summary["p95"],
+                "source_record_id": source_record_id,
+                "source_value_kind": first.get("source_value_kind", ""),
+                "source_maturity": first.get("source_maturity", ""),
+                "parameter_source_class": first.get("parameter_source_class", ""),
+                "exploratory_prior": first.get("exploratory_prior", ""),
+                "range_scope": first.get("range_scope", ""),
+                "range_interpretation": first.get("range_interpretation", ""),
+                "allowed_use": first.get("allowed_use", ""),
+                "uncertainty_band_status": _parameter_uncertainty_band_status(first),
+                "interpretation_guardrail": _parameter_uncertainty_guardrail(first),
+            }
+        )
+    for row in summary_metric_rows:
+        context = dict(row)
+        rows.append(
+            {
+                **_case_columns(context),
+                "summary_type": "output_metric_sample_distribution",
+                "target_id": row.get("metric", ""),
+                "target_label": row.get("metric", ""),
+                "source_table": "summary_metrics",
+                "source_metric": row.get("metric", ""),
+                "units": row.get("units", ""),
+                "count": row.get("count", ""),
+                "p05": row.get("p05", ""),
+                "p50": row.get("p50", ""),
+                "p95": row.get("p95", ""),
+                "source_record_id": "",
+                "source_value_kind": "",
+                "source_maturity": "",
+                "parameter_source_class": "",
+                "exploratory_prior": "",
+                "range_scope": "",
+                "range_interpretation": "",
+                "allowed_use": "exploratory_output_summary_not_validation",
+                "uncertainty_band_status": "computed_from_existing_sample_outputs",
+                "interpretation_guardrail": (
+                    "These p05/p50/p95 values summarize simulated samples from explicit inputs; "
+                    "they are not empirical confidence intervals, calibration results, or validation evidence."
+                ),
+            }
+        )
+    return rows
+
+
+def _parameter_uncertainty_band_status(row: Mapping[str, Any]) -> str:
+    value_kind = str(row.get("source_value_kind", ""))
+    if value_kind in {"range", "distribution"}:
+        return "computed_from_explicit_parameter_range"
+    if value_kind == "exact":
+        return "exact_source_value_repeated_across_samples"
+    if value_kind == "unknown":
+        return "unknown_source_value"
+    return "source_value_kind_not_recorded"
+
+
+def _parameter_uncertainty_guardrail(row: Mapping[str, Any]) -> str:
+    value_kind = str(row.get("source_value_kind", ""))
+    allowed_use = str(row.get("allowed_use", ""))
+    if value_kind in {"range", "distribution"}:
+        return (
+            "Band is derived from explicit sampled parameter values and allowed use "
+            f"`{allowed_use}`; it is not calibration, validation, or empirical uncertainty."
+        )
+    if value_kind == "exact":
+        return "Exact source value has no uncertainty band beyond repeated sampled output."
+    return "No scientific uncertainty interpretation is available for this source value kind."
 
 
 def _environment_summary_rows(

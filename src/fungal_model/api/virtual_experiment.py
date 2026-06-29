@@ -293,6 +293,11 @@ class DegradationScreenResult:
 
         return self._table_rows("comparison_summary", "comparison_summary.csv")
 
+    def uncertainty_summary(self) -> list[dict[str, str]]:
+        """Load the uncertainty/range summary without rerunning simulation."""
+
+        return self._table_rows("uncertainty_summary", "uncertainty_summary.csv")
+
     def provenance(self) -> list[dict[str, str]]:
         """Load the standard provenance table without rerunning simulation."""
 
