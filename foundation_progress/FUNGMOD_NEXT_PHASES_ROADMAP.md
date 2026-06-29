@@ -68,20 +68,23 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-13 THERMO-003 entropy-production-rate
-notebook coverage slice after the registry-backed product-inhibition assembly
-and researcher-facing example, validation ingestion gate, build-first reframe,
+The current next PR is a scoped PR-14 THERMO-003 configured entropy-budget
+summary slice after the registry-backed product-inhibition assembly and
+researcher-facing example, validation ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
 writer, PR-09 HTML report wrapper, PR-10 report-folder index/navigation,
-PR-11 screen-comparison summary ergonomics, and PR-12 comparison/report-output
-example notebook, and THERMO-003 configured thermodynamic/entropy diagnostics
-to date.
+PR-11 screen-comparison summary ergonomics, PR-12 comparison/report-output
+example notebook, and PR-13 THERMO-003 entropy-production-rate notebook
+coverage, plus THERMO-003 configured thermodynamic/entropy diagnostics to
+date.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
-diagnostics notebook coverage for explicit-Q and entropy-rate rows. Do not
-rebuild the completed scoped slices above unless code or tests contradict this
-status.
+diagnostics notebook coverage for explicit-Q and entropy-rate rows. The
+current slice adds only a JSON summary budget over existing explicit
+entropy-rate metadata rows; it does not infer thermodynamics or change solver
+behavior. Do not rebuild the completed scoped slices above unless code or
+tests contradict this status.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
