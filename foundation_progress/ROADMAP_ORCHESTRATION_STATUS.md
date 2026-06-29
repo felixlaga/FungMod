@@ -30,7 +30,7 @@ Use this workflow for each roadmap PR:
 
 ## Phase And PR Queue
 
-Current next PR: **PR-14: THERMO-003 configured entropy-budget summary**.
+Current next PR: **PR-15: THERMO-003 entropy-budget output notebook inspection**.
 
 Validation remains important, but it is no longer allowed to block the core
 simulator roadmap. The current priority is to build the virtual-experiment
@@ -55,8 +55,9 @@ before improving the simulator itself.
 | PR-11 | PRODUCT-001 screen-comparison summary ergonomics | complete once merged for the scoped derived-output summary; PRODUCT-001 remains partial | Add a derived `comparison_summary.csv` over existing final-metric and threshold rows, with machine-readable comparison/ranking guardrails and recommended next actions. No new biology, solver behavior, validation data, calibration, empirical comparison claims, unsupported ranking, inferred environment response, or hidden report logic. |
 | PR-12 | PRODUCT-001 comparison/report-output example notebook | complete once merged for the scoped example notebook; PRODUCT-001 remains partial | Add a public-API notebook that writes existing standard outputs and reports, inspects `comparison_summary.csv`, and explains metadata-only environment-grid guardrails. No new biology, solver behavior, validation data, calibration, empirical comparison claims, unsupported ranking, inferred environment response, or notebook-only scientific logic. |
 | PR-13 | THERMO-003 entropy-production-rate notebook coverage | complete once merged for the scoped notebook-coverage slice | Extend the configured-output thermodynamics notebook to inspect existing entropy-production-rate JSON/CSV fields from explicit configured metadata. No new equations, inferred thermodynamics, inferred activities/Q/concentrations, redox model, electron-balance model, validation claim, or solver-time enforcement. |
-| PR-14 | THERMO-003 configured entropy-budget summary | current next; partial for thermodynamic/entropy constraints | Add a top-level `thermodynamic_summary.json` budget over existing explicit `entropy_production_rate_metadata` rows, counting only numeric `joule / second / kelvin` entropy-rate values. No inferred thermodynamics, solver-time enforcement, validation data, registry biology, or CSV row-schema change. |
-| PR-15 | VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred | Add sourced observations only after simulator outputs are mature enough that comparison is meaningful. Validation, calibration, and empirical comparison claims require real observations. |
+| PR-14 | THERMO-003 configured entropy-budget summary | complete once merged for the scoped JSON-summary slice; THERMO-003 remains partial | Add a top-level `thermodynamic_summary.json` budget over existing explicit `entropy_production_rate_metadata` rows, counting only numeric `joule / second / kelvin` entropy-rate values. No inferred thermodynamics, solver-time enforcement, validation data, registry biology, or CSV row-schema change. |
+| PR-15 | THERMO-003 entropy-budget output notebook inspection | current next; partial for thermodynamic/entropy constraints | Extend researcher-facing configured-output diagnostics to inspect the new entropy-budget JSON fields from explicit configured metadata. No new equations, inferred thermodynamics, solver-time enforcement, validation data, or notebook-only scientific logic. |
+| PR-16 | VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred | Add sourced observations only after simulator outputs are mature enough that comparison is meaningful. Validation, calibration, and empirical comparison claims require real observations. |
 
 If a future orchestrator changes the queue, update this table, explain the
 reason in `progress.md`, and keep the current-next-PR line machine-checkable.

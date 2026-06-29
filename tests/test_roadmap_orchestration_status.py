@@ -67,10 +67,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-14: THERMO-003 configured entropy-budget summary"
+    current_next = "PR-15: THERMO-003 entropy-budget output notebook inspection"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is a scoped PR-14 THERMO-003 configured entropy-budget" in roadmap
+    assert "The current next PR is a scoped PR-15 THERMO-003 entropy-budget output" in roadmap
+    assert "PR-14 THERMO-003 configured entropy-budget summary" in roadmap
     assert "PR-13 THERMO-003 entropy-production-rate notebook" in roadmap
     assert "PR-12 comparison/report-output" in roadmap
     assert "PR-11 screen-comparison summary ergonomics" in roadmap
@@ -90,7 +91,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-14: THERMO-003 configured entropy-budget summary"
+    current_next = "PR-15: THERMO-003 entropy-budget output notebook inspection"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -102,6 +103,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-11" not in text
         assert "Current next PR: **PR-12" not in text
         assert "Current next PR: **PR-13" not in text
+        assert "Current next PR: **PR-14" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -148,7 +150,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-12 | PRODUCT-001 comparison/report-output example notebook" in status
     assert "PR-13 | THERMO-003 entropy-production-rate notebook coverage" in status
     assert "PR-14 | THERMO-003 configured entropy-budget summary" in status
-    assert "PR-15 | VALIDATION-DATA-001" in status
+    assert "PR-15 | THERMO-003 entropy-budget output notebook inspection" in status
+    assert "PR-16 | VALIDATION-DATA-001" in status
 
 
 def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> None:
@@ -193,7 +196,7 @@ def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-14: THERMO-003 configured entropy-budget summary"
+    current_next = "PR-15: THERMO-003 entropy-budget output notebook inspection"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -206,11 +209,12 @@ def test_validation_data_gate_keeps_pr03_current_and_not_complete() -> None:
         assert "PR-11" not in _current_next_lines(text)
         assert "PR-12" not in _current_next_lines(text)
         assert "PR-13" not in _current_next_lines(text)
+        assert "PR-14" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset | deferred; blocked/partial" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
     assert "Status: `deferred; blocked/partial` for ingestion." in gate
-    assert "deferred as PR-15" in gate
+    assert "deferred as PR-16" in gate
     assert "Status: `complete`" not in gate
     assert "does not complete VALIDATION-DATA-001" in gate
     assert "validation, calibration, or empirical comparison claims" in roadmap
