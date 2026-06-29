@@ -84,6 +84,7 @@ def write_standard_tables(
         "environment_summary": destination / "environment_summary.csv",
         "comparison_summary": destination / "comparison_summary.csv",
         "uncertainty_summary": destination / "uncertainty_summary.csv",
+        "trajectory_quantiles": destination / "trajectory_quantiles.csv",
         "provenance_table": destination / "provenance_table.csv",
         "limitations_table": destination / "limitations_table.csv",
         "missing_parameters": destination / "missing_parameters.csv",
@@ -160,6 +161,7 @@ def _build_table_rows(
         "environment_summary": [],
         "comparison_summary": [],
         "uncertainty_summary": [],
+        "trajectory_quantiles": [],
         "provenance_table": [],
         "limitations_table": [],
         "missing_parameters": [],
@@ -239,6 +241,7 @@ def _build_table_rows(
         sampled_parameter_rows=rows["sampled_parameters"],
         summary_metric_rows=rows["summary_metrics"],
     )
+    rows["trajectory_quantiles"] = _trajectory_quantile_rows(rows["time_series_long"])
     return rows
 
 
@@ -1371,6 +1374,71 @@ def _uncertainty_summary_rows(
             }
         )
     return rows
+
+
+def _trajectory_quantile_rows(time_series_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str, str, str, str, str, str, str], list[float]] = {}
+    contexts: dict[tuple[str, str, str, str, str, str, str, str], Mapping[str, Any]] = {}
+    for row in time_series_rows:
+        value = _optional_float(row.get("value"))
+        if value is None:
+            continue
+        key = (
+            str(row.get("case_id", "")),
+            str(row.get("time_index", "")),
+            str(row.get("time", "")),
+            str(row.get("time_units", "")),
+            str(row.get("state", "")),
+            str(row.get("state_role", "")),
+            str(row.get("source", "")),
+            str(row.get("units", "")),
+        )
+        contexts.setdefault(key, row)
+        grouped.setdefault(key, []).append(value)
+
+    output: list[dict[str, Any]] = []
+    for key in sorted(grouped, key=_trajectory_quantile_sort_key):
+        values = grouped[key]
+        summary = summarize_numeric_values(values)
+        if summary["count"] == 0:
+            continue
+        context = contexts[key]
+        _, time_index, time, time_units, state, state_role, source, units = key
+        output.append(
+            {
+                **_case_columns(context),
+                "time_index": time_index,
+                "time": time,
+                "time_units": time_units,
+                "state": state,
+                "state_role": state_role,
+                "source_table": "time_series_long",
+                "source_metric": "value",
+                "source": source,
+                "units": units,
+                "count": summary["count"],
+                "p05": summary["p05"],
+                "p50": summary["p50"],
+                "p95": summary["p95"],
+                "allowed_use": "exploratory_trajectory_summary_not_validation",
+                "trajectory_band_status": "computed_from_existing_time_series_rows",
+                "interpretation_guardrail": (
+                    "These p05/p50/p95 values summarize simulated sample time-series rows only; "
+                    "they are not validation data, calibration results, empirical confidence intervals, "
+                    "or posterior uncertainty."
+                ),
+            }
+        )
+    return output
+
+
+def _trajectory_quantile_sort_key(key: tuple[str, str, str, str, str, str, str, str]) -> tuple[str, int, str, str, str]:
+    case_id, time_index, _time, _time_units, state, state_role, source, _units = key
+    try:
+        numeric_time_index = int(time_index)
+    except ValueError:
+        numeric_time_index = -1
+    return (case_id, numeric_time_index, state, state_role, source)
 
 
 def _parameter_uncertainty_band_status(row: Mapping[str, Any]) -> str:

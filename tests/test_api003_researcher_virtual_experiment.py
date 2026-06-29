@@ -244,6 +244,7 @@ def test_result_table_accessors_return_standard_tables(tmp_path: Path) -> None:
     assert result.final_metrics()[0]["metric"]
     assert result.threshold_times()[0]["threshold_fraction"]
     assert result.sampled_parameters()[0]["symbol"]
+    assert result.trajectory_quantiles()[0]["state"]
     assert result.provenance()[0]["record_type"]
     assert result.limitations()[0]["limitation"]
     assert result.missing_parameters() == []
@@ -280,6 +281,9 @@ def test_result_write_report_renders_standard_table_facts_without_validation_cla
     assert "## Uncertainty and range summary" in report
     assert "not empirical confidence intervals, calibration results, or validation evidence" in report
     assert "sampled_parameter_distribution" in report
+    assert "## Trajectory quantile bands" in report
+    assert "time_series_long.csv" in report
+    assert "exploratory_trajectory_summary_not_validation" in report
     assert "homogeneous_michaelis_menten" in report
     assert "whole-fungus physiology" in report
     assert "user_supplied_exploratory_prior" in report
@@ -323,6 +327,7 @@ def test_result_write_report_can_write_html_sidecar_without_changing_markdown_co
     assert 'href="../case_summary.csv"' in html
     assert 'href="../final_metrics.csv"' in html
     assert 'href="../uncertainty_summary.csv"' in html
+    assert 'href="../trajectory_quantiles.csv"' in html
     assert "not an additional validation, calibration, or empirical comparison" in html
     assert "empirically validated" not in html.lower()
     assert "calibrated against observations" not in html.lower()
@@ -365,6 +370,7 @@ def test_result_write_report_can_write_report_folder_index_over_existing_artifac
     assert 'href="../case_summary.csv"' in index
     assert 'href="../final_metrics.csv"' in index
     assert 'href="../uncertainty_summary.csv"' in index
+    assert 'href="../trajectory_quantiles.csv"' in index
     assert 'href="../figures/quicklook&lt;summary&gt;.png"' in index
     assert "links existing output artifacts only" in index
     assert "validation, calibration, empirical comparison, or scientific interpretation" in index

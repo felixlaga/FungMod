@@ -298,6 +298,11 @@ class DegradationScreenResult:
 
         return self._table_rows("uncertainty_summary", "uncertainty_summary.csv")
 
+    def trajectory_quantiles(self) -> list[dict[str, str]]:
+        """Load trajectory quantile bands without rerunning simulation."""
+
+        return self._table_rows("trajectory_quantiles", "trajectory_quantiles.csv")
+
     def provenance(self) -> list[dict[str, str]]:
         """Load the standard provenance table without rerunning simulation."""
 

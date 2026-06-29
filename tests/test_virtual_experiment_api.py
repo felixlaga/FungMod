@@ -57,6 +57,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "environment_summary.csv",
         "comparison_summary.csv",
         "uncertainty_summary.csv",
+        "trajectory_quantiles.csv",
         "provenance_table.csv",
         "limitations_table.csv",
         "missing_parameters.csv",
@@ -84,6 +85,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     summary_rows = _csv_rows(output_dir / "summary_metrics.csv")
     comparison_rows = _csv_rows(output_dir / "comparison_summary.csv")
     uncertainty_rows = _csv_rows(output_dir / "uncertainty_summary.csv")
+    trajectory_quantile_rows = _csv_rows(output_dir / "trajectory_quantiles.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
     limitation_rows = _csv_rows(output_dir / "limitations_table.csv")
     missing_rows = _csv_rows(output_dir / "missing_parameters.csv")
@@ -92,7 +94,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     output_manifest = _json_mapping(output_dir / "output_manifest.json")
     output_schema = _json_mapping(output_dir / "virtual_experiment_output_schema.json")
 
-    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.3.0"
+    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.4.0"
     assert output_schema["schema_version"] == OUTPUT_SCHEMA_VERSION
 
     assert {"case_id", "sample_id", "fungus_id", "substrate_id", "environment_id", "time", "state", "value"}.issubset(
@@ -126,6 +128,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert any(row["metric"] == "final_product_concentration" and row["count"] == "6" for row in summary_rows)
     assert result.comparison_summary() == comparison_rows
     assert result.uncertainty_summary() == uncertainty_rows
+    assert result.trajectory_quantiles() == trajectory_quantile_rows
     assert any(
         row["source_table"] == "final_metrics"
         and row["source_metric"] == "final_product_concentration"
@@ -184,6 +187,24 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert {row["source_table"] for row in metric_uncertainty_rows} == {"summary_metrics"}
     assert {row["allowed_use"] for row in metric_uncertainty_rows} == {"exploratory_output_summary_not_validation"}
     assert all(float(row["p95"]) >= float(row["p05"]) for row in metric_uncertainty_rows)
+    substrate_trajectory_rows = [
+        row
+        for row in trajectory_quantile_rows
+        if row["state"] == "cellobiose_concentration"
+        and row["state_role"] == "substrate"
+        and row["source_table"] == "time_series_long"
+        and row["source_metric"] == "value"
+    ]
+    assert substrate_trajectory_rows
+    assert {row["count"] for row in substrate_trajectory_rows} == {"6"}
+    assert {row["allowed_use"] for row in substrate_trajectory_rows} == {
+        "exploratory_trajectory_summary_not_validation"
+    }
+    assert {row["trajectory_band_status"] for row in substrate_trajectory_rows} == {
+        "computed_from_existing_time_series_rows"
+    }
+    assert all("not validation data" in row["interpretation_guardrail"] for row in substrate_trajectory_rows)
+    assert all(float(row["p95"]) >= float(row["p05"]) for row in substrate_trajectory_rows)
     assert result.modelability_items() == modelability_rows
     assert any(
         row["item_status"] == "known"
@@ -257,6 +278,19 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         and row["output_schema_version"] == OUTPUT_SCHEMA_VERSION
         for row in dictionary_rows
     )
+    assert any(
+        row["table"] == "trajectory_quantiles" and row["column"] == "interpretation_guardrail"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "trajectory_quantiles"
+        and row["column"] == "output_schema_version"
+        and row["output_schema_version"] == OUTPUT_SCHEMA_VERSION
+        for row in dictionary_rows
+    )
+    output_schema_tables = output_schema["tables"]
+    assert isinstance(output_schema_tables, dict)
+    assert "trajectory_quantiles" in output_schema_tables
     assert any(
         row["table"] == "modelability_items" and row["column"] == "allowed_use"
         for row in dictionary_rows

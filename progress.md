@@ -26,6 +26,42 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Trajectory-Quantile Output Ergonomics
+
+Date: 2026-06-29
+
+Status: `complete` for the scoped PR-17 derived-output/report ergonomics
+slice once merged; PRODUCT-001 remains `partial` for broader
+researcher-facing output ergonomics.
+
+Completed in this pass:
+
+- Added `trajectory_quantiles.csv` as a standard virtual-experiment output
+  table derived from existing `time_series_long.csv` sample rows.
+- Added `DegradationScreenResult.trajectory_quantiles()` for loading
+  trajectory bands without rerunning simulations.
+- Updated the Markdown report, optional HTML sidecar, and report-folder index
+  so the new standard table is visible while preserving explicit
+  interpretation guardrails.
+- Updated the versioned output schema and data dictionary to `1.4.0`,
+  including machine-readable allowed-use, trajectory-band status, and
+  interpretation-guardrail columns.
+- Updated active README and roadmap/status docs so PR-17 is complete for the
+  scoped trajectory-quantile output ergonomics slice, PR-18 is the next
+  build-first PRODUCT-001 trajectory-quantile example and quicklook ergonomics
+  target, and VALIDATION-DATA-001 remains deferred to PR-19 or later.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+validation data, calibration routine, empirical comparison claim, inferred
+environment response, posterior uncertainty claim, silent fallback constant, or
+notebook-only scientific implementation was added.
+
+Recommended next task: implement PR-18 as a small build-first PRODUCT-001 slice
+that improves trajectory-quantile inspection and quicklook ergonomics from
+existing standard output tables with explicit guardrails, without validation
+data, calibration, empirical comparison, inferred environment responses,
+hidden notebook science, or solver/model changes.
+
 ## PRODUCT-001 Uncertainty-Band Output Ergonomics
 
 Date: 2026-06-29
