@@ -68,7 +68,7 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-16 PRODUCT-001 uncertainty-band output
+The current next PR is a scoped PR-17 PRODUCT-001 trajectory-quantile output
 ergonomics slice after the registry-backed product-inhibition assembly and
 researcher-facing example, validation ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
@@ -76,7 +76,8 @@ writer, PR-09 HTML report wrapper, PR-10 report-folder index/navigation,
 PR-11 screen-comparison summary ergonomics, PR-12 comparison/report-output
 example notebook, and PR-13 THERMO-003 entropy-production-rate notebook
 coverage, plus the PR-14 THERMO-003 configured entropy-budget summary and
-PR-15 entropy-budget output notebook inspection.
+PR-15 entropy-budget output notebook inspection, and the PR-16
+uncertainty-band output ergonomics slice.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -85,11 +86,16 @@ completed PR-14 slice added only a JSON summary budget over existing explicit
 entropy-rate metadata rows; it did not infer thermodynamics or change solver
 behavior. The completed PR-15 slice should make that budget inspectable in the
 diagnostics notebook path without adding equations, validation data, inferred
-thermodynamics, or solver-time enforcement. The current PRODUCT-001 slice should
-surface existing explicit uncertainty/range information more clearly without
-adding validation data, calibration, empirical comparison, inferred environment
-responses, or silent fallback constants. Do not rebuild the completed scoped
-slices above unless code or tests contradict this status.
+thermodynamics, or solver-time enforcement. The completed PR-16 slice should
+surface existing explicit uncertainty/range information in standard outputs and
+reports without adding validation data, calibration, empirical comparison,
+posterior uncertainty claims, inferred environment responses, or silent
+fallback constants. The current PRODUCT-001 slice should derive
+trajectory-level quantile or band outputs from existing sample time-series rows
+with explicit guardrails, without adding validation data, calibration,
+empirical comparison, inferred environment responses, solver/model changes, or
+silent fallback constants. Do not rebuild the completed scoped slices above
+unless code or tests contradict this status.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

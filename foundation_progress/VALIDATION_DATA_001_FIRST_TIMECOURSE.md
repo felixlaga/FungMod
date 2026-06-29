@@ -22,12 +22,13 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-16: PRODUCT-001 uncertainty-band output ergonomics**.
+Current next PR: **PR-17: PRODUCT-001 trajectory-quantile output ergonomics**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
-important, but it is deferred as PR-17 until the simulator can produce mature
-enough degradation outputs for comparison. This gate does not complete VALIDATION-DATA-001.
+important, but it is deferred to PR-18 or later until the simulator can produce
+mature enough degradation outputs for comparison. This gate does not complete
+VALIDATION-DATA-001.
 
 ## Candidate Evidence Checked
 

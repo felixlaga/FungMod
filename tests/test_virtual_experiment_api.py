@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 import pytest
 
 from fungal_model import EnvironmentGrid, VirtualExperiment
 from fungal_model.api import DegradationScreenResult, VirtualExperimentError
+from fungal_model.api.output_schema import OUTPUT_SCHEMA_VERSION
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +56,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "summary_metrics.csv",
         "environment_summary.csv",
         "comparison_summary.csv",
+        "uncertainty_summary.csv",
         "provenance_table.csv",
         "limitations_table.csv",
         "missing_parameters.csv",
@@ -61,6 +64,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "virtual_experiment_output_data_dictionary.csv",
         "virtual_experiment_output_schema.json",
         "virtual_experiment_summary.json",
+        "output_manifest.json",
     )
     for filename in required_files:
         assert (output_dir / filename).exists(), filename
@@ -79,11 +83,17 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     mechanism_rows = _csv_rows(output_dir / "mechanism_summary.csv")
     summary_rows = _csv_rows(output_dir / "summary_metrics.csv")
     comparison_rows = _csv_rows(output_dir / "comparison_summary.csv")
+    uncertainty_rows = _csv_rows(output_dir / "uncertainty_summary.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
     limitation_rows = _csv_rows(output_dir / "limitations_table.csv")
     missing_rows = _csv_rows(output_dir / "missing_parameters.csv")
     suggestion_rows = _csv_rows(output_dir / "suggested_experiments.csv")
     dictionary_rows = _csv_rows(output_dir / "virtual_experiment_output_data_dictionary.csv")
+    output_manifest = _json_mapping(output_dir / "output_manifest.json")
+    output_schema = _json_mapping(output_dir / "virtual_experiment_output_schema.json")
+
+    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.3.0"
+    assert output_schema["schema_version"] == OUTPUT_SCHEMA_VERSION
 
     assert {"case_id", "sample_id", "fungus_id", "substrate_id", "environment_id", "time", "state", "value"}.issubset(
         time_rows[0]
@@ -115,6 +125,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert any(row["metric"] == "time_to_10_percent_substrate_degradation" for row in threshold_rows)
     assert any(row["metric"] == "final_product_concentration" and row["count"] == "6" for row in summary_rows)
     assert result.comparison_summary() == comparison_rows
+    assert result.uncertainty_summary() == uncertainty_rows
     assert any(
         row["source_table"] == "final_metrics"
         and row["source_metric"] == "final_product_concentration"
@@ -150,6 +161,29 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         for row in enzyme_prior_rows
     )
     assert all(row["allowed_use"] == "exploratory_simulation_only_not_literature_curated" for row in enzyme_prior_rows)
+    enzyme_uncertainty_rows = [
+        row
+        for row in uncertainty_rows
+        if row["summary_type"] == "sampled_parameter_distribution"
+        and row["target_id"] == "enzyme_concentration_beta_glucosidase"
+    ]
+    assert enzyme_uncertainty_rows
+    assert {row["source_table"] for row in enzyme_uncertainty_rows} == {"sampled_parameters"}
+    assert {row["source_value_kind"] for row in enzyme_uncertainty_rows} == {"distribution"}
+    assert {row["uncertainty_band_status"] for row in enzyme_uncertainty_rows} == {
+        "computed_from_explicit_parameter_range"
+    }
+    assert all("not calibration" in row["interpretation_guardrail"] for row in enzyme_uncertainty_rows)
+    metric_uncertainty_rows = [
+        row
+        for row in uncertainty_rows
+        if row["summary_type"] == "output_metric_sample_distribution"
+        and row["target_id"] == "final_product_concentration"
+    ]
+    assert metric_uncertainty_rows
+    assert {row["source_table"] for row in metric_uncertainty_rows} == {"summary_metrics"}
+    assert {row["allowed_use"] for row in metric_uncertainty_rows} == {"exploratory_output_summary_not_validation"}
+    assert all(float(row["p95"]) >= float(row["p05"]) for row in metric_uncertainty_rows)
     assert result.modelability_items() == modelability_rows
     assert any(
         row["item_status"] == "known"
@@ -211,6 +245,16 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     )
     assert any(
         row["table"] == "comparison_summary" and row["column"] == "ranking_blocking_reason"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "uncertainty_summary" and row["column"] == "interpretation_guardrail"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "uncertainty_summary"
+        and row["column"] == "output_schema_version"
+        and row["output_schema_version"] == OUTPUT_SCHEMA_VERSION
         for row in dictionary_rows
     )
     assert any(
@@ -309,3 +353,10 @@ def test_virtual_experiment_writes_preflight_report_for_blocked_scientific_case(
 def _csv_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def _json_mapping(path: Path) -> dict[str, object]:
+    with path.open(encoding="utf-8") as handle:
+        data = json.load(handle)
+    assert isinstance(data, dict)
+    return data

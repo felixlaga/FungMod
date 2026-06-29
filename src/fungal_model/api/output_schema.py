@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "1.2.0"
+OUTPUT_SCHEMA_VERSION = "1.3.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -321,6 +321,33 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         ),
         primary_key=("case_id", "sample_id", "source_table", "source_metric", "threshold_fraction"),
         join_keys=("case_id", "sample_id"),
+    ),
+    "uncertainty_summary": _table(
+        "Derived uncertainty/range index over existing sampled parameters and per-case summary metrics.",
+        (
+            *COMMON_CASE_COLUMNS,
+            _column("summary_type", "Kind of uncertainty summary row.", allowed_values="sampled_parameter_distribution; output_metric_sample_distribution"),
+            _column("target_id", "Parameter symbol or metric represented by the row.", semantic_type="identifier"),
+            _column("target_label", "Human-readable target label."),
+            _column("source_table", "Standard output table that supplied the values."),
+            _column("source_metric", "Source value or metric summarized."),
+            _column("units", "Units for p05/p50/p95."),
+            _column("count", "Number of values summarized.", semantic_type="integer"),
+            _column("p05", "5th percentile over existing sampled values or sample outputs.", semantic_type="number"),
+            _column("p50", "Median over existing sampled values or sample outputs.", semantic_type="number"),
+            _column("p95", "95th percentile over existing sampled values or sample outputs.", semantic_type="number"),
+            _column("source_record_id", "Registry parameter record for sampled-parameter rows.", required=False, semantic_type="identifier"),
+            _column("source_value_kind", "Original ValueSpec kind for sampled-parameter rows.", required=False),
+            _column("source_maturity", "Maturity label for sampled-parameter source records.", required=False),
+            _column("parameter_source_class", "Normalized source class for sampled-parameter rows.", required=False),
+            _column("exploratory_prior", "Whether the sampled-parameter source is exploratory.", required=False, semantic_type="boolean"),
+            _column("range_scope", "Range/distribution scope for sampled-parameter rows.", required=False),
+            _column("range_interpretation", "Allowed interpretation for sampled-parameter ranges.", required=False),
+            _column("allowed_use", "Machine-readable allowed-use policy for the summarized values."),
+            _column("uncertainty_band_status", "Machine-readable status for how the band was produced."),
+            _column("interpretation_guardrail", "Human-readable guardrail preventing validation/calibration overclaims."),
+        ),
+        primary_key=("case_id", "summary_type", "target_id", "source_table", "source_metric", "source_record_id"),
     ),
     "provenance_table": _table(
         "Registry and parameter provenance rows used by each case.",

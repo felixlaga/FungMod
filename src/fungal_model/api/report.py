@@ -19,6 +19,7 @@ TABLE_FILENAMES = {
     "mechanism_summary": "mechanism_summary.csv",
     "assumption_summary": "assumption_summary.csv",
     "comparison_summary": "comparison_summary.csv",
+    "uncertainty_summary": "uncertainty_summary.csv",
     "provenance_table": "provenance_table.csv",
     "limitations_table": "limitations_table.csv",
     "missing_parameters": "missing_parameters.csv",
@@ -91,6 +92,7 @@ def _render_report(
     threshold_times = tables["threshold_times"]
     mechanisms = tables["mechanism_summary"]
     sampled_parameters = tables["sampled_parameters"]
+    uncertainty_summary = tables["uncertainty_summary"]
     assumptions = tables["assumption_summary"]
     provenance = tables["provenance_table"]
     limitations = tables["limitations_table"]
@@ -126,6 +128,10 @@ def _render_report(
         "## Parameter assumptions",
         "",
         *_sampled_parameter_lines(sampled_parameters),
+        "",
+        "## Uncertainty and range summary",
+        "",
+        *_uncertainty_summary_lines(uncertainty_summary),
         "",
         "## Assumptions",
         "",
@@ -250,6 +256,23 @@ def _sampled_parameter_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
         lines.append(
             f"- `{_value(row, 'symbol')}` = {value} {units}; "
             f"source class `{source_class}`; allowed use `{allowed_use}`."
+        )
+    return lines
+
+
+def _uncertainty_summary_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
+    if not rows:
+        return ["No uncertainty-summary rows were present in the standard tables."]
+    lines = [
+        "These rows summarize existing sampled parameters and simulated sample outputs only. "
+        "They are not empirical confidence intervals, calibration results, or validation evidence."
+    ]
+    for row in rows[:12]:
+        lines.append(
+            f"- `{_value(row, 'summary_type')}` `{_value(row, 'target_id')}`: "
+            f"p05={_value(row, 'p05')} p50={_value(row, 'p50')} p95={_value(row, 'p95')} "
+            f"{_value(row, 'units')}; status `{_value(row, 'uncertainty_band_status')}`; "
+            f"allowed use `{_value(row, 'allowed_use')}`."
         )
     return lines
 
