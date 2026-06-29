@@ -22,11 +22,11 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-15: THERMO-003 entropy-budget output notebook inspection**.
+Current next PR: **PR-16: PRODUCT-001 uncertainty-band output ergonomics**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
-important, but it is deferred as PR-16 until the simulator can produce mature
+important, but it is deferred as PR-17 until the simulator can produce mature
 enough degradation outputs for comparison. This gate does not complete VALIDATION-DATA-001.
 
 ## Candidate Evidence Checked
