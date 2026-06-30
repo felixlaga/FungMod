@@ -178,11 +178,21 @@ def _render_report(
         "",
         "## Assumptions",
         "",
-        *_message_lines(assumptions, preferred_fields=("message", "allowed_use")),
+        *_assumption_lines(assumptions),
+        "",
+        "## Provenance and limitation decision summary",
+        "",
+        *_decision_summary_lines(
+            assumptions=assumptions,
+            limitations=limitations,
+            missing_parameters=missing_parameters,
+            suggested_experiments=suggested_experiments,
+            provenance=provenance,
+        ),
         "",
         "## Limitations",
         "",
-        *_message_lines(limitations, preferred_fields=("limitation", "allowed_use")),
+        *_limitation_lines(limitations),
         "",
         "## Missing parameters",
         "",
@@ -190,7 +200,7 @@ def _render_report(
         "",
         "## Suggested follow-up experiments",
         "",
-        *_message_lines(suggested_experiments, preferred_fields=("suggested_experiment", "reason")),
+        *_suggested_experiment_lines(suggested_experiments),
         "",
         "## Provenance",
         "",
@@ -442,6 +452,91 @@ def _message_lines(rows: Sequence[Mapping[str, str]], *, preferred_fields: tuple
     return lines
 
 
+def _assumption_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
+    if not rows:
+        return ["None recorded in the standard table."]
+    lines = []
+    for row in rows[:12]:
+        message = _value(row, "message")
+        details = _row_details(
+            row,
+            (
+                ("row_type", "row type"),
+                ("item_id", "item"),
+                ("allowed_use", "allowed use"),
+                ("recommended_next_action", "recommended next action"),
+            ),
+        )
+        suffix = f"; {details}" if details else ""
+        lines.append(f"- {message}{suffix}" if message else f"- {_compact_row(row)}")
+    return lines
+
+
+def _decision_summary_lines(
+    *,
+    assumptions: Sequence[Mapping[str, str]],
+    limitations: Sequence[Mapping[str, str]],
+    missing_parameters: Sequence[Mapping[str, str]],
+    suggested_experiments: Sequence[Mapping[str, str]],
+    provenance: Sequence[Mapping[str, str]],
+) -> list[str]:
+    lines = [
+        "This summary is derived only from existing `assumption_summary.csv`, "
+        "`limitations_table.csv`, `missing_parameters.csv`, `suggested_experiments.csv`, "
+        "and `provenance_table.csv` rows. It is for deciding what to inspect or measure next; "
+        "it is not validation, calibration, empirical comparison, or inferred biology.",
+        "- Source row counts: "
+        f"assumptions={len(assumptions)}; limitations={len(limitations)}; "
+        f"missing parameters={len(missing_parameters)}; suggested experiments={len(suggested_experiments)}; "
+        f"provenance={len(provenance)}.",
+    ]
+    limitation_counts = _counts(limitations, "severity")
+    if limitation_counts:
+        lines.append(f"- Limitation severity counts: {_format_counts(limitation_counts)}.")
+    allowed_use_counts = _counts(assumptions, "allowed_use")
+    for key, count in _counts(provenance, "allowed_use").items():
+        allowed_use_counts[key] = allowed_use_counts.get(key, 0) + count
+    if allowed_use_counts:
+        lines.append(f"- Assumption/provenance allowed-use labels present: {_format_counts(allowed_use_counts)}.")
+    missing_counts = _counts(missing_parameters, "missing_status")
+    if missing_counts:
+        lines.append(f"- Missing-parameter status counts: {_format_counts(missing_counts)}.")
+    if suggested_experiments:
+        lines.append(f"- Suggested-experiment priority counts: {_format_counts(_counts(suggested_experiments, 'priority'))}.")
+        for row in suggested_experiments[:5]:
+            target = _value(row, "parameter_symbol") or _value(row, "suggestion_id")
+            lines.append(
+                f"- Next action `{target}` priority `{_value(row, 'priority')}`: "
+                f"{_value(row, 'suggested_experiment')} "
+                f"Allowed use after resolution `{_value(row, 'allowed_use_after_resolution')}`."
+            )
+    else:
+        lines.append("- Suggested-experiment priority counts: none recorded.")
+    exploratory_prior_count = sum(1 for row in provenance if _value(row, "exploratory_prior") == "true")
+    if exploratory_prior_count:
+        lines.append(f"- Exploratory-prior provenance rows: {exploratory_prior_count}.")
+    return lines
+
+
+def _limitation_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
+    if not rows:
+        return ["None recorded in the standard table."]
+    lines = []
+    for row in rows[:12]:
+        details = _row_details(
+            row,
+            (
+                ("case_id", "case"),
+                ("category", "category"),
+                ("severity", "severity"),
+                ("source", "source"),
+            ),
+        )
+        suffix = f"; {details}" if details else ""
+        lines.append(f"- {_value(row, 'limitation')}{suffix}" if _value(row, "limitation") else f"- {_compact_row(row)}")
+    return lines
+
+
 def _sampled_parameter_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
     if not rows:
         return ["No sampled-parameter rows were present in the standard tables."]
@@ -496,21 +591,58 @@ def _trajectory_quantile_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
 def _missing_parameter_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
     if not rows:
         return ["None recorded in the standard table."]
-    return [
-        f"- `{_value(row, 'parameter_symbol', fallback_field='item_id')}` expected units `{_value(row, 'expected_units')}`: "
-        f"{_value(row, 'message')}"
-        for row in rows[:12]
-    ]
+    lines = []
+    for row in rows[:12]:
+        symbol = _value(row, "parameter_symbol", fallback_field="item_id")
+        suggested = _value(row, "suggested_experiment")
+        suggested_suffix = f"; suggested resolution: {suggested}" if suggested else ""
+        lines.append(
+            f"- `{symbol}` status `{_value(row, 'missing_status')}`; "
+            f"expected units `{_value(row, 'expected_units')}`; "
+            f"source record `{_value(row, 'source_record_id')}`: {_value(row, 'message')}"
+            f"{suggested_suffix}"
+        )
+    return lines
+
+
+def _suggested_experiment_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
+    if not rows:
+        return ["None recorded in the standard table."]
+    lines = []
+    for row in rows[:12]:
+        target = _value(row, "parameter_symbol") or _value(row, "suggestion_id")
+        lines.append(
+            f"- `{target}` priority `{_value(row, 'priority')}`: "
+            f"{_value(row, 'suggested_experiment')} "
+            f"Rationale: {_value(row, 'rationale')} "
+            f"Allowed use after resolution `{_value(row, 'allowed_use_after_resolution')}`."
+        )
+    return lines
 
 
 def _provenance_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
     if not rows:
         return ["No provenance rows were present in the standard tables."]
-    return [
-        f"- `{_value(row, 'record_type')}` `{_value(row, 'record_id')}`: "
-        f"{_value(row, 'source') or _value(row, 'provenance') or _compact_row(row)}"
-        for row in rows[:12]
-    ]
+    lines = []
+    for row in rows[:12]:
+        source = _value(row, "source") or _value(row, "provenance") or _compact_row(row)
+        details = _row_details(
+            row,
+            (
+                ("role", "role"),
+                ("symbol", "symbol"),
+                ("maturity", "maturity"),
+                ("value_kind", "value kind"),
+                ("confidence_level", "confidence"),
+                ("range_scope", "range scope"),
+                ("range_interpretation", "range interpretation"),
+                ("allowed_use", "allowed use"),
+                ("notes", "notes"),
+            ),
+        )
+        suffix = f"; {details}" if details else ""
+        lines.append(f"- `{_value(row, 'record_type')}` `{_value(row, 'record_id')}`: {source}{suffix}")
+    return lines
 
 
 def _quicklook_lines(paths: Sequence[str]) -> list[str]:
@@ -527,6 +659,7 @@ def _render_html_report(
     quicklook_paths: Sequence[str],
 ) -> str:
     body = _markdown_to_html_body(markdown)
+    decision_links = _decision_table_link_items(table_root=table_root, output_dir=output_dir)
     table_links = _table_link_items(table_root=table_root, output_dir=output_dir)
     thermodynamic_links = _thermodynamic_link_items(table_root=table_root, output_dir=output_dir)
     quicklook_links = _quicklook_link_items(quicklook_paths, output_dir=output_dir)
@@ -546,6 +679,10 @@ def _render_html_report(
             "</head>",
             "<body>",
             body,
+            "<h2>Decision-support tables</h2>",
+            "<ul>",
+            *decision_links,
+            "</ul>",
             "<h2>Standard output tables</h2>",
             "<ul>",
             *table_links,
@@ -579,6 +716,7 @@ def _render_report_folder_index(
         html_path=html_path,
     )
     manifest_links = _manifest_link_items(table_root=table_root, report_dir=report_dir)
+    decision_links = _decision_table_link_items(table_root=table_root, output_dir=report_dir)
     table_links = _table_link_items(table_root=table_root, output_dir=report_dir)
     thermodynamic_links = _thermodynamic_link_items(table_root=table_root, output_dir=report_dir)
     quicklook_links = _quicklook_link_items(quicklook_paths, output_dir=report_dir)
@@ -606,6 +744,10 @@ def _render_report_folder_index(
             "<h2>Output manifest</h2>",
             "<ul>",
             *manifest_links,
+            "</ul>",
+            "<h2>Decision-support tables</h2>",
+            "<ul>",
+            *decision_links,
             "</ul>",
             "<h2>Standard CSV tables</h2>",
             "<ul>",
@@ -707,6 +849,24 @@ def _table_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
     return items
 
 
+def _decision_table_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
+    descriptions = {
+        "assumption_summary": "assumptions and allowed-use labels",
+        "limitations_table": "limitations and scientific guardrails",
+        "missing_parameters": "missing or incompatible inputs",
+        "suggested_experiments": "suggested experiments and curation tasks",
+        "provenance_table": "registry and parameter provenance rows",
+    }
+    items = []
+    for name, description in descriptions.items():
+        table_path = table_root / TABLE_FILENAMES[name]
+        if table_path.exists():
+            items.append(_link_item(path=table_path, base_dir=output_dir, label=table_path.name, description=description))
+    if not items:
+        return ["  <li>No decision-support CSV tables were present.</li>"]
+    return items
+
+
 def _thermodynamic_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
     items = []
     for name, filename in THERMODYNAMIC_FILENAMES.items():
@@ -778,6 +938,24 @@ def _format_counts(value: Any) -> str:
     if not isinstance(value, Mapping):
         return "{}"
     return "{" + ", ".join(f"{key}: {value[key]}" for key in sorted(value)) + "}"
+
+
+def _counts(rows: Sequence[Mapping[str, str]], field: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        key = _value(row, field)
+        if key:
+            counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _row_details(row: Mapping[str, str], fields: Sequence[tuple[str, str]]) -> str:
+    details = []
+    for field, label in fields:
+        value = _value(row, field)
+        if value:
+            details.append(f"{label} `{value}`")
+    return "; ".join(details)
 
 
 def _compact_row(row: Mapping[str, str]) -> str:
