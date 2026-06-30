@@ -9,6 +9,7 @@ import pytest
 import yaml
 
 from fungal_model import run_configured_model
+from fungal_model.api.report import write_virtual_experiment_report
 from fungal_model.chemistry.stoichiometry import (
     ElementalComposition,
     StoichiometricReactionMetadata,
@@ -394,6 +395,32 @@ def test_configured_reaction_quotient_validator_writes_thermodynamic_summary(tmp
     assert float(csv_rows[0]["residual_value"]) == pytest.approx(-5000.0)
     assert "thermodynamic_summary.json" in manifest["files"]
     assert "thermodynamic_summary.csv" in manifest["files"]
+
+    report_path = write_virtual_experiment_report(
+        table_dir=output_dir,
+        output_dir=output_dir / "report",
+        include_html=True,
+        include_index=True,
+    )
+    report = report_path.read_text(encoding="utf-8")
+    html = report_path.with_suffix(".html").read_text(encoding="utf-8")
+    index = report_path.with_name("index.html").read_text(encoding="utf-8")
+
+    assert "## Explicit thermodynamic diagnostics" in report
+    assert "existing configured-output `thermodynamic_summary.json` and `thermodynamic_summary.csv`" in report
+    assert "do not infer activities, reaction quotients, concentrations" in report
+    assert "validation evidence, or solver-time thermodynamic enforcement" in report
+    assert "`reaction_quotient_thermodynamic_feasibility`" in report
+    assert "delta_gibbs=-5000.0 joule / mole" in report
+    assert "delta_g = delta_g_standard + R*T*ln(Q)" in report
+    assert "solver-time enforcement `False`" in report
+    assert "No inferred activity model" in report
+    assert 'href="../thermodynamic_summary.json"' in html
+    assert 'href="../thermodynamic_summary.csv"' in html
+    assert 'href="../thermodynamic_summary.json"' in index
+    assert 'href="../thermodynamic_summary.csv"' in index
+    assert "empirically validated" not in report.lower()
+    assert "calibrated against observations" not in report.lower()
 
 
 def test_configured_entropy_production_rate_validator_writes_thermodynamic_summary(tmp_path: Path) -> None:

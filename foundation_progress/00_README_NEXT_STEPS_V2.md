@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-20 after merge:
+Scoped status as of PR-21 after merge:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -56,6 +56,10 @@ The JSON summary includes `has_entropy_budget`,
 `entropy_budget_evaluated_count`, `entropy_budget_negative_count`, and
 `entropy_budget_status` fields while leaving missing or non-numeric
 entropy-rate metadata unevaluated rather than treating it as zero.
+Report utilities now add Markdown, HTML, and report-folder index visibility for
+existing configured-output `thermodynamic_summary.json` and
+`thermodynamic_summary.csv` artifacts without inferring thermodynamic inputs or
+adding solver-time enforcement.
 Example notebooks now include
 `11_thermodynamics_entropy_diagnostics.ipynb` for configured explicit-Q Gibbs,
 entropy-production-rate, and entropy-budget output inspection without
@@ -72,7 +76,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-21: THERMO-003 explicit thermodynamic-summary report ergonomics**.
+Current next PR: **PR-22: PRODUCT-001 provenance/limitations report ergonomics**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -143,11 +147,17 @@ calibration, empirical-comparison claims, inferred environment responses,
 posterior uncertainty claims, solver/model changes, hidden notebook science,
 schema changes, or silent fallback constants.
 
-The current THERMO-003 slice should improve explicit thermodynamic-summary
-report or inspection ergonomics from existing configured-output diagnostics
-only. It must not infer activities, reaction quotients, concentrations, redox
-potentials, electron balances, validation evidence, or solver-time
-thermodynamic enforcement.
+The completed THERMO-003 thermodynamic-summary report ergonomics slice exposes
+existing `thermodynamic_summary.json` and `thermodynamic_summary.csv` artifacts
+in Markdown, HTML, and index report paths only. It does not infer activities,
+reaction quotients, concentrations, redox potentials, electron balances,
+validation evidence, or solver-time thermodynamic enforcement.
+
+The current PRODUCT-001 slice should improve provenance, limitation,
+missing-parameter, or suggested-experiment report ergonomics from existing
+standard output tables only. It must not add validation data, calibration,
+empirical comparison, inferred environment responses, hidden notebook science,
+schema changes, or solver/model behavior.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
