@@ -26,6 +26,41 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Degradation-Rate Quicklook And Report Ergonomics
+
+Date: 2026-06-30
+
+Status: `complete` for the scoped PR-19 quicklook/report inspection slice
+once merged; PRODUCT-001 remains `partial` for broader researcher-facing
+output ergonomics.
+
+Completed in this pass:
+
+- Added a presentation-only `degradation_rate_vs_time.png` quicklook figure
+  generated from existing `time_series_long.csv` `degradation_rate` rows.
+- Added a bounded degradation-rate inspection section to the deterministic
+  Markdown report, with optional HTML/index visibility flowing through the
+  existing report paths and standard table links.
+- Updated virtual-experiment API and report tests so the quicklook figure,
+  manifest entry, report guardrails, and `time_series_long.csv` report links
+  are exercised.
+- Updated active README and roadmap/status docs so PR-19 is complete for the
+  scoped degradation-rate inspection slice, PR-20 is the next build-first
+  PRODUCT-001 threshold-time inspection/report ergonomics target, and
+  VALIDATION-DATA-001 remains deferred to PR-21 or later.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+validation data, calibration routine, empirical comparison claim, inferred
+environment response, posterior uncertainty claim, silent fallback constant,
+CSV row contract change, or notebook-only scientific implementation was added.
+
+Recommended next task: implement PR-20 as a small build-first PRODUCT-001
+slice that improves threshold-time inspection/report ergonomics from existing
+`threshold_times.csv`, `summary_metrics.csv`, and report/index paths with
+explicit guardrails, without validation data, calibration, empirical
+comparison, inferred environment responses, hidden notebook science, or
+solver/model changes.
+
 ## PRODUCT-001 Trajectory-Quantile Example And Quicklook Ergonomics
 
 Date: 2026-06-30
@@ -48,7 +83,7 @@ Completed in this pass:
 - Updated active README and roadmap/status docs so PR-18 is complete for the
   scoped trajectory-quantile inspection slice, PR-19 is the next build-first
   PRODUCT-001 degradation-rate quicklook/report ergonomics target, and
-  VALIDATION-DATA-001 remains deferred to PR-20 or later.
+  VALIDATION-DATA-001 remained deferred behind build-first simulator work.
 
 No biological mechanism, numerical model, solver behavior, registry records,
 validation data, calibration routine, empirical comparison claim, inferred

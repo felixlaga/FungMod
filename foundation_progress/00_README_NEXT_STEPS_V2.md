@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-18 after merge:
+Scoped status as of PR-19 after merge:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -36,6 +36,10 @@ Example notebooks now include
 `14_trajectory_quantiles_example.ipynb` for public-API trajectory-quantile
 inspection and presentation-only quicklook generation without validation
 claims.
+The completed degradation-rate quicklook/report ergonomics slice adds a
+presentation-only `degradation_rate_vs_time.png` quicklook and a bounded degradation-rate inspection section
+from existing `time_series_long.csv` `degradation_rate` rows without changing
+solver/model behavior.
 THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator,
 configured entropy-production-rate metadata diagnostic, configured
 thermodynamic JSON/CSV summaries, notebook coverage for both explicit-Q and
@@ -64,7 +68,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-19: PRODUCT-001 degradation-rate quicklook/report ergonomics**.
+Current next PR: **PR-20: PRODUCT-001 threshold-time inspection/report ergonomics**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -114,6 +118,13 @@ The completed trajectory-quantile example and quicklook ergonomics slice adds
 standard output tables, not validation, calibration, empirical comparison,
 posterior uncertainty, inferred environment response, or solver/model
 behavior.
+The completed degradation-rate quicklook/report ergonomics slice adds
+`degradation_rate_vs_time.png` as a presentation-only quicklook generated from
+existing `time_series_long.csv` `degradation_rate` rows. The Markdown report
+and optional HTML/index outputs expose those existing rate rows for inspection
+with explicit guardrails; they do not add validation, calibration, empirical
+comparison, a new rate law, inferred environment response, or solver/model
+behavior.
 
 THERMO-003 configured-output diagnostics should remain explicit metadata in and
 `thermodynamic_summary.json`/`.csv` out. The completed notebook inspection path
@@ -121,11 +132,12 @@ must not infer activities, reaction quotients, concentrations, redox potentials,
 electron balances, validation evidence, or solver-time thermodynamic
 enforcement.
 
-The current PRODUCT-001 slice should improve degradation-rate inspection and
-report/quicklook ergonomics from existing standard output tables only. It must
-not add validation data, calibration, empirical-comparison claims, inferred
-environment responses, posterior uncertainty claims, solver/model changes,
-hidden notebook science, or silent fallback constants.
+The current PRODUCT-001 slice should improve threshold-time inspection and
+report ergonomics from existing `threshold_times.csv`, `summary_metrics.csv`,
+and report/index paths only. It must not add validation data, calibration,
+empirical-comparison claims, inferred environment responses, posterior
+uncertainty claims, solver/model changes, hidden notebook science, or silent
+fallback constants.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the

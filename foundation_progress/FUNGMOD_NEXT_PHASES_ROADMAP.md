@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-19 PRODUCT-001 degradation-rate
-quicklook/report ergonomics slice after the registry-backed product-inhibition assembly and
+The current next PR is a scoped PR-20 PRODUCT-001 threshold-time
+inspection/report ergonomics slice after the registry-backed product-inhibition assembly and
 researcher-facing example, validation ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
 writer, PR-09 HTML report wrapper, PR-10 report-folder index/navigation,
@@ -79,7 +79,8 @@ coverage, plus the PR-14 THERMO-003 configured entropy-budget summary and
 PR-15 entropy-budget output notebook inspection, and the PR-16
 uncertainty-band output ergonomics slice, the PR-17 trajectory-quantile
 output ergonomics slice, and the PR-18 trajectory-quantile example and
-quicklook ergonomics slice.
+quicklook ergonomics slice, and the PR-19 degradation-rate quicklook/report
+ergonomics slice.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -100,8 +101,13 @@ trajectory-quantile notebook and a presentation-only
 `trajectory_quantile_bands.png` quicklook generated from
 `trajectory_quantiles.csv`; it does not add validation, calibration, empirical
 comparison, posterior uncertainty, inferred environment response, or
-solver/model behavior. The current PR-19 PRODUCT-001 slice should improve
-degradation-rate inspection and report/quicklook ergonomics from existing
+solver/model behavior. The completed PR-19 slice adds a presentation-only
+`degradation_rate_vs_time.png` quicklook and report visibility over existing
+`time_series_long.csv` `degradation_rate` rows only; it does not add
+validation, calibration, empirical comparison, inferred environment response, a
+new rate law, posterior uncertainty, solver/model behavior, CSV row-contract
+changes, or silent fallback constants. The current PR-20 PRODUCT-001 slice
+should improve threshold-time inspection/report ergonomics from existing
 standard output tables without hidden notebook science, validation data,
 calibration, empirical comparison, inferred environment responses, posterior
 uncertainty claims, solver/model changes, or silent fallback constants. Do not

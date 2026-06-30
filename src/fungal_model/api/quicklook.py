@@ -48,6 +48,14 @@ def write_quicklook_plots(
                 ylabel="substrate degraded fraction",
             )
         )
+        written.append(
+            _plot_rows(
+                rows,
+                output_path=figure_root / "degradation_rate_vs_time.png",
+                include=lambda row: row.get("state") == "degradation_rate",
+                ylabel="degradation rate",
+            )
+        )
     trajectory_quantile_path = _plot_trajectory_quantile_bands(
         trajectory_quantile_rows,
         output_path=figure_root / "trajectory_quantile_bands.png",
