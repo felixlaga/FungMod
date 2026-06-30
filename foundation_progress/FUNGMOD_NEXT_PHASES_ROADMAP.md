@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-21 THERMO-003 explicit
-thermodynamic-summary report ergonomics slice after the registry-backed product-inhibition assembly and
+The current next PR is a scoped PR-22 PRODUCT-001 provenance/limitations
+report ergonomics slice after the registry-backed product-inhibition assembly and
 researcher-facing example, validation ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
 writer, PR-09 HTML report wrapper, PR-10 report-folder index/navigation,
@@ -80,8 +80,9 @@ PR-15 entropy-budget output notebook inspection, and the PR-16
 uncertainty-band output ergonomics slice, the PR-17 trajectory-quantile
 output ergonomics slice, and the PR-18 trajectory-quantile example and
 quicklook ergonomics slice, the PR-19 degradation-rate quicklook/report
-ergonomics slice, and the PR-20 threshold-time inspection/report ergonomics
-slice.
+ergonomics slice, the PR-20 threshold-time inspection/report ergonomics
+slice, and the PR-21 THERMO-003 explicit thermodynamic-summary report
+ergonomics slice.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -112,13 +113,15 @@ improves threshold-time inspection/report ergonomics from existing
 `threshold_times.csv` and `summary_metrics.csv` rows without hidden notebook
 science, validation data, calibration, empirical comparison, inferred
 environment responses, posterior uncertainty claims, solver/model changes,
-schema changes, or silent fallback constants. The current PR-21 THERMO-003
-slice should improve explicit thermodynamic-summary report or inspection
-ergonomics from existing configured-output diagnostics without inferring
-activities, reaction quotients, concentrations, redox potentials, electron
-balances, validation evidence, or solver-time thermodynamic enforcement. Do
-not rebuild the completed scoped slices above unless code or tests contradict
-this status.
+schema changes, or silent fallback constants. The completed PR-21 THERMO-003
+slice adds Markdown, HTML, and index visibility for existing configured-output
+`thermodynamic_summary.json` and `thermodynamic_summary.csv` artifacts without
+inferring activities, reaction quotients, concentrations, redox potentials,
+electron balances, validation evidence, or solver-time thermodynamic
+enforcement. The current PR-22 PRODUCT-001 slice should improve provenance,
+limitation, missing-parameter, or suggested-experiment report ergonomics from
+existing standard output tables only. Do not rebuild the completed scoped
+slices above unless code or tests contradict this status.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

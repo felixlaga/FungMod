@@ -26,6 +26,47 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Explicit Thermodynamic-Summary Report Ergonomics
+
+Date: 2026-06-30
+
+Status: `complete` for the scoped PR-21 report-inspection slice once merged;
+THERMO-003 remains `partial` for broader dynamic thermodynamic and entropy
+constraints.
+
+Completed in this pass:
+
+- Added an explicit thermodynamic-diagnostics section to the deterministic
+  Markdown report when the report utility is pointed at a configured-output
+  folder containing existing `thermodynamic_summary.json` and
+  `thermodynamic_summary.csv` artifacts.
+- Added optional HTML sidecar and report-folder index links for those existing
+  thermodynamic summary artifacts without adding them to the virtual-experiment
+  standard table schema.
+- Kept the report section bounded to existing configured-output diagnostics:
+  summary counts, explicit-Q/entropy-rate flags, entropy-budget fields,
+  supported/unsupported-scope text, and row-level residual/equation fields.
+- Updated focused configured-output/report tests so a real
+  `run_configured_model(...)` explicit-Q Gibbs run proves Markdown, HTML, and
+  index visibility for `thermodynamic_summary.json` and
+  `thermodynamic_summary.csv`.
+- Updated active README and roadmap/status docs so PR-21 is complete for the
+  scoped thermodynamic-summary report ergonomics slice, PR-22 is the next
+  build-first PRODUCT-001 provenance/limitations report ergonomics target, and
+  VALIDATION-DATA-001 remains deferred to PR-23 or later.
+
+No inferred activities, inferred reaction quotients, inferred concentrations,
+redox-potential model, electron-balance model, biological mechanism, numerical
+model, solver behavior, registry record, validation data, calibration routine,
+empirical comparison claim, schema version change, CSV row contract change,
+silent fallback constant, or hidden notebook science was added.
+
+Recommended next task: implement PR-22 as a small build-first PRODUCT-001
+slice that improves provenance, limitation, missing-parameter, or
+suggested-experiment inspection in existing report/index paths, without
+validation data, calibration, empirical comparison, inferred environment
+responses, hidden notebook science, schema changes, or solver/model changes.
+
 ## PRODUCT-001 Threshold-Time Inspection And Report Ergonomics
 
 Date: 2026-06-30

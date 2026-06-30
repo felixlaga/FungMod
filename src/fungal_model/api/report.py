@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import csv
 import html
+import json
 import os
 import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 
 TABLE_FILENAMES = {
@@ -27,6 +29,11 @@ TABLE_FILENAMES = {
     "limitations_table": "limitations_table.csv",
     "missing_parameters": "missing_parameters.csv",
     "suggested_experiments": "suggested_experiments.csv",
+}
+
+THERMODYNAMIC_FILENAMES = {
+    "thermodynamic_summary_json": "thermodynamic_summary.json",
+    "thermodynamic_summary_csv": "thermodynamic_summary.csv",
 }
 
 
@@ -49,7 +56,14 @@ def write_virtual_experiment_report(
     destination.mkdir(parents=True, exist_ok=True)
     report_path = destination / "virtual_experiment_report.md"
     tables = {name: _read_rows(table_root / filename) for name, filename in TABLE_FILENAMES.items()}
-    markdown = _render_report(tables=tables, quicklook_paths=quicklook_paths)
+    thermodynamic_summary = _read_json_mapping(table_root / THERMODYNAMIC_FILENAMES["thermodynamic_summary_json"])
+    thermodynamic_rows = _read_rows(table_root / THERMODYNAMIC_FILENAMES["thermodynamic_summary_csv"])
+    markdown = _render_report(
+        tables=tables,
+        quicklook_paths=quicklook_paths,
+        thermodynamic_summary=thermodynamic_summary,
+        thermodynamic_rows=thermodynamic_rows,
+    )
     report_path.write_text(markdown, encoding="utf-8")
     if include_html:
         html_path = destination / "virtual_experiment_report.html"
@@ -84,10 +98,21 @@ def _read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def _read_json_mapping(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, Mapping):
+        return {}
+    return {str(key): value for key, value in data.items()}
+
+
 def _render_report(
     *,
     tables: Mapping[str, Sequence[Mapping[str, str]]],
     quicklook_paths: Sequence[str],
+    thermodynamic_summary: Mapping[str, Any],
+    thermodynamic_rows: Sequence[Mapping[str, str]],
 ) -> str:
     preflight = tables["modelability_preflight"]
     case_summary = tables["case_summary"]
@@ -130,6 +155,10 @@ def _render_report(
         "## Threshold times",
         "",
         *_threshold_lines(threshold_times, summary_metric_rows=summary_metrics),
+        "",
+        "## Explicit thermodynamic diagnostics",
+        "",
+        *_thermodynamic_summary_lines(thermodynamic_summary, thermodynamic_rows),
         "",
         "## Active mechanisms and modifiers",
         "",
@@ -301,6 +330,95 @@ def _threshold_lines(
     return lines
 
 
+def _thermodynamic_summary_lines(
+    summary: Mapping[str, Any],
+    rows: Sequence[Mapping[str, str]],
+) -> list[str]:
+    if not summary and not rows:
+        return ["No configured thermodynamic-summary artifacts were present."]
+
+    lines = [
+        "These diagnostics inspect existing configured-output `thermodynamic_summary.json` "
+        "and `thermodynamic_summary.csv` artifacts only. They do not infer activities, "
+        "reaction quotients, concentrations, redox potentials, electron balances, validation evidence, "
+        "or solver-time thermodynamic enforcement."
+    ]
+    if summary:
+        lines.append(
+            "- Summary: "
+            f"count={_summary_value(summary, 'count')}; "
+            f"status_counts={_format_counts(summary.get('status_counts'))}; "
+            f"severity_counts={_format_counts(summary.get('severity_counts'))}; "
+            f"explicit reaction-quotient Gibbs rows `{_summary_value(summary, 'has_reaction_quotient_gibbs')}`; "
+            f"entropy-production-rate rows `{_summary_value(summary, 'has_entropy_production_rate')}`; "
+            f"solver-time enforcement `{_summary_value(summary, 'has_solver_time_enforcement')}`."
+        )
+        if "has_entropy_budget" in summary:
+            entropy_budget_parts = [
+                f"available `{_summary_value(summary, 'has_entropy_budget')}`",
+                f"status `{_summary_value(summary, 'entropy_budget_status')}`",
+                f"evaluated rows={_summary_value(summary, 'entropy_budget_evaluated_count')}",
+                f"negative rows={_summary_value(summary, 'entropy_budget_negative_count')}",
+            ]
+            if summary.get("has_entropy_budget") is True:
+                units = _summary_value(summary, "entropy_budget_units")
+                entropy_budget_parts.extend(
+                    [
+                        f"total={_summary_value(summary, 'entropy_budget_total')} {units}".rstrip(),
+                        f"minimum={_summary_value(summary, 'entropy_budget_minimum')} {units}".rstrip(),
+                    ]
+                )
+            lines.append("- Entropy budget: " + "; ".join(entropy_budget_parts) + ".")
+        for field, label in (
+            ("supported_scope", "Supported scope"),
+            ("unsupported_scope", "Unsupported scope"),
+            ("entropy_budget_limitations", "Entropy-budget limitations"),
+        ):
+            value = _summary_value(summary, field)
+            if value:
+                lines.append(f"- {label}: {value}")
+
+    if rows:
+        lines.append("Row-level diagnostics from `thermodynamic_summary.csv`:")
+    else:
+        lines.append("No row-level `thermodynamic_summary.csv` diagnostics were present.")
+    for row in rows[:12]:
+        details = _thermodynamic_row_details(row)
+        suffix = f"; {details}" if details else ""
+        message = _value(row, "message")
+        message_suffix = f"; {message}" if message else ""
+        lines.append(
+            f"- `{_value(row, 'name')}`: status `{_value(row, 'status')}`; "
+            f"passed `{_value(row, 'passed')}`; severity `{_value(row, 'severity')}`"
+            f"{suffix}{message_suffix}."
+        )
+    return lines
+
+
+def _thermodynamic_row_details(row: Mapping[str, str]) -> str:
+    details = []
+    residual_value = _value(row, "residual_value")
+    residual_units = _value(row, "residual_units")
+    if residual_value:
+        details.append(f"residual={residual_value} {_display_units(residual_units)}")
+    delta_gibbs = _value(row, "delta_gibbs")
+    if delta_gibbs:
+        details.append(f"delta_gibbs={delta_gibbs} {_display_units(_value(row, 'delta_gibbs_units'))}")
+    entropy_rate = _value(row, "entropy_production_rate")
+    if entropy_rate:
+        details.append(
+            f"entropy_production_rate={entropy_rate} "
+            f"{_display_units(_value(row, 'entropy_production_rate_units'))}"
+        )
+    equation = _value(row, "gibbs_equation") or _value(row, "entropy_equation")
+    if equation:
+        details.append(f"equation `{equation}`")
+    solver_time = _value(row, "solver_time_enforcement")
+    if solver_time:
+        details.append(f"solver_time_enforcement `{solver_time}`")
+    return "; ".join(details)
+
+
 def _mechanism_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
     active = [row for row in rows if _value(row, "active") != "false"]
     if not active:
@@ -410,6 +528,7 @@ def _render_html_report(
 ) -> str:
     body = _markdown_to_html_body(markdown)
     table_links = _table_link_items(table_root=table_root, output_dir=output_dir)
+    thermodynamic_links = _thermodynamic_link_items(table_root=table_root, output_dir=output_dir)
     quicklook_links = _quicklook_link_items(quicklook_paths, output_dir=output_dir)
     return "\n".join(
         [
@@ -430,6 +549,10 @@ def _render_html_report(
             "<h2>Standard output tables</h2>",
             "<ul>",
             *table_links,
+            "</ul>",
+            "<h2>Configured thermodynamic diagnostics</h2>",
+            "<ul>",
+            *thermodynamic_links,
             "</ul>",
             "<h2>Quicklook figure files</h2>",
             "<ul>",
@@ -457,6 +580,7 @@ def _render_report_folder_index(
     )
     manifest_links = _manifest_link_items(table_root=table_root, report_dir=report_dir)
     table_links = _table_link_items(table_root=table_root, output_dir=report_dir)
+    thermodynamic_links = _thermodynamic_link_items(table_root=table_root, output_dir=report_dir)
     quicklook_links = _quicklook_link_items(quicklook_paths, output_dir=report_dir)
     return "\n".join(
         [
@@ -486,6 +610,10 @@ def _render_report_folder_index(
             "<h2>Standard CSV tables</h2>",
             "<ul>",
             *table_links,
+            "</ul>",
+            "<h2>Configured thermodynamic diagnostics</h2>",
+            "<ul>",
+            *thermodynamic_links,
             "</ul>",
             "<h2>Quicklook figures</h2>",
             "<ul>",
@@ -579,6 +707,24 @@ def _table_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
     return items
 
 
+def _thermodynamic_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
+    items = []
+    for name, filename in THERMODYNAMIC_FILENAMES.items():
+        path = table_root / filename
+        if path.exists():
+            items.append(
+                _link_item(
+                    path=path,
+                    base_dir=output_dir,
+                    label=filename,
+                    description=name,
+                )
+            )
+    if not items:
+        return ["  <li>No configured thermodynamic-summary artifacts were present.</li>"]
+    return items
+
+
 def _quicklook_link_items(paths: Sequence[str], *, output_dir: Path) -> list[str]:
     if not paths:
         return ["  <li>No quicklook figure paths were recorded.</li>"]
@@ -619,6 +765,19 @@ def _optional_float(value: str) -> float | None:
 
 def _display_units(units: str) -> str:
     return units if units else "unitless"
+
+
+def _summary_value(summary: Mapping[str, Any], field: str) -> str:
+    value = summary.get(field)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _format_counts(value: Any) -> str:
+    if not isinstance(value, Mapping):
+        return "{}"
+    return "{" + ", ".join(f"{key}: {value[key]}" for key in sorted(value)) + "}"
 
 
 def _compact_row(row: Mapping[str, str]) -> str:

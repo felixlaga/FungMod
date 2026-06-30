@@ -22,11 +22,11 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-21: THERMO-003 explicit thermodynamic-summary report ergonomics**.
+Current next PR: **PR-22: PRODUCT-001 provenance/limitations report ergonomics**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
-important, but it is deferred to PR-22 or later until the simulator can produce
+important, but it is deferred to PR-23 or later until the simulator can produce
 mature enough degradation outputs for comparison. This gate does not complete
 VALIDATION-DATA-001.
 

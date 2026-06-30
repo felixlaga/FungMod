@@ -37,7 +37,8 @@ basic kinetics layer:
 - explicit reaction-quotient Gibbs feasibility and entropy-production
   diagnostics for caller-supplied dimensionless Q and entropy-rate metadata,
 - configured thermodynamic JSON/CSV summary outputs for explicit Gibbs/entropy
-  validation diagnostics, including an aggregate explicit entropy-rate budget,
+  validation diagnostics, including an aggregate explicit entropy-rate budget
+  and report/index visibility for existing summary artifacts,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - least-squares calibration utilities with train/validation residual reporting,
@@ -193,7 +194,12 @@ sections over existing standard rows, without adding validation or calibration
 claims. Optional HTML artifacts can be written beside the Markdown report for
 browser viewing: an HTML sidecar over the same report and an index page that
 links existing report, table, manifest, and quicklook files without
-reinterpreting scientific values:
+reinterpreting scientific values. When the report utility is pointed at a
+configured-output folder that already contains `thermodynamic_summary.json` and
+`thermodynamic_summary.csv`, it adds an explicit thermodynamic-diagnostics
+inspection section and links those artifacts without inferring activities,
+reaction quotients, concentrations, redox chemistry, validation evidence, or
+solver-time thermodynamic enforcement:
 
 ```python
 result.write_report("outputs/report/", include_html=True, include_index=True)
@@ -288,6 +294,7 @@ empirical validation:
 - `11_thermodynamics_entropy_diagnostics.ipynb`
 - `12_reversible_product_inhibition_example.ipynb`
 - `13_screen_comparison_summary_example.ipynb`
+- `14_trajectory_quantiles_example.ipynb`
 
 Notebook tests check that notebooks import `fungal_model`, avoid defining core
 rate laws/classes or low-level solvers inline, and execute every foundation,
