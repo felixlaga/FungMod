@@ -26,6 +26,41 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Trajectory-Quantile Example And Quicklook Ergonomics
+
+Date: 2026-06-30
+
+Status: `complete` for the scoped PR-18 example/quicklook inspection slice
+once merged; PRODUCT-001 remains `partial` for broader researcher-facing
+output ergonomics.
+
+Completed in this pass:
+
+- Added `notebooks/examples/14_trajectory_quantiles_example.ipynb` as a
+  public-API example that runs an existing exploratory virtual experiment,
+  writes standard outputs and reports, loads `trajectory_quantiles.csv` through
+  `DegradationScreenResult.trajectory_quantiles()`, and verifies trajectory
+  guardrails.
+- Added a presentation-only `trajectory_quantile_bands.png` quicklook figure
+  generated from existing `trajectory_quantiles.csv` rows.
+- Updated notebook and virtual-experiment API tests so the example, quicklook
+  figure, report links, and guardrail columns are exercised.
+- Updated active README and roadmap/status docs so PR-18 is complete for the
+  scoped trajectory-quantile inspection slice, PR-19 is the next build-first
+  PRODUCT-001 degradation-rate quicklook/report ergonomics target, and
+  VALIDATION-DATA-001 remains deferred to PR-20 or later.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+validation data, calibration routine, empirical comparison claim, inferred
+environment response, posterior uncertainty claim, silent fallback constant,
+CSV row contract change, or notebook-only scientific implementation was added.
+
+Recommended next task: implement PR-19 as a small build-first PRODUCT-001
+slice that improves degradation-rate inspection and report/quicklook
+ergonomics from existing standard output tables with explicit guardrails,
+without validation data, calibration, empirical comparison, inferred
+environment responses, hidden notebook science, or solver/model changes.
+
 ## PRODUCT-001 Trajectory-Quantile Output Ergonomics
 
 Date: 2026-06-29

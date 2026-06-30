@@ -18,6 +18,7 @@ NOTEBOOKS = [
 PRODUCT_NOTEBOOKS = [
     "10_virtual_experiment_product_tour.ipynb",
     "13_screen_comparison_summary_example.ipynb",
+    "14_trajectory_quantiles_example.ipynb",
 ]
 
 THERMODYNAMIC_NOTEBOOKS = [
@@ -129,6 +130,25 @@ def test_screen_comparison_notebook_is_researcher_facing_but_unvalidated() -> No
     assert "comparison_summary()" in source
     assert "comparison_summary.csv" in source
     assert "ranking_blocking_reason" in source
+    assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
+
+
+def test_trajectory_quantiles_notebook_is_researcher_facing_but_unvalidated() -> None:
+    notebook = load_notebook("14_trajectory_quantiles_example.ipynb")
+    markdown = "\n".join(markdown_cells(notebook)).lower()
+    source = "\n".join(code_cells(notebook))
+
+    assert notebook["nbformat"] == 4
+    assert "researcher-facing exploratory example" in markdown
+    assert "not an empirical validation" in markdown
+    assert "posterior-uncertainty" in markdown
+    assert "trajectory_quantiles()" in source
+    assert "trajectory_quantiles.csv" in source
+    assert "write_quicklook_plots(" in source
+    assert "trajectory_quantile_bands.png" in source
+    assert "write_report(" in source
+    assert "include_html=True" in source
+    assert "include_index=True" in source
     assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
 
 
@@ -262,6 +282,32 @@ def test_screen_comparison_notebook_executes_smoke_path_with_temp_outputs(
         row["recommended_next_action"]
         for row in comparison_rows
     } == {"inspect_source_rows_only_do_not_rank_or_plot_as_response"}
+
+
+def test_trajectory_quantiles_notebook_executes_smoke_path_with_temp_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "notebook_outputs"
+    monkeypatch.setenv("FUNGMOD_NOTEBOOK_OUTPUT_ROOT", str(output_root))
+    _execute_notebook("14_trajectory_quantiles_example.ipynb")
+
+    output = output_root / "14_trajectory_quantiles_example"
+    trajectory_rows = _csv_rows(output / "trajectory_quantiles.csv")
+    assert (output / "output_manifest.json").exists()
+    assert (output / "figures" / "trajectory_quantile_bands.png").exists()
+    assert (output / "report" / "virtual_experiment_report.md").exists()
+    assert (output / "report" / "virtual_experiment_report.html").exists()
+    assert (output / "report" / "index.html").exists()
+    index_text = (output / "report" / "index.html").read_text(encoding="utf-8")
+    assert "trajectory_quantiles.csv" in index_text
+    assert "trajectory_quantile_bands.png" in index_text
+    assert trajectory_rows
+    assert {row["source_table"] for row in trajectory_rows} == {"time_series_long"}
+    assert {row["allowed_use"] for row in trajectory_rows} == {
+        "exploratory_trajectory_summary_not_validation"
+    }
+    assert all("not validation data" in row["interpretation_guardrail"] for row in trajectory_rows)
 
 
 def test_thermodynamics_entropy_notebook_executes_smoke_path_with_temp_outputs(
