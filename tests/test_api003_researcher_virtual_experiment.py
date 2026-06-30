@@ -278,6 +278,10 @@ def test_result_write_report_renders_standard_table_facts_without_validation_cla
     assert "cellobiose" in report
     assert "final_product_concentration" in report
     assert "time_to_10_percent_substrate_degradation" in report
+    assert "## Degradation-rate inspection" in report
+    assert "existing `time_series_long.csv` `degradation_rate` rows only" in report
+    assert "maximum observed rate" in report
+    assert "or a new rate law" in report
     assert "## Uncertainty and range summary" in report
     assert "not empirical confidence intervals, calibration results, or validation evidence" in report
     assert "sampled_parameter_distribution" in report
@@ -325,6 +329,7 @@ def test_result_write_report_can_write_html_sidecar_without_changing_markdown_co
     assert "# FungMod Virtual-Experiment Report" in report_path.read_text(encoding="utf-8")
     assert "<h1>FungMod Virtual-Experiment Report</h1>" in html
     assert 'href="../case_summary.csv"' in html
+    assert 'href="../time_series_long.csv"' in html
     assert 'href="../final_metrics.csv"' in html
     assert 'href="../uncertainty_summary.csv"' in html
     assert 'href="../trajectory_quantiles.csv"' in html
@@ -368,6 +373,7 @@ def test_result_write_report_can_write_report_folder_index_over_existing_artifac
     assert 'href="virtual_experiment_report.html"' in index
     assert 'href="../output_manifest.json"' in index
     assert 'href="../case_summary.csv"' in index
+    assert 'href="../time_series_long.csv"' in index
     assert 'href="../final_metrics.csv"' in index
     assert 'href="../uncertainty_summary.csv"' in index
     assert 'href="../trajectory_quantiles.csv"' in index

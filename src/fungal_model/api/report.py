@@ -13,6 +13,7 @@ from pathlib import Path
 TABLE_FILENAMES = {
     "modelability_preflight": "modelability_preflight.csv",
     "case_summary": "case_summary.csv",
+    "time_series_long": "time_series_long.csv",
     "final_metrics": "final_metrics.csv",
     "threshold_times": "threshold_times.csv",
     "sampled_parameters": "sampled_parameters.csv",
@@ -89,6 +90,7 @@ def _render_report(
 ) -> str:
     preflight = tables["modelability_preflight"]
     case_summary = tables["case_summary"]
+    time_series = tables["time_series_long"]
     final_metrics = tables["final_metrics"]
     threshold_times = tables["threshold_times"]
     mechanisms = tables["mechanism_summary"]
@@ -118,6 +120,10 @@ def _render_report(
         "## Final metrics",
         "",
         *_metric_lines(final_metrics),
+        "",
+        "## Degradation-rate inspection",
+        "",
+        *_degradation_rate_lines(time_series),
         "",
         "## Threshold times",
         "",
@@ -207,6 +213,48 @@ def _metric_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
         f"{_value(row, 'value')} {_value(row, 'units')}".rstrip()
         for row in computed[:12]
     ]
+
+
+def _degradation_rate_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
+    rate_rows = [
+        row
+        for row in rows
+        if _value(row, "state") == "degradation_rate"
+        and _value(row, "source") == "simulation_process_rate"
+        and _optional_float(_value(row, "value")) is not None
+    ]
+    if not rate_rows:
+        return ["No degradation-rate rows were present in `time_series_long.csv`."]
+
+    lines = [
+        "These rows are an inspection summary over existing `time_series_long.csv` "
+        "`degradation_rate` rows only. They are not validation, calibration, empirical comparison, "
+        "or a new rate law."
+    ]
+    grouped: dict[tuple[str, str, str, str], list[tuple[float, float]]] = {}
+    for row in rate_rows:
+        time = _optional_float(_value(row, "time"))
+        value = _optional_float(_value(row, "value"))
+        if time is None or value is None:
+            continue
+        key = (
+            _value(row, "case_id"),
+            _value(row, "sample_id"),
+            _value(row, "units"),
+            _value(row, "time_units"),
+        )
+        grouped.setdefault(key, []).append((time, value))
+
+    for (case_id, sample_id, units, time_units), values in sorted(grouped.items())[:12]:
+        ordered = sorted(values)
+        rate_values = [value for _time, value in ordered]
+        time_values = [time for time, _value in ordered]
+        lines.append(
+            f"- `{case_id}` sample `{sample_id}`: {len(values)} existing rate rows; "
+            f"time range {min(time_values)}..{max(time_values)} {_display_units(time_units)}; "
+            f"maximum observed rate {max(rate_values)} {_display_units(units)}."
+        )
+    return lines
 
 
 def _threshold_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
@@ -532,6 +580,19 @@ def _value(row: Mapping[str, str], field: str, *, fallback_field: str | None = N
     if value or fallback_field is None:
         return value
     return row.get(fallback_field, "")
+
+
+def _optional_float(value: str) -> float | None:
+    if value == "":
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _display_units(units: str) -> str:
+    return units if units else "unitless"
 
 
 def _compact_row(row: Mapping[str, str]) -> str:

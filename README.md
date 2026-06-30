@@ -183,11 +183,17 @@ behavior.
 Quicklook plots include a presentation-only trajectory-band figure generated
 from `trajectory_quantiles.csv`; it is for inspection, not validation or
 calibration.
+Quicklook plots also include a presentation-only degradation-rate figure
+generated from existing `time_series_long.csv` `degradation_rate` rows; it is
+for inspection, not validation, calibration, empirical comparison, or a new
+rate law.
 Results can also render a deterministic Markdown report from those standard
-tables without adding validation or calibration claims. Optional HTML artifacts
-can be written beside the Markdown report for browser viewing: an HTML sidecar
-over the same report and an index page that links existing report, table,
-manifest, and quicklook files without reinterpreting scientific values:
+tables, including a bounded degradation-rate inspection section over existing
+rate rows, without adding validation or calibration claims. Optional HTML
+artifacts can be written beside the Markdown report for browser viewing: an
+HTML sidecar over the same report and an index page that links existing
+report, table, manifest, and quicklook files without reinterpreting scientific
+values:
 
 ```python
 result.write_report("outputs/report/", include_html=True, include_index=True)
