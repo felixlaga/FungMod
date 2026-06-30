@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-22 PRODUCT-001 provenance/limitations
-report ergonomics slice after the registry-backed product-inhibition assembly and
+The current next PR is a scoped PR-23 PRODUCT-001 provenance/limitations
+report example-notebook slice after the registry-backed product-inhibition assembly and
 researcher-facing example, validation ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
 writer, PR-09 HTML report wrapper, PR-10 report-folder index/navigation,
@@ -82,6 +82,7 @@ output ergonomics slice, and the PR-18 trajectory-quantile example and
 quicklook ergonomics slice, the PR-19 degradation-rate quicklook/report
 ergonomics slice, the PR-20 threshold-time inspection/report ergonomics
 slice, and the PR-21 THERMO-003 explicit thermodynamic-summary report
+ergonomics slice, and the PR-22 PRODUCT-001 provenance/limitations report
 ergonomics slice.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
@@ -118,9 +119,14 @@ slice adds Markdown, HTML, and index visibility for existing configured-output
 `thermodynamic_summary.json` and `thermodynamic_summary.csv` artifacts without
 inferring activities, reaction quotients, concentrations, redox potentials,
 electron balances, validation evidence, or solver-time thermodynamic
-enforcement. The current PR-22 PRODUCT-001 slice should improve provenance,
-limitation, missing-parameter, or suggested-experiment report ergonomics from
-existing standard output tables only. Do not rebuild the completed scoped
+enforcement. The completed PR-22 PRODUCT-001 slice improves provenance,
+limitation, missing-parameter, and suggested-experiment report ergonomics from
+existing standard output tables only, including a Markdown decision summary and
+additive HTML/index links over existing decision-support tables. The current
+PR-23 PRODUCT-001 slice should make that report decision summary inspectable in
+a public-API example notebook without adding validation data, calibration,
+empirical comparison, inferred environment responses, hidden notebook science,
+schema changes, or solver/model behavior. Do not rebuild the completed scoped
 slices above unless code or tests contradict this status.
 
 Validation remains important, but it is now deliberately deferred behind core

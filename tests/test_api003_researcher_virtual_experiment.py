@@ -292,9 +292,19 @@ def test_result_write_report_renders_standard_table_facts_without_validation_cla
     assert "## Trajectory quantile bands" in report
     assert "time_series_long.csv" in report
     assert "exploratory_trajectory_summary_not_validation" in report
+    assert "## Provenance and limitation decision summary" in report
+    assert "derived only from existing `assumption_summary.csv`" in report
+    assert "not validation, calibration, empirical comparison, or inferred biology" in report
+    assert "Source row counts: assumptions=" in report
+    assert "Limitation severity counts:" in report
+    assert "Assumption/provenance allowed-use labels present:" in report
+    assert "Exploratory-prior provenance rows:" in report
     assert "homogeneous_michaelis_menten" in report
     assert "whole-fungus physiology" in report
     assert "user_supplied_exploratory_prior" in report
+    assert "category `not_modelled`" in report
+    assert "severity `important`" in report
+    assert "allowed use `exploratory_simulation_only_not_literature_curated`" in report
     sampled_rows = _csv_rows(Path(result.output_directory) / "sampled_parameters.csv")
     sampled_numeric = next(row for row in sampled_rows if row["sampled_value"])
     assert f"`{sampled_numeric['symbol']}` = {sampled_numeric['sampled_value']} {sampled_numeric['units']}" in report
@@ -338,6 +348,10 @@ def test_result_write_report_can_write_html_sidecar_without_changing_markdown_co
     assert 'href="../uncertainty_summary.csv"' in html
     assert 'href="../summary_metrics.csv"' in html
     assert 'href="../trajectory_quantiles.csv"' in html
+    assert "<h2>Decision-support tables</h2>" in html
+    assert 'href="../assumption_summary.csv"' in html
+    assert 'href="../limitations_table.csv"' in html
+    assert 'href="../provenance_table.csv"' in html
     assert "not an additional validation, calibration, or empirical comparison" in html
     assert "empirically validated" not in html.lower()
     assert "calibrated against observations" not in html.lower()
@@ -383,6 +397,10 @@ def test_result_write_report_can_write_report_folder_index_over_existing_artifac
     assert 'href="../uncertainty_summary.csv"' in index
     assert 'href="../summary_metrics.csv"' in index
     assert 'href="../trajectory_quantiles.csv"' in index
+    assert "<h2>Decision-support tables</h2>" in index
+    assert 'href="../assumption_summary.csv"' in index
+    assert 'href="../limitations_table.csv"' in index
+    assert 'href="../provenance_table.csv"' in index
     assert 'href="../figures/quicklook&lt;summary&gt;.png"' in index
     assert "links existing output artifacts only" in index
     assert "validation, calibration, empirical comparison, or scientific interpretation" in index
@@ -461,6 +479,117 @@ def test_html_report_escapes_table_content_and_links_figures_deterministically(t
     assert 'href="../tables/case_summary.csv"' in first_index
     assert 'href="../figures/quicklook&lt;1&gt;.png"' in first_index
     assert "validation, calibration, empirical comparison, or scientific interpretation" in first_index
+
+
+def test_report_renders_missing_parameter_suggestions_and_provenance_fields_from_existing_tables(tmp_path: Path) -> None:
+    table_dir = tmp_path / "planning_tables"
+    table_dir.mkdir()
+    _write_csv(
+        table_dir / "assumption_summary.csv",
+        [
+            {
+                "case_id": "case_1",
+                "row_type": "uncertain",
+                "item_id": "k_missing",
+                "message": "Exploratory mode keeps this uncertain input visible.",
+                "allowed_use": "exploratory_context_not_validation",
+                "recommended_next_action": "measure_or_curate_parameter",
+            }
+        ],
+    )
+    _write_csv(
+        table_dir / "limitations_table.csv",
+        [
+            {
+                "case_id": "case_1",
+                "category": "missing_input",
+                "severity": "blocking",
+                "limitation": "Parameter k_missing is explicitly unknown.",
+                "source": "k_missing",
+            }
+        ],
+    )
+    _write_csv(
+        table_dir / "missing_parameters.csv",
+        [
+            {
+                "case_id": "case_1",
+                "missing_item_type": "parameter",
+                "parameter_symbol": "k_missing",
+                "source_record_id": "record_123",
+                "expected_units": "1 / second",
+                "missing_status": "explicit_unknown",
+                "message": "Parameter k_missing is required before scientific simulation.",
+                "suggested_experiment": "Measure or curate k_missing for the selected registry case.",
+                "details": '{"record_id": "record_123"}',
+            }
+        ],
+    )
+    _write_csv(
+        table_dir / "suggested_experiments.csv",
+        [
+            {
+                "case_id": "case_1",
+                "suggestion_id": "case_1_suggestion_000",
+                "parameter_symbol": "k_missing",
+                "suggested_experiment": "Measure or curate k_missing for the selected registry case.",
+                "priority": "high",
+                "rationale": "Required input is missing, explicitly unknown, or incompatible for this registry case.",
+                "allowed_use_after_resolution": "scientific_or_exploratory_when_recorded_with_provenance_and_units",
+            }
+        ],
+    )
+    _write_csv(
+        table_dir / "provenance_table.csv",
+        [
+            {
+                "case_id": "case_1",
+                "record_type": "parameter",
+                "record_id": "record_123",
+                "role": "rate_constant",
+                "symbol": "k_missing",
+                "maturity": "exploratory_prior",
+                "value_kind": "unknown",
+                "source": "registry fixture",
+                "confidence_level": "explicit_unknown",
+                "exploratory_prior": "true",
+                "range_scope": "not_applicable",
+                "range_interpretation": "unknown_not_sampled",
+                "allowed_use": "blocked_until_measured",
+                "notes": "Do not infer this value.",
+                "provenance": '{"source": "registry fixture"}',
+            }
+        ],
+    )
+
+    report_path = write_virtual_experiment_report(
+        table_dir=table_dir,
+        output_dir=tmp_path / "report",
+        include_html=True,
+        include_index=True,
+    )
+    report = report_path.read_text(encoding="utf-8")
+    html = report_path.with_suffix(".html").read_text(encoding="utf-8")
+    index = report_path.with_name("index.html").read_text(encoding="utf-8")
+
+    assert "## Provenance and limitation decision summary" in report
+    assert "Source row counts: assumptions=1; limitations=1; missing parameters=1; suggested experiments=1; provenance=1" in report
+    assert "Missing-parameter status counts: {explicit_unknown: 1}" in report
+    assert "Suggested-experiment priority counts: {high: 1}" in report
+    assert "Exploratory-prior provenance rows: 1" in report
+    assert "row type `uncertain`" in report
+    assert "recommended next action `measure_or_curate_parameter`" in report
+    assert "category `missing_input`" in report
+    assert "source record `record_123`" in report
+    assert "Allowed use after resolution `scientific_or_exploratory_when_recorded_with_provenance_and_units`" in report
+    assert "role `rate_constant`" in report
+    assert "value kind `unknown`" in report
+    assert "allowed use `blocked_until_measured`" in report
+    assert "not validation, calibration, empirical comparison, or inferred biology" in report
+    assert "empirically validated" not in report.lower()
+    assert 'href="../planning_tables/missing_parameters.csv"' in html
+    assert 'href="../planning_tables/suggested_experiments.csv"' in html
+    assert 'href="../planning_tables/provenance_table.csv"' in index
 
 
 def test_html_report_uses_report_relative_links_for_relative_inputs(

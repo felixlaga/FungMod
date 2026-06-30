@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-21 after merge:
+Scoped status as of PR-22 after merge:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -44,6 +44,11 @@ The completed threshold-time inspection/report ergonomics slice exposes
 existing `threshold_times.csv` rows and `summary_metrics.csv` threshold
 quantiles in the deterministic report and report/index links without
 validation claims.
+The completed provenance/limitations report ergonomics slice adds a Markdown
+decision summary and richer assumption, limitation, missing-parameter,
+suggested-experiment, and provenance row renderers derived only from existing
+standard output tables. HTML and index paths add links to those existing
+decision-support tables without changing the Markdown-primary contract.
 THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator,
 configured entropy-production-rate metadata diagnostic, configured
 thermodynamic JSON/CSV summaries, notebook coverage for both explicit-Q and
@@ -76,7 +81,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-22: PRODUCT-001 provenance/limitations report ergonomics**.
+Current next PR: **PR-23: PRODUCT-001 provenance/limitations report example notebook**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -153,9 +158,16 @@ in Markdown, HTML, and index report paths only. It does not infer activities,
 reaction quotients, concentrations, redox potentials, electron balances,
 validation evidence, or solver-time thermodynamic enforcement.
 
-The current PRODUCT-001 slice should improve provenance, limitation,
-missing-parameter, or suggested-experiment report ergonomics from existing
-standard output tables only. It must not add validation data, calibration,
+The completed provenance/limitations report ergonomics slice improves
+inspection of existing assumption, limitation, missing-parameter,
+suggested-experiment, and provenance rows in Markdown, HTML, and index report
+paths only. It does not add validation data, calibration, empirical comparison,
+inferred environment responses, hidden notebook science, schema changes, or
+solver/model behavior.
+
+The current PRODUCT-001 slice should add a public-API example notebook that
+writes reports and inspects the provenance/limitation decision summary and
+decision-support table links. It must not add validation data, calibration,
 empirical comparison, inferred environment responses, hidden notebook science,
 schema changes, or solver/model behavior.
 

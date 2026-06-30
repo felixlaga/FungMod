@@ -26,6 +26,48 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Provenance/Limitations Report Ergonomics
+
+Date: 2026-07-01
+
+Status: `complete` for the scoped PR-22 report-inspection slice once merged;
+PRODUCT-001 remains `partial` for broader researcher-facing output
+ergonomics.
+
+Completed in this pass:
+
+- Added a provenance and limitation decision-summary section to the
+  deterministic Markdown report, derived only from existing
+  `assumption_summary.csv`, `limitations_table.csv`, `missing_parameters.csv`,
+  `suggested_experiments.csv`, and `provenance_table.csv` rows.
+- Expanded the report renderers for assumptions, limitations, missing
+  parameters, suggested follow-up experiments, and provenance so row types,
+  categories, severities, sources, missing statuses, suggested resolutions,
+  allowed-use labels, and provenance record details are easier to inspect.
+- Added optional HTML sidecar and report-folder index links for those existing
+  decision-support tables while preserving the Markdown report as the primary
+  contract.
+- Updated focused report tests so real generated reports and small
+  table-derived fixtures prove the new decision summary and richer row
+  renderers without changing simulation behavior.
+- Updated active README and roadmap/status docs so PR-22 is complete for the
+  scoped provenance/limitations report ergonomics slice, PR-23 is the next
+  build-first PRODUCT-001 provenance/limitations report example-notebook
+  target, and VALIDATION-DATA-001 remains deferred to PR-24 or later.
+
+No biological mechanism, numerical model, solver behavior, registry record,
+validation data, calibration routine, empirical comparison claim, inferred
+environment response, posterior uncertainty claim, schema version change, CSV
+row contract change, silent fallback constant, or hidden notebook science was
+added.
+
+Recommended next task: implement PR-23 as a small build-first PRODUCT-001
+example-notebook slice that uses the public API to write reports and inspect
+the provenance/limitation decision summary and decision-support table links,
+without validation data, calibration, empirical comparison, inferred
+environment responses, hidden notebook science, schema changes, or solver/model
+changes.
+
 ## THERMO-003 Explicit Thermodynamic-Summary Report Ergonomics
 
 Date: 2026-06-30

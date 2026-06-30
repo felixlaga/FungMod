@@ -190,16 +190,19 @@ for inspection, not validation, calibration, empirical comparison, or a new
 rate law.
 Results can also render a deterministic Markdown report from those standard
 tables, including bounded degradation-rate and threshold-time inspection
-sections over existing standard rows, without adding validation or calibration
-claims. Optional HTML artifacts can be written beside the Markdown report for
-browser viewing: an HTML sidecar over the same report and an index page that
-links existing report, table, manifest, and quicklook files without
-reinterpreting scientific values. When the report utility is pointed at a
-configured-output folder that already contains `thermodynamic_summary.json` and
-`thermodynamic_summary.csv`, it adds an explicit thermodynamic-diagnostics
-inspection section and links those artifacts without inferring activities,
-reaction quotients, concentrations, redox chemistry, validation evidence, or
-solver-time thermodynamic enforcement:
+sections plus a provenance/limitation decision summary over existing standard
+rows, without adding validation or calibration claims. The decision summary
+uses existing assumption, limitation, missing-parameter, suggested-experiment,
+and provenance rows only; it is for inspection and planning next experiments,
+not empirical comparison or inferred biology. Optional HTML artifacts can be
+written beside the Markdown report for browser viewing: an HTML sidecar over
+the same report and an index page that links existing report, table, manifest,
+decision-support, and quicklook files without reinterpreting scientific values.
+When the report utility is pointed at a configured-output folder that already
+contains `thermodynamic_summary.json` and `thermodynamic_summary.csv`, it adds
+an explicit thermodynamic-diagnostics inspection section and links those
+artifacts without inferring activities, reaction quotients, concentrations,
+redox chemistry, validation evidence, or solver-time thermodynamic enforcement:
 
 ```python
 result.write_report("outputs/report/", include_html=True, include_index=True)
