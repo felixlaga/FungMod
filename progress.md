@@ -26,6 +26,45 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Provenance/Limitations Report Example Notebook
+
+Date: 2026-07-01
+
+Status: `complete` for the scoped PR-23 example-notebook slice once merged;
+PRODUCT-001 remains `partial` for broader researcher-facing output
+ergonomics.
+
+Completed in this pass:
+
+- Added `notebooks/examples/15_provenance_limitations_report_example.ipynb`
+  as a public-API example that runs an existing supported exploratory virtual
+  experiment, writes the Markdown report plus optional HTML sidecar and
+  report-folder index, and inspects the provenance/limitation decision summary.
+- The notebook loads existing decision-support rows through public
+  `DegradationScreenResult` accessors for assumptions, limitations, missing
+  parameters, suggested experiments, and provenance.
+- The notebook checks existing report/index links for
+  `assumption_summary.csv`, `limitations_table.csv`,
+  `missing_parameters.csv`, `suggested_experiments.csv`, and
+  `provenance_table.csv` without adding notebook-only scientific logic.
+- Updated notebook smoke tests so the new example remains researcher-facing,
+  unvalidated, public-API-only, and executable with temporary outputs.
+- Updated active README and roadmap/status docs so PR-23 is complete for the
+  scoped provenance/limitations report example-notebook slice, while
+  VALIDATION-DATA-001 remains deferred and evidence-gated before any ingestion
+  or empirical-comparison work.
+
+No biological mechanism, numerical model, solver behavior, registry record,
+validation data, calibration routine, empirical comparison claim, inferred
+environment response, posterior uncertainty claim, schema version change, CSV
+row contract change, silent fallback constant, report utility behavior, or
+hidden notebook science was added.
+
+Recommended next task: revisit VALIDATION-DATA-001 only if source-backed
+numeric time-course observations satisfying the active evidence gate are
+available; otherwise choose the next build-first simulator/output ergonomics
+slice rather than ingesting or fabricating validation data.
+
 ## PRODUCT-001 Provenance/Limitations Report Ergonomics
 
 Date: 2026-07-01

@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-22 after merge:
+Scoped status as of PR-23 after merge:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -49,6 +49,11 @@ decision summary and richer assumption, limitation, missing-parameter,
 suggested-experiment, and provenance row renderers derived only from existing
 standard output tables. HTML and index paths add links to those existing
 decision-support tables without changing the Markdown-primary contract.
+The completed provenance/limitations report example-notebook slice adds
+`15_provenance_limitations_report_example.ipynb` as a public-API example that
+writes Markdown/HTML/index report artifacts and inspects the table-derived
+decision summary plus existing decision-support links and rows without
+validation claims.
 THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator,
 configured entropy-production-rate metadata diagnostic, configured
 thermodynamic JSON/CSV summaries, notebook coverage for both explicit-Q and
@@ -81,7 +86,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-23: PRODUCT-001 provenance/limitations report example notebook**.
+Current next PR: **PR-24: VALIDATION-DATA-001 evidence-gated first time-course dataset**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -165,11 +170,17 @@ paths only. It does not add validation data, calibration, empirical comparison,
 inferred environment responses, hidden notebook science, schema changes, or
 solver/model behavior.
 
-The current PRODUCT-001 slice should add a public-API example notebook that
-writes reports and inspects the provenance/limitation decision summary and
-decision-support table links. It must not add validation data, calibration,
-empirical comparison, inferred environment responses, hidden notebook science,
-schema changes, or solver/model behavior.
+The completed PRODUCT-001 provenance/limitations example-notebook slice adds a
+public-API example notebook that writes reports and inspects the
+provenance/limitation decision summary and decision-support table links. It
+does not add validation data, calibration, empirical comparison, inferred
+environment responses, hidden notebook science, schema changes, or
+solver/model behavior.
+
+VALIDATION-DATA-001 remains deferred and evidence-gated. PR-24 should start
+only if source-backed numeric time-course observations satisfy the active gate;
+otherwise the next maker should pick another build-first simulator/output
+ergonomics slice rather than treating incomplete candidate reviews as data.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
