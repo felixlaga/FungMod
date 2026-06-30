@@ -278,6 +278,10 @@ def test_result_write_report_renders_standard_table_facts_without_validation_cla
     assert "cellobiose" in report
     assert "final_product_concentration" in report
     assert "time_to_10_percent_substrate_degradation" in report
+    assert "existing `threshold_times.csv` and `summary_metrics.csv` values only" in report
+    assert "not validation data, calibration results, empirical comparisons" in report
+    assert "summary_metrics.csv" in report
+    assert "time_to_50_percent_substrate_degradation" in report
     assert "## Degradation-rate inspection" in report
     assert "existing `time_series_long.csv` `degradation_rate` rows only" in report
     assert "maximum observed rate" in report
@@ -332,6 +336,7 @@ def test_result_write_report_can_write_html_sidecar_without_changing_markdown_co
     assert 'href="../time_series_long.csv"' in html
     assert 'href="../final_metrics.csv"' in html
     assert 'href="../uncertainty_summary.csv"' in html
+    assert 'href="../summary_metrics.csv"' in html
     assert 'href="../trajectory_quantiles.csv"' in html
     assert "not an additional validation, calibration, or empirical comparison" in html
     assert "empirically validated" not in html.lower()
@@ -376,6 +381,7 @@ def test_result_write_report_can_write_report_folder_index_over_existing_artifac
     assert 'href="../time_series_long.csv"' in index
     assert 'href="../final_metrics.csv"' in index
     assert 'href="../uncertainty_summary.csv"' in index
+    assert 'href="../summary_metrics.csv"' in index
     assert 'href="../trajectory_quantiles.csv"' in index
     assert 'href="../figures/quicklook&lt;summary&gt;.png"' in index
     assert "links existing output artifacts only" in index

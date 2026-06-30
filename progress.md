@@ -26,6 +26,41 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PRODUCT-001 Threshold-Time Inspection And Report Ergonomics
+
+Date: 2026-06-30
+
+Status: `complete` for the scoped PR-20 report-inspection slice once merged;
+PRODUCT-001 remains `partial` for broader researcher-facing output
+ergonomics.
+
+Completed in this pass:
+
+- Added `summary_metrics.csv` to the report/index standard-table links so
+  aggregate threshold quantiles are easier to inspect beside per-sample
+  threshold rows.
+- Expanded the deterministic Markdown report's threshold-time section to show
+  existing `threshold_times.csv` rows and existing `summary_metrics.csv`
+  threshold quantiles with explicit guardrails.
+- Updated report tests so Markdown, HTML, and index outputs expose the
+  threshold-time guardrails and `summary_metrics.csv` links.
+- Updated active README and roadmap/status docs so PR-20 is complete for the
+  scoped threshold-time inspection slice, PR-21 is the next build-first
+  THERMO-003 explicit thermodynamic-summary report ergonomics target, and
+  VALIDATION-DATA-001 remains deferred to PR-22 or later.
+
+No biological mechanism, numerical model, solver behavior, registry records,
+validation data, calibration routine, empirical comparison claim, inferred
+environment response, posterior uncertainty claim, silent fallback constant,
+CSV row contract change, schema version change, or notebook-only scientific
+implementation was added.
+
+Recommended next task: implement PR-21 as a small build-first THERMO-003 slice
+that improves explicit thermodynamic-summary report or inspection ergonomics
+from existing configured-output diagnostics only, without inferred
+thermodynamics, validation data, calibration, empirical comparison, hidden
+notebook science, or solver/model changes.
+
 ## PRODUCT-001 Degradation-Rate Quicklook And Report Ergonomics
 
 Date: 2026-06-30

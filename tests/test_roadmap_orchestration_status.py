@@ -67,10 +67,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-20: PRODUCT-001 threshold-time inspection/report ergonomics"
+    current_next = "PR-21: THERMO-003 explicit thermodynamic-summary report ergonomics"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is a scoped PR-20 PRODUCT-001 threshold-time" in roadmap
+    assert "The current next PR is a scoped PR-21 THERMO-003 explicit" in roadmap
+    assert "PR-20 threshold-time inspection/report ergonomics" in roadmap
     assert "PR-19 degradation-rate quicklook/report\nergonomics" in roadmap
     assert "PR-18 trajectory-quantile example and\nquicklook ergonomics" in roadmap
     assert "PR-17 trajectory-quantile\noutput ergonomics" in roadmap
@@ -96,7 +97,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-20: PRODUCT-001 threshold-time inspection/report ergonomics"
+    current_next = "PR-21: THERMO-003 explicit thermodynamic-summary report ergonomics"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -114,6 +115,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-17" not in text
         assert "Current next PR: **PR-18" not in text
         assert "Current next PR: **PR-19" not in text
+        assert "Current next PR: **PR-20" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -136,6 +138,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "degradation_rate_vs_time.png" in next_steps
     assert "time_series_long.csv" in status
     assert "bounded degradation-rate inspection section" in next_steps
+    assert "threshold_times.csv" in status
+    assert "summary_metrics.csv" in status
+    assert "summary_metrics.csv" in next_steps
+    assert "simulated threshold summaries" in status
     assert "14_trajectory_quantiles_example.ipynb" in status
     assert "14_trajectory_quantiles_example.ipynb" in next_steps
     assert "ranking_blocking_reason" in status
@@ -182,7 +188,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-18 | PRODUCT-001 trajectory-quantile example and quicklook ergonomics" in status
     assert "PR-19 | PRODUCT-001 degradation-rate quicklook/report ergonomics" in status
     assert "PR-20 | PRODUCT-001 threshold-time inspection/report ergonomics" in status
-    assert "PR-21 | VALIDATION-DATA-001" in status
+    assert "PR-21 | THERMO-003 explicit thermodynamic-summary report ergonomics" in status
+    assert "PR-22 | VALIDATION-DATA-001" in status
 
 
 def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> None:
@@ -227,7 +234,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-20: PRODUCT-001 threshold-time inspection/report ergonomics"
+    current_next = "PR-21: THERMO-003 explicit thermodynamic-summary report ergonomics"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -246,11 +253,12 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-17" not in _current_next_lines(text)
         assert "PR-18" not in _current_next_lines(text)
         assert "PR-19" not in _current_next_lines(text)
+        assert "PR-20" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset | deferred; blocked/partial" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
     assert "Status: `deferred; blocked/partial` for ingestion." in gate
-    assert "deferred to PR-21 or later" in gate
+    assert "deferred to PR-22 or later" in gate
     assert "Status: `complete`" not in gate
     assert "does not complete" in gate
     assert "VALIDATION-DATA-001" in gate
