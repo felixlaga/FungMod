@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-19 after merge:
+Scoped status as of PR-20 after merge:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -40,6 +40,10 @@ The completed degradation-rate quicklook/report ergonomics slice adds a
 presentation-only `degradation_rate_vs_time.png` quicklook and a bounded degradation-rate inspection section
 from existing `time_series_long.csv` `degradation_rate` rows without changing
 solver/model behavior.
+The completed threshold-time inspection/report ergonomics slice exposes
+existing `threshold_times.csv` rows and `summary_metrics.csv` threshold
+quantiles in the deterministic report and report/index links without
+validation claims.
 THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator,
 configured entropy-production-rate metadata diagnostic, configured
 thermodynamic JSON/CSV summaries, notebook coverage for both explicit-Q and
@@ -68,7 +72,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-20: PRODUCT-001 threshold-time inspection/report ergonomics**.
+Current next PR: **PR-21: THERMO-003 explicit thermodynamic-summary report ergonomics**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -132,12 +136,18 @@ must not infer activities, reaction quotients, concentrations, redox potentials,
 electron balances, validation evidence, or solver-time thermodynamic
 enforcement.
 
-The current PRODUCT-001 slice should improve threshold-time inspection and
-report ergonomics from existing `threshold_times.csv`, `summary_metrics.csv`,
-and report/index paths only. It must not add validation data, calibration,
-empirical-comparison claims, inferred environment responses, posterior
-uncertainty claims, solver/model changes, hidden notebook science, or silent
-fallback constants.
+The completed threshold-time inspection/report ergonomics slice improves
+inspection of existing `threshold_times.csv` rows and `summary_metrics.csv`
+threshold quantiles in report paths only. It does not add validation data,
+calibration, empirical-comparison claims, inferred environment responses,
+posterior uncertainty claims, solver/model changes, hidden notebook science,
+schema changes, or silent fallback constants.
+
+The current THERMO-003 slice should improve explicit thermodynamic-summary
+report or inspection ergonomics from existing configured-output diagnostics
+only. It must not infer activities, reaction quotients, concentrations, redox
+potentials, electron balances, validation evidence, or solver-time
+thermodynamic enforcement.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the

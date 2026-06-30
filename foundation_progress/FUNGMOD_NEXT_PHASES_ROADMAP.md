@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-20 PRODUCT-001 threshold-time
-inspection/report ergonomics slice after the registry-backed product-inhibition assembly and
+The current next PR is a scoped PR-21 THERMO-003 explicit
+thermodynamic-summary report ergonomics slice after the registry-backed product-inhibition assembly and
 researcher-facing example, validation ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
 writer, PR-09 HTML report wrapper, PR-10 report-folder index/navigation,
@@ -79,8 +79,9 @@ coverage, plus the PR-14 THERMO-003 configured entropy-budget summary and
 PR-15 entropy-budget output notebook inspection, and the PR-16
 uncertainty-band output ergonomics slice, the PR-17 trajectory-quantile
 output ergonomics slice, and the PR-18 trajectory-quantile example and
-quicklook ergonomics slice, and the PR-19 degradation-rate quicklook/report
-ergonomics slice.
+quicklook ergonomics slice, the PR-19 degradation-rate quicklook/report
+ergonomics slice, and the PR-20 threshold-time inspection/report ergonomics
+slice.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -106,13 +107,18 @@ solver/model behavior. The completed PR-19 slice adds a presentation-only
 `time_series_long.csv` `degradation_rate` rows only; it does not add
 validation, calibration, empirical comparison, inferred environment response, a
 new rate law, posterior uncertainty, solver/model behavior, CSV row-contract
-changes, or silent fallback constants. The current PR-20 PRODUCT-001 slice
-should improve threshold-time inspection/report ergonomics from existing
-standard output tables without hidden notebook science, validation data,
-calibration, empirical comparison, inferred environment responses, posterior
-uncertainty claims, solver/model changes, or silent fallback constants. Do not
-rebuild the completed scoped slices above unless code or tests contradict this
-status.
+changes, or silent fallback constants. The completed PR-20 PRODUCT-001 slice
+improves threshold-time inspection/report ergonomics from existing
+`threshold_times.csv` and `summary_metrics.csv` rows without hidden notebook
+science, validation data, calibration, empirical comparison, inferred
+environment responses, posterior uncertainty claims, solver/model changes,
+schema changes, or silent fallback constants. The current PR-21 THERMO-003
+slice should improve explicit thermodynamic-summary report or inspection
+ergonomics from existing configured-output diagnostics without inferring
+activities, reaction quotients, concentrations, redox potentials, electron
+balances, validation evidence, or solver-time thermodynamic enforcement. Do
+not rebuild the completed scoped slices above unless code or tests contradict
+this status.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

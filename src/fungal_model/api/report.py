@@ -16,6 +16,7 @@ TABLE_FILENAMES = {
     "time_series_long": "time_series_long.csv",
     "final_metrics": "final_metrics.csv",
     "threshold_times": "threshold_times.csv",
+    "summary_metrics": "summary_metrics.csv",
     "sampled_parameters": "sampled_parameters.csv",
     "mechanism_summary": "mechanism_summary.csv",
     "assumption_summary": "assumption_summary.csv",
@@ -93,6 +94,7 @@ def _render_report(
     time_series = tables["time_series_long"]
     final_metrics = tables["final_metrics"]
     threshold_times = tables["threshold_times"]
+    summary_metrics = tables["summary_metrics"]
     mechanisms = tables["mechanism_summary"]
     sampled_parameters = tables["sampled_parameters"]
     uncertainty_summary = tables["uncertainty_summary"]
@@ -127,7 +129,7 @@ def _render_report(
         "",
         "## Threshold times",
         "",
-        *_threshold_lines(threshold_times),
+        *_threshold_lines(threshold_times, summary_metric_rows=summary_metrics),
         "",
         "## Active mechanisms and modifiers",
         "",
@@ -257,10 +259,18 @@ def _degradation_rate_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
     return lines
 
 
-def _threshold_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
+def _threshold_lines(
+    rows: Sequence[Mapping[str, str]],
+    *,
+    summary_metric_rows: Sequence[Mapping[str, str]],
+) -> list[str]:
     if not rows:
         return ["No threshold-time rows were present in the standard tables."]
-    lines = []
+    lines = [
+        "These rows inspect existing `threshold_times.csv` and `summary_metrics.csv` values only. "
+        "They are simulated threshold times, not validation data, calibration results, empirical comparisons, "
+        "or observed degradation endpoints."
+    ]
     for row in rows[:12]:
         value = _value(row, "value")
         units = _value(row, "units")
@@ -271,6 +281,22 @@ def _threshold_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
             f"- `{_value(row, 'case_id')}` sample `{_value(row, 'sample_id')}` threshold "
             f"{_value(row, 'threshold_fraction')} (`{_value(row, 'metric')}`): "
             f"`{_value(row, 'status')}`{timing}.{suffix}"
+        )
+    threshold_summaries = [
+        row
+        for row in summary_metric_rows
+        if _value(row, "metric").startswith("time_to_")
+        and _value(row, "metric").endswith("_percent_substrate_degradation")
+    ]
+    if threshold_summaries:
+        lines.append("Summary rows from `summary_metrics.csv`:")
+    else:
+        lines.append("No computed threshold summary rows were present in `summary_metrics.csv`.")
+    for row in threshold_summaries[:12]:
+        lines.append(
+            f"- `{_value(row, 'case_id')}` `{_value(row, 'metric')}`: "
+            f"count={_value(row, 'count')}; p05={_value(row, 'p05')} "
+            f"p50={_value(row, 'p50')} p95={_value(row, 'p95')} {_value(row, 'units')}".rstrip()
         )
     return lines
 
