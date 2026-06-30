@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-18 PRODUCT-001 trajectory-quantile example
-and quicklook ergonomics slice after the registry-backed product-inhibition assembly and
+The current next PR is a scoped PR-19 PRODUCT-001 degradation-rate
+quicklook/report ergonomics slice after the registry-backed product-inhibition assembly and
 researcher-facing example, validation ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
 writer, PR-09 HTML report wrapper, PR-10 report-folder index/navigation,
@@ -77,8 +77,9 @@ PR-11 screen-comparison summary ergonomics, PR-12 comparison/report-output
 example notebook, and PR-13 THERMO-003 entropy-production-rate notebook
 coverage, plus the PR-14 THERMO-003 configured entropy-budget summary and
 PR-15 entropy-budget output notebook inspection, and the PR-16
-uncertainty-band output ergonomics slice, and the PR-17 trajectory-quantile
-output ergonomics slice.
+uncertainty-band output ergonomics slice, the PR-17 trajectory-quantile
+output ergonomics slice, and the PR-18 trajectory-quantile example and
+quicklook ergonomics slice.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -91,19 +92,21 @@ thermodynamics, or solver-time enforcement. The completed PR-16 slice should
 surface existing explicit uncertainty/range information in standard outputs and
 reports without adding validation data, calibration, empirical comparison,
 posterior uncertainty claims, inferred environment responses, or silent
-fallback constants. The current PRODUCT-001 slice should derive
-trajectory-level quantile or band outputs from existing sample time-series rows
-with explicit guardrails, without adding validation data, calibration,
-empirical comparison, inferred environment responses, solver/model changes, or
-silent fallback constants. The completed PR-17 slice adds
+fallback constants. The completed PR-17 slice adds
 `trajectory_quantiles.csv`, `DegradationScreenResult.trajectory_quantiles()`,
 schema/data-dictionary coverage, and report/index visibility over existing
-`time_series_long.csv` rows only. The current PR-18 PRODUCT-001 slice should
-improve trajectory-quantile inspection and quicklook ergonomics from existing
+`time_series_long.csv` rows only. The completed PR-18 slice adds a public-API
+trajectory-quantile notebook and a presentation-only
+`trajectory_quantile_bands.png` quicklook generated from
+`trajectory_quantiles.csv`; it does not add validation, calibration, empirical
+comparison, posterior uncertainty, inferred environment response, or
+solver/model behavior. The current PR-19 PRODUCT-001 slice should improve
+degradation-rate inspection and report/quicklook ergonomics from existing
 standard output tables without hidden notebook science, validation data,
-calibration, empirical comparison, inferred environment responses,
-solver/model changes, or silent fallback constants. Do not rebuild the
-completed scoped slices above unless code or tests contradict this status.
+calibration, empirical comparison, inferred environment responses, posterior
+uncertainty claims, solver/model changes, or silent fallback constants. Do not
+rebuild the completed scoped slices above unless code or tests contradict this
+status.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

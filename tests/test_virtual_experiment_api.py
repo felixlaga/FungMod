@@ -73,6 +73,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert (output_dir / "figures" / "substrate_remaining_vs_time.png").exists()
     assert (output_dir / "figures" / "product_release_vs_time.png").exists()
     assert (output_dir / "figures" / "degradation_fraction_vs_time.png").exists()
+    assert (output_dir / "figures" / "trajectory_quantile_bands.png").exists()
 
     time_rows = _csv_rows(output_dir / "time_series_long.csv")
     preflight_rows = _csv_rows(output_dir / "modelability_preflight.csv")
@@ -96,6 +97,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
 
     assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.4.0"
     assert output_schema["schema_version"] == OUTPUT_SCHEMA_VERSION
+    assert "figures/trajectory_quantile_bands.png" in output_manifest["files"]
 
     assert {"case_id", "sample_id", "fungus_id", "substrate_id", "environment_id", "time", "state", "value"}.issubset(
         time_rows[0]

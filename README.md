@@ -180,6 +180,9 @@ rows into p05/p50/p95 trajectory bands with explicit allowed-use and
 interpretation guardrails; it is not validation data, calibration evidence,
 empirical confidence intervals, posterior uncertainty, or new simulation
 behavior.
+Quicklook plots include a presentation-only trajectory-band figure generated
+from `trajectory_quantiles.csv`; it is for inspection, not validation or
+calibration.
 Results can also render a deterministic Markdown report from those standard
 tables without adding validation or calibration claims. Optional HTML artifacts
 can be written beside the Markdown report for browser viewing: an HTML sidecar
@@ -218,6 +221,9 @@ condition-specific parameter record is active.
 For a complete public-API walkthrough of guarded screen comparisons, report
 artifacts, and metadata-only environment-grid limitations, see
 `notebooks/examples/13_screen_comparison_summary_example.ipynb`.
+For a public-API walkthrough of trajectory-quantile inspection and the
+presentation-only trajectory-band quicklook, see
+`notebooks/examples/14_trajectory_quantiles_example.ipynb`.
 
 ## Public API
 
