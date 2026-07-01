@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-23 after merge:
+Scoped status as of PR-23 after merge, with PR-24 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -77,8 +77,9 @@ validation claims or solver-time enforcement, including the
 `has_entropy_production_rate`, `has_entropy_budget`, and
 `entropy_budget_status` summary fields.
 BIO-003: partial/software-tested for generic reversible product inhibition as
-an explicit configured process modifier and registry-backed case-template
-assembly when explicit product-state and K_i records exist.
+an explicit configured process modifier, registry-backed case-template
+assembly, and a non-PET configured framework benchmark when explicit
+product-state and K_i records exist.
 The scoped reversible-product-inhibition target now has a public example
 notebook, `12_reversible_product_inhibition_example.ipynb`, that compares
 inhibited and uninhibited exploratory virtual experiments and inspects
@@ -86,13 +87,22 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-24: VALIDATION-DATA-001 evidence-gated first time-course dataset**.
+Current next PR: **PR-24: BIO-003 non-PET product-inhibition genericity hardening**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
 has no real observation table under `data/experiments/literature/`. That blocks
 validation, calibration, and empirical comparison claims; it does not block
 building the simulator.
+
+Because the current validation evidence gate is still blocked, the selected
+PR-24 work is build-first BIO-003 genericity hardening: a toy,
+framework-benchmark configured non-PET surface model with an explicit
+artificial product-state `K_i` and `product_inhibition` modifier. This proves
+the existing reversible product-inhibition modifier runs outside the
+researcher-facing BIO-002 public example without adding validation data,
+calibration, empirical comparison, solver-law changes, silent fallback
+constants, or new biology claims.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer
@@ -177,10 +187,11 @@ does not add validation data, calibration, empirical comparison, inferred
 environment responses, hidden notebook science, schema changes, or
 solver/model behavior.
 
-VALIDATION-DATA-001 remains deferred and evidence-gated. PR-24 should start
-only if source-backed numeric time-course observations satisfy the active gate;
-otherwise the next maker should pick another build-first simulator/output
-ergonomics slice rather than treating incomplete candidate reviews as data.
+VALIDATION-DATA-001 remains deferred and evidence-gated. A validation
+ingestion PR should start only if source-backed numeric time-course
+observations satisfy the active gate; otherwise future makers should pick
+build-first simulator/output ergonomics slices rather than treating incomplete
+candidate reviews as data.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
@@ -191,6 +202,8 @@ carry explicit product-inhibition modifiers into configured runs and standard
 mechanism summaries when product-state and `K_i` records exist. The scoped
 researcher-facing example for this reversible-product-inhibition target is
 covered by `notebooks/examples/12_reversible_product_inhibition_example.ipynb`;
-broad BIO-003 remains partial.
+the non-PET configured benchmark is
+`data/model_configs/toy_surface_dummy_non_pet_product_inhibition.yml`. Broad
+BIO-003 remains partial.
 
 `old_progress/` is historical and non-binding.

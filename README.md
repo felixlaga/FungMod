@@ -81,6 +81,9 @@ basic kinetics layer:
 - mechanism summaries that can expose active configured rate modifiers such as
   explicit reversible product inhibition when registry-backed case templates
   provide product-state and positive unit-compatible `K_i` records;
+- a toy non-PET configured product-inhibition benchmark that exercises the
+  same explicit product-state and positive unit-compatible `K_i` path as
+  framework coverage only, not as biological evidence;
 - an offline-first SABIO-RK source adapter that loads frozen kinetic-law
   snapshots and writes review-only proposed records without mutating the
   simulation registry;
@@ -338,9 +341,10 @@ Internal software-test model-config shells include:
 - `data/model_configs/toy_homogeneous_ab.yml`
 - `data/model_configs/toy_surface_pet_plugin.yml`
 - `data/model_configs/toy_surface_dummy_non_pet.yml`
+- `data/model_configs/toy_surface_dummy_non_pet_product_inhibition.yml`
 
-All three load through `load_model_config`. They are framework benchmarks, not
-scientific biology.
+All four load through `load_model_config`. They are framework benchmarks, not
+scientific biology or validation evidence.
 
 Product maps live under `data/product_maps/` and are loaded through
 `load_product_map`. They carry configured state names and benchmark maturity

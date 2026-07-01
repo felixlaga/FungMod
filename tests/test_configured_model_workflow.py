@@ -28,6 +28,11 @@ def test_generic_configured_runner_executes_all_foundation_benchmarks(tmp_path) 
         (MODEL_CONFIGS / "toy_homogeneous_ab.yml", {}, "a_to_b"),
         (MODEL_CONFIGS / "toy_surface_dummy_non_pet.yml", {}, "dummy_surface_catalysis"),
         (
+            MODEL_CONFIGS / "toy_surface_dummy_non_pet_product_inhibition.yml",
+            {},
+            "dummy_surface_catalysis",
+        ),
+        (
             MODEL_CONFIGS / "toy_surface_pet_plugin.yml",
             {"substrate_registry": pet_substrate_loader_registry()},
             "plugin_surface_catalysis",
@@ -123,6 +128,53 @@ def test_configured_model_runs_with_explicit_product_inhibition_modifier(tmp_pat
         }
     ]
     assert process_config["modifiers"][0]["type"] == "product_inhibition"
+
+
+def test_non_pet_surface_benchmark_runs_with_explicit_product_inhibition_modifier(tmp_path) -> None:
+    output_dir = tmp_path / "dummy_non_pet_product_inhibited"
+
+    result = run_configured_model(
+        MODEL_CONFIGS / "toy_surface_dummy_non_pet_product_inhibition.yml",
+        output_dir=output_dir,
+    )
+
+    metadata = json.loads((output_dir / "configured_metadata.json").read_text(encoding="utf-8"))
+    assumptions = json.loads((output_dir / "assumptions.json").read_text(encoding="utf-8"))
+    process_config = json.loads((output_dir / "input_model_config.json").read_text(encoding="utf-8"))[
+        "processes"
+    ][0]
+    merged_parameters = json.loads((output_dir / "merged_parameters.json").read_text(encoding="utf-8"))
+
+    assert result.solver_metadata["success"] is True
+    assert "dummy_surface_catalysis" in result.process_rates
+    assert metadata["mode"] == "toy"
+    assert metadata["maturity"] == "framework_benchmark"
+    assert metadata["provenance"]["validity_range"] == "framework tests and exploratory examples only"
+    assert metadata["configured_process_modifiers"] == [
+        {
+            "process_id": "dummy_surface_catalysis",
+            "modifier_index": 0,
+            "type": "product_inhibition",
+            "product_state": "released_product_amount",
+            "inhibition_constant": "K_i_dummy_product",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Single-product reversible inhibition only; configured only when product_state "
+                "and positive unit-compatible K_i are explicit."
+            ),
+        }
+    ]
+    assert any(item["name"] == "reversible product inhibition modifier" for item in assumptions)
+    assert process_config["modifiers"] == [
+        {
+            "type": "product_inhibition",
+            "product_state": "released_product_amount",
+            "inhibition_constant": "K_i_dummy_product",
+        }
+    ]
+    ki_parameter = next(item for item in merged_parameters["parameters"] if item["symbol"] == "K_i_dummy_product")
+    assert ki_parameter["units"] == "kilogram"
+    assert "not biological inhibition evidence" in ki_parameter["notes"]
 
 
 def test_configured_product_inhibition_requires_explicit_inhibition_constant(tmp_path) -> None:

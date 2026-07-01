@@ -68,9 +68,10 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-24 VALIDATION-DATA-001 evidence-gated
-first time-course dataset slice after the registry-backed product-inhibition assembly and
-researcher-facing example, validation ingestion gate, build-first reframe,
+The current next PR is a scoped PR-24 BIO-003 non-PET configured
+product-inhibition genericity-hardening slice after the registry-backed
+product-inhibition assembly and researcher-facing example, validation
+ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
 writer, PR-09 HTML report wrapper, PR-10 report-folder index/navigation,
 PR-11 screen-comparison summary ergonomics, PR-12 comparison/report-output
@@ -84,7 +85,12 @@ ergonomics slice, the PR-20 threshold-time inspection/report ergonomics
 slice, and the PR-21 THERMO-003 explicit thermodynamic-summary report
 ergonomics slice, the PR-22 PRODUCT-001 provenance/limitations report
 ergonomics slice, and the PR-23 PRODUCT-001 provenance/limitations report
-example notebook slice.
+example notebook slice. The PR-24 BIO-003 slice should add a toy,
+framework-benchmark configured non-PET product-inhibition path with an
+explicit artificial product-state `K_i`, proving the modifier runs outside the
+researcher-facing BIO-002 example without adding validation data, calibration,
+empirical comparison, solver-law changes, silent fallback constants, or new
+biology claims.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -130,12 +136,13 @@ empirical comparison, inferred environment responses, hidden notebook science,
 schema changes, or solver/model behavior. Do not rebuild the completed scoped
 slices above unless code or tests contradict this status.
 
-VALIDATION-DATA-001 remains deferred and evidence-gated. PR-24 may start only
-if a source-backed numeric time-course dataset satisfies the active evidence
-requirements in `foundation_progress/VALIDATION_DATA_001_FIRST_TIMECOURSE.md`;
-otherwise the next maker should choose another build-first simulator/output
-ergonomics slice rather than ingesting, digitizing, or fabricating validation
-data.
+VALIDATION-DATA-001 remains deferred and evidence-gated. A validation
+ingestion PR may start only if a source-backed numeric time-course dataset
+satisfies the active evidence requirements in
+`foundation_progress/VALIDATION_DATA_001_FIRST_TIMECOURSE.md`; because the
+current candidate reviews do not satisfy that gate, PR-24 is deliberately
+build-first BIO-003 work rather than ingestion, digitization, or fabricated
+validation data.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

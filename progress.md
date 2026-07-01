@@ -26,6 +26,43 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## BIO-003 Non-PET Product-Inhibition Genericity Hardening
+
+Date: 2026-07-01
+
+Status: `complete` for the scoped PR-24 build-first genericity-hardening slice
+once merged; broad BIO-003 remains `partial/software-tested`, and
+VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added
+  `data/model_configs/toy_surface_dummy_non_pet_product_inhibition.yml`, a
+  `mode: toy`, `maturity: framework_benchmark` configured model derived from
+  the generic non-PET surface benchmark.
+- The fixture adds an explicit artificial product-state `K_i` parameter and a
+  `product_inhibition` modifier on the existing dummy surface-catalysis
+  process, labelled as software benchmark/testing coverage rather than
+  biological evidence.
+- Updated configured workflow tests so `run_configured_model(...)` executes
+  the non-PET product-inhibition fixture and verifies configured modifier
+  metadata, the reversible product-inhibition assumption surface, artificial
+  `K_i` labelling, mode/maturity labels, and successful validation output.
+- Updated active README, BIO-003 notes, roadmap/status docs, validation gate
+  docs, and queue-status tests so PR-24 is the selected build-first BIO-003
+  slice because the validation evidence gate remains blocked.
+
+No new biology, validation data, calibration routine, empirical comparison
+claim, solver law, numerical behavior change, registry biology record,
+researcher-facing API change, live API call, silent fallback constant,
+scientific `K_i` claim, toxicity, uptake, secretion, biomass, physiology, or
+multi-product inhibition support was added.
+
+Recommended next task: revisit VALIDATION-DATA-001 only if source-backed
+numeric time-course observations satisfying the active evidence gate are
+available; otherwise choose the next build-first simulator/output ergonomics
+slice rather than ingesting, digitizing, or fabricating validation data.
+
 ## PRODUCT-001 Provenance/Limitations Report Example Notebook
 
 Date: 2026-07-01
