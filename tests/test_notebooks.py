@@ -19,6 +19,7 @@ PRODUCT_NOTEBOOKS = [
     "10_virtual_experiment_product_tour.ipynb",
     "13_screen_comparison_summary_example.ipynb",
     "14_trajectory_quantiles_example.ipynb",
+    "15_provenance_limitations_report_example.ipynb",
 ]
 
 THERMODYNAMIC_NOTEBOOKS = [
@@ -149,6 +150,32 @@ def test_trajectory_quantiles_notebook_is_researcher_facing_but_unvalidated() ->
     assert "write_report(" in source
     assert "include_html=True" in source
     assert "include_index=True" in source
+    assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
+
+
+def test_provenance_limitations_report_notebook_is_researcher_facing_but_unvalidated() -> None:
+    notebook = load_notebook("15_provenance_limitations_report_example.ipynb")
+    markdown = "\n".join(markdown_cells(notebook)).lower()
+    source = "\n".join(code_cells(notebook))
+
+    assert notebook["nbformat"] == 4
+    assert "researcher-facing exploratory example" in markdown
+    assert "not an empirical validation" in markdown
+    assert "report/output ergonomics" in markdown
+    assert "provenance/limitation decision summary" in markdown
+    assert "decision-support table links" in markdown
+    assert "virtual_experiment(" in source
+    assert "write_report(" in source
+    assert "include_html=True" in source
+    assert "include_index=True" in source
+    assert "provenance()" in source
+    assert "limitations()" in source
+    assert "missing_parameters()" in source
+    assert "suggested_experiments()" in source
+    assert "assumption_summary()" in source
+    assert "provenance_table.csv" in source
+    assert "limitations_table.csv" in source
+    assert "not validation, calibration, empirical comparison, or inferred biology" in source
     assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
 
 
@@ -308,6 +335,46 @@ def test_trajectory_quantiles_notebook_executes_smoke_path_with_temp_outputs(
         "exploratory_trajectory_summary_not_validation"
     }
     assert all("not validation data" in row["interpretation_guardrail"] for row in trajectory_rows)
+
+
+def test_provenance_limitations_report_notebook_executes_smoke_path_with_temp_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "notebook_outputs"
+    monkeypatch.setenv("FUNGMOD_NOTEBOOK_OUTPUT_ROOT", str(output_root))
+    _execute_notebook("15_provenance_limitations_report_example.ipynb")
+
+    output = output_root / "15_provenance_limitations_report_example"
+    report_dir = output / "report"
+    report_text = (report_dir / "virtual_experiment_report.md").read_text(encoding="utf-8")
+    html_text = (report_dir / "virtual_experiment_report.html").read_text(encoding="utf-8")
+    index_text = (report_dir / "index.html").read_text(encoding="utf-8")
+
+    assert (output / "output_manifest.json").exists()
+    assert "## Provenance and limitation decision summary" in report_text
+    assert "derived only from existing `assumption_summary.csv`" in report_text
+    assert "not validation, calibration, empirical comparison, or inferred biology" in report_text
+    assert "Source row counts: assumptions=" in report_text
+    assert "Limitation severity counts:" in report_text
+    assert "Assumption/provenance allowed-use labels present:" in report_text
+    assert "Exploratory-prior provenance rows:" in report_text
+
+    assert _csv_rows(output / "assumption_summary.csv")
+    assert _csv_rows(output / "limitations_table.csv")
+    assert _csv_rows(output / "provenance_table.csv")
+    assert (output / "missing_parameters.csv").exists()
+    assert (output / "suggested_experiments.csv").exists()
+
+    for filename in (
+        "assumption_summary.csv",
+        "limitations_table.csv",
+        "missing_parameters.csv",
+        "suggested_experiments.csv",
+        "provenance_table.csv",
+    ):
+        assert filename in index_text
+        assert f"../{filename}" in html_text
 
 
 def test_thermodynamics_entropy_notebook_executes_smoke_path_with_temp_outputs(

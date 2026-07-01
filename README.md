@@ -64,6 +64,9 @@ basic kinetics layer:
 - a researcher-facing screen-comparison notebook that writes report artifacts
   and inspects `comparison_summary.csv` guardrails without ranking
   metadata-only environment grids,
+- a researcher-facing provenance/limitations report notebook that writes the
+  Markdown/HTML/index report artifacts and inspects the table-derived decision
+  summary and decision-support links,
 - human-editable YAML config folders for fungi, substrates, enzymes,
   environments, geometries, parameters, and experiments,
 - schema-checked config loaders with explicit unknown-value handling,
@@ -239,6 +242,9 @@ artifacts, and metadata-only environment-grid limitations, see
 For a public-API walkthrough of trajectory-quantile inspection and the
 presentation-only trajectory-band quicklook, see
 `notebooks/examples/14_trajectory_quantiles_example.ipynb`.
+For a public-API walkthrough of the provenance/limitation decision summary and
+decision-support report links, see
+`notebooks/examples/15_provenance_limitations_report_example.ipynb`.
 
 ## Public API
 
@@ -285,9 +291,9 @@ no longer provide a process-to-`Reaction` adapter bridge.
 ## Notebooks
 
 The `notebooks/examples/` folder contains software-test notebooks for
-configured workflow plumbing, configured thermodynamic-output inspection, plus
-one researcher-facing exploratory product tour. The product tour is not
-empirical validation:
+configured workflow plumbing, configured thermodynamic-output inspection, and
+researcher-facing exploratory examples for public virtual-experiment outputs.
+These researcher-facing notebooks are not empirical validation:
 
 - `00_quickstart.ipynb`
 - `01_config_entity_inspection.ipynb`
@@ -298,6 +304,7 @@ empirical validation:
 - `12_reversible_product_inhibition_example.ipynb`
 - `13_screen_comparison_summary_example.ipynb`
 - `14_trajectory_quantiles_example.ipynb`
+- `15_provenance_limitations_report_example.ipynb`
 
 Notebook tests check that notebooks import `fungal_model`, avoid defining core
 rate laws/classes or low-level solvers inline, and execute every foundation,

@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-23 PRODUCT-001 provenance/limitations
-report example-notebook slice after the registry-backed product-inhibition assembly and
+The current next PR is a scoped PR-24 VALIDATION-DATA-001 evidence-gated
+first time-course dataset slice after the registry-backed product-inhibition assembly and
 researcher-facing example, validation ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
 writer, PR-09 HTML report wrapper, PR-10 report-folder index/navigation,
@@ -82,8 +82,9 @@ output ergonomics slice, and the PR-18 trajectory-quantile example and
 quicklook ergonomics slice, the PR-19 degradation-rate quicklook/report
 ergonomics slice, the PR-20 threshold-time inspection/report ergonomics
 slice, and the PR-21 THERMO-003 explicit thermodynamic-summary report
-ergonomics slice, and the PR-22 PRODUCT-001 provenance/limitations report
-ergonomics slice.
+ergonomics slice, the PR-22 PRODUCT-001 provenance/limitations report
+ergonomics slice, and the PR-23 PRODUCT-001 provenance/limitations report
+example notebook slice.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -122,12 +123,19 @@ electron balances, validation evidence, or solver-time thermodynamic
 enforcement. The completed PR-22 PRODUCT-001 slice improves provenance,
 limitation, missing-parameter, and suggested-experiment report ergonomics from
 existing standard output tables only, including a Markdown decision summary and
-additive HTML/index links over existing decision-support tables. The current
-PR-23 PRODUCT-001 slice should make that report decision summary inspectable in
-a public-API example notebook without adding validation data, calibration,
+additive HTML/index links over existing decision-support tables. The completed
+PR-23 PRODUCT-001 slice makes that report decision summary inspectable in a
+public-API example notebook without adding validation data, calibration,
 empirical comparison, inferred environment responses, hidden notebook science,
 schema changes, or solver/model behavior. Do not rebuild the completed scoped
 slices above unless code or tests contradict this status.
+
+VALIDATION-DATA-001 remains deferred and evidence-gated. PR-24 may start only
+if a source-backed numeric time-course dataset satisfies the active evidence
+requirements in `foundation_progress/VALIDATION_DATA_001_FIRST_TIMECOURSE.md`;
+otherwise the next maker should choose another build-first simulator/output
+ergonomics slice rather than ingesting, digitizing, or fabricating validation
+data.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
