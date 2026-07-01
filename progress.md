@@ -26,12 +26,52 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Virtual-Experiment Thermodynamic Diagnostics Bridge
+
+Date: 2026-07-01
+
+Status: `complete` for the scoped PR-25 standard-table/accessor bridge once
+merged; broader THERMO-003 remains `partial` for dynamic thermodynamic and
+entropy constraints, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added `thermodynamic_diagnostics.csv` as a standard virtual-experiment
+  output table with schema/data-dictionary coverage in output schema version
+  `1.5.0`.
+- Added `DegradationScreenResult.thermodynamic_diagnostics()` for loading the
+  standard table without rerunning simulations.
+- The table is populated only by reading existing per-sample configured-output
+  `thermodynamic_summary.json` and `thermodynamic_summary.csv` artifacts from
+  sample bundle directories.
+- Rows copy artifact-presence flags, configured row names/statuses, residual
+  and equation fields, entropy-budget summary fields when present, and explicit
+  allowed-use/interpretation guardrails.
+- If no configured thermodynamic artifacts exist, the standard table is written
+  header-only rather than failing validation or inventing diagnostics.
+- Added report/index standard-table link visibility through the existing table
+  link pattern.
+- Updated focused virtual-experiment tests to prove both the header-only
+  no-artifact case and the artifact-derived row case.
+
+No validation data, calibration routine, empirical comparison claim, inferred
+activity model, inferred reaction quotient, inferred concentration, redox
+potential model, electron-balance model, solver-time thermodynamic
+enforcement, biological mechanism, numerical model, solver behavior, registry
+record, hidden notebook science, or silent fallback constant was added.
+
+Recommended next task: revisit VALIDATION-DATA-001 only if source-backed
+numeric time-course observations satisfying the active evidence gate are
+available; otherwise choose the next build-first simulator/output ergonomics
+slice rather than ingesting, digitizing, or fabricating validation data.
+
 ## BIO-003 Non-PET Product-Inhibition Genericity Hardening
 
 Date: 2026-07-01
 
 Status: `complete` for the scoped PR-24 build-first genericity-hardening slice
-once merged; broad BIO-003 remains `partial/software-tested`, and
+after PR #39 merged; broad BIO-003 remains `partial/software-tested`, and
 VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
 
 Completed in this pass:

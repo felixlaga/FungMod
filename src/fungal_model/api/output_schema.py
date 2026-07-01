@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "1.4.0"
+OUTPUT_SCHEMA_VERSION = "1.5.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -39,7 +39,12 @@ COMMON_CASE_COLUMNS = (
     _column("substrate_name", "Display name for the substrate record."),
     _column("environment_id", "Registry or runtime ID for the environment case.", semantic_type="identifier"),
     _column("environment_name", "Display name for the environment case."),
-    _column("temperature_C", "Environment temperature metadata in degrees Celsius.", required=False, units_policy="degree_Celsius"),
+    _column(
+        "temperature_C",
+        "Environment temperature metadata in degrees Celsius.",
+        required=False,
+        units_policy="degree_Celsius",
+    ),
     _column("ph", "Environment pH metadata.", required=False, units_policy="dimensionless"),
     _column("oxygen", "Environment oxygen label or value metadata.", required=False),
     _column("environment_source", "Whether the environment came from the registry or a runtime grid."),
@@ -49,7 +54,9 @@ COMMON_CASE_COLUMNS = (
         allowed_values="metadata_only; condition_specific_parameters; active_response_model; preflight_only; not_applicable",
     ),
     _column("environment_response_model", "Active environment-response model identifier, or none."),
-    _column("environment_comparison_allowed", "Whether environment-level outcome comparisons are scientifically supported."),
+    _column(
+        "environment_comparison_allowed", "Whether environment-level outcome comparisons are scientifically supported."
+    ),
     _column("environment_ranking_allowed", "Whether this table may be used to rank environments by model response."),
     _column("environment_response_plot_allowed", "Whether environment-response plots are scientifically supported."),
     _column("environment_guardrail", "Short policy explaining environment comparison and plotting limits."),
@@ -82,7 +89,11 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         "Preflight guardrail status before simulation.",
         (
             *COMMON_CASE_COLUMNS,
-            _column("assessment_mode", "Mode used for this preflight assessment.", allowed_values="scientific; exploratory; toy"),
+            _column(
+                "assessment_mode",
+                "Mode used for this preflight assessment.",
+                allowed_values="scientific; exploratory; toy",
+            ),
             _column("status", "Modelability status for the case."),
             _column(
                 "simulation_allowed_for_mode",
@@ -171,7 +182,13 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             *COMMON_CASE_COLUMNS,
             *SAMPLE_COLUMNS,
             _column("metric", "Metric name."),
-            _column("value", "Metric value when status permits.", required=False, units_policy="units", semantic_type="number"),
+            _column(
+                "value",
+                "Metric value when status permits.",
+                required=False,
+                units_policy="units",
+                semantic_type="number",
+            ),
             _column("units", "Units for value, or not_applicable."),
             _column("status", "Metric status.", allowed_values="computed; derived_proxy; not_applicable"),
             _column("notes", "Metric caveats or not-applicable explanation.", required=False),
@@ -184,9 +201,16 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         (
             *COMMON_CASE_COLUMNS,
             *SAMPLE_COLUMNS,
-            _column("threshold_fraction", "Substrate degradation threshold.", units_policy="dimensionless", semantic_type="number"),
+            _column(
+                "threshold_fraction",
+                "Substrate degradation threshold.",
+                units_policy="dimensionless",
+                semantic_type="number",
+            ),
             _column("metric", "Threshold metric name."),
-            _column("value", "Crossing time when reached.", required=False, units_policy="units", semantic_type="number"),
+            _column(
+                "value", "Crossing time when reached.", required=False, units_policy="units", semantic_type="number"
+            ),
             _column("units", "Time units."),
             _column("status", "Threshold status.", allowed_values="computed; not_reached; not_applicable"),
             _column("notes", "Threshold caveats or not-applicable explanation.", required=False),
@@ -204,13 +228,17 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("sampled_value", "Exact value used in this sample.", units_policy="units", semantic_type="number"),
             _column("units", "Units for sampled_value."),
             _column("sampled_value_kind", "Value kind used by the sampled run."),
-            _column("source_record_id", "Registry parameter record that generated this sample.", semantic_type="identifier"),
+            _column(
+                "source_record_id", "Registry parameter record that generated this sample.", semantic_type="identifier"
+            ),
             _column("source_value_kind", "Original ValueSpec kind on the source record."),
             _column("source_maturity", "Maturity label on the source parameter record."),
             _column("parameter_source_class", "Normalized source class for researcher filtering."),
             _column("source", "Human-readable value source."),
             _column("confidence_level", "Confidence or maturity label from the ValueSpec."),
-            _column("exploratory_prior", "Whether the source is a user-supplied exploratory prior.", semantic_type="boolean"),
+            _column(
+                "exploratory_prior", "Whether the source is a user-supplied exploratory prior.", semantic_type="boolean"
+            ),
             _column("range_scope", "Machine-readable scope of a range or distribution."),
             _column("range_interpretation", "How a range or distribution may be interpreted."),
             _column("allowed_use", "Machine-readable policy for allowed downstream use."),
@@ -223,7 +251,11 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         "Per-case assumptions, uncertain inputs, blockers, and follow-up suggestions.",
         (
             *COMMON_CASE_COLUMNS,
-            _column("row_type", "Kind of summary row.", allowed_values="assumption; uncertain; missing; incompatible; suggested_experiment"),
+            _column(
+                "row_type",
+                "Kind of summary row.",
+                allowed_values="assumption; uncertain; missing; incompatible; suggested_experiment",
+            ),
             _column("item_type", "Modelability item type or summary item family."),
             _column("item_id", "Stable item identifier within the case.", semantic_type="identifier"),
             _column("modelability_status", "Modelability status for the case."),
@@ -238,10 +270,18 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         (
             *COMMON_CASE_COLUMNS,
             _column("mechanism_index", "Zero-based mechanism index within the case.", semantic_type="integer"),
-            _column("mechanism_kind", "Mechanism row kind.", allowed_values="process_law; rate_modifier; thermodynamic_validator"),
+            _column(
+                "mechanism_kind",
+                "Mechanism row kind.",
+                allowed_values="process_law; rate_modifier; thermodynamic_validator",
+            ),
             _column("mechanism_id", "Stable mechanism identifier.", semantic_type="identifier"),
             _column("mechanism_family", "Reusable mechanism family."),
-            _column("active", "Whether this mechanism actively affected simulated rates or outputs.", semantic_type="boolean"),
+            _column(
+                "active",
+                "Whether this mechanism actively affected simulated rates or outputs.",
+                semantic_type="boolean",
+            ),
             _column("maturity", "Mechanism maturity label."),
             _column("configured_by", "Registry/config source that selected this mechanism."),
             _column("equation_or_law", "Short mathematical law or process description."),
@@ -274,7 +314,9 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         (
             _column("output_schema_version", "Version of this virtual-experiment output schema."),
             _column("environment_id", "Environment ID.", semantic_type="identifier"),
-            _column("temperature_C", "Environment temperature metadata.", required=False, units_policy="degree_Celsius"),
+            _column(
+                "temperature_C", "Environment temperature metadata.", required=False, units_policy="degree_Celsius"
+            ),
             _column("ph", "Environment pH metadata.", required=False, units_policy="dimensionless"),
             _column("oxygen", "Environment oxygen metadata.", required=False),
             _column("environment_source", "Environment source."),
@@ -289,12 +331,42 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("n_samples", "Number of attempted samples.", semantic_type="integer"),
             _column("n_successful_samples", "Number of successful samples.", semantic_type="integer"),
             _column("n_failed_samples", "Number of failed samples.", semantic_type="integer"),
-            _column("median_final_substrate_degraded_fraction", "Median degradation fraction when comparison is allowed.", required=False, semantic_type="number"),
-            _column("p05_final_substrate_degraded_fraction", "5th percentile when comparison is allowed.", required=False, semantic_type="number"),
-            _column("p95_final_substrate_degraded_fraction", "95th percentile when comparison is allowed.", required=False, semantic_type="number"),
-            _column("median_time_to_50_percent_degradation", "Median time-to-50-percent degradation when comparison is allowed.", required=False, semantic_type="number"),
-            _column("p05_time_to_50_percent_degradation", "5th percentile when comparison is allowed.", required=False, semantic_type="number"),
-            _column("p95_time_to_50_percent_degradation", "95th percentile when comparison is allowed.", required=False, semantic_type="number"),
+            _column(
+                "median_final_substrate_degraded_fraction",
+                "Median degradation fraction when comparison is allowed.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "p05_final_substrate_degraded_fraction",
+                "5th percentile when comparison is allowed.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "p95_final_substrate_degraded_fraction",
+                "95th percentile when comparison is allowed.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "median_time_to_50_percent_degradation",
+                "Median time-to-50-percent degradation when comparison is allowed.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "p05_time_to_50_percent_degradation",
+                "5th percentile when comparison is allowed.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "p95_time_to_50_percent_degradation",
+                "95th percentile when comparison is allowed.",
+                required=False,
+                semantic_type="number",
+            ),
             _column("limitations", "Semicolon-separated limitations for the environment rows."),
         ),
         primary_key=("environment_id",),
@@ -308,15 +380,29 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("comparison_scope", "Comparison scope represented by this row."),
             _column("source_table", "Standard output table that supplied this row."),
             _column("source_metric", "Metric from the source row."),
-            _column("threshold_fraction", "Threshold fraction for threshold rows.", required=False, units_policy="dimensionless", semantic_type="number"),
+            _column(
+                "threshold_fraction",
+                "Threshold fraction for threshold rows.",
+                required=False,
+                units_policy="dimensionless",
+                semantic_type="number",
+            ),
             _column("value", "Source row value when present.", required=False, semantic_type="number"),
             _column("units", "Source row units."),
             _column("source_status", "Status from the source row."),
             _column("source_notes", "Notes from the source row.", required=False),
             _column("comparable_group_id", "Stable group ID for rows with the same source table, metric, and units."),
-            _column("comparison_allowed", "Whether side-by-side comparison is allowed for this row.", semantic_type="boolean"),
+            _column(
+                "comparison_allowed",
+                "Whether side-by-side comparison is allowed for this row.",
+                semantic_type="boolean",
+            ),
             _column("ranking_allowed", "Whether this row may be ranked against peer rows.", semantic_type="boolean"),
-            _column("ranking_blocking_reason", "Reason ranking is blocked, or blank when ranking is allowed.", required=False),
+            _column(
+                "ranking_blocking_reason",
+                "Reason ranking is blocked, or blank when ranking is allowed.",
+                required=False,
+            ),
             _column("recommended_next_action", "Machine-readable recommendation for interpreting this row."),
         ),
         primary_key=("case_id", "sample_id", "source_table", "source_metric", "threshold_fraction"),
@@ -326,7 +412,11 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         "Derived uncertainty/range index over existing sampled parameters and per-case summary metrics.",
         (
             *COMMON_CASE_COLUMNS,
-            _column("summary_type", "Kind of uncertainty summary row.", allowed_values="sampled_parameter_distribution; output_metric_sample_distribution"),
+            _column(
+                "summary_type",
+                "Kind of uncertainty summary row.",
+                allowed_values="sampled_parameter_distribution; output_metric_sample_distribution",
+            ),
             _column("target_id", "Parameter symbol or metric represented by the row.", semantic_type="identifier"),
             _column("target_label", "Human-readable target label."),
             _column("source_table", "Standard output table that supplied the values."),
@@ -336,16 +426,28 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("p05", "5th percentile over existing sampled values or sample outputs.", semantic_type="number"),
             _column("p50", "Median over existing sampled values or sample outputs.", semantic_type="number"),
             _column("p95", "95th percentile over existing sampled values or sample outputs.", semantic_type="number"),
-            _column("source_record_id", "Registry parameter record for sampled-parameter rows.", required=False, semantic_type="identifier"),
+            _column(
+                "source_record_id",
+                "Registry parameter record for sampled-parameter rows.",
+                required=False,
+                semantic_type="identifier",
+            ),
             _column("source_value_kind", "Original ValueSpec kind for sampled-parameter rows.", required=False),
             _column("source_maturity", "Maturity label for sampled-parameter source records.", required=False),
             _column("parameter_source_class", "Normalized source class for sampled-parameter rows.", required=False),
-            _column("exploratory_prior", "Whether the sampled-parameter source is exploratory.", required=False, semantic_type="boolean"),
+            _column(
+                "exploratory_prior",
+                "Whether the sampled-parameter source is exploratory.",
+                required=False,
+                semantic_type="boolean",
+            ),
             _column("range_scope", "Range/distribution scope for sampled-parameter rows.", required=False),
             _column("range_interpretation", "Allowed interpretation for sampled-parameter ranges.", required=False),
             _column("allowed_use", "Machine-readable allowed-use policy for the summarized values."),
             _column("uncertainty_band_status", "Machine-readable status for how the band was produced."),
-            _column("interpretation_guardrail", "Human-readable guardrail preventing validation/calibration overclaims."),
+            _column(
+                "interpretation_guardrail", "Human-readable guardrail preventing validation/calibration overclaims."
+            ),
         ),
         primary_key=("case_id", "summary_type", "target_id", "source_table", "source_metric", "source_record_id"),
     ),
@@ -354,7 +456,12 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         (
             *COMMON_CASE_COLUMNS,
             _column("time_index", "Zero-based index in the simulated time grid.", semantic_type="integer"),
-            _column("time", "Simulation time represented by this quantile row.", units_policy="time_units", semantic_type="number"),
+            _column(
+                "time",
+                "Simulation time represented by this quantile row.",
+                units_policy="time_units",
+                semantic_type="number",
+            ),
             _column("time_units", "Units for the time column."),
             _column("state", "State or derived observable name summarized from time_series_long."),
             _column("state_role", "Semantic role for the state or observable."),
@@ -368,9 +475,182 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("p95", "95th percentile over existing sample time-series values.", semantic_type="number"),
             _column("allowed_use", "Machine-readable allowed-use policy for the summarized values."),
             _column("trajectory_band_status", "Machine-readable status for how the trajectory band was produced."),
-            _column("interpretation_guardrail", "Human-readable guardrail preventing validation/calibration overclaims."),
+            _column(
+                "interpretation_guardrail", "Human-readable guardrail preventing validation/calibration overclaims."
+            ),
         ),
         primary_key=("case_id", "time_index", "state", "state_role", "source", "units"),
+    ),
+    "thermodynamic_diagnostics": _table(
+        "Configured-output thermodynamic diagnostics copied from existing per-sample thermodynamic_summary artifacts.",
+        (
+            *COMMON_CASE_COLUMNS,
+            *SAMPLE_COLUMNS,
+            _column("artifact_source_directory", "Sample configured-output bundle directory inspected for artifacts."),
+            _column(
+                "thermodynamic_summary_json_present",
+                "Whether thermodynamic_summary.json existed in the sample bundle.",
+                semantic_type="boolean",
+            ),
+            _column(
+                "thermodynamic_summary_csv_present",
+                "Whether thermodynamic_summary.csv existed in the sample bundle.",
+                semantic_type="boolean",
+            ),
+            _column("summary_kind", "Top-level kind field from thermodynamic_summary.json.", required=False),
+            _column(
+                "summary_count",
+                "Top-level count from thermodynamic_summary.json.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "summary_status_counts",
+                "JSON status-count mapping copied from thermodynamic_summary.json.",
+                required=False,
+            ),
+            _column(
+                "summary_severity_counts",
+                "JSON severity-count mapping copied from thermodynamic_summary.json.",
+                required=False,
+            ),
+            _column(
+                "summary_has_reaction_quotient_gibbs",
+                "Whether the configured summary reported explicit-Q Gibbs rows.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column(
+                "summary_has_entropy_production_rate",
+                "Whether the configured summary reported entropy-production-rate rows.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column(
+                "summary_has_entropy_budget",
+                "Whether the configured summary reported an evaluated entropy budget.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column(
+                "entropy_budget_scope",
+                "Entropy-budget scope text copied from thermodynamic_summary.json.",
+                required=False,
+            ),
+            _column(
+                "entropy_budget_units", "Entropy-budget units copied from thermodynamic_summary.json.", required=False
+            ),
+            _column(
+                "entropy_budget_total",
+                "Entropy-budget total copied from thermodynamic_summary.json.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "entropy_budget_minimum",
+                "Entropy-budget minimum copied from thermodynamic_summary.json.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "entropy_budget_negative_count",
+                "Entropy-budget negative-row count copied from thermodynamic_summary.json.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "entropy_budget_evaluated_count",
+                "Entropy-budget evaluated-row count copied from thermodynamic_summary.json.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "entropy_budget_status", "Entropy-budget status copied from thermodynamic_summary.json.", required=False
+            ),
+            _column(
+                "entropy_budget_limitations",
+                "Entropy-budget limitations copied from thermodynamic_summary.json.",
+                required=False,
+            ),
+            _column(
+                "row_index",
+                "Zero-based thermodynamic_summary.csv row index within the sample bundle.",
+                semantic_type="integer",
+            ),
+            _column("row_name", "Validation row name copied from thermodynamic_summary.csv."),
+            _column("row_status", "Validation row status copied from thermodynamic_summary.csv.", required=False),
+            _column("row_passed", "Validation row passed flag copied from thermodynamic_summary.csv.", required=False),
+            _column("row_severity", "Validation row severity copied from thermodynamic_summary.csv.", required=False),
+            _column(
+                "residual_value",
+                "Residual value copied from thermodynamic_summary.csv when present.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "residual_units", "Residual units copied from thermodynamic_summary.csv when present.", required=False
+            ),
+            _column(
+                "delta_gibbs",
+                "Delta Gibbs value copied from thermodynamic_summary.csv when present.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "delta_gibbs_units",
+                "Delta Gibbs units copied from thermodynamic_summary.csv when present.",
+                required=False,
+            ),
+            _column(
+                "entropy_production_per_mole",
+                "Entropy production per mole copied from thermodynamic_summary.csv when present.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "entropy_production_rate",
+                "Entropy production rate copied from thermodynamic_summary.csv when present.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "entropy_production_rate_units",
+                "Entropy production rate units copied from thermodynamic_summary.csv when present.",
+                required=False,
+            ),
+            _column(
+                "gibbs_equation", "Equation text copied from thermodynamic_summary.csv when present.", required=False
+            ),
+            _column(
+                "entropy_equation", "Equation text copied from thermodynamic_summary.csv when present.", required=False
+            ),
+            _column(
+                "dynamic_reaction_quotient",
+                "Dynamic reaction quotient status copied from thermodynamic_summary.csv when present.",
+                required=False,
+            ),
+            _column(
+                "activity_model",
+                "Activity-model status copied from thermodynamic_summary.csv when present.",
+                required=False,
+            ),
+            _column(
+                "solver_time_enforcement",
+                "Solver-time enforcement status copied from thermodynamic_summary.csv when present.",
+                required=False,
+            ),
+            _column("supported_scope", "Supported-scope text copied from thermodynamic_summary.json.", required=False),
+            _column(
+                "unsupported_scope", "Unsupported-scope text copied from thermodynamic_summary.json.", required=False
+            ),
+            _column(
+                "message", "Validation row message copied from thermodynamic_summary.csv when present.", required=False
+            ),
+            _column("allowed_use", "Machine-readable policy for interpreting this row."),
+            _column("interpretation_guardrail", "Human-readable no-inference guardrail for this diagnostics row."),
+        ),
+        primary_key=("case_id", "sample_id", "row_index", "row_name"),
+        join_keys=("case_id", "sample_id"),
     ),
     "provenance_table": _table(
         "Registry and parameter provenance rows used by each case.",
@@ -384,7 +664,9 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("value_kind", "ValueSpec kind or missing/incompatible marker.", required=False),
             _column("source", "Human-readable source.", required=False),
             _column("confidence_level", "Confidence or maturity level.", required=False),
-            _column("exploratory_prior", "Whether the row is an exploratory prior.", required=False, semantic_type="boolean"),
+            _column(
+                "exploratory_prior", "Whether the row is an exploratory prior.", required=False, semantic_type="boolean"
+            ),
             _column("range_scope", "Range/distribution scope when applicable.", required=False),
             _column("range_interpretation", "Range/distribution interpretation when applicable.", required=False),
             _column("allowed_use", "Allowed downstream use policy.", required=False),

@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-23 after merge, with PR-24 selected:
+Scoped status as of PR-24 after PR #39 merged, with PR-25 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -70,6 +70,12 @@ Report utilities now add Markdown, HTML, and report-folder index visibility for
 existing configured-output `thermodynamic_summary.json` and
 `thermodynamic_summary.csv` artifacts without inferring thermodynamic inputs or
 adding solver-time enforcement.
+Standard virtual-experiment outputs now include `thermodynamic_diagnostics.csv`
+and `DegradationScreenResult.thermodynamic_diagnostics()` as a bridge over
+existing per-sample configured-output `thermodynamic_summary.json`/`.csv` artifacts only. The table is header-only when no configured thermodynamic
+artifacts exist and must not be read as inferred activities, reaction
+quotients, concentrations, redox potentials, electron balances, validation
+evidence, or solver-time thermodynamic enforcement.
 Example notebooks now include
 `11_thermodynamics_entropy_diagnostics.ipynb` for configured explicit-Q Gibbs,
 entropy-production-rate, and entropy-budget output inspection without
@@ -87,7 +93,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-24: BIO-003 non-PET product-inhibition genericity hardening**.
+Current next PR: **PR-25: THERMO-003 virtual-experiment thermodynamic diagnostics bridge**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -95,14 +101,14 @@ has no real observation table under `data/experiments/literature/`. That blocks
 validation, calibration, and empirical comparison claims; it does not block
 building the simulator.
 
-Because the current validation evidence gate is still blocked, the selected
-PR-24 work is build-first BIO-003 genericity hardening: a toy,
+Because the current validation evidence gate is still blocked, PR-24 has
+completed a build-first BIO-003 genericity hardening slice: a toy,
 framework-benchmark configured non-PET surface model with an explicit
-artificial product-state `K_i` and `product_inhibition` modifier. This proves
-the existing reversible product-inhibition modifier runs outside the
-researcher-facing BIO-002 public example without adding validation data,
-calibration, empirical comparison, solver-law changes, silent fallback
-constants, or new biology claims.
+artificial product-state `K_i` and `product_inhibition` modifier. The selected
+PR-25 work is now a build-first THERMO-003 virtual-experiment diagnostics
+bridge over existing configured thermodynamic summary artifacts only, without
+validation data, calibration, empirical comparison, solver-law changes, silent
+fallback constants, inferred thermodynamics, or new biology claims.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer
@@ -139,6 +145,14 @@ trajectory-band status, and interpretation guardrails and must not be read as
 validation data, calibration evidence, empirical confidence intervals,
 posterior uncertainty, inferred environment response, or solver/model
 behavior.
+The completed thermodynamic-diagnostics bridge slice adds
+`thermodynamic_diagnostics.csv` and
+`DegradationScreenResult.thermodynamic_diagnostics()` as a standard table
+derived only from existing per-sample configured-output
+`thermodynamic_summary.json`/`.csv` artifacts. It preserves artifact-presence,
+entropy-budget, allowed-use, and interpretation guardrails and must not be
+read as inferred thermodynamics, validation evidence, empirical comparison, or
+solver-time enforcement.
 The completed trajectory-quantile example and quicklook ergonomics slice adds
 `14_trajectory_quantiles_example.ipynb` and a presentation-only
 `trajectory_quantile_bands.png` quicklook generated from

@@ -38,7 +38,9 @@ basic kinetics layer:
   diagnostics for caller-supplied dimensionless Q and entropy-rate metadata,
 - configured thermodynamic JSON/CSV summary outputs for explicit Gibbs/entropy
   validation diagnostics, including an aggregate explicit entropy-rate budget
-  and report/index visibility for existing summary artifacts,
+  and report/index visibility for existing summary artifacts plus a standard
+  virtual-experiment thermodynamic diagnostics table derived from existing
+  per-sample configured summary artifacts,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - least-squares calibration utilities with train/validation residual reporting,
@@ -166,6 +168,8 @@ The standard output folder includes long-format time series, final states,
 final metrics, threshold times, sampled parameters, summary metrics,
 guarded screen-comparison summaries, uncertainty/range summaries,
 trajectory quantile summaries,
+configured thermodynamic diagnostics copied from existing per-sample
+`thermodynamic_summary.json`/`.csv` artifacts when those artifacts are present,
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
@@ -187,6 +191,13 @@ rows into p05/p50/p95 trajectory bands with explicit allowed-use and
 interpretation guardrails; it is not validation data, calibration evidence,
 empirical confidence intervals, posterior uncertainty, or new simulation
 behavior.
+`thermodynamic_diagnostics.csv` copies existing per-sample configured-output
+`thermodynamic_summary.json`/`.csv` fields into a standard virtual-experiment
+table with explicit artifact-presence, entropy-budget, allowed-use, and
+interpretation guardrails. If no configured thermodynamic artifacts exist, the
+table remains header-only; it does not infer activities, reaction quotients,
+concentrations, redox potentials, electron balances, validation evidence, or
+solver-time thermodynamic enforcement.
 Quicklook plots include a presentation-only trajectory-band figure generated
 from `trajectory_quantiles.csv`; it is for inspection, not validation or
 calibration.

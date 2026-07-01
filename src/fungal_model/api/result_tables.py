@@ -61,8 +61,7 @@ def write_standard_tables(
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     reports_by_case = {
-        (report.fungus_id, report.substrate_id, report.environment_id): report
-        for report in preflight_reports
+        (report.fungus_id, report.substrate_id, report.environment_id): report for report in preflight_reports
     }
     table_rows = _build_table_rows(
         screen_result=screen_result,
@@ -85,6 +84,7 @@ def write_standard_tables(
         "comparison_summary": destination / "comparison_summary.csv",
         "uncertainty_summary": destination / "uncertainty_summary.csv",
         "trajectory_quantiles": destination / "trajectory_quantiles.csv",
+        "thermodynamic_diagnostics": destination / "thermodynamic_diagnostics.csv",
         "provenance_table": destination / "provenance_table.csv",
         "limitations_table": destination / "limitations_table.csv",
         "missing_parameters": destination / "missing_parameters.csv",
@@ -162,6 +162,7 @@ def _build_table_rows(
         "comparison_summary": [],
         "uncertainty_summary": [],
         "trajectory_quantiles": [],
+        "thermodynamic_diagnostics": [],
         "provenance_table": [],
         "limitations_table": [],
         "missing_parameters": [],
@@ -223,6 +224,9 @@ def _build_table_rows(
                     sample=sample,
                     role_records=role_records,
                 )
+            )
+            rows["thermodynamic_diagnostics"].extend(
+                _thermodynamic_diagnostic_rows(sample_context=sample_context, sample=sample)
             )
     rows["summary_metrics"] = _summary_metric_rows(rows["final_metrics"], rows["threshold_times"])
     rows["environment_summary"] = _environment_summary_rows(
@@ -397,8 +401,7 @@ def _environment_policy(environment_effect_status: str) -> dict[str, Any]:
             "environment_ranking_allowed": False,
             "environment_response_plot_allowed": False,
             "environment_guardrail": (
-                "Metadata-only environment cases cannot be ranked or plotted as "
-                "environmental response models."
+                "Metadata-only environment cases cannot be ranked or plotted as environmental response models."
             ),
         }
     if environment_effect_status in {"condition_specific_parameters", "active_response_model"}:
@@ -744,9 +747,7 @@ def _process_mechanism_descriptor(
         "provenance": json.dumps(
             {
                 "process_type": process_type,
-                "role_record_ids": {
-                    role: record.record_id for role, record in sorted(role_records.items())
-                },
+                "role_record_ids": {role: record.record_id for role, record in sorted(role_records.items())},
                 "case_template_id": configured_by,
             },
             sort_keys=True,
@@ -788,10 +789,7 @@ def _mechanism_parameters(
     report: ModelabilityReport,
     role_records: Mapping[str, ParameterRecord],
 ) -> tuple[str, ...]:
-    role_symbols = tuple(
-        f"{role}:{record.parameter_symbol}"
-        for role, record in sorted(role_records.items())
-    )
+    role_symbols = tuple(f"{role}:{record.parameter_symbol}" for role, record in sorted(role_records.items()))
     if role_symbols:
         return role_symbols
     return tuple(report.required_parameters)
@@ -1025,7 +1023,11 @@ def _final_metric_rows(
 ) -> list[dict[str, Any]]:
     base = _base_sample_columns(sample_context)
     if not trajectory_rows:
-        return [_metric_row(base, "trajectory_available", "", "not_applicable", "not_applicable", "No trajectory was written.")]
+        return [
+            _metric_row(
+                base, "trajectory_available", "", "not_applicable", "not_applicable", "No trajectory was written."
+            )
+        ]
     final_row = trajectory_rows[-1]
     substrate_state = state_roles.get("substrate")
     product_state = state_roles.get("product")
@@ -1036,8 +1038,26 @@ def _final_metric_rows(
     max_rate = _maximum_process_rate(rate_rows)
     rows: list[dict[str, Any]] = []
     if substrate_state is None or final_substrate is None:
-        rows.append(_metric_row(base, "final_substrate_remaining", "", "not_applicable", "not_applicable", "No substrate state mapping was available."))
-        rows.append(_metric_row(base, "final_substrate_degraded_fraction", "", "dimensionless", "not_applicable", "No substrate state mapping was available."))
+        rows.append(
+            _metric_row(
+                base,
+                "final_substrate_remaining",
+                "",
+                "not_applicable",
+                "not_applicable",
+                "No substrate state mapping was available.",
+            )
+        )
+        rows.append(
+            _metric_row(
+                base,
+                "final_substrate_degraded_fraction",
+                "",
+                "dimensionless",
+                "not_applicable",
+                "No substrate state mapping was available.",
+            )
+        )
     else:
         rows.append(
             _metric_row(
@@ -1050,7 +1070,16 @@ def _final_metric_rows(
             )
         )
         if initial_substrate is None or initial_substrate == 0.0:
-            rows.append(_metric_row(base, "final_substrate_degraded_fraction", "", "dimensionless", "not_applicable", "Initial substrate was unavailable or zero."))
+            rows.append(
+                _metric_row(
+                    base,
+                    "final_substrate_degraded_fraction",
+                    "",
+                    "dimensionless",
+                    "not_applicable",
+                    "Initial substrate was unavailable or zero.",
+                )
+            )
         else:
             rows.append(
                 _metric_row(
@@ -1095,8 +1124,26 @@ def _final_metric_rows(
                     )
                 )
     if product_state is None or final_product is None:
-        rows.append(_metric_row(base, "final_product_concentration", "", "not_applicable", "not_applicable", "No product state mapping was available."))
-        rows.append(_metric_row(base, "final_product_formed", "", "not_applicable", "not_applicable", "No product state mapping was available."))
+        rows.append(
+            _metric_row(
+                base,
+                "final_product_concentration",
+                "",
+                "not_applicable",
+                "not_applicable",
+                "No product state mapping was available.",
+            )
+        )
+        rows.append(
+            _metric_row(
+                base,
+                "final_product_formed",
+                "",
+                "not_applicable",
+                "not_applicable",
+                "No product state mapping was available.",
+            )
+        )
     else:
         product_units = final_row.get(f"{product_state}_units", "")
         product_metric = _final_product_metric_name(product_units)
@@ -1104,16 +1151,56 @@ def _final_metric_rows(
         if _is_surface_case(sample_context):
             rows.append(_metric_row(base, "soluble_product_amount", final_product, product_units, "computed", ""))
         if initial_product is None:
-            rows.append(_metric_row(base, "final_product_formed", "", product_units, "not_applicable", "Initial product was unavailable."))
+            rows.append(
+                _metric_row(
+                    base,
+                    "final_product_formed",
+                    "",
+                    product_units,
+                    "not_applicable",
+                    "Initial product was unavailable.",
+                )
+            )
         else:
-            rows.append(_metric_row(base, "final_product_formed", final_product - initial_product, product_units, "computed", ""))
+            rows.append(
+                _metric_row(
+                    base, "final_product_formed", final_product - initial_product, product_units, "computed", ""
+                )
+            )
             if initial_substrate is None or initial_substrate == 0.0:
-                rows.append(_metric_row(base, "final_product_yield", "", "dimensionless", "not_applicable", "Initial substrate was unavailable or zero."))
+                rows.append(
+                    _metric_row(
+                        base,
+                        "final_product_yield",
+                        "",
+                        "dimensionless",
+                        "not_applicable",
+                        "Initial substrate was unavailable or zero.",
+                    )
+                )
             else:
-                rows.append(_metric_row(base, "final_product_yield", (final_product - initial_product) / initial_substrate, "dimensionless", "computed", ""))
+                rows.append(
+                    _metric_row(
+                        base,
+                        "final_product_yield",
+                        (final_product - initial_product) / initial_substrate,
+                        "dimensionless",
+                        "computed",
+                        "",
+                    )
+                )
     for metric_name in ("maximum_product_release_rate", "maximum_substrate_depletion_rate"):
         if max_rate is None:
-            rows.append(_metric_row(base, metric_name, "", "not_applicable", "not_applicable", "No process-rate trajectory was available."))
+            rows.append(
+                _metric_row(
+                    base,
+                    metric_name,
+                    "",
+                    "not_applicable",
+                    "not_applicable",
+                    "No process-rate trajectory was available.",
+                )
+            )
         else:
             rows.append(_metric_row(base, metric_name, max_rate["value"], max_rate["units"], "computed", ""))
     return rows
@@ -1150,28 +1237,31 @@ def _threshold_rows(
     substrate_state = state_roles.get("substrate")
     if not trajectory_rows or substrate_state is None:
         return [
-            _threshold_row(base, threshold, "", "not_applicable", "not_applicable", "No substrate trajectory was available.")
+            _threshold_row(
+                base, threshold, "", "not_applicable", "not_applicable", "No substrate trajectory was available."
+            )
             for threshold in DEGRADATION_THRESHOLDS
         ]
     initial_substrate = _initial_state_value(trajectory_rows, substrate_state)
     if initial_substrate is None or initial_substrate == 0.0:
         return [
-            _threshold_row(base, threshold, "", "not_applicable", "not_applicable", "Initial substrate was unavailable or zero.")
+            _threshold_row(
+                base, threshold, "", "not_applicable", "not_applicable", "Initial substrate was unavailable or zero."
+            )
             for threshold in DEGRADATION_THRESHOLDS
         ]
     time_values = [_optional_float(row.get("time")) for row in trajectory_rows]
     substrate_values = [_optional_float(row.get(substrate_state)) for row in trajectory_rows]
     if any(value is None for value in time_values) or any(value is None for value in substrate_values):
         return [
-            _threshold_row(base, threshold, "", "not_applicable", "not_applicable", "Trajectory contains missing numeric values.")
+            _threshold_row(
+                base, threshold, "", "not_applicable", "not_applicable", "Trajectory contains missing numeric values."
+            )
             for threshold in DEGRADATION_THRESHOLDS
         ]
     numeric_time_values = [float(value) for value in time_values if value is not None]
     numeric_substrate_values = [float(value) for value in substrate_values if value is not None]
-    degraded = [
-        (initial_substrate - value) / initial_substrate
-        for value in numeric_substrate_values
-    ]
+    degraded = [(initial_substrate - value) / initial_substrate for value in numeric_substrate_values]
     units = trajectory_rows[0].get("time_units", "")
     rows: list[dict[str, Any]] = []
     for threshold in DEGRADATION_THRESHOLDS:
@@ -1181,7 +1271,16 @@ def _threshold_rows(
             threshold=threshold,
         )
         if crossing is None:
-            rows.append(_threshold_row(base, threshold, "", units, "not_reached", "Threshold was not reached within the simulated time span."))
+            rows.append(
+                _threshold_row(
+                    base,
+                    threshold,
+                    "",
+                    units,
+                    "not_reached",
+                    "Threshold was not reached within the simulated time span.",
+                )
+            )
         else:
             rows.append(_threshold_row(base, threshold, crossing, units, "computed", ""))
     return rows
@@ -1279,9 +1378,7 @@ def _summary_metric_rows(
     for (case_id, metric, units), values in sorted(grouped.items()):
         context = contexts.get(case_id, {})
         base = (
-            _case_columns(context)
-            if context
-            else {"output_schema_version": OUTPUT_SCHEMA_VERSION, "case_id": case_id}
+            _case_columns(context) if context else {"output_schema_version": OUTPUT_SCHEMA_VERSION, "case_id": case_id}
         )
         rows.append(
             {
@@ -1439,6 +1536,81 @@ def _trajectory_quantile_sort_key(key: tuple[str, str, str, str, str, str, str, 
     except ValueError:
         numeric_time_index = -1
     return (case_id, numeric_time_index, state, state_role, source)
+
+
+def _thermodynamic_diagnostic_rows(
+    *,
+    sample_context: Mapping[str, Any],
+    sample: EnsembleSample,
+) -> list[dict[str, Any]]:
+    sample_dir = Path(sample.output_directory)
+    summary_path = sample_dir / "thermodynamic_summary.json"
+    rows_path = sample_dir / "thermodynamic_summary.csv"
+    summary = _read_json_mapping(summary_path)
+    artifact_rows = _read_csv(rows_path) if rows_path.exists() else []
+    if not summary and not artifact_rows:
+        return []
+
+    source_rows: Sequence[Mapping[str, Any]] = artifact_rows or (
+        {
+            "name": "thermodynamic_summary_artifact",
+            "status": "present_no_row_diagnostics",
+            "message": "thermodynamic_summary.json was present but thermodynamic_summary.csv had no rows.",
+        },
+    )
+    base = {
+        **_base_sample_columns(sample_context),
+        "artifact_source_directory": str(sample_dir),
+        "thermodynamic_summary_json_present": summary_path.exists(),
+        "thermodynamic_summary_csv_present": rows_path.exists(),
+        "summary_kind": summary.get("kind", ""),
+        "summary_count": summary.get("count", ""),
+        "summary_status_counts": _json_string(summary.get("status_counts")),
+        "summary_severity_counts": _json_string(summary.get("severity_counts")),
+        "summary_has_reaction_quotient_gibbs": summary.get("has_reaction_quotient_gibbs", ""),
+        "summary_has_entropy_production_rate": summary.get("has_entropy_production_rate", ""),
+        "summary_has_entropy_budget": summary.get("has_entropy_budget", ""),
+        "entropy_budget_scope": summary.get("entropy_budget_scope", ""),
+        "entropy_budget_units": summary.get("entropy_budget_units", ""),
+        "entropy_budget_total": summary.get("entropy_budget_total", ""),
+        "entropy_budget_minimum": summary.get("entropy_budget_minimum", ""),
+        "entropy_budget_negative_count": summary.get("entropy_budget_negative_count", ""),
+        "entropy_budget_evaluated_count": summary.get("entropy_budget_evaluated_count", ""),
+        "entropy_budget_status": summary.get("entropy_budget_status", ""),
+        "entropy_budget_limitations": summary.get("entropy_budget_limitations", ""),
+        "supported_scope": summary.get("supported_scope", ""),
+        "unsupported_scope": summary.get("unsupported_scope", ""),
+        "allowed_use": "configured_metadata_inspection_only",
+        "interpretation_guardrail": (
+            "Rows are copied from existing configured thermodynamic_summary artifacts only; "
+            "they do not infer activities, reaction quotients, concentrations, redox potentials, "
+            "electron balances, validation evidence, or solver-time thermodynamic enforcement."
+        ),
+    }
+    return [
+        {
+            **base,
+            "row_index": row_index,
+            "row_name": row.get("name", ""),
+            "row_status": row.get("status", ""),
+            "row_passed": row.get("passed", ""),
+            "row_severity": row.get("severity", ""),
+            "residual_value": row.get("residual_value", ""),
+            "residual_units": row.get("residual_units", ""),
+            "delta_gibbs": row.get("delta_gibbs", ""),
+            "delta_gibbs_units": row.get("delta_gibbs_units", ""),
+            "entropy_production_per_mole": row.get("entropy_production_per_mole", ""),
+            "entropy_production_rate": row.get("entropy_production_rate", ""),
+            "entropy_production_rate_units": row.get("entropy_production_rate_units", ""),
+            "gibbs_equation": row.get("gibbs_equation", ""),
+            "entropy_equation": row.get("entropy_equation", ""),
+            "dynamic_reaction_quotient": row.get("dynamic_reaction_quotient", ""),
+            "activity_model": row.get("activity_model", ""),
+            "solver_time_enforcement": row.get("solver_time_enforcement", ""),
+            "message": row.get("message", ""),
+        }
+        for row_index, row in enumerate(source_rows)
+    ]
 
 
 def _parameter_uncertainty_band_status(row: Mapping[str, Any]) -> str:
@@ -1669,16 +1841,24 @@ def _provenance_rows(
     except RegistryCaseBuildError:
         compatibility = None
     if compatibility is not None:
-        rows.append(_record_provenance_row(context, "process_compatibility", compatibility, role="", symbol="", value_kind=""))
+        rows.append(
+            _record_provenance_row(context, "process_compatibility", compatibility, role="", symbol="", value_kind="")
+        )
         if compatibility.case_template_id:
             try:
                 template = registry.get_case_template(compatibility.case_template_id)
             except RegistryLookupError:
                 template = None
             if template is not None:
-                rows.append(_record_provenance_row(context, "case_template", template, role="", symbol="", value_kind=""))
+                rows.append(
+                    _record_provenance_row(context, "case_template", template, role="", symbol="", value_kind="")
+                )
     for role, record in role_records.items():
-        rows.append(_record_provenance_row(context, "parameter", record, role=role, symbol=record.parameter_symbol, value_kind=record.value.kind))
+        rows.append(
+            _record_provenance_row(
+                context, "parameter", record, role=role, symbol=record.parameter_symbol, value_kind=record.value.kind
+            )
+        )
     for item in tuple(report.missing) + tuple(report.incompatible):
         rows.append(
             {
@@ -1720,7 +1900,9 @@ def _record_provenance_row(
         "symbol": symbol,
         "maturity": record.maturity,
         "value_kind": value_kind,
-        "source": _value_source(record) if isinstance(record, ParameterRecord) else _provenance_source(record.provenance),
+        "source": _value_source(record)
+        if isinstance(record, ParameterRecord)
+        else _provenance_source(record.provenance),
         "confidence_level": "" if value is None else (value.confidence_level or ""),
         "exploratory_prior": _is_exploratory_record(record) if isinstance(record, ParameterRecord) else "",
         "range_scope": record.range_scope if isinstance(record, ParameterRecord) else "",
@@ -2082,7 +2264,9 @@ def _best_case_parameter_record(
         candidates = [record for record in candidates if not _is_exploratory_record(record)]
     if not candidates:
         return None
-    return max(candidates, key=_scientific_parameter_record_priority if mode == "scientific" else _parameter_record_priority)
+    return max(
+        candidates, key=_scientific_parameter_record_priority if mode == "scientific" else _parameter_record_priority
+    )
 
 
 def _matches(record_value: str | None, requested: str) -> bool:
@@ -2122,11 +2306,7 @@ def _scientific_parameter_record_priority(record: ParameterRecord) -> tuple[int,
 
 
 def _trajectory_state_names(row: Mapping[str, str]) -> tuple[str, ...]:
-    return tuple(
-        name
-        for name in row
-        if name not in {"time", "time_units"} and not name.endswith("_units")
-    )
+    return tuple(name for name in row if name not in {"time", "time_units"} and not name.endswith("_units"))
 
 
 def _role_for_state(state_name: str, state_roles: Mapping[str, str]) -> str:
@@ -2231,6 +2411,21 @@ def _parameter_source_class(record: ParameterRecord | None) -> str:
 def _read_csv(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def _read_json_mapping(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, Mapping):
+        return {}
+    return {str(key): value for key, value in data.items()}
+
+
+def _json_string(value: Any) -> str:
+    if value is None or value == "":
+        return ""
+    return json.dumps(value, sort_keys=True)
 
 
 def _write_table(path: Path, *, table_name: str, rows: Sequence[Mapping[str, Any]]) -> None:

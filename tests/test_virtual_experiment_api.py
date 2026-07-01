@@ -58,6 +58,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "comparison_summary.csv",
         "uncertainty_summary.csv",
         "trajectory_quantiles.csv",
+        "thermodynamic_diagnostics.csv",
         "provenance_table.csv",
         "limitations_table.csv",
         "missing_parameters.csv",
@@ -88,6 +89,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     comparison_rows = _csv_rows(output_dir / "comparison_summary.csv")
     uncertainty_rows = _csv_rows(output_dir / "uncertainty_summary.csv")
     trajectory_quantile_rows = _csv_rows(output_dir / "trajectory_quantiles.csv")
+    thermodynamic_diagnostic_rows = _csv_rows(output_dir / "thermodynamic_diagnostics.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
     limitation_rows = _csv_rows(output_dir / "limitations_table.csv")
     missing_rows = _csv_rows(output_dir / "missing_parameters.csv")
@@ -96,7 +98,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     output_manifest = _json_mapping(output_dir / "output_manifest.json")
     output_schema = _json_mapping(output_dir / "virtual_experiment_output_schema.json")
 
-    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.4.0"
+    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.5.0"
     assert output_schema["schema_version"] == OUTPUT_SCHEMA_VERSION
     assert "figures/degradation_rate_vs_time.png" in output_manifest["files"]
     assert "figures/trajectory_quantile_bands.png" in output_manifest["files"]
@@ -114,11 +116,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert preflight_rows[0]["blocking_reason"] == "not_blocked"
     assert preflight_rows[0]["recommended_next_action"] == "simulate_exploratory"
 
-    computed_metrics = {
-        row["metric"]
-        for row in final_metric_rows
-        if row["status"] == "computed"
-    }
+    computed_metrics = {row["metric"] for row in final_metric_rows if row["status"] == "computed"}
     assert {
         "final_substrate_remaining",
         "final_substrate_degraded_fraction",
@@ -133,6 +131,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert result.comparison_summary() == comparison_rows
     assert result.uncertainty_summary() == uncertainty_rows
     assert result.trajectory_quantiles() == trajectory_quantile_rows
+    assert result.thermodynamic_diagnostics() == thermodynamic_diagnostic_rows == []
     assert any(
         row["source_table"] == "final_metrics"
         and row["source_metric"] == "final_product_concentration"
@@ -152,11 +151,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "side_by_side_comparison_and_guarded_ranking_allowed"
     }
 
-    enzyme_prior_rows = [
-        row
-        for row in sampled_rows
-        if row["symbol"] == "enzyme_concentration_beta_glucosidase"
-    ]
+    enzyme_prior_rows = [row for row in sampled_rows if row["symbol"] == "enzyme_concentration_beta_glucosidase"]
     assert enzyme_prior_rows
     assert all(row["source_value_kind"] == "distribution" for row in enzyme_prior_rows)
     assert all(row["parameter_source_class"] == "user_supplied_exploratory_prior" for row in enzyme_prior_rows)
@@ -244,8 +239,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         for row in assumption_rows
     )
     assert any(
-        row["symbol"] == "Km_cellobiose"
-        and row["parameter_source_class"] == "selected_exact_value"
+        row["symbol"] == "Km_cellobiose" and row["parameter_source_class"] == "selected_exact_value"
         for row in sampled_rows
     )
     assert any(row["metric"] == "final_product_concentration" and row["fungus_id"] == FUNGUS_ID for row in summary_rows)
@@ -256,25 +250,14 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert any("not a whole-fungus" in row["limitation"] for row in limitation_rows)
     assert not missing_rows
     assert not suggestion_rows
+    assert any(row["table"] == "sampled_parameters" and row["column"] == "allowed_use" for row in dictionary_rows)
+    assert any(row["table"] == "assumption_summary" and row["column"] == "allowed_use" for row in dictionary_rows)
+    assert any(row["table"] == "mechanism_summary" and row["column"] == "mechanism_kind" for row in dictionary_rows)
     assert any(
-        row["table"] == "sampled_parameters" and row["column"] == "allowed_use"
-        for row in dictionary_rows
+        row["table"] == "comparison_summary" and row["column"] == "ranking_blocking_reason" for row in dictionary_rows
     )
     assert any(
-        row["table"] == "assumption_summary" and row["column"] == "allowed_use"
-        for row in dictionary_rows
-    )
-    assert any(
-        row["table"] == "mechanism_summary" and row["column"] == "mechanism_kind"
-        for row in dictionary_rows
-    )
-    assert any(
-        row["table"] == "comparison_summary" and row["column"] == "ranking_blocking_reason"
-        for row in dictionary_rows
-    )
-    assert any(
-        row["table"] == "uncertainty_summary" and row["column"] == "interpretation_guardrail"
-        for row in dictionary_rows
+        row["table"] == "uncertainty_summary" and row["column"] == "interpretation_guardrail" for row in dictionary_rows
     )
     assert any(
         row["table"] == "uncertainty_summary"
@@ -292,17 +275,22 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         and row["output_schema_version"] == OUTPUT_SCHEMA_VERSION
         for row in dictionary_rows
     )
+    assert any(
+        row["table"] == "thermodynamic_diagnostics" and row["column"] == "interpretation_guardrail"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "thermodynamic_diagnostics"
+        and row["column"] == "output_schema_version"
+        and row["output_schema_version"] == OUTPUT_SCHEMA_VERSION
+        for row in dictionary_rows
+    )
     output_schema_tables = output_schema["tables"]
     assert isinstance(output_schema_tables, dict)
     assert "trajectory_quantiles" in output_schema_tables
-    assert any(
-        row["table"] == "modelability_items" and row["column"] == "allowed_use"
-        for row in dictionary_rows
-    )
-    assert any(
-        row["table"] == "missing_parameters" and row["column"] == "expected_units"
-        for row in dictionary_rows
-    )
+    assert "thermodynamic_diagnostics" in output_schema_tables
+    assert any(row["table"] == "modelability_items" and row["column"] == "allowed_use" for row in dictionary_rows)
+    assert any(row["table"] == "missing_parameters" and row["column"] == "expected_units" for row in dictionary_rows)
 
 
 def test_virtual_experiment_accepts_environment_grid_registry_ids(tmp_path: Path) -> None:
@@ -316,6 +304,109 @@ def test_virtual_experiment_accepts_environment_grid_registry_ids(tmp_path: Path
     result = study.simulate(n_samples=1, seed=3, output_dir=tmp_path / "grid_ids", quicklook=False)
 
     assert Path(result.output_directory, "time_series_long.csv").exists()
+
+
+def test_virtual_experiment_thermodynamic_diagnostics_copy_existing_sample_artifacts_only(
+    tmp_path: Path,
+) -> None:
+    study = VirtualExperiment.from_registry(
+        fungi=FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=REGISTRY_INDEX,
+    )
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=3,
+        output_dir=tmp_path / "thermodynamic_bridge",
+        quicklook=False,
+    )
+    sample_dir = Path(result.screen_result.case_results[0].samples[0].output_directory)
+    summary = {
+        "kind": "configured_thermodynamic_summary",
+        "count": 1,
+        "status_counts": {"passed": 1},
+        "severity_counts": {"info": 1},
+        "has_reaction_quotient_gibbs": True,
+        "has_entropy_production_rate": True,
+        "has_entropy_budget": True,
+        "entropy_budget_scope": "Aggregate over explicit configured entropy rows.",
+        "entropy_budget_units": "joule / second / kelvin",
+        "entropy_budget_total": 0.1,
+        "entropy_budget_minimum": 0.1,
+        "entropy_budget_negative_count": 0,
+        "entropy_budget_evaluated_count": 1,
+        "entropy_budget_status": "non_negative",
+        "entropy_budget_limitations": "Configured metadata summary only; no inferred thermodynamics.",
+        "supported_scope": "Explicit configured metadata only.",
+        "unsupported_scope": "No inferred activity model or solver-time thermodynamic enforcement.",
+    }
+    (sample_dir / "thermodynamic_summary.json").write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    _write_csv(
+        sample_dir / "thermodynamic_summary.csv",
+        [
+            {
+                "name": "reaction_quotient_thermodynamic_feasibility",
+                "status": "passed",
+                "passed": "true",
+                "severity": "info",
+                "message": "explicit configured metadata row",
+                "residual_value": "-5000.0",
+                "residual_units": "joule / mole",
+                "delta_gibbs": "-5000.0",
+                "delta_gibbs_units": "joule / mole",
+                "entropy_production_per_mole": "16.77",
+                "entropy_production_rate": "0.1",
+                "entropy_production_rate_units": "joule / second / kelvin",
+                "gibbs_equation": "delta_g = delta_g_standard + R*T*ln(Q)",
+                "entropy_equation": "entropy_production_rate = explicit configured metadata",
+                "dynamic_reaction_quotient": "explicit_parameter",
+                "activity_model": "caller_supplied_dimensionless_reaction_quotient",
+                "solver_time_enforcement": "not_evaluated",
+            }
+        ],
+    )
+
+    result.write_tables()
+
+    rows = result.thermodynamic_diagnostics()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["row_name"] == "reaction_quotient_thermodynamic_feasibility"
+    assert row["artifact_source_directory"] == str(sample_dir)
+    assert row["thermodynamic_summary_json_present"] == "true"
+    assert row["thermodynamic_summary_csv_present"] == "true"
+    assert row["summary_status_counts"] == '{"passed": 1}'
+    assert row["summary_has_reaction_quotient_gibbs"] == "true"
+    assert row["summary_has_entropy_production_rate"] == "true"
+    assert row["summary_has_entropy_budget"] == "true"
+    assert row["entropy_budget_status"] == "non_negative"
+    assert row["entropy_budget_negative_count"] == "0"
+    assert row["gibbs_equation"] == "delta_g = delta_g_standard + R*T*ln(Q)"
+    assert row["solver_time_enforcement"] == "not_evaluated"
+    assert row["allowed_use"] == "configured_metadata_inspection_only"
+    assert (
+        "Rows are copied from existing configured thermodynamic_summary artifacts only"
+        in row["interpretation_guardrail"]
+    )
+    assert "solver-time thermodynamic enforcement" in row["interpretation_guardrail"]
+
+    report_path = result.write_report()
+    report = report_path.read_text(encoding="utf-8")
+    assert "Standard virtual-experiment rows from `thermodynamic_diagnostics.csv`" in report
+    assert "`reaction_quotient_thermodynamic_feasibility` for case" in report
+    assert "configured-summary JSON present `true`" in report
+    assert "configured-summary CSV present `true`" in report
+    assert "allowed use `configured_metadata_inspection_only`" in report
+    assert "Rows are copied from existing configured thermodynamic_summary artifacts only" in report
+    assert (
+        "do not infer activities, reaction quotients, concentrations, redox potentials, "
+        "electron balances, validation evidence, or solver-time thermodynamic enforcement"
+    ) in report
 
 
 def test_environment_grid_numeric_values_generate_runtime_environment_ids() -> None:
@@ -391,6 +482,18 @@ def test_virtual_experiment_writes_preflight_report_for_blocked_scientific_case(
 def _csv_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
+    fieldnames: list[str] = []
+    for row in rows:
+        for key in row:
+            if key not in fieldnames:
+                fieldnames.append(key)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def _json_mapping(path: Path) -> dict[str, object]:

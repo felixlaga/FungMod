@@ -66,9 +66,7 @@ class VirtualExperiment:
             fungus_resolutions = tuple(resolver.resolve_fungus(value) for value in fungus_inputs)
             substrate_resolutions = tuple(resolver.resolve_substrate(value) for value in substrate_inputs)
             environment_resolutions = (
-                ()
-                if environment_cases
-                else tuple(resolver.resolve_environment(value) for value in environment_ids)
+                () if environment_cases else tuple(resolver.resolve_environment(value) for value in environment_ids)
             )
             fungus_ids = tuple(resolution.record_id for resolution in fungus_resolutions)
             substrate_ids = tuple(resolution.record_id for resolution in substrate_resolutions)
@@ -177,9 +175,7 @@ class VirtualExperiment:
                 )
             else:
                 message = "Exploratory simulation can simulate only modelable or exploratory cases."
-            raise VirtualExperimentError(
-                f"{message} Blocked preflight reports: {statuses}. Details: {details}"
-            )
+            raise VirtualExperimentError(f"{message} Blocked preflight reports: {statuses}. Details: {details}")
         root = Path(output_dir)
         effective_n_samples = 1 if mode == "scientific" else n_samples
         screen = simulate_screen(
@@ -303,6 +299,11 @@ class DegradationScreenResult:
 
         return self._table_rows("trajectory_quantiles", "trajectory_quantiles.csv")
 
+    def thermodynamic_diagnostics(self) -> list[dict[str, str]]:
+        """Load configured thermodynamic diagnostics copied from existing sample artifacts."""
+
+        return self._table_rows("thermodynamic_diagnostics", "thermodynamic_diagnostics.csv")
+
     def provenance(self) -> list[dict[str, str]]:
         """Load the standard provenance table without rerunning simulation."""
 
@@ -336,7 +337,9 @@ class DegradationScreenResult:
     def write_summary(self, path: str | Path | None = None) -> Path:
         """Write a JSON summary of the virtual experiment and table outputs."""
 
-        destination = Path(path) if path is not None else Path(self.output_directory) / "virtual_experiment_summary.json"
+        destination = (
+            Path(path) if path is not None else Path(self.output_directory) / "virtual_experiment_summary.json"
+        )
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return destination
@@ -465,7 +468,9 @@ def _string_tuple(values: Sequence[str] | str, *, field_name: str) -> tuple[str,
     return output
 
 
-def _environment_inputs(environments: Sequence[str] | str | EnvironmentGrid) -> tuple[tuple[str, ...], tuple[EnvironmentCase, ...]]:
+def _environment_inputs(
+    environments: Sequence[str] | str | EnvironmentGrid,
+) -> tuple[tuple[str, ...], tuple[EnvironmentCase, ...]]:
     if isinstance(environments, EnvironmentGrid):
         environment_cases = environments.environment_cases()
         environment_ids = environments.registry_ids()
