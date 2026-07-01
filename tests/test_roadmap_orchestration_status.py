@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 STATUS_DOC = ROOT / "foundation_progress" / "ROADMAP_ORCHESTRATION_STATUS.md"
+README = ROOT / "README.md"
 NEXT_STEPS = ROOT / "foundation_progress" / "00_README_NEXT_STEPS_V2.md"
 ACTIVE_ROADMAP = ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP.md"
 VALIDATION_GATE = ROOT / "foundation_progress" / "VALIDATION_DATA_001_FIRST_TIMECOURSE.md"
@@ -67,10 +68,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-24: VALIDATION-DATA-001 evidence-gated first time-course dataset"
+    current_next = "PR-24: BIO-003 non-PET product-inhibition genericity hardening"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is a scoped PR-24 VALIDATION-DATA-001" in roadmap
+    assert "The current next PR is a scoped PR-24 BIO-003 non-PET configured" in roadmap
     assert "PR-23 PRODUCT-001 provenance/limitations report\nexample notebook" in roadmap
     assert "PR-22 PRODUCT-001 provenance/limitations report" in roadmap
     assert "PR-21 THERMO-003 explicit thermodynamic-summary report" in roadmap
@@ -96,11 +97,12 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
 
 
 def test_build_first_queue_defers_validation_without_deleting_it() -> None:
+    readme = _read(README)
     status = _read(STATUS_DOC)
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-24: VALIDATION-DATA-001 evidence-gated first time-course dataset"
+    current_next = "PR-24: BIO-003 non-PET product-inhibition genericity hardening"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -167,6 +169,11 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "11_thermodynamics_entropy_diagnostics.ipynb" in next_steps
     assert "12_reversible_product_inhibition_example.ipynb" in status
     assert "12_reversible_product_inhibition_example.ipynb" in next_steps
+    assert "toy_surface_dummy_non_pet_product_inhibition.yml" in status
+    assert "toy_surface_dummy_non_pet_product_inhibition.yml" in next_steps
+    assert "toy_surface_dummy_non_pet_product_inhibition.yml" in readme
+    assert "All four load through `load_model_config`" in readme
+    assert "All three load through `load_model_config`" not in readme
     assert "thermodynamic_summary.json" in status
     assert "thermodynamic_summary.csv" in status
     assert "report utilities now expose existing configured-output thermodynamic summary artifacts" in status
@@ -205,7 +212,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-21 | THERMO-003 explicit thermodynamic-summary report ergonomics" in status
     assert "PR-22 | PRODUCT-001 provenance/limitations report ergonomics" in status
     assert "PR-23 | PRODUCT-001 provenance/limitations report example notebook" in status
-    assert "PR-24 | VALIDATION-DATA-001" in status
+    assert "PR-24 | BIO-003 non-PET product-inhibition genericity hardening" in status
+    assert "PR-25 or later | VALIDATION-DATA-001" in status
 
 
 def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> None:
@@ -221,6 +229,8 @@ def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> 
     assert "partial/software-tested for configured and registry-backed reversible product inhibition" in status
     assert "partial/software-tested for generic reversible product inhibition" in next_steps
     assert "ProductInhibitionModifier" in bio003_doc
+    assert "toy_surface_dummy_non_pet_product_inhibition.yml" in bio003_doc
+    assert "non-PET toy surface benchmark" in bio003_doc
     assert "validation_status: software_tested" in proposal
     assert "Configured model processes can now opt into it" in next_steps
     assert "registry-backed case assembly" in progress
@@ -250,7 +260,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-24: VALIDATION-DATA-001 evidence-gated first time-course dataset"
+    current_next = "PR-24: BIO-003 non-PET product-inhibition genericity hardening"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -274,10 +284,11 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-22" not in _current_next_lines(text)
         assert "PR-23" not in _current_next_lines(text)
 
-    assert "VALIDATION-DATA-001 first real time-course dataset | deferred; blocked/partial" in status
+    assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
     assert "Status: `deferred; blocked/partial` for ingestion." in gate
-    assert "PR-24 must not ingest, digitize, or\nfabricate data unless those evidence requirements are met" in gate
+    assert "The selected PR-24 work is\ntherefore build-first BIO-003 genericity hardening" in gate
+    assert "A future validation ingestion PR must not ingest, digitize, or fabricate data" in gate
     assert "Status: `complete`" not in gate
     assert "does not complete" in gate
     assert "VALIDATION-DATA-001" in gate

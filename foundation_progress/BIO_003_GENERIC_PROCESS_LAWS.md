@@ -41,6 +41,19 @@ configured metadata, limitations, and final degradation/product metrics. Its
 example registry uses an explicit provenance-labelled exploratory `K_i`
 fixture and does not supply validation data.
 
+The configured-model workflow also includes a non-PET genericity benchmark:
+
+```text
+data/model_configs/toy_surface_dummy_non_pet_product_inhibition.yml
+```
+
+That fixture is `mode: toy` and `maturity: framework_benchmark`. It uses an
+explicit artificial product-state `K_i` parameter only to verify that
+`product_inhibition` runs through the generic configured path outside the
+researcher-facing BIO-002 public example. It is not biological inhibition
+evidence, validation data, calibration, toxicity, uptake, secretion, biomass,
+physiology, or multi-product inhibition support.
+
 ## What this does not permit
 
 This selected target does not permit:
@@ -62,6 +75,8 @@ This scoped slice can be marked complete only when:
 - tests ensure the selected mechanism remains generic and explicitly scoped;
 - configured workflow tests show the mechanism scales rates only when explicit
   product-state and `K_i` inputs are provided.
+- configured workflow tests include a non-PET toy surface benchmark that emits
+  configured product-inhibition metadata and assumption records.
 - registry-backed case-assembly tests show explicit template modifier records
   flow into configured outputs and `mechanism_summary.csv` without fallback
   inhibition constants.
