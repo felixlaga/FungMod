@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-24 after PR #39 merged, with PR-25 selected:
+Scoped status as of PR-25 after PR #40 merged, with PR-26 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -82,6 +82,11 @@ entropy-production-rate, and entropy-budget output inspection without
 validation claims or solver-time enforcement, including the
 `has_entropy_production_rate`, `has_entropy_budget`, and
 `entropy_budget_status` summary fields.
+Example notebooks now also include
+`16_thermodynamic_diagnostics_example.ipynb` for public-API inspection of the
+standard `thermodynamic_diagnostics.csv` table, the header-only no-artifact
+case, and a labelled package-generated artifact-copy demonstration without
+validation claims or solver-time enforcement.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier, registry-backed case-template
 assembly, and a non-PET configured framework benchmark when explicit
@@ -93,7 +98,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-25: THERMO-003 virtual-experiment thermodynamic diagnostics bridge**.
+Current next PR: **PR-26: THERMO-003 virtual-experiment thermodynamic diagnostics example notebook**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -101,14 +106,14 @@ has no real observation table under `data/experiments/literature/`. That blocks
 validation, calibration, and empirical comparison claims; it does not block
 building the simulator.
 
-Because the current validation evidence gate is still blocked, PR-24 has
-completed a build-first BIO-003 genericity hardening slice: a toy,
-framework-benchmark configured non-PET surface model with an explicit
-artificial product-state `K_i` and `product_inhibition` modifier. The selected
-PR-25 work is now a build-first THERMO-003 virtual-experiment diagnostics
-bridge over existing configured thermodynamic summary artifacts only, without
-validation data, calibration, empirical comparison, solver-law changes, silent
-fallback constants, inferred thermodynamics, or new biology claims.
+Because the current validation evidence gate is still blocked, PR-25 has
+completed a build-first THERMO-003 virtual-experiment diagnostics bridge over
+existing configured thermodynamic summary artifacts only. The selected PR-26
+work is now a build-first THERMO-003 example notebook for the standard
+`thermodynamic_diagnostics.csv` and
+`DegradationScreenResult.thermodynamic_diagnostics()` path, without validation
+data, calibration, empirical comparison, solver-law changes, silent fallback
+constants, inferred thermodynamics, or new biology claims.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

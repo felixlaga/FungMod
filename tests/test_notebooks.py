@@ -24,6 +24,7 @@ PRODUCT_NOTEBOOKS = [
 
 THERMODYNAMIC_NOTEBOOKS = [
     "11_thermodynamics_entropy_diagnostics.ipynb",
+    "16_thermodynamic_diagnostics_example.ipynb",
 ]
 
 BIO003_NOTEBOOKS = [
@@ -208,6 +209,31 @@ def test_thermodynamics_entropy_notebook_uses_configured_outputs_only() -> None:
     assert "from fungal_model.chemistry" not in source
     assert "validate_reaction_quotient_gibbs_feasibility" not in source
     assert "GibbsFreeEnergyEstimate" not in source
+
+
+def test_thermodynamic_diagnostics_notebook_is_researcher_facing_but_unvalidated() -> None:
+    notebook = load_notebook("16_thermodynamic_diagnostics_example.ipynb")
+    markdown = "\n".join(markdown_cells(notebook)).lower()
+    source = "\n".join(code_cells(notebook))
+
+    assert notebook["nbformat"] == 4
+    assert "researcher-facing exploratory example" in markdown
+    assert "not an empirical validation" in markdown
+    assert "header-only" in markdown
+    assert "package-generated configured thermodynamic summary artifacts" in markdown
+    assert "does not infer activities, reaction quotients, concentrations" in markdown
+    assert "solver-time thermodynamic enforcement" in markdown
+    assert "VirtualExperiment.from_registry(" in source
+    assert "run_configured_model(" in source
+    assert "thermodynamic_diagnostics()" in source
+    assert "thermodynamic_diagnostics.csv" in source
+    assert "thermodynamic_summary.json" in source
+    assert "thermodynamic_summary.csv" in source
+    assert "shutil.copy2(" in source
+    assert "write_report(" in source
+    assert "include_html=True" in source
+    assert "include_index=True" in source
+    assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
 
 
 def test_product_inhibition_notebook_is_researcher_facing_but_unvalidated() -> None:
@@ -417,6 +443,51 @@ def test_thermodynamics_entropy_notebook_executes_smoke_path_with_temp_outputs(
     assert "entropy_budget_status" not in csv_rows_by_name["entropy_production_rate_metadata"]
     assert "No inferred activity model" in summary["unsupported_scope"]
     assert "concentration model" in summary["unsupported_scope"]
+
+
+def test_thermodynamic_diagnostics_notebook_executes_smoke_path_with_temp_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "notebook_outputs"
+    monkeypatch.setenv("FUNGMOD_NOTEBOOK_OUTPUT_ROOT", str(output_root))
+    _execute_notebook("16_thermodynamic_diagnostics_example.ipynb")
+
+    output = output_root / "16_thermodynamic_diagnostics_example"
+    no_artifact_output = output / "no_artifacts"
+    configured_output = output / "configured_thermodynamic_summary"
+    copied_output = output / "copied_artifact_bridge"
+
+    assert (no_artifact_output / "thermodynamic_diagnostics.csv").exists()
+    assert _csv_rows(no_artifact_output / "thermodynamic_diagnostics.csv") == []
+    assert (configured_output / "thermodynamic_summary.json").exists()
+    assert (configured_output / "thermodynamic_summary.csv").exists()
+
+    summary = json.loads((configured_output / "thermodynamic_summary.json").read_text(encoding="utf-8"))
+    diagnostic_rows = _csv_rows(copied_output / "thermodynamic_diagnostics.csv")
+    report_text = (copied_output / "report" / "virtual_experiment_report.md").read_text(encoding="utf-8")
+    index_text = (copied_output / "report" / "index.html").read_text(encoding="utf-8")
+
+    assert summary["kind"] == "configured_thermodynamic_summary"
+    assert summary["has_reaction_quotient_gibbs"] is True
+    assert summary["has_entropy_production_rate"] is True
+    assert summary["has_entropy_budget"] is True
+    assert diagnostic_rows
+    assert {row["row_name"] for row in diagnostic_rows} == {
+        "reaction_quotient_thermodynamic_feasibility",
+        "entropy_production_rate_metadata",
+    }
+    assert {row["thermodynamic_summary_json_present"] for row in diagnostic_rows} == {"true"}
+    assert {row["thermodynamic_summary_csv_present"] for row in diagnostic_rows} == {"true"}
+    assert {row["allowed_use"] for row in diagnostic_rows} == {"configured_metadata_inspection_only"}
+    assert {row["entropy_budget_status"] for row in diagnostic_rows} == {"non_negative"}
+    assert all(
+        "Rows are copied from existing configured thermodynamic_summary artifacts only"
+        in row["interpretation_guardrail"]
+        for row in diagnostic_rows
+    )
+    assert "Standard virtual-experiment rows from `thermodynamic_diagnostics.csv`" in report_text
+    assert "thermodynamic_diagnostics.csv" in index_text
 
 
 def test_product_inhibition_notebook_executes_smoke_path_with_temp_outputs(

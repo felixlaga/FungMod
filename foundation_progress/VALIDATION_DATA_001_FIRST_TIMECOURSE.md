@@ -22,14 +22,14 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-25: THERMO-003 virtual-experiment thermodynamic diagnostics bridge**.
+Current next PR: **PR-26: THERMO-003 virtual-experiment thermodynamic diagnostics example notebook**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
 important, but it remains deferred until source-backed numeric observations
 satisfy the evidence requirements below and the simulator can produce mature
-enough degradation outputs for comparison. The selected PR-25 work is
-therefore build-first THERMO-003 virtual-experiment diagnostics bridging, not
+enough degradation outputs for comparison. The selected PR-26 work is
+therefore build-first THERMO-003 thermodynamic-diagnostics notebook work, not
 validation ingestion. A future validation ingestion PR must not ingest, digitize, or fabricate data unless those evidence requirements are met. This gate does not complete VALIDATION-DATA-001.
 
 ## Candidate Evidence Checked
