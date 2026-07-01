@@ -25,6 +25,7 @@ TABLE_FILENAMES = {
     "comparison_summary": "comparison_summary.csv",
     "uncertainty_summary": "uncertainty_summary.csv",
     "trajectory_quantiles": "trajectory_quantiles.csv",
+    "thermodynamic_diagnostics": "thermodynamic_diagnostics.csv",
     "provenance_table": "provenance_table.csv",
     "limitations_table": "limitations_table.csv",
     "missing_parameters": "missing_parameters.csv",
@@ -124,6 +125,7 @@ def _render_report(
     sampled_parameters = tables["sampled_parameters"]
     uncertainty_summary = tables["uncertainty_summary"]
     trajectory_quantiles = tables["trajectory_quantiles"]
+    thermodynamic_diagnostics = tables["thermodynamic_diagnostics"]
     assumptions = tables["assumption_summary"]
     provenance = tables["provenance_table"]
     limitations = tables["limitations_table"]
@@ -158,7 +160,11 @@ def _render_report(
         "",
         "## Explicit thermodynamic diagnostics",
         "",
-        *_thermodynamic_summary_lines(thermodynamic_summary, thermodynamic_rows),
+        *_thermodynamic_summary_lines(
+            thermodynamic_summary,
+            thermodynamic_rows,
+            standard_rows=thermodynamic_diagnostics,
+        ),
         "",
         "## Active mechanisms and modifiers",
         "",
@@ -224,7 +230,9 @@ def _case_summary_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
         substrate_id = _value(row, "substrate_id")
         environment_id = _value(row, "environment_id")
         status = _value(row, "modelability_status")
-        lines.append(f"- `{case_id}`: `{fungus_id}` on `{substrate_id}` in `{environment_id}`; modelability `{status}`.")
+        lines.append(
+            f"- `{case_id}`: `{fungus_id}` on `{substrate_id}` in `{environment_id}`; modelability `{status}`."
+        )
     return lines
 
 
@@ -343,15 +351,18 @@ def _threshold_lines(
 def _thermodynamic_summary_lines(
     summary: Mapping[str, Any],
     rows: Sequence[Mapping[str, str]],
+    *,
+    standard_rows: Sequence[Mapping[str, str]],
 ) -> list[str]:
-    if not summary and not rows:
+    if not summary and not rows and not standard_rows:
         return ["No configured thermodynamic-summary artifacts were present."]
 
     lines = [
         "These diagnostics inspect existing configured-output `thermodynamic_summary.json` "
-        "and `thermodynamic_summary.csv` artifacts only. They do not infer activities, "
-        "reaction quotients, concentrations, redox potentials, electron balances, validation evidence, "
-        "or solver-time thermodynamic enforcement."
+        "and `thermodynamic_summary.csv` artifacts, including rows copied into standard "
+        "`thermodynamic_diagnostics.csv`, only. They do not infer activities, reaction quotients, "
+        "concentrations, redox potentials, electron balances, validation evidence, or solver-time "
+        "thermodynamic enforcement."
     ]
     if summary:
         lines.append(
@@ -402,6 +413,29 @@ def _thermodynamic_summary_lines(
             f"passed `{_value(row, 'passed')}`; severity `{_value(row, 'severity')}`"
             f"{suffix}{message_suffix}."
         )
+    if standard_rows:
+        lines.append(
+            "Standard virtual-experiment rows from `thermodynamic_diagnostics.csv` "
+            "(copied from existing configured thermodynamic-summary artifacts only):"
+        )
+    else:
+        lines.append("No standard `thermodynamic_diagnostics.csv` rows were present.")
+    for row in standard_rows[:12]:
+        details = _thermodynamic_row_details(row)
+        detail_suffix = f"; {details}" if details else ""
+        message = _value(row, "message")
+        message_suffix = f"; {message}" if message else ""
+        guardrail = _value(row, "interpretation_guardrail")
+        guardrail_suffix = f" Guardrail: {guardrail}" if guardrail else ""
+        lines.append(
+            f"- `{_value(row, 'row_name')}` for case `{_value(row, 'case_id')}` "
+            f"sample `{_value(row, 'sample_id')}`: status `{_value(row, 'row_status')}`; "
+            f"passed `{_value(row, 'row_passed')}`; severity `{_value(row, 'row_severity')}`; "
+            f"configured-summary JSON present `{_value(row, 'thermodynamic_summary_json_present')}`; "
+            f"configured-summary CSV present `{_value(row, 'thermodynamic_summary_csv_present')}`; "
+            f"allowed use `{_value(row, 'allowed_use')}`"
+            f"{detail_suffix}{message_suffix}.{guardrail_suffix}"
+        )
     return lines
 
 
@@ -417,8 +451,7 @@ def _thermodynamic_row_details(row: Mapping[str, str]) -> str:
     entropy_rate = _value(row, "entropy_production_rate")
     if entropy_rate:
         details.append(
-            f"entropy_production_rate={entropy_rate} "
-            f"{_display_units(_value(row, 'entropy_production_rate_units'))}"
+            f"entropy_production_rate={entropy_rate} {_display_units(_value(row, 'entropy_production_rate_units'))}"
         )
     equation = _value(row, "gibbs_equation") or _value(row, "entropy_equation")
     if equation:
@@ -502,7 +535,9 @@ def _decision_summary_lines(
     if missing_counts:
         lines.append(f"- Missing-parameter status counts: {_format_counts(missing_counts)}.")
     if suggested_experiments:
-        lines.append(f"- Suggested-experiment priority counts: {_format_counts(_counts(suggested_experiments, 'priority'))}.")
+        lines.append(
+            f"- Suggested-experiment priority counts: {_format_counts(_counts(suggested_experiments, 'priority'))}."
+        )
         for row in suggested_experiments[:5]:
             target = _value(row, "parameter_symbol") or _value(row, "suggestion_id")
             lines.append(
@@ -533,7 +568,9 @@ def _limitation_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
             ),
         )
         suffix = f"; {details}" if details else ""
-        lines.append(f"- {_value(row, 'limitation')}{suffix}" if _value(row, "limitation") else f"- {_compact_row(row)}")
+        lines.append(
+            f"- {_value(row, 'limitation')}{suffix}" if _value(row, "limitation") else f"- {_compact_row(row)}"
+        )
     return lines
 
 
@@ -861,7 +898,9 @@ def _decision_table_link_items(*, table_root: Path, output_dir: Path) -> list[st
     for name, description in descriptions.items():
         table_path = table_root / TABLE_FILENAMES[name]
         if table_path.exists():
-            items.append(_link_item(path=table_path, base_dir=output_dir, label=table_path.name, description=description))
+            items.append(
+                _link_item(path=table_path, base_dir=output_dir, label=table_path.name, description=description)
+            )
     if not items:
         return ["  <li>No decision-support CSV tables were present.</li>"]
     return items
@@ -888,10 +927,7 @@ def _thermodynamic_link_items(*, table_root: Path, output_dir: Path) -> list[str
 def _quicklook_link_items(paths: Sequence[str], *, output_dir: Path) -> list[str]:
     if not paths:
         return ["  <li>No quicklook figure paths were recorded.</li>"]
-    return [
-        _link_item(path=Path(path), base_dir=output_dir, label=Path(path).name or path)
-        for path in paths
-    ]
+    return [_link_item(path=Path(path), base_dir=output_dir, label=Path(path).name or path) for path in paths]
 
 
 def _link_item(*, path: Path, base_dir: Path, label: str, description: str = "") -> str:
