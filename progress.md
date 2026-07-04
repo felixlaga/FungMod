@@ -26,13 +26,56 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-28 Configured Environment Modifier Example Notebook
+
+Date: 2026-07-04
+
+Status: `complete` for the scoped PR-28 public configured-workflow example
+notebook slice once merged; broader environment-response biology remains
+explicit-config only, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added `notebooks/examples/17_configured_environment_modifiers_example.ipynb`
+  to demonstrate configured `temperature_arrhenius_reference` and
+  `ph_gaussian` rate modifiers through `run_configured_model(...)` and
+  package-generated configured outputs.
+- The notebook creates a temporary artificial framework-benchmark config from
+  the existing homogeneous software-test benchmark, adds explicit artificial
+  Arrhenius and Gaussian pH parameter records, and keeps the source labelled as
+  non-biological software-test data.
+- The notebook inspects `configured_metadata.json`, `assumptions.json`,
+  `merged_parameters.json`, `entity_snapshots/`, `input_model_config.json`,
+  and `process_rates.csv` so explicit modifier parameters and explicit
+  environment temperature/pH values are visible from configured workflow
+  outputs.
+- Updated notebook inventory/smoke tests so the new notebook remains
+  JSON-valid, public-API/configured-runner only, free of hidden rate laws or
+  solver logic, and executable with temporary outputs.
+- Updated active README and roadmap/status docs so PR-27 is complete after
+  PR #42, PR-28 is the current build-first environment-modifier example
+  notebook slice, and VALIDATION-DATA-001 remains deferred behind the evidence
+  gate.
+
+No validation data, calibration routine, empirical comparison claim, fitted
+pH/temperature response curve, organism-specific physiology, inferred
+environment response, runtime EnvironmentGrid behavior change, solver/model
+behavior, registry biology record, hidden notebook science, oxygen/redox
+behavior, thermodynamic enforcement, or silent fallback constant was added.
+
+Recommended next task: revisit VALIDATION-DATA-001 only if source-backed
+numeric time-course observations satisfying the active evidence gate are
+available; otherwise choose the next small build-first simulator/output slice.
+
 ## PR-27 Explicit Configured Environmental Rate Modifiers
 
 Date: 2026-07-04
 
 Status: `complete` for the scoped PR-27 configured environment-modifier slice
-once merged; broader environment-response biology remains explicit-config only,
-and VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+after PR #42 merged; broader environment-response biology remains
+explicit-config only, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
 
 Completed in this pass:
 
@@ -52,8 +95,8 @@ Completed in this pass:
   required parameters, missing environment pH/temperature values, and
   unsupported modifier types.
 - Updated active README and roadmap/status docs so PR-26 is complete after
-  PR #41, PR-27 is the current build-first explicit environment-modifier slice,
-  and VALIDATION-DATA-001 remains deferred behind the evidence gate.
+  PR #41, PR-27 is the build-first explicit environment-modifier slice, and
+  VALIDATION-DATA-001 remains deferred behind the evidence gate.
 
 No validation data, calibration routine, empirical comparison claim, fitted
 pH/temperature response curve, organism-specific physiology, inferred
