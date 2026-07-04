@@ -64,6 +64,8 @@ class RateModifierProcess(Process):
         geometry: Any = None,
     ) -> Quantity:
         rate = self.base_process.rate(state, time, parameters, environment, geometry)
+        if environment is None and _requires_environment(self.rate_modifiers):
+            raise ValueError("Explicit environment rate modifiers require an environment entity.")
         for modifier in self.rate_modifiers:
             rate = modifier.scale(
                 rate=rate,
@@ -243,6 +245,10 @@ def _modifier_failure_modes(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
             )
         )
     return tuple(modes)
+
+
+def _requires_environment(modifiers: tuple[Any, ...]) -> bool:
+    return any(isinstance(modifier, (TemperatureModifier, PHModifier)) for modifier in modifiers)
 
 
 def _required_parameters(

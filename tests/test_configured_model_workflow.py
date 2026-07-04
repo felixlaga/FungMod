@@ -264,6 +264,17 @@ def test_configured_environment_modifier_requires_environment_value(tmp_path) ->
     assert "does not define pH" in report["message"]
 
 
+def test_configured_environment_modifier_requires_environment_entity(tmp_path) -> None:
+    config_path = _environment_modified_homogeneous_config(tmp_path, include_environment_entity=False)
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "missing_environment_entity")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "model_execution"
+    assert "Explicit environment rate modifiers require an environment entity" in report["message"]
+
+
 def test_configured_model_rejects_unsupported_modifier_type(tmp_path) -> None:
     data = yaml.safe_load((MODEL_CONFIGS / "toy_homogeneous_ab.yml").read_text(encoding="utf-8"))
     data = deepcopy(data)
@@ -375,6 +386,7 @@ def _environment_modified_homogeneous_config(
     tmp_path: Path,
     *,
     include_ph_width_parameter: bool = True,
+    include_environment_entity: bool = True,
     include_environment_ph: bool = True,
 ) -> Path:
     data = yaml.safe_load((MODEL_CONFIGS / "toy_homogeneous_ab.yml").read_text(encoding="utf-8"))
@@ -449,7 +461,9 @@ def _environment_modified_homogeneous_config(
             "source": "FungMod configured environment-modifier software benchmark.",
         },
     ]
-    if not include_environment_ph:
+    if not include_environment_entity:
+        data["entities"]["environment"] = None
+    elif not include_environment_ph:
         environment = yaml.safe_load((ROOT / "data" / "environments" / "lab_30C_pH7.yml").read_text(encoding="utf-8"))
         environment = deepcopy(environment)
         del environment["conditions"]["ph"]
