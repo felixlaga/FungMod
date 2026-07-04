@@ -266,6 +266,9 @@ decision-support report links, see
 For a public-API walkthrough of the standard virtual-experiment thermodynamic
 diagnostics table and header-only/artifact-copy guardrails, see
 `notebooks/examples/16_thermodynamic_diagnostics_example.ipynb`.
+For a public configured-workflow walkthrough of explicit
+`temperature_arrhenius_reference` and `ph_gaussian` modifier outputs, see
+`notebooks/examples/17_configured_environment_modifiers_example.ipynb`.
 
 ## Public API
 
@@ -327,6 +330,7 @@ These researcher-facing notebooks are not empirical validation:
 - `14_trajectory_quantiles_example.ipynb`
 - `15_provenance_limitations_report_example.ipynb`
 - `16_thermodynamic_diagnostics_example.ipynb`
+- `17_configured_environment_modifiers_example.ipynb`
 
 Notebook tests check that notebooks import `fungal_model`, avoid defining core
 rate laws/classes or low-level solvers inline, and execute every foundation,
@@ -353,6 +357,11 @@ supplies explicit Arrhenius or Gaussian pH parameters and the environment
 defines the required temperature or pH value. This is explicit configured
 framework behavior, not inferred environment-response biology, calibration, or
 empirical comparison.
+The configured environment-modifier notebook demonstrates this path with a
+temporary artificial framework-benchmark config, then inspects package-generated
+configured metadata, assumptions, merged parameters, entity snapshots, and
+process rates. It does not fit response curves, validate biology, infer
+environment responses, or change `EnvironmentGrid` behavior.
 
 ## Data And Configs
 

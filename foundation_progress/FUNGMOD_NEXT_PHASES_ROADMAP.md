@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-27 explicit configured environmental rate
-modifiers slice after the registry-backed
+The current next PR is a scoped PR-28 configured environmental rate modifier
+example-notebook slice after the registry-backed
 product-inhibition assembly and researcher-facing example, validation
 ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
@@ -87,8 +87,9 @@ ergonomics slice, the PR-22 PRODUCT-001 provenance/limitations report
 ergonomics slice, and the PR-23 PRODUCT-001 provenance/limitations report
 example notebook slice, and the PR-24 BIO-003 non-PET product-inhibition
 genericity-hardening slice, and the PR-25 THERMO-003 virtual-experiment
-thermodynamic diagnostics bridge, and the PR-26 THERMO-003
-virtual-experiment thermodynamic diagnostics example notebook. The completed
+thermodynamic diagnostics bridge, the PR-26 THERMO-003
+virtual-experiment thermodynamic diagnostics example notebook, and the PR-27
+explicit configured environmental rate-modifier wiring slice. The completed
 PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -106,14 +107,21 @@ adds a public-API example notebook that inspects that standard table/accessor
 path, including the header-only no-artifact case and a carefully labelled
 package-generated artifact-copy demonstration, without inferred
 thermodynamics, validation data, empirical comparison, hidden notebook science,
-or solver-time thermodynamic enforcement. The PR-27 slice should wire existing
-`TemperatureModifier` and `PHModifier` response laws into configured generic
-process modifier construction as explicit `temperature_arrhenius_reference`
-and `ph_gaussian` modifiers with explicit parameters and environment values,
-without validation data, calibration, empirical comparison, fitted
-pH/temperature curves, organism-specific physiology, inferred environment
-response, hidden notebook science, solver-time thermodynamic enforcement, or
-silent fallback constants.
+or solver-time thermodynamic enforcement. The completed PR-27 slice wires
+existing `TemperatureModifier` and `PHModifier` response laws into configured
+generic process modifier construction as explicit
+`temperature_arrhenius_reference` and `ph_gaussian` modifiers with explicit
+parameters and environment values, without validation data, calibration,
+empirical comparison, fitted pH/temperature curves, organism-specific
+physiology, inferred environment response, hidden notebook science,
+solver-time thermodynamic enforcement, or silent fallback constants. The PR-28
+slice should add a public configured-workflow example notebook that
+demonstrates those explicit modifiers through package APIs and configured
+workflow outputs, without validation data, calibration, empirical comparison,
+fitted pH/temperature curves, organism-specific physiology, inferred
+environment response, EnvironmentGrid behavior changes, hidden notebook
+science, oxygen/redox behavior, thermodynamic enforcement, or silent fallback
+constants.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -168,9 +176,9 @@ VALIDATION-DATA-001 remains deferred and evidence-gated. A validation
 ingestion PR may start only if a source-backed numeric time-course dataset
 satisfies the active evidence requirements in
 `foundation_progress/VALIDATION_DATA_001_FIRST_TIMECOURSE.md`; because the
-current candidate reviews do not satisfy that gate, PR-27 is deliberately
-build-first configured environment-modifier work rather than ingestion,
-digitization, or fabricated validation data.
+current candidate reviews do not satisfy that gate, PR-28 is deliberately
+build-first configured environment-modifier example-notebook work rather than
+ingestion, digitization, or fabricated validation data.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

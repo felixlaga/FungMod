@@ -31,6 +31,10 @@ BIO003_NOTEBOOKS = [
     "12_reversible_product_inhibition_example.ipynb",
 ]
 
+ENVIRONMENT_MODIFIER_NOTEBOOKS = [
+    "17_configured_environment_modifiers_example.ipynb",
+]
+
 
 NOTEBOOK_DIR = Path(__file__).resolve().parents[1] / "notebooks" / "examples"
 
@@ -96,7 +100,13 @@ def test_foundation_notebooks_are_labelled_software_test_only() -> None:
 
 
 def test_notebooks_do_not_define_core_classes_or_rate_laws() -> None:
-    for name in [*NOTEBOOKS, *PRODUCT_NOTEBOOKS, *THERMODYNAMIC_NOTEBOOKS, *BIO003_NOTEBOOKS]:
+    for name in [
+        *NOTEBOOKS,
+        *PRODUCT_NOTEBOOKS,
+        *THERMODYNAMIC_NOTEBOOKS,
+        *BIO003_NOTEBOOKS,
+        *ENVIRONMENT_MODIFIER_NOTEBOOKS,
+    ]:
         source = "\n".join(code_cells(load_notebook(name)))
         for label, pattern in HIDDEN_IMPLEMENTATION_PATTERNS.items():
             assert not pattern.search(source), f"{name} contains hidden implementation pattern {label!r}"
@@ -250,6 +260,32 @@ def test_product_inhibition_notebook_is_researcher_facing_but_unvalidated() -> N
     assert "prepare_reversible_product_inhibition_example_registry" in source
     assert "mechanism_summary()" in source
     assert "configured_metadata.json" in source
+    assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
+
+
+def test_configured_environment_modifier_notebook_uses_configured_outputs_only() -> None:
+    notebook = load_notebook("17_configured_environment_modifiers_example.ipynb")
+    markdown = "\n".join(markdown_cells(notebook)).lower()
+    source = "\n".join(code_cells(notebook))
+
+    assert notebook["nbformat"] == 4
+    assert "public configured-workflow example" in markdown
+    assert "artificial framework-benchmark config data" in markdown
+    assert "not an empirical validation" in markdown
+    assert "no fitted response curve" in markdown
+    assert "no inferred environment response" in markdown
+    assert "no environmentgrid behavior change" in markdown
+    assert "run_configured_model(" in source
+    assert "temperature_arrhenius_reference" in source
+    assert "ph_gaussian" in source
+    assert "configured_metadata.json" in source
+    assert "assumptions.json" in source
+    assert "process_rates.csv" in source
+    assert "merged_parameters.json" in source
+    assert "entity_snapshots" in source
+    assert "index.json" in source
+    assert "environment_grid(" not in source
+    assert "EnvironmentGrid" not in source
     assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
 
 
@@ -509,6 +545,52 @@ def test_product_inhibition_notebook_executes_smoke_path_with_temp_outputs(
         and row["parameters"] == "inhibition_constant:K_i_bio003_product_example"
         for row in mechanism_rows
     )
+
+
+def test_configured_environment_modifier_notebook_executes_smoke_path_with_temp_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "notebook_outputs"
+    monkeypatch.setenv("FUNGMOD_NOTEBOOK_OUTPUT_ROOT", str(output_root))
+    _execute_notebook("17_configured_environment_modifiers_example.ipynb")
+
+    output = output_root / "17_configured_environment_modifiers_example"
+    base_output = output / "base"
+    modified_output = output / "modified"
+
+    metadata = json.loads((modified_output / "configured_metadata.json").read_text(encoding="utf-8"))
+    assumptions = json.loads((modified_output / "assumptions.json").read_text(encoding="utf-8"))
+    input_config = json.loads((modified_output / "input_model_config.json").read_text(encoding="utf-8"))
+    merged_parameters = json.loads((modified_output / "merged_parameters.json").read_text(encoding="utf-8"))
+    entity_index = json.loads((modified_output / "entity_snapshots" / "index.json").read_text(encoding="utf-8"))
+    environment_entry = next(entry for entry in entity_index["entities"] if entry["role"] == "environment")
+    environment = json.loads((modified_output / environment_entry["snapshot_path"]).read_text(encoding="utf-8"))
+
+    assert (base_output / "process_rates.csv").exists()
+    assert (modified_output / "process_rates.csv").exists()
+    assert (modified_output / "output_manifest.json").exists()
+    assert [row["type"] for row in metadata["configured_process_modifiers"]] == [
+        "temperature_arrhenius_reference",
+        "ph_gaussian",
+    ]
+    assert metadata["configured_process_modifiers"][0]["activation_energy_symbol"] == "E_a_env"
+    assert metadata["configured_process_modifiers"][1]["width_symbol"] == "pH_width_env"
+    assert {row["environment_value"] for row in metadata["configured_process_modifiers"]} == {"temperature", "ph"}
+    assert all(row["maturity"] == "exploratory_configured_mechanism" for row in metadata["configured_process_modifiers"])
+    assert input_config["processes"][0]["modifiers"][0]["type"] == "temperature_arrhenius_reference"
+    assert input_config["processes"][0]["modifiers"][1]["type"] == "ph_gaussian"
+    assert {"E_a_env", "T_ref_env", "pH_opt_env", "pH_width_env"}.issubset(
+        {item["symbol"] for item in merged_parameters["parameters"]}
+    )
+    assert environment["temperature"]["value"] == 303.15
+    assert environment["ph"]["value"] == 7.0
+    assert any(item["name"] == "Arrhenius temperature scaling without deactivation" for item in assumptions)
+    assert any(item["name"] == "Gaussian empirical pH activity profile" for item in assumptions)
+
+    base_first_rate = float(_csv_rows(base_output / "process_rates.csv")[0]["value"])
+    modified_first_rate = float(_csv_rows(modified_output / "process_rates.csv")[0]["value"])
+    assert modified_first_rate != pytest.approx(base_first_rate)
 
 
 def _execute_notebook(name: str) -> None:
