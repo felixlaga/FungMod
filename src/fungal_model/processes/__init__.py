@@ -31,7 +31,12 @@ from .homogeneous import (
     MassActionProcess,
     homogeneous_process_assumption,
 )
-from .rate_modifiers import RateModifierProcess, product_inhibition_modifier_from_config
+from .rate_modifiers import (
+    RateModifierProcess,
+    ph_modifier_from_config,
+    product_inhibition_modifier_from_config,
+    temperature_modifier_from_config,
+)
 from .registry import MissingProcessIssue, ProcessLibrary, ProcessRegistry
 from .surface import (
     AccessibleSitePool,
@@ -82,7 +87,9 @@ __all__ = [
     "ValidityDomain",
     "default_foundation_factories",
     "homogeneous_process_assumption",
+    "ph_modifier_from_config",
     "product_inhibition_modifier_from_config",
     "surface_catalysis_assumption",
     "surface_catalysis_rate",
+    "temperature_modifier_from_config",
 ]

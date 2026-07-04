@@ -14,7 +14,9 @@ from fungal_model.processes.homogeneous import (
 )
 from fungal_model.processes.rate_modifiers import (
     RateModifierProcess,
+    ph_modifier_from_config,
     product_inhibition_modifier_from_config,
+    temperature_modifier_from_config,
 )
 from fungal_model.processes.surface import (
     AccessibleSitePool,
@@ -349,6 +351,10 @@ def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> 
     modifier_type = str(mapping.get("type") or mapping.get("modifier_type") or "").strip()
     if modifier_type == "product_inhibition":
         return product_inhibition_modifier_from_config(mapping, state_units=context.state_units)
+    if modifier_type == "temperature_arrhenius_reference":
+        return temperature_modifier_from_config(mapping)
+    if modifier_type == "ph_gaussian":
+        return ph_modifier_from_config(mapping)
     raise ValueError(f"Unsupported rate modifier type: {modifier_type!r}.")
 
 

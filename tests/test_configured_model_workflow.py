@@ -177,6 +177,109 @@ def test_non_pet_surface_benchmark_runs_with_explicit_product_inhibition_modifie
     assert "not biological inhibition evidence" in ki_parameter["notes"]
 
 
+def test_configured_model_runs_with_explicit_environment_rate_modifiers(tmp_path) -> None:
+    config_path = _environment_modified_homogeneous_config(tmp_path)
+
+    base = run_configured_model(MODEL_CONFIGS / "toy_homogeneous_ab.yml", output_dir=tmp_path / "base")
+    modified = run_configured_model(config_path, output_dir=tmp_path / "environment_modified")
+
+    assumptions = json.loads((tmp_path / "environment_modified" / "assumptions.json").read_text(encoding="utf-8"))
+    metadata = json.loads((tmp_path / "environment_modified" / "configured_metadata.json").read_text(encoding="utf-8"))
+    process_config = json.loads(
+        (tmp_path / "environment_modified" / "input_model_config.json").read_text(encoding="utf-8")
+    )["processes"][0]
+
+    assert "a_to_b" in modified.process_rates
+    assert modified.process_rates["a_to_b"].magnitude[0] != pytest.approx(base.process_rates["a_to_b"].magnitude[0])
+    assert any(item["name"] == "Arrhenius temperature scaling without deactivation" for item in assumptions)
+    assert any(item["name"] == "Gaussian empirical pH activity profile" for item in assumptions)
+    assert metadata["configured_process_modifiers"] == [
+        {
+            "process_id": "a_to_b",
+            "modifier_index": 0,
+            "type": "temperature_arrhenius_reference",
+            "environment_value": "temperature",
+            "activation_energy_symbol": "E_a_env",
+            "reference_temperature_symbol": "T_ref_env",
+            "minimum_temperature_symbol": "",
+            "maximum_temperature_symbol": "",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Arrhenius reference-temperature scaling only; configured only when environment "
+                "temperature and explicit unit-compatible parameters are present."
+            ),
+        },
+        {
+            "process_id": "a_to_b",
+            "modifier_index": 1,
+            "type": "ph_gaussian",
+            "environment_value": "ph",
+            "optimum_symbol": "pH_opt_env",
+            "width_symbol": "pH_width_env",
+            "minimum_ph_symbol": "",
+            "maximum_ph_symbol": "",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Gaussian empirical pH activity scaling only; configured only when environment "
+                "pH and explicit unit-compatible parameters are present."
+            ),
+        },
+    ]
+    assert process_config["modifiers"] == [
+        {
+            "type": "temperature_arrhenius_reference",
+            "activation_energy_symbol": "E_a_env",
+            "reference_temperature_symbol": "T_ref_env",
+            "source": "FungMod configured environment-modifier software benchmark.",
+        },
+        {
+            "type": "ph_gaussian",
+            "optimum_symbol": "pH_opt_env",
+            "width_symbol": "pH_width_env",
+            "source": "FungMod configured environment-modifier software benchmark.",
+        },
+    ]
+
+
+def test_configured_environment_modifier_requires_explicit_parameters(tmp_path) -> None:
+    config_path = _environment_modified_homogeneous_config(tmp_path, include_ph_width_parameter=False)
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "missing_environment_modifier_parameter")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "model_assembly"
+    assert "required_parameters" in report["missing_capabilities"]
+    assert "pH_width_env" in json.dumps(report)
+
+
+def test_configured_environment_modifier_requires_environment_value(tmp_path) -> None:
+    config_path = _environment_modified_homogeneous_config(tmp_path, include_environment_ph=False)
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "missing_environment_value")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "model_execution"
+    assert "does not define pH" in report["message"]
+
+
+def test_configured_model_rejects_unsupported_modifier_type(tmp_path) -> None:
+    data = yaml.safe_load((MODEL_CONFIGS / "toy_homogeneous_ab.yml").read_text(encoding="utf-8"))
+    data = deepcopy(data)
+    data["processes"][0]["modifiers"] = [{"type": "not_supported"}]
+    config_path = tmp_path / "toy_homogeneous_unsupported_modifier.yml"
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "unsupported_modifier")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "process_factory_build"
+    assert "process_factory_requirements" in report["missing_capabilities"]
+    assert "Unsupported rate modifier type" in report["message"]
+
+
 def test_configured_product_inhibition_requires_explicit_inhibition_constant(tmp_path) -> None:
     config_path = _product_inhibited_homogeneous_config(tmp_path, include_ki_parameter=False)
 
@@ -264,6 +367,96 @@ def _product_inhibited_homogeneous_config(
         }
     ]
     config_path = tmp_path / "toy_homogeneous_product_inhibition.yml"
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    return config_path
+
+
+def _environment_modified_homogeneous_config(
+    tmp_path: Path,
+    *,
+    include_ph_width_parameter: bool = True,
+    include_environment_ph: bool = True,
+) -> Path:
+    data = yaml.safe_load((MODEL_CONFIGS / "toy_homogeneous_ab.yml").read_text(encoding="utf-8"))
+    data = deepcopy(data)
+    parameters = data["parameters"][0]["parameters"]
+    parameters.extend(
+        [
+            {
+                "name": "toy Arrhenius activation energy",
+                "symbol": "E_a_env",
+                "value": 50000.0,
+                "units": "joule / mole",
+                "uncertainty": 0.0,
+                "source": "FungMod configured environment-modifier software benchmark.",
+                "confidence_level": "testing",
+                "notes": "Artificial framework-benchmark value; not a fitted or biological temperature response.",
+                "measurement_method": "defined benchmark value",
+                "validity_range": "framework tests only",
+            },
+            {
+                "name": "toy Arrhenius reference temperature",
+                "symbol": "T_ref_env",
+                "value": 293.15,
+                "units": "kelvin",
+                "uncertainty": 0.0,
+                "source": "FungMod configured environment-modifier software benchmark.",
+                "confidence_level": "testing",
+                "notes": "Artificial framework-benchmark value; not a fitted or biological temperature response.",
+                "measurement_method": "defined benchmark value",
+                "validity_range": "framework tests only",
+            },
+            {
+                "name": "toy pH optimum",
+                "symbol": "pH_opt_env",
+                "value": 6.0,
+                "units": "dimensionless",
+                "uncertainty": 0.0,
+                "source": "FungMod configured environment-modifier software benchmark.",
+                "confidence_level": "testing",
+                "notes": "Artificial framework-benchmark value; not a fitted or biological pH response.",
+                "measurement_method": "defined benchmark value",
+                "validity_range": "framework tests only",
+            },
+        ]
+    )
+    if include_ph_width_parameter:
+        parameters.append(
+            {
+                "name": "toy pH width",
+                "symbol": "pH_width_env",
+                "value": 1.5,
+                "units": "dimensionless",
+                "uncertainty": 0.0,
+                "source": "FungMod configured environment-modifier software benchmark.",
+                "confidence_level": "testing",
+                "notes": "Artificial framework-benchmark value; not a fitted or biological pH response.",
+                "measurement_method": "defined benchmark value",
+                "validity_range": "framework tests only",
+            }
+        )
+    data["processes"][0]["modifiers"] = [
+        {
+            "type": "temperature_arrhenius_reference",
+            "activation_energy_symbol": "E_a_env",
+            "reference_temperature_symbol": "T_ref_env",
+            "source": "FungMod configured environment-modifier software benchmark.",
+        },
+        {
+            "type": "ph_gaussian",
+            "optimum_symbol": "pH_opt_env",
+            "width_symbol": "pH_width_env",
+            "source": "FungMod configured environment-modifier software benchmark.",
+        },
+    ]
+    if not include_environment_ph:
+        environment = yaml.safe_load((ROOT / "data" / "environments" / "lab_30C_pH7.yml").read_text(encoding="utf-8"))
+        environment = deepcopy(environment)
+        del environment["conditions"]["ph"]
+        environment_path = tmp_path / "lab_30C_without_ph.yml"
+        environment_path.write_text(yaml.safe_dump(environment, sort_keys=False), encoding="utf-8")
+        data["entities"]["environment"]["path"] = str(environment_path)
+    config_path = tmp_path / "toy_homogeneous_environment_modifiers.yml"
     config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return config_path
 

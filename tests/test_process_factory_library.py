@@ -255,6 +255,156 @@ def test_product_inhibition_modifier_wraps_generic_surface_config() -> None:
     assert any(requirement.symbol == "K_i_surface_product" for requirement in process.required_parameters)
 
 
+def test_environment_rate_modifiers_wrap_generic_first_order_config() -> None:
+    process_config = ProcessConfig.from_mapping(
+        {
+            "id": "generic_environment_modified_first_order",
+            "process_type": "first_order",
+            "states": {
+                "source": "S",
+                "product": "P",
+            },
+            "parameters": {
+                "rate_constant": "k_loss",
+            },
+            "modifiers": [
+                {
+                    "type": "temperature_arrhenius_reference",
+                    "activation_energy_symbol": "E_a",
+                    "reference_temperature_symbol": "T_ref",
+                },
+                {
+                    "type": "ph_gaussian",
+                    "optimum_symbol": "pH_opt",
+                    "width_symbol": "pH_width",
+                },
+            ],
+        }
+    )
+    context = ProcessBuildContext(state_units={"S": "kilogram", "P": "kilogram"})
+
+    process = ProcessLibrary.default_foundation().build_processes(context, (process_config,))[0]
+
+    assert isinstance(process, RateModifierProcess)
+    assert [modifier.to_dict()["type"] for modifier in process.rate_modifiers] == [
+        "temperature_arrhenius_reference",
+        "ph_gaussian",
+    ]
+    assert {requirement.symbol for requirement in process.required_parameters} == {
+        "k_loss",
+        "E_a",
+        "T_ref",
+        "pH_opt",
+        "pH_width",
+    }
+    assert "missing environment temperature" in process.failure_modes
+    assert "missing environment pH" in process.failure_modes
+    base_rate = process.base_process.rate(
+        {"S": Q_(2.0, "kilogram"), "P": Q_(0.0, "kilogram")},
+        Q_(0.0, "second"),
+        _parameter_set(k_loss=(0.2, "1 / second")),
+        Environment(name="test"),
+    )
+    modified_rate = process.rate(
+        {"S": Q_(2.0, "kilogram"), "P": Q_(0.0, "kilogram")},
+        Q_(0.0, "second"),
+        _parameter_set(
+            k_loss=(0.2, "1 / second"),
+            E_a=(50000.0, "joule / mole"),
+            T_ref=(293.15, "kelvin"),
+            pH_opt=(6.0, "dimensionless"),
+            pH_width=(1.5, "dimensionless"),
+        ),
+        Environment(name="explicit environment", temperature=Q_(303.15, "kelvin"), ph=Q_(7.0, "dimensionless")),
+    )
+
+    assert modified_rate.to(base_rate.units).magnitude != pytest.approx(base_rate.magnitude)
+    assert process.contributions(modified_rate)["S"].magnitude == pytest.approx(-modified_rate.magnitude)
+
+
+def test_environment_rate_modifiers_require_explicit_config_fields() -> None:
+    process_config = ProcessConfig.from_mapping(
+        {
+            "id": "missing_temperature_config",
+            "process_type": "first_order",
+            "states": {"source": "S"},
+            "parameters": {"rate_constant": "k_loss"},
+            "modifiers": [
+                {
+                    "type": "temperature_arrhenius_reference",
+                    "activation_energy_symbol": "E_a",
+                }
+            ],
+        }
+    )
+    context = ProcessBuildContext(state_units={"S": "kilogram"})
+
+    with pytest.raises(ValueError, match="requires reference_temperature_symbol"):
+        ProcessLibrary.default_foundation().build_processes(context, (process_config,))
+
+
+def test_environment_rate_modifiers_require_environment_values() -> None:
+    process_config = ProcessConfig.from_mapping(
+        {
+            "id": "missing_environment_values",
+            "process_type": "first_order",
+            "states": {"source": "S"},
+            "parameters": {"rate_constant": "k_loss"},
+            "modifiers": [
+                {
+                    "type": "temperature_arrhenius_reference",
+                    "activation_energy_symbol": "E_a",
+                    "reference_temperature_symbol": "T_ref",
+                },
+                {
+                    "type": "ph_gaussian",
+                    "optimum_symbol": "pH_opt",
+                    "width_symbol": "pH_width",
+                },
+            ],
+        }
+    )
+    process = ProcessLibrary.default_foundation().build_processes(
+        ProcessBuildContext(state_units={"S": "kilogram"}),
+        (process_config,),
+    )[0]
+    parameters = _parameter_set(
+        k_loss=(0.2, "1 / second"),
+        E_a=(50000.0, "joule / mole"),
+        T_ref=(293.15, "kelvin"),
+        pH_opt=(6.0, "dimensionless"),
+        pH_width=(1.5, "dimensionless"),
+    )
+
+    with pytest.raises(ValueError, match="does not define temperature"):
+        process.rate({"S": Q_(2.0, "kilogram")}, Q_(0.0, "second"), parameters, Environment(name="missing"))
+    with pytest.raises(ValueError, match="does not define pH"):
+        process.rate(
+            {"S": Q_(2.0, "kilogram")},
+            Q_(0.0, "second"),
+            parameters,
+            Environment(name="missing pH", temperature=Q_(303.15, "kelvin")),
+        )
+
+
+def test_unsupported_rate_modifier_type_is_rejected() -> None:
+    process_config = ProcessConfig.from_mapping(
+        {
+            "id": "unsupported_modifier",
+            "process_type": "first_order",
+            "states": {"source": "S"},
+            "parameters": {"rate_constant": "k_loss"},
+            "modifiers": [{"type": "not_supported"}],
+        }
+    )
+
+    with pytest.raises(ValueError, match="Unsupported rate modifier type"):
+        ProcessLibrary.default_foundation().build_processes(
+            ProcessBuildContext(state_units={"S": "kilogram"}),
+            (process_config,),
+        )
+
+
 def test_factory_module_has_no_plugin_imports_or_domain_names() -> None:
     source = (ROOT / "src" / "fungal_model" / "processes" / "factories.py").read_text(encoding="utf-8")
 

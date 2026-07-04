@@ -86,6 +86,10 @@ basic kinetics layer:
 - a toy non-PET configured product-inhibition benchmark that exercises the
   same explicit product-state and positive unit-compatible `K_i` path as
   framework coverage only, not as biological evidence;
+- configured generic process modifiers for explicit
+  `temperature_arrhenius_reference` and `ph_gaussian` rate scaling, using the
+  existing Arrhenius and Gaussian pH response-law implementations only when
+  explicit parameters and environment values are supplied;
 - an offline-first SABIO-RK source adapter that loads frozen kinetic-law
   snapshots and writes review-only proposed records without mutating the
   simulation registry;
@@ -343,6 +347,12 @@ The product-inhibition notebook demonstrates the generic reversible
 standard output tables with an explicit exploratory example `K_i`; it is not
 validation, calibration, toxicity, uptake, secretion, biomass, whole-fungus
 physiology, or multi-product inhibition evidence.
+Configured generic processes can also opt into existing
+`temperature_arrhenius_reference` and `ph_gaussian` modifiers when the config
+supplies explicit Arrhenius or Gaussian pH parameters and the environment
+defines the required temperature or pH value. This is explicit configured
+framework behavior, not inferred environment-response biology, calibration, or
+empirical comparison.
 
 ## Data And Configs
 

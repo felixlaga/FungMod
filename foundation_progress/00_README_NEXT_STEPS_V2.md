@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-25 after PR #40 merged, with PR-26 selected:
+Scoped status as of PR-26 after PR #41 merged, with PR-27 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -87,6 +87,12 @@ Example notebooks now also include
 standard `thermodynamic_diagnostics.csv` table, the header-only no-artifact
 case, and a labelled package-generated artifact-copy demonstration without
 validation claims or solver-time enforcement.
+Configured generic processes can now opt into existing
+`temperature_arrhenius_reference` and `ph_gaussian` environmental rate
+modifiers when explicit Arrhenius or Gaussian pH parameters and the required
+environment values are supplied. This is explicit configured framework
+behavior, not inferred environment-response biology, calibration, validation,
+or empirical comparison.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier, registry-backed case-template
 assembly, and a non-PET configured framework benchmark when explicit
@@ -98,7 +104,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-26: THERMO-003 virtual-experiment thermodynamic diagnostics example notebook**.
+Current next PR: **PR-27: explicit configured environmental rate modifiers**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -106,14 +112,15 @@ has no real observation table under `data/experiments/literature/`. That blocks
 validation, calibration, and empirical comparison claims; it does not block
 building the simulator.
 
-Because the current validation evidence gate is still blocked, PR-25 has
-completed a build-first THERMO-003 virtual-experiment diagnostics bridge over
-existing configured thermodynamic summary artifacts only. The selected PR-26
-work is now a build-first THERMO-003 example notebook for the standard
+Because the current validation evidence gate is still blocked, PR-26 has
+completed a build-first THERMO-003 example notebook for the standard
 `thermodynamic_diagnostics.csv` and
-`DegradationScreenResult.thermodynamic_diagnostics()` path, without validation
-data, calibration, empirical comparison, solver-law changes, silent fallback
-constants, inferred thermodynamics, or new biology claims.
+`DegradationScreenResult.thermodynamic_diagnostics()` path. The selected PR-27
+work is now a build-first configured environment-modifier slice that wires
+existing `TemperatureModifier` and `PHModifier` response laws into generic
+configured processes with explicit parameters and environment values, without
+validation data, calibration, empirical comparison, solver-law changes, silent
+fallback constants, inferred environment responses, or new biology claims.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

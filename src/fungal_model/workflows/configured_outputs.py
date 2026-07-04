@@ -189,24 +189,89 @@ def _configured_process_modifiers(config: ModelConfig) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for process in config.processes:
         for index, modifier in enumerate(process.modifiers):
-            rows.append(
-                {
-                    "process_id": process.id,
-                    "modifier_index": index,
-                    "type": modifier.get("type", modifier.get("modifier_type", "")),
-                    "product_state": modifier.get("product_state", ""),
-                    "inhibition_constant": modifier.get(
-                        "inhibition_constant",
-                        modifier.get("inhibition_constant_symbol", modifier.get("K_i", "")),
-                    ),
-                    "maturity": "exploratory_configured_mechanism",
-                    "limitation": (
-                        "Single-product reversible inhibition only; configured "
-                        "only when product_state and positive unit-compatible K_i are explicit."
-                    ),
-                }
-            )
+            rows.append(_configured_process_modifier_row(process.id, index, modifier))
     return rows
+
+
+def _configured_process_modifier_row(
+    process_id: str,
+    index: int,
+    modifier: Mapping[str, Any],
+) -> dict[str, Any]:
+    modifier_type = modifier.get("type", modifier.get("modifier_type", ""))
+    row: dict[str, Any] = {
+        "process_id": process_id,
+        "modifier_index": index,
+        "type": modifier_type,
+    }
+    if modifier_type == "product_inhibition":
+        row.update(
+            {
+                "product_state": modifier.get("product_state", ""),
+                "inhibition_constant": modifier.get(
+                    "inhibition_constant",
+                    modifier.get("inhibition_constant_symbol", modifier.get("K_i", "")),
+                ),
+                "maturity": "exploratory_configured_mechanism",
+                "limitation": (
+                    "Single-product reversible inhibition only; configured "
+                    "only when product_state and positive unit-compatible K_i are explicit."
+                ),
+            }
+        )
+    elif modifier_type == "temperature_arrhenius_reference":
+        row.update(
+            {
+                "environment_value": "temperature",
+                "activation_energy_symbol": modifier.get(
+                    "activation_energy_symbol",
+                    modifier.get("activation_energy", ""),
+                ),
+                "reference_temperature_symbol": modifier.get(
+                    "reference_temperature_symbol",
+                    modifier.get("reference_temperature", ""),
+                ),
+                "minimum_temperature_symbol": modifier.get(
+                    "minimum_temperature_symbol",
+                    modifier.get("minimum_temperature", ""),
+                ),
+                "maximum_temperature_symbol": modifier.get(
+                    "maximum_temperature_symbol",
+                    modifier.get("maximum_temperature", ""),
+                ),
+                "maturity": "exploratory_configured_mechanism",
+                "limitation": (
+                    "Arrhenius reference-temperature scaling only; configured only when "
+                    "environment temperature and explicit unit-compatible parameters are present."
+                ),
+            }
+        )
+    elif modifier_type == "ph_gaussian":
+        row.update(
+            {
+                "environment_value": "ph",
+                "optimum_symbol": modifier.get(
+                    "optimum_symbol",
+                    modifier.get("optimum_ph_symbol", modifier.get("optimum", modifier.get("optimum_ph", ""))),
+                ),
+                "width_symbol": modifier.get("width_symbol", modifier.get("width", "")),
+                "minimum_ph_symbol": modifier.get("minimum_ph_symbol", modifier.get("minimum_ph", "")),
+                "maximum_ph_symbol": modifier.get("maximum_ph_symbol", modifier.get("maximum_ph", "")),
+                "maturity": "exploratory_configured_mechanism",
+                "limitation": (
+                    "Gaussian empirical pH activity scaling only; configured only when "
+                    "environment pH and explicit unit-compatible parameters are present."
+                ),
+            }
+        )
+    else:
+        row.update(
+            {
+                "maturity": "unsupported_configured_modifier",
+                "limitation": "Unsupported modifier type; configured execution should reject this process modifier.",
+            }
+        )
+    return row
 
 
 def _validation_summary(result: SimulationResult) -> dict[str, Any]:
