@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-28 configured environmental rate modifier
-example-notebook slice after the registry-backed
+The current next PR is a scoped PR-29 configured oxygen and water-activity
+modifier wiring slice after the registry-backed
 product-inhibition assembly and researcher-facing example, validation
 ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
@@ -88,8 +88,9 @@ ergonomics slice, and the PR-23 PRODUCT-001 provenance/limitations report
 example notebook slice, and the PR-24 BIO-003 non-PET product-inhibition
 genericity-hardening slice, and the PR-25 THERMO-003 virtual-experiment
 thermodynamic diagnostics bridge, the PR-26 THERMO-003
-virtual-experiment thermodynamic diagnostics example notebook, and the PR-27
-explicit configured environmental rate-modifier wiring slice. The completed
+virtual-experiment thermodynamic diagnostics example notebook, the PR-27
+explicit configured environmental rate-modifier wiring slice, and the PR-28
+configured environment modifier example notebook slice. The completed
 PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -115,12 +116,21 @@ parameters and environment values, without validation data, calibration,
 empirical comparison, fitted pH/temperature curves, organism-specific
 physiology, inferred environment response, hidden notebook science,
 solver-time thermodynamic enforcement, or silent fallback constants. The PR-28
-slice should add a public configured-workflow example notebook that
+slice added a public configured-workflow example notebook that
 demonstrates those explicit modifiers through package APIs and configured
 workflow outputs, without validation data, calibration, empirical comparison,
 fitted pH/temperature curves, organism-specific physiology, inferred
 environment response, EnvironmentGrid behavior changes, hidden notebook
 science, oxygen/redox behavior, thermodynamic enforcement, or silent fallback
+constants. The PR-29 slice should wire existing `OxygenModifier` and
+`WaterActivityModifier` response laws into configured generic process modifier
+construction as explicit `oxygen_monod` and `water_activity_threshold`
+modifiers with explicit parameters, oxygen units, and environment values,
+without validation data, calibration, empirical comparison, fitted oxygen or
+water-activity response curves, organism-specific physiology, inferred
+environment response, oxygen consumption state, gas transfer, redox balance,
+anaerobic metabolism, substrate water-binding model, EnvironmentGrid behavior
+change, hidden notebook science, thermodynamic enforcement, or silent fallback
 constants.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
@@ -176,9 +186,10 @@ VALIDATION-DATA-001 remains deferred and evidence-gated. A validation
 ingestion PR may start only if a source-backed numeric time-course dataset
 satisfies the active evidence requirements in
 `foundation_progress/VALIDATION_DATA_001_FIRST_TIMECOURSE.md`; because the
-current candidate reviews do not satisfy that gate, PR-28 is deliberately
-build-first configured environment-modifier example-notebook work rather than
-ingestion, digitization, or fabricated validation data.
+current candidate reviews do not satisfy that gate, PR-28 is complete as
+build-first configured environment-modifier example-notebook work and PR-29 is
+deliberately build-first configured oxygen/water-activity modifier wiring
+rather than ingestion, digitization, or fabricated validation data.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

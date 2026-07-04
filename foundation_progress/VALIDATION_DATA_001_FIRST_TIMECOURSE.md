@@ -22,15 +22,15 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-28: configured environment modifier example notebook**.
+Current next PR: **PR-29: explicit oxygen and water-activity configured modifiers**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
 important, but it remains deferred until source-backed numeric observations
 satisfy the evidence requirements below and the simulator can produce mature
-enough degradation outputs for comparison. The selected PR-28 work is
-therefore build-first configured environment-modifier example-notebook work,
-not validation ingestion. A future validation ingestion PR must not ingest,
+enough degradation outputs for comparison. The selected PR-29 work is
+therefore build-first configured oxygen/water-activity modifier wiring, not
+validation ingestion. A future validation ingestion PR must not ingest,
 digitize, or fabricate data unless those evidence requirements are met. This
 gate does not complete VALIDATION-DATA-001.
 

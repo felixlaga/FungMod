@@ -241,6 +241,70 @@ def test_configured_model_runs_with_explicit_environment_rate_modifiers(tmp_path
     ]
 
 
+def test_configured_model_runs_with_explicit_oxygen_water_activity_modifiers(tmp_path) -> None:
+    config_path = _oxygen_water_modified_homogeneous_config(tmp_path)
+
+    base = run_configured_model(MODEL_CONFIGS / "toy_homogeneous_ab.yml", output_dir=tmp_path / "base")
+    modified = run_configured_model(config_path, output_dir=tmp_path / "oxygen_water_modified")
+
+    assumptions = json.loads((tmp_path / "oxygen_water_modified" / "assumptions.json").read_text(encoding="utf-8"))
+    metadata = json.loads((tmp_path / "oxygen_water_modified" / "configured_metadata.json").read_text(encoding="utf-8"))
+    process_config = json.loads(
+        (tmp_path / "oxygen_water_modified" / "input_model_config.json").read_text(encoding="utf-8")
+    )["processes"][0]
+    merged_parameters = json.loads(
+        (tmp_path / "oxygen_water_modified" / "merged_parameters.json").read_text(encoding="utf-8")
+    )
+
+    assert "a_to_b" in modified.process_rates
+    assert modified.process_rates["a_to_b"].magnitude[0] != pytest.approx(base.process_rates["a_to_b"].magnitude[0])
+    assert any(item["name"] == "oxygen Monod limitation modifier" for item in assumptions)
+    assert any(item["name"] == "minimum water activity threshold" for item in assumptions)
+    assert metadata["configured_process_modifiers"] == [
+        {
+            "process_id": "a_to_b",
+            "modifier_index": 0,
+            "type": "oxygen_monod",
+            "environment_value": "oxygen_concentration",
+            "half_saturation_symbol": "K_O2_env",
+            "oxygen_units": "mole / liter",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Monod oxygen scaling only; configured only when environment oxygen concentration "
+                "and explicit positive unit-compatible half-saturation are present. No oxygen consumption, "
+                "gas transfer, redox balance, or anaerobic metabolism."
+            ),
+        },
+        {
+            "process_id": "a_to_b",
+            "modifier_index": 1,
+            "type": "water_activity_threshold",
+            "environment_value": "water_activity",
+            "minimum_water_activity_symbol": "a_w_min_env",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Binary water-activity threshold scaling only; configured only when environment water activity "
+                "and an explicit unit-compatible threshold parameter are present. No smooth response curve, "
+                "hysteresis, substrate water binding, or spatial moisture model."
+            ),
+        },
+    ]
+    assert process_config["modifiers"] == [
+        {
+            "type": "oxygen_monod",
+            "half_saturation_symbol": "K_O2_env",
+            "oxygen_units": "mole / liter",
+            "source": "FungMod configured oxygen-water modifier software benchmark.",
+        },
+        {
+            "type": "water_activity_threshold",
+            "minimum_water_activity_symbol": "a_w_min_env",
+            "source": "FungMod configured oxygen-water modifier software benchmark.",
+        },
+    ]
+    assert {item["symbol"] for item in merged_parameters["parameters"]}.issuperset({"K_O2_env", "a_w_min_env"})
+
+
 def test_configured_environment_modifier_requires_explicit_parameters(tmp_path) -> None:
     config_path = _environment_modified_homogeneous_config(tmp_path, include_ph_width_parameter=False)
 
@@ -251,6 +315,29 @@ def test_configured_environment_modifier_requires_explicit_parameters(tmp_path) 
     assert report["stage"] == "model_assembly"
     assert "required_parameters" in report["missing_capabilities"]
     assert "pH_width_env" in json.dumps(report)
+
+
+def test_configured_oxygen_water_modifiers_require_explicit_parameters(tmp_path) -> None:
+    missing_oxygen = _oxygen_water_modified_homogeneous_config(tmp_path, include_oxygen_half_parameter=False)
+    missing_water_activity = _oxygen_water_modified_homogeneous_config(
+        tmp_path,
+        config_name="toy_homogeneous_missing_water_activity_parameter.yml",
+        include_water_activity_parameter=False,
+    )
+
+    with pytest.raises(ConfiguredModelExecutionError) as oxygen_exc:
+        run_configured_model(missing_oxygen, output_dir=tmp_path / "missing_oxygen_modifier_parameter")
+    with pytest.raises(ConfiguredModelExecutionError) as water_exc:
+        run_configured_model(missing_water_activity, output_dir=tmp_path / "missing_water_activity_parameter")
+
+    oxygen_report = oxygen_exc.value.report.to_dict()
+    water_report = water_exc.value.report.to_dict()
+    assert oxygen_report["stage"] == "model_assembly"
+    assert "required_parameters" in oxygen_report["missing_capabilities"]
+    assert "K_O2_env" in json.dumps(oxygen_report)
+    assert water_report["stage"] == "model_assembly"
+    assert "required_parameters" in water_report["missing_capabilities"]
+    assert "a_w_min_env" in json.dumps(water_report)
 
 
 def test_configured_environment_modifier_requires_environment_value(tmp_path) -> None:
@@ -264,6 +351,27 @@ def test_configured_environment_modifier_requires_environment_value(tmp_path) ->
     assert "does not define pH" in report["message"]
 
 
+def test_configured_oxygen_water_modifiers_require_environment_values(tmp_path) -> None:
+    missing_oxygen = _oxygen_water_modified_homogeneous_config(tmp_path, include_environment_oxygen=False)
+    missing_water_activity = _oxygen_water_modified_homogeneous_config(
+        tmp_path,
+        config_name="toy_homogeneous_without_water_activity.yml",
+        include_environment_water_activity=False,
+    )
+
+    with pytest.raises(ConfiguredModelExecutionError) as oxygen_exc:
+        run_configured_model(missing_oxygen, output_dir=tmp_path / "missing_oxygen_value")
+    with pytest.raises(ConfiguredModelExecutionError) as water_exc:
+        run_configured_model(missing_water_activity, output_dir=tmp_path / "missing_water_activity_value")
+
+    oxygen_report = oxygen_exc.value.report.to_dict()
+    water_report = water_exc.value.report.to_dict()
+    assert oxygen_report["stage"] == "model_execution"
+    assert "does not define oxygen concentration" in oxygen_report["message"]
+    assert water_report["stage"] == "model_execution"
+    assert "does not define water activity" in water_report["message"]
+
+
 def test_configured_environment_modifier_requires_environment_entity(tmp_path) -> None:
     config_path = _environment_modified_homogeneous_config(tmp_path, include_environment_entity=False)
 
@@ -273,6 +381,40 @@ def test_configured_environment_modifier_requires_environment_entity(tmp_path) -
     report = exc_info.value.report.to_dict()
     assert report["stage"] == "model_execution"
     assert "Explicit environment rate modifiers require an environment entity" in report["message"]
+
+
+def test_configured_oxygen_water_modifiers_require_environment_entity(tmp_path) -> None:
+    config_path = _oxygen_water_modified_homogeneous_config(tmp_path, include_environment_entity=False)
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "missing_oxygen_water_environment_entity")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "model_execution"
+    assert "Explicit environment rate modifiers require an environment entity" in report["message"]
+
+
+def test_configured_oxygen_modifier_rejects_non_positive_half_saturation(tmp_path) -> None:
+    config_path = _oxygen_water_modified_homogeneous_config(tmp_path, oxygen_half_value=0.0)
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "bad_oxygen_half_saturation")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "model_execution"
+    assert "Oxygen half-saturation must be positive" in report["message"]
+
+
+def test_configured_oxygen_water_modifiers_require_explicit_config_fields(tmp_path) -> None:
+    config_path = _oxygen_water_modified_homogeneous_config(tmp_path, include_oxygen_units_config=False)
+
+    with pytest.raises(ConfiguredModelExecutionError) as exc_info:
+        run_configured_model(config_path, output_dir=tmp_path / "missing_oxygen_units_config")
+
+    report = exc_info.value.report.to_dict()
+    assert report["stage"] == "process_factory_build"
+    assert "process_factory_requirements" in report["missing_capabilities"]
+    assert "oxygen_monod modifier requires oxygen_units" in report["message"]
 
 
 def test_configured_model_rejects_unsupported_modifier_type(tmp_path) -> None:
@@ -471,6 +613,83 @@ def _environment_modified_homogeneous_config(
         environment_path.write_text(yaml.safe_dump(environment, sort_keys=False), encoding="utf-8")
         data["entities"]["environment"]["path"] = str(environment_path)
     config_path = tmp_path / "toy_homogeneous_environment_modifiers.yml"
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    return config_path
+
+
+def _oxygen_water_modified_homogeneous_config(
+    tmp_path: Path,
+    *,
+    config_name: str = "toy_homogeneous_oxygen_water_modifiers.yml",
+    include_oxygen_half_parameter: bool = True,
+    oxygen_half_value: float = 0.25,
+    include_water_activity_parameter: bool = True,
+    include_environment_entity: bool = True,
+    include_environment_oxygen: bool = True,
+    include_environment_water_activity: bool = True,
+    include_oxygen_units_config: bool = True,
+) -> Path:
+    data = yaml.safe_load((MODEL_CONFIGS / "toy_homogeneous_ab.yml").read_text(encoding="utf-8"))
+    data = deepcopy(data)
+    parameters = data["parameters"][0]["parameters"]
+    if include_oxygen_half_parameter:
+        parameters.append(
+            {
+                "name": "toy oxygen half saturation",
+                "symbol": "K_O2_env",
+                "value": oxygen_half_value,
+                "units": "mole / liter",
+                "uncertainty": 0.0,
+                "source": "FungMod configured oxygen-water modifier software benchmark.",
+                "confidence_level": "testing",
+                "notes": "Artificial framework-benchmark value; not fitted oxygen physiology or redox behavior.",
+                "measurement_method": "defined benchmark value",
+                "validity_range": "framework tests only",
+            }
+        )
+    if include_water_activity_parameter:
+        parameters.append(
+            {
+                "name": "toy minimum water activity",
+                "symbol": "a_w_min_env",
+                "value": 0.9,
+                "units": "dimensionless",
+                "uncertainty": 0.0,
+                "source": "FungMod configured oxygen-water modifier software benchmark.",
+                "confidence_level": "testing",
+                "notes": "Artificial framework-benchmark value; not a fitted moisture response.",
+                "measurement_method": "defined benchmark value",
+                "validity_range": "framework tests only",
+            }
+        )
+    oxygen_modifier = {
+        "type": "oxygen_monod",
+        "half_saturation_symbol": "K_O2_env",
+        "source": "FungMod configured oxygen-water modifier software benchmark.",
+    }
+    if include_oxygen_units_config:
+        oxygen_modifier["oxygen_units"] = "mole / liter"
+    data["processes"][0]["modifiers"] = [
+        oxygen_modifier,
+        {
+            "type": "water_activity_threshold",
+            "minimum_water_activity_symbol": "a_w_min_env",
+            "source": "FungMod configured oxygen-water modifier software benchmark.",
+        },
+    ]
+    if not include_environment_entity:
+        data["entities"]["environment"] = None
+    elif not include_environment_oxygen or not include_environment_water_activity:
+        environment = yaml.safe_load((ROOT / "data" / "environments" / "lab_30C_pH7.yml").read_text(encoding="utf-8"))
+        environment = deepcopy(environment)
+        if not include_environment_oxygen:
+            del environment["conditions"]["oxygen_concentration"]
+        if not include_environment_water_activity:
+            del environment["conditions"]["water_activity"]
+        environment_path = tmp_path / f"{Path(config_name).stem}_environment.yml"
+        environment_path.write_text(yaml.safe_dump(environment, sort_keys=False), encoding="utf-8")
+        data["entities"]["environment"]["path"] = str(environment_path)
+    config_path = tmp_path / config_name
     config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return config_path
 

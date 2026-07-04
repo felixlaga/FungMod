@@ -322,6 +322,84 @@ def test_environment_rate_modifiers_wrap_generic_first_order_config() -> None:
     assert process.contributions(modified_rate)["S"].magnitude == pytest.approx(-modified_rate.magnitude)
 
 
+def test_oxygen_water_activity_modifiers_wrap_generic_first_order_config() -> None:
+    process_config = ProcessConfig.from_mapping(
+        {
+            "id": "generic_oxygen_water_modified_first_order",
+            "process_type": "first_order",
+            "states": {
+                "source": "S",
+                "product": "P",
+            },
+            "parameters": {
+                "rate_constant": "k_loss",
+            },
+            "modifiers": [
+                {
+                    "type": "oxygen_monod",
+                    "half_saturation_symbol": "K_O2_env",
+                    "oxygen_units": "mole / liter",
+                },
+                {
+                    "type": "water_activity_threshold",
+                    "minimum_water_activity_symbol": "a_w_min_env",
+                },
+            ],
+        }
+    )
+    context = ProcessBuildContext(state_units={"S": "kilogram", "P": "kilogram"})
+
+    process = ProcessLibrary.default_foundation().build_processes(context, (process_config,))[0]
+
+    assert isinstance(process, RateModifierProcess)
+    assert [modifier.to_dict()["type"] for modifier in process.rate_modifiers] == [
+        "oxygen_monod",
+        "water_activity_threshold",
+    ]
+    assert {requirement.symbol for requirement in process.required_parameters} == {
+        "k_loss",
+        "K_O2_env",
+        "a_w_min_env",
+    }
+    assert "missing environment oxygen concentration" in process.failure_modes
+    assert "missing environment water activity" in process.failure_modes
+    base_rate = process.base_process.rate(
+        {"S": Q_(2.0, "kilogram"), "P": Q_(0.0, "kilogram")},
+        Q_(0.0, "second"),
+        _parameter_set(k_loss=(0.2, "1 / second")),
+        Environment(name="test"),
+    )
+    parameters = _parameter_set(
+        k_loss=(0.2, "1 / second"),
+        K_O2_env=(0.5, "mole / liter"),
+        a_w_min_env=(0.9, "dimensionless"),
+    )
+    modified_rate = process.rate(
+        {"S": Q_(2.0, "kilogram"), "P": Q_(0.0, "kilogram")},
+        Q_(0.0, "second"),
+        parameters,
+        Environment(
+            name="explicit environment",
+            oxygen_concentration=Q_(0.5, "mole / liter"),
+            water_activity=Q_(0.98, "dimensionless"),
+        ),
+    )
+    dry_rate = process.rate(
+        {"S": Q_(2.0, "kilogram"), "P": Q_(0.0, "kilogram")},
+        Q_(0.0, "second"),
+        parameters,
+        Environment(
+            name="dry explicit environment",
+            oxygen_concentration=Q_(0.5, "mole / liter"),
+            water_activity=Q_(0.5, "dimensionless"),
+        ),
+    )
+
+    assert modified_rate.to(base_rate.units).magnitude == pytest.approx(base_rate.magnitude / 2.0)
+    assert dry_rate.to(base_rate.units).magnitude == pytest.approx(0.0)
+    assert process.contributions(modified_rate)["S"].magnitude == pytest.approx(-modified_rate.magnitude)
+
+
 def test_environment_rate_modifiers_require_explicit_config_fields() -> None:
     process_config = ProcessConfig.from_mapping(
         {
@@ -341,6 +419,38 @@ def test_environment_rate_modifiers_require_explicit_config_fields() -> None:
 
     with pytest.raises(ValueError, match="requires reference_temperature_symbol"):
         ProcessLibrary.default_foundation().build_processes(context, (process_config,))
+
+
+def test_oxygen_water_activity_modifiers_require_explicit_config_fields() -> None:
+    context = ProcessBuildContext(state_units={"S": "kilogram"})
+    missing_oxygen_units = ProcessConfig.from_mapping(
+        {
+            "id": "missing_oxygen_units",
+            "process_type": "first_order",
+            "states": {"source": "S"},
+            "parameters": {"rate_constant": "k_loss"},
+            "modifiers": [
+                {
+                    "type": "oxygen_monod",
+                    "half_saturation_symbol": "K_O2_env",
+                }
+            ],
+        }
+    )
+    missing_water_threshold = ProcessConfig.from_mapping(
+        {
+            "id": "missing_water_threshold",
+            "process_type": "first_order",
+            "states": {"source": "S"},
+            "parameters": {"rate_constant": "k_loss"},
+            "modifiers": [{"type": "water_activity_threshold"}],
+        }
+    )
+
+    with pytest.raises(ValueError, match="requires oxygen_units"):
+        ProcessLibrary.default_foundation().build_processes(context, (missing_oxygen_units,))
+    with pytest.raises(ValueError, match="requires minimum_water_activity_symbol"):
+        ProcessLibrary.default_foundation().build_processes(context, (missing_water_threshold,))
 
 
 def test_environment_rate_modifiers_require_environment_values() -> None:
@@ -384,6 +494,47 @@ def test_environment_rate_modifiers_require_environment_values() -> None:
             Q_(0.0, "second"),
             parameters,
             Environment(name="missing pH", temperature=Q_(303.15, "kelvin")),
+        )
+
+
+def test_oxygen_water_activity_modifiers_require_environment_values() -> None:
+    process_config = ProcessConfig.from_mapping(
+        {
+            "id": "missing_oxygen_water_values",
+            "process_type": "first_order",
+            "states": {"source": "S"},
+            "parameters": {"rate_constant": "k_loss"},
+            "modifiers": [
+                {
+                    "type": "oxygen_monod",
+                    "half_saturation_symbol": "K_O2_env",
+                    "oxygen_units": "mole / liter",
+                },
+                {
+                    "type": "water_activity_threshold",
+                    "minimum_water_activity_symbol": "a_w_min_env",
+                },
+            ],
+        }
+    )
+    process = ProcessLibrary.default_foundation().build_processes(
+        ProcessBuildContext(state_units={"S": "kilogram"}),
+        (process_config,),
+    )[0]
+    parameters = _parameter_set(
+        k_loss=(0.2, "1 / second"),
+        K_O2_env=(0.5, "mole / liter"),
+        a_w_min_env=(0.9, "dimensionless"),
+    )
+
+    with pytest.raises(ValueError, match="does not define oxygen concentration"):
+        process.rate({"S": Q_(2.0, "kilogram")}, Q_(0.0, "second"), parameters, Environment(name="missing"))
+    with pytest.raises(ValueError, match="does not define water activity"):
+        process.rate(
+            {"S": Q_(2.0, "kilogram")},
+            Q_(0.0, "second"),
+            parameters,
+            Environment(name="missing water activity", oxygen_concentration=Q_(0.5, "mole / liter")),
         )
 
 

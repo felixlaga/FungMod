@@ -26,12 +26,56 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-29 Explicit Oxygen And Water-Activity Configured Modifiers
+
+Date: 2026-07-04
+
+Status: `complete` for the scoped PR-29 configured oxygen and water-activity
+modifier slice once merged; broader environment-response biology remains
+explicit-config only, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Wired existing `OxygenModifier` and `WaterActivityModifier` response laws
+  into configured process modifier construction through `oxygen_monod` and
+  `water_activity_threshold` process modifiers.
+- Configured generic processes now expose explicit parameter requirements for
+  positive oxygen half-saturation symbols and minimum water-activity threshold
+  symbols, using caller-supplied oxygen concentration units rather than inferred
+  defaults.
+- Configured output metadata now records explicit oxygen and water-activity
+  modifier rows with maturity labels and limitations, while preserving existing
+  product-inhibition and pH/temperature metadata.
+- Added focused process-factory and configured-workflow tests proving explicit
+  oxygen and water-activity modifiers change configured generic process rates
+  when explicit parameters and environment values are supplied.
+- Added guardrail tests for missing configured modifier fields, missing required
+  parameters, missing environment oxygen/water-activity values, missing
+  environment entities, non-positive oxygen half-saturation, and unsupported
+  modifier types.
+- Updated active README and roadmap/status docs so PR-28 is complete after
+  PR #43, PR-29 is the build-first explicit oxygen/water-activity configured
+  modifier slice, and VALIDATION-DATA-001 remains deferred behind the evidence
+  gate.
+
+No validation data, calibration routine, empirical comparison claim, fitted
+oxygen or water-activity response curve, organism-specific physiology, inferred
+environment response, oxygen consumption state, gas transfer, redox balance,
+anaerobic metabolism, substrate water-binding model, EnvironmentGrid behavior
+change, registry biology record, hidden notebook science, solver-time
+thermodynamic enforcement, or silent fallback constant was added.
+
+Recommended next task: revisit VALIDATION-DATA-001 only if source-backed
+numeric time-course observations satisfying the active evidence gate are
+available; otherwise choose the next small build-first simulator/output slice.
+
 ## PR-28 Configured Environment Modifier Example Notebook
 
 Date: 2026-07-04
 
 Status: `complete` for the scoped PR-28 public configured-workflow example
-notebook slice once merged; broader environment-response biology remains
+notebook slice after PR #43 merged; broader environment-response biology remains
 explicit-config only, and VALIDATION-DATA-001 remains `deferred;
 blocked/partial` for ingestion.
 

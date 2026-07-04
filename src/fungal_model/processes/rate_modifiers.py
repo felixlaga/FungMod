@@ -8,7 +8,13 @@ from typing import Any
 
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity
-from fungal_model.modifiers import PHModifier, ProductInhibitionModifier, TemperatureModifier
+from fungal_model.modifiers import (
+    OxygenModifier,
+    PHModifier,
+    ProductInhibitionModifier,
+    TemperatureModifier,
+    WaterActivityModifier,
+)
 from fungal_model.processes.base import (
     ParameterRequirement,
     Process,
@@ -181,6 +187,43 @@ def ph_modifier_from_config(modifier_config: Mapping[str, Any]) -> PHModifier:
     )
 
 
+def oxygen_modifier_from_config(modifier_config: Mapping[str, Any]) -> OxygenModifier:
+    """Build a Monod oxygen modifier from explicit config fields."""
+
+    half_saturation = _required_symbol(
+        modifier_config,
+        "half_saturation_symbol",
+        "oxygen_half_saturation_symbol",
+        "half_saturation",
+        "K_O2",
+        field_name="half_saturation_symbol",
+        modifier_type="oxygen_monod",
+    )
+    oxygen_units = _required_text(
+        modifier_config,
+        "oxygen_units",
+        field_name="oxygen_units",
+        modifier_type="oxygen_monod",
+    )
+    return OxygenModifier(
+        half_saturation_symbol=half_saturation,
+        oxygen_units=oxygen_units,
+    )
+
+
+def water_activity_modifier_from_config(modifier_config: Mapping[str, Any]) -> WaterActivityModifier:
+    """Build a binary water-activity threshold modifier from explicit config fields."""
+
+    minimum_water_activity = _required_symbol(
+        modifier_config,
+        "minimum_water_activity_symbol",
+        "minimum_water_activity",
+        field_name="minimum_water_activity_symbol",
+        modifier_type="water_activity_threshold",
+    )
+    return WaterActivityModifier(minimum_water_activity_symbol=minimum_water_activity)
+
+
 def _required_state_variables(
     base_process: Process,
     modifiers: tuple[Any, ...],
@@ -217,6 +260,16 @@ def _modifier_limitations(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
             "pH scaling uses the existing Gaussian activity modifier and requires "
             "explicit environment pH plus configured parameters."
         )
+    if any(isinstance(modifier, OxygenModifier) for modifier in modifiers):
+        limitations.append(
+            "Oxygen scaling uses the existing Monod oxygen modifier and requires "
+            "explicit environment oxygen concentration plus configured parameters."
+        )
+    if any(isinstance(modifier, WaterActivityModifier) for modifier in modifiers):
+        limitations.append(
+            "Water-activity scaling uses the existing threshold modifier and requires "
+            "explicit environment water activity plus a configured threshold parameter."
+        )
     return tuple(limitations)
 
 
@@ -244,11 +297,28 @@ def _modifier_failure_modes(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
                 "missing, non-positive, or unit-incompatible Gaussian pH parameters",
             )
         )
+    if any(isinstance(modifier, OxygenModifier) for modifier in modifiers):
+        modes.extend(
+            (
+                "missing environment oxygen concentration",
+                "missing, non-positive, or unit-incompatible oxygen half-saturation parameter",
+            )
+        )
+    if any(isinstance(modifier, WaterActivityModifier) for modifier in modifiers):
+        modes.extend(
+            (
+                "missing environment water activity",
+                "missing or unit-incompatible minimum water-activity parameter",
+            )
+        )
     return tuple(modes)
 
 
 def _requires_environment(modifiers: tuple[Any, ...]) -> bool:
-    return any(isinstance(modifier, (TemperatureModifier, PHModifier)) for modifier in modifiers)
+    return any(
+        isinstance(modifier, (TemperatureModifier, PHModifier, OxygenModifier, WaterActivityModifier))
+        for modifier in modifiers
+    )
 
 
 def _required_parameters(
@@ -321,6 +391,24 @@ def _required_parameters(
                         name="Gaussian pH validity bound",
                         description="Optional explicit pH bound for configured Gaussian pH scaling.",
                     )
+        elif isinstance(modifier, OxygenModifier):
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.half_saturation_symbol,
+                units=modifier.oxygen_units,
+                name="oxygen half-saturation concentration",
+                description="Positive K_O2 for explicit configured Monod oxygen scaling.",
+            )
+        elif isinstance(modifier, WaterActivityModifier):
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.minimum_water_activity_symbol,
+                units="dimensionless",
+                name="minimum water activity threshold",
+                description="Minimum water activity for explicit configured threshold scaling.",
+            )
     return tuple(requirements)
 
 
@@ -363,6 +451,18 @@ def _required_symbol(
     return symbol
 
 
+def _required_text(
+    modifier_config: Mapping[str, Any],
+    *keys: str,
+    field_name: str,
+    modifier_type: str,
+) -> str:
+    value = _optional_symbol(modifier_config, *keys)
+    if value is None:
+        raise ValueError(f"{modifier_type} modifier requires {field_name}.")
+    return value
+
+
 def _optional_symbol(modifier_config: Mapping[str, Any], *keys: str) -> str | None:
     for key in keys:
         value = modifier_config.get(key)
@@ -392,7 +492,9 @@ def _unique_assumptions(assumptions: list[Any]) -> tuple[Any, ...]:
 
 __all__ = [
     "RateModifierProcess",
+    "oxygen_modifier_from_config",
     "ph_modifier_from_config",
     "product_inhibition_modifier_from_config",
     "temperature_modifier_from_config",
+    "water_activity_modifier_from_config",
 ]

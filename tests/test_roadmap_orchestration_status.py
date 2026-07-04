@@ -68,10 +68,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-28: configured environment modifier example notebook"
+    current_next = "PR-29: explicit oxygen and water-activity configured modifiers"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is a scoped PR-28 configured environmental rate modifier" in roadmap
+    assert "The current next PR is a scoped PR-29 configured oxygen and water-activity" in roadmap
+    assert "PR-28\nconfigured environment modifier example notebook slice" in roadmap
     assert "PR-27\nexplicit configured environmental rate-modifier wiring slice" in roadmap
     assert "PR-25 THERMO-003 virtual-experiment\nthermodynamic diagnostics bridge" in roadmap
     assert "PR-24 BIO-003 non-PET product-inhibition\ngenericity-hardening slice" in roadmap
@@ -105,7 +106,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-28: configured environment modifier example notebook"
+    current_next = "PR-29: explicit oxygen and water-activity configured modifiers"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -131,6 +132,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-25" not in text
         assert "Current next PR: **PR-26" not in text
         assert "Current next PR: **PR-27" not in text
+        assert "Current next PR: **PR-28" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -191,10 +193,16 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "All three load through `load_model_config`" not in readme
     assert "temperature_arrhenius_reference" in status
     assert "ph_gaussian" in status
+    assert "oxygen_monod" in status
+    assert "water_activity_threshold" in status
     assert "temperature_arrhenius_reference" in next_steps
     assert "ph_gaussian" in next_steps
+    assert "oxygen_monod" in next_steps
+    assert "water_activity_threshold" in next_steps
     assert "temperature_arrhenius_reference" in readme
     assert "ph_gaussian" in readme
+    assert "oxygen_monod" in readme
+    assert "water_activity_threshold" in readme
     assert "thermodynamic_summary.json" in status
     assert "thermodynamic_summary.csv" in status
     assert "header-only when no artifacts exist" in status
@@ -244,8 +252,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-27 | Explicit configured environmental rate modifiers" in status
     assert "complete after PR #42 merged for the scoped configured modifier wiring slice" in status
     assert "PR-28 | Configured environment modifier example notebook" in status
+    assert "complete after PR #43 merged for the scoped public configured-workflow example notebook slice" in status
+    assert "PR-29 | Explicit oxygen and water-activity configured modifiers" in status
     assert "current next because the VALIDATION-DATA-001 evidence gate remains blocked" in status
-    assert "PR-29 or later | VALIDATION-DATA-001" in status
+    assert "PR-30 or later | VALIDATION-DATA-001" in status
 
 
 def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> None:
@@ -292,7 +302,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-28: configured environment modifier example notebook"
+    current_next = "PR-29: explicit oxygen and water-activity configured modifiers"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -319,11 +329,12 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-25" not in _current_next_lines(text)
         assert "PR-26" not in _current_next_lines(text)
         assert "PR-27" not in _current_next_lines(text)
+        assert "PR-28" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
     assert "Status: `deferred; blocked/partial` for ingestion." in gate
-    assert "The selected PR-28 work is\ntherefore build-first configured environment-modifier example-notebook work" in gate
+    assert "The selected PR-29 work is\ntherefore build-first configured oxygen/water-activity modifier wiring" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "digitize, or fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate
