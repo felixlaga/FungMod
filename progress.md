@@ -26,6 +26,45 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-27 Explicit Configured Environmental Rate Modifiers
+
+Date: 2026-07-04
+
+Status: `complete` for the scoped PR-27 configured environment-modifier slice
+once merged; broader environment-response biology remains explicit-config only,
+and VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Wired existing `TemperatureModifier` and `PHModifier` response laws into
+  configured process modifier construction through
+  `temperature_arrhenius_reference` and `ph_gaussian` process modifiers.
+- Configured generic processes now expose explicit parameter requirements for
+  Arrhenius activation/reference temperature symbols and Gaussian pH
+  optimum/width symbols, including optional configured validity-bound symbols.
+- Configured output metadata now records explicit pH/temperature modifier rows
+  with maturity labels and limitations, while preserving existing
+  product-inhibition metadata.
+- Added focused process-factory and configured-workflow tests proving explicit
+  pH/temperature modifiers change configured generic process rates when
+  explicit parameters and environment values are supplied.
+- Added guardrail tests for missing configured modifier symbols, missing
+  required parameters, missing environment pH/temperature values, and
+  unsupported modifier types.
+- Updated active README and roadmap/status docs so PR-26 is complete after
+  PR #41, PR-27 is the current build-first explicit environment-modifier slice,
+  and VALIDATION-DATA-001 remains deferred behind the evidence gate.
+
+No validation data, calibration routine, empirical comparison claim, fitted
+pH/temperature response curve, organism-specific physiology, inferred
+environment response, runtime EnvironmentGrid behavior change, solver law,
+registry biology record, hidden notebook science, solver-time thermodynamic
+enforcement, or silent fallback constant was added.
+
+Recommended next task: revisit VALIDATION-DATA-001 only if source-backed
+numeric time-course observations satisfying the active evidence gate are
+available; otherwise choose the next small build-first simulator/output slice.
+
 ## THERMO-003 Virtual-Experiment Thermodynamic Diagnostics Example Notebook
 
 Date: 2026-07-01

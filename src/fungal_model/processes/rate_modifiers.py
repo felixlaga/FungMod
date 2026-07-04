@@ -8,7 +8,7 @@ from typing import Any
 
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity
-from fungal_model.modifiers import ProductInhibitionModifier
+from fungal_model.modifiers import PHModifier, ProductInhibitionModifier, TemperatureModifier
 from fungal_model.processes.base import (
     ParameterRequirement,
     Process,
@@ -46,18 +46,9 @@ class RateModifierProcess(Process):
             validity=ValidityDomain(
                 description=base_process.validity.description,
                 labels=(*base_process.validity.labels, "rate_modified"),
-                limitations=(
-                    *base_process.validity.limitations,
-                    "Rate is scaled only by explicitly configured generic modifiers.",
-                    "Product inhibition support is single-product reversible inhibition only.",
-                ),
+                limitations=(*base_process.validity.limitations, *_modifier_limitations(rate_modifiers)),
             ),
-            failure_modes=(
-                *base_process.failure_modes,
-                "missing product inhibitor state",
-                "negative product inhibitor state",
-                "missing, non-positive, or unit-incompatible product inhibition constant",
-            ),
+            failure_modes=(*base_process.failure_modes, *_modifier_failure_modes(rate_modifiers)),
             source=base_process.source,
             notes=notes or base_process.notes,
         )
@@ -73,6 +64,8 @@ class RateModifierProcess(Process):
         geometry: Any = None,
     ) -> Quantity:
         rate = self.base_process.rate(state, time, parameters, environment, geometry)
+        if environment is None and _requires_environment(self.rate_modifiers):
+            raise ValueError("Explicit environment rate modifiers require an environment entity.")
         for modifier in self.rate_modifiers:
             rate = modifier.scale(
                 rate=rate,
@@ -126,6 +119,68 @@ def product_inhibition_modifier_from_config(
     )
 
 
+def temperature_modifier_from_config(modifier_config: Mapping[str, Any]) -> TemperatureModifier:
+    """Build an Arrhenius temperature modifier from explicit config fields."""
+
+    activation_energy = _required_symbol(
+        modifier_config,
+        "activation_energy_symbol",
+        "activation_energy",
+        field_name="activation_energy_symbol",
+        modifier_type="temperature_arrhenius_reference",
+    )
+    reference_temperature = _required_symbol(
+        modifier_config,
+        "reference_temperature_symbol",
+        "reference_temperature",
+        field_name="reference_temperature_symbol",
+        modifier_type="temperature_arrhenius_reference",
+    )
+    return TemperatureModifier(
+        activation_energy_symbol=activation_energy,
+        reference_temperature_symbol=reference_temperature,
+        minimum_temperature_symbol=_optional_symbol(
+            modifier_config,
+            "minimum_temperature_symbol",
+            "minimum_temperature",
+        ),
+        maximum_temperature_symbol=_optional_symbol(
+            modifier_config,
+            "maximum_temperature_symbol",
+            "maximum_temperature",
+        ),
+        source=_modifier_source(modifier_config, "Explicit configured Arrhenius temperature modifier."),
+    )
+
+
+def ph_modifier_from_config(modifier_config: Mapping[str, Any]) -> PHModifier:
+    """Build a Gaussian pH modifier from explicit config fields."""
+
+    optimum = _required_symbol(
+        modifier_config,
+        "optimum_symbol",
+        "optimum_ph_symbol",
+        "optimum",
+        "optimum_ph",
+        field_name="optimum_symbol",
+        modifier_type="ph_gaussian",
+    )
+    width = _required_symbol(
+        modifier_config,
+        "width_symbol",
+        "width",
+        field_name="width_symbol",
+        modifier_type="ph_gaussian",
+    )
+    return PHModifier(
+        optimum_symbol=optimum,
+        width_symbol=width,
+        minimum_ph_symbol=_optional_symbol(modifier_config, "minimum_ph_symbol", "minimum_ph"),
+        maximum_ph_symbol=_optional_symbol(modifier_config, "maximum_ph_symbol", "maximum_ph"),
+        source=_modifier_source(modifier_config, "Explicit configured Gaussian pH modifier."),
+    )
+
+
 def _required_state_variables(
     base_process: Process,
     modifiers: tuple[Any, ...],
@@ -148,6 +203,54 @@ def _required_state_variables(
     return tuple(specs)
 
 
+def _modifier_limitations(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
+    limitations = ["Rate is scaled only by explicitly configured generic modifiers."]
+    if any(isinstance(modifier, ProductInhibitionModifier) for modifier in modifiers):
+        limitations.append("Product inhibition support is single-product reversible inhibition only.")
+    if any(isinstance(modifier, TemperatureModifier) for modifier in modifiers):
+        limitations.append(
+            "Temperature scaling uses the existing Arrhenius reference-rate modifier "
+            "and requires explicit environment temperature plus configured parameters."
+        )
+    if any(isinstance(modifier, PHModifier) for modifier in modifiers):
+        limitations.append(
+            "pH scaling uses the existing Gaussian activity modifier and requires "
+            "explicit environment pH plus configured parameters."
+        )
+    return tuple(limitations)
+
+
+def _modifier_failure_modes(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
+    modes: list[str] = []
+    if any(isinstance(modifier, ProductInhibitionModifier) for modifier in modifiers):
+        modes.extend(
+            (
+                "missing product inhibitor state",
+                "negative product inhibitor state",
+                "missing, non-positive, or unit-incompatible product inhibition constant",
+            )
+        )
+    if any(isinstance(modifier, TemperatureModifier) for modifier in modifiers):
+        modes.extend(
+            (
+                "missing environment temperature",
+                "missing, non-positive, or unit-incompatible Arrhenius temperature parameters",
+            )
+        )
+    if any(isinstance(modifier, PHModifier) for modifier in modifiers):
+        modes.extend(
+            (
+                "missing environment pH",
+                "missing, non-positive, or unit-incompatible Gaussian pH parameters",
+            )
+        )
+    return tuple(modes)
+
+
+def _requires_environment(modifiers: tuple[Any, ...]) -> bool:
+    return any(isinstance(modifier, (TemperatureModifier, PHModifier)) for modifier in modifiers)
+
+
 def _required_parameters(
     base_process: Process,
     modifiers: tuple[Any, ...],
@@ -155,26 +258,125 @@ def _required_parameters(
     requirements = list(base_process.required_parameters)
     existing_units = {requirement.symbol: requirement.units for requirement in requirements}
     for modifier in modifiers:
-        if not isinstance(modifier, ProductInhibitionModifier):
-            continue
-        if modifier.inhibition_constant_symbol in existing_units:
-            if existing_units[modifier.inhibition_constant_symbol] != modifier.product_units:
-                raise ValueError(
-                    "Product inhibition constant symbol collides with an existing "
-                    f"parameter using different units: {modifier.inhibition_constant_symbol!r}."
-                )
-            continue
-        if modifier.inhibition_constant_symbol not in existing_units:
-            requirements.append(
-                ParameterRequirement(
-                    symbol=modifier.inhibition_constant_symbol,
-                    units=modifier.product_units,
-                    name="product inhibition constant",
-                    description="Positive K_i for explicit reversible product inhibition.",
-                )
+        if isinstance(modifier, ProductInhibitionModifier):
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.inhibition_constant_symbol,
+                units=modifier.product_units,
+                name="product inhibition constant",
+                description="Positive K_i for explicit reversible product inhibition.",
             )
-            existing_units[modifier.inhibition_constant_symbol] = modifier.product_units
+        elif isinstance(modifier, TemperatureModifier):
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.activation_energy_symbol,
+                units="joule / mole",
+                name="Arrhenius activation energy",
+                description="Activation energy for explicit configured Arrhenius temperature scaling.",
+            )
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.reference_temperature_symbol,
+                units="kelvin",
+                name="Arrhenius reference temperature",
+                description="Reference temperature for explicit configured Arrhenius temperature scaling.",
+            )
+            for symbol in (modifier.minimum_temperature_symbol, modifier.maximum_temperature_symbol):
+                if symbol is not None:
+                    _add_requirement(
+                        requirements,
+                        existing_units,
+                        symbol=symbol,
+                        units="kelvin",
+                        name="Arrhenius validity temperature bound",
+                        description="Optional explicit temperature bound for configured Arrhenius scaling.",
+                    )
+        elif isinstance(modifier, PHModifier):
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.optimum_symbol,
+                units="dimensionless",
+                name="Gaussian pH optimum",
+                description="Optimum pH for explicit configured Gaussian pH scaling.",
+            )
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.width_symbol,
+                units="dimensionless",
+                name="Gaussian pH width",
+                description="Positive pH width for explicit configured Gaussian pH scaling.",
+            )
+            for symbol in (modifier.minimum_ph_symbol, modifier.maximum_ph_symbol):
+                if symbol is not None:
+                    _add_requirement(
+                        requirements,
+                        existing_units,
+                        symbol=symbol,
+                        units="dimensionless",
+                        name="Gaussian pH validity bound",
+                        description="Optional explicit pH bound for configured Gaussian pH scaling.",
+                    )
     return tuple(requirements)
+
+
+def _add_requirement(
+    requirements: list[ParameterRequirement],
+    existing_units: dict[str, str],
+    *,
+    symbol: str,
+    units: str,
+    name: str,
+    description: str,
+) -> None:
+    if symbol in existing_units:
+        if existing_units[symbol] != units:
+            raise ValueError(
+                f"Modifier parameter symbol {symbol!r} collides with an existing "
+                f"parameter using different units: {existing_units[symbol]!r} and {units!r}."
+            )
+        return
+    requirements.append(
+        ParameterRequirement(
+            symbol=symbol,
+            units=units,
+            name=name,
+            description=description,
+        )
+    )
+    existing_units[symbol] = units
+
+
+def _required_symbol(
+    modifier_config: Mapping[str, Any],
+    *keys: str,
+    field_name: str,
+    modifier_type: str,
+) -> str:
+    symbol = _optional_symbol(modifier_config, *keys)
+    if symbol is None:
+        raise ValueError(f"{modifier_type} modifier requires {field_name}.")
+    return symbol
+
+
+def _optional_symbol(modifier_config: Mapping[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        value = modifier_config.get(key)
+        if value is None:
+            continue
+        symbol = str(value).strip()
+        if symbol:
+            return symbol
+    return None
+
+
+def _modifier_source(modifier_config: Mapping[str, Any], default: str) -> str:
+    source = str(modifier_config.get("source") or "").strip()
+    return source or default
 
 
 def _unique_assumptions(assumptions: list[Any]) -> tuple[Any, ...]:
@@ -188,4 +390,9 @@ def _unique_assumptions(assumptions: list[Any]) -> tuple[Any, ...]:
     return tuple(result)
 
 
-__all__ = ["RateModifierProcess", "product_inhibition_modifier_from_config"]
+__all__ = [
+    "RateModifierProcess",
+    "ph_modifier_from_config",
+    "product_inhibition_modifier_from_config",
+    "temperature_modifier_from_config",
+]
