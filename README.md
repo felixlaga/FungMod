@@ -90,6 +90,10 @@ basic kinetics layer:
   `temperature_arrhenius_reference` and `ph_gaussian` rate scaling, using the
   existing Arrhenius and Gaussian pH response-law implementations only when
   explicit parameters and environment values are supplied;
+- configured generic process modifiers for explicit `oxygen_monod` and
+  `water_activity_threshold` rate scaling, using the existing oxygen and
+  water-activity response-law implementations only when explicit parameters,
+  oxygen units, and environment values are supplied;
 - an offline-first SABIO-RK source adapter that loads frozen kinetic-law
   snapshots and writes review-only proposed records without mutating the
   simulation registry;
@@ -352,16 +356,20 @@ standard output tables with an explicit exploratory example `K_i`; it is not
 validation, calibration, toxicity, uptake, secretion, biomass, whole-fungus
 physiology, or multi-product inhibition evidence.
 Configured generic processes can also opt into existing
-`temperature_arrhenius_reference` and `ph_gaussian` modifiers when the config
-supplies explicit Arrhenius or Gaussian pH parameters and the environment
-defines the required temperature or pH value. This is explicit configured
-framework behavior, not inferred environment-response biology, calibration, or
-empirical comparison.
+`temperature_arrhenius_reference`, `ph_gaussian`, `oxygen_monod`, and
+`water_activity_threshold` modifiers when the config supplies explicit
+parameters and the environment defines the required temperature, pH, oxygen
+concentration, or water-activity value. This is explicit configured framework
+behavior, not inferred environment-response biology, calibration, validation,
+or empirical comparison.
 The configured environment-modifier notebook demonstrates this path with a
 temporary artificial framework-benchmark config, then inspects package-generated
 configured metadata, assumptions, merged parameters, entity snapshots, and
-process rates. It does not fit response curves, validate biology, infer
-environment responses, or change `EnvironmentGrid` behavior.
+process rates for the pH/temperature slice. The oxygen and water-activity
+configured modifiers are package behavior only in this slice. They do not fit
+response curves, validate biology, infer environment responses, model oxygen
+consumption, gas transfer, redox balance, anaerobic metabolism, substrate water
+binding, or change `EnvironmentGrid` behavior.
 
 ## Data And Configs
 

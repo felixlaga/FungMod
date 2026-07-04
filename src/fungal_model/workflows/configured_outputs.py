@@ -264,6 +264,39 @@ def _configured_process_modifier_row(
                 ),
             }
         )
+    elif modifier_type == "oxygen_monod":
+        row.update(
+            {
+                "environment_value": "oxygen_concentration",
+                "half_saturation_symbol": modifier.get(
+                    "half_saturation_symbol",
+                    modifier.get("oxygen_half_saturation_symbol", modifier.get("half_saturation", modifier.get("K_O2", ""))),
+                ),
+                "oxygen_units": modifier.get("oxygen_units", ""),
+                "maturity": "exploratory_configured_mechanism",
+                "limitation": (
+                    "Monod oxygen scaling only; configured only when environment oxygen "
+                    "concentration and explicit positive unit-compatible half-saturation are present. "
+                    "No oxygen consumption, gas transfer, redox balance, or anaerobic metabolism."
+                ),
+            }
+        )
+    elif modifier_type == "water_activity_threshold":
+        row.update(
+            {
+                "environment_value": "water_activity",
+                "minimum_water_activity_symbol": modifier.get(
+                    "minimum_water_activity_symbol",
+                    modifier.get("minimum_water_activity", ""),
+                ),
+                "maturity": "exploratory_configured_mechanism",
+                "limitation": (
+                    "Binary water-activity threshold scaling only; configured only when environment "
+                    "water activity and an explicit unit-compatible threshold parameter are present. "
+                    "No smooth response curve, hysteresis, substrate water binding, or spatial moisture model."
+                ),
+            }
+        )
     else:
         row.update(
             {

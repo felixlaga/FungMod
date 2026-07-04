@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-27 after PR #42 merged, with PR-28 selected:
+Scoped status as of PR-28 after PR #43 merged, with PR-29 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -100,6 +100,13 @@ package-generated configured metadata, assumptions, merged parameters, entity
 snapshots, and process rates without fitted response curves, validation,
 empirical comparison, inferred environment responses, or EnvironmentGrid
 behavior changes.
+Configured generic processes can also opt into existing `oxygen_monod` and
+`water_activity_threshold` environmental rate modifiers when explicit oxygen
+half-saturation, oxygen units, water-activity threshold parameters, and the
+required environment values are supplied. This is explicit configured framework
+behavior, not inferred oxygen or moisture biology, calibration, validation,
+empirical comparison, oxygen consumption, gas transfer, redox balance,
+anaerobic metabolism, substrate water binding, or EnvironmentGrid behavior.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier, registry-backed case-template
 assembly, and a non-PET configured framework benchmark when explicit
@@ -111,7 +118,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-28: configured environment modifier example notebook**.
+Current next PR: **PR-29: explicit oxygen and water-activity configured modifiers**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -119,14 +126,18 @@ has no real observation table under `data/experiments/literature/`. That blocks
 validation, calibration, and empirical comparison claims; it does not block
 building the simulator.
 
-Because the current validation evidence gate is still blocked, PR-27 has
-completed a build-first configured environment-modifier slice that wires
-existing `TemperatureModifier` and `PHModifier` response laws into generic
-configured processes with explicit parameters and environment values. The
-selected PR-28 work is now a build-first configured environment-modifier
-example notebook that inspects that package behavior through configured
-outputs, without validation data, calibration, empirical comparison,
-solver-law changes, silent fallback constants, inferred environment responses,
+Because the current validation evidence gate is still blocked, PR-27 completed
+a build-first configured environment-modifier slice that wires existing
+`TemperatureModifier` and `PHModifier` response laws into generic configured
+processes with explicit parameters and environment values, and PR-28 completed
+a public configured-workflow example notebook for those modifiers after
+PR #43 merged. The selected PR-29 work is now a build-first configured
+oxygen/water-activity modifier slice that wires existing `OxygenModifier` and
+`WaterActivityModifier` response laws into generic configured processes with
+explicit parameters, oxygen units, and environment values, without validation
+data, calibration, empirical comparison, solver-law changes, silent fallback
+constants, inferred environment responses, oxygen consumption, gas transfer,
+redox balance, anaerobic metabolism, substrate water-binding behavior,
 EnvironmentGrid behavior changes, hidden notebook science, or new biology
 claims.
 
