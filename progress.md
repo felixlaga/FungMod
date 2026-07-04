@@ -26,12 +26,52 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Virtual-Experiment Thermodynamic Diagnostics Example Notebook
+
+Date: 2026-07-01
+
+Status: `complete` for the scoped PR-26 example-notebook slice once merged;
+broader THERMO-003 remains `partial` for dynamic thermodynamic and entropy
+constraints, and VALIDATION-DATA-001 remains `deferred; blocked/partial` for
+ingestion.
+
+Completed in this pass:
+
+- Added `notebooks/examples/16_thermodynamic_diagnostics_example.ipynb` as a
+  public-API example for the standard `thermodynamic_diagnostics.csv` table and
+  `DegradationScreenResult.thermodynamic_diagnostics()` accessor.
+- The notebook demonstrates the normal header-only/no-artifact case for
+  virtual-experiment samples that have no configured thermodynamic summary
+  artifacts.
+- The notebook then uses `run_configured_model(...)` to generate package-owned
+  `thermodynamic_summary.json` and `thermodynamic_summary.csv` artifacts from
+  explicit configured metadata, copies only those artifacts into a
+  virtual-experiment sample bundle, and reruns the standard table writer.
+- Updated notebook smoke tests so the new example remains public-API-only,
+  executable with temporary outputs, and bounded to existing configured
+  artifacts plus standard result-table/report access.
+- Updated active README and roadmap/status docs so PR-25 is complete, PR-26 is
+  the current build-first notebook slice, and VALIDATION-DATA-001 remains
+  deferred behind the evidence gate.
+
+No validation data, calibration routine, empirical comparison claim, inferred
+activity model, inferred reaction quotient, inferred concentration, redox
+potential model, electron-balance model, solver-time thermodynamic
+enforcement, biological mechanism, numerical model, solver behavior, registry
+record, hidden notebook science, schema change, CSV row-contract change, or
+silent fallback constant was added.
+
+Recommended next task: revisit VALIDATION-DATA-001 only if source-backed
+numeric time-course observations satisfying the active evidence gate are
+available; otherwise choose the next build-first simulator/output ergonomics
+slice rather than ingesting, digitizing, or fabricating validation data.
+
 ## THERMO-003 Virtual-Experiment Thermodynamic Diagnostics Bridge
 
 Date: 2026-07-01
 
-Status: `complete` for the scoped PR-25 standard-table/accessor bridge once
-merged; broader THERMO-003 remains `partial` for dynamic thermodynamic and
+Status: `complete` for the scoped PR-25 standard-table/accessor bridge after
+PR #40 merged; broader THERMO-003 remains `partial` for dynamic thermodynamic and
 entropy constraints, and VALIDATION-DATA-001 remains `deferred;
 blocked/partial` for ingestion.
 

@@ -259,6 +259,9 @@ presentation-only trajectory-band quicklook, see
 For a public-API walkthrough of the provenance/limitation decision summary and
 decision-support report links, see
 `notebooks/examples/15_provenance_limitations_report_example.ipynb`.
+For a public-API walkthrough of the standard virtual-experiment thermodynamic
+diagnostics table and header-only/artifact-copy guardrails, see
+`notebooks/examples/16_thermodynamic_diagnostics_example.ipynb`.
 
 ## Public API
 
@@ -319,6 +322,7 @@ These researcher-facing notebooks are not empirical validation:
 - `13_screen_comparison_summary_example.ipynb`
 - `14_trajectory_quantiles_example.ipynb`
 - `15_provenance_limitations_report_example.ipynb`
+- `16_thermodynamic_diagnostics_example.ipynb`
 
 Notebook tests check that notebooks import `fungal_model`, avoid defining core
 rate laws/classes or low-level solvers inline, and execute every foundation,
@@ -327,6 +331,13 @@ uses configured explicit-Q Gibbs and entropy-production-rate metadata only and
 inspects the configured entropy-budget JSON summary; it does not infer
 activities, reaction quotients, concentrations, redox potentials, or
 solver-time thermodynamic enforcement.
+The virtual-experiment thermodynamic diagnostics notebook inspects
+`thermodynamic_diagnostics.csv` and
+`DegradationScreenResult.thermodynamic_diagnostics()` through public APIs,
+including the header-only no-artifact case and a labelled copy of
+package-generated configured summary artifacts. It does not infer activities,
+reaction quotients, concentrations, redox potentials, electron balances,
+validation evidence, or solver-time thermodynamic enforcement.
 The product-inhibition notebook demonstrates the generic reversible
 `1 / (1 + P / K_i)` modifier through the public virtual-experiment API and
 standard output tables with an explicit exploratory example `K_i`; it is not

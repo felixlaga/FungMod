@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-25 THERMO-003 virtual-experiment
-thermodynamic diagnostics bridge after the registry-backed
+The current next PR is a scoped PR-26 THERMO-003 virtual-experiment
+thermodynamic diagnostics example notebook after the registry-backed
 product-inhibition assembly and researcher-facing example, validation
 ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
@@ -86,19 +86,25 @@ slice, and the PR-21 THERMO-003 explicit thermodynamic-summary report
 ergonomics slice, the PR-22 PRODUCT-001 provenance/limitations report
 ergonomics slice, and the PR-23 PRODUCT-001 provenance/limitations report
 example notebook slice, and the PR-24 BIO-003 non-PET product-inhibition
-genericity-hardening slice. The completed PR-24 BIO-003 slice added a toy,
-framework-benchmark configured non-PET product-inhibition path with an
+genericity-hardening slice, and the PR-25 THERMO-003 virtual-experiment
+thermodynamic diagnostics bridge. The completed PR-24 BIO-003 slice added a
+toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
 researcher-facing BIO-002 example without adding validation data, calibration,
 empirical comparison, solver-law changes, silent fallback constants, or new
-biology claims. The PR-25 THERMO-003 slice should add
+biology claims. The completed PR-25 THERMO-003 slice added
 `thermodynamic_diagnostics.csv` and
 `DegradationScreenResult.thermodynamic_diagnostics()` as a standard
 virtual-experiment bridge over existing per-sample configured-output
 `thermodynamic_summary.json`/`.csv` artifacts only, with header-only output
 when no artifacts exist and without inferred activities, reaction quotients,
 concentrations, redox potentials, electron balances, validation evidence, or
-solver-time thermodynamic enforcement.
+solver-time thermodynamic enforcement. The PR-26 THERMO-003 slice should add a
+public-API example notebook that inspects that standard table/accessor path,
+including the header-only no-artifact case and a carefully labelled
+package-generated artifact-copy demonstration, without inferred
+thermodynamics, validation data, empirical comparison, hidden notebook science,
+or solver-time thermodynamic enforcement.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -134,9 +140,11 @@ slice adds Markdown, HTML, and index visibility for existing configured-output
 `thermodynamic_summary.json` and `thermodynamic_summary.csv` artifacts without
 inferring activities, reaction quotients, concentrations, redox potentials,
 electron balances, validation evidence, or solver-time thermodynamic
-enforcement. The PR-25 THERMO-003 slice bridges those existing per-sample
-configured artifacts into standard virtual-experiment outputs only; it must
-not compute or infer new thermodynamic quantities. The completed PR-22
+enforcement. The completed PR-25 THERMO-003 slice bridges those existing
+per-sample configured artifacts into standard virtual-experiment outputs only;
+it must not compute or infer new thermodynamic quantities. The PR-26 notebook
+slice should make that bridge inspectable through public APIs without changing
+scientific or numerical behavior. The completed PR-22
 PRODUCT-001 slice improves provenance,
 limitation, missing-parameter, and suggested-experiment report ergonomics from
 existing standard output tables only, including a Markdown decision summary and
@@ -151,8 +159,8 @@ VALIDATION-DATA-001 remains deferred and evidence-gated. A validation
 ingestion PR may start only if a source-backed numeric time-course dataset
 satisfies the active evidence requirements in
 `foundation_progress/VALIDATION_DATA_001_FIRST_TIMECOURSE.md`; because the
-current candidate reviews do not satisfy that gate, PR-25 is deliberately
-build-first THERMO-003 output/accessor work rather than ingestion,
+current candidate reviews do not satisfy that gate, PR-26 is deliberately
+build-first THERMO-003 example-notebook work rather than ingestion,
 digitization, or fabricated validation data.
 
 Validation remains important, but it is now deliberately deferred behind core
