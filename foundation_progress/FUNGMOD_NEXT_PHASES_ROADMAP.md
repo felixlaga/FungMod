@@ -68,8 +68,9 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-31 registry-backed explicit environment
-modifier assembly slice after the registry-backed
+The current next PR is PR-32 repository hygiene cleanup after the PR-31
+registry-backed explicit environment modifier assembly slice and the
+registry-backed
 product-inhibition assembly and researcher-facing example, validation
 ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
@@ -92,7 +93,10 @@ virtual-experiment thermodynamic diagnostics example notebook, the PR-27
 explicit configured environmental rate-modifier wiring slice, and the PR-28
 configured environment modifier example notebook slice, and the PR-29
 explicit oxygen/water-activity configured modifier wiring slice, and the PR-30
-configured oxygen/water-activity modifier example notebook slice. The completed
+configured oxygen/water-activity modifier example notebook slice. The PR-32
+cleanup removes tracked generated metadata and adds a focused repository
+hygiene guardrail without changing scientific, numerical, solver, notebook
+output, validation-data, calibration, or biology behavior. The completed
 PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the

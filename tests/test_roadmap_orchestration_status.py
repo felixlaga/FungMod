@@ -68,10 +68,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-31: registry-backed explicit environment modifier assembly"
+    current_next = "PR-32: repository hygiene cleanup"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is a scoped PR-31 registry-backed explicit environment" in roadmap
+    assert "The current next PR is PR-32 repository hygiene cleanup" in roadmap
     assert "PR-30\nconfigured oxygen/water-activity modifier example notebook slice" in roadmap
     assert "PR-29\nexplicit oxygen/water-activity configured modifier wiring slice" in roadmap
     assert "PR-28\nconfigured environment modifier example notebook slice" in roadmap
@@ -108,7 +108,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-31: registry-backed explicit environment modifier assembly"
+    current_next = "PR-32: repository hygiene cleanup"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -137,6 +137,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-28" not in text
         assert "Current next PR: **PR-29" not in text
         assert "Current next PR: **PR-30" not in text
+        assert "Current next PR: **PR-31" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -265,8 +266,11 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-30 | Configured oxygen and water-activity modifier example notebook" in status
     assert "complete after PR #45 merged for the scoped public configured-workflow example notebook slice" in status
     assert "PR-31 | Registry-backed explicit environment modifier assembly" in status
-    assert "current next because the VALIDATION-DATA-001 evidence gate remains blocked" in status
-    assert "PR-32 or later | VALIDATION-DATA-001" in status
+    assert "complete after PR #46 merged for the scoped one-process registry template modifier bridge" in status
+    assert "PR-32 | Repository hygiene cleanup" in status
+    assert "current next because PR #46 merged and tracked generated metadata should be removed" in status
+    assert "PR-33 or later | Chain-template explicit environment modifier assembly or focused solver diagnostics" in status
+    assert "Future | VALIDATION-DATA-001" in status
 
 
 def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> None:
@@ -313,7 +317,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-31: registry-backed explicit environment modifier assembly"
+    current_next = "PR-32: repository hygiene cleanup"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -343,11 +347,12 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-28" not in _current_next_lines(text)
         assert "PR-29" not in _current_next_lines(text)
         assert "PR-30" not in _current_next_lines(text)
+        assert "PR-31" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
     assert "Status: `deferred; blocked/partial` for ingestion." in gate
-    assert "The selected PR-31 work is therefore build-first\nregistry-backed explicit environment modifier assembly" in gate
+    assert "The selected PR-32 work is therefore repository hygiene cleanup" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate

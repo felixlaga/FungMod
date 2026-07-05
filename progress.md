@@ -26,6 +26,41 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-32 Repository Hygiene Cleanup
+
+Date: 2026-07-05
+
+Status: `complete` for the scoped repository hygiene cleanup once merged; no
+scientific, numerical, solver, notebook-output, validation-data, calibration,
+or biology behavior changed.
+
+Completed in this pass:
+
+- Removed the tracked generated macOS metadata files `.DS_Store`,
+  `data/.DS_Store`, `data/experiments/.DS_Store`,
+  `data/experiments/synthetic/.DS_Store`,
+  `foundation_progress/.DS_Store`, `notebooks/.DS_Store`,
+  `notebooks/examples/.DS_Store`, `old_progress/.DS_Store`, and
+  `src/.DS_Store`.
+- Updated `.gitignore` so `.DS_Store` files and notebook checkpoint
+  directories remain untracked in future worktrees.
+- Added `tests/test_repository_hygiene.py` to assert that generated metadata
+  files such as `.DS_Store`, `.pyc`, `__pycache__`, and
+  `.ipynb_checkpoints` are not tracked by git.
+- Updated the active roadmap/status current-next wording after PR #46 so
+  PR-31 is treated as merged and this cleanup slice is the machine-checkable
+  PR-32 current next item until this PR merges.
+
+No `old_progress/` content, scientific fixtures, validation datasets, notebook
+outputs, solver behavior, response-law behavior, calibration path, or biology
+records were changed or deleted beyond the tracked `.DS_Store` metadata file.
+
+Recommended next task: after PR-32 merges, choose a scoped PR-33 simulator
+building slice such as chain-template explicit environment modifier assembly,
+or a focused solver diagnostics slice. Revisit VALIDATION-DATA-001 only if
+source-backed numeric time-course observations satisfying the active evidence
+gate are available.
+
 ## PR-30 Configured Oxygen And Water-Activity Modifier Example Notebook
 
 Date: 2026-07-05
@@ -74,8 +109,8 @@ available; otherwise choose the next small build-first simulator/output slice.
 
 Date: 2026-07-05
 
-Status: `current next` for the scoped PR-31 registry-backed explicit
-environment modifier assembly slice until merged; broader environment-response
+Status: `complete` for the scoped PR-31 registry-backed explicit environment
+modifier assembly slice after PR #46 merged; broader environment-response
 biology remains explicit-config only, chain-template environment modifier
 support remains a follow-up, and VALIDATION-DATA-001 remains `deferred;
 blocked/partial` for ingestion.
@@ -114,10 +149,11 @@ transfer, redox balance, anaerobic metabolism, substrate water-binding model,
 EnvironmentGrid behavior change, new response law, solver-time thermodynamic
 enforcement, hidden notebook science, or silent fallback constant was added.
 
-Recommended next task: keep PR-31 as current next until merged; after merge,
-choose a scoped follow-up such as chain-template explicit environment modifier
-assembly, or revisit VALIDATION-DATA-001 only if source-backed numeric
-time-course observations satisfying the active evidence gate are available.
+Recommended next task: complete the scoped PR-32 repository hygiene cleanup,
+then choose a scoped follow-up such as chain-template explicit environment
+modifier assembly, or revisit VALIDATION-DATA-001 only if source-backed
+numeric time-course observations satisfying the active evidence gate are
+available.
 
 ## PR-29 Explicit Oxygen And Water-Activity Configured Modifiers
 

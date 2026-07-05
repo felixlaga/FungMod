@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-30 after PR #45 merged, with PR-31 selected:
+Scoped status as of PR-31 after PR #46 merged, with PR-32 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -134,7 +134,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-31: registry-backed explicit environment modifier assembly**.
+Current next PR: **PR-32: repository hygiene cleanup**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -148,16 +148,17 @@ a build-first configured environment-modifier slice that wires existing
 processes with explicit parameters and environment values, PR-28 completed
 a public configured-workflow example notebook for those modifiers after
 PR #43 merged, PR-29 completed the explicit `oxygen_monod` and
-`water_activity_threshold` configured modifier wiring after PR #44 merged, and
+`water_activity_threshold` configured modifier wiring after PR #44 merged,
 PR-30 completed the configured oxygen/water-activity example notebook after
-PR #45 merged. The selected PR-31 work is now a build-first registry-backed
-explicit environment modifier assembly slice that bridges explicit
-case-template records to those existing package paths, without validation
+PR #45 merged, and PR-31 completed the one-process registry-backed explicit
+environment modifier assembly slice after PR #46 merged. The selected PR-32
+work is now repository hygiene cleanup: removing tracked generated metadata,
+preventing recurrence, and adding a focused guardrail test without validation
 data, calibration, empirical comparison, fitted curves, silent fallback
 constants, inferred environment responses, oxygen consumption, gas transfer,
 redox balance, anaerobic metabolism, substrate water-binding behavior,
-EnvironmentGrid behavior changes, hidden notebook science, or new biology
-claims.
+EnvironmentGrid behavior changes, hidden notebook science, solver/model
+behavior changes, or new biology claims.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer
