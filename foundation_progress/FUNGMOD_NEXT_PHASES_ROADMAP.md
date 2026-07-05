@@ -68,8 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is a scoped PR-30 configured oxygen and water-activity
-modifier example notebook slice after the registry-backed
+The current next PR is a scoped PR-31 registry-backed explicit environment
+modifier assembly slice after the registry-backed
 product-inhibition assembly and researcher-facing example, validation
 ingestion gate, build-first reframe,
 PRODUCT-001 public API/output slices including the PR-08 Markdown report
@@ -91,7 +91,8 @@ thermodynamic diagnostics bridge, the PR-26 THERMO-003
 virtual-experiment thermodynamic diagnostics example notebook, the PR-27
 explicit configured environmental rate-modifier wiring slice, and the PR-28
 configured environment modifier example notebook slice, and the PR-29
-explicit oxygen/water-activity configured modifier wiring slice. The completed
+explicit oxygen/water-activity configured modifier wiring slice, and the PR-30
+configured oxygen/water-activity modifier example notebook slice. The completed
 PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -132,7 +133,7 @@ fitted oxygen or water-activity response curves, organism-specific physiology,
 inferred environment response, oxygen consumption state, gas transfer, redox
 balance, anaerobic metabolism, substrate water-binding model, EnvironmentGrid
 behavior change, hidden notebook science, thermodynamic enforcement, or silent
-fallback constants. The PR-30 slice should add public configured-workflow
+fallback constants. The completed PR-30 slice added public configured-workflow
 example notebook coverage for those explicit oxygen and water-activity
 modifiers through package APIs and configured outputs, using artificial
 framework-benchmark config values only, without validation data, calibration,
@@ -141,7 +142,17 @@ organism-specific physiology, inferred environment response, oxygen
 consumption state, gas transfer, redox balance, anaerobic metabolism,
 substrate water-binding model, EnvironmentGrid behavior change, hidden
 notebook science, thermodynamic enforcement, solver/model behavior changes, or
-silent fallback constants.
+silent fallback constants. The PR-31 slice should bridge explicit one-process
+registry case-template modifier records to the existing configured
+`temperature_arrhenius_reference`, `ph_gaussian`, `oxygen_monod`, and
+`water_activity_threshold` response-law support, emitting package-generated
+environment entities only from exact registry environment values when required
+and failing before execution for missing fields, unresolved roles, missing or
+non-exact environment conditions, or unsupported modifier types. It must not
+infer parameters, fit curves, add validation data, oxygen consumption, gas
+transfer, redox, anaerobic metabolism, substrate water-binding behavior,
+EnvironmentGrid behavior changes, hidden notebook science, or silent fallback
+constants.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -199,8 +210,9 @@ satisfies the active evidence requirements in
 current candidate reviews do not satisfy that gate, PR-28 is complete as
 build-first configured environment-modifier example-notebook work, PR-29 is
 complete as build-first configured oxygen/water-activity modifier wiring after
-PR #44, and PR-30 is deliberately build-first configured
-oxygen/water-activity example-notebook coverage rather than ingestion,
+PR #44, PR-30 is complete as build-first configured oxygen/water-activity
+example-notebook coverage after PR #45, and PR-31 is deliberately build-first
+registry-backed explicit environment modifier assembly rather than ingestion,
 digitization, or fabricated validation data.
 
 Validation remains important, but it is now deliberately deferred behind core

@@ -10,6 +10,7 @@ from typing import Any, Literal
 from fungal_model.io.model_config import ModelConfig
 from fungal_model.registry.records import (
     CaseTemplateRecord,
+    EnvironmentRecord,
     ParameterRecord,
     ProcessCompatibilityRecord,
     SubstrateRecord,
@@ -39,6 +40,14 @@ EXTRACELLULAR_ENZYME_CHAIN_PARAMETER_ROLES = (
     "accessible_surface_area",
     "km",
     "kcat",
+)
+ENVIRONMENT_MODIFIER_TYPES = frozenset(
+    {
+        "temperature_arrhenius_reference",
+        "ph_gaussian",
+        "oxygen_monod",
+        "water_activity_threshold",
+    }
 )
 
 
@@ -447,6 +456,8 @@ def _template_process_modifiers(
     *,
     case_template: CaseTemplateRecord,
     parameter_records: Mapping[str, ParameterRecord],
+    registry: FungModRegistry,
+    environment_id: str,
 ) -> list[dict[str, Any]]:
     modifiers = case_template.process_state_metadata.get("process_modifiers")
     if modifiers is None:
@@ -458,39 +469,367 @@ def _template_process_modifiers(
     configured: list[dict[str, Any]] = []
     for index, modifier in enumerate(modifiers):
         modifier_type = str(modifier.get("type", "")).strip()
-        if modifier_type != "product_inhibition":
-            raise RegistryCaseBuildError(
-                f"Case template {case_template.case_template_id!r} declares unsupported modifier type "
-                f"{modifier_type!r}."
+        if modifier_type == "product_inhibition":
+            configured.append(
+                _template_product_inhibition_modifier(
+                    case_template=case_template,
+                    parameter_records=parameter_records,
+                    modifier=modifier,
+                    index=index,
+                )
             )
-        product_role = str(modifier.get("product_state_role", "")).strip()
-        if not product_role:
-            raise RegistryCaseBuildError(
-                f"Case template {case_template.case_template_id!r} process_modifiers[{index}] requires "
-                "product_state_role."
+            continue
+        if modifier_type in ENVIRONMENT_MODIFIER_TYPES:
+            configured.append(
+                _template_environment_modifier(
+                    case_template=case_template,
+                    parameter_records=parameter_records,
+                    registry=registry,
+                    environment_id=environment_id,
+                    modifier=modifier,
+                    modifier_type=modifier_type,
+                    index=index,
+                )
             )
-        product_state = _template_state(case_template, product_role)
-        inhibition_role = str(modifier.get("inhibition_constant_role", "")).strip()
-        if not inhibition_role:
-            raise RegistryCaseBuildError(
-                f"Case template {case_template.case_template_id!r} process_modifiers[{index}] requires "
-                "inhibition_constant_role."
-            )
-        try:
-            inhibition_constant = parameter_records[inhibition_role].parameter_symbol
-        except KeyError as exc:
-            raise RegistryCaseBuildError(
-                f"Case template {case_template.case_template_id!r} modifier references unresolved "
-                f"inhibition_constant_role {inhibition_role!r}."
-            ) from exc
-        configured.append(
-            {
-                "type": "product_inhibition",
-                "product_state": product_state,
-                "inhibition_constant": inhibition_constant,
-            }
+            continue
+        raise RegistryCaseBuildError(
+            f"Case template {case_template.case_template_id!r} declares unsupported modifier type "
+            f"{modifier_type!r}."
         )
     return configured
+
+
+def _template_product_inhibition_modifier(
+    *,
+    case_template: CaseTemplateRecord,
+    parameter_records: Mapping[str, ParameterRecord],
+    modifier: Mapping[str, Any],
+    index: int,
+) -> dict[str, Any]:
+    product_role = str(modifier.get("product_state_role", "")).strip()
+    if not product_role:
+        raise RegistryCaseBuildError(
+            f"Case template {case_template.case_template_id!r} process_modifiers[{index}] requires "
+            "product_state_role."
+        )
+    inhibition_role = str(modifier.get("inhibition_constant_role", "")).strip()
+    if not inhibition_role:
+        raise RegistryCaseBuildError(
+            f"Case template {case_template.case_template_id!r} process_modifiers[{index}] requires "
+            "inhibition_constant_role."
+        )
+    return {
+        "type": "product_inhibition",
+        "product_state": _template_state(case_template, product_role),
+        "inhibition_constant": _template_parameter_symbol(
+            case_template=case_template,
+            parameter_records=parameter_records,
+            role=inhibition_role,
+            field_name="inhibition_constant_role",
+        ),
+    }
+
+
+def _template_environment_modifier(
+    *,
+    case_template: CaseTemplateRecord,
+    parameter_records: Mapping[str, ParameterRecord],
+    registry: FungModRegistry,
+    environment_id: str,
+    modifier: Mapping[str, Any],
+    modifier_type: str,
+    index: int,
+) -> dict[str, Any]:
+    if modifier_type == "temperature_arrhenius_reference":
+        _require_exact_environment_condition(
+            registry=registry,
+            environment_id=environment_id,
+            condition_name="temperature",
+            case_template=case_template,
+            modifier_type=modifier_type,
+            index=index,
+        )
+        configured = {
+            "type": modifier_type,
+            "activation_energy_symbol": _required_modifier_role_symbol(
+                case_template=case_template,
+                parameter_records=parameter_records,
+                modifier=modifier,
+                role_field="activation_energy_role",
+                index=index,
+            ),
+            "reference_temperature_symbol": _required_modifier_role_symbol(
+                case_template=case_template,
+                parameter_records=parameter_records,
+                modifier=modifier,
+                role_field="reference_temperature_role",
+                index=index,
+            ),
+        }
+        _add_optional_modifier_role_symbol(
+            configured,
+            "minimum_temperature_symbol",
+            case_template=case_template,
+            parameter_records=parameter_records,
+            modifier=modifier,
+            role_field="minimum_temperature_role",
+        )
+        _add_optional_modifier_role_symbol(
+            configured,
+            "maximum_temperature_symbol",
+            case_template=case_template,
+            parameter_records=parameter_records,
+            modifier=modifier,
+            role_field="maximum_temperature_role",
+        )
+        return configured
+    if modifier_type == "ph_gaussian":
+        _require_exact_environment_condition(
+            registry=registry,
+            environment_id=environment_id,
+            condition_name="ph",
+            case_template=case_template,
+            modifier_type=modifier_type,
+            index=index,
+        )
+        configured = {
+            "type": modifier_type,
+            "optimum_symbol": _required_modifier_role_symbol(
+                case_template=case_template,
+                parameter_records=parameter_records,
+                modifier=modifier,
+                role_field="optimum_role",
+                index=index,
+            ),
+            "width_symbol": _required_modifier_role_symbol(
+                case_template=case_template,
+                parameter_records=parameter_records,
+                modifier=modifier,
+                role_field="width_role",
+                index=index,
+            ),
+        }
+        _add_optional_modifier_role_symbol(
+            configured,
+            "minimum_ph_symbol",
+            case_template=case_template,
+            parameter_records=parameter_records,
+            modifier=modifier,
+            role_field="minimum_ph_role",
+        )
+        _add_optional_modifier_role_symbol(
+            configured,
+            "maximum_ph_symbol",
+            case_template=case_template,
+            parameter_records=parameter_records,
+            modifier=modifier,
+            role_field="maximum_ph_role",
+        )
+        return configured
+    if modifier_type == "oxygen_monod":
+        _require_exact_environment_condition(
+            registry=registry,
+            environment_id=environment_id,
+            condition_name="oxygen_concentration",
+            case_template=case_template,
+            modifier_type=modifier_type,
+            index=index,
+        )
+        oxygen_units = str(modifier.get("oxygen_units", "")).strip()
+        if not oxygen_units:
+            raise RegistryCaseBuildError(
+                f"Case template {case_template.case_template_id!r} process_modifiers[{index}] "
+                "requires oxygen_units."
+            )
+        return {
+            "type": modifier_type,
+            "half_saturation_symbol": _required_modifier_role_symbol(
+                case_template=case_template,
+                parameter_records=parameter_records,
+                modifier=modifier,
+                role_field="half_saturation_role",
+                index=index,
+            ),
+            "oxygen_units": oxygen_units,
+        }
+    if modifier_type == "water_activity_threshold":
+        _require_exact_environment_condition(
+            registry=registry,
+            environment_id=environment_id,
+            condition_name="water_activity",
+            case_template=case_template,
+            modifier_type=modifier_type,
+            index=index,
+        )
+        return {
+            "type": modifier_type,
+            "minimum_water_activity_symbol": _required_modifier_role_symbol(
+                case_template=case_template,
+                parameter_records=parameter_records,
+                modifier=modifier,
+                role_field="minimum_water_activity_role",
+                index=index,
+            ),
+        }
+    raise RegistryCaseBuildError(
+        f"Case template {case_template.case_template_id!r} declares unsupported modifier type "
+        f"{modifier_type!r}."
+    )
+
+
+def _required_modifier_role_symbol(
+    *,
+    case_template: CaseTemplateRecord,
+    parameter_records: Mapping[str, ParameterRecord],
+    modifier: Mapping[str, Any],
+    role_field: str,
+    index: int,
+) -> str:
+    role = str(modifier.get(role_field, "")).strip()
+    if not role:
+        raise RegistryCaseBuildError(
+            f"Case template {case_template.case_template_id!r} process_modifiers[{index}] requires "
+            f"{role_field}."
+        )
+    return _template_parameter_symbol(
+        case_template=case_template,
+        parameter_records=parameter_records,
+        role=role,
+        field_name=role_field,
+    )
+
+
+def _add_optional_modifier_role_symbol(
+    configured: dict[str, Any],
+    symbol_field: str,
+    *,
+    case_template: CaseTemplateRecord,
+    parameter_records: Mapping[str, ParameterRecord],
+    modifier: Mapping[str, Any],
+    role_field: str,
+) -> None:
+    role = str(modifier.get(role_field, "")).strip()
+    if not role:
+        return
+    configured[symbol_field] = _template_parameter_symbol(
+        case_template=case_template,
+        parameter_records=parameter_records,
+        role=role,
+        field_name=role_field,
+    )
+
+
+def _template_parameter_symbol(
+    *,
+    case_template: CaseTemplateRecord,
+    parameter_records: Mapping[str, ParameterRecord],
+    role: str,
+    field_name: str,
+) -> str:
+    try:
+        return parameter_records[role].parameter_symbol
+    except KeyError as exc:
+        raise RegistryCaseBuildError(
+            f"Case template {case_template.case_template_id!r} modifier references unresolved "
+            f"{field_name} {role!r}."
+        ) from exc
+
+
+def _require_exact_environment_condition(
+    *,
+    registry: FungModRegistry,
+    environment_id: str,
+    condition_name: str,
+    case_template: CaseTemplateRecord,
+    modifier_type: str,
+    index: int,
+) -> None:
+    environment = registry.get_environment(environment_id)
+    value = environment.conditions.get(condition_name)
+    if value is None:
+        raise RegistryCaseBuildError(
+            f"Case template {case_template.case_template_id!r} process_modifiers[{index}] "
+            f"{modifier_type!r} requires environment condition {condition_name!r} in "
+            f"environment {environment_id!r}."
+        )
+    if not value.is_exact:
+        raise RegistryCaseBuildError(
+            f"Case template {case_template.case_template_id!r} process_modifiers[{index}] "
+            f"{modifier_type!r} requires exact environment condition {condition_name!r}; "
+            f"environment {environment_id!r} has ValueSpec kind {value.kind!r}."
+        )
+    validation = value.validate(nonnegative=condition_name in {"oxygen_concentration", "water_activity"})
+    if not validation.passed or value.value is None or value.units is None:
+        raise RegistryCaseBuildError(
+            f"Environment condition {condition_name!r} for environment {environment_id!r} "
+            f"failed exact ValueSpec validation: {validation.to_dict()}."
+        )
+
+
+def _template_environment_entity(
+    *,
+    registry: FungModRegistry,
+    environment_id: str,
+    modifiers: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    required_conditions = _required_environment_conditions(modifiers)
+    if not required_conditions:
+        return None
+    environment = registry.get_environment(environment_id)
+    return {
+        "id": environment_id,
+        "data": {
+            "kind": "environment",
+            "name": environment.name,
+            "provenance": {
+                **dict(environment.provenance),
+                "source": _environment_source(environment, required_conditions),
+            },
+            "conditions": {
+                condition: environment.conditions[condition].to_dict()
+                for condition in required_conditions
+            },
+            "notes": environment.notes,
+        },
+    }
+
+
+def _required_environment_conditions(modifiers: list[dict[str, Any]]) -> tuple[str, ...]:
+    conditions: list[str] = []
+    for modifier in modifiers:
+        modifier_type = str(modifier.get("type", "")).strip()
+        if modifier_type == "temperature_arrhenius_reference":
+            conditions.append("temperature")
+        elif modifier_type == "ph_gaussian":
+            conditions.append("ph")
+        elif modifier_type == "oxygen_monod":
+            conditions.append("oxygen_concentration")
+        elif modifier_type == "water_activity_threshold":
+            conditions.append("water_activity")
+    return tuple(dict.fromkeys(conditions))
+
+
+def _environment_source(environment: EnvironmentRecord, required_conditions: tuple[str, ...]) -> str:
+    provenance_source = str(environment.provenance.get("source", "")).strip()
+    if provenance_source:
+        return provenance_source
+    condition_sources = {
+        str(environment.conditions[condition].source or "").strip()
+        for condition in required_conditions
+    }
+    condition_sources.discard("")
+    if len(condition_sources) == 1:
+        return next(iter(condition_sources))
+    source_database = str(environment.provenance.get("source_database", "")).strip()
+    source_reaction_id = str(environment.provenance.get("source_reaction_id", "")).strip()
+    if source_database and source_reaction_id:
+        return f"{source_database} reaction {source_reaction_id}"
+    if source_database:
+        return source_database
+    raise RegistryCaseBuildError(
+        f"Environment record {environment.record_id!r} cannot provide a source for configured "
+        "environment modifier assembly."
+    )
 
 
 def _template_config_name(
@@ -557,6 +896,64 @@ def _surface_catalysis_config_data(
         parameter_records=parameter_records,
         bio001=bio001,
     )
+    modifiers = _template_process_modifiers(
+        case_template=case_template,
+        parameter_records=parameter_records,
+        registry=registry,
+        environment_id=environment_id,
+    )
+    environment_entity = _template_environment_entity(
+        registry=registry,
+        environment_id=environment_id,
+        modifiers=modifiers,
+    )
+    entities: dict[str, Any] = {
+        "geometry": {
+            "id": "geometry",
+            "loader": "well_mixed",
+            "data": _template_geometry_data(
+                case_template,
+                fallback=_bio001_geometry_data() if bio001 else _toy_geometry_data(),
+            ),
+        },
+        "substrates": [
+            {
+                "id": substrate_id,
+                "loader": "generic_solid",
+                "data": _surface_substrate_data(
+                    substrate=substrate,
+                    enzyme_class=compatibility.enzyme_class,
+                    provenance=provenance,
+                    bio001=bio001,
+                ),
+            }
+        ],
+        "enzymes": [
+            {
+                "id": compatibility.enzyme_class,
+                "data": _surface_enzyme_data(
+                    compatibility=compatibility,
+                    substrate=substrate,
+                    provenance=provenance,
+                    bio001=bio001,
+                ),
+            }
+        ],
+        "product_maps": [
+            _product_map_entity(
+                case_template=case_template,
+                provenance=provenance,
+                name=(
+                    "BIO-001 cellulose soluble product release map"
+                    if bio001
+                    else "toy registry one-to-one product release map"
+                ),
+                maturity="exploratory" if bio001 else "framework_benchmark",
+            )
+        ],
+    }
+    if environment_entity is not None:
+        entities["environment"] = environment_entity
     return {
         "kind": "model_config",
         "name": _template_config_name(
@@ -569,51 +966,7 @@ def _surface_catalysis_config_data(
         "maturity": _template_config_maturity(case_template, fallback="exploratory" if bio001 else "framework_benchmark"),
         "provenance": provenance,
         "case_template": _case_template_config(case_template),
-        "entities": {
-            "geometry": {
-                "id": "geometry",
-                "loader": "well_mixed",
-                "data": _template_geometry_data(
-                    case_template,
-                    fallback=_bio001_geometry_data() if bio001 else _toy_geometry_data(),
-                ),
-            },
-            "substrates": [
-                {
-                    "id": substrate_id,
-                    "loader": "generic_solid",
-                    "data": _surface_substrate_data(
-                        substrate=substrate,
-                        enzyme_class=compatibility.enzyme_class,
-                        provenance=provenance,
-                        bio001=bio001,
-                    ),
-                }
-            ],
-            "enzymes": [
-                {
-                    "id": compatibility.enzyme_class,
-                    "data": _surface_enzyme_data(
-                        compatibility=compatibility,
-                        substrate=substrate,
-                        provenance=provenance,
-                        bio001=bio001,
-                    ),
-                }
-            ],
-            "product_maps": [
-                _product_map_entity(
-                    case_template=case_template,
-                    provenance=provenance,
-                    name=(
-                        "BIO-001 cellulose soluble product release map"
-                        if bio001
-                        else "toy registry one-to-one product release map"
-                    ),
-                    maturity="exploratory" if bio001 else "framework_benchmark",
-                )
-            ],
-        },
+        "entities": entities,
         "parameters": [
             {
                 "id": "registry_case_parameters",
@@ -644,10 +997,7 @@ def _surface_catalysis_config_data(
                     if role in SURFACE_CATALYSIS_PARAMETER_ROLES
                 },
                 "product_map": product_map_id,
-                "modifiers": _template_process_modifiers(
-                    case_template=case_template,
-                    parameter_records=parameter_records,
-                ),
+                "modifiers": modifiers,
                 "output_state_roles": dict(case_template.output_state_roles),
                 "assumptions": _process_assumptions(
                     case_template,
@@ -887,6 +1237,50 @@ def _homogeneous_mm_config_data(
         environment_id=environment_id,
         parameter_records=parameter_records,
     )
+    modifiers = _template_process_modifiers(
+        case_template=case_template,
+        parameter_records=parameter_records,
+        registry=registry,
+        environment_id=environment_id,
+    )
+    environment_entity = _template_environment_entity(
+        registry=registry,
+        environment_id=environment_id,
+        modifiers=modifiers,
+    )
+    entities: dict[str, Any] = {
+        "substrates": [
+            {
+                "id": substrate_id,
+                "loader": "generic_dissolved",
+                "data": _homogeneous_substrate_data(
+                    substrate=substrate,
+                    enzyme_class=compatibility.enzyme_class,
+                    provenance=provenance,
+                ),
+            }
+        ],
+        "enzymes": [
+            {
+                "id": compatibility.enzyme_class,
+                "data": _homogeneous_enzyme_data(
+                    compatibility=compatibility,
+                    substrate=substrate,
+                    provenance=provenance,
+                ),
+            }
+        ],
+        "product_maps": [
+            _product_map_entity(
+                case_template=case_template,
+                provenance=provenance,
+                name="SABIO-RK Reaction 618 cellobiose to beta-D-glucose product map",
+                maturity="literature_metadata",
+            )
+        ],
+    }
+    if environment_entity is not None:
+        entities["environment"] = environment_entity
     return {
         "kind": "model_config",
         "name": _template_config_name(
@@ -899,37 +1293,7 @@ def _homogeneous_mm_config_data(
         "maturity": _template_config_maturity(case_template, fallback="scientific"),
         "provenance": provenance,
         "case_template": _case_template_config(case_template),
-        "entities": {
-            "substrates": [
-                {
-                    "id": substrate_id,
-                    "loader": "generic_dissolved",
-                    "data": _homogeneous_substrate_data(
-                        substrate=substrate,
-                        enzyme_class=compatibility.enzyme_class,
-                        provenance=provenance,
-                    ),
-                }
-            ],
-            "enzymes": [
-                {
-                    "id": compatibility.enzyme_class,
-                    "data": _homogeneous_enzyme_data(
-                        compatibility=compatibility,
-                        substrate=substrate,
-                        provenance=provenance,
-                    ),
-                }
-            ],
-            "product_maps": [
-                _product_map_entity(
-                    case_template=case_template,
-                    provenance=provenance,
-                    name="SABIO-RK Reaction 618 cellobiose to beta-D-glucose product map",
-                    maturity="literature_metadata",
-                )
-            ],
-        },
+        "entities": entities,
         "parameters": [
             {
                 "id": "sabiork_reaction_618_parameters",
@@ -954,10 +1318,7 @@ def _homogeneous_mm_config_data(
                     "kcat": parameter_records["kcat"].parameter_symbol,
                     "rate_units": rate_units,
                 },
-                "modifiers": _template_process_modifiers(
-                    case_template=case_template,
-                    parameter_records=parameter_records,
-                ),
+                "modifiers": modifiers,
                 "output_state_roles": dict(case_template.output_state_roles),
                 "assumptions": _process_assumptions(
                     case_template,

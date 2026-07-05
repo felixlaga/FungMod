@@ -34,6 +34,12 @@ def load_parameter_set(path: str | Path) -> ParameterSet:
 
 def load_environment(path: str | Path) -> Environment:
     data = load_yaml_config(path)
+    return environment_from_config(data)
+
+
+def environment_from_config(data: Mapping[str, Any]) -> Environment:
+    """Build an environment entity from an already-loaded config mapping."""
+
     conditions = data.get("conditions", {})
     provenance = data["provenance"]
     return Environment(
@@ -127,6 +133,7 @@ def _quantity(data: Mapping[str, Any] | None):
 
 __all__ = [
     "enzyme_from_config",
+    "environment_from_config",
     "load_enzyme",
     "load_environment",
     "load_fungus",

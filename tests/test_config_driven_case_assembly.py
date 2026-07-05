@@ -217,6 +217,249 @@ def test_one_process_registry_template_emits_configured_product_inhibition_modif
     ]
 
 
+def test_one_process_registry_template_emits_temperature_ph_modifiers(tmp_path: Path) -> None:
+    base_registry = _registry_with_exact_enzyme_concentration(tmp_path / "base")
+    modified_registry_dir = _registry_with_reaction618_environment_modifiers(tmp_path / "modified", modifier_set="temperature_ph")
+    modified_registry = load_registry(modified_registry_dir / "registry_index.yml")
+
+    base_config = build_model_config_from_registry_case(
+        fungus_id=REACTION_FUNGUS_ID,
+        substrate_id=REACTION_SUBSTRATE_ID,
+        environment_id=REACTION_ENVIRONMENT_ID,
+        registry=base_registry,
+        mode="scientific",
+        output_directory=str(tmp_path / "base_outputs"),
+    )
+    modified_config = build_model_config_from_registry_case(
+        fungus_id=REACTION_FUNGUS_ID,
+        substrate_id=REACTION_SUBSTRATE_ID,
+        environment_id=REACTION_ENVIRONMENT_ID,
+        registry=modified_registry,
+        mode="scientific",
+        output_directory=str(tmp_path / "temperature_ph_outputs"),
+    )
+    modified_data = modified_config.to_dict()
+
+    assert modified_data["entities"]["environment"]["id"] == REACTION_ENVIRONMENT_ID
+    assert set(modified_data["entities"]["environment"]["data"]["conditions"]) == {"temperature", "ph"}
+    assert modified_data["processes"][0]["modifiers"] == [
+        {
+            "type": "temperature_arrhenius_reference",
+            "activation_energy_symbol": "E_a_reaction618_env_fixture",
+            "reference_temperature_symbol": "T_ref_reaction618_env_fixture",
+        },
+        {
+            "type": "ph_gaussian",
+            "optimum_symbol": "pH_opt_reaction618_env_fixture",
+            "width_symbol": "pH_width_reaction618_env_fixture",
+        },
+    ]
+
+    base_path = tmp_path / "base_temperature_ph.yml"
+    modified_path = tmp_path / "reaction618_temperature_ph.yml"
+    base_path.write_text(yaml.safe_dump(base_config.to_dict(), sort_keys=False), encoding="utf-8")
+    modified_path.write_text(yaml.safe_dump(modified_data, sort_keys=False), encoding="utf-8")
+    base_result = run_configured_model(base_path, output_dir=tmp_path / "base_outputs")
+    modified_result = run_configured_model(modified_path, output_dir=tmp_path / "temperature_ph_outputs")
+    metadata = json.loads((tmp_path / "temperature_ph_outputs" / "configured_metadata.json").read_text(encoding="utf-8"))
+    environment_snapshot = json.loads(
+        (tmp_path / "temperature_ph_outputs" / "entity_snapshots" / "environment.json").read_text(encoding="utf-8")
+    )
+
+    assert modified_result.process_rates["sabiork_reaction_618_homogeneous_mm"].magnitude[0] != pytest.approx(
+        base_result.process_rates["sabiork_reaction_618_homogeneous_mm"].magnitude[0]
+    )
+    assert environment_snapshot["temperature"]["value"] == pytest.approx(303.15)
+    assert environment_snapshot["ph"]["value"] == pytest.approx(5.0)
+    assert metadata["configured_process_modifiers"] == [
+        {
+            "process_id": "sabiork_reaction_618_homogeneous_mm",
+            "modifier_index": 0,
+            "type": "temperature_arrhenius_reference",
+            "environment_value": "temperature",
+            "activation_energy_symbol": "E_a_reaction618_env_fixture",
+            "reference_temperature_symbol": "T_ref_reaction618_env_fixture",
+            "minimum_temperature_symbol": "",
+            "maximum_temperature_symbol": "",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Arrhenius reference-temperature scaling only; configured only when environment "
+                "temperature and explicit unit-compatible parameters are present."
+            ),
+        },
+        {
+            "process_id": "sabiork_reaction_618_homogeneous_mm",
+            "modifier_index": 1,
+            "type": "ph_gaussian",
+            "environment_value": "ph",
+            "optimum_symbol": "pH_opt_reaction618_env_fixture",
+            "width_symbol": "pH_width_reaction618_env_fixture",
+            "minimum_ph_symbol": "",
+            "maximum_ph_symbol": "",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Gaussian empirical pH activity scaling only; configured only when environment "
+                "pH and explicit unit-compatible parameters are present."
+            ),
+        },
+    ]
+
+
+def test_one_process_registry_template_emits_oxygen_water_activity_modifiers(tmp_path: Path) -> None:
+    registry_dir = _registry_with_reaction618_environment_modifiers(tmp_path, modifier_set="oxygen_water")
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    config = build_model_config_from_registry_case(
+        fungus_id=REACTION_FUNGUS_ID,
+        substrate_id=REACTION_SUBSTRATE_ID,
+        environment_id=REACTION_ENVIRONMENT_ID,
+        registry=registry,
+        mode="scientific",
+        output_directory=str(tmp_path / "oxygen_water_outputs"),
+    )
+    data = config.to_dict()
+
+    assert set(data["entities"]["environment"]["data"]["conditions"]) == {"oxygen_concentration", "water_activity"}
+    assert data["processes"][0]["modifiers"] == [
+        {
+            "type": "oxygen_monod",
+            "half_saturation_symbol": "K_O2_reaction618_env_fixture",
+            "oxygen_units": "mole / liter",
+        },
+        {
+            "type": "water_activity_threshold",
+            "minimum_water_activity_symbol": "a_w_min_reaction618_env_fixture",
+        },
+    ]
+
+    config_path = tmp_path / "reaction618_oxygen_water.yml"
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    result = run_configured_model(config_path, output_dir=tmp_path / "oxygen_water_outputs")
+    metadata = json.loads((tmp_path / "oxygen_water_outputs" / "configured_metadata.json").read_text(encoding="utf-8"))
+
+    assert result.solver_metadata["success"] is True
+    assert metadata["configured_process_modifiers"] == [
+        {
+            "process_id": "sabiork_reaction_618_homogeneous_mm",
+            "modifier_index": 0,
+            "type": "oxygen_monod",
+            "environment_value": "oxygen_concentration",
+            "half_saturation_symbol": "K_O2_reaction618_env_fixture",
+            "oxygen_units": "mole / liter",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Monod oxygen scaling only; configured only when environment oxygen concentration "
+                "and explicit positive unit-compatible half-saturation are present. No oxygen consumption, "
+                "gas transfer, redox balance, or anaerobic metabolism."
+            ),
+        },
+        {
+            "process_id": "sabiork_reaction_618_homogeneous_mm",
+            "modifier_index": 1,
+            "type": "water_activity_threshold",
+            "environment_value": "water_activity",
+            "minimum_water_activity_symbol": "a_w_min_reaction618_env_fixture",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Binary water-activity threshold scaling only; configured only when environment water activity "
+                "and an explicit unit-compatible threshold parameter are present. No smooth response curve, "
+                "hysteresis, substrate water binding, or spatial moisture model."
+            ),
+        },
+    ]
+
+
+def test_one_process_registry_environment_modifier_requires_resolved_role(tmp_path: Path) -> None:
+    registry_dir = _registry_with_reaction618_environment_modifiers(
+        tmp_path,
+        modifier_set="temperature_ph",
+        ph_width_role="missing_ph_width_role",
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(RegistryCaseBuildError, match="width_role 'missing_ph_width_role'"):
+        build_model_config_from_registry_case(
+            fungus_id=REACTION_FUNGUS_ID,
+            substrate_id=REACTION_SUBSTRATE_ID,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            registry=registry,
+            mode="scientific",
+            output_directory=str(tmp_path / "missing_role"),
+        )
+
+
+def test_one_process_registry_environment_modifier_requires_environment_condition(tmp_path: Path) -> None:
+    registry_dir = _registry_with_reaction618_environment_modifiers(
+        tmp_path,
+        modifier_set="oxygen_water",
+        include_environment_oxygen=False,
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(RegistryCaseBuildError, match="requires environment condition 'oxygen_concentration'"):
+        build_model_config_from_registry_case(
+            fungus_id=REACTION_FUNGUS_ID,
+            substrate_id=REACTION_SUBSTRATE_ID,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            registry=registry,
+            mode="scientific",
+            output_directory=str(tmp_path / "missing_environment_oxygen"),
+        )
+
+
+def test_one_process_registry_environment_modifier_requires_exact_environment_value(tmp_path: Path) -> None:
+    registry_dir = _registry_with_reaction618_environment_modifiers(
+        tmp_path,
+        modifier_set="temperature_ph",
+        ph_value_kind="range",
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(RegistryCaseBuildError, match="requires exact environment condition 'ph'"):
+        build_model_config_from_registry_case(
+            fungus_id=REACTION_FUNGUS_ID,
+            substrate_id=REACTION_SUBSTRATE_ID,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            registry=registry,
+            mode="scientific",
+            output_directory=str(tmp_path / "non_exact_ph"),
+        )
+
+
+def test_one_process_registry_oxygen_modifier_requires_units_field(tmp_path: Path) -> None:
+    registry_dir = _registry_with_reaction618_environment_modifiers(
+        tmp_path,
+        modifier_set="oxygen_water",
+        include_oxygen_units=False,
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(RegistryCaseBuildError, match="requires oxygen_units"):
+        build_model_config_from_registry_case(
+            fungus_id=REACTION_FUNGUS_ID,
+            substrate_id=REACTION_SUBSTRATE_ID,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            registry=registry,
+            mode="scientific",
+            output_directory=str(tmp_path / "missing_oxygen_units"),
+        )
+
+
+def test_one_process_registry_environment_modifier_rejects_unsupported_type(tmp_path: Path) -> None:
+    registry_dir = _registry_with_reaction618_environment_modifiers(tmp_path, modifier_set="unsupported")
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(RegistryCaseBuildError, match="unsupported modifier type 'temperature_magic'"):
+        build_model_config_from_registry_case(
+            fungus_id=REACTION_FUNGUS_ID,
+            substrate_id=REACTION_SUBSTRATE_ID,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            registry=registry,
+            mode="scientific",
+            output_directory=str(tmp_path / "unsupported_environment_modifier"),
+        )
+
+
 def test_one_process_registry_product_inhibition_requires_explicit_ki_record(tmp_path: Path) -> None:
     registry_dir = _registry_with_reaction618_process_modifier(tmp_path, include_ki_record=False)
     registry = load_registry(registry_dir / "registry_index.yml")
@@ -488,6 +731,247 @@ def _registry_with_reaction618_process_modifier(
     return registry_dir
 
 
+def _registry_with_reaction618_environment_modifiers(
+    tmp_path: Path,
+    *,
+    modifier_set: str,
+    ph_width_role: str = "ph_width",
+    include_environment_oxygen: bool = True,
+    include_oxygen_units: bool = True,
+    ph_value_kind: str = "exact",
+) -> Path:
+    registry_dir = _copy_registry(tmp_path)
+
+    template_path = registry_dir / "case_templates" / "case_templates.yml"
+    template_data = _yaml_mapping(template_path)
+    for record in cast(list[dict[str, Any]], template_data["records"]):
+        if record["record_id"] == "sabiork_reaction_618_homogeneous_mm_template":
+            if modifier_set == "temperature_ph":
+                record["process_state_metadata"]["process_modifiers"] = [
+                    {
+                        "type": "temperature_arrhenius_reference",
+                        "activation_energy_role": "activation_energy",
+                        "reference_temperature_role": "reference_temperature",
+                    },
+                    {
+                        "type": "ph_gaussian",
+                        "optimum_role": "ph_optimum",
+                        "width_role": ph_width_role,
+                    },
+                ]
+            elif modifier_set == "oxygen_water":
+                oxygen_modifier = {
+                    "type": "oxygen_monod",
+                    "half_saturation_role": "oxygen_half_saturation",
+                }
+                if include_oxygen_units:
+                    oxygen_modifier["oxygen_units"] = "mole / liter"
+                record["process_state_metadata"]["process_modifiers"] = [
+                    oxygen_modifier,
+                    {
+                        "type": "water_activity_threshold",
+                        "minimum_water_activity_role": "minimum_water_activity",
+                    },
+                ]
+            elif modifier_set == "unsupported":
+                record["process_state_metadata"]["process_modifiers"] = [
+                    {
+                        "type": "temperature_magic",
+                        "activation_energy_role": "activation_energy",
+                    }
+                ]
+            else:
+                raise AssertionError(f"Unknown modifier set {modifier_set!r}")
+            break
+    else:
+        raise AssertionError("Missing Reaction 618 case template")
+    template_path.write_text(yaml.safe_dump(template_data, sort_keys=False), encoding="utf-8")
+
+    compatibility_path = registry_dir / "processes" / "process_compatibility.yml"
+    compatibility_data = _yaml_mapping(compatibility_path)
+    for record in cast(list[dict[str, Any]], compatibility_data["records"]):
+        if record["record_id"] == "beta_glucosidase_cellobiose_homogeneous_mm":
+            if modifier_set == "temperature_ph":
+                _add_role_mapping(record, "activation_energy", "E_a_reaction618_env_fixture")
+                _add_role_mapping(record, "reference_temperature", "T_ref_reaction618_env_fixture")
+                _add_role_mapping(record, "ph_optimum", "pH_opt_reaction618_env_fixture")
+                _add_role_mapping(record, "ph_width", "pH_width_reaction618_env_fixture")
+            else:
+                _add_role_mapping(record, "oxygen_half_saturation", "K_O2_reaction618_env_fixture")
+                _add_role_mapping(record, "minimum_water_activity", "a_w_min_reaction618_env_fixture")
+            break
+    else:
+        raise AssertionError("Missing Reaction 618 process compatibility")
+    compatibility_path.write_text(yaml.safe_dump(compatibility_data, sort_keys=False), encoding="utf-8")
+
+    parameter_path = registry_dir / "parameters" / "parameter_records.yml"
+    parameter_data = _yaml_mapping(parameter_path)
+    parameter_records = cast(list[dict[str, Any]], parameter_data["records"])
+    _set_reaction618_enzyme_concentration_exact(parameter_records)
+    if modifier_set == "temperature_ph":
+        parameter_records[0:0] = [
+            _environment_modifier_parameter_record(
+                record_id="reaction618_activation_energy_fixture",
+                name="Reaction 618 Arrhenius activation energy fixture",
+                symbol="E_a_reaction618_env_fixture",
+                value=50000.0,
+                units="joule / mole",
+                notes="Artificial activation energy for registry environment-modifier tests; not a fitted response.",
+            ),
+            _environment_modifier_parameter_record(
+                record_id="reaction618_reference_temperature_fixture",
+                name="Reaction 618 Arrhenius reference temperature fixture",
+                symbol="T_ref_reaction618_env_fixture",
+                value=293.15,
+                units="kelvin",
+                notes="Artificial reference temperature for registry environment-modifier tests; not a fitted response.",
+            ),
+            _environment_modifier_parameter_record(
+                record_id="reaction618_ph_optimum_fixture",
+                name="Reaction 618 pH optimum fixture",
+                symbol="pH_opt_reaction618_env_fixture",
+                value=6.0,
+                units="dimensionless",
+                notes="Artificial pH optimum for registry environment-modifier tests; not a fitted response.",
+            ),
+            _environment_modifier_parameter_record(
+                record_id="reaction618_ph_width_fixture",
+                name="Reaction 618 pH width fixture",
+                symbol="pH_width_reaction618_env_fixture",
+                value=1.5,
+                units="dimensionless",
+                notes="Artificial pH width for registry environment-modifier tests; not a fitted response.",
+            ),
+        ]
+    else:
+        parameter_records[0:0] = [
+            _environment_modifier_parameter_record(
+                record_id="reaction618_oxygen_half_saturation_fixture",
+                name="Reaction 618 oxygen half-saturation fixture",
+                symbol="K_O2_reaction618_env_fixture",
+                value=0.25,
+                units="mole / liter",
+                notes="Artificial oxygen half-saturation for registry modifier tests; not oxygen physiology.",
+            ),
+            _environment_modifier_parameter_record(
+                record_id="reaction618_minimum_water_activity_fixture",
+                name="Reaction 618 minimum water-activity fixture",
+                symbol="a_w_min_reaction618_env_fixture",
+                value=0.9,
+                units="dimensionless",
+                notes="Artificial water-activity threshold for registry modifier tests; not a fitted moisture response.",
+            ),
+        ]
+    parameter_path.write_text(yaml.safe_dump(parameter_data, sort_keys=False), encoding="utf-8")
+
+    environment_path = registry_dir / "environments" / "environments.yml"
+    environment_data = _yaml_mapping(environment_path)
+    for record in cast(list[dict[str, Any]], environment_data["records"]):
+        if record["record_id"] == REACTION_ENVIRONMENT_ID:
+            conditions = cast(dict[str, Any], record["conditions"])
+            if ph_value_kind == "range":
+                conditions["ph"] = {
+                    "kind": "range",
+                    "lower": 4.5,
+                    "upper": 5.5,
+                    "units": "dimensionless",
+                    "source": "FungMod PR-31 non-exact environment fixture.",
+                    "confidence_level": "testing",
+                    "notes": "Range value used only to prove registry builder rejects non-exact modifier environments.",
+                }
+            if modifier_set == "oxygen_water":
+                if include_environment_oxygen:
+                    conditions["oxygen_concentration"] = {
+                        "kind": "exact",
+                        "value": 0.25,
+                        "units": "mole / liter",
+                        "source": "FungMod PR-31 oxygen-water environment fixture.",
+                        "confidence_level": "testing",
+                        "notes": "Artificial oxygen concentration for configured modifier mechanics only.",
+                    }
+                conditions["water_activity"] = {
+                    "kind": "exact",
+                    "value": 0.98,
+                    "units": "dimensionless",
+                    "source": "FungMod PR-31 oxygen-water environment fixture.",
+                    "confidence_level": "testing",
+                    "notes": "Artificial water activity for configured modifier mechanics only.",
+                }
+            break
+    else:
+        raise AssertionError("Missing Reaction 618 environment")
+    environment_path.write_text(yaml.safe_dump(environment_data, sort_keys=False), encoding="utf-8")
+    return registry_dir
+
+
+def _add_role_mapping(record: dict[str, Any], role: str, symbol: str) -> None:
+    parameter_roles = cast(dict[str, str], record["parameter_roles"])
+    parameter_roles[role] = symbol
+    required_parameters = cast(list[str], record["required_parameters"])
+    if symbol not in required_parameters:
+        required_parameters.append(symbol)
+
+
+def _set_reaction618_enzyme_concentration_exact(parameter_records: list[dict[str, Any]]) -> None:
+    for record in parameter_records:
+        if (
+            record.get("parameter_symbol") == ENZYME_CONCENTRATION_SYMBOL
+            and record.get("process_type") == "homogeneous_michaelis_menten"
+            and record.get("maturity") == "literature_processed"
+        ):
+            record["value"] = {
+                "kind": "exact",
+                "value": 0.01,
+                "units": "mM",
+                "source": "Local deterministic enzyme concentration fixture",
+                "confidence_level": "synthetic_control",
+                "notes": "Used only to exercise homogeneous builder mechanics; not a SABIO-RK value.",
+            }
+            return
+    raise AssertionError("Missing enzyme concentration record")
+
+
+def _environment_modifier_parameter_record(
+    *,
+    record_id: str,
+    name: str,
+    symbol: str,
+    value: float,
+    units: str,
+    notes: str,
+) -> dict[str, Any]:
+    return {
+        "record_id": record_id,
+        "name": name,
+        "maturity": "software_test_fixture",
+        "provenance": {
+            "source": "FungMod PR-31 registry environment-modifier software test fixture.",
+            "confidence_level": "testing",
+            "bio_milestone": "PR-31",
+            "notes": notes,
+        },
+        "parameter_symbol": symbol,
+        "process_type": "homogeneous_michaelis_menten",
+        "enzyme_class": None,
+        "substrate_class": None,
+        "fungus_id": None,
+        "substrate_id": None,
+        "environment_id": None,
+        "value": {
+            "kind": "exact",
+            "value": value,
+            "units": units,
+            "source": "FungMod PR-31 registry environment-modifier software test fixture.",
+            "confidence_level": "testing",
+            "notes": notes,
+        },
+        "range_scope": "software_test_fixture",
+        "range_interpretation": "configured mechanics only",
+        "allowed_use": "scientific_builder_software_testing_only_not_scientific_validation",
+        "notes": notes,
+    }
+
+
 def _registry_with_exact_enzyme_concentration(tmp_path: Path):
     registry_dir = _copy_registry(tmp_path)
     parameters_path = registry_dir / "parameters" / "parameter_records.yml"
@@ -514,6 +998,7 @@ def _registry_with_exact_enzyme_concentration(tmp_path: Path):
 
 def _copy_registry(tmp_path: Path) -> Path:
     destination = tmp_path / "data_registry"
+    destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ROOT / "data_registry", destination)
     return destination
 
