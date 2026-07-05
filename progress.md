@@ -26,12 +26,56 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-30 Configured Oxygen And Water-Activity Modifier Example Notebook
+
+Date: 2026-07-05
+
+Status: `complete` for the scoped PR-30 public configured-workflow example
+notebook slice once merged; broader environment-response biology remains
+explicit-config only, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added
+  `notebooks/examples/18_configured_oxygen_water_modifiers_example.ipynb` to
+  demonstrate configured `oxygen_monod` and `water_activity_threshold` rate
+  modifiers through `run_configured_model(...)` and package-generated
+  configured outputs.
+- The notebook creates a temporary artificial framework-benchmark config from
+  the existing homogeneous software-test benchmark, adds explicit artificial
+  oxygen half-saturation and minimum water-activity parameter records, and
+  keeps the source labelled as non-biological software-test data.
+- The notebook inspects `configured_metadata.json`, `assumptions.json`,
+  `merged_parameters.json`, `entity_snapshots/`, `input_model_config.json`,
+  and `process_rates.csv` so explicit modifier parameters, oxygen units, and
+  explicit environment oxygen/water-activity values are visible from
+  configured workflow outputs.
+- Updated notebook inventory/smoke tests so the new notebook remains
+  JSON-valid, public-API/configured-runner only, free of hidden rate laws or
+  solver logic, and executable with temporary outputs.
+- Updated active README and roadmap/status docs so PR-29 is complete after
+  PR #44, PR-30 is the current build-first oxygen/water-activity configured
+  modifier example notebook slice, and VALIDATION-DATA-001 remains deferred
+  behind the evidence gate.
+
+No validation data, calibration routine, empirical comparison claim, fitted
+oxygen or water-activity response curve, organism-specific physiology, inferred
+environment response, oxygen consumption state, gas transfer, redox balance,
+anaerobic metabolism, substrate water-binding model, EnvironmentGrid behavior
+change, solver/model behavior, registry biology record, hidden notebook
+science, thermodynamic enforcement, or silent fallback constant was added.
+
+Recommended next task: revisit VALIDATION-DATA-001 only if source-backed
+numeric time-course observations satisfying the active evidence gate are
+available; otherwise choose the next small build-first simulator/output slice.
+
 ## PR-29 Explicit Oxygen And Water-Activity Configured Modifiers
 
 Date: 2026-07-04
 
 Status: `complete` for the scoped PR-29 configured oxygen and water-activity
-modifier slice once merged; broader environment-response biology remains
+modifier slice after PR #44 merged; broader environment-response biology remains
 explicit-config only, and VALIDATION-DATA-001 remains `deferred;
 blocked/partial` for ingestion.
 
@@ -56,8 +100,8 @@ Completed in this pass:
   modifier types.
 - Updated active README and roadmap/status docs so PR-28 is complete after
   PR #43, PR-29 is the build-first explicit oxygen/water-activity configured
-  modifier slice, and VALIDATION-DATA-001 remains deferred behind the evidence
-  gate.
+  modifier slice selected after PR #43, and VALIDATION-DATA-001 remains
+  deferred behind the evidence gate.
 
 No validation data, calibration routine, empirical comparison claim, fitted
 oxygen or water-activity response curve, organism-specific physiology, inferred

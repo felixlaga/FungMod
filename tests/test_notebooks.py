@@ -33,6 +33,7 @@ BIO003_NOTEBOOKS = [
 
 ENVIRONMENT_MODIFIER_NOTEBOOKS = [
     "17_configured_environment_modifiers_example.ipynb",
+    "18_configured_oxygen_water_modifiers_example.ipynb",
 ]
 
 
@@ -284,6 +285,38 @@ def test_configured_environment_modifier_notebook_uses_configured_outputs_only()
     assert "merged_parameters.json" in source
     assert "entity_snapshots" in source
     assert "index.json" in source
+    assert "environment_grid(" not in source
+    assert "EnvironmentGrid" not in source
+    assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
+
+
+def test_configured_oxygen_water_modifier_notebook_uses_configured_outputs_only() -> None:
+    notebook = load_notebook("18_configured_oxygen_water_modifiers_example.ipynb")
+    markdown = "\n".join(markdown_cells(notebook)).lower()
+    source = "\n".join(code_cells(notebook))
+
+    assert notebook["nbformat"] == 4
+    assert "public configured-workflow example" in markdown
+    assert "artificial framework-benchmark temp config data" in markdown
+    assert "not an empirical validation" in markdown
+    assert "no biological claim" in markdown
+    assert "fitted oxygen/water-activity response curve" in markdown
+    assert "no inferred environment response" in markdown
+    assert "no environmentgrid behavior change" in markdown
+    assert "no oxygen consumption state" in markdown
+    assert "gas transfer" in markdown
+    assert "redox balance" in markdown
+    assert "anaerobic metabolism" in markdown
+    assert "substrate water-binding model" in markdown
+    assert "run_configured_model(" in source
+    assert "oxygen_monod" in source
+    assert "water_activity_threshold" in source
+    assert "configured_metadata.json" in source
+    assert "assumptions.json" in source
+    assert "process_rates.csv" in source
+    assert "merged_parameters.json" in source
+    assert "entity_snapshots" in source
+    assert "input_model_config.json" in source
     assert "environment_grid(" not in source
     assert "EnvironmentGrid" not in source
     assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
@@ -587,6 +620,64 @@ def test_configured_environment_modifier_notebook_executes_smoke_path_with_temp_
     assert environment["ph"]["value"] == 7.0
     assert any(item["name"] == "Arrhenius temperature scaling without deactivation" for item in assumptions)
     assert any(item["name"] == "Gaussian empirical pH activity profile" for item in assumptions)
+
+    base_first_rate = float(_csv_rows(base_output / "process_rates.csv")[0]["value"])
+    modified_first_rate = float(_csv_rows(modified_output / "process_rates.csv")[0]["value"])
+    assert modified_first_rate != pytest.approx(base_first_rate)
+
+
+def test_configured_oxygen_water_modifier_notebook_executes_smoke_path_with_temp_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "notebook_outputs"
+    monkeypatch.setenv("FUNGMOD_NOTEBOOK_OUTPUT_ROOT", str(output_root))
+    _execute_notebook("18_configured_oxygen_water_modifiers_example.ipynb")
+
+    output = output_root / "18_configured_oxygen_water_modifiers_example"
+    base_output = output / "base"
+    modified_output = output / "modified"
+
+    metadata = json.loads((modified_output / "configured_metadata.json").read_text(encoding="utf-8"))
+    assumptions = json.loads((modified_output / "assumptions.json").read_text(encoding="utf-8"))
+    input_config = json.loads((modified_output / "input_model_config.json").read_text(encoding="utf-8"))
+    merged_parameters = json.loads((modified_output / "merged_parameters.json").read_text(encoding="utf-8"))
+    entity_index = json.loads((modified_output / "entity_snapshots" / "index.json").read_text(encoding="utf-8"))
+    environment_entry = next(entry for entry in entity_index["entities"] if entry["role"] == "environment")
+    environment = json.loads((modified_output / environment_entry["snapshot_path"]).read_text(encoding="utf-8"))
+
+    assert (base_output / "process_rates.csv").exists()
+    assert (modified_output / "process_rates.csv").exists()
+    assert (modified_output / "output_manifest.json").exists()
+    assert [row["type"] for row in metadata["configured_process_modifiers"]] == [
+        "oxygen_monod",
+        "water_activity_threshold",
+    ]
+    oxygen_modifier, water_modifier = metadata["configured_process_modifiers"]
+    assert oxygen_modifier["half_saturation_symbol"] == "K_O2_env"
+    assert oxygen_modifier["oxygen_units"] == "mole / liter"
+    assert water_modifier["minimum_water_activity_symbol"] == "a_w_min_env"
+    assert {row["environment_value"] for row in metadata["configured_process_modifiers"]} == {
+        "oxygen_concentration",
+        "water_activity",
+    }
+    assert all(row["maturity"] == "exploratory_configured_mechanism" for row in metadata["configured_process_modifiers"])
+    assert "No oxygen consumption" in oxygen_modifier["limitation"]
+    assert "gas transfer" in oxygen_modifier["limitation"]
+    assert "redox balance" in oxygen_modifier["limitation"]
+    assert "anaerobic metabolism" in oxygen_modifier["limitation"]
+    assert "No smooth response curve" in water_modifier["limitation"]
+    assert "substrate water binding" in water_modifier["limitation"]
+    assert input_config["processes"][0]["modifiers"][0]["type"] == "oxygen_monod"
+    assert input_config["processes"][0]["modifiers"][1]["type"] == "water_activity_threshold"
+    assert {"K_O2_env", "a_w_min_env"}.issubset(
+        {item["symbol"] for item in merged_parameters["parameters"]}
+    )
+    assert environment["oxygen_concentration"]["value"] == 0.25
+    assert environment["oxygen_concentration"]["units"] == "mole / liter"
+    assert environment["water_activity"]["value"] == 0.98
+    assert any(item["name"] == "oxygen Monod limitation modifier" for item in assumptions)
+    assert any(item["name"] == "minimum water activity threshold" for item in assumptions)
 
     base_first_rate = float(_csv_rows(base_output / "process_rates.csv")[0]["value"])
     modified_first_rate = float(_csv_rows(modified_output / "process_rates.csv")[0]["value"])
