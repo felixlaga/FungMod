@@ -68,8 +68,9 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-32 repository hygiene cleanup after the PR-31
-registry-backed explicit environment modifier assembly slice and the
+The current next PR is PR-33 chain-template explicit environment modifier
+assembly after the PR-32 repository hygiene cleanup slice, the PR-31
+registry-backed explicit environment modifier assembly slice, and the
 registry-backed
 product-inhibition assembly and researcher-facing example, validation
 ingestion gate, build-first reframe,
@@ -93,10 +94,19 @@ virtual-experiment thermodynamic diagnostics example notebook, the PR-27
 explicit configured environmental rate-modifier wiring slice, and the PR-28
 configured environment modifier example notebook slice, and the PR-29
 explicit oxygen/water-activity configured modifier wiring slice, and the PR-30
-configured oxygen/water-activity modifier example notebook slice. The PR-32
-cleanup removes tracked generated metadata and adds a focused repository
-hygiene guardrail without changing scientific, numerical, solver, notebook
-output, validation-data, calibration, or biology behavior. The completed
+configured oxygen/water-activity modifier example notebook slice. The completed
+PR-32 cleanup removed tracked generated metadata and added a focused repository
+hygiene guardrail after PR #47 without changing scientific, numerical, solver,
+notebook output, validation-data, calibration, or biology behavior. The current
+PR-33 slice bridges explicit BIO-002-style chain process-template modifier
+records to the existing configured `temperature_arrhenius_reference`,
+`ph_gaussian`, `oxygen_monod`, and `water_activity_threshold` response-law
+support, emitting package-generated environment entities only from exact
+registry environment values when an explicit environment id is supplied. It
+does not infer parameters, fit curves, add validation data, oxygen consumption,
+gas transfer, redox, anaerobic metabolism, substrate water-binding behavior,
+EnvironmentGrid behavior changes, hidden notebook science, new response laws,
+solver/model response-law changes, or silent fallback constants. The completed
 PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -157,6 +167,17 @@ infer parameters, fit curves, add validation data, oxygen consumption, gas
 transfer, redox, anaerobic metabolism, substrate water-binding behavior,
 EnvironmentGrid behavior changes, hidden notebook science, or silent fallback
 constants.
+The current PR-33 slice extends the explicit registry-template environment
+modifier bridge to BIO-002-style chain process-template modifier entries, using
+the same existing configured response laws and exact registry environment
+values only. It fails before execution for missing role fields, unresolved
+roles, missing environment context, missing environment conditions, non-exact
+environment values, missing oxygen units, or unsupported modifier types, and it
+does not add validation data, fitted curves, inferred environment responses,
+new response laws, oxygen consumption, gas transfer, redox, anaerobic
+metabolism, substrate water-binding behavior, EnvironmentGrid behavior changes,
+hidden notebook science, solver/model response-law changes, or silent fallback
+constants.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -215,13 +236,13 @@ current candidate reviews do not satisfy that gate, PR-28 is complete as
 build-first configured environment-modifier example-notebook work, PR-29 is
 complete as build-first configured oxygen/water-activity modifier wiring after
 PR #44, PR-30 is complete as build-first configured oxygen/water-activity
-example-notebook coverage after PR #45, and PR-31 completed after PR #46 as
-build-first registry-backed explicit environment modifier assembly. The
-current PR-32 slice is repository hygiene cleanup rather than
+example-notebook coverage after PR #45, PR-31 completed after PR #46 as
+build-first registry-backed explicit environment modifier assembly, and PR-32
+completed after PR #47 as repository hygiene cleanup. The current PR-33 slice
+is chain-template explicit environment modifier assembly rather than
 ingestion, digitization, or fabricated validation data; the recommended next
-simulator-building follow-up remains a scoped PR-33 slice such as
-chain-template explicit environment modifier assembly or focused solver
-diagnostics.
+simulator-building follow-up is a focused PR-34 solver diagnostics or
+conservation/drift diagnostics slice.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
