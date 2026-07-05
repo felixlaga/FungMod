@@ -94,6 +94,11 @@ basic kinetics layer:
   `water_activity_threshold` rate scaling, using the existing oxygen and
   water-activity response-law implementations only when explicit parameters,
   oxygen units, and environment values are supplied;
+- registry-backed one-process case-template assembly for explicit environment
+  modifier records that bridge to the existing configured
+  `temperature_arrhenius_reference`, `ph_gaussian`, `oxygen_monod`, and
+  `water_activity_threshold` modifier support only when explicit parameter
+  roles and exact registry environment values are supplied;
 - an offline-first SABIO-RK source adapter that loads frozen kinetic-law
   snapshots and writes review-only proposed records without mutating the
   simulation registry;

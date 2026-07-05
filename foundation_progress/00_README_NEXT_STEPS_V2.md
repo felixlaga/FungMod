@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-29 after PR #44 merged, with PR-30 selected:
+Scoped status as of PR-30 after PR #45 merged, with PR-31 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -115,6 +115,14 @@ entity snapshots, input config, and process rates without fitted response
 curves, validation, empirical comparison, inferred environment responses,
 oxygen consumption, gas transfer, redox balance, anaerobic metabolism,
 substrate water-binding behavior, or EnvironmentGrid behavior changes.
+One-process registry case templates can now bridge explicit environment
+modifier records for `temperature_arrhenius_reference`, `ph_gaussian`,
+`oxygen_monod`, and `water_activity_threshold` into those existing configured
+modifier paths when all parameter roles resolve and exact registry environment
+values are present. The builder emits a package-generated environment entity
+from those explicit registry values when required and fails before execution
+for missing fields, missing roles, missing environment conditions, non-exact
+environment values, or unsupported modifier types.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier, registry-backed case-template
 assembly, and a non-PET configured framework benchmark when explicit
@@ -126,7 +134,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-30: configured oxygen and water-activity modifier example notebook**.
+Current next PR: **PR-31: registry-backed explicit environment modifier assembly**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -139,16 +147,17 @@ a build-first configured environment-modifier slice that wires existing
 `TemperatureModifier` and `PHModifier` response laws into generic configured
 processes with explicit parameters and environment values, PR-28 completed
 a public configured-workflow example notebook for those modifiers after
-PR #43 merged, and PR-29 completed the explicit `oxygen_monod` and
-`water_activity_threshold` configured modifier wiring after PR #44 merged. The
-selected PR-30 work is now a build-first configured oxygen/water-activity
-example-notebook slice that demonstrates those existing package paths through
-temporary artificial framework-benchmark config values and package-generated
-outputs, without validation data, calibration, empirical comparison,
-solver-law changes, silent fallback constants, inferred environment responses,
-oxygen consumption, gas transfer, redox balance, anaerobic metabolism,
-substrate water-binding behavior, EnvironmentGrid behavior changes, hidden
-notebook science, or new biology claims.
+PR #43 merged, PR-29 completed the explicit `oxygen_monod` and
+`water_activity_threshold` configured modifier wiring after PR #44 merged, and
+PR-30 completed the configured oxygen/water-activity example notebook after
+PR #45 merged. The selected PR-31 work is now a build-first registry-backed
+explicit environment modifier assembly slice that bridges explicit
+case-template records to those existing package paths, without validation
+data, calibration, empirical comparison, fitted curves, silent fallback
+constants, inferred environment responses, oxygen consumption, gas transfer,
+redox balance, anaerobic metabolism, substrate water-binding behavior,
+EnvironmentGrid behavior changes, hidden notebook science, or new biology
+claims.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

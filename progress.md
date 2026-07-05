@@ -31,7 +31,7 @@ Status key:
 Date: 2026-07-05
 
 Status: `complete` for the scoped PR-30 public configured-workflow example
-notebook slice once merged; broader environment-response biology remains
+notebook slice after PR #45 merged; broader environment-response biology remains
 explicit-config only, and VALIDATION-DATA-001 remains `deferred;
 blocked/partial` for ingestion.
 
@@ -55,9 +55,9 @@ Completed in this pass:
   JSON-valid, public-API/configured-runner only, free of hidden rate laws or
   solver logic, and executable with temporary outputs.
 - Updated active README and roadmap/status docs so PR-29 is complete after
-  PR #44, PR-30 is the current build-first oxygen/water-activity configured
-  modifier example notebook slice, and VALIDATION-DATA-001 remains deferred
-  behind the evidence gate.
+  PR #44, PR-30 is the build-first oxygen/water-activity configured modifier
+  example notebook slice selected after PR #44, and VALIDATION-DATA-001
+  remains deferred behind the evidence gate.
 
 No validation data, calibration routine, empirical comparison claim, fitted
 oxygen or water-activity response curve, organism-specific physiology, inferred
@@ -69,6 +69,55 @@ science, thermodynamic enforcement, or silent fallback constant was added.
 Recommended next task: revisit VALIDATION-DATA-001 only if source-backed
 numeric time-course observations satisfying the active evidence gate are
 available; otherwise choose the next small build-first simulator/output slice.
+
+## PR-31 Registry-Backed Explicit Environment Modifier Assembly
+
+Date: 2026-07-05
+
+Status: `current next` for the scoped PR-31 registry-backed explicit
+environment modifier assembly slice until merged; broader environment-response
+biology remains explicit-config only, chain-template environment modifier
+support remains a follow-up, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Extended one-process registry case-template assembly so explicit
+  `process_modifiers` records can emit configured
+  `temperature_arrhenius_reference`, `ph_gaussian`, `oxygen_monod`, and
+  `water_activity_threshold` modifiers using existing configured modifier
+  field names.
+- Added builder checks that modifier records must supply required role fields,
+  roles must resolve to explicit parameter records, oxygen modifiers must
+  declare `oxygen_units`, and required registry environment conditions must be
+  present and exact before a model config is emitted.
+- Added package-generated environment config references for one-process
+  registry configs when explicit environment modifiers require runtime
+  environment values, sourced only from the registry environment record.
+- Allowed configured input loading to consume inline environment config data,
+  matching the existing inline entity pattern for other configured entities.
+- Added copied-registry tests proving temperature/pH and oxygen/water-activity
+  one-process template modifiers emit configured metadata, environment entity
+  snapshots, and inspectable process-rate changes, plus clear builder failures
+  for unresolved roles, missing environment conditions, non-exact environment
+  values, and missing oxygen units.
+- Inspected `src/fungal_model/screening/enzyme_chain.py`; chain templates
+  still support explicit product-inhibition modifiers only. Extending the same
+  environment modifier records to chain templates needs a follow-up slice so
+  chain-specific environment record selection and entity emission can stay
+  explicit and tested.
+
+No validation data, calibration routine, empirical comparison claim, fitted
+temperature, pH, oxygen, or water-activity response curve, organism-specific
+physiology, inferred environment response, oxygen consumption state, gas
+transfer, redox balance, anaerobic metabolism, substrate water-binding model,
+EnvironmentGrid behavior change, new response law, solver-time thermodynamic
+enforcement, hidden notebook science, or silent fallback constant was added.
+
+Recommended next task: keep PR-31 as current next until merged; after merge,
+choose a scoped follow-up such as chain-template explicit environment modifier
+assembly, or revisit VALIDATION-DATA-001 only if source-backed numeric
+time-course observations satisfying the active evidence gate are available.
 
 ## PR-29 Explicit Oxygen And Water-Activity Configured Modifiers
 

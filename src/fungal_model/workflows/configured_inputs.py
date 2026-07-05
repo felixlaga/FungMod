@@ -27,6 +27,7 @@ from fungal_model.io.registries import (
 )
 from fungal_model.io.yaml_loader import (
     enzyme_from_config,
+    environment_from_config,
     load_enzyme,
     load_environment,
     load_fungus,
@@ -168,6 +169,8 @@ def _load_product_map_reference(
 def _load_environment_reference(reference: ConfigReference | None, config: ModelConfig) -> Any | None:
     if reference is None:
         return None
+    if reference.data is not None:
+        return environment_from_config(reference.data)
     _require_path_reference(reference, entity_name="environment")
     return load_environment(_resolve_path(reference, config))
 
