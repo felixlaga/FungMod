@@ -146,13 +146,13 @@ organism-specific physiology, inferred environment response, oxygen
 consumption state, gas transfer, redox balance, anaerobic metabolism,
 substrate water-binding model, EnvironmentGrid behavior change, hidden
 notebook science, thermodynamic enforcement, solver/model behavior changes, or
-silent fallback constants. The PR-31 slice should bridge explicit one-process
-registry case-template modifier records to the existing configured
+silent fallback constants. The completed PR-31 slice bridged explicit
+one-process registry case-template modifier records to the existing configured
 `temperature_arrhenius_reference`, `ph_gaussian`, `oxygen_monod`, and
 `water_activity_threshold` response-law support, emitting package-generated
 environment entities only from exact registry environment values when required
 and failing before execution for missing fields, unresolved roles, missing or
-non-exact environment conditions, or unsupported modifier types. It must not
+non-exact environment conditions, or unsupported modifier types. It did not
 infer parameters, fit curves, add validation data, oxygen consumption, gas
 transfer, redox, anaerobic metabolism, substrate water-binding behavior,
 EnvironmentGrid behavior changes, hidden notebook science, or silent fallback
@@ -215,9 +215,13 @@ current candidate reviews do not satisfy that gate, PR-28 is complete as
 build-first configured environment-modifier example-notebook work, PR-29 is
 complete as build-first configured oxygen/water-activity modifier wiring after
 PR #44, PR-30 is complete as build-first configured oxygen/water-activity
-example-notebook coverage after PR #45, and PR-31 is deliberately build-first
-registry-backed explicit environment modifier assembly rather than ingestion,
-digitization, or fabricated validation data.
+example-notebook coverage after PR #45, and PR-31 completed after PR #46 as
+build-first registry-backed explicit environment modifier assembly. The
+current PR-32 slice is repository hygiene cleanup rather than
+ingestion, digitization, or fabricated validation data; the recommended next
+simulator-building follow-up remains a scoped PR-33 slice such as
+chain-template explicit environment modifier assembly or focused solver
+diagnostics.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

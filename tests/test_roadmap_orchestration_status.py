@@ -72,6 +72,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
     assert "The current next PR is PR-32 repository hygiene cleanup" in roadmap
+    assert "The PR-31 slice should bridge" not in roadmap
+    assert "PR-31 is deliberately build-first" not in roadmap
+    assert "The completed PR-31 slice bridged explicit" in roadmap
+    assert "current PR-32 slice is repository hygiene cleanup" in roadmap
+    assert "recommended next\nsimulator-building follow-up remains a scoped PR-33 slice" in roadmap
     assert "PR-30\nconfigured oxygen/water-activity modifier example notebook slice" in roadmap
     assert "PR-29\nexplicit oxygen/water-activity configured modifier wiring slice" in roadmap
     assert "PR-28\nconfigured environment modifier example notebook slice" in roadmap
