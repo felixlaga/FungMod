@@ -41,6 +41,9 @@ basic kinetics layer:
   and report/index visibility for existing summary artifacts plus a standard
   virtual-experiment thermodynamic diagnostics table derived from existing
   per-sample configured summary artifacts,
+- configured conservation JSON/CSV diagnostics copied from existing
+  `SimulationResult` trajectories and explicit configured `mass_balance`
+  `conserved_weights`, for drift inspection only,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - least-squares calibration utilities with train/validation residual reporting,
@@ -187,6 +190,8 @@ guarded screen-comparison summaries, uncertainty/range summaries,
 trajectory quantile summaries,
 configured thermodynamic diagnostics copied from existing per-sample
 `thermodynamic_summary.json`/`.csv` artifacts when those artifacts are present,
+configured conservation diagnostics copied from existing configured
+`mass_balance` `conserved_weights` and state trajectories,
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
@@ -215,6 +220,13 @@ interpretation guardrails. If no configured thermodynamic artifacts exist, the
 table remains header-only; it does not infer activities, reaction quotients,
 concentrations, redox potentials, electron balances, validation evidence, or
 solver-time thermodynamic enforcement.
+Configured output bundles also include `conservation_diagnostics.json` and
+`conservation_diagnostics.csv` for explicit configured `mass_balance`
+validators with `conserved_weights`; these rows copy weighted conserved totals
+from existing state trajectories and are diagnostics only, not validation,
+calibration, thresholding, solver enforcement, thermodynamics, or biological
+evidence. If no such validator is configured, the JSON reports
+`evaluated_count: 0` and the CSV remains header-only.
 Quicklook plots include a presentation-only trajectory-band figure generated
 from `trajectory_quantiles.csv`; it is for inspection, not validation or
 calibration.

@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-32 after PR #47 merged, with PR-33 selected:
+Scoped status as of PR-33 after PR #48 merged, with PR-34 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -131,6 +131,16 @@ a package-generated environment entity from those exact values when required
 and fails before execution for missing role fields, unresolved roles, missing
 environment context, missing environment conditions, non-exact environment
 values, missing oxygen units, or unsupported modifier types.
+Configured output bundles now include `conservation_diagnostics.json` and
+`conservation_diagnostics.csv` for explicit configured `mass_balance`
+validators with `conserved_weights`. The diagnostics compute weighted initial
+and final conserved totals, final drift, maximum absolute drift, relative
+maximum drift when the initial total is finite and nonzero, units, and
+allowed-use text from existing `SimulationResult` trajectories only. Header-only
+CSV and `evaluated_count: 0` JSON behavior are used when no explicit configured
+mass-balance weights exist. These artifacts are not validation, calibration,
+threshold changes, thermodynamic enforcement, solver changes, or biology
+claims.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier, registry-backed case-template
 assembly, and a non-PET configured framework benchmark when explicit
@@ -142,7 +152,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-33: chain-template explicit environment modifier assembly**.
+Current next PR: **PR-34: configured-output conservation/drift diagnostics**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -160,16 +170,16 @@ PR #43 merged, PR-29 completed the explicit `oxygen_monod` and
 PR-30 completed the configured oxygen/water-activity example notebook after
 PR #45 merged, PR-31 completed the one-process registry-backed explicit
 environment modifier assembly slice after PR #46 merged, and PR-32 completed
-the repository hygiene cleanup after PR #47 merged. The selected PR-33 work is
-now chain-template explicit environment modifier assembly: bridging explicit
-BIO-002-style process-template modifier records into existing configured
-environment modifier paths without validation data, calibration, empirical
-comparison, fitted curves, silent fallback constants, inferred environment
-responses, oxygen consumption, gas transfer, redox balance, anaerobic
-metabolism, substrate water-binding behavior, EnvironmentGrid behavior
-changes, hidden notebook science, solver/model response-law changes, or new
-biology claims. Recommended next after PR-33: a focused solver diagnostics or
-conservation/drift diagnostics slice.
+the repository hygiene cleanup after PR #47 merged. PR-33 completed the
+chain-template explicit environment modifier assembly slice after PR #48
+merged. The selected PR-34 work is configured-output conservation/drift
+diagnostics: deriving a small diagnostics artifact from existing
+`SimulationResult` trajectories and explicit configured `mass_balance`
+`conserved_weights` only. It does not add validation data, calibration,
+empirical comparison, threshold changes, thermodynamic enforcement,
+solver/model behavior changes, hidden notebook science, silent fallback
+constants, inferred environment responses, or new biology claims. Recommended
+next after PR-34: a focused cleanup guardrail or solver diagnostics follow-up.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

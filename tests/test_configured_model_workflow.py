@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 from copy import deepcopy
@@ -84,6 +85,78 @@ def test_configured_output_records_generic_assembly_metadata(tmp_path) -> None:
     assert run["validation"]["passed"] is True
     assert decisions["decisions"][0]["can_build"] is True
     assert validators["summary"]["passed"] is True
+
+
+def test_configured_output_writes_conservation_diagnostics(tmp_path) -> None:
+    output_dir = tmp_path / "homogeneous_run"
+
+    run_configured_model(
+        MODEL_CONFIGS / "toy_homogeneous_ab.yml",
+        output_dir=output_dir,
+    )
+
+    diagnostics = json.loads((output_dir / "conservation_diagnostics.json").read_text(encoding="utf-8"))
+    with (output_dir / "conservation_diagnostics.csv").open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    manifest = json.loads((output_dir / "output_manifest.json").read_text(encoding="utf-8"))
+
+    assert diagnostics["kind"] == "configured_conservation_diagnostics"
+    assert diagnostics["validator_count"] == 1
+    assert diagnostics["evaluated_count"] == 1
+    assert diagnostics["rows"][0]["validator_id"] == "closed_mass_balance"
+    assert diagnostics["rows"][0]["status"] == "evaluated"
+    assert diagnostics["rows"][0]["weighted_states"] == {
+        "dissolved_substrate_amount": 1.0,
+        "released_product_amount": 1.0,
+    }
+    assert diagnostics["rows"][0]["initial_conserved_total"] == pytest.approx(1.0)
+    assert diagnostics["rows"][0]["final_conserved_total"] == pytest.approx(1.0)
+    assert diagnostics["rows"][0]["final_drift"] == pytest.approx(0.0, abs=1e-12)
+    assert diagnostics["rows"][0]["max_absolute_drift"] == pytest.approx(0.0, abs=1e-12)
+    assert diagnostics["rows"][0]["relative_max_absolute_drift"] == pytest.approx(0.0, abs=1e-12)
+    assert diagnostics["rows"][0]["units"] == "kilogram"
+    assert "not validation, calibration" in diagnostics["rows"][0]["allowed_use"]
+    assert rows[0]["validator_id"] == "closed_mass_balance"
+    assert rows[0]["weighted_states"] == (
+        '{"dissolved_substrate_amount": 1.0, "released_product_amount": 1.0}'
+    )
+    assert "conservation_diagnostics.json" in manifest["files"]
+    assert "conservation_diagnostics.csv" in manifest["files"]
+
+
+def test_configured_output_writes_zero_evaluated_conservation_diagnostics_without_mass_balance(
+    tmp_path,
+) -> None:
+    config_path = _homogeneous_config_without_mass_balance(tmp_path)
+    output_dir = tmp_path / "no_mass_balance"
+
+    run_configured_model(config_path, output_dir=output_dir)
+
+    diagnostics = json.loads((output_dir / "conservation_diagnostics.json").read_text(encoding="utf-8"))
+    with (output_dir / "conservation_diagnostics.csv").open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+
+    assert diagnostics["kind"] == "configured_conservation_diagnostics"
+    assert diagnostics["validator_count"] == 0
+    assert diagnostics["evaluated_count"] == 0
+    assert diagnostics["rows"] == []
+    assert rows == []
+    assert "validator_id" in (reader.fieldnames or ())
+
+
+def test_configured_mass_balance_missing_state_remains_explicit(tmp_path) -> None:
+    data = yaml.safe_load((MODEL_CONFIGS / "toy_homogeneous_ab.yml").read_text(encoding="utf-8"))
+    data = deepcopy(data)
+    data["validators"][1]["conserved_weights"]["missing_state"] = 1.0
+    config_path = tmp_path / "toy_homogeneous_missing_mass_balance_state.yml"
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    output_dir = tmp_path / "missing_state"
+
+    with pytest.raises(KeyError, match="missing_state"):
+        run_configured_model(config_path, output_dir=output_dir)
+
+    assert not (output_dir / "output_manifest.json").exists()
 
 
 def test_configured_output_bundle_contains_entity_snapshots(tmp_path) -> None:
@@ -694,6 +767,19 @@ def _oxygen_water_modified_homogeneous_config(
     return config_path
 
 
+def _homogeneous_config_without_mass_balance(tmp_path: Path) -> Path:
+    data = yaml.safe_load((MODEL_CONFIGS / "toy_homogeneous_ab.yml").read_text(encoding="utf-8"))
+    data = deepcopy(data)
+    data["validators"] = [
+        validator
+        for validator in data["validators"]
+        if validator["validator_type"] != "mass_balance"
+    ]
+    config_path = tmp_path / "toy_homogeneous_without_mass_balance.yml"
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    return config_path
+
+
 def _expected_configured_output_files() -> tuple[str, ...]:
     return (
         "record.json",
@@ -716,6 +802,8 @@ def _expected_configured_output_files() -> tuple[str, ...]:
         "initial_state.json",
         "time_grid.json",
         "validators.json",
+        "conservation_diagnostics.json",
+        "conservation_diagnostics.csv",
         "merged_parameters.json",
         "run_environment.json",
         "package_versions.json",
