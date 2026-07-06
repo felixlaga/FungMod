@@ -11,6 +11,14 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 FINAL_GOAL_HTML_PLAN = "foundation_progress/FUNGMOD_FINAL_GOAL_PR_PLAN_2026_06_20.html"
+ACTIVE_SOURCE_OF_TRUTH_DOCS = (
+    "AGENTS.md",
+    "README.md",
+    "foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md",
+    "foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md",
+    "progress.md",
+    "ARCHITECTURE_DEBT.md",
+)
 
 
 ArtifactCheck = tuple[str, Callable[[str, tuple[str, ...]], bool]]
@@ -115,3 +123,11 @@ def test_generated_progress_report_html_snapshots_are_ignored() -> None:
 def test_final_goal_html_plan_remains_tracked_and_allowed() -> None:
     assert FINAL_GOAL_HTML_PLAN in _tracked_files()
     assert not _git_check_ignore(FINAL_GOAL_HTML_PLAN)
+
+
+def test_active_source_of_truth_docs_remain_tracked_and_allowed() -> None:
+    tracked_files = set(_tracked_files())
+
+    for path in ACTIVE_SOURCE_OF_TRUTH_DOCS:
+        assert path in tracked_files
+        assert not _git_check_ignore(path)
