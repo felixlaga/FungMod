@@ -68,17 +68,18 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-35: focused repository hygiene guardrail extension"
+    current_next = "PR-36: configured-output solver diagnostics"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-35 focused repository hygiene guardrail extension" in roadmap
+    assert "The current next PR is PR-36 configured-output solver diagnostics" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
     assert "The completed PR-33 slice extends the explicit registry-template environment" in roadmap
     assert "The completed PR-34 slice is limited to configured-output conservation/drift" in roadmap
-    assert "The current PR-35 slice is limited to\nrepository hygiene guardrails" in roadmap
-    assert "recommended next simulator-building follow-up is a solver diagnostics slice" in roadmap
+    assert "The completed PR-35 slice is limited to\nrepository hygiene guardrails" in roadmap
+    assert "The current PR-36 slice\nis limited to configured-output solver diagnostics" in roadmap
+    assert "recommended next simulator-building follow-up is\na small diagnostics visibility slice" in roadmap
     assert "PR-30\nconfigured oxygen/water-activity modifier example notebook slice" in roadmap
     assert "PR-29\nexplicit oxygen/water-activity configured modifier wiring slice" in roadmap
     assert "PR-28\nconfigured environment modifier example notebook slice" in roadmap
@@ -115,7 +116,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-35: focused repository hygiene guardrail extension"
+    current_next = "PR-36: configured-output solver diagnostics"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -148,6 +149,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-32" not in text
         assert "Current next PR: **PR-33" not in text
         assert "Current next PR: **PR-34" not in text
+        assert "Current next PR: **PR-35" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -171,6 +173,12 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "conservation_diagnostics.csv" in status
     assert "conservation_diagnostics.csv" in next_steps
     assert "conservation_diagnostics.json" in next_steps
+    assert "solver_diagnostics.csv" in status
+    assert "solver_diagnostics.csv" in next_steps
+    assert "solver_diagnostics.json" in next_steps
+    assert "solver_diagnostics.csv" in readme
+    assert "existing configured run metadata" in status
+    assert "header-only CSV plus JSON\n`status: unavailable` behavior" in next_steps
     assert "existing `SimulationResult` state trajectories" in status
     assert "Header-only\nCSV and `evaluated_count: 0` JSON behavior" in next_steps
     assert "trajectory_quantile_bands.png" in status
@@ -289,8 +297,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-34 | Configured-output conservation/drift diagnostics" in status
     assert "complete after PR #49 merged for the scoped configured-output conservation/drift diagnostics slice" in status
     assert "PR-35 | Focused repository hygiene guardrail extension" in status
-    assert "current next after PR #49 merged and PR-34 completed" in status
-    assert "PR-36 or later | Simulator-building diagnostics follow-up" in status
+    assert "complete after PR #50 merged for the scoped repository hygiene guardrail extension" in status
+    assert "PR-36 | Configured-output solver diagnostics" in status
+    assert "current next after PR #50 merged and PR-35 completed" in status
+    assert "PR-37 or later | Simulator diagnostics visibility follow-up" in status
     assert "Future | VALIDATION-DATA-001" in status
 
 
@@ -338,7 +348,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-35: focused repository hygiene guardrail extension"
+    current_next = "PR-36: configured-output solver diagnostics"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -372,13 +382,14 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-32" not in _current_next_lines(text)
         assert "PR-33" not in _current_next_lines(text)
         assert "PR-34" not in _current_next_lines(text)
+        assert "PR-35" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
     assert "Status: `deferred; blocked/partial` for ingestion." in gate
-    assert "selected PR-35 work is therefore a focused repository\nhygiene guardrail extension" in gate
-    assert "A future validation\ningestion PR must not ingest" in gate
-    assert "fabricate data unless those evidence\nrequirements are met" in gate
+    assert "selected PR-36 work is therefore configured-output solver\ndiagnostics" in gate
+    assert "A future validation ingestion PR must\nnot ingest" in gate
+    assert "fabricate data unless those evidence requirements are\nmet" in gate
     assert "Status: `complete`" not in gate
     assert "does not complete" in gate
     assert "VALIDATION-DATA-001" in gate

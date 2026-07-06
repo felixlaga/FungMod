@@ -110,6 +110,13 @@ class ConfiguredOutputWriter:
             conservation_diagnostics["rows"],
             _CONSERVATION_DIAGNOSTIC_COLUMNS,
         )
+        solver_diagnostics = _solver_diagnostics(config, inputs, result)
+        _write_json(destination / "solver_diagnostics.json", solver_diagnostics)
+        _write_csv_with_fieldnames(
+            destination / "solver_diagnostics.csv",
+            solver_diagnostics["rows"],
+            _SOLVER_DIAGNOSTIC_COLUMNS,
+        )
         _write_json(destination / "merged_parameters.json", inputs.parameters.to_dict())
         _write_json(destination / "run_environment.json", _run_environment())
         _write_json(destination / "package_versions.json", _package_versions(result))
@@ -603,6 +610,143 @@ def _weighted_conserved_total(
     if total is None:
         raise ValueError("At least one conserved weight is required.")
     return total
+
+
+_SOLVER_DIAGNOSTIC_ALLOWED_USE = (
+    "Diagnostic copy over existing configured run metadata, solver settings, "
+    "solver metadata, time-grid counts, state counts, and process counts only; "
+    "not validation, calibration, numerical thresholding, solver tuning advice, "
+    "or solver-time enforcement."
+)
+
+_SOLVER_DIAGNOSTIC_GUARDRAIL = (
+    "This artifact reports recorded solver/configuration metadata only. It does "
+    "not infer scientific values, alter solver behavior, compare against empirical "
+    "data, or establish numerical quality thresholds."
+)
+
+_SOLVER_METADATA_FIELDS = ("backend", "method", "success", "status", "message", "nfev", "njev", "nlu")
+
+_SOLVER_DIAGNOSTIC_COLUMNS = (
+    "config_name",
+    "config_path",
+    "mode",
+    "maturity",
+    "kind",
+    "result_name",
+    "result_label",
+    "model_version",
+    "state_count",
+    "configured_process_count",
+    "process_rate_count",
+    "time_units",
+    "configured_time_start",
+    "configured_time_stop",
+    "configured_time_evaluation_count",
+    "result_time_point_count",
+    "solver_backend",
+    "solver_method",
+    "solver_success",
+    "solver_status",
+    "solver_message",
+    "nfev",
+    "njev",
+    "nlu",
+    "rtol",
+    "atol",
+    "max_step_value",
+    "max_step_units",
+    "metadata_available",
+    "allowed_use",
+    "interpretation_guardrail",
+)
+
+
+def _solver_diagnostics(
+    config: ModelConfig,
+    inputs: ConfiguredInputs,
+    result: SimulationResult,
+) -> dict[str, Any]:
+    metadata = dict(result.solver_metadata)
+    metadata_available = bool(metadata)
+    rows = [_solver_diagnostic_row(config, inputs, result, metadata)] if metadata_available else []
+    missing_metadata_fields = [field for field in _SOLVER_METADATA_FIELDS if field not in metadata]
+    return {
+        "kind": "configured_solver_diagnostics",
+        "metadata_available": metadata_available,
+        "row_count": len(rows),
+        "status": "available" if metadata_available else "unavailable",
+        "missing_metadata_fields": missing_metadata_fields,
+        "allowed_use": _SOLVER_DIAGNOSTIC_ALLOWED_USE,
+        "unsupported_scope": (
+            "No solver behavior change, numerical threshold, validation rule, "
+            "calibration target, empirical comparison, thermodynamic enforcement, "
+            "or biological claim is created by this artifact."
+        ),
+        "rows": rows,
+    }
+
+
+def _solver_diagnostic_row(
+    config: ModelConfig,
+    inputs: ConfiguredInputs,
+    result: SimulationResult,
+    metadata: Mapping[str, Any],
+) -> dict[str, Any]:
+    settings = result.solver_settings.to_dict()
+    max_step = settings.get("max_step")
+    if isinstance(max_step, Mapping):
+        max_step_value = max_step.get("value")
+        max_step_units = max_step.get("units")
+    else:
+        max_step_value = None
+        max_step_units = ""
+    time_units = str(inputs.t_span[1].units)
+    return {
+        "config_name": config.name,
+        "config_path": "" if config.path is None else str(config.path),
+        "mode": config.mode,
+        "maturity": config.maturity,
+        "kind": config.kind,
+        "result_name": result.name,
+        "result_label": result.label,
+        "model_version": result.model_version,
+        "state_count": len(result.states),
+        "configured_process_count": len(config.processes),
+        "process_rate_count": len(result.process_rates),
+        "time_units": time_units,
+        "configured_time_start": _quantity_scalar(inputs.t_span[0], time_units),
+        "configured_time_stop": _quantity_scalar(inputs.t_span[1], time_units),
+        "configured_time_evaluation_count": _quantity_value_count(inputs.t_eval),
+        "result_time_point_count": _quantity_value_count(result.time),
+        "solver_backend": metadata.get("backend"),
+        "solver_method": metadata.get("method", settings.get("method")),
+        "solver_success": metadata.get("success"),
+        "solver_status": metadata.get("status"),
+        "solver_message": metadata.get("message"),
+        "nfev": metadata.get("nfev"),
+        "njev": metadata.get("njev"),
+        "nlu": metadata.get("nlu"),
+        "rtol": settings.get("rtol"),
+        "atol": settings.get("atol"),
+        "max_step_value": max_step_value,
+        "max_step_units": max_step_units,
+        "metadata_available": True,
+        "allowed_use": _SOLVER_DIAGNOSTIC_ALLOWED_USE,
+        "interpretation_guardrail": _SOLVER_DIAGNOSTIC_GUARDRAIL,
+    }
+
+
+def _quantity_scalar(quantity: Quantity, units: str) -> float:
+    value = quantity.to(units)
+    values = np.asarray(value.magnitude, dtype=float)
+    return float(values.flat[0])
+
+
+def _quantity_value_count(quantity: Quantity | None) -> int | None:
+    if quantity is None:
+        return None
+    return int(np.asarray(quantity.magnitude).size)
 
 
 def _count_by_key(report: list[dict[str, Any]], key: str) -> dict[str, int]:

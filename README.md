@@ -227,6 +227,14 @@ from existing state trajectories and are diagnostics only, not validation,
 calibration, thresholding, solver enforcement, thermodynamics, or biological
 evidence. If no such validator is configured, the JSON reports
 `evaluated_count: 0` and the CSV remains header-only.
+Configured output bundles also include `solver_diagnostics.json` and
+`solver_diagnostics.csv` derived from existing configured run metadata, solver
+settings, solver metadata, time-grid/evaluation counts, state counts, and
+process counts only. If solver metadata is absent, the JSON reports
+`status: unavailable` and the CSV remains header-only. These artifacts do not
+change solver behavior, infer scientific values, define numerical quality
+thresholds, add validation/calibration evidence, compare against empirical
+data, or enforce thermodynamics.
 Quicklook plots include a presentation-only trajectory-band figure generated
 from `trajectory_quantiles.csv`; it is for inspection, not validation or
 calibration.
@@ -502,7 +510,12 @@ configuration-facing artifacts:
 - `initial_state.json`
 - `time_grid.json`
 - `validators.json`
+- `conservation_diagnostics.json`
+- `conservation_diagnostics.csv`
+- `solver_diagnostics.json`
+- `solver_diagnostics.csv`
 - `merged_parameters.json`
+- `solver_settings.json`
 - `entity_snapshots/`
 - `output_manifest.json`
 
