@@ -22,18 +22,19 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-33: chain-template explicit environment modifier assembly**.
+Current next PR: **PR-34: configured-output conservation/drift diagnostics**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
 important, but it remains deferred until source-backed numeric observations
 satisfy the evidence requirements below and the simulator can produce mature
 enough degradation outputs for comparison. The PR-31 work is complete after
-PR #46, and PR-32 repository hygiene cleanup is complete after PR #47. The
-selected PR-33 work is therefore chain-template explicit environment modifier
-assembly, not validation ingestion. A future validation ingestion PR must not
-ingest, digitize, or fabricate data unless those evidence requirements are met.
-This gate does not complete VALIDATION-DATA-001.
+PR #46, PR-32 repository hygiene cleanup is complete after PR #47, and PR-33
+chain-template explicit environment modifier assembly is complete after
+PR #48. The selected PR-34 work is therefore configured-output
+conservation/drift diagnostics, not validation ingestion. A future validation
+ingestion PR must not ingest, digitize, or fabricate data unless those evidence
+requirements are met. This gate does not complete VALIDATION-DATA-001.
 
 ## Candidate Evidence Checked
 

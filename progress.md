@@ -26,6 +26,42 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-34 Configured-Output Conservation/Drift Diagnostics
+
+Date: 2026-07-06
+
+Status: `complete` for the scoped PR-34 configured-output conservation/drift
+diagnostics slice once merged; broader solver diagnostics remain a follow-up,
+and VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added `conservation_diagnostics.json` and `conservation_diagnostics.csv` to
+  configured result bundles.
+- Derived diagnostics only from existing `SimulationResult` state trajectories
+  and explicit configured `mass_balance` validators that declare
+  `conserved_weights`.
+- Recorded validator id, optional `closed_system`, weighted state metadata,
+  initial and final conserved totals, final drift, maximum absolute drift,
+  relative maximum drift when the initial total is finite and nonzero, units,
+  row status/reason, and allowed-use text.
+- Wrote deterministic header-only CSV plus JSON `evaluated_count: 0` behavior
+  when no explicit configured mass-balance weights are present.
+- Kept missing-state and incompatible-unit behavior explicit rather than
+  silently coercing diagnostics.
+- Updated configured-output tests, manifest expectations, active README
+  capability text, roadmap/status docs, validation-gate current-next wording,
+  and roadmap orchestration status tests.
+
+No validation data, calibration routine, empirical comparison claim, fitted
+curve, new validation rule, solver equation, threshold change, thermodynamic
+enforcement, biology record, hidden notebook science, or silent fallback
+constant was added.
+
+Recommended next task: after PR-34 merges, choose a focused cleanup guardrail
+or a solver diagnostics follow-up that improves inspectability without changing
+scientific or numerical behavior unless explicitly tested.
+
 ## PR-33 Chain-Template Explicit Environment Modifier Assembly
 
 Date: 2026-07-05

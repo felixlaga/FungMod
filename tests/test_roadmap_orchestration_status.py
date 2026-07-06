@@ -68,15 +68,16 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-33: chain-template explicit environment modifier assembly"
+    current_next = "PR-34: configured-output conservation/drift diagnostics"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-33 chain-template explicit environment modifier" in roadmap
+    assert "The current next PR is PR-34 configured-output conservation/drift diagnostics" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
-    assert "The current PR-33 slice extends the explicit registry-template environment" in roadmap
-    assert "recommended next\nsimulator-building follow-up is a focused PR-34 solver diagnostics" in roadmap
+    assert "The completed PR-33 slice extends the explicit registry-template environment" in roadmap
+    assert "The current PR-34 slice is limited to configured-output conservation/drift" in roadmap
+    assert "recommended\nnext simulator-building follow-up is a focused cleanup guardrail" in roadmap
     assert "PR-30\nconfigured oxygen/water-activity modifier example notebook slice" in roadmap
     assert "PR-29\nexplicit oxygen/water-activity configured modifier wiring slice" in roadmap
     assert "PR-28\nconfigured environment modifier example notebook slice" in roadmap
@@ -113,7 +114,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-33: chain-template explicit environment modifier assembly"
+    current_next = "PR-34: configured-output conservation/drift diagnostics"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -143,6 +144,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-29" not in text
         assert "Current next PR: **PR-30" not in text
         assert "Current next PR: **PR-31" not in text
+        assert "Current next PR: **PR-32" not in text
+        assert "Current next PR: **PR-33" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -163,6 +166,11 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "thermodynamic_diagnostics.csv" in status
     assert "thermodynamic_diagnostics.csv" in next_steps
     assert "DegradationScreenResult.thermodynamic_diagnostics()" in next_steps
+    assert "conservation_diagnostics.csv" in status
+    assert "conservation_diagnostics.csv" in next_steps
+    assert "conservation_diagnostics.json" in next_steps
+    assert "existing `SimulationResult` state trajectories" in status
+    assert "Header-only\nCSV and `evaluated_count: 0` JSON behavior" in next_steps
     assert "trajectory_quantile_bands.png" in status
     assert "degradation_rate_vs_time.png" in status
     assert "degradation_rate_vs_time.png" in next_steps
@@ -275,8 +283,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-32 | Repository hygiene cleanup" in status
     assert "complete after PR #47 merged for the scoped repository hygiene slice" in status
     assert "PR-33 | Chain-template explicit environment modifier assembly" in status
-    assert "current next after PR #47 merged and PR-32 completed" in status
-    assert "PR-34 or later | Focused solver diagnostics or conservation/drift diagnostics" in status
+    assert "complete after PR #48 merged for the scoped chain-template environment modifier bridge" in status
+    assert "PR-34 | Configured-output conservation/drift diagnostics" in status
+    assert "current next after PR #48 merged and PR-33 completed" in status
+    assert "PR-35 or later | Focused cleanup guardrail or solver diagnostics follow-up" in status
     assert "Future | VALIDATION-DATA-001" in status
 
 
@@ -324,7 +334,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-33: chain-template explicit environment modifier assembly"
+    current_next = "PR-34: configured-output conservation/drift diagnostics"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -356,13 +366,14 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-30" not in _current_next_lines(text)
         assert "PR-31" not in _current_next_lines(text)
         assert "PR-32" not in _current_next_lines(text)
+        assert "PR-33" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
     assert "Status: `deferred; blocked/partial` for ingestion." in gate
-    assert "selected PR-33 work is therefore chain-template explicit environment modifier" in gate
-    assert "A future validation ingestion PR must not\ningest" in gate
-    assert "fabricate data unless those evidence requirements are met" in gate
+    assert "selected PR-34 work is therefore configured-output\nconservation/drift diagnostics" in gate
+    assert "A future validation\ningestion PR must not ingest" in gate
+    assert "fabricate data unless those evidence\nrequirements are met" in gate
     assert "Status: `complete`" not in gate
     assert "does not complete" in gate
     assert "VALIDATION-DATA-001" in gate

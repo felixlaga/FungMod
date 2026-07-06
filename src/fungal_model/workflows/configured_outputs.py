@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
+from pint.errors import DimensionalityError
 
 from fungal_model.core.units import Quantity, is_quantity
 from fungal_model.io.model_config import ConfigReference, ModelConfig
@@ -102,6 +103,13 @@ class ConfiguredOutputWriter:
                 destination / "thermodynamic_summary.csv",
                 thermodynamic_summary["rows"],
             )
+        conservation_diagnostics = _conservation_diagnostics(config, result)
+        _write_json(destination / "conservation_diagnostics.json", conservation_diagnostics)
+        _write_csv_with_fieldnames(
+            destination / "conservation_diagnostics.csv",
+            conservation_diagnostics["rows"],
+            _CONSERVATION_DIAGNOSTIC_COLUMNS,
+        )
         _write_json(destination / "merged_parameters.json", inputs.parameters.to_dict())
         _write_json(destination / "run_environment.json", _run_environment())
         _write_json(destination / "package_versions.json", _package_versions(result))
@@ -129,6 +137,15 @@ def _write_json(path: Path, data: Any) -> None:
 def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = list(rows[0]) if rows else ()
+    _write_csv_with_fieldnames(path, rows, fieldnames)
+
+
+def _write_csv_with_fieldnames(
+    path: Path,
+    rows: list[dict[str, Any]],
+    fieldnames: tuple[str, ...] | list[str],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
@@ -459,6 +476,133 @@ def _thermodynamic_summary_row(item: Mapping[str, Any]) -> dict[str, Any]:
         "missing_metadata": details_map.get("missing_metadata", []),
         "provenance_refs": details_map.get("provenance_refs", []),
     }
+
+
+_CONSERVATION_DIAGNOSTIC_ALLOWED_USE = (
+    "Diagnostic copy over existing SimulationResult trajectories and explicit "
+    "configured mass_balance conserved_weights only; not validation, calibration, "
+    "thresholding, or solver-time enforcement."
+)
+
+_CONSERVATION_DIAGNOSTIC_COLUMNS = (
+    "validator_id",
+    "status",
+    "reason",
+    "closed_system",
+    "weighted_states",
+    "initial_conserved_total",
+    "final_conserved_total",
+    "final_drift",
+    "max_absolute_drift",
+    "relative_max_absolute_drift",
+    "units",
+    "allowed_use",
+)
+
+
+def _conservation_diagnostics(config: ModelConfig, result: SimulationResult) -> dict[str, Any]:
+    rows = [
+        _conservation_diagnostic_row(
+            validator_id=validator.id,
+            closed_system=validator.settings.get("closed_system"),
+            conserved_weights=cast(Mapping[str, Any], validator.settings["conserved_weights"]),
+            result=result,
+        )
+        for validator in config.validators
+        if validator.validator_type == "mass_balance"
+        and isinstance(validator.settings.get("conserved_weights"), Mapping)
+    ]
+    evaluated_count = sum(1 for row in rows if row["status"] == "evaluated")
+    return {
+        "kind": "configured_conservation_diagnostics",
+        "validator_count": len(rows),
+        "evaluated_count": evaluated_count,
+        "status_counts": _count_by_key(rows, "status"),
+        "allowed_use": _CONSERVATION_DIAGNOSTIC_ALLOWED_USE,
+        "unsupported_scope": (
+            "No new validation rule, solver equation, calibration target, threshold "
+            "change, thermodynamic enforcement, or biological claim is created by "
+            "this artifact."
+        ),
+        "rows": rows,
+    }
+
+
+def _conservation_diagnostic_row(
+    *,
+    validator_id: str,
+    closed_system: Any,
+    conserved_weights: Mapping[str, Any],
+    result: SimulationResult,
+) -> dict[str, Any]:
+    weights = {str(name): value for name, value in sorted(conserved_weights.items(), key=lambda item: str(item[0]))}
+    base_row: dict[str, Any] = {
+        "validator_id": validator_id,
+        "status": "unsupported",
+        "reason": "",
+        "closed_system": closed_system if isinstance(closed_system, bool) else None,
+        "weighted_states": weights,
+        "initial_conserved_total": None,
+        "final_conserved_total": None,
+        "final_drift": None,
+        "max_absolute_drift": None,
+        "relative_max_absolute_drift": None,
+        "units": "",
+        "allowed_use": _CONSERVATION_DIAGNOSTIC_ALLOWED_USE,
+    }
+    try:
+        total = _weighted_conserved_total(result, weights)
+    except KeyError as exc:
+        base_row["reason"] = str(exc)
+        return base_row
+    except (DimensionalityError, TypeError, ValueError) as exc:
+        base_row["reason"] = f"Conserved total could not be evaluated with configured weights: {exc}"
+        return base_row
+
+    values = np.asarray(total.magnitude, dtype=float)
+    if values.size == 0:
+        base_row["reason"] = "Conserved total has no numeric trajectory values."
+        return base_row
+    initial = float(values.flat[0])
+    final = float(values.flat[-1])
+    drift = values - initial
+    max_absolute_drift = float(np.max(np.abs(drift)))
+    relative_max_absolute_drift = (
+        max_absolute_drift / abs(initial)
+        if np.isfinite(initial) and initial != 0.0
+        else None
+    )
+    base_row.update(
+        {
+            "status": "evaluated",
+            "reason": "",
+            "initial_conserved_total": initial,
+            "final_conserved_total": final,
+            "final_drift": final - initial,
+            "max_absolute_drift": max_absolute_drift,
+            "relative_max_absolute_drift": relative_max_absolute_drift,
+            "units": str(total.units),
+        }
+    )
+    return base_row
+
+
+def _weighted_conserved_total(
+    result: SimulationResult,
+    conserved_weights: Mapping[str, Any],
+) -> Quantity:
+    if not conserved_weights:
+        raise ValueError("At least one conserved weight is required.")
+    total: Quantity | None = None
+    for state_name, raw_weight in conserved_weights.items():
+        if state_name not in result.states:
+            raise KeyError(f"Conserved weight provided for unknown state {state_name!r}.")
+        weight = raw_weight if is_quantity(raw_weight) else float(raw_weight)
+        term = result.states[state_name] * weight
+        total = term if total is None else cast(Quantity, total + term.to(total.units))
+    if total is None:
+        raise ValueError("At least one conserved weight is required.")
+    return total
 
 
 def _count_by_key(report: list[dict[str, Any]], key: str) -> dict[str, int]:
