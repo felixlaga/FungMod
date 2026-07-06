@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import csv
 import json
 from pathlib import Path
-from copy import deepcopy
 
 import pytest
 import yaml
@@ -16,8 +16,14 @@ from fungal_model import (
     merge_parameter_sets,
     run_configured_model,
 )
+from fungal_model.io.model_config import load_model_config
 from fungal_model.plugins.pet import pet_substrate_loader_registry
 from fungal_model.results import SimulationResult
+from fungal_model.workflows import (
+    ConfiguredInputLoader,
+    ConfiguredOutputWriter,
+    ConfiguredProcessAssembler,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -143,6 +149,98 @@ def test_configured_output_writes_zero_evaluated_conservation_diagnostics_withou
     assert diagnostics["rows"] == []
     assert rows == []
     assert "validator_id" in (reader.fieldnames or ())
+
+
+def test_configured_output_writes_solver_diagnostics_from_existing_metadata(tmp_path) -> None:
+    output_dir = tmp_path / "homogeneous_run"
+
+    result = run_configured_model(
+        MODEL_CONFIGS / "toy_homogeneous_ab.yml",
+        output_dir=output_dir,
+    )
+
+    diagnostics = json.loads((output_dir / "solver_diagnostics.json").read_text(encoding="utf-8"))
+    with (output_dir / "solver_diagnostics.csv").open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    manifest = json.loads((output_dir / "output_manifest.json").read_text(encoding="utf-8"))
+
+    assert diagnostics["kind"] == "configured_solver_diagnostics"
+    assert diagnostics["metadata_available"] is True
+    assert diagnostics["row_count"] == 1
+    assert diagnostics["status"] == "available"
+    assert diagnostics["rows"][0]["config_name"] == "toy homogeneous A to B benchmark"
+    assert diagnostics["rows"][0]["mode"] == "toy"
+    assert diagnostics["rows"][0]["maturity"] == "framework_benchmark"
+    assert diagnostics["rows"][0]["state_count"] == 2
+    assert diagnostics["rows"][0]["configured_process_count"] == 1
+    assert diagnostics["rows"][0]["process_rate_count"] == 1
+    assert diagnostics["rows"][0]["time_units"] == "second"
+    assert diagnostics["rows"][0]["configured_time_start"] == pytest.approx(0.0)
+    assert diagnostics["rows"][0]["configured_time_stop"] == pytest.approx(10.0)
+    assert diagnostics["rows"][0]["configured_time_evaluation_count"] == 11
+    assert diagnostics["rows"][0]["result_time_point_count"] == 11
+    assert diagnostics["rows"][0]["solver_backend"] == "scipy.solve_ivp"
+    assert diagnostics["rows"][0]["solver_method"] == result.solver_settings.method
+    assert diagnostics["rows"][0]["solver_success"] is True
+    assert diagnostics["rows"][0]["nfev"] == result.solver_metadata["nfev"]
+    assert "not validation, calibration" in diagnostics["rows"][0]["allowed_use"]
+    assert "does not infer scientific values" in diagnostics["rows"][0]["interpretation_guardrail"]
+    assert rows[0]["config_name"] == "toy homogeneous A to B benchmark"
+    assert rows[0]["solver_backend"] == "scipy.solve_ivp"
+    assert rows[0]["solver_success"] == "True"
+    assert rows[0]["configured_time_evaluation_count"] == "11"
+    assert "solver_diagnostics.json" in manifest["files"]
+    assert "solver_diagnostics.csv" in manifest["files"]
+
+
+def test_configured_output_writes_header_only_solver_diagnostics_without_metadata(tmp_path) -> None:
+    config = load_model_config(MODEL_CONFIGS / "toy_homogeneous_ab.yml")
+    inputs = ConfiguredInputLoader().load(config)
+    assembly = ConfiguredProcessAssembler().assemble(config, inputs)
+    result = assembly.model.run(
+        initial_state=inputs.initial_state,
+        t_span=inputs.t_span,
+        t_eval=inputs.t_eval,
+        label=config.mode,
+        name=config.name,
+    )
+    result.solver_metadata = {}
+    output_dir = tmp_path / "no_solver_metadata"
+
+    ConfiguredOutputWriter().write_result_bundle(
+        config=config,
+        inputs=inputs,
+        decisions=assembly.decisions,
+        result=result,
+        output_dir=output_dir,
+    )
+
+    diagnostics = json.loads((output_dir / "solver_diagnostics.json").read_text(encoding="utf-8"))
+    with (output_dir / "solver_diagnostics.csv").open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+    manifest = json.loads((output_dir / "output_manifest.json").read_text(encoding="utf-8"))
+
+    assert diagnostics["kind"] == "configured_solver_diagnostics"
+    assert diagnostics["metadata_available"] is False
+    assert diagnostics["row_count"] == 0
+    assert diagnostics["status"] == "unavailable"
+    assert diagnostics["missing_metadata_fields"] == [
+        "backend",
+        "method",
+        "success",
+        "status",
+        "message",
+        "nfev",
+        "njev",
+        "nlu",
+    ]
+    assert diagnostics["rows"] == []
+    assert rows == []
+    assert "solver_backend" in (reader.fieldnames or ())
+    assert "nfev" in (reader.fieldnames or ())
+    assert "solver_diagnostics.json" in manifest["files"]
+    assert "solver_diagnostics.csv" in manifest["files"]
 
 
 def test_configured_mass_balance_missing_state_remains_explicit(tmp_path) -> None:
@@ -804,6 +902,8 @@ def _expected_configured_output_files() -> tuple[str, ...]:
         "validators.json",
         "conservation_diagnostics.json",
         "conservation_diagnostics.csv",
+        "solver_diagnostics.json",
+        "solver_diagnostics.csv",
         "merged_parameters.json",
         "run_environment.json",
         "package_versions.json",

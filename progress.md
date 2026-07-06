@@ -26,13 +26,51 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-36 Configured-Output Solver Diagnostics
+
+Date: 2026-07-06
+
+Status: `complete` for the scoped PR-36 configured-output solver diagnostics
+slice once merged; recommended next is a small simulator diagnostics visibility
+follow-up, and VALIDATION-DATA-001 remains `deferred; blocked/partial` for
+ingestion.
+
+Completed in this pass:
+
+- Added `solver_diagnostics.json` and `solver_diagnostics.csv` to configured
+  result bundles.
+- Derived diagnostics only from existing configured run metadata, solver
+  settings, solver metadata, time-grid/evaluation counts, state counts, and
+  process counts already available on the configured workflow result/model.
+- Recorded config/run identity, model version, state/process counts, configured
+  time-grid bounds and evaluation count, result time-point count, solver
+  backend, method, success/status/message, nfev/njev/nlu, tolerances, optional
+  max step, allowed-use text, and interpretation guardrails where solver
+  metadata exists.
+- Wrote deterministic header-only CSV plus JSON `status: unavailable` behavior
+  when solver metadata is absent.
+- Updated configured-output tests, manifest expectations, active README
+  capability text, roadmap/status docs, validation-gate current-next wording,
+  and roadmap orchestration status tests.
+
+No solver behavior, numerical threshold, validation rule, calibration routine,
+empirical comparison claim, validation data, biology record, thermodynamic
+enforcement, hidden notebook science, silent fallback constant, or scientific
+inference was added.
+
+Recommended next task: after PR-36 merges, choose a small simulator diagnostics
+visibility follow-up that remains metadata/table-derived, such as exposing
+configured solver diagnostics through a public inspection example or improving
+configured bundle navigation without changing solver or scientific behavior.
+
 ## PR-35 Repository Hygiene Guardrail Extension
 
 Date: 2026-07-06
 
 Status: `complete` for the scoped PR-35 repository hygiene guardrail extension
-once merged; recommended next is a simulator-building diagnostics follow-up,
-and VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+after PR #50 merged; PR-36 configured-output solver diagnostics is the current
+next build-first simulator diagnostics slice, and VALIDATION-DATA-001 remains
+`deferred; blocked/partial` for ingestion.
 
 Completed in this pass:
 
@@ -56,9 +94,9 @@ No code behavior, solver behavior, validation rule, calibration routine,
 notebook output, validation data, biology record, thermodynamics, empirical
 comparison claim, scientific output schema, or numerical behavior changed.
 
-Recommended next task: choose a focused simulator-building diagnostics
-follow-up that improves inspectability without changing scientific or
-numerical behavior unless explicitly tested.
+Recommended next task: complete PR-36 configured-output solver diagnostics as
+a focused simulator diagnostics slice that improves inspectability without
+changing scientific or numerical behavior unless explicitly tested.
 
 ## PR-34 Configured-Output Conservation/Drift Diagnostics
 

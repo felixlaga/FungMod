@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-34 after PR #49 merged, with PR-35 selected:
+Scoped status as of PR-35 after PR #50 merged, with PR-36 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -141,6 +141,15 @@ CSV and `evaluated_count: 0` JSON behavior are used when no explicit configured
 mass-balance weights exist. These artifacts are not validation, calibration,
 threshold changes, thermodynamic enforcement, solver changes, or biology
 claims.
+Configured output bundles now also include `solver_diagnostics.json` and
+`solver_diagnostics.csv` for existing configured run metadata, solver
+settings, solver metadata, time-grid/evaluation counts, state counts, and
+process counts only. They expose recorded solver method/backend/status/message
+and nfev/njev/nlu fields when present, and use header-only CSV plus JSON
+`status: unavailable` behavior when solver metadata is absent. These artifacts
+are not solver behavior changes, numerical thresholds, validation,
+calibration, empirical comparison, thermodynamic enforcement, inferred
+scientific values, or biology claims.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier, registry-backed case-template
 assembly, and a non-PET configured framework benchmark when explicit
@@ -152,7 +161,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-35: focused repository hygiene guardrail extension**.
+Current next PR: **PR-36: configured-output solver diagnostics**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -175,14 +184,17 @@ chain-template explicit environment modifier assembly slice after PR #48
 merged. PR-34 completed configured-output conservation/drift diagnostics after
 PR #49 merged, deriving a small diagnostics artifact from existing
 `SimulationResult` trajectories and explicit configured `mass_balance`
-`conserved_weights` only. The selected PR-35 work is a focused repository
-hygiene guardrail extension that keeps generated artifacts already covered by
-`.gitignore` out of git while preserving the tracked final-goal HTML plan. It
-does not add validation data, calibration, empirical comparison, threshold
-changes, thermodynamic enforcement, solver/model behavior changes, hidden
-notebook science, silent fallback constants, inferred environment responses,
-or new biology claims. Recommended next after PR-35: a simulator-building
-diagnostics follow-up.
+`conserved_weights` only. PR-35 completed a focused repository hygiene
+guardrail extension after PR #50 merged, keeping generated artifacts already
+covered by `.gitignore` out of git while preserving the tracked final-goal HTML
+plan. The selected PR-36 work is configured-output solver diagnostics derived
+from existing configured run metadata, solver settings, solver metadata,
+time-grid/evaluation counts, state counts, and process counts only. It does
+not add validation data, calibration, empirical comparison, threshold changes,
+thermodynamic enforcement, solver/model behavior changes, hidden notebook
+science, silent fallback constants, inferred environment responses, or new
+biology claims. Recommended next after PR-36: a small simulator diagnostics
+visibility follow-up.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

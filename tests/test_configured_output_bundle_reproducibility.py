@@ -30,6 +30,8 @@ def test_configured_output_manifest_lists_existing_reproducibility_files(tmp_pat
         "package_versions.json",
         "source_revision.json",
         "solver_settings.json",
+        "solver_diagnostics.json",
+        "solver_diagnostics.csv",
         "process_build_decisions.json",
     ):
         assert required_file in manifest["files"]
@@ -40,6 +42,11 @@ def test_configured_output_manifest_lists_existing_reproducibility_files(tmp_pat
     solver = _json(output_dir / "solver_settings.json")
     assert solver["solver_settings"]["method"] == result.solver_settings.method
     assert solver["solver_metadata"]["backend"] == "scipy.solve_ivp"
+
+    solver_diagnostics = _json(output_dir / "solver_diagnostics.json")
+    assert solver_diagnostics["kind"] == "configured_solver_diagnostics"
+    assert solver_diagnostics["metadata_available"] is True
+    assert solver_diagnostics["rows"][0]["solver_backend"] == "scipy.solve_ivp"
 
     packages = _json(output_dir / "package_versions.json")
     assert packages["fungal_model"]["version"] == result.model_version
