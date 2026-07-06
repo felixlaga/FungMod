@@ -18,6 +18,11 @@ from fungal_model.io.model_config import ModelConfig
 from fungal_model.registry.records import CaseTemplateRecord, ParameterRecord
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.results import SimulationResult
+from fungal_model.screening.template_environment_modifiers import (
+    ENVIRONMENT_MODIFIER_TYPES,
+    build_template_environment_entity,
+    build_template_environment_modifier,
+)
 from fungal_model.workflows import run_configured_model
 
 
@@ -63,6 +68,7 @@ class ChainTemplateSpec:
     processes: tuple[Mapping[str, Any], ...]
     conservation: ChainConservationSpec
     outputs: Mapping[str, Any]
+    environment_id: str | None
 
 
 @dataclass(frozen=True)
@@ -88,11 +94,30 @@ def build_extracellular_enzyme_chain_config(
     *,
     registry: FungModRegistry,
     template_id: str = BIO002_ENZYME_CHAIN_TEMPLATE_ID,
+    environment_id: str | None = None,
     output_directory: str | Path | None = None,
 ) -> ModelConfig:
     """Build an extracellular enzyme-chain ``ModelConfig`` from registry metadata."""
 
-    chain = _chain_spec(registry=registry, template_id=template_id)
+    chain = _chain_spec(registry=registry, template_id=template_id, environment_id=environment_id)
+    processes = [
+        _process_config(process, chain=chain, registry=registry)
+        for process in chain.processes
+    ]
+    entities = {
+        **_configured_entities(chain.metadata),
+        "product_maps": [
+            _product_map_entity(product_map, chain=chain)
+            for product_map in chain.product_maps
+        ],
+    }
+    environment_entity = _chain_environment_entity(
+        registry=registry,
+        chain=chain,
+        processes=processes,
+    )
+    if environment_entity is not None:
+        entities["environment"] = environment_entity
     data = {
         "kind": "model_config",
         "name": _metadata_text(chain.metadata, "config_name", chain.template.name),
@@ -102,13 +127,7 @@ def build_extracellular_enzyme_chain_config(
         "case_template": _case_template_config(chain),
         "chain_outputs": deepcopy(dict(chain.outputs)),
         "suggested_experiments": _suggested_experiments(chain.metadata),
-        "entities": {
-            **_configured_entities(chain.metadata),
-            "product_maps": [
-                _product_map_entity(product_map, chain=chain)
-                for product_map in chain.product_maps
-            ],
-        },
+        "entities": entities,
         "parameters": [
             {
                 "id": "enzyme_chain_parameters",
@@ -118,10 +137,7 @@ def build_extracellular_enzyme_chain_config(
                 ],
             }
         ],
-        "processes": [
-            _process_config(process, chain=chain)
-            for process in chain.processes
-        ],
+        "processes": processes,
         "initial_state": _initial_state(chain),
         "time": _time_config(chain.template),
         "validators": _validators(chain),
@@ -139,6 +155,7 @@ def run_extracellular_enzyme_chain_demo(
     registry: FungModRegistry,
     output_dir: str | Path,
     template_id: str = BIO002_ENZYME_CHAIN_TEMPLATE_ID,
+    environment_id: str | None = None,
 ) -> EnzymeChainRunResult:
     """Build, run, and table an extracellular enzyme-chain demo template."""
 
@@ -148,6 +165,7 @@ def run_extracellular_enzyme_chain_demo(
     config = build_extracellular_enzyme_chain_config(
         registry=registry,
         template_id=template_id,
+        environment_id=environment_id,
         output_directory=bundle_dir,
     )
     config_path = root / "model_config.yml"
@@ -194,7 +212,12 @@ def write_enzyme_chain_standard_tables(
     return {name: str(path) for name, path in paths.items()}
 
 
-def _chain_spec(*, registry: FungModRegistry, template_id: str) -> ChainTemplateSpec:
+def _chain_spec(
+    *,
+    registry: FungModRegistry,
+    template_id: str,
+    environment_id: str | None,
+) -> ChainTemplateSpec:
     template = _chain_template(registry, template_id)
     metadata = _chain_metadata(template)
     state_roles = dict(template.state_roles)
@@ -202,6 +225,12 @@ def _chain_spec(*, registry: FungModRegistry, template_id: str) -> ChainTemplate
     state_units = _state_units(template, parameter_records=parameter_records)
     product_maps = _mapping_sequence(metadata.get("product_maps"), field_name="process_state_metadata.product_maps")
     processes = _mapping_sequence(metadata.get("process_templates"), field_name="process_state_metadata.process_templates")
+    resolved_environment_id = _chain_environment_id(
+        metadata=metadata,
+        requested_environment_id=environment_id,
+        requires_environment=_process_templates_require_environment(processes),
+        template_id=template.case_template_id,
+    )
     if len(processes) != 2:
         raise EnzymeChainAssemblyError(
             f"Template {template.case_template_id!r} must declare exactly two process_templates for a two-step chain."
@@ -232,6 +261,7 @@ def _chain_spec(*, registry: FungModRegistry, template_id: str) -> ChainTemplate
         processes=processes,
         conservation=conservation,
         outputs=outputs,
+        environment_id=resolved_environment_id,
     )
 
 
@@ -363,6 +393,44 @@ def _configured_entities(metadata: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _chain_environment_id(
+    *,
+    metadata: Mapping[str, Any],
+    requested_environment_id: str | None,
+    requires_environment: bool,
+    template_id: str,
+) -> str | None:
+    if requested_environment_id is not None and str(requested_environment_id).strip():
+        return str(requested_environment_id)
+    configured_environment_id = str(metadata.get("environment_id", "")).strip()
+    if configured_environment_id:
+        return configured_environment_id
+    if requires_environment:
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} declares environment modifiers but no explicit environment_id was supplied "
+            "to chain assembly or process_state_metadata.environment_id."
+        )
+    return None
+
+
+def _process_templates_require_environment(processes: Sequence[Mapping[str, Any]]) -> bool:
+    for spec in processes:
+        process_id = str(spec.get("id", ""))
+        for modifier in _mapping_sequence(
+            spec.get("modifiers"),
+            field_name=f"process_template {process_id}.modifiers",
+            allow_empty=True,
+        ):
+            modifier_type = _required_text(
+                modifier,
+                "type",
+                field_name=f"process_template {process_id}.modifiers",
+            )
+            if modifier_type in ENVIRONMENT_MODIFIER_TYPES:
+                return True
+    return False
+
+
 def _entity_reference(
     value: Mapping[str, Any],
     *,
@@ -471,6 +539,7 @@ def _process_config(
     spec: Mapping[str, Any],
     *,
     chain: ChainTemplateSpec,
+    registry: FungModRegistry,
 ) -> dict[str, Any]:
     process_id = _required_text(spec, "id", field_name="process_state_metadata.process_templates")
     process_type = _required_text(spec, "process_type", field_name=f"process_template {process_id}")
@@ -513,7 +582,12 @@ def _process_config(
         "states": states,
         "parameters": parameters,
         "product_map": product_map,
-        "modifiers": _process_modifiers(spec, chain=chain, process_id=process_id),
+        "modifiers": _process_modifiers(
+            spec,
+            chain=chain,
+            registry=registry,
+            process_id=process_id,
+        ),
         "output_state_roles": dict(chain.state_roles),
         "assumptions": [str(item) for item in spec.get("assumptions", ()) or ()],
     }
@@ -523,6 +597,7 @@ def _process_modifiers(
     spec: Mapping[str, Any],
     *,
     chain: ChainTemplateSpec,
+    registry: FungModRegistry,
     process_id: str,
 ) -> list[dict[str, Any]]:
     modifiers: list[dict[str, Any]] = []
@@ -534,6 +609,34 @@ def _process_modifiers(
             "type",
             field_name=f"process_template {process_id}.modifiers[{index}]",
         )
+        if modifier_type in ENVIRONMENT_MODIFIER_TYPES:
+            if chain.environment_id is None:
+                raise EnzymeChainAssemblyError(
+                    f"Process template {process_id!r} modifier {modifier_type!r} requires an explicit environment_id."
+                )
+            modifiers.append(
+                build_template_environment_modifier(
+                    template_id=chain.template.case_template_id,
+                    parameter_symbols={
+                        role: record.parameter_symbol
+                        for role, record in chain.parameter_records.items()
+                    },
+                    registry=registry,
+                    environment_id=chain.environment_id,
+                    modifier=modifier,
+                    modifier_type=modifier_type,
+                    index=index,
+                    modifier_label=(
+                        f"Template {chain.template.case_template_id!r} process {process_id!r} "
+                        f"modifiers[{index}]"
+                    ),
+                    unresolved_label=(
+                        f"Template {chain.template.case_template_id!r} process {process_id!r} modifier"
+                    ),
+                    error_type=EnzymeChainAssemblyError,
+                )
+            )
+            continue
         if modifier_type != "product_inhibition":
             raise EnzymeChainAssemblyError(
                 f"Process template {process_id!r} declares unsupported modifier type {modifier_type!r}."
@@ -570,6 +673,26 @@ def _process_modifiers(
             }
         )
     return modifiers
+
+
+def _chain_environment_entity(
+    *,
+    registry: FungModRegistry,
+    chain: ChainTemplateSpec,
+    processes: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    modifiers: list[dict[str, Any]] = []
+    for process in processes:
+        for modifier in process.get("modifiers", ()) or ():
+            modifiers.append(dict(modifier))
+    if chain.environment_id is None:
+        return None
+    return build_template_environment_entity(
+        registry=registry,
+        environment_id=chain.environment_id,
+        modifiers=modifiers,
+        error_type=EnzymeChainAssemblyError,
+    )
 
 
 def _validate_product_map_ids(template: CaseTemplateRecord, specs: Sequence[Mapping[str, Any]]) -> None:
@@ -668,6 +791,8 @@ def _validate_process_templates(
                 "type",
                 field_name=f"process_template {process_id}.modifiers[{index}]",
             )
+            if modifier_type in ENVIRONMENT_MODIFIER_TYPES:
+                continue
             if modifier_type != "product_inhibition":
                 raise EnzymeChainAssemblyError(
                     f"Template {template.case_template_id!r} process {process_id!r} declares unsupported "

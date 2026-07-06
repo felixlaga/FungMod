@@ -176,6 +176,245 @@ def test_registry_product_inhibition_rejects_non_positive_ki_without_fallback(tm
     assert "Product inhibition constant must be positive" in report["message"]
 
 
+def test_registry_chain_template_emits_temperature_ph_environment_modifiers(tmp_path: Path) -> None:
+    base_registry = load_registry(REGISTRY_INDEX)
+    modified_registry_dir = _registry_with_bio002_environment_modifiers(
+        tmp_path / "modified",
+        modifier_set="temperature_ph",
+    )
+    modified_registry = load_registry(modified_registry_dir / "registry_index.yml")
+
+    base_config = build_extracellular_enzyme_chain_config(
+        registry=base_registry,
+        environment_id=REACTION_ENVIRONMENT_ID,
+        output_directory=tmp_path / "base_chain_outputs",
+    )
+    modified_config = build_extracellular_enzyme_chain_config(
+        registry=modified_registry,
+        environment_id=REACTION_ENVIRONMENT_ID,
+        output_directory=tmp_path / "temperature_ph_outputs",
+    )
+    modified_data = modified_config.to_dict()
+
+    assert modified_data["entities"]["environment"]["id"] == REACTION_ENVIRONMENT_ID
+    assert set(modified_data["entities"]["environment"]["data"]["conditions"]) == {"temperature", "ph"}
+    assert modified_data["processes"][1]["modifiers"] == [
+        {
+            "type": "temperature_arrhenius_reference",
+            "activation_energy_symbol": "E_a_bio002_chain_env_fixture",
+            "reference_temperature_symbol": "T_ref_bio002_chain_env_fixture",
+        },
+        {
+            "type": "ph_gaussian",
+            "optimum_symbol": "pH_opt_bio002_chain_env_fixture",
+            "width_symbol": "pH_width_bio002_chain_env_fixture",
+        },
+    ]
+
+    base_path = tmp_path / "bio002_base_chain.yml"
+    modified_path = tmp_path / "bio002_temperature_ph_chain.yml"
+    base_path.write_text(yaml.safe_dump(base_config.to_dict(), sort_keys=False), encoding="utf-8")
+    modified_path.write_text(yaml.safe_dump(modified_data, sort_keys=False), encoding="utf-8")
+    base_result = run_configured_model(base_path, output_dir=tmp_path / "base_chain_outputs")
+    modified_result = run_configured_model(modified_path, output_dir=tmp_path / "temperature_ph_outputs")
+    metadata = json.loads((tmp_path / "temperature_ph_outputs" / "configured_metadata.json").read_text(encoding="utf-8"))
+    environment_snapshot = json.loads(
+        (tmp_path / "temperature_ph_outputs" / "entity_snapshots" / "environment.json").read_text(encoding="utf-8")
+    )
+
+    assert max(modified_result.process_rates["bio002_cellobiose_to_glucose_mm"].magnitude) != pytest.approx(
+        max(base_result.process_rates["bio002_cellobiose_to_glucose_mm"].magnitude)
+    )
+    assert environment_snapshot["temperature"]["value"] == pytest.approx(303.15)
+    assert environment_snapshot["ph"]["value"] == pytest.approx(5.0)
+    assert metadata["configured_process_modifiers"] == [
+        {
+            "process_id": "bio002_cellobiose_to_glucose_mm",
+            "modifier_index": 0,
+            "type": "temperature_arrhenius_reference",
+            "environment_value": "temperature",
+            "activation_energy_symbol": "E_a_bio002_chain_env_fixture",
+            "reference_temperature_symbol": "T_ref_bio002_chain_env_fixture",
+            "minimum_temperature_symbol": "",
+            "maximum_temperature_symbol": "",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Arrhenius reference-temperature scaling only; configured only when environment "
+                "temperature and explicit unit-compatible parameters are present."
+            ),
+        },
+        {
+            "process_id": "bio002_cellobiose_to_glucose_mm",
+            "modifier_index": 1,
+            "type": "ph_gaussian",
+            "environment_value": "ph",
+            "optimum_symbol": "pH_opt_bio002_chain_env_fixture",
+            "width_symbol": "pH_width_bio002_chain_env_fixture",
+            "minimum_ph_symbol": "",
+            "maximum_ph_symbol": "",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Gaussian empirical pH activity scaling only; configured only when environment "
+                "pH and explicit unit-compatible parameters are present."
+            ),
+        },
+    ]
+
+
+def test_registry_chain_template_emits_oxygen_water_activity_environment_modifiers(tmp_path: Path) -> None:
+    registry_dir = _registry_with_bio002_environment_modifiers(tmp_path, modifier_set="oxygen_water")
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    config = build_extracellular_enzyme_chain_config(
+        registry=registry,
+        environment_id=REACTION_ENVIRONMENT_ID,
+        output_directory=tmp_path / "oxygen_water_outputs",
+    )
+    data = config.to_dict()
+
+    assert set(data["entities"]["environment"]["data"]["conditions"]) == {"oxygen_concentration", "water_activity"}
+    assert data["processes"][1]["modifiers"] == [
+        {
+            "type": "oxygen_monod",
+            "half_saturation_symbol": "K_O2_bio002_chain_env_fixture",
+            "oxygen_units": "mole / liter",
+        },
+        {
+            "type": "water_activity_threshold",
+            "minimum_water_activity_symbol": "a_w_min_bio002_chain_env_fixture",
+        },
+    ]
+
+    config_path = tmp_path / "bio002_oxygen_water_chain.yml"
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    result = run_configured_model(config_path, output_dir=tmp_path / "oxygen_water_outputs")
+    metadata = json.loads((tmp_path / "oxygen_water_outputs" / "configured_metadata.json").read_text(encoding="utf-8"))
+    environment_snapshot = json.loads(
+        (tmp_path / "oxygen_water_outputs" / "entity_snapshots" / "environment.json").read_text(encoding="utf-8")
+    )
+
+    assert result.solver_metadata["success"] is True
+    assert environment_snapshot["oxygen_concentration"]["value"] == pytest.approx(0.00025)
+    assert environment_snapshot["water_activity"]["value"] == pytest.approx(0.96)
+    assert metadata["configured_process_modifiers"] == [
+        {
+            "process_id": "bio002_cellobiose_to_glucose_mm",
+            "modifier_index": 0,
+            "type": "oxygen_monod",
+            "environment_value": "oxygen_concentration",
+            "half_saturation_symbol": "K_O2_bio002_chain_env_fixture",
+            "oxygen_units": "mole / liter",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Monod oxygen scaling only; configured only when environment oxygen concentration "
+                "and explicit positive unit-compatible half-saturation are present. No oxygen consumption, "
+                "gas transfer, redox balance, or anaerobic metabolism."
+            ),
+        },
+        {
+            "process_id": "bio002_cellobiose_to_glucose_mm",
+            "modifier_index": 1,
+            "type": "water_activity_threshold",
+            "environment_value": "water_activity",
+            "minimum_water_activity_symbol": "a_w_min_bio002_chain_env_fixture",
+            "maturity": "exploratory_configured_mechanism",
+            "limitation": (
+                "Binary water-activity threshold scaling only; configured only when environment water activity "
+                "and an explicit unit-compatible threshold parameter are present. No smooth response curve, "
+                "hysteresis, substrate water binding, or spatial moisture model."
+            ),
+        },
+    ]
+
+
+def test_registry_chain_environment_modifier_requires_environment_condition(tmp_path: Path) -> None:
+    registry_dir = _registry_with_bio002_environment_modifiers(
+        tmp_path,
+        modifier_set="oxygen_water",
+        include_environment_oxygen=False,
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="requires environment condition 'oxygen_concentration'"):
+        build_extracellular_enzyme_chain_config(
+            registry=registry,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            output_directory=tmp_path / "missing_environment_oxygen",
+        )
+
+
+def test_registry_chain_environment_modifier_requires_exact_environment_value(tmp_path: Path) -> None:
+    registry_dir = _registry_with_bio002_environment_modifiers(
+        tmp_path,
+        modifier_set="temperature_ph",
+        ph_value_kind="range",
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="requires exact environment condition 'ph'"):
+        build_extracellular_enzyme_chain_config(
+            registry=registry,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            output_directory=tmp_path / "non_exact_ph",
+        )
+
+
+def test_registry_chain_environment_modifier_requires_role_field(tmp_path: Path) -> None:
+    registry_dir = _registry_with_bio002_environment_modifiers(
+        tmp_path,
+        modifier_set="temperature_ph",
+        include_ph_width_role=False,
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="requires width_role"):
+        build_extracellular_enzyme_chain_config(
+            registry=registry,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            output_directory=tmp_path / "missing_width_role",
+        )
+
+
+def test_registry_chain_environment_modifier_requires_resolved_role(tmp_path: Path) -> None:
+    registry_dir = _registry_with_bio002_environment_modifiers(
+        tmp_path,
+        modifier_set="temperature_ph",
+        ph_width_role="missing_ph_width_role",
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="width_role 'missing_ph_width_role'"):
+        build_extracellular_enzyme_chain_config(
+            registry=registry,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            output_directory=tmp_path / "unresolved_width_role",
+        )
+
+
+def test_registry_chain_environment_modifier_requires_oxygen_units_field(tmp_path: Path) -> None:
+    registry_dir = _registry_with_bio002_environment_modifiers(
+        tmp_path,
+        modifier_set="oxygen_water",
+        include_oxygen_units=False,
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="requires oxygen_units"):
+        build_extracellular_enzyme_chain_config(
+            registry=registry,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            output_directory=tmp_path / "missing_oxygen_units",
+        )
+
+
+def test_registry_chain_environment_modifier_requires_explicit_environment_id(tmp_path: Path) -> None:
+    registry_dir = _registry_with_bio002_environment_modifiers(tmp_path, modifier_set="temperature_ph")
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="no explicit environment_id"):
+        build_extracellular_enzyme_chain_config(registry=registry, output_directory=tmp_path / "missing_environment_id")
+
+
 def test_one_process_registry_template_emits_configured_product_inhibition_modifier(tmp_path: Path) -> None:
     registry_dir = _registry_with_reaction618_process_modifier(tmp_path)
     registry = load_registry(registry_dir / "registry_index.yml")
@@ -635,6 +874,215 @@ def _registry_with_bio002_product_inhibition(
         )
         parameter_path.write_text(yaml.safe_dump(parameter_data, sort_keys=False), encoding="utf-8")
     return registry_dir
+
+
+def _registry_with_bio002_environment_modifiers(
+    tmp_path: Path,
+    *,
+    modifier_set: str,
+    ph_width_role: str = "ph_width",
+    include_ph_width_role: bool = True,
+    include_environment_oxygen: bool = True,
+    include_oxygen_units: bool = True,
+    ph_value_kind: str = "exact",
+) -> Path:
+    registry_dir = _copy_registry(tmp_path)
+
+    template_path = registry_dir / "case_templates" / "case_templates.yml"
+    template_data = _yaml_mapping(template_path)
+    for record in cast(list[dict[str, Any]], template_data["records"]):
+        if record["record_id"] == "bio002_extracellular_enzyme_chain_template":
+            metadata = record["process_state_metadata"]
+            if modifier_set == "temperature_ph":
+                metadata["parameter_record_ids"].update(
+                    {
+                        "activation_energy": "bio002_chain_activation_energy_fixture",
+                        "reference_temperature": "bio002_chain_reference_temperature_fixture",
+                        "ph_optimum": "bio002_chain_ph_optimum_fixture",
+                        "ph_width": "bio002_chain_ph_width_fixture",
+                    }
+                )
+                ph_modifier = {
+                    "type": "ph_gaussian",
+                    "optimum_role": "ph_optimum",
+                }
+                if include_ph_width_role:
+                    ph_modifier["width_role"] = ph_width_role
+                metadata["process_templates"][1]["modifiers"] = [
+                    {
+                        "type": "temperature_arrhenius_reference",
+                        "activation_energy_role": "activation_energy",
+                        "reference_temperature_role": "reference_temperature",
+                    },
+                    ph_modifier,
+                ]
+            elif modifier_set == "oxygen_water":
+                metadata["parameter_record_ids"].update(
+                    {
+                        "oxygen_half_saturation": "bio002_chain_oxygen_half_saturation_fixture",
+                        "minimum_water_activity": "bio002_chain_minimum_water_activity_fixture",
+                    }
+                )
+                oxygen_modifier = {
+                    "type": "oxygen_monod",
+                    "half_saturation_role": "oxygen_half_saturation",
+                }
+                if include_oxygen_units:
+                    oxygen_modifier["oxygen_units"] = "mole / liter"
+                metadata["process_templates"][1]["modifiers"] = [
+                    oxygen_modifier,
+                    {
+                        "type": "water_activity_threshold",
+                        "minimum_water_activity_role": "minimum_water_activity",
+                    },
+                ]
+            else:
+                raise AssertionError(f"Unknown modifier set {modifier_set!r}")
+            break
+    else:
+        raise AssertionError("Missing BIO-002 chain template")
+    template_path.write_text(yaml.safe_dump(template_data, sort_keys=False), encoding="utf-8")
+
+    parameter_path = registry_dir / "parameters" / "parameter_records.yml"
+    parameter_data = _yaml_mapping(parameter_path)
+    parameter_records = cast(list[dict[str, Any]], parameter_data["records"])
+    if modifier_set == "temperature_ph":
+        parameter_records[0:0] = [
+            _chain_environment_modifier_parameter_record(
+                record_id="bio002_chain_activation_energy_fixture",
+                name="BIO-002 chain Arrhenius activation energy fixture",
+                symbol="E_a_bio002_chain_env_fixture",
+                value=50000.0,
+                units="joule / mole",
+                notes="Artificial activation energy for chain environment-modifier tests; not a fitted response.",
+            ),
+            _chain_environment_modifier_parameter_record(
+                record_id="bio002_chain_reference_temperature_fixture",
+                name="BIO-002 chain Arrhenius reference temperature fixture",
+                symbol="T_ref_bio002_chain_env_fixture",
+                value=293.15,
+                units="kelvin",
+                notes="Artificial reference temperature for chain environment-modifier tests; not a fitted response.",
+            ),
+            _chain_environment_modifier_parameter_record(
+                record_id="bio002_chain_ph_optimum_fixture",
+                name="BIO-002 chain pH optimum fixture",
+                symbol="pH_opt_bio002_chain_env_fixture",
+                value=6.0,
+                units="dimensionless",
+                notes="Artificial pH optimum for chain environment-modifier tests; not a fitted response.",
+            ),
+            _chain_environment_modifier_parameter_record(
+                record_id="bio002_chain_ph_width_fixture",
+                name="BIO-002 chain pH width fixture",
+                symbol="pH_width_bio002_chain_env_fixture",
+                value=1.5,
+                units="dimensionless",
+                notes="Artificial pH width for chain environment-modifier tests; not a fitted response.",
+            ),
+        ]
+    else:
+        parameter_records[0:0] = [
+            _chain_environment_modifier_parameter_record(
+                record_id="bio002_chain_oxygen_half_saturation_fixture",
+                name="BIO-002 chain oxygen half-saturation fixture",
+                symbol="K_O2_bio002_chain_env_fixture",
+                value=0.0001,
+                units="mole / liter",
+                notes="Artificial oxygen half-saturation for chain environment-modifier tests; not a fitted response.",
+            ),
+            _chain_environment_modifier_parameter_record(
+                record_id="bio002_chain_minimum_water_activity_fixture",
+                name="BIO-002 chain minimum water-activity fixture",
+                symbol="a_w_min_bio002_chain_env_fixture",
+                value=0.75,
+                units="dimensionless",
+                notes="Artificial water-activity threshold for chain environment-modifier tests; not a fitted response.",
+            ),
+        ]
+    parameter_path.write_text(yaml.safe_dump(parameter_data, sort_keys=False), encoding="utf-8")
+
+    environment_path = registry_dir / "environments" / "environments.yml"
+    environment_data = _yaml_mapping(environment_path)
+    for record in cast(list[dict[str, Any]], environment_data["records"]):
+        if record["record_id"] == REACTION_ENVIRONMENT_ID:
+            conditions = record["conditions"]
+            if ph_value_kind == "range":
+                conditions["ph"] = {
+                    "kind": "range",
+                    "lower": 4.8,
+                    "upper": 5.2,
+                    "units": "dimensionless",
+                    "source": "FungMod PR-33 chain environment-modifier software test fixture.",
+                    "confidence_level": "testing",
+                    "notes": "Artificial pH range used to prove exact-value guardrails.",
+                }
+            if modifier_set == "oxygen_water":
+                if include_environment_oxygen:
+                    conditions["oxygen_concentration"] = {
+                        "kind": "exact",
+                        "value": 0.00025,
+                        "units": "mole / liter",
+                        "source": "FungMod PR-33 chain environment-modifier software test fixture.",
+                        "confidence_level": "testing",
+                        "notes": "Artificial exact oxygen value for configured modifier assembly tests.",
+                    }
+                else:
+                    conditions.pop("oxygen_concentration", None)
+                conditions["water_activity"] = {
+                    "kind": "exact",
+                    "value": 0.96,
+                    "units": "dimensionless",
+                    "source": "FungMod PR-33 chain environment-modifier software test fixture.",
+                    "confidence_level": "testing",
+                    "notes": "Artificial exact water activity for configured modifier assembly tests.",
+                }
+            break
+    else:
+        raise AssertionError("Missing Reaction 618 environment")
+    environment_path.write_text(yaml.safe_dump(environment_data, sort_keys=False), encoding="utf-8")
+    return registry_dir
+
+
+def _chain_environment_modifier_parameter_record(
+    *,
+    record_id: str,
+    name: str,
+    symbol: str,
+    value: float,
+    units: str,
+    notes: str,
+) -> dict[str, Any]:
+    return {
+        "record_id": record_id,
+        "name": name,
+        "maturity": "software_test_fixture",
+        "provenance": {
+            "source": "FungMod PR-33 chain environment-modifier software test fixture.",
+            "confidence_level": "testing",
+            "bio_milestone": "PR-33",
+            "notes": notes,
+        },
+        "parameter_symbol": symbol,
+        "process_type": "extracellular_enzyme_chain",
+        "enzyme_class": None,
+        "substrate_class": None,
+        "fungus_id": None,
+        "substrate_id": None,
+        "environment_id": None,
+        "value": {
+            "kind": "exact",
+            "value": value,
+            "units": units,
+            "source": "FungMod PR-33 chain environment-modifier software test fixture.",
+            "confidence_level": "testing",
+            "notes": notes,
+        },
+        "range_scope": "software_test_fixture",
+        "range_interpretation": "configured mechanics only",
+        "allowed_use": "scientific_builder_software_testing_only_not_scientific_validation",
+        "notes": notes,
+    }
 
 
 def _registry_with_reaction618_process_modifier(

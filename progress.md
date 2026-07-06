@@ -26,13 +26,58 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-33 Chain-Template Explicit Environment Modifier Assembly
+
+Date: 2026-07-05
+
+Status: `complete` for the scoped PR-33 chain-template explicit environment
+modifier assembly slice once merged; broader environment-response biology
+remains explicit-config only, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Extended BIO-002-style chain process-template assembly so explicit
+  per-process `modifiers` records can emit configured
+  `temperature_arrhenius_reference`, `ph_gaussian`, `oxygen_monod`, and
+  `water_activity_threshold` modifiers using the same existing configured
+  modifier field names as PR-31.
+- Added explicit chain environment context handling through an optional
+  `environment_id` builder argument and the researcher-facing registry case
+  environment id. Chain templates with environment modifiers now fail if no
+  explicit environment id is supplied by the caller or template metadata.
+- Added package-generated configured environment entities for chain configs
+  when environment modifiers require runtime environment values, sourced only
+  from exact registry environment conditions.
+- Shared the registry-template environment modifier assembly helper between
+  one-process case-template assembly and chain process-template assembly so the
+  same explicit role, exact ValueSpec, oxygen-units, and environment-source
+  guardrails apply.
+- Added copied-registry tests proving chain process templates emit
+  temperature/pH and oxygen/water-activity modifiers, expose exact environment
+  snapshots and configured metadata, change process-rate inspection outputs,
+  and fail clearly for missing role fields, unresolved roles, missing
+  environment context, missing environment conditions, non-exact environment
+  values, and missing oxygen units.
+
+No validation data, calibration routine, empirical comparison claim, fitted
+temperature, pH, oxygen, or water-activity response curve, organism-specific
+physiology, inferred environment response, oxygen consumption state, gas
+transfer, redox balance, anaerobic metabolism, substrate water-binding model,
+EnvironmentGrid behavior change, new response law, solver-time thermodynamic
+enforcement, hidden notebook science, or silent fallback constant was added.
+
+Recommended next task: choose a focused PR-34 simulator diagnostics slice, such
+as solver diagnostics or conservation/drift diagnostics, unless review finds a
+smaller follow-up in the chain-template modifier path.
+
 ## PR-32 Repository Hygiene Cleanup
 
 Date: 2026-07-05
 
-Status: `complete` for the scoped repository hygiene cleanup once merged; no
-scientific, numerical, solver, notebook-output, validation-data, calibration,
-or biology behavior changed.
+Status: `complete` for the scoped repository hygiene cleanup after PR #47
+merged; no scientific, numerical, solver, notebook-output, validation-data,
+calibration, or biology behavior changed.
 
 Completed in this pass:
 
@@ -48,8 +93,8 @@ Completed in this pass:
   files such as `.DS_Store`, `.pyc`, `__pycache__`, and
   `.ipynb_checkpoints` are not tracked by git.
 - Updated the active roadmap/status current-next wording after PR #46 so
-  PR-31 is treated as merged and this cleanup slice is the machine-checkable
-  PR-32 current next item until this PR merges.
+  PR-31 was treated as merged and the cleanup slice became the
+  machine-checkable PR-32 current next item until PR #47 merged.
 
 No `old_progress/` content, scientific fixtures, validation datasets, notebook
 outputs, solver behavior, response-law behavior, calibration path, or biology

@@ -99,6 +99,10 @@ basic kinetics layer:
   `temperature_arrhenius_reference`, `ph_gaussian`, `oxygen_monod`, and
   `water_activity_threshold` modifier support only when explicit parameter
   roles and exact registry environment values are supplied;
+- registry-backed BIO-002-style chain-template assembly for those same
+  explicit environment modifier records, using process-template modifier roles
+  and explicit environment ids only, with package-generated environment
+  entities emitted from exact registry environment values when required;
 - an offline-first SABIO-RK source adapter that loads frozen kinetic-law
   snapshots and writes review-only proposed records without mutating the
   simulation registry;
@@ -371,6 +375,11 @@ parameters and the environment defines the required temperature, pH, oxygen
 concentration, or water-activity value. This is explicit configured framework
 behavior, not inferred environment-response biology, calibration, validation,
 or empirical comparison.
+Registry case templates can bridge explicit modifier records into those same
+configured paths for one-process templates and BIO-002-style chain process
+templates when every parameter role resolves and an explicit environment id
+provides exact registry values. Chain assembly does not infer missing
+environment context or silently default values.
 The configured environment-modifier notebook demonstrates this path with a
 temporary artificial framework-benchmark config, then inspects package-generated
 configured metadata, assumptions, merged parameters, entity snapshots, and

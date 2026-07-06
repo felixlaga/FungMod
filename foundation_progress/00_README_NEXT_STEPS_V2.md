@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-31 after PR #46 merged, with PR-32 selected:
+Scoped status as of PR-32 after PR #47 merged, with PR-33 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -123,6 +123,14 @@ values are present. The builder emits a package-generated environment entity
 from those explicit registry values when required and fails before execution
 for missing fields, missing roles, missing environment conditions, non-exact
 environment values, or unsupported modifier types.
+BIO-002-style chain templates can now bridge those same explicit environment
+modifier records from process-template modifier entries into existing
+configured modifier paths when all parameter roles resolve and an explicit
+environment id supplies exact registry environment values. Chain assembly emits
+a package-generated environment entity from those exact values when required
+and fails before execution for missing role fields, unresolved roles, missing
+environment context, missing environment conditions, non-exact environment
+values, missing oxygen units, or unsupported modifier types.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier, registry-backed case-template
 assembly, and a non-PET configured framework benchmark when explicit
@@ -134,7 +142,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-32: repository hygiene cleanup**.
+Current next PR: **PR-33: chain-template explicit environment modifier assembly**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -150,15 +158,18 @@ a public configured-workflow example notebook for those modifiers after
 PR #43 merged, PR-29 completed the explicit `oxygen_monod` and
 `water_activity_threshold` configured modifier wiring after PR #44 merged,
 PR-30 completed the configured oxygen/water-activity example notebook after
-PR #45 merged, and PR-31 completed the one-process registry-backed explicit
-environment modifier assembly slice after PR #46 merged. The selected PR-32
-work is now repository hygiene cleanup: removing tracked generated metadata,
-preventing recurrence, and adding a focused guardrail test without validation
-data, calibration, empirical comparison, fitted curves, silent fallback
-constants, inferred environment responses, oxygen consumption, gas transfer,
-redox balance, anaerobic metabolism, substrate water-binding behavior,
-EnvironmentGrid behavior changes, hidden notebook science, solver/model
-behavior changes, or new biology claims.
+PR #45 merged, PR-31 completed the one-process registry-backed explicit
+environment modifier assembly slice after PR #46 merged, and PR-32 completed
+the repository hygiene cleanup after PR #47 merged. The selected PR-33 work is
+now chain-template explicit environment modifier assembly: bridging explicit
+BIO-002-style process-template modifier records into existing configured
+environment modifier paths without validation data, calibration, empirical
+comparison, fitted curves, silent fallback constants, inferred environment
+responses, oxygen consumption, gas transfer, redox balance, anaerobic
+metabolism, substrate water-binding behavior, EnvironmentGrid behavior
+changes, hidden notebook science, solver/model response-law changes, or new
+biology claims. Recommended next after PR-33: a focused solver diagnostics or
+conservation/drift diagnostics slice.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer
