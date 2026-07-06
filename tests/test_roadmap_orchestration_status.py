@@ -68,16 +68,17 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-34: configured-output conservation/drift diagnostics"
+    current_next = "PR-35: focused repository hygiene guardrail extension"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-34 configured-output conservation/drift diagnostics" in roadmap
+    assert "The current next PR is PR-35 focused repository hygiene guardrail extension" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
     assert "The completed PR-33 slice extends the explicit registry-template environment" in roadmap
-    assert "The current PR-34 slice is limited to configured-output conservation/drift" in roadmap
-    assert "recommended\nnext simulator-building follow-up is a focused cleanup guardrail" in roadmap
+    assert "The completed PR-34 slice is limited to configured-output conservation/drift" in roadmap
+    assert "The current PR-35 slice is limited to\nrepository hygiene guardrails" in roadmap
+    assert "recommended next simulator-building follow-up is a solver diagnostics slice" in roadmap
     assert "PR-30\nconfigured oxygen/water-activity modifier example notebook slice" in roadmap
     assert "PR-29\nexplicit oxygen/water-activity configured modifier wiring slice" in roadmap
     assert "PR-28\nconfigured environment modifier example notebook slice" in roadmap
@@ -114,7 +115,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-34: configured-output conservation/drift diagnostics"
+    current_next = "PR-35: focused repository hygiene guardrail extension"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -146,6 +147,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-31" not in text
         assert "Current next PR: **PR-32" not in text
         assert "Current next PR: **PR-33" not in text
+        assert "Current next PR: **PR-34" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -285,8 +287,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-33 | Chain-template explicit environment modifier assembly" in status
     assert "complete after PR #48 merged for the scoped chain-template environment modifier bridge" in status
     assert "PR-34 | Configured-output conservation/drift diagnostics" in status
-    assert "current next after PR #48 merged and PR-33 completed" in status
-    assert "PR-35 or later | Focused cleanup guardrail or solver diagnostics follow-up" in status
+    assert "complete after PR #49 merged for the scoped configured-output conservation/drift diagnostics slice" in status
+    assert "PR-35 | Focused repository hygiene guardrail extension" in status
+    assert "current next after PR #49 merged and PR-34 completed" in status
+    assert "PR-36 or later | Simulator-building diagnostics follow-up" in status
     assert "Future | VALIDATION-DATA-001" in status
 
 
@@ -334,7 +338,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-34: configured-output conservation/drift diagnostics"
+    current_next = "PR-35: focused repository hygiene guardrail extension"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -367,11 +371,12 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-31" not in _current_next_lines(text)
         assert "PR-32" not in _current_next_lines(text)
         assert "PR-33" not in _current_next_lines(text)
+        assert "PR-34" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
     assert "Status: `deferred; blocked/partial` for ingestion." in gate
-    assert "selected PR-34 work is therefore configured-output\nconservation/drift diagnostics" in gate
+    assert "selected PR-35 work is therefore a focused repository\nhygiene guardrail extension" in gate
     assert "A future validation\ningestion PR must not ingest" in gate
     assert "fabricate data unless those evidence\nrequirements are met" in gate
     assert "Status: `complete`" not in gate

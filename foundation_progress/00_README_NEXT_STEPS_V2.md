@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-33 after PR #48 merged, with PR-34 selected:
+Scoped status as of PR-34 after PR #49 merged, with PR-35 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -152,7 +152,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-34: configured-output conservation/drift diagnostics**.
+Current next PR: **PR-35: focused repository hygiene guardrail extension**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -169,17 +169,20 @@ PR #43 merged, PR-29 completed the explicit `oxygen_monod` and
 `water_activity_threshold` configured modifier wiring after PR #44 merged,
 PR-30 completed the configured oxygen/water-activity example notebook after
 PR #45 merged, PR-31 completed the one-process registry-backed explicit
-environment modifier assembly slice after PR #46 merged, and PR-32 completed
-the repository hygiene cleanup after PR #47 merged. PR-33 completed the
+environment modifier assembly slice after PR #46 merged, PR-32 completed
+the repository hygiene cleanup after PR #47 merged, and PR-33 completed the
 chain-template explicit environment modifier assembly slice after PR #48
-merged. The selected PR-34 work is configured-output conservation/drift
-diagnostics: deriving a small diagnostics artifact from existing
+merged. PR-34 completed configured-output conservation/drift diagnostics after
+PR #49 merged, deriving a small diagnostics artifact from existing
 `SimulationResult` trajectories and explicit configured `mass_balance`
-`conserved_weights` only. It does not add validation data, calibration,
-empirical comparison, threshold changes, thermodynamic enforcement,
-solver/model behavior changes, hidden notebook science, silent fallback
-constants, inferred environment responses, or new biology claims. Recommended
-next after PR-34: a focused cleanup guardrail or solver diagnostics follow-up.
+`conserved_weights` only. The selected PR-35 work is a focused repository
+hygiene guardrail extension that keeps generated artifacts already covered by
+`.gitignore` out of git while preserving the tracked final-goal HTML plan. It
+does not add validation data, calibration, empirical comparison, threshold
+changes, thermodynamic enforcement, solver/model behavior changes, hidden
+notebook science, silent fallback constants, inferred environment responses,
+or new biology claims. Recommended next after PR-35: a simulator-building
+diagnostics follow-up.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer
