@@ -68,8 +68,9 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-34 configured-output conservation/drift diagnostics
-after the PR-33 chain-template explicit environment modifier assembly slice,
+The current next PR is PR-35 focused repository hygiene guardrail extension
+after the PR-34 configured-output conservation/drift diagnostics slice,
+the PR-33 chain-template explicit environment modifier assembly slice,
 the PR-32 repository hygiene cleanup slice, the PR-31
 registry-backed explicit environment modifier assembly slice, and the
 registry-backed
@@ -108,11 +109,17 @@ It did not infer parameters, fit curves, add validation data, oxygen
 consumption, gas transfer, redox, anaerobic metabolism, substrate water-binding
 behavior, EnvironmentGrid behavior changes, hidden notebook science, new
 response laws, solver/model response-law changes, or silent fallback constants.
-The current PR-34 slice adds configured-output conservation/drift diagnostics
+The completed PR-34 slice added configured-output conservation/drift diagnostics
 copied from existing `SimulationResult` trajectories and explicit configured
 `mass_balance` `conserved_weights` only. It does not add a validation rule,
 solver equation, threshold change, thermodynamic enforcement, calibration,
-validation data, empirical comparison, or biology claim. The completed
+validation data, empirical comparison, or biology claim. The current PR-35
+slice extends repository hygiene guardrails so tracked generated artifacts
+already covered by `.gitignore` cannot enter git, and generated
+`foundation_progress/FUNGMOD_PROGRESS_REPORT_*.html` snapshots are ignored
+without hiding the tracked final-goal HTML plan. It does not change code
+behavior, solver behavior, notebook output, validation data, calibration,
+biology, thermodynamics, or scientific claims. The completed
 PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -184,9 +191,10 @@ new response laws, oxygen consumption, gas transfer, redox, anaerobic
 metabolism, substrate water-binding behavior, EnvironmentGrid behavior changes,
 hidden notebook science, solver/model response-law changes, or silent fallback
 constants.
-The current PR-34 slice is limited to configured-output conservation/drift
+The completed PR-34 slice is limited to configured-output conservation/drift
 diagnostics over existing state trajectories and explicit configured
-`mass_balance` `conserved_weights`.
+`mass_balance` `conserved_weights`. The current PR-35 slice is limited to
+repository hygiene guardrails for generated artifacts.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -247,12 +255,12 @@ complete as build-first configured oxygen/water-activity modifier wiring after
 PR #44, PR-30 is complete as build-first configured oxygen/water-activity
 example-notebook coverage after PR #45, PR-31 completed after PR #46 as
 build-first registry-backed explicit environment modifier assembly, PR-32
-completed after PR #47 as repository hygiene cleanup, and PR-33 completed
-after PR #48 as chain-template explicit environment modifier assembly. The
-current PR-34 slice is configured-output conservation/drift diagnostics rather
-than ingestion, digitization, or fabricated validation data; the recommended
-next simulator-building follow-up is a focused cleanup guardrail or solver
-diagnostics slice.
+completed after PR #47 as repository hygiene cleanup, PR-33 completed after
+PR #48 as chain-template explicit environment modifier assembly, and PR-34
+completed after PR #49 as configured-output conservation/drift diagnostics.
+The current PR-35 slice is a focused repository hygiene guardrail extension
+rather than ingestion, digitization, or fabricated validation data; the
+recommended next simulator-building follow-up is a solver diagnostics slice.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

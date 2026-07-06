@@ -26,13 +26,48 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-35 Repository Hygiene Guardrail Extension
+
+Date: 2026-07-06
+
+Status: `complete` for the scoped PR-35 repository hygiene guardrail extension
+once merged; recommended next is a simulator-building diagnostics follow-up,
+and VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added a `.gitignore` rule for generated
+  `foundation_progress/FUNGMOD_PROGRESS_REPORT_*.html` snapshots while leaving
+  the tracked final-goal HTML plan allowed.
+- Extended the git-backed repository hygiene test to reject tracked generated
+  artifacts already covered by `.gitignore`, including Python/tool caches,
+  coverage artifacts, build/dist/htmlcov/output folders, egg-info metadata,
+  bytecode, logs, temporary files, `.DS_Store`, notebook checkpoints, and
+  generated progress-report HTML snapshots.
+- Added explicit guardrail assertions that generated progress-report HTML
+  snapshots are ignored and that
+  `foundation_progress/FUNGMOD_FINAL_GOAL_PR_PLAN_2026_06_20.html` remains
+  tracked and allowed.
+- Updated active roadmap/status docs and roadmap orchestration tests so PR-34
+  is complete after PR #49, PR-35 is the current hygiene guardrail extension,
+  and the recommended next task is a simulator-building diagnostics follow-up.
+
+No code behavior, solver behavior, validation rule, calibration routine,
+notebook output, validation data, biology record, thermodynamics, empirical
+comparison claim, scientific output schema, or numerical behavior changed.
+
+Recommended next task: choose a focused simulator-building diagnostics
+follow-up that improves inspectability without changing scientific or
+numerical behavior unless explicitly tested.
+
 ## PR-34 Configured-Output Conservation/Drift Diagnostics
 
 Date: 2026-07-06
 
 Status: `complete` for the scoped PR-34 configured-output conservation/drift
-diagnostics slice once merged; broader solver diagnostics remain a follow-up,
-and VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+diagnostics slice after PR #49 merged; broader solver diagnostics remain a
+follow-up, and VALIDATION-DATA-001 remains `deferred; blocked/partial` for
+ingestion.
 
 Completed in this pass:
 
@@ -58,9 +93,10 @@ curve, new validation rule, solver equation, threshold change, thermodynamic
 enforcement, biology record, hidden notebook science, or silent fallback
 constant was added.
 
-Recommended next task: after PR-34 merges, choose a focused cleanup guardrail
-or a solver diagnostics follow-up that improves inspectability without changing
-scientific or numerical behavior unless explicitly tested.
+Recommended next task: after PR-34 merged, complete the focused PR-35
+repository hygiene guardrail extension, then choose a simulator-building
+diagnostics follow-up that improves inspectability without changing scientific
+or numerical behavior unless explicitly tested.
 
 ## PR-33 Chain-Template Explicit Environment Modifier Assembly
 
