@@ -304,6 +304,11 @@ class DegradationScreenResult:
 
         return self._table_rows("thermodynamic_diagnostics", "thermodynamic_diagnostics.csv")
 
+    def solver_diagnostics(self) -> list[dict[str, str]]:
+        """Load configured solver diagnostics copied from existing sample artifacts."""
+
+        return self._table_rows("solver_diagnostics", "solver_diagnostics.csv")
+
     def provenance(self) -> list[dict[str, str]]:
         """Load the standard provenance table without rerunning simulation."""
 

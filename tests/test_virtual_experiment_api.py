@@ -59,6 +59,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "uncertainty_summary.csv",
         "trajectory_quantiles.csv",
         "thermodynamic_diagnostics.csv",
+        "solver_diagnostics.csv",
         "provenance_table.csv",
         "limitations_table.csv",
         "missing_parameters.csv",
@@ -90,6 +91,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     uncertainty_rows = _csv_rows(output_dir / "uncertainty_summary.csv")
     trajectory_quantile_rows = _csv_rows(output_dir / "trajectory_quantiles.csv")
     thermodynamic_diagnostic_rows = _csv_rows(output_dir / "thermodynamic_diagnostics.csv")
+    solver_diagnostic_rows = _csv_rows(output_dir / "solver_diagnostics.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
     limitation_rows = _csv_rows(output_dir / "limitations_table.csv")
     missing_rows = _csv_rows(output_dir / "missing_parameters.csv")
@@ -98,7 +100,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     output_manifest = _json_mapping(output_dir / "output_manifest.json")
     output_schema = _json_mapping(output_dir / "virtual_experiment_output_schema.json")
 
-    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.5.0"
+    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.6.0"
     assert output_schema["schema_version"] == OUTPUT_SCHEMA_VERSION
     assert "figures/degradation_rate_vs_time.png" in output_manifest["files"]
     assert "figures/trajectory_quantile_bands.png" in output_manifest["files"]
@@ -132,6 +134,14 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert result.uncertainty_summary() == uncertainty_rows
     assert result.trajectory_quantiles() == trajectory_quantile_rows
     assert result.thermodynamic_diagnostics() == thermodynamic_diagnostic_rows == []
+    assert result.solver_diagnostics() == solver_diagnostic_rows
+    assert {row["summary_kind"] for row in solver_diagnostic_rows} == {"configured_solver_diagnostics"}
+    assert {row["summary_status"] for row in solver_diagnostic_rows} == {"available"}
+    assert {row["summary_metadata_available"] for row in solver_diagnostic_rows} == {"true"}
+    assert {row["solver_diagnostics_json_present"] for row in solver_diagnostic_rows} == {"true"}
+    assert {row["solver_diagnostics_csv_present"] for row in solver_diagnostic_rows} == {"true"}
+    assert {row["solver_backend"] for row in solver_diagnostic_rows} == {"scipy.solve_ivp"}
+    assert {row["allowed_use"] for row in solver_diagnostic_rows} == {"configured_solver_metadata_inspection_only"}
     assert any(
         row["source_table"] == "final_metrics"
         and row["source_metric"] == "final_product_concentration"
@@ -285,10 +295,21 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         and row["output_schema_version"] == OUTPUT_SCHEMA_VERSION
         for row in dictionary_rows
     )
+    assert any(
+        row["table"] == "solver_diagnostics" and row["column"] == "interpretation_guardrail"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "solver_diagnostics"
+        and row["column"] == "output_schema_version"
+        and row["output_schema_version"] == OUTPUT_SCHEMA_VERSION
+        for row in dictionary_rows
+    )
     output_schema_tables = output_schema["tables"]
     assert isinstance(output_schema_tables, dict)
     assert "trajectory_quantiles" in output_schema_tables
     assert "thermodynamic_diagnostics" in output_schema_tables
+    assert "solver_diagnostics" in output_schema_tables
     assert any(row["table"] == "modelability_items" and row["column"] == "allowed_use" for row in dictionary_rows)
     assert any(row["table"] == "missing_parameters" and row["column"] == "expected_units" for row in dictionary_rows)
 
@@ -407,6 +428,103 @@ def test_virtual_experiment_thermodynamic_diagnostics_copy_existing_sample_artif
         "do not infer activities, reaction quotients, concentrations, redox potentials, "
         "electron balances, validation evidence, or solver-time thermodynamic enforcement"
     ) in report
+
+
+def test_virtual_experiment_solver_diagnostics_copy_existing_sample_artifacts_only(
+    tmp_path: Path,
+) -> None:
+    study = VirtualExperiment.from_registry(
+        fungi=FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=REGISTRY_INDEX,
+    )
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=3,
+        output_dir=tmp_path / "solver_bridge",
+        quicklook=False,
+    )
+    sample_dir = Path(result.screen_result.case_results[0].samples[0].output_directory)
+
+    rows = result.solver_diagnostics()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["artifact_source_directory"] == str(sample_dir)
+    assert row["solver_diagnostics_json_present"] == "true"
+    assert row["solver_diagnostics_csv_present"] == "true"
+    assert row["summary_kind"] == "configured_solver_diagnostics"
+    assert row["summary_status"] == "available"
+    assert row["summary_metadata_available"] == "true"
+    assert row["summary_row_count"] == "1"
+    assert row["solver_backend"] == "scipy.solve_ivp"
+    assert row["metadata_available"] == "True"
+    assert row["configured_time_evaluation_count"] == "101"
+    assert row["allowed_use"] == "configured_solver_metadata_inspection_only"
+    assert "Rows are copied from existing configured solver_diagnostics artifacts only" in row[
+        "interpretation_guardrail"
+    ]
+    assert "solver quality thresholds" in row["interpretation_guardrail"]
+    assert "thermodynamic enforcement" in row["interpretation_guardrail"]
+    assert "biology claims" in row["interpretation_guardrail"]
+
+    report_path = result.write_report(include_html=True, include_index=True)
+    report = report_path.read_text(encoding="utf-8")
+    html = report_path.with_suffix(".html").read_text(encoding="utf-8")
+    index = report_path.with_name("index.html").read_text(encoding="utf-8")
+    assert "Standard virtual-experiment rows from `solver_diagnostics.csv`" in report
+    assert "copied from existing configured solver-diagnostics artifacts only" in report
+    assert "do not change solver behavior" in report
+    assert "define numerical quality thresholds" in report
+    assert "validation/calibration evidence" in report
+    assert "enforce thermodynamics" in report
+    assert "add biology claims" in report
+    assert "solver_diagnostics.csv" in html
+    assert "solver_diagnostics.csv" in index
+    assert "solver_diagnostics.json" not in index
+    assert "empirically validated" not in report.lower()
+    assert "calibrated against observations" not in report.lower()
+
+
+def test_virtual_experiment_solver_diagnostics_header_only_without_sample_artifacts(
+    tmp_path: Path,
+) -> None:
+    study = VirtualExperiment.from_registry(
+        fungi=FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=REGISTRY_INDEX,
+    )
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=3,
+        output_dir=tmp_path / "solver_bridge_no_artifacts",
+        quicklook=False,
+    )
+    sample_dir = Path(result.screen_result.case_results[0].samples[0].output_directory)
+    (sample_dir / "solver_diagnostics.json").unlink()
+    (sample_dir / "solver_diagnostics.csv").unlink()
+
+    result.write_tables()
+
+    assert result.solver_diagnostics() == []
+    with (Path(result.output_directory) / "solver_diagnostics.csv").open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        assert list(reader) == []
+        fieldnames = set(reader.fieldnames or ())
+    assert {
+        "output_schema_version",
+        "case_id",
+        "sample_id",
+        "artifact_source_directory",
+        "solver_diagnostics_json_present",
+        "solver_diagnostics_csv_present",
+        "summary_status",
+        "solver_backend",
+        "interpretation_guardrail",
+    }.issubset(fieldnames)
 
 
 def test_environment_grid_numeric_values_generate_runtime_environment_ids() -> None:

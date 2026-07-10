@@ -26,6 +26,7 @@ TABLE_FILENAMES = {
     "uncertainty_summary": "uncertainty_summary.csv",
     "trajectory_quantiles": "trajectory_quantiles.csv",
     "thermodynamic_diagnostics": "thermodynamic_diagnostics.csv",
+    "solver_diagnostics": "solver_diagnostics.csv",
     "provenance_table": "provenance_table.csv",
     "limitations_table": "limitations_table.csv",
     "missing_parameters": "missing_parameters.csv",
@@ -41,6 +42,16 @@ SOLVER_DIAGNOSTIC_FILENAMES = {
     "solver_diagnostics_json": "solver_diagnostics.json",
     "solver_diagnostics_csv": "solver_diagnostics.csv",
 }
+
+STANDARD_SOLVER_DIAGNOSTIC_FIELDS = frozenset(
+    {
+        "case_id",
+        "sample_id",
+        "artifact_source_directory",
+        "solver_diagnostics_json_present",
+        "solver_diagnostics_csv_present",
+    }
+)
 
 
 def write_virtual_experiment_report(
@@ -61,11 +72,14 @@ def write_virtual_experiment_report(
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     report_path = destination / "virtual_experiment_report.md"
-    tables = {name: _read_rows(table_root / filename) for name, filename in TABLE_FILENAMES.items()}
+    tables = {
+        name: _read_standard_table_rows(name, table_root / filename)
+        for name, filename in TABLE_FILENAMES.items()
+    }
     thermodynamic_summary = _read_json_mapping(table_root / THERMODYNAMIC_FILENAMES["thermodynamic_summary_json"])
     thermodynamic_rows = _read_rows(table_root / THERMODYNAMIC_FILENAMES["thermodynamic_summary_csv"])
     solver_diagnostics = _read_json_mapping(table_root / SOLVER_DIAGNOSTIC_FILENAMES["solver_diagnostics_json"])
-    solver_rows = _read_rows(table_root / SOLVER_DIAGNOSTIC_FILENAMES["solver_diagnostics_csv"])
+    solver_rows = _read_configured_solver_rows(table_root / SOLVER_DIAGNOSTIC_FILENAMES["solver_diagnostics_csv"])
     markdown = _render_report(
         tables=tables,
         quicklook_paths=quicklook_paths,
@@ -108,6 +122,26 @@ def _read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def _read_standard_table_rows(table_name: str, path: Path) -> list[dict[str, str]]:
+    if table_name == "solver_diagnostics" and not _is_standard_solver_diagnostics_csv(path):
+        return []
+    return _read_rows(path)
+
+
+def _read_configured_solver_rows(path: Path) -> list[dict[str, str]]:
+    if _is_standard_solver_diagnostics_csv(path):
+        return []
+    return _read_rows(path)
+
+
+def _is_standard_solver_diagnostics_csv(path: Path) -> bool:
+    if not path.exists():
+        return False
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        return STANDARD_SOLVER_DIAGNOSTIC_FIELDS.issubset(set(reader.fieldnames or ()))
+
+
 def _read_json_mapping(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
@@ -137,6 +171,7 @@ def _render_report(
     uncertainty_summary = tables["uncertainty_summary"]
     trajectory_quantiles = tables["trajectory_quantiles"]
     thermodynamic_diagnostics = tables["thermodynamic_diagnostics"]
+    solver_standard_rows = tables["solver_diagnostics"]
     assumptions = tables["assumption_summary"]
     provenance = tables["provenance_table"]
     limitations = tables["limitations_table"]
@@ -179,7 +214,7 @@ def _render_report(
         "",
         "## Configured solver diagnostics",
         "",
-        *_solver_diagnostics_lines(solver_diagnostics, solver_rows),
+        *_solver_diagnostics_lines(solver_diagnostics, solver_rows, standard_rows=solver_standard_rows),
         "",
         "## Active mechanisms and modifiers",
         "",
@@ -480,15 +515,19 @@ def _thermodynamic_row_details(row: Mapping[str, str]) -> str:
 def _solver_diagnostics_lines(
     summary: Mapping[str, Any],
     rows: Sequence[Mapping[str, str]],
+    *,
+    standard_rows: Sequence[Mapping[str, str]],
 ) -> list[str]:
-    if not summary and not rows:
-        return ["No configured solver-diagnostics artifacts were present."]
+    if not summary and not rows and not standard_rows:
+        return ["No configured solver-diagnostics artifacts or standard solver_diagnostics.csv rows were present."]
 
     lines = [
         "These diagnostics inspect existing configured-output `solver_diagnostics.json` "
-        "and `solver_diagnostics.csv` artifacts only. They do not change solver behavior, "
-        "define numerical quality thresholds, add validation/calibration evidence, compare "
-        "against empirical data, enforce thermodynamics, or add biology claims."
+        "and `solver_diagnostics.csv` artifacts only. Standard virtual-experiment "
+        "`solver_diagnostics.csv` rows, when present, are copied from those artifacts. "
+        "They do not change solver behavior, define numerical quality thresholds, add "
+        "validation/calibration evidence, compare against empirical data, enforce "
+        "thermodynamics, or add biology claims."
     ]
     if summary:
         missing_fields = summary.get("missing_metadata_fields")
@@ -538,6 +577,51 @@ def _solver_diagnostics_lines(
         lines.append(
             f"- `{_value(row, 'config_name')}` result `{_value(row, 'result_name')}`: "
             f"{details}; allowed use `{_value(row, 'allowed_use')}`"
+            f"{message_suffix}.{guardrail_suffix}"
+        )
+    if standard_rows:
+        lines.append(
+            "Standard virtual-experiment rows from `solver_diagnostics.csv` "
+            "(copied from existing configured solver-diagnostics artifacts only):"
+        )
+    else:
+        lines.append("No standard `solver_diagnostics.csv` rows were present.")
+    for row in standard_rows[:12]:
+        details = _row_details(
+            row,
+            (
+                ("summary_status", "summary status"),
+                ("summary_metadata_available", "summary metadata available"),
+                ("summary_row_count", "summary row count"),
+                ("mode", "mode"),
+                ("maturity", "maturity"),
+                ("solver_backend", "backend"),
+                ("solver_method", "method"),
+                ("solver_success", "success"),
+                ("solver_status", "status"),
+                ("nfev", "nfev"),
+                ("njev", "njev"),
+                ("nlu", "nlu"),
+                ("state_count", "state count"),
+                ("configured_process_count", "configured process count"),
+                ("process_rate_count", "process-rate count"),
+                ("configured_time_evaluation_count", "configured time points"),
+                ("result_time_point_count", "result time points"),
+            ),
+        )
+        message = _value(row, "solver_message")
+        message_suffix = f"; solver message `{message}`" if message else ""
+        guardrail = _value(row, "interpretation_guardrail")
+        guardrail_suffix = f" Guardrail: {guardrail}" if guardrail else ""
+        config_name = _value(row, "config_name") or "solver_diagnostics_artifact"
+        result_name = _value(row, "result_name") or "present_no_row_diagnostics"
+        details_suffix = f"; {details}" if details else ""
+        lines.append(
+            f"- `{config_name}` result `{result_name}` for case `{_value(row, 'case_id')}` "
+            f"sample `{_value(row, 'sample_id')}`: configured JSON present "
+            f"`{_value(row, 'solver_diagnostics_json_present')}`; configured CSV present "
+            f"`{_value(row, 'solver_diagnostics_csv_present')}`{details_suffix}; "
+            f"allowed use `{_value(row, 'allowed_use')}`"
             f"{message_suffix}.{guardrail_suffix}"
         )
     return lines
@@ -970,6 +1054,8 @@ def _table_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
     items = []
     for name, filename in TABLE_FILENAMES.items():
         table_path = table_root / filename
+        if name == "solver_diagnostics" and not _is_standard_solver_diagnostics_csv(table_path):
+            continue
         if table_path.exists():
             items.append(_link_item(path=table_path, base_dir=output_dir, label=filename, description=name))
     if not items:
@@ -1019,6 +1105,8 @@ def _solver_diagnostic_link_items(*, table_root: Path, output_dir: Path) -> list
     items = []
     for name, filename in SOLVER_DIAGNOSTIC_FILENAMES.items():
         path = table_root / filename
+        if filename == "solver_diagnostics.csv" and _is_standard_solver_diagnostics_csv(path):
+            continue
         if path.exists():
             items.append(
                 _link_item(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "1.5.0"
+OUTPUT_SCHEMA_VERSION = "1.6.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -650,6 +650,169 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("interpretation_guardrail", "Human-readable no-inference guardrail for this diagnostics row."),
         ),
         primary_key=("case_id", "sample_id", "row_index", "row_name"),
+        join_keys=("case_id", "sample_id"),
+    ),
+    "solver_diagnostics": _table(
+        "Configured-output solver diagnostics copied from existing per-sample solver_diagnostics artifacts.",
+        (
+            *COMMON_CASE_COLUMNS,
+            *SAMPLE_COLUMNS,
+            _column("artifact_source_directory", "Sample configured-output bundle directory inspected for artifacts."),
+            _column(
+                "solver_diagnostics_json_present",
+                "Whether solver_diagnostics.json existed in the sample bundle.",
+                semantic_type="boolean",
+            ),
+            _column(
+                "solver_diagnostics_csv_present",
+                "Whether solver_diagnostics.csv existed in the sample bundle.",
+                semantic_type="boolean",
+            ),
+            _column("summary_kind", "Top-level kind field from solver_diagnostics.json.", required=False),
+            _column("summary_status", "Top-level status field from solver_diagnostics.json.", required=False),
+            _column(
+                "summary_metadata_available",
+                "Whether solver metadata was available according to solver_diagnostics.json.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column(
+                "summary_row_count",
+                "Top-level row_count from solver_diagnostics.json.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "summary_missing_metadata_fields",
+                "JSON list of missing solver metadata fields copied from solver_diagnostics.json.",
+                required=False,
+            ),
+            _column(
+                "summary_allowed_use",
+                "Top-level allowed-use text copied from solver_diagnostics.json.",
+                required=False,
+            ),
+            _column(
+                "unsupported_scope",
+                "Unsupported-scope text copied from solver_diagnostics.json.",
+                required=False,
+            ),
+            _column(
+                "row_index",
+                "Zero-based solver_diagnostics.csv row index within the sample bundle.",
+                semantic_type="integer",
+            ),
+            _column("config_name", "Configured model name copied from solver_diagnostics.csv.", required=False),
+            _column("config_path", "Configured model path copied from solver_diagnostics.csv.", required=False),
+            _column("mode", "Configured model mode copied from solver_diagnostics.csv.", required=False),
+            _column("maturity", "Configured model maturity copied from solver_diagnostics.csv.", required=False),
+            _column("kind", "Configured model kind copied from solver_diagnostics.csv.", required=False),
+            _column("result_name", "Simulation result name copied from solver_diagnostics.csv.", required=False),
+            _column("result_label", "Simulation result label copied from solver_diagnostics.csv.", required=False),
+            _column("model_version", "Simulation model version copied from solver_diagnostics.csv.", required=False),
+            _column(
+                "state_count",
+                "State count copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "configured_process_count",
+                "Configured process count copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "process_rate_count",
+                "Process-rate count copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column("time_units", "Time units copied from solver_diagnostics.csv.", required=False),
+            _column(
+                "configured_time_start",
+                "Configured time-grid start copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "configured_time_stop",
+                "Configured time-grid stop copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "configured_time_evaluation_count",
+                "Configured time-grid evaluation count copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "result_time_point_count",
+                "Result time-point count copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column("solver_backend", "Solver backend copied from solver_diagnostics.csv.", required=False),
+            _column("solver_method", "Solver method copied from solver_diagnostics.csv.", required=False),
+            _column(
+                "solver_success",
+                "Solver success flag copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column("solver_status", "Solver status copied from solver_diagnostics.csv.", required=False),
+            _column("solver_message", "Solver message copied from solver_diagnostics.csv.", required=False),
+            _column(
+                "nfev",
+                "Solver function-evaluation count copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "njev",
+                "Solver Jacobian-evaluation count copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "nlu",
+                "Solver LU-decomposition count copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "rtol",
+                "Relative tolerance copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "atol",
+                "Absolute tolerance copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "max_step_value",
+                "Maximum step value copied from solver_diagnostics.csv when present.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column("max_step_units", "Maximum step units copied from solver_diagnostics.csv.", required=False),
+            _column(
+                "metadata_available",
+                "Row-level metadata availability copied from solver_diagnostics.csv.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column("allowed_use", "Machine-readable policy for interpreting this row."),
+            _column(
+                "interpretation_guardrail",
+                "Human-readable guardrail preventing solver-quality, validation, or biology overclaims.",
+            ),
+        ),
+        primary_key=("case_id", "sample_id", "row_index", "config_name", "result_name"),
         join_keys=("case_id", "sample_id"),
     ),
     "provenance_table": _table(

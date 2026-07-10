@@ -85,6 +85,7 @@ def write_standard_tables(
         "uncertainty_summary": destination / "uncertainty_summary.csv",
         "trajectory_quantiles": destination / "trajectory_quantiles.csv",
         "thermodynamic_diagnostics": destination / "thermodynamic_diagnostics.csv",
+        "solver_diagnostics": destination / "solver_diagnostics.csv",
         "provenance_table": destination / "provenance_table.csv",
         "limitations_table": destination / "limitations_table.csv",
         "missing_parameters": destination / "missing_parameters.csv",
@@ -163,6 +164,7 @@ def _build_table_rows(
         "uncertainty_summary": [],
         "trajectory_quantiles": [],
         "thermodynamic_diagnostics": [],
+        "solver_diagnostics": [],
         "provenance_table": [],
         "limitations_table": [],
         "missing_parameters": [],
@@ -227,6 +229,9 @@ def _build_table_rows(
             )
             rows["thermodynamic_diagnostics"].extend(
                 _thermodynamic_diagnostic_rows(sample_context=sample_context, sample=sample)
+            )
+            rows["solver_diagnostics"].extend(
+                _solver_diagnostic_rows(sample_context=sample_context, sample=sample)
             )
     rows["summary_metrics"] = _summary_metric_rows(rows["final_metrics"], rows["threshold_times"])
     rows["environment_summary"] = _environment_summary_rows(
@@ -1608,6 +1613,85 @@ def _thermodynamic_diagnostic_rows(
             "activity_model": row.get("activity_model", ""),
             "solver_time_enforcement": row.get("solver_time_enforcement", ""),
             "message": row.get("message", ""),
+        }
+        for row_index, row in enumerate(source_rows)
+    ]
+
+
+def _solver_diagnostic_rows(
+    *,
+    sample_context: Mapping[str, Any],
+    sample: EnsembleSample,
+) -> list[dict[str, Any]]:
+    sample_dir = Path(sample.output_directory)
+    summary_path = sample_dir / "solver_diagnostics.json"
+    rows_path = sample_dir / "solver_diagnostics.csv"
+    summary = _read_json_mapping(summary_path)
+    artifact_rows = _read_csv(rows_path) if rows_path.exists() else []
+    if not summary and not artifact_rows:
+        return []
+
+    source_rows: Sequence[Mapping[str, Any]] = artifact_rows or (
+        {
+            "config_name": "solver_diagnostics_artifact",
+            "result_name": "present_no_row_diagnostics",
+            "metadata_available": summary.get("metadata_available", ""),
+            "solver_status": summary.get("status", ""),
+            "solver_message": "solver_diagnostics.json was present but solver_diagnostics.csv had no rows.",
+        },
+    )
+    base = {
+        **_base_sample_columns(sample_context),
+        "artifact_source_directory": str(sample_dir),
+        "solver_diagnostics_json_present": summary_path.exists(),
+        "solver_diagnostics_csv_present": rows_path.exists(),
+        "summary_kind": summary.get("kind", ""),
+        "summary_status": summary.get("status", ""),
+        "summary_metadata_available": summary.get("metadata_available", ""),
+        "summary_row_count": summary.get("row_count", ""),
+        "summary_missing_metadata_fields": _json_string(summary.get("missing_metadata_fields")),
+        "summary_allowed_use": summary.get("allowed_use", ""),
+        "unsupported_scope": summary.get("unsupported_scope", ""),
+        "allowed_use": "configured_solver_metadata_inspection_only",
+        "interpretation_guardrail": (
+            "Rows are copied from existing configured solver_diagnostics artifacts only; "
+            "they do not define solver quality thresholds, validation evidence, calibration evidence, "
+            "thermodynamic enforcement, or biology claims."
+        ),
+    }
+    return [
+        {
+            **base,
+            "row_index": row_index,
+            "config_name": row.get("config_name", ""),
+            "config_path": row.get("config_path", ""),
+            "mode": row.get("mode", ""),
+            "maturity": row.get("maturity", ""),
+            "kind": row.get("kind", ""),
+            "result_name": row.get("result_name", ""),
+            "result_label": row.get("result_label", ""),
+            "model_version": row.get("model_version", ""),
+            "state_count": row.get("state_count", ""),
+            "configured_process_count": row.get("configured_process_count", ""),
+            "process_rate_count": row.get("process_rate_count", ""),
+            "time_units": row.get("time_units", ""),
+            "configured_time_start": row.get("configured_time_start", ""),
+            "configured_time_stop": row.get("configured_time_stop", ""),
+            "configured_time_evaluation_count": row.get("configured_time_evaluation_count", ""),
+            "result_time_point_count": row.get("result_time_point_count", ""),
+            "solver_backend": row.get("solver_backend", ""),
+            "solver_method": row.get("solver_method", ""),
+            "solver_success": row.get("solver_success", ""),
+            "solver_status": row.get("solver_status", ""),
+            "solver_message": row.get("solver_message", ""),
+            "nfev": row.get("nfev", ""),
+            "njev": row.get("njev", ""),
+            "nlu": row.get("nlu", ""),
+            "rtol": row.get("rtol", ""),
+            "atol": row.get("atol", ""),
+            "max_step_value": row.get("max_step_value", ""),
+            "max_step_units": row.get("max_step_units", ""),
+            "metadata_available": row.get("metadata_available", ""),
         }
         for row_index, row in enumerate(source_rows)
     ]

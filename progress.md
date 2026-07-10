@@ -26,12 +26,53 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-39 Virtual-Experiment Solver Diagnostics Bridge
+
+Date: 2026-07-10
+
+Status: `complete` for the scoped PR-39 standard-table/accessor bridge once
+merged; PR-38 is complete after PR #53, and VALIDATION-DATA-001 remains
+`deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added `solver_diagnostics.csv` as a standard virtual-experiment output table
+  with schema/data-dictionary coverage in output schema version `1.6.0`.
+- Added `DegradationScreenResult.solver_diagnostics()` for loading the standard
+  table without rerunning simulations.
+- The table is populated only by reading existing per-sample configured-output
+  `solver_diagnostics.json` and `solver_diagnostics.csv` artifacts from sample
+  bundle directories.
+- Rows copy artifact-presence flags, top-level configured solver diagnostics
+  metadata, configured row fields, and explicit allowed-use/interpretation
+  guardrails.
+- If no configured solver diagnostics artifacts exist, the standard table is
+  written header-only rather than inferring solver metadata.
+- Added report/index standard-table visibility while preserving the existing
+  configured-output report links for configured `solver_diagnostics.json` and
+  `solver_diagnostics.csv` artifacts.
+- Updated focused virtual-experiment tests to prove both the header-only
+  no-artifact case and the artifact-derived row case.
+- Updated active README, roadmap/status docs, validation-gate current-next
+  wording, and roadmap orchestration status tests so PR-38 is complete after
+  PR #53 and PR-39 is the current solver diagnostics bridge slice.
+
+No solver behavior, numerical quality threshold, validation rule, calibration
+routine, empirical comparison claim, validation data, biology record,
+thermodynamic enforcement, hidden notebook science, silent fallback constant,
+scientific inference, configured-output row schema, or notebook behavior
+changed.
+
+Recommended next task: continue build-first simulator capability work,
+preferably with a bounded mechanism, thermodynamic inspectability, or
+table-derived output ergonomics slice, rather than validation ingestion.
+
 ## PR-38 Solver Diagnostics Example Notebook
 
 Date: 2026-07-10
 
 Status: `complete` for the scoped PR-38 solver diagnostics example notebook
-once merged; PR-37 is complete after PR #52, and VALIDATION-DATA-001 remains
+after PR #53 merged; PR-37 is complete after PR #52, and VALIDATION-DATA-001 remains
 `deferred; blocked/partial` for ingestion.
 
 Completed in this pass:
