@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-36 after PR #51 merged, with PR-37 selected:
+Scoped status as of PR-37 after PR #52 merged, with PR-38 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -155,6 +155,12 @@ and `solver_diagnostics.csv` artifacts in Markdown, HTML, and report-folder
 index paths without changing solver behavior, defining numerical quality
 thresholds, adding validation/calibration evidence, comparing against empirical
 data, enforcing thermodynamics, or adding biology claims.
+Example notebooks now include `19_solver_diagnostics_example.ipynb` for public
+configured-workflow inspection of package-generated solver diagnostics
+artifacts, report/index links, and the explicit header-only/no-metadata
+guardrail without solver behavior changes, numerical quality thresholds,
+validation/calibration evidence, thermodynamic enforcement, inferred
+scientific values, or biology claims.
 BIO-003: partial/software-tested for generic reversible product inhibition as
 an explicit configured process modifier, registry-backed case-template
 assembly, and a non-PET configured framework benchmark when explicit
@@ -166,7 +172,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-37: solver diagnostics visibility follow-up**.
+Current next PR: **PR-38: solver diagnostics example notebook**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -195,12 +201,16 @@ covered by `.gitignore` out of git while preserving the tracked final-goal HTML
 plan. PR-36 completed configured-output solver diagnostics after PR #51,
 derived from existing configured run metadata, solver settings, solver
 metadata, time-grid/evaluation counts, state counts, and process counts only.
-The selected PR-37 work is a small report/index visibility follow-up over those
-existing solver diagnostics artifacts. It does not add validation data,
-calibration, empirical comparison, threshold changes, thermodynamic
-enforcement, solver/model behavior changes, hidden notebook science, silent
-fallback constants, inferred environment responses, or new biology claims.
-Recommended next after PR-37: continue build-first simulator capability work.
+PR-37 completed a small report/index visibility follow-up over those existing
+solver diagnostics artifacts after PR #52. The selected PR-38 work is a small
+configured-workflow example notebook for solver diagnostics artifact
+inspection. It does not add validation data, calibration, empirical comparison,
+threshold changes, thermodynamic enforcement, solver/model behavior changes,
+hidden notebook science, silent fallback constants, inferred environment
+responses, configured-output schema changes, or new biology claims.
+Recommended next after PR-38: continue build-first simulator capability work,
+preferably as a bounded generic mechanism, thermodynamic inspectability, or
+table-derived output ergonomics slice.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

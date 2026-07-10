@@ -36,6 +36,10 @@ ENVIRONMENT_MODIFIER_NOTEBOOKS = [
     "18_configured_oxygen_water_modifiers_example.ipynb",
 ]
 
+SOLVER_DIAGNOSTIC_NOTEBOOKS = [
+    "19_solver_diagnostics_example.ipynb",
+]
+
 
 NOTEBOOK_DIR = Path(__file__).resolve().parents[1] / "notebooks" / "examples"
 
@@ -107,6 +111,7 @@ def test_notebooks_do_not_define_core_classes_or_rate_laws() -> None:
         *THERMODYNAMIC_NOTEBOOKS,
         *BIO003_NOTEBOOKS,
         *ENVIRONMENT_MODIFIER_NOTEBOOKS,
+        *SOLVER_DIAGNOSTIC_NOTEBOOKS,
     ]:
         source = "\n".join(code_cells(load_notebook(name)))
         for label, pattern in HIDDEN_IMPLEMENTATION_PATTERNS.items():
@@ -319,6 +324,33 @@ def test_configured_oxygen_water_modifier_notebook_uses_configured_outputs_only(
     assert "input_model_config.json" in source
     assert "environment_grid(" not in source
     assert "EnvironmentGrid" not in source
+    assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
+
+
+def test_solver_diagnostics_notebook_uses_configured_outputs_only() -> None:
+    notebook = load_notebook("19_solver_diagnostics_example.ipynb")
+    markdown = "\n".join(markdown_cells(notebook)).lower()
+    source = "\n".join(code_cells(notebook))
+
+    assert notebook["nbformat"] == 4
+    assert "public configured-workflow example" in markdown
+    assert "package-generated configured solver diagnostics artifacts" in markdown
+    assert "not an empirical validation" in markdown
+    assert "no solver behavior change" in markdown
+    assert "no numerical quality thresholds" in markdown
+    assert "validation/calibration evidence" in markdown
+    assert "header-only" in markdown
+    assert "status: unavailable" in markdown
+    assert "metadata for inspectability only" in markdown
+    assert "run_configured_model(" in source
+    assert "solver_diagnostics.json" in source
+    assert "solver_diagnostics.csv" in source
+    assert "ConfiguredInputLoader" in source
+    assert "ConfiguredProcessAssembler" in source
+    assert "ConfiguredOutputWriter" in source
+    assert "write_virtual_experiment_report(" in source
+    assert "include_html=True" in source
+    assert "include_index=True" in source
     assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in source
 
 
@@ -682,6 +714,57 @@ def test_configured_oxygen_water_modifier_notebook_executes_smoke_path_with_temp
     base_first_rate = float(_csv_rows(base_output / "process_rates.csv")[0]["value"])
     modified_first_rate = float(_csv_rows(modified_output / "process_rates.csv")[0]["value"])
     assert modified_first_rate != pytest.approx(base_first_rate)
+
+
+def test_solver_diagnostics_notebook_executes_smoke_path_with_temp_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "notebook_outputs"
+    monkeypatch.setenv("FUNGMOD_NOTEBOOK_OUTPUT_ROOT", str(output_root))
+    _execute_notebook("19_solver_diagnostics_example.ipynb")
+
+    output = output_root / "19_solver_diagnostics_example"
+    available_output = output / "available_metadata"
+    no_metadata_output = output / "header_only_no_metadata"
+
+    available_diagnostics = json.loads((available_output / "solver_diagnostics.json").read_text(encoding="utf-8"))
+    available_rows = _csv_rows(available_output / "solver_diagnostics.csv")
+    report_text = (available_output / "report" / "virtual_experiment_report.md").read_text(encoding="utf-8")
+    html_text = (available_output / "report" / "virtual_experiment_report.html").read_text(encoding="utf-8")
+    index_text = (available_output / "report" / "index.html").read_text(encoding="utf-8")
+
+    assert available_diagnostics["kind"] == "configured_solver_diagnostics"
+    assert available_diagnostics["status"] == "available"
+    assert available_diagnostics["metadata_available"] is True
+    assert available_diagnostics["row_count"] == 1
+    assert available_rows[0]["solver_backend"] == "scipy.solve_ivp"
+    assert available_rows[0]["metadata_available"] == "True"
+    assert available_rows[0]["configured_time_evaluation_count"] == "11"
+    assert "not validation, calibration" in available_rows[0]["allowed_use"]
+    assert "does not infer scientific values" in available_rows[0]["interpretation_guardrail"]
+
+    no_metadata_diagnostics = json.loads((no_metadata_output / "solver_diagnostics.json").read_text(encoding="utf-8"))
+    with (no_metadata_output / "solver_diagnostics.csv").open(newline="", encoding="utf-8") as handle:
+        no_metadata_reader = csv.DictReader(handle)
+        no_metadata_rows = list(no_metadata_reader)
+    assert no_metadata_diagnostics["kind"] == "configured_solver_diagnostics"
+    assert no_metadata_diagnostics["status"] == "unavailable"
+    assert no_metadata_diagnostics["metadata_available"] is False
+    assert no_metadata_diagnostics["row_count"] == 0
+    assert no_metadata_rows == []
+    assert "solver_backend" in (no_metadata_reader.fieldnames or ())
+    assert "nfev" in (no_metadata_reader.fieldnames or ())
+
+    assert "## Configured solver diagnostics" in report_text
+    assert "existing configured-output `solver_diagnostics.json` and `solver_diagnostics.csv` artifacts only" in report_text
+    assert "do not change solver behavior" in report_text
+    assert "define numerical quality thresholds" in report_text
+    assert "validation/calibration evidence" in report_text
+    assert "solver_diagnostics.json" in html_text
+    assert "solver_diagnostics.csv" in html_text
+    assert "solver_diagnostics.json" in index_text
+    assert "solver_diagnostics.csv" in index_text
 
 
 def _execute_notebook(name: str) -> None:

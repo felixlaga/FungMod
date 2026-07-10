@@ -76,6 +76,10 @@ basic kinetics layer:
 - a researcher-facing provenance/limitations report notebook that writes the
   Markdown/HTML/index report artifacts and inspects the table-derived decision
   summary and decision-support links,
+- a public configured-workflow solver-diagnostics notebook that inspects
+  package-generated `solver_diagnostics.json`/`.csv` artifacts, report/index
+  links, and the header-only/no-metadata guardrail without interpreting solver
+  metadata as validation or quality thresholds,
 - human-editable YAML config folders for fungi, substrates, enzymes,
   environments, geometries, parameters, and experiments,
 - schema-checked config loaders with explicit unknown-value handling,
@@ -315,6 +319,10 @@ For a public configured-workflow walkthrough of explicit
 For a public configured-workflow walkthrough of explicit `oxygen_monod` and
 `water_activity_threshold` modifier outputs, see
 `notebooks/examples/18_configured_oxygen_water_modifiers_example.ipynb`.
+For a public configured-workflow walkthrough of configured solver diagnostics
+artifact inspection, report/index links, and the header-only/no-metadata
+guardrail, see
+`notebooks/examples/19_solver_diagnostics_example.ipynb`.
 
 ## Public API
 
@@ -378,10 +386,11 @@ These researcher-facing notebooks are not empirical validation:
 - `16_thermodynamic_diagnostics_example.ipynb`
 - `17_configured_environment_modifiers_example.ipynb`
 - `18_configured_oxygen_water_modifiers_example.ipynb`
+- `19_solver_diagnostics_example.ipynb`
 
 Notebook tests check that notebooks import `fungal_model`, avoid defining core
 rate laws/classes or low-level solvers inline, and execute every foundation,
-product-tour, and thermodynamic-output smoke path. The thermodynamics notebook
+product-tour, and configured-output diagnostics smoke path. The thermodynamics notebook
 uses configured explicit-Q Gibbs and entropy-production-rate metadata only and
 inspects the configured entropy-budget JSON summary; it does not infer
 activities, reaction quotients, concentrations, redox potentials, or
@@ -421,6 +430,13 @@ assumptions, merged parameters, entity snapshots, input config, and process
 rates. It does not fit response curves, validate biology, infer environment
 responses, model oxygen consumption, gas transfer, redox balance, anaerobic
 metabolism, substrate water binding, or change `EnvironmentGrid` behavior.
+The configured solver-diagnostics notebook demonstrates package-generated
+`solver_diagnostics.json` and `solver_diagnostics.csv` inspection for the
+normal metadata path, report/index visibility, and the explicit header-only
+JSON `status: unavailable` path when solver metadata is absent. It does not
+change solver behavior, define numerical quality thresholds, add validation or
+calibration evidence, compare against empirical data, enforce thermodynamics,
+infer scientific values, or add biology claims.
 
 ## Data And Configs
 

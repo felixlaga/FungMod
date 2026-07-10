@@ -68,10 +68,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-37: solver diagnostics visibility follow-up"
+    current_next = "PR-38: solver diagnostics example notebook"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-37 solver diagnostics visibility follow-up" in roadmap
+    assert "The current next PR is PR-38 solver diagnostics example notebook" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
@@ -79,7 +79,8 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "The completed PR-34 slice is limited to configured-output conservation/drift" in roadmap
     assert "The completed PR-35 slice is limited to\nrepository hygiene guardrails" in roadmap
     assert "The completed PR-36\nslice is limited to configured-output solver diagnostics" in roadmap
-    assert "The current PR-37 slice\nis limited to Markdown, HTML, and report-folder index visibility" in roadmap
+    assert "The completed PR-37\nslice is limited to Markdown, HTML, and report-folder index visibility" in roadmap
+    assert "The current\nPR-38 slice is limited to a package-output-driven solver diagnostics example" in roadmap
     assert "PR-30\nconfigured oxygen/water-activity modifier example notebook slice" in roadmap
     assert "PR-29\nexplicit oxygen/water-activity configured modifier wiring slice" in roadmap
     assert "PR-28\nconfigured environment modifier example notebook slice" in roadmap
@@ -116,7 +117,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-37: solver diagnostics visibility follow-up"
+    current_next = "PR-38: solver diagnostics example notebook"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -151,6 +152,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-34" not in text
         assert "Current next PR: **PR-35" not in text
         assert "Current next PR: **PR-36" not in text
+        assert "Current next PR: **PR-37" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -178,9 +180,14 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "solver_diagnostics.csv" in next_steps
     assert "solver_diagnostics.json" in next_steps
     assert "solver_diagnostics.csv" in readme
+    assert "19_solver_diagnostics_example.ipynb" in status
+    assert "19_solver_diagnostics_example.ipynb" in next_steps
+    assert "19_solver_diagnostics_example.ipynb" in readme
+    assert "package-generated solver diagnostics artifact inspection" in status
+    assert "header-only/no-metadata" in next_steps
     assert "existing configured run metadata" in status
     assert "Report utilities now expose existing configured-output `solver_diagnostics.json`" in next_steps
-    assert "Add Markdown, HTML, and report-folder index visibility for existing configured-output" in status
+    assert "Added Markdown, HTML, and report-folder index visibility for existing configured-output" in status
     assert "header-only CSV plus JSON\n`status: unavailable` behavior" in next_steps
     assert "existing `SimulationResult` state trajectories" in status
     assert "Header-only\nCSV and `evaluated_count: 0` JSON behavior" in next_steps
@@ -240,7 +247,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "thermodynamic_summary.json" in status
     assert "thermodynamic_summary.csv" in status
     assert "header-only when no artifacts exist" in status
-    assert "report utilities now expose existing configured-output thermodynamic summary artifacts" in status
+    assert "report utilities now expose existing configured-output thermodynamic summary and solver diagnostics artifacts" in status
     assert "thermodynamic_summary.csv` artifacts without inferring thermodynamic inputs" in next_steps
     assert "existing per-sample configured-output `thermodynamic_summary.json`/`.csv` artifacts only" in next_steps
     assert "provenance/limitation decision summary" in status
@@ -304,7 +311,9 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-36 | Configured-output solver diagnostics" in status
     assert "complete after PR #51 merged for the scoped configured-output solver diagnostics slice" in status
     assert "PR-37 | Solver diagnostics visibility follow-up" in status
-    assert "current next after PR #51 merged and PR-36 completed" in status
+    assert "complete after PR #52 merged for the scoped report/index visibility slice" in status
+    assert "PR-38 | Solver diagnostics example notebook" in status
+    assert "current next after PR #52 merged and PR-37 completed" in status
     assert "Future simulator capability follow-up" in status
     assert "Future | VALIDATION-DATA-001" in status
 
@@ -353,7 +362,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-37: solver diagnostics visibility follow-up"
+    current_next = "PR-38: solver diagnostics example notebook"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -389,12 +398,14 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-34" not in _current_next_lines(text)
         assert "PR-35" not in _current_next_lines(text)
         assert "PR-36" not in _current_next_lines(text)
+        assert "PR-37" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
     assert "Status: `deferred; blocked/partial` for ingestion." in gate
     assert "PR-36 configured-output solver diagnostics is complete after PR #51" in gate
-    assert "selected PR-37 work is therefore solver diagnostics visibility follow-up" in gate
+    assert "PR-37 solver diagnostics visibility follow-up is complete after PR #52" in gate
+    assert "selected PR-38 work is therefore a solver diagnostics example notebook" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate
