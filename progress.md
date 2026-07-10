@@ -26,14 +26,49 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-37 Solver Diagnostics Visibility Follow-Up
+
+Date: 2026-07-10
+
+Status: `complete` for the scoped PR-37 solver diagnostics visibility
+follow-up once merged; recommended next remains build-first simulator
+capability work, and VALIDATION-DATA-001 remains `deferred; blocked/partial`
+for ingestion.
+
+Completed in this pass:
+
+- Added Markdown report visibility for existing configured-output
+  `solver_diagnostics.json` and `solver_diagnostics.csv` artifacts when
+  `write_report(...)` is pointed at a configured-output folder.
+- Added optional HTML report and report-folder index links for those existing
+  solver diagnostics artifacts, matching the established configured-output
+  artifact navigation pattern.
+- Kept the section presentation-only and metadata-derived: it summarizes the
+  existing JSON status, metadata-availability state, missing solver-metadata
+  fields, and existing CSV rows without interpreting numerical quality.
+- Added focused configured-output tests for the available-metadata and
+  header-only/no-metadata solver diagnostics visibility paths.
+- Updated active README, roadmap/status docs, validation-gate current-next
+  wording, and roadmap orchestration status tests so PR-36 is complete after
+  PR #51 and PR-37 is the current visibility follow-up.
+
+No solver behavior, numerical threshold, validation rule, calibration routine,
+empirical comparison claim, validation data, biology record, thermodynamic
+enforcement, hidden notebook science, silent fallback constant, scientific
+inference, output generation behavior, or configured-output row schema changed.
+
+Recommended next task: choose another small build-first simulator capability
+slice, preferably metadata/table-derived output ergonomics or generic
+simulator inspectability work, rather than validation ingestion.
+
 ## PR-36 Configured-Output Solver Diagnostics
 
 Date: 2026-07-06
 
 Status: `complete` for the scoped PR-36 configured-output solver diagnostics
-slice once merged; recommended next is a small simulator diagnostics visibility
-follow-up, and VALIDATION-DATA-001 remains `deferred; blocked/partial` for
-ingestion.
+slice after PR #51 merged; the current next task is PR-37 solver diagnostics
+visibility follow-up, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
 
 Completed in this pass:
 
@@ -58,9 +93,8 @@ empirical comparison claim, validation data, biology record, thermodynamic
 enforcement, hidden notebook science, silent fallback constant, or scientific
 inference was added.
 
-Recommended next task: after PR-36 merges, choose a small simulator diagnostics
-visibility follow-up that remains metadata/table-derived, such as exposing
-configured solver diagnostics through a public inspection example or improving
+Recommended next task: complete PR-37 as a small simulator diagnostics
+visibility follow-up that remains metadata/table-derived and improves
 configured bundle navigation without changing solver or scientific behavior.
 
 ## PR-35 Repository Hygiene Guardrail Extension
