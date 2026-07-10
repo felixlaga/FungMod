@@ -26,14 +26,50 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-38 Solver Diagnostics Example Notebook
+
+Date: 2026-07-10
+
+Status: `complete` for the scoped PR-38 solver diagnostics example notebook
+once merged; PR-37 is complete after PR #52, and VALIDATION-DATA-001 remains
+`deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added `notebooks/examples/19_solver_diagnostics_example.ipynb` as a public
+  configured-workflow example over package-generated configured solver
+  diagnostics artifacts.
+- The notebook runs the existing configured workflow to inspect
+  `solver_diagnostics.json`, `solver_diagnostics.csv`, and report/index links
+  for the normal metadata path.
+- The notebook also demonstrates the explicit header-only/no-metadata
+  guardrail by using package workflow helpers to write a bundle whose JSON
+  reports `status: unavailable` and whose CSV keeps headers without row-level
+  diagnostics.
+- Updated notebook inventory/smoke tests so the new notebook remains
+  package-output-driven, does not define hidden solver/rate-law logic, and
+  verifies normal metadata, no-metadata, and report/index visibility paths.
+- Updated active README, roadmap/status docs, validation-gate current-next
+  wording, and roadmap orchestration status tests so PR-37 is complete after
+  PR #52 and PR-38 is the current solver diagnostics example-notebook slice.
+
+No solver behavior, numerical threshold, validation rule, calibration routine,
+empirical comparison claim, validation data, biology record, thermodynamic
+enforcement, hidden notebook science, silent fallback constant, scientific
+inference, configured-output row schema, or report-generation behavior changed.
+
+Recommended next task: choose another small build-first simulator capability
+slice, preferably a bounded generic mechanism, thermodynamic inspectability, or
+table-derived output ergonomics follow-up, rather than validation ingestion.
+
 ## PR-37 Solver Diagnostics Visibility Follow-Up
 
 Date: 2026-07-10
 
 Status: `complete` for the scoped PR-37 solver diagnostics visibility
-follow-up once merged; recommended next remains build-first simulator
-capability work, and VALIDATION-DATA-001 remains `deferred; blocked/partial`
-for ingestion.
+follow-up after PR #52 merged; the current next task is PR-38 solver
+diagnostics example notebook, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
 
 Completed in this pass:
 
@@ -50,7 +86,7 @@ Completed in this pass:
   header-only/no-metadata solver diagnostics visibility paths.
 - Updated active README, roadmap/status docs, validation-gate current-next
   wording, and roadmap orchestration status tests so PR-36 is complete after
-  PR #51 and PR-37 is the current visibility follow-up.
+  PR #51 and PR-37 is the selected visibility follow-up.
 
 No solver behavior, numerical threshold, validation rule, calibration routine,
 empirical comparison claim, validation data, biology record, thermodynamic
@@ -58,8 +94,8 @@ enforcement, hidden notebook science, silent fallback constant, scientific
 inference, output generation behavior, or configured-output row schema changed.
 
 Recommended next task: choose another small build-first simulator capability
-slice, preferably metadata/table-derived output ergonomics or generic
-simulator inspectability work, rather than validation ingestion.
+slice, preferably the PR-38 solver diagnostics example notebook, rather than
+validation ingestion.
 
 ## PR-36 Configured-Output Solver Diagnostics
 
