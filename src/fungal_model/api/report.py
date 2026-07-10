@@ -37,6 +37,11 @@ THERMODYNAMIC_FILENAMES = {
     "thermodynamic_summary_csv": "thermodynamic_summary.csv",
 }
 
+SOLVER_DIAGNOSTIC_FILENAMES = {
+    "solver_diagnostics_json": "solver_diagnostics.json",
+    "solver_diagnostics_csv": "solver_diagnostics.csv",
+}
+
 
 def write_virtual_experiment_report(
     *,
@@ -59,11 +64,15 @@ def write_virtual_experiment_report(
     tables = {name: _read_rows(table_root / filename) for name, filename in TABLE_FILENAMES.items()}
     thermodynamic_summary = _read_json_mapping(table_root / THERMODYNAMIC_FILENAMES["thermodynamic_summary_json"])
     thermodynamic_rows = _read_rows(table_root / THERMODYNAMIC_FILENAMES["thermodynamic_summary_csv"])
+    solver_diagnostics = _read_json_mapping(table_root / SOLVER_DIAGNOSTIC_FILENAMES["solver_diagnostics_json"])
+    solver_rows = _read_rows(table_root / SOLVER_DIAGNOSTIC_FILENAMES["solver_diagnostics_csv"])
     markdown = _render_report(
         tables=tables,
         quicklook_paths=quicklook_paths,
         thermodynamic_summary=thermodynamic_summary,
         thermodynamic_rows=thermodynamic_rows,
+        solver_diagnostics=solver_diagnostics,
+        solver_rows=solver_rows,
     )
     report_path.write_text(markdown, encoding="utf-8")
     if include_html:
@@ -114,6 +123,8 @@ def _render_report(
     quicklook_paths: Sequence[str],
     thermodynamic_summary: Mapping[str, Any],
     thermodynamic_rows: Sequence[Mapping[str, str]],
+    solver_diagnostics: Mapping[str, Any],
+    solver_rows: Sequence[Mapping[str, str]],
 ) -> str:
     preflight = tables["modelability_preflight"]
     case_summary = tables["case_summary"]
@@ -165,6 +176,10 @@ def _render_report(
             thermodynamic_rows,
             standard_rows=thermodynamic_diagnostics,
         ),
+        "",
+        "## Configured solver diagnostics",
+        "",
+        *_solver_diagnostics_lines(solver_diagnostics, solver_rows),
         "",
         "## Active mechanisms and modifiers",
         "",
@@ -462,6 +477,72 @@ def _thermodynamic_row_details(row: Mapping[str, str]) -> str:
     return "; ".join(details)
 
 
+def _solver_diagnostics_lines(
+    summary: Mapping[str, Any],
+    rows: Sequence[Mapping[str, str]],
+) -> list[str]:
+    if not summary and not rows:
+        return ["No configured solver-diagnostics artifacts were present."]
+
+    lines = [
+        "These diagnostics inspect existing configured-output `solver_diagnostics.json` "
+        "and `solver_diagnostics.csv` artifacts only. They do not change solver behavior, "
+        "define numerical quality thresholds, add validation/calibration evidence, compare "
+        "against empirical data, enforce thermodynamics, or add biology claims."
+    ]
+    if summary:
+        missing_fields = summary.get("missing_metadata_fields")
+        lines.append(
+            "- Summary: "
+            f"status `{_summary_value(summary, 'status')}`; "
+            f"metadata available `{_summary_value(summary, 'metadata_available')}`; "
+            f"row count={_summary_value(summary, 'row_count')}; "
+            f"missing metadata fields={_format_sequence(missing_fields)}."
+        )
+        for field, label in (
+            ("allowed_use", "Allowed use"),
+            ("unsupported_scope", "Unsupported scope"),
+        ):
+            value = _summary_value(summary, field)
+            if value:
+                lines.append(f"- {label}: {value}")
+
+    if rows:
+        lines.append("Rows from `solver_diagnostics.csv`:")
+    else:
+        lines.append("No row-level `solver_diagnostics.csv` diagnostics were present.")
+    for row in rows[:12]:
+        details = _row_details(
+            row,
+            (
+                ("mode", "mode"),
+                ("maturity", "maturity"),
+                ("solver_backend", "backend"),
+                ("solver_method", "method"),
+                ("solver_success", "success"),
+                ("solver_status", "status"),
+                ("nfev", "nfev"),
+                ("njev", "njev"),
+                ("nlu", "nlu"),
+                ("state_count", "state count"),
+                ("configured_process_count", "configured process count"),
+                ("process_rate_count", "process-rate count"),
+                ("configured_time_evaluation_count", "configured time points"),
+                ("result_time_point_count", "result time points"),
+            ),
+        )
+        message = _value(row, "solver_message")
+        message_suffix = f"; solver message `{message}`" if message else ""
+        guardrail = _value(row, "interpretation_guardrail")
+        guardrail_suffix = f" Guardrail: {guardrail}" if guardrail else ""
+        lines.append(
+            f"- `{_value(row, 'config_name')}` result `{_value(row, 'result_name')}`: "
+            f"{details}; allowed use `{_value(row, 'allowed_use')}`"
+            f"{message_suffix}.{guardrail_suffix}"
+        )
+    return lines
+
+
 def _mechanism_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
     active = [row for row in rows if _value(row, "active") != "false"]
     if not active:
@@ -699,6 +780,7 @@ def _render_html_report(
     decision_links = _decision_table_link_items(table_root=table_root, output_dir=output_dir)
     table_links = _table_link_items(table_root=table_root, output_dir=output_dir)
     thermodynamic_links = _thermodynamic_link_items(table_root=table_root, output_dir=output_dir)
+    solver_links = _solver_diagnostic_link_items(table_root=table_root, output_dir=output_dir)
     quicklook_links = _quicklook_link_items(quicklook_paths, output_dir=output_dir)
     return "\n".join(
         [
@@ -728,6 +810,10 @@ def _render_html_report(
             "<ul>",
             *thermodynamic_links,
             "</ul>",
+            "<h2>Configured solver diagnostics</h2>",
+            "<ul>",
+            *solver_links,
+            "</ul>",
             "<h2>Quicklook figure files</h2>",
             "<ul>",
             *quicklook_links,
@@ -756,6 +842,7 @@ def _render_report_folder_index(
     decision_links = _decision_table_link_items(table_root=table_root, output_dir=report_dir)
     table_links = _table_link_items(table_root=table_root, output_dir=report_dir)
     thermodynamic_links = _thermodynamic_link_items(table_root=table_root, output_dir=report_dir)
+    solver_links = _solver_diagnostic_link_items(table_root=table_root, output_dir=report_dir)
     quicklook_links = _quicklook_link_items(quicklook_paths, output_dir=report_dir)
     return "\n".join(
         [
@@ -793,6 +880,10 @@ def _render_report_folder_index(
             "<h2>Configured thermodynamic diagnostics</h2>",
             "<ul>",
             *thermodynamic_links,
+            "</ul>",
+            "<h2>Configured solver diagnostics</h2>",
+            "<ul>",
+            *solver_links,
             "</ul>",
             "<h2>Quicklook figures</h2>",
             "<ul>",
@@ -924,6 +1015,24 @@ def _thermodynamic_link_items(*, table_root: Path, output_dir: Path) -> list[str
     return items
 
 
+def _solver_diagnostic_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
+    items = []
+    for name, filename in SOLVER_DIAGNOSTIC_FILENAMES.items():
+        path = table_root / filename
+        if path.exists():
+            items.append(
+                _link_item(
+                    path=path,
+                    base_dir=output_dir,
+                    label=filename,
+                    description=name,
+                )
+            )
+    if not items:
+        return ["  <li>No configured solver-diagnostics artifacts were present.</li>"]
+    return items
+
+
 def _quicklook_link_items(paths: Sequence[str], *, output_dir: Path) -> list[str]:
     if not paths:
         return ["  <li>No quicklook figure paths were recorded.</li>"]
@@ -974,6 +1083,12 @@ def _format_counts(value: Any) -> str:
     if not isinstance(value, Mapping):
         return "{}"
     return "{" + ", ".join(f"{key}: {value[key]}" for key in sorted(value)) + "}"
+
+
+def _format_sequence(value: Any) -> str:
+    if not isinstance(value, Sequence) or isinstance(value, str):
+        return "[]"
+    return "[" + ", ".join(str(item) for item in value) + "]"
 
 
 def _counts(rows: Sequence[Mapping[str, str]], field: str) -> dict[str, int]:

@@ -68,7 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-36 configured-output solver diagnostics after the
+The current next PR is PR-37 solver diagnostics visibility follow-up after the
+PR-36 configured-output solver diagnostics slice,
 PR-35 repository hygiene guardrail extension,
 the PR-34 configured-output conservation/drift diagnostics slice,
 the PR-33 chain-template explicit environment modifier assembly slice,
@@ -120,12 +121,17 @@ already covered by `.gitignore` cannot enter git after PR #50, and generated
 `foundation_progress/FUNGMOD_PROGRESS_REPORT_*.html` snapshots are ignored
 without hiding the tracked final-goal HTML plan. It does not change code
 behavior, solver behavior, notebook output, validation data, calibration,
-biology, thermodynamics, or scientific claims. The current PR-36 slice adds
+biology, thermodynamics, or scientific claims. The completed PR-36 slice added
 configured-output solver diagnostics derived from existing configured run
 metadata, solver settings, solver metadata, time-grid/evaluation counts, state
-counts, and process counts only. It does not change solver behavior, infer
-scientific values, add numerical thresholds, validation data, calibration,
-empirical comparison, thermodynamic enforcement, or biology claims. The completed
+counts, and process counts only after PR #51. It did not change solver
+behavior, infer scientific values, add numerical thresholds, validation data,
+calibration, empirical comparison, thermodynamic enforcement, or biology
+claims. The current PR-37 slice exposes those existing configured-output
+solver diagnostics artifacts in report/index visibility paths only. It does not
+change solver behavior, define numerical thresholds, add validation data,
+calibration, empirical comparison, thermodynamic enforcement, hidden notebook
+science, or biology claims. The completed
 PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -200,9 +206,11 @@ constants.
 The completed PR-34 slice is limited to configured-output conservation/drift
 diagnostics over existing state trajectories and explicit configured
 `mass_balance` `conserved_weights`. The completed PR-35 slice is limited to
-repository hygiene guardrails for generated artifacts. The current PR-36 slice
-is limited to configured-output solver diagnostics copied from existing
-configured workflow metadata and solver metadata only.
+repository hygiene guardrails for generated artifacts. The completed PR-36
+slice is limited to configured-output solver diagnostics copied from existing
+configured workflow metadata and solver metadata only. The current PR-37 slice
+is limited to Markdown, HTML, and report-folder index visibility for those
+existing configured-output solver diagnostics artifacts only.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -267,10 +275,11 @@ completed after PR #47 as repository hygiene cleanup, PR-33 completed after
 PR #48 as chain-template explicit environment modifier assembly, and PR-34
 completed after PR #49 as configured-output conservation/drift diagnostics.
 PR-35 completed after PR #50 as a focused repository hygiene guardrail
-extension. The current PR-36 slice is configured-output solver diagnostics
+extension, and PR-36 completed after PR #51 as configured-output solver
+diagnostics. The current PR-37 slice is a diagnostics visibility follow-up
 rather than ingestion, digitization, fabricated validation data, calibration,
-or empirical comparison; the recommended next simulator-building follow-up is
-a small diagnostics visibility slice.
+or empirical comparison; the recommended next simulator-building follow-up
+should continue build-first simulator capability.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

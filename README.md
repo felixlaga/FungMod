@@ -44,6 +44,10 @@ basic kinetics layer:
 - configured conservation JSON/CSV diagnostics copied from existing
   `SimulationResult` trajectories and explicit configured `mass_balance`
   `conserved_weights`, for drift inspection only,
+- configured solver JSON/CSV diagnostics copied from existing configured run
+  metadata, solver settings, solver metadata, time-grid/evaluation counts,
+  state counts, and process counts, with report/index visibility for existing
+  solver diagnostics artifacts,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - least-squares calibration utilities with train/validation residual reporting,
@@ -256,7 +260,13 @@ When the report utility is pointed at a configured-output folder that already
 contains `thermodynamic_summary.json` and `thermodynamic_summary.csv`, it adds
 an explicit thermodynamic-diagnostics inspection section and links those
 artifacts without inferring activities, reaction quotients, concentrations,
-redox chemistry, validation evidence, or solver-time thermodynamic enforcement:
+redox chemistry, validation evidence, or solver-time thermodynamic enforcement.
+When it is pointed at a configured-output folder with existing
+`solver_diagnostics.json` and `solver_diagnostics.csv`, it adds an explicit
+solver-diagnostics inspection section and links those artifacts without
+changing solver behavior, defining numerical quality thresholds, adding
+validation/calibration evidence, comparing against empirical data, enforcing
+thermodynamics, or adding biology claims:
 
 ```python
 result.write_report("outputs/report/", include_html=True, include_index=True)

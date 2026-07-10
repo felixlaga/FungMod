@@ -16,6 +16,7 @@ from fungal_model import (
     merge_parameter_sets,
     run_configured_model,
 )
+from fungal_model.api.report import write_virtual_experiment_report
 from fungal_model.io.model_config import load_model_config
 from fungal_model.plugins.pet import pet_substrate_loader_registry
 from fungal_model.results import SimulationResult
@@ -193,6 +194,41 @@ def test_configured_output_writes_solver_diagnostics_from_existing_metadata(tmp_
     assert "solver_diagnostics.csv" in manifest["files"]
 
 
+def test_configured_output_report_exposes_solver_diagnostics_artifacts(tmp_path) -> None:
+    output_dir = tmp_path / "homogeneous_run"
+
+    run_configured_model(
+        MODEL_CONFIGS / "toy_homogeneous_ab.yml",
+        output_dir=output_dir,
+    )
+
+    report_path = write_virtual_experiment_report(
+        table_dir=output_dir,
+        output_dir=output_dir / "report",
+        include_html=True,
+        include_index=True,
+    )
+    report = report_path.read_text(encoding="utf-8")
+    html = report_path.with_suffix(".html").read_text(encoding="utf-8")
+    index = report_path.with_name("index.html").read_text(encoding="utf-8")
+
+    assert "## Configured solver diagnostics" in report
+    assert "existing configured-output `solver_diagnostics.json` and `solver_diagnostics.csv` artifacts only" in report
+    assert "do not change solver behavior" in report
+    assert "define numerical quality thresholds" in report
+    assert "validation/calibration evidence" in report
+    assert "`toy homogeneous A to B benchmark`" in report
+    assert "backend `scipy.solve_ivp`" in report
+    assert "configured time points `11`" in report
+    assert "Diagnostic copy over existing configured run metadata" in report
+    assert 'href="../solver_diagnostics.json"' in html
+    assert 'href="../solver_diagnostics.csv"' in html
+    assert 'href="../solver_diagnostics.json"' in index
+    assert 'href="../solver_diagnostics.csv"' in index
+    assert "empirically validated" not in report.lower()
+    assert "calibrated against observations" not in report.lower()
+
+
 def test_configured_output_writes_header_only_solver_diagnostics_without_metadata(tmp_path) -> None:
     config = load_model_config(MODEL_CONFIGS / "toy_homogeneous_ab.yml")
     inputs = ConfiguredInputLoader().load(config)
@@ -241,6 +277,25 @@ def test_configured_output_writes_header_only_solver_diagnostics_without_metadat
     assert "nfev" in (reader.fieldnames or ())
     assert "solver_diagnostics.json" in manifest["files"]
     assert "solver_diagnostics.csv" in manifest["files"]
+
+    report_path = write_virtual_experiment_report(
+        table_dir=output_dir,
+        output_dir=output_dir / "report",
+        include_html=True,
+        include_index=True,
+    )
+    report = report_path.read_text(encoding="utf-8")
+    html = report_path.with_suffix(".html").read_text(encoding="utf-8")
+    index = report_path.with_name("index.html").read_text(encoding="utf-8")
+
+    assert "status `unavailable`" in report
+    assert "metadata available `False`" in report
+    assert "missing metadata fields=[backend, method, success, status, message, nfev, njev, nlu]" in report
+    assert "No row-level `solver_diagnostics.csv` diagnostics were present." in report
+    assert 'href="../solver_diagnostics.json"' in html
+    assert 'href="../solver_diagnostics.csv"' in html
+    assert 'href="../solver_diagnostics.json"' in index
+    assert 'href="../solver_diagnostics.csv"' in index
 
 
 def test_configured_mass_balance_missing_state_remains_explicit(tmp_path) -> None:

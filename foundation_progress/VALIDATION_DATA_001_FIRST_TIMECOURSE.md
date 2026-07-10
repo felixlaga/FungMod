@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-36: configured-output solver diagnostics**.
+Current next PR: **PR-37: solver diagnostics visibility follow-up**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -33,10 +33,11 @@ PR #46, PR-32 repository hygiene cleanup is complete after PR #47, PR-33
 chain-template explicit environment modifier assembly is complete after
 PR #48, and PR-34 configured-output conservation/drift diagnostics is complete
 after PR #49. PR-35 repository hygiene guardrail extension is complete after
-PR #50. The selected PR-36 work is therefore configured-output solver
-diagnostics, not validation ingestion. A future validation ingestion PR must
-not ingest, digitize, or fabricate data unless those evidence requirements are
-met. This gate does not complete VALIDATION-DATA-001.
+PR #50. PR-36 configured-output solver diagnostics is complete after PR #51.
+The selected PR-37 work is therefore solver diagnostics visibility follow-up,
+not validation ingestion. A future validation ingestion PR must not ingest,
+digitize, or fabricate data unless those evidence requirements are met. This
+gate does not complete VALIDATION-DATA-001.
 
 ## Candidate Evidence Checked
 
