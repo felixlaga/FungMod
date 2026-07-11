@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 
 from fungal_model.core.parameters import Parameter
@@ -57,26 +59,42 @@ def finite_volume_laplacian_1d(
     laplacian = np.zeros_like(magnitudes, dtype=float)
 
     if boundary_conditions.left.kind == "periodic":
-        factor = float(FINITE_DIFFERENCE_CENTER_STENCIL_FACTOR.quantity.to("dimensionless").magnitude)
+        factor = float(
+            cast(Quantity, FINITE_DIFFERENCE_CENTER_STENCIL_FACTOR.quantity)
+            .to("dimensionless")
+            .magnitude
+        )
         laplacian = (np.roll(magnitudes, -1) - factor * magnitudes + np.roll(magnitudes, 1)) / dx2
         return Q_(laplacian, f"{field.units} / meter ** 2")
 
     if magnitudes.size > 2:
-        factor = float(FINITE_DIFFERENCE_CENTER_STENCIL_FACTOR.quantity.to("dimensionless").magnitude)
+        factor = float(
+            cast(Quantity, FINITE_DIFFERENCE_CENTER_STENCIL_FACTOR.quantity)
+            .to("dimensionless")
+            .magnitude
+        )
         laplacian[1:-1] = (magnitudes[2:] - factor * magnitudes[1:-1] + magnitudes[:-2]) / dx2
 
     if boundary_conditions.left.kind == "no_flux":
         laplacian[0] = (magnitudes[1] - magnitudes[0]) / dx2
     else:
         fixed = boundary_conditions.left.value_as(str(field.units)).magnitude
-        factor = float(FINITE_VOLUME_BOUNDARY_FACE_FACTOR.quantity.to("dimensionless").magnitude)
+        factor = float(
+            cast(Quantity, FINITE_VOLUME_BOUNDARY_FACE_FACTOR.quantity)
+            .to("dimensionless")
+            .magnitude
+        )
         laplacian[0] = (magnitudes[1] - magnitudes[0] - factor * (magnitudes[0] - fixed)) / dx2
 
     if boundary_conditions.right.kind == "no_flux":
         laplacian[-1] = (magnitudes[-2] - magnitudes[-1]) / dx2
     else:
         fixed = boundary_conditions.right.value_as(str(field.units)).magnitude
-        factor = float(FINITE_VOLUME_BOUNDARY_FACE_FACTOR.quantity.to("dimensionless").magnitude)
+        factor = float(
+            cast(Quantity, FINITE_VOLUME_BOUNDARY_FACE_FACTOR.quantity)
+            .to("dimensionless")
+            .magnitude
+        )
         laplacian[-1] = (magnitudes[-2] - magnitudes[-1] + factor * (fixed - magnitudes[-1])) / dx2
 
     return Q_(laplacian, f"{field.units} / meter ** 2")

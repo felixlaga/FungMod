@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from fungal_model.chemistry.stoichiometry import (
     DEFAULT_STOICHIOMETRIC_ABSOLUTE_TOLERANCE,
@@ -13,7 +13,7 @@ from fungal_model.chemistry.stoichiometry import (
     StoichiometricTerm,
 )
 from fungal_model.core.provenance import has_text
-from fungal_model.core.units import Q_, assert_compatible
+from fungal_model.core.units import Q_, Quantity, assert_compatible
 from fungal_model.core.validators import (
     ValidationResult,
     validate_charge_balance,
@@ -996,7 +996,7 @@ def _role_from_signed_coefficient(coefficient: float) -> str:
 
 
 def _stoichiometric_tolerance() -> float:
-    return float(DEFAULT_STOICHIOMETRIC_ABSOLUTE_TOLERANCE.quantity.magnitude)
+    return float(cast(Quantity, DEFAULT_STOICHIOMETRIC_ABSOLUTE_TOLERANCE.quantity).magnitude)
 
 
 def _check_types(value: Any) -> tuple[str, ...]:

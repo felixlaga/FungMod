@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 
@@ -138,9 +139,9 @@ def gaussian_ph_activity(
         name="scaled pH deviation",
     )
     exponent = (
-        -PH_GAUSSIAN_HALF_FACTOR.quantity.to("dimensionless")
+        -cast(Quantity, PH_GAUSSIAN_HALF_FACTOR.quantity).to("dimensionless")
         * scaled_deviation
-        ** PH_GAUSSIAN_EXPONENT_POWER.quantity.to("dimensionless").magnitude
+        ** cast(Quantity, PH_GAUSSIAN_EXPONENT_POWER.quantity).to("dimensionless").magnitude
     )
     return assert_compatible(
         Q_(np.exp(exponent.magnitude), "dimensionless"),

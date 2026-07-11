@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-40: virtual-experiment conservation diagnostics bridge**.
+Current next PR: **PR-41: Pyright optional-member-access ratchet**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -36,11 +36,12 @@ after PR #49. PR-35 repository hygiene guardrail extension is complete after
 PR #50. PR-36 configured-output solver diagnostics is complete after PR #51.
 PR-37 solver diagnostics visibility follow-up is complete after PR #52. PR-38
 solver diagnostics example notebook is complete after PR #53. PR-39
-virtual-experiment solver diagnostics bridge is complete after PR #54. The
-selected PR-40 work is therefore a virtual-experiment conservation diagnostics
-bridge, not validation ingestion. A future validation ingestion PR must not ingest,
-digitize, or fabricate data unless those evidence requirements are met. This
-gate does not complete VALIDATION-DATA-001.
+virtual-experiment solver diagnostics bridge is complete after PR #54. PR-40
+virtual-experiment conservation diagnostics bridge is complete after PR #55.
+The selected PR-41 work is therefore a Pyright optional-member-access quality
+ratchet, not validation ingestion. A future validation ingestion PR must not ingest,
+digitize, or fabricate data unless those evidence requirements are met.
+This gate does not complete VALIDATION-DATA-001.
 
 ## Candidate Evidence Checked
 

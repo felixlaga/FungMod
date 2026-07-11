@@ -987,7 +987,7 @@ def _severity_for_status(*, status: str, required: bool) -> str:
 
 def _stoichiometric_tolerance_value(absolute_tolerance: float | None) -> float:
     if absolute_tolerance is None:
-        return float(DEFAULT_STOICHIOMETRIC_ABSOLUTE_TOLERANCE.quantity.magnitude)
+        return float(cast(Quantity, DEFAULT_STOICHIOMETRIC_ABSOLUTE_TOLERANCE.quantity).magnitude)
     tolerance = float(absolute_tolerance)
     if tolerance < 0.0:
         raise ValueError("absolute_tolerance must be non-negative.")

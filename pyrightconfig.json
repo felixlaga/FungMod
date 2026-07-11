@@ -16,7 +16,7 @@
   "reportGeneralTypeIssues": true,
   "reportInvalidTypeForm": true,
   "reportOperatorIssue": true,
-  "reportOptionalMemberAccess": false,
+  "reportOptionalMemberAccess": true,
   "reportOptionalOperand": true,
   "reportReturnType": true,
   "reportMissingTypeStubs": false,

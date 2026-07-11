@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 
@@ -112,7 +112,7 @@ class UniformGrid1D:
     @property
     def coordinates(self) -> Quantity:
         dx = self.cell_width
-        offset = float(CELL_CENTER_OFFSET.quantity.to("dimensionless").magnitude)
+        offset = float(cast(Quantity, CELL_CENTER_OFFSET.quantity).to("dimensionless").magnitude)
         return Q_((np.arange(self.n_cells, dtype=float) + offset) * dx.magnitude, dx.units)
 
     def to_dict(self) -> dict[str, Any]:
