@@ -46,8 +46,9 @@ basic kinetics layer:
   `conserved_weights`, for drift inspection only,
 - configured solver JSON/CSV diagnostics copied from existing configured run
   metadata, solver settings, solver metadata, time-grid/evaluation counts,
-  state counts, and process counts, with report/index visibility for existing
-  solver diagnostics artifacts,
+  state counts, and process counts, with report/index visibility plus a
+  standard virtual-experiment solver diagnostics table/accessor derived from
+  existing per-sample configured solver diagnostics artifacts,
 - 1D finite-volume reaction-diffusion with explicit boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - least-squares calibration utilities with train/validation residual reporting,
@@ -228,6 +229,14 @@ interpretation guardrails. If no configured thermodynamic artifacts exist, the
 table remains header-only; it does not infer activities, reaction quotients,
 concentrations, redox potentials, electron balances, validation evidence, or
 solver-time thermodynamic enforcement.
+`solver_diagnostics.csv` copies existing per-sample configured-output
+`solver_diagnostics.json`/`.csv` fields into a standard virtual-experiment
+table with explicit artifact-presence, metadata-availability, allowed-use, and
+interpretation guardrails. If no per-sample configured solver diagnostics
+artifacts exist, the table remains header-only; it does not change solver
+behavior, infer scientific values, define numerical quality thresholds, add
+validation/calibration evidence, compare against empirical data, enforce
+thermodynamics, or add biology claims.
 Configured output bundles also include `conservation_diagnostics.json` and
 `conservation_diagnostics.csv` for explicit configured `mass_balance`
 validators with `conserved_weights`; these rows copy weighted conserved totals

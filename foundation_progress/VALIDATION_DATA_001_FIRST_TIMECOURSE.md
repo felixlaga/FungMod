@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-38: solver diagnostics example notebook**.
+Current next PR: **PR-39: virtual-experiment solver diagnostics bridge**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -34,8 +34,9 @@ chain-template explicit environment modifier assembly is complete after
 PR #48, and PR-34 configured-output conservation/drift diagnostics is complete
 after PR #49. PR-35 repository hygiene guardrail extension is complete after
 PR #50. PR-36 configured-output solver diagnostics is complete after PR #51.
-PR-37 solver diagnostics visibility follow-up is complete after PR #52. The
-selected PR-38 work is therefore a solver diagnostics example notebook, not
+PR-37 solver diagnostics visibility follow-up is complete after PR #52. PR-38
+solver diagnostics example notebook is complete after PR #53. The selected
+PR-39 work is therefore a virtual-experiment solver diagnostics bridge, not
 validation ingestion. A future validation ingestion PR must not ingest,
 digitize, or fabricate data unless those evidence requirements are met. This
 gate does not complete VALIDATION-DATA-001.
