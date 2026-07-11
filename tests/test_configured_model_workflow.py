@@ -131,6 +131,41 @@ def test_configured_output_writes_conservation_diagnostics(tmp_path) -> None:
     assert "conservation_diagnostics.csv" in manifest["files"]
 
 
+def test_configured_output_report_exposes_conservation_diagnostics_artifacts(tmp_path) -> None:
+    output_dir = tmp_path / "homogeneous_run"
+
+    run_configured_model(
+        MODEL_CONFIGS / "toy_homogeneous_ab.yml",
+        output_dir=output_dir,
+    )
+
+    report_path = write_virtual_experiment_report(
+        table_dir=output_dir,
+        output_dir=output_dir / "report",
+        include_html=True,
+        include_index=True,
+    )
+    report = report_path.read_text(encoding="utf-8")
+    html = report_path.with_suffix(".html").read_text(encoding="utf-8")
+    index = report_path.with_name("index.html").read_text(encoding="utf-8")
+
+    assert "## Conservation diagnostics" in report
+    assert (
+        "existing configured-output `conservation_diagnostics.json` and "
+        "`conservation_diagnostics.csv` artifacts only"
+    ) in report
+    assert "validator count=1" in report
+    assert "evaluated count=1" in report
+    assert "status counts={evaluated: 1}" in report
+    assert "`closed_mass_balance`" in report
+    assert "do not infer conserved quantities" in report
+    assert "No standard `conservation_diagnostics.csv` rows were present." in report
+    assert 'href="../conservation_diagnostics.json"' in html
+    assert 'href="../conservation_diagnostics.csv"' in html
+    assert 'href="../conservation_diagnostics.json"' in index
+    assert 'href="../conservation_diagnostics.csv"' in index
+
+
 def test_configured_output_writes_zero_evaluated_conservation_diagnostics_without_mass_balance(
     tmp_path,
 ) -> None:

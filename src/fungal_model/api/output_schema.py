@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "1.6.0"
+OUTPUT_SCHEMA_VERSION = "1.7.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -480,6 +480,113 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             ),
         ),
         primary_key=("case_id", "time_index", "state", "state_role", "source", "units"),
+    ),
+    "conservation_diagnostics": _table(
+        "Configured-output conservation diagnostics copied from existing per-sample conservation_diagnostics artifacts.",
+        (
+            *COMMON_CASE_COLUMNS,
+            *SAMPLE_COLUMNS,
+            _column("artifact_source_directory", "Sample configured-output bundle directory inspected for artifacts."),
+            _column(
+                "conservation_diagnostics_json_present",
+                "Whether conservation_diagnostics.json existed in the sample bundle.",
+                semantic_type="boolean",
+            ),
+            _column(
+                "conservation_diagnostics_csv_present",
+                "Whether conservation_diagnostics.csv existed in the sample bundle.",
+                semantic_type="boolean",
+            ),
+            _column("summary_kind", "Top-level kind field from conservation_diagnostics.json.", required=False),
+            _column(
+                "summary_validator_count",
+                "Top-level validator_count copied from conservation_diagnostics.json.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "summary_evaluated_count",
+                "Top-level evaluated_count copied from conservation_diagnostics.json.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "summary_status_counts",
+                "JSON status-count mapping copied from conservation_diagnostics.json.",
+                required=False,
+            ),
+            _column(
+                "summary_allowed_use",
+                "Top-level allowed-use text copied from conservation_diagnostics.json.",
+                required=False,
+            ),
+            _column(
+                "unsupported_scope",
+                "Unsupported-scope text copied from conservation_diagnostics.json.",
+                required=False,
+            ),
+            _column(
+                "row_index",
+                "Zero-based conservation_diagnostics.csv row index within the sample bundle.",
+                semantic_type="integer",
+            ),
+            _column("validator_id", "Validator ID copied from conservation_diagnostics.csv.", required=False),
+            _column("status", "Diagnostic status copied from conservation_diagnostics.csv.", required=False),
+            _column("reason", "Diagnostic reason copied from conservation_diagnostics.csv.", required=False),
+            _column(
+                "closed_system",
+                "Closed-system metadata copied from conservation_diagnostics.csv.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column(
+                "weighted_states",
+                "JSON weighted-state mapping copied from conservation_diagnostics.csv.",
+                required=False,
+            ),
+            _column(
+                "initial_conserved_total",
+                "Initial conserved total copied from conservation_diagnostics.csv.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "final_conserved_total",
+                "Final conserved total copied from conservation_diagnostics.csv.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "final_drift",
+                "Final drift copied from conservation_diagnostics.csv.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "max_absolute_drift",
+                "Maximum absolute drift copied from conservation_diagnostics.csv.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "relative_max_absolute_drift",
+                "Relative maximum absolute drift copied from conservation_diagnostics.csv.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column("units", "Conserved-total units copied from conservation_diagnostics.csv.", required=False),
+            _column(
+                "allowed_use",
+                "Allowed-use text copied from the configured conservation diagnostics row or summary.",
+                required=False,
+            ),
+            _column(
+                "interpretation_guardrail",
+                "Human-readable guardrail preventing validation, threshold, chemistry, or biology overclaims.",
+            ),
+        ),
+        primary_key=("case_id", "sample_id", "row_index", "validator_id"),
+        join_keys=("case_id", "sample_id"),
     ),
     "thermodynamic_diagnostics": _table(
         "Configured-output thermodynamic diagnostics copied from existing per-sample thermodynamic_summary artifacts.",

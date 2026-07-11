@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-38 after PR #53 merged, with PR-39 selected:
+Scoped status as of PR-39 after PR #54 merged, with PR-40 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -141,6 +141,14 @@ CSV and `evaluated_count: 0` JSON behavior are used when no explicit configured
 mass-balance weights exist. These artifacts are not validation, calibration,
 threshold changes, thermodynamic enforcement, solver changes, or biology
 claims.
+Standard virtual-experiment outputs now also include
+`conservation_diagnostics.csv` and
+`DegradationScreenResult.conservation_diagnostics()` as a bridge over existing
+per-sample configured-output `conservation_diagnostics.json`/`.csv` artifacts
+only. The table is header-only when those artifacts are absent and must not be
+read as inferred conserved quantities, tolerances, pass/fail thresholds,
+validation evidence, chemistry, thermodynamics, calibration, empirical
+comparison, or biology.
 Configured output bundles now also include `solver_diagnostics.json` and
 `solver_diagnostics.csv` for existing configured run metadata, solver
 settings, solver metadata, time-grid/evaluation counts, state counts, and
@@ -179,7 +187,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-39: virtual-experiment solver diagnostics bridge**.
+Current next PR: **PR-40: virtual-experiment conservation diagnostics bridge**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -210,16 +218,16 @@ derived from existing configured run metadata, solver settings, solver
 metadata, time-grid/evaluation counts, state counts, and process counts only.
 PR-37 completed a small report/index visibility follow-up over those existing
 solver diagnostics artifacts after PR #52. PR-38 completed the configured
-solver diagnostics example notebook after PR #53. The selected PR-39 work is a
-standard virtual-experiment table/accessor bridge over existing per-sample
-configured solver diagnostics artifacts. It does not add validation data,
-calibration, empirical comparison, threshold changes, thermodynamic
-enforcement, solver/model behavior changes, hidden notebook science, silent
-fallback constants, inferred environment responses, configured-output schema
-changes, or new biology claims.
-Recommended next after PR-39: continue build-first simulator capability work,
-preferably as a bounded generic mechanism, thermodynamic inspectability, or
-table-derived output ergonomics slice.
+solver diagnostics example notebook after PR #53. PR-39 completed the standard
+virtual-experiment solver diagnostics table/accessor bridge after PR #54. The
+selected PR-40 work is a standard virtual-experiment table/accessor bridge over
+existing per-sample configured conservation diagnostics artifacts. It does not
+infer conserved quantities, tolerances, pass/fail thresholds, validation
+evidence, chemistry, thermodynamics, calibration, empirical comparison, or
+biology, and it does not change configured-output conservation artifact or
+scientific numerical behavior.
+Recommended next after PR-40: add a bounded public-API conservation diagnostics
+example notebook over the standard table/accessor and header-only guardrail.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

@@ -25,6 +25,7 @@ TABLE_FILENAMES = {
     "comparison_summary": "comparison_summary.csv",
     "uncertainty_summary": "uncertainty_summary.csv",
     "trajectory_quantiles": "trajectory_quantiles.csv",
+    "conservation_diagnostics": "conservation_diagnostics.csv",
     "thermodynamic_diagnostics": "thermodynamic_diagnostics.csv",
     "solver_diagnostics": "solver_diagnostics.csv",
     "provenance_table": "provenance_table.csv",
@@ -32,6 +33,21 @@ TABLE_FILENAMES = {
     "missing_parameters": "missing_parameters.csv",
     "suggested_experiments": "suggested_experiments.csv",
 }
+
+CONSERVATION_DIAGNOSTIC_FILENAMES = {
+    "conservation_diagnostics_json": "conservation_diagnostics.json",
+    "conservation_diagnostics_csv": "conservation_diagnostics.csv",
+}
+
+STANDARD_CONSERVATION_DIAGNOSTIC_FIELDS = frozenset(
+    {
+        "case_id",
+        "sample_id",
+        "artifact_source_directory",
+        "conservation_diagnostics_json_present",
+        "conservation_diagnostics_csv_present",
+    }
+)
 
 THERMODYNAMIC_FILENAMES = {
     "thermodynamic_summary_json": "thermodynamic_summary.json",
@@ -76,6 +92,12 @@ def write_virtual_experiment_report(
         name: _read_standard_table_rows(name, table_root / filename)
         for name, filename in TABLE_FILENAMES.items()
     }
+    conservation_diagnostics = _read_json_mapping(
+        table_root / CONSERVATION_DIAGNOSTIC_FILENAMES["conservation_diagnostics_json"]
+    )
+    conservation_rows = _read_configured_conservation_rows(
+        table_root / CONSERVATION_DIAGNOSTIC_FILENAMES["conservation_diagnostics_csv"]
+    )
     thermodynamic_summary = _read_json_mapping(table_root / THERMODYNAMIC_FILENAMES["thermodynamic_summary_json"])
     thermodynamic_rows = _read_rows(table_root / THERMODYNAMIC_FILENAMES["thermodynamic_summary_csv"])
     solver_diagnostics = _read_json_mapping(table_root / SOLVER_DIAGNOSTIC_FILENAMES["solver_diagnostics_json"])
@@ -83,6 +105,8 @@ def write_virtual_experiment_report(
     markdown = _render_report(
         tables=tables,
         quicklook_paths=quicklook_paths,
+        conservation_diagnostics=conservation_diagnostics,
+        conservation_rows=conservation_rows,
         thermodynamic_summary=thermodynamic_summary,
         thermodynamic_rows=thermodynamic_rows,
         solver_diagnostics=solver_diagnostics,
@@ -123,9 +147,25 @@ def _read_rows(path: Path) -> list[dict[str, str]]:
 
 
 def _read_standard_table_rows(table_name: str, path: Path) -> list[dict[str, str]]:
+    if table_name == "conservation_diagnostics" and not _is_standard_conservation_diagnostics_csv(path):
+        return []
     if table_name == "solver_diagnostics" and not _is_standard_solver_diagnostics_csv(path):
         return []
     return _read_rows(path)
+
+
+def _read_configured_conservation_rows(path: Path) -> list[dict[str, str]]:
+    if _is_standard_conservation_diagnostics_csv(path):
+        return []
+    return _read_rows(path)
+
+
+def _is_standard_conservation_diagnostics_csv(path: Path) -> bool:
+    if not path.exists():
+        return False
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        return STANDARD_CONSERVATION_DIAGNOSTIC_FIELDS.issubset(set(reader.fieldnames or ()))
 
 
 def _read_configured_solver_rows(path: Path) -> list[dict[str, str]]:
@@ -155,6 +195,8 @@ def _render_report(
     *,
     tables: Mapping[str, Sequence[Mapping[str, str]]],
     quicklook_paths: Sequence[str],
+    conservation_diagnostics: Mapping[str, Any],
+    conservation_rows: Sequence[Mapping[str, str]],
     thermodynamic_summary: Mapping[str, Any],
     thermodynamic_rows: Sequence[Mapping[str, str]],
     solver_diagnostics: Mapping[str, Any],
@@ -170,6 +212,7 @@ def _render_report(
     sampled_parameters = tables["sampled_parameters"]
     uncertainty_summary = tables["uncertainty_summary"]
     trajectory_quantiles = tables["trajectory_quantiles"]
+    conservation_standard_rows = tables["conservation_diagnostics"]
     thermodynamic_diagnostics = tables["thermodynamic_diagnostics"]
     solver_standard_rows = tables["solver_diagnostics"]
     assumptions = tables["assumption_summary"]
@@ -203,6 +246,14 @@ def _render_report(
         "## Threshold times",
         "",
         *_threshold_lines(threshold_times, summary_metric_rows=summary_metrics),
+        "",
+        "## Conservation diagnostics",
+        "",
+        *_conservation_diagnostics_lines(
+            conservation_diagnostics,
+            conservation_rows,
+            standard_rows=conservation_standard_rows,
+        ),
         "",
         "## Explicit thermodynamic diagnostics",
         "",
@@ -394,6 +445,96 @@ def _threshold_lines(
             f"- `{_value(row, 'case_id')}` `{_value(row, 'metric')}`: "
             f"count={_value(row, 'count')}; p05={_value(row, 'p05')} "
             f"p50={_value(row, 'p50')} p95={_value(row, 'p95')} {_value(row, 'units')}".rstrip()
+        )
+    return lines
+
+
+def _conservation_diagnostics_lines(
+    summary: Mapping[str, Any],
+    rows: Sequence[Mapping[str, str]],
+    *,
+    standard_rows: Sequence[Mapping[str, str]],
+) -> list[str]:
+    if not summary and not rows and not standard_rows:
+        return ["No configured conservation-diagnostics artifacts or standard conservation_diagnostics.csv rows were present."]
+
+    lines = [
+        "These diagnostics inspect existing configured-output `conservation_diagnostics.json` "
+        "and `conservation_diagnostics.csv` artifacts only. Standard virtual-experiment "
+        "`conservation_diagnostics.csv` rows, when present, copy fields from those artifacts. "
+        "They do not infer conserved quantities, tolerances, pass/fail thresholds, validation "
+        "evidence, chemistry, thermodynamics, calibration, empirical comparison, or biology."
+    ]
+    if summary:
+        lines.append(
+            "- Summary: "
+            f"kind `{_summary_value(summary, 'kind')}`; "
+            f"validator count={_summary_value(summary, 'validator_count')}; "
+            f"evaluated count={_summary_value(summary, 'evaluated_count')}; "
+            f"status counts={_format_counts(summary.get('status_counts'))}."
+        )
+        for field, label in (
+            ("allowed_use", "Allowed use"),
+            ("unsupported_scope", "Unsupported scope"),
+        ):
+            value = _summary_value(summary, field)
+            if value:
+                lines.append(f"- {label}: {value}")
+
+    if rows:
+        lines.append("Rows from configured `conservation_diagnostics.csv`:")
+    else:
+        lines.append("No row-level configured `conservation_diagnostics.csv` diagnostics were present.")
+    for row in rows[:12]:
+        details = _row_details(
+            row,
+            (
+                ("status", "status"),
+                ("closed_system", "closed system"),
+                ("initial_conserved_total", "initial total"),
+                ("final_conserved_total", "final total"),
+                ("final_drift", "final drift"),
+                ("max_absolute_drift", "maximum absolute drift"),
+                ("relative_max_absolute_drift", "relative maximum absolute drift"),
+                ("units", "units"),
+            ),
+        )
+        lines.append(
+            f"- `{_value(row, 'validator_id')}`: {details}; allowed use `{_value(row, 'allowed_use')}`."
+        )
+
+    if standard_rows:
+        lines.append(
+            "Standard virtual-experiment rows from `conservation_diagnostics.csv` "
+            "(copied from existing configured conservation-diagnostics artifacts only):"
+        )
+    else:
+        lines.append("No standard `conservation_diagnostics.csv` rows were present.")
+    for row in standard_rows[:12]:
+        details = _row_details(
+            row,
+            (
+                ("summary_validator_count", "summary validator count"),
+                ("summary_evaluated_count", "summary evaluated count"),
+                ("status", "status"),
+                ("closed_system", "closed system"),
+                ("initial_conserved_total", "initial total"),
+                ("final_conserved_total", "final total"),
+                ("final_drift", "final drift"),
+                ("max_absolute_drift", "maximum absolute drift"),
+                ("relative_max_absolute_drift", "relative maximum absolute drift"),
+                ("units", "units"),
+            ),
+        )
+        details_suffix = f"; {details}" if details else ""
+        guardrail = _value(row, "interpretation_guardrail")
+        guardrail_suffix = f" Guardrail: {guardrail}" if guardrail else ""
+        validator_id = _value(row, "validator_id") or "present_no_row_diagnostics"
+        lines.append(
+            f"- `{validator_id}` for case `{_value(row, 'case_id')}` sample `{_value(row, 'sample_id')}`: "
+            f"configured JSON present `{_value(row, 'conservation_diagnostics_json_present')}`; "
+            f"configured CSV present `{_value(row, 'conservation_diagnostics_csv_present')}`"
+            f"{details_suffix}; allowed use `{_value(row, 'allowed_use')}`.{guardrail_suffix}"
         )
     return lines
 
@@ -863,6 +1004,7 @@ def _render_html_report(
     body = _markdown_to_html_body(markdown)
     decision_links = _decision_table_link_items(table_root=table_root, output_dir=output_dir)
     table_links = _table_link_items(table_root=table_root, output_dir=output_dir)
+    conservation_links = _conservation_diagnostic_link_items(table_root=table_root, output_dir=output_dir)
     thermodynamic_links = _thermodynamic_link_items(table_root=table_root, output_dir=output_dir)
     solver_links = _solver_diagnostic_link_items(table_root=table_root, output_dir=output_dir)
     quicklook_links = _quicklook_link_items(quicklook_paths, output_dir=output_dir)
@@ -889,6 +1031,10 @@ def _render_html_report(
             "<h2>Standard output tables</h2>",
             "<ul>",
             *table_links,
+            "</ul>",
+            "<h2>Configured conservation diagnostics</h2>",
+            "<ul>",
+            *conservation_links,
             "</ul>",
             "<h2>Configured thermodynamic diagnostics</h2>",
             "<ul>",
@@ -925,6 +1071,7 @@ def _render_report_folder_index(
     manifest_links = _manifest_link_items(table_root=table_root, report_dir=report_dir)
     decision_links = _decision_table_link_items(table_root=table_root, output_dir=report_dir)
     table_links = _table_link_items(table_root=table_root, output_dir=report_dir)
+    conservation_links = _conservation_diagnostic_link_items(table_root=table_root, output_dir=report_dir)
     thermodynamic_links = _thermodynamic_link_items(table_root=table_root, output_dir=report_dir)
     solver_links = _solver_diagnostic_link_items(table_root=table_root, output_dir=report_dir)
     quicklook_links = _quicklook_link_items(quicklook_paths, output_dir=report_dir)
@@ -960,6 +1107,10 @@ def _render_report_folder_index(
             "<h2>Standard CSV tables</h2>",
             "<ul>",
             *table_links,
+            "</ul>",
+            "<h2>Configured conservation diagnostics</h2>",
+            "<ul>",
+            *conservation_links,
             "</ul>",
             "<h2>Configured thermodynamic diagnostics</h2>",
             "<ul>",
@@ -1054,6 +1205,8 @@ def _table_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
     items = []
     for name, filename in TABLE_FILENAMES.items():
         table_path = table_root / filename
+        if name == "conservation_diagnostics" and not _is_standard_conservation_diagnostics_csv(table_path):
+            continue
         if name == "solver_diagnostics" and not _is_standard_solver_diagnostics_csv(table_path):
             continue
         if table_path.exists():
@@ -1080,6 +1233,26 @@ def _decision_table_link_items(*, table_root: Path, output_dir: Path) -> list[st
             )
     if not items:
         return ["  <li>No decision-support CSV tables were present.</li>"]
+    return items
+
+
+def _conservation_diagnostic_link_items(*, table_root: Path, output_dir: Path) -> list[str]:
+    items = []
+    for name, filename in CONSERVATION_DIAGNOSTIC_FILENAMES.items():
+        path = table_root / filename
+        if filename == "conservation_diagnostics.csv" and _is_standard_conservation_diagnostics_csv(path):
+            continue
+        if path.exists():
+            items.append(
+                _link_item(
+                    path=path,
+                    base_dir=output_dir,
+                    label=filename,
+                    description=name,
+                )
+            )
+    if not items:
+        return ["  <li>No configured conservation-diagnostics artifacts were present.</li>"]
     return items
 
 

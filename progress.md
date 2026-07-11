@@ -26,12 +26,54 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-40 Virtual-Experiment Conservation Diagnostics Bridge
+
+Date: 2026-07-11
+
+Status: `complete` for the scoped PR-40 standard-table/accessor bridge once
+merged; PR-39 is complete after PR #54, and VALIDATION-DATA-001 remains
+`deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added `conservation_diagnostics.csv` as a standard virtual-experiment output
+  table with schema/data-dictionary coverage in output schema version `1.7.0`.
+- Added `DegradationScreenResult.conservation_diagnostics()` for loading the
+  standard table without rerunning simulations.
+- The table is populated only by reading existing per-sample configured-output
+  `conservation_diagnostics.json` and `conservation_diagnostics.csv` artifacts
+  from sample bundle directories.
+- Rows copy artifact-presence flags, top-level configured conservation
+  diagnostics fields, configured row fields, and explicit interpretation
+  guardrails.
+- If no configured conservation diagnostics artifacts exist, the standard
+  table is written header-only rather than inferring conservation metadata.
+- Added Markdown, HTML, report-folder index, and output-manifest visibility
+  while preserving configured-output conservation artifact generation and row
+  behavior unchanged.
+- Added focused virtual-experiment tests for package-generated artifact-field
+  copying, the header-only no-artifact case, accessor/schema/report visibility,
+  and queue/status contracts.
+- Updated active README, roadmap/status docs, validation-gate current-next
+  wording, and roadmap orchestration status tests so PR-39 is complete after
+  PR #54 and PR-40 is the current conservation diagnostics bridge slice.
+
+No conserved quantity, tolerance, pass/fail threshold, validation rule,
+validation evidence, chemistry, thermodynamics, calibration, empirical
+comparison, biology record, solver behavior, scientific numerical behavior,
+configured-output conservation artifact schema, or hidden notebook science
+changed.
+
+Recommended next task: add a bounded public-API conservation diagnostics
+example notebook over the standard table/accessor and its header-only guardrail,
+without changing configured-output artifacts or scientific behavior.
+
 ## PR-39 Virtual-Experiment Solver Diagnostics Bridge
 
 Date: 2026-07-10
 
-Status: `complete` for the scoped PR-39 standard-table/accessor bridge once
-merged; PR-38 is complete after PR #53, and VALIDATION-DATA-001 remains
+Status: `complete` for the scoped PR-39 standard-table/accessor bridge after PR
+#54 merged; PR-38 is complete after PR #53, and VALIDATION-DATA-001 remains
 `deferred; blocked/partial` for ingestion.
 
 Completed in this pass:
