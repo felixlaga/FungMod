@@ -26,12 +26,51 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-41 Pyright Optional-Member-Access Ratchet
+
+Date: 2026-07-11
+
+Status: `complete` for the global optional-member-access typing ratchet once
+merged; PR-40 is complete after PR #55, FD-005 is resolved, and
+VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Enabled Pyright `reportOptionalMemberAccess` globally in
+  `pyrightconfig.json` without disabling or weakening another diagnostic.
+- Quantified the pre-change baseline at 35 optional-member-access errors across
+  11 modules: configured calibration, calibration fitting, stoichiometry, core
+  validators, Gaussian pH kinetics, PET substrate metadata, diffusion,
+  transport geometry, Monte Carlo uncertainty, local sensitivity, and static
+  balance workflow helpers.
+- Narrowed nullable `Parameter.quantity` and optional uncertainty parameters
+  with precise local `Quantity`/`Parameter` annotations after existing
+  validation contracts. No value was defaulted, guessed, ignored, or cast to
+  `Any`.
+- Updated the README quality-gate text, architecture-debt register, Phase 1 QA
+  finding, active roadmap/status queue, validation gate, and focused quality
+  and roadmap guardrail tests.
+- Recorded PR-40 complete after PR #55 and made PR-41 the current-next PR while
+  keeping validation deferred behind its evidence gate.
+
+No scientific equation, parameter value, quantity conversion, numerical
+tolerance, solver path, model output, validation data, calibration result,
+biology record, notebook behavior, public API, or output schema changed. The
+narrowing uses runtime-neutral precise annotations where existing validation
+already establishes non-null state, so no reachable control-flow boundary was
+changed and no new behavioral test was warranted.
+
+Recommended next task: add the bounded public-API conservation diagnostics
+example notebook previously identified after PR-40, using only the standard
+table/accessor and header-only guardrail without changing configured-output
+artifacts or scientific behavior.
+
 ## PR-40 Virtual-Experiment Conservation Diagnostics Bridge
 
 Date: 2026-07-11
 
-Status: `complete` for the scoped PR-40 standard-table/accessor bridge once
-merged; PR-39 is complete after PR #54, and VALIDATION-DATA-001 remains
+Status: `complete` for the scoped PR-40 standard-table/accessor bridge after PR
+#55 merged; PR-39 is complete after PR #54, and VALIDATION-DATA-001 remains
 `deferred; blocked/partial` for ingestion.
 
 Completed in this pass:

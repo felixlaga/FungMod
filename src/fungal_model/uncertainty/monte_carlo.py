@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Callable, Literal, Mapping, Sequence
+from typing import Any, Callable, Literal, Mapping, Sequence, cast
 
 import numpy as np
 
@@ -121,8 +121,8 @@ class ParameterUncertaintySpec:
             self.lower_bound.validate_value()
             self.upper_bound.validate_provenance()
             self.upper_bound.validate_value()
-            lower = float(self.lower_bound.quantity.to(nominal.units).magnitude)
-            upper = float(self.upper_bound.quantity.to(nominal.units).magnitude)
+            lower = float(cast(Quantity, self.lower_bound.quantity).to(nominal.units).magnitude)
+            upper = float(cast(Quantity, self.upper_bound.quantity).to(nominal.units).magnitude)
             if not lower < upper:
                 raise ValueError(f"Uniform bounds for {self.symbol} must satisfy lower < upper.")
         elif self.distribution == "lognormal":
@@ -139,7 +139,7 @@ class ParameterUncertaintySpec:
             )
             if sigma < 0.0:
                 raise ValueError(f"Log standard deviation for {self.symbol} must be non-negative.")
-            nominal_value = float(nominal.quantity.to(nominal.units).magnitude)
+            nominal_value = float(cast(Quantity, nominal.quantity).to(nominal.units).magnitude)
             if nominal_value <= 0.0:
                 raise ValueError(f"Lognormal uncertainty requires positive nominal {self.symbol}.")
         else:
@@ -148,15 +148,21 @@ class ParameterUncertaintySpec:
     def sample(self, base_parameters: ParameterSet, rng: np.random.Generator, n_samples: int) -> np.ndarray:
         self.validate(base_parameters)
         nominal = base_parameters.get(self.symbol)
-        nominal_value = float(nominal.quantity.to(nominal.units).magnitude)
+        nominal_value = float(cast(Quantity, nominal.quantity).to(nominal.units).magnitude)
         if self.distribution == "normal":
-            std = float(self.standard_deviation.quantity.to(nominal.units).magnitude)
+            standard_deviation = cast(Parameter, self.standard_deviation)
+            std = float(cast(Quantity, standard_deviation.quantity).to(nominal.units).magnitude)
             return rng.normal(loc=nominal_value, scale=std, size=n_samples)
         if self.distribution == "uniform":
-            lower = float(self.lower_bound.quantity.to(nominal.units).magnitude)
-            upper = float(self.upper_bound.quantity.to(nominal.units).magnitude)
+            lower_bound = cast(Parameter, self.lower_bound)
+            upper_bound = cast(Parameter, self.upper_bound)
+            lower = float(cast(Quantity, lower_bound.quantity).to(nominal.units).magnitude)
+            upper = float(cast(Quantity, upper_bound.quantity).to(nominal.units).magnitude)
             return rng.uniform(low=lower, high=upper, size=n_samples)
-        sigma = float(self.log_standard_deviation.quantity.to("dimensionless").magnitude)
+        log_standard_deviation = cast(Parameter, self.log_standard_deviation)
+        sigma = float(
+            cast(Quantity, log_standard_deviation.quantity).to("dimensionless").magnitude
+        )
         return rng.lognormal(mean=np.log(nominal_value), sigma=sigma, size=n_samples)
 
     def to_dict(self) -> dict[str, Any]:

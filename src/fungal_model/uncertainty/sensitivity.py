@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, cast
 
 import numpy as np
 
@@ -80,7 +80,7 @@ class LocalSensitivitySpec:
         )
         if step <= 0.0:
             raise ValueError(f"Relative step for {self.symbol} must be positive.")
-        base_value = float(base.quantity.to(base.units).magnitude)
+        base_value = float(cast(Quantity, base.quantity).to(base.units).magnitude)
         if base_value == 0.0:
             raise ValueError(
                 f"Local relative sensitivity for {self.symbol} requires a non-zero base value."
@@ -201,7 +201,7 @@ def local_sensitivity(
         parameter = base_parameters.get(spec.symbol)
         parameter_quantity = require_quantity(parameter.quantity, name=parameter.symbol)
         parameter_value = float(parameter_quantity.to(parameter.units).magnitude)
-        step = float(spec.relative_step.quantity.to("dimensionless").magnitude)
+        step = float(cast(Quantity, spec.relative_step.quantity).to("dimensionless").magnitude)
         lower_value = parameter_value * (1.0 - step)
         upper_value = parameter_value * (1.0 + step)
         lower_parameter = _replace_parameter(

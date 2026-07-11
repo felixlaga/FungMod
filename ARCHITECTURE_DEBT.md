@@ -7,11 +7,12 @@ ID, status, reason, risk, exit condition, removal milestone, and tests
 protecting the boundary. New foundation work should remove entries from this
 file, not normalize them.
 
-Current Phase 1 state: `FD-005` is the only active debt entry. `FD-006`
-process-to-`Reaction` adapter debt was resolved in Phase 1 Task 4; retained
-`Reaction`, `SimulationEngine`, and `ReactionDiffusionEngine1D` APIs are
-intentional explicit low-level APIs, not native configured workflow
-dependencies.
+Current state: there are no active architecture-debt entries. `FD-005` was
+resolved in PR-41 by enabling Pyright optional-member-access checking and
+narrowing nullable scientific values explicitly. `FD-006` process-to-`Reaction`
+adapter debt was resolved in Phase 1 Task 4; retained `Reaction`,
+`SimulationEngine`, and `ReactionDiffusionEngine1D` APIs are intentional
+explicit low-level APIs, not native configured workflow dependencies.
 
 ## FD-001 Legacy PET workflow in the generic workflow package
 
@@ -135,26 +136,28 @@ configured well-mixed configs with tripwires on `SimulationEngine` and
 `_reaction_from_process`. Direct low-level reaction-engine tests remain only
 where `Reaction` objects are constructed explicitly.
 
-## FD-005 Remaining Pyright optional-value baseline
+## FD-005 Pyright optional-value baseline
 
-Status: active
+Status: resolved in PR-41
 
-Reason: Pyright now checks invalid type forms, return types, assignment types,
-argument types, attribute access, call issues, operator issues, optional
-operands, and general type issues. Optional member access remains disabled
-because calibration, transport, uncertainty, and plugin substrate modules still
-need explicit non-null quantity narrowing.
+Reason: before PR-41, Pyright checked invalid type forms, return types,
+assignment types, argument types, attribute access, call issues, operator
+issues, optional operands, and general type issues, but optional member access
+remained disabled while scientific modules needed explicit non-null quantity
+narrowing.
 
-Risk: Type checking can pass while some optional quantity/member access issues
-remain in scientific modules. This must not be mistaken for a strict typing
-guarantee.
+Risk before resolution: type checking could pass while optional
+quantity/member-access issues remained in scientific modules. The enabled
+diagnostic now protects that boundary.
 
-Exit condition: optional-state contracts are rewritten or annotated so
-`reportOptionalMemberAccess` can be re-enabled while remaining green in CI.
+Exit condition: met. Nullable quantity and parameter accesses now use explicit
+narrowing or precise local annotations, and `reportOptionalMemberAccess` is
+enabled while full Pyright remains green.
 
-Removal milestone: the next optional-quantity narrowing package-quality ratchet.
+Removal milestone: resolved in PR-41.
 
 Tests protecting it: `tests/test_quality_config.py` verifies that Pyright is a
-declared dev dependency, that `pyrightconfig.json` exists, that stricter
-diagnostics are enabled, and that CI runs the Pyright command. GitHub Actions
-runs Pyright on every push and pull request.
+declared dev dependency, that `pyrightconfig.json` exists, that
+`reportOptionalMemberAccess` and the other stricter diagnostics are enabled,
+and that CI runs the Pyright command. GitHub Actions runs Pyright on every push
+and pull request.

@@ -13,7 +13,7 @@ accidentally run a scientific PET simulation with guessed values.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Literal
+from typing import TYPE_CHECKING, Iterable, Literal, cast
 
 import numpy as np
 
@@ -201,8 +201,8 @@ def _validate_fraction(parameter: Parameter) -> None:
     if value is None:
         return
     values = np.asarray(value.magnitude, dtype=float)
-    lower = float(ZERO_FRACTION.quantity.to("dimensionless").magnitude)
-    upper = float(TOTAL_FRACTION.quantity.to("dimensionless").magnitude)
+    lower = float(cast(Quantity, ZERO_FRACTION.quantity).to("dimensionless").magnitude)
+    upper = float(cast(Quantity, TOTAL_FRACTION.quantity).to("dimensionless").magnitude)
     if np.any(values < lower) or np.any(values > upper):
         raise ValueError(f"{parameter.symbol} must be between {lower} and {upper}.")
 
@@ -332,7 +332,9 @@ class PETSubstrate(Substrate):
         _validate_non_negative(self.accessible_surface_area_parameter, "meter ** 2")
         roughness = _known_quantity(self.roughness_factor, "dimensionless")
         if roughness is not None:
-            minimum = float(MINIMUM_ROUGHNESS_FACTOR.quantity.to("dimensionless").magnitude)
+            minimum = float(
+                cast(Quantity, MINIMUM_ROUGHNESS_FACTOR.quantity).to("dimensionless").magnitude
+            )
             if np.any(np.asarray(roughness.magnitude, dtype=float) < minimum):
                 raise ValueError(f"r_rough must be at least {minimum}.")
 
@@ -346,7 +348,7 @@ class PETSubstrate(Substrate):
         if crystallinity is None:
             return None
         return (
-            TOTAL_FRACTION.quantity.to("dimensionless")
+            cast(Quantity, TOTAL_FRACTION.quantity).to("dimensionless")
             - crystallinity.to("dimensionless")
         )
 

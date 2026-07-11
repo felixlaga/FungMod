@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence, cast
 
 import numpy as np
 from scipy.optimize import least_squares
@@ -108,7 +108,7 @@ class FittableParameter:
                 name=f"{self.symbol} upper bound",
             ).magnitude
         )
-        initial = float(base.quantity.to(base.units).magnitude)
+        initial = float(cast(Quantity, base.quantity).to(base.units).magnitude)
         if not lower < upper:
             raise ValueError(f"Bounds for {self.symbol} must satisfy lower < upper.")
         if not lower <= initial <= upper:
@@ -116,13 +116,13 @@ class FittableParameter:
 
     def initial_numeric(self, base_parameters: ParameterSet) -> float:
         base = base_parameters.get(self.symbol)
-        return float(base.quantity.to(base.units).magnitude)
+        return float(cast(Quantity, base.quantity).to(base.units).magnitude)
 
     def bounds_numeric(self, base_parameters: ParameterSet) -> tuple[float, float]:
         base = base_parameters.get(self.symbol)
         return (
-            float(self.lower_bound.quantity.to(base.units).magnitude),
-            float(self.upper_bound.quantity.to(base.units).magnitude),
+            float(cast(Quantity, self.lower_bound.quantity).to(base.units).magnitude),
+            float(cast(Quantity, self.upper_bound.quantity).to(base.units).magnitude),
         )
 
     def to_dict(self, base_parameters: ParameterSet) -> dict[str, Any]:
@@ -262,7 +262,7 @@ def _covariance_and_intervals(
         }
         for row, row_symbol in enumerate(symbols)
     }
-    z_value = float(APPROXIMATE_NORMAL_95_Z.quantity.magnitude)
+    z_value = float(cast(Quantity, APPROXIMATE_NORMAL_95_Z.quantity).magnitude)
     intervals: dict[str, dict[str, float | str]] = {}
     for index, symbol in enumerate(symbols):
         parameter = fitted_parameters.get(symbol)
@@ -406,7 +406,7 @@ def fit_least_squares(
     for spec, value in zip(fittables, optimizer_result.x, strict=True):
         lower, upper = spec.bounds_numeric(base_parameters)
         tolerance = max(1.0, abs(value)) * float(
-            BOUND_PROXIMITY_RELATIVE_TOLERANCE.quantity.magnitude
+            cast(Quantity, BOUND_PROXIMITY_RELATIVE_TOLERANCE.quantity).magnitude
         )
         if abs(value - lower) <= tolerance or abs(value - upper) <= tolerance:
             warnings.append(

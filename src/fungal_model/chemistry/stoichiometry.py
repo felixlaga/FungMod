@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -152,7 +152,7 @@ class StoichiometricReactionMetadata:
 
     def is_element_balanced(self, *, absolute_tolerance: float | None = None) -> bool:
         tolerance = (
-            float(DEFAULT_STOICHIOMETRIC_ABSOLUTE_TOLERANCE.quantity.magnitude)
+            float(cast(Quantity, DEFAULT_STOICHIOMETRIC_ABSOLUTE_TOLERANCE.quantity).magnitude)
             if absolute_tolerance is None
             else absolute_tolerance
         )

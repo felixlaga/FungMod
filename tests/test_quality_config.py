@@ -37,10 +37,12 @@ def test_quality_tool_configs_exist() -> None:
     assert pyright["reportOperatorIssue"] is True
     assert pyright["reportOptionalOperand"] is True
     assert pyright["reportReturnType"] is True
-    assert pyright["reportOptionalMemberAccess"] is False
+    assert pyright["reportOptionalMemberAccess"] is True
 
     debt_register = (ROOT / "ARCHITECTURE_DEBT.md").read_text(encoding="utf-8")
-    assert "FD-005 Remaining Pyright optional-value baseline" in debt_register
+    assert "FD-005 Pyright optional-value baseline" in debt_register
+    assert "Status: resolved in PR-41" in debt_register
+    assert "there are no active architecture-debt entries" in debt_register
 
 
 def test_ci_runs_lint_typecheck_and_coverage() -> None:

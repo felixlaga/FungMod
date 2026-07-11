@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-39 after PR #54 merged, with PR-40 selected:
+Scoped status as of PR-40 after PR #55 merged, with PR-41 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -187,7 +187,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-40: virtual-experiment conservation diagnostics bridge**.
+Current next PR: **PR-41: Pyright optional-member-access ratchet**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -219,14 +219,13 @@ metadata, time-grid/evaluation counts, state counts, and process counts only.
 PR-37 completed a small report/index visibility follow-up over those existing
 solver diagnostics artifacts after PR #52. PR-38 completed the configured
 solver diagnostics example notebook after PR #53. PR-39 completed the standard
-virtual-experiment solver diagnostics table/accessor bridge after PR #54. The
-selected PR-40 work is a standard virtual-experiment table/accessor bridge over
-existing per-sample configured conservation diagnostics artifacts. It does not
-infer conserved quantities, tolerances, pass/fail thresholds, validation
-evidence, chemistry, thermodynamics, calibration, empirical comparison, or
-biology, and it does not change configured-output conservation artifact or
-scientific numerical behavior.
-Recommended next after PR-40: add a bounded public-API conservation diagnostics
+virtual-experiment solver diagnostics table/accessor bridge after PR #54.
+PR-40 completed the standard virtual-experiment conservation diagnostics
+table/accessor bridge after PR #55. The selected PR-41 work enables Pyright
+`reportOptionalMemberAccess` globally and narrows the 35 baseline errors across
+11 scientific modules without guessed values, `Any` casts, suppressions, or
+scientific/numerical behavior changes.
+Recommended next after PR-41: add a bounded public-API conservation diagnostics
 example notebook over the standard table/accessor and header-only guardrail.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:

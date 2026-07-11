@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 import tempfile
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import yaml
@@ -351,7 +351,9 @@ def _validate_requested_bounds(
             raise ConfiguredCalibrationError(
                 f"Bounds for {symbol!r} must satisfy lower < upper; got {bounds[symbol]!r}."
             )
-        initial_value = float(parameters.get(symbol).quantity.to(parameters.get(symbol).units).magnitude)
+        parameter = parameters.get(symbol)
+        initial_quantity = cast(Quantity, parameter.quantity)
+        initial_value = float(initial_quantity.to(parameter.units).magnitude)
         if not lower_value <= initial_value <= upper_value:
             raise ConfiguredCalibrationError(
                 f"Initial guess for {symbol!r} must fall inside its bounds; "
