@@ -58,6 +58,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         "comparison_summary.csv",
         "uncertainty_summary.csv",
         "trajectory_quantiles.csv",
+        "conservation_diagnostics.csv",
         "thermodynamic_diagnostics.csv",
         "solver_diagnostics.csv",
         "provenance_table.csv",
@@ -90,6 +91,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     comparison_rows = _csv_rows(output_dir / "comparison_summary.csv")
     uncertainty_rows = _csv_rows(output_dir / "uncertainty_summary.csv")
     trajectory_quantile_rows = _csv_rows(output_dir / "trajectory_quantiles.csv")
+    conservation_diagnostic_rows = _csv_rows(output_dir / "conservation_diagnostics.csv")
     thermodynamic_diagnostic_rows = _csv_rows(output_dir / "thermodynamic_diagnostics.csv")
     solver_diagnostic_rows = _csv_rows(output_dir / "solver_diagnostics.csv")
     provenance_rows = _csv_rows(output_dir / "provenance_table.csv")
@@ -100,8 +102,10 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     output_manifest = _json_mapping(output_dir / "output_manifest.json")
     output_schema = _json_mapping(output_dir / "virtual_experiment_output_schema.json")
 
-    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.6.0"
+    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.7.0"
     assert output_schema["schema_version"] == OUTPUT_SCHEMA_VERSION
+    assert "conservation_diagnostics.csv" in output_manifest["files"]
+    assert "conservation_diagnostics" in output_manifest["tables"]
     assert "figures/degradation_rate_vs_time.png" in output_manifest["files"]
     assert "figures/trajectory_quantile_bands.png" in output_manifest["files"]
 
@@ -133,6 +137,12 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert result.comparison_summary() == comparison_rows
     assert result.uncertainty_summary() == uncertainty_rows
     assert result.trajectory_quantiles() == trajectory_quantile_rows
+    assert result.conservation_diagnostics() == conservation_diagnostic_rows
+    assert {row["summary_kind"] for row in conservation_diagnostic_rows} == {
+        "configured_conservation_diagnostics"
+    }
+    assert {row["conservation_diagnostics_json_present"] for row in conservation_diagnostic_rows} == {"true"}
+    assert {row["conservation_diagnostics_csv_present"] for row in conservation_diagnostic_rows} == {"true"}
     assert result.thermodynamic_diagnostics() == thermodynamic_diagnostic_rows == []
     assert result.solver_diagnostics() == solver_diagnostic_rows
     assert {row["summary_kind"] for row in solver_diagnostic_rows} == {"configured_solver_diagnostics"}
@@ -286,6 +296,16 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         for row in dictionary_rows
     )
     assert any(
+        row["table"] == "conservation_diagnostics" and row["column"] == "interpretation_guardrail"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "conservation_diagnostics"
+        and row["column"] == "output_schema_version"
+        and row["output_schema_version"] == OUTPUT_SCHEMA_VERSION
+        for row in dictionary_rows
+    )
+    assert any(
         row["table"] == "thermodynamic_diagnostics" and row["column"] == "interpretation_guardrail"
         for row in dictionary_rows
     )
@@ -308,6 +328,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     output_schema_tables = output_schema["tables"]
     assert isinstance(output_schema_tables, dict)
     assert "trajectory_quantiles" in output_schema_tables
+    assert "conservation_diagnostics" in output_schema_tables
     assert "thermodynamic_diagnostics" in output_schema_tables
     assert "solver_diagnostics" in output_schema_tables
     assert any(row["table"] == "modelability_items" and row["column"] == "allowed_use" for row in dictionary_rows)
@@ -325,6 +346,121 @@ def test_virtual_experiment_accepts_environment_grid_registry_ids(tmp_path: Path
     result = study.simulate(n_samples=1, seed=3, output_dir=tmp_path / "grid_ids", quicklook=False)
 
     assert Path(result.output_directory, "time_series_long.csv").exists()
+
+
+def test_virtual_experiment_conservation_diagnostics_copy_existing_sample_artifacts_only(
+    tmp_path: Path,
+) -> None:
+    study = VirtualExperiment.from_registry(
+        fungi=FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=REGISTRY_INDEX,
+    )
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=3,
+        output_dir=tmp_path / "conservation_bridge",
+        quicklook=False,
+    )
+    sample_dir = Path(result.screen_result.case_results[0].samples[0].output_directory)
+    configured_summary = _json_mapping(sample_dir / "conservation_diagnostics.json")
+    configured_rows = _csv_rows(sample_dir / "conservation_diagnostics.csv")
+
+    rows = result.conservation_diagnostics()
+    assert len(rows) == len(configured_rows) == 1
+    row = rows[0]
+    configured_row = configured_rows[0]
+    assert row["artifact_source_directory"] == str(sample_dir)
+    assert row["conservation_diagnostics_json_present"] == "true"
+    assert row["conservation_diagnostics_csv_present"] == "true"
+    assert row["summary_kind"] == configured_summary["kind"] == "configured_conservation_diagnostics"
+    assert row["summary_validator_count"] == str(configured_summary["validator_count"])
+    assert row["summary_evaluated_count"] == str(configured_summary["evaluated_count"])
+    assert row["summary_status_counts"] == json.dumps(configured_summary["status_counts"], sort_keys=True)
+    assert row["summary_allowed_use"] == configured_summary["allowed_use"]
+    assert row["unsupported_scope"] == configured_summary["unsupported_scope"]
+    copied_fields = (
+        "validator_id",
+        "status",
+        "reason",
+        "closed_system",
+        "weighted_states",
+        "initial_conserved_total",
+        "final_conserved_total",
+        "final_drift",
+        "max_absolute_drift",
+        "relative_max_absolute_drift",
+        "units",
+        "allowed_use",
+    )
+    assert {field: row[field] for field in copied_fields} == {
+        field: configured_row[field] for field in copied_fields
+    }
+    assert "Rows are copied from existing configured conservation_diagnostics artifacts only" in row[
+        "interpretation_guardrail"
+    ]
+    assert "pass/fail thresholds" in row["interpretation_guardrail"]
+    assert "thermodynamics" in row["interpretation_guardrail"]
+    assert "biology" in row["interpretation_guardrail"]
+
+    report_path = result.write_report(include_html=True, include_index=True)
+    report = report_path.read_text(encoding="utf-8")
+    html = report_path.with_suffix(".html").read_text(encoding="utf-8")
+    index = report_path.with_name("index.html").read_text(encoding="utf-8")
+    assert "Standard virtual-experiment rows from `conservation_diagnostics.csv`" in report
+    assert "copied from existing configured conservation-diagnostics artifacts only" in report
+    assert "do not infer conserved quantities" in report
+    assert "pass/fail thresholds" in report
+    assert "validation evidence" in report
+    assert "chemistry, thermodynamics, calibration, empirical comparison, or biology" in report
+    assert "conservation_diagnostics.csv" in html
+    assert "conservation_diagnostics.csv" in index
+    assert "conservation_diagnostics.json" not in index
+
+
+def test_virtual_experiment_conservation_diagnostics_header_only_without_sample_artifacts(
+    tmp_path: Path,
+) -> None:
+    study = VirtualExperiment.from_registry(
+        fungi=FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=REGISTRY_INDEX,
+    )
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=3,
+        output_dir=tmp_path / "conservation_bridge_no_artifacts",
+        quicklook=False,
+    )
+    sample_dir = Path(result.screen_result.case_results[0].samples[0].output_directory)
+    (sample_dir / "conservation_diagnostics.json").unlink()
+    (sample_dir / "conservation_diagnostics.csv").unlink()
+
+    result.write_tables()
+
+    assert result.conservation_diagnostics() == []
+    with (Path(result.output_directory) / "conservation_diagnostics.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        reader = csv.DictReader(handle)
+        assert list(reader) == []
+        fieldnames = set(reader.fieldnames or ())
+    assert {
+        "output_schema_version",
+        "case_id",
+        "sample_id",
+        "artifact_source_directory",
+        "conservation_diagnostics_json_present",
+        "conservation_diagnostics_csv_present",
+        "summary_evaluated_count",
+        "validator_id",
+        "max_absolute_drift",
+        "interpretation_guardrail",
+    }.issubset(fieldnames)
 
 
 def test_virtual_experiment_thermodynamic_diagnostics_copy_existing_sample_artifacts_only(

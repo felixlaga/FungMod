@@ -84,6 +84,7 @@ def write_standard_tables(
         "comparison_summary": destination / "comparison_summary.csv",
         "uncertainty_summary": destination / "uncertainty_summary.csv",
         "trajectory_quantiles": destination / "trajectory_quantiles.csv",
+        "conservation_diagnostics": destination / "conservation_diagnostics.csv",
         "thermodynamic_diagnostics": destination / "thermodynamic_diagnostics.csv",
         "solver_diagnostics": destination / "solver_diagnostics.csv",
         "provenance_table": destination / "provenance_table.csv",
@@ -163,6 +164,7 @@ def _build_table_rows(
         "comparison_summary": [],
         "uncertainty_summary": [],
         "trajectory_quantiles": [],
+        "conservation_diagnostics": [],
         "thermodynamic_diagnostics": [],
         "solver_diagnostics": [],
         "provenance_table": [],
@@ -226,6 +228,9 @@ def _build_table_rows(
                     sample=sample,
                     role_records=role_records,
                 )
+            )
+            rows["conservation_diagnostics"].extend(
+                _conservation_diagnostic_rows(sample_context=sample_context, sample=sample)
             )
             rows["thermodynamic_diagnostics"].extend(
                 _thermodynamic_diagnostic_rows(sample_context=sample_context, sample=sample)
@@ -1541,6 +1546,58 @@ def _trajectory_quantile_sort_key(key: tuple[str, str, str, str, str, str, str, 
     except ValueError:
         numeric_time_index = -1
     return (case_id, numeric_time_index, state, state_role, source)
+
+
+def _conservation_diagnostic_rows(
+    *,
+    sample_context: Mapping[str, Any],
+    sample: EnsembleSample,
+) -> list[dict[str, Any]]:
+    sample_dir = Path(sample.output_directory)
+    summary_path = sample_dir / "conservation_diagnostics.json"
+    rows_path = sample_dir / "conservation_diagnostics.csv"
+    summary = _read_json_mapping(summary_path)
+    artifact_rows = _read_csv(rows_path) if rows_path.exists() else []
+    if not summary and not artifact_rows:
+        return []
+
+    source_rows: Sequence[Mapping[str, Any]] = artifact_rows or ({},)
+    base = {
+        **_base_sample_columns(sample_context),
+        "artifact_source_directory": str(sample_dir),
+        "conservation_diagnostics_json_present": summary_path.exists(),
+        "conservation_diagnostics_csv_present": rows_path.exists(),
+        "summary_kind": summary.get("kind", ""),
+        "summary_validator_count": summary.get("validator_count", ""),
+        "summary_evaluated_count": summary.get("evaluated_count", ""),
+        "summary_status_counts": _json_string(summary.get("status_counts")),
+        "summary_allowed_use": summary.get("allowed_use", ""),
+        "unsupported_scope": summary.get("unsupported_scope", ""),
+        "interpretation_guardrail": (
+            "Rows are copied from existing configured conservation_diagnostics artifacts only; "
+            "they do not infer conserved quantities, tolerances, pass/fail thresholds, validation "
+            "evidence, chemistry, thermodynamics, calibration, empirical comparison, or biology."
+        ),
+    }
+    return [
+        {
+            **base,
+            "row_index": row_index,
+            "validator_id": row.get("validator_id", ""),
+            "status": row.get("status", ""),
+            "reason": row.get("reason", ""),
+            "closed_system": row.get("closed_system", ""),
+            "weighted_states": row.get("weighted_states", ""),
+            "initial_conserved_total": row.get("initial_conserved_total", ""),
+            "final_conserved_total": row.get("final_conserved_total", ""),
+            "final_drift": row.get("final_drift", ""),
+            "max_absolute_drift": row.get("max_absolute_drift", ""),
+            "relative_max_absolute_drift": row.get("relative_max_absolute_drift", ""),
+            "units": row.get("units", ""),
+            "allowed_use": row.get("allowed_use", summary.get("allowed_use", "")),
+        }
+        for row_index, row in enumerate(source_rows)
+    ]
 
 
 def _thermodynamic_diagnostic_rows(

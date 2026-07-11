@@ -299,6 +299,11 @@ class DegradationScreenResult:
 
         return self._table_rows("trajectory_quantiles", "trajectory_quantiles.csv")
 
+    def conservation_diagnostics(self) -> list[dict[str, str]]:
+        """Load configured conservation diagnostics copied from existing sample artifacts."""
+
+        return self._table_rows("conservation_diagnostics", "conservation_diagnostics.csv")
+
     def thermodynamic_diagnostics(self) -> list[dict[str, str]]:
         """Load configured thermodynamic diagnostics copied from existing sample artifacts."""
 

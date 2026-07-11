@@ -43,7 +43,9 @@ basic kinetics layer:
   per-sample configured summary artifacts,
 - configured conservation JSON/CSV diagnostics copied from existing
   `SimulationResult` trajectories and explicit configured `mass_balance`
-  `conserved_weights`, for drift inspection only,
+  `conserved_weights`, for drift inspection only, plus a standard
+  virtual-experiment conservation diagnostics table/accessor derived from
+  existing per-sample configured conservation diagnostics artifacts,
 - configured solver JSON/CSV diagnostics copied from existing configured run
   metadata, solver settings, solver metadata, time-grid/evaluation counts,
   state counts, and process counts, with report/index visibility plus a
@@ -199,8 +201,8 @@ guarded screen-comparison summaries, uncertainty/range summaries,
 trajectory quantile summaries,
 configured thermodynamic diagnostics copied from existing per-sample
 `thermodynamic_summary.json`/`.csv` artifacts when those artifacts are present,
-configured conservation diagnostics copied from existing configured
-`mass_balance` `conserved_weights` and state trajectories,
+configured conservation diagnostics copied from existing per-sample
+`conservation_diagnostics.json`/`.csv` artifacts when those artifacts are present,
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
@@ -222,6 +224,13 @@ rows into p05/p50/p95 trajectory bands with explicit allowed-use and
 interpretation guardrails; it is not validation data, calibration evidence,
 empirical confidence intervals, posterior uncertainty, or new simulation
 behavior.
+`conservation_diagnostics.csv` copies existing per-sample configured-output
+`conservation_diagnostics.json`/`.csv` fields into a standard
+virtual-experiment table with explicit artifact-presence, allowed-use, and
+interpretation guardrails. If no per-sample configured conservation artifacts
+exist, the table remains header-only; it does not infer conserved quantities,
+tolerances, pass/fail thresholds, validation evidence, chemistry,
+thermodynamics, calibration, empirical comparison, or biology.
 `thermodynamic_diagnostics.csv` copies existing per-sample configured-output
 `thermodynamic_summary.json`/`.csv` fields into a standard virtual-experiment
 table with explicit artifact-presence, entropy-budget, allowed-use, and
@@ -269,6 +278,12 @@ not empirical comparison or inferred biology. Optional HTML artifacts can be
 written beside the Markdown report for browser viewing: an HTML sidecar over
 the same report and an index page that links existing report, table, manifest,
 decision-support, and quicklook files without reinterpreting scientific values.
+When it is pointed at a configured-output folder with existing
+`conservation_diagnostics.json` and `conservation_diagnostics.csv`, it adds an
+explicit conservation-diagnostics inspection section and links those artifacts
+without inferring conserved quantities, tolerances, pass/fail thresholds,
+validation evidence, chemistry, thermodynamics, calibration, empirical
+comparison, or biology.
 When the report utility is pointed at a configured-output folder that already
 contains `thermodynamic_summary.json` and `thermodynamic_summary.csv`, it adds
 an explicit thermodynamic-diagnostics inspection section and links those

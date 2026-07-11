@@ -68,7 +68,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-39 virtual-experiment solver diagnostics bridge after
+The current next PR is PR-40 virtual-experiment conservation diagnostics bridge
+after the PR-39 virtual-experiment solver diagnostics bridge,
 the PR-38 solver diagnostics example notebook,
 the PR-37 solver diagnostics visibility follow-up,
 the PR-36 configured-output solver diagnostics slice,
@@ -139,15 +140,22 @@ package-generated `solver_diagnostics.json`/`.csv` artifacts, report/index
 links, and the header-only/no-metadata guardrail only after PR #53. It did not
 change solver behavior, define numerical thresholds, add validation data,
 calibration, empirical comparison, thermodynamic enforcement, hidden notebook
-science, configured-output schema changes, or biology claims. The current
-PR-39 slice adds `solver_diagnostics.csv` and
+science, configured-output schema changes, or biology claims. The completed
+PR-39 slice added `solver_diagnostics.csv` and
 `DegradationScreenResult.solver_diagnostics()` as a standard
 virtual-experiment bridge over existing per-sample configured-output
-`solver_diagnostics.json`/`.csv` artifacts only. It does not change solver
-behavior, define numerical thresholds, add validation data, calibration,
+`solver_diagnostics.json`/`.csv` artifacts only after PR #54. It did not change
+solver behavior, define numerical thresholds, add validation data, calibration,
 empirical comparison, thermodynamic enforcement, hidden notebook science,
-configured-output schema changes, or biology claims. The completed
-PR-24 BIO-003 slice added a
+configured-output schema changes, or biology claims. The current PR-40 slice
+adds `conservation_diagnostics.csv` and
+`DegradationScreenResult.conservation_diagnostics()` as a standard
+virtual-experiment bridge over existing per-sample configured-output
+`conservation_diagnostics.json`/`.csv` artifacts only. It does not infer
+conserved quantities, tolerances, pass/fail thresholds, validation evidence,
+chemistry, thermodynamics, calibration, empirical comparison, or biology, and
+it does not change configured-output conservation artifact behavior. The
+completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
 researcher-facing BIO-002 example without adding validation data, calibration,
@@ -228,9 +236,13 @@ slice is limited to Markdown, HTML, and report-folder index visibility for
 those existing configured-output solver diagnostics artifacts only. The
 completed PR-38 slice is limited to a package-output-driven solver diagnostics
 example notebook over those artifacts, report/index visibility, and the
-explicit header-only/no-metadata guardrail. The current PR-39 slice is limited
+explicit header-only/no-metadata guardrail. The completed PR-39 slice is limited
 to a standard virtual-experiment `solver_diagnostics.csv` table/accessor bridge
-over those existing per-sample configured artifacts.
+over those existing per-sample configured artifacts after PR #54. The current
+PR-40 slice is limited to a standard virtual-experiment
+`conservation_diagnostics.csv` table/accessor bridge over existing per-sample
+configured conservation artifacts, with report/index visibility and header-only
+output when artifacts are absent.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -297,12 +309,13 @@ completed after PR #49 as configured-output conservation/drift diagnostics.
 PR-35 completed after PR #50 as a focused repository hygiene guardrail
 extension, and PR-36 completed after PR #51 as configured-output solver
 diagnostics. PR-37 completed after PR #52 as a diagnostics visibility follow-up.
-PR-38 completed after PR #53 as a solver diagnostics example notebook. The
-current PR-39 slice is a virtual-experiment solver diagnostics bridge rather
-than ingestion, digitization, fabricated validation data, calibration, or
-empirical comparison; the recommended next simulator-building follow-up should
-continue build-first simulator capability, preferably as a bounded mechanism,
-thermodynamic inspectability, or output-ergonomics slice.
+PR-38 completed after PR #53 as a solver diagnostics example notebook. PR-39
+completed after PR #54 as a virtual-experiment solver diagnostics bridge. The
+current PR-40 slice is a virtual-experiment conservation diagnostics bridge
+rather than ingestion, digitization, fabricated validation data, calibration, or
+empirical comparison; the recommended next simulator-building follow-up is a
+bounded public-API conservation diagnostics example notebook over the standard
+table/accessor and header-only guardrail.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

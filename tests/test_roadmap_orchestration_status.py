@@ -68,10 +68,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-39: virtual-experiment solver diagnostics bridge"
+    current_next = "PR-40: virtual-experiment conservation diagnostics bridge"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-39 virtual-experiment solver diagnostics bridge" in roadmap
+    assert "The current next PR is PR-40 virtual-experiment conservation diagnostics bridge" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
@@ -81,7 +81,9 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "The completed PR-36\nslice is limited to configured-output solver diagnostics" in roadmap
     assert "The completed PR-37\nslice is limited to Markdown, HTML, and report-folder index visibility" in roadmap
     assert "completed PR-38 slice is limited to a package-output-driven solver diagnostics" in roadmap
-    assert "current PR-39 slice is limited\nto a standard virtual-experiment `solver_diagnostics.csv`" in roadmap
+    assert "completed PR-39 slice is limited\nto a standard virtual-experiment `solver_diagnostics.csv`" in roadmap
+    assert "current\nPR-40 slice is limited to a standard virtual-experiment" in roadmap
+    assert "`conservation_diagnostics.csv` table/accessor bridge" in roadmap
     assert "PR-30\nconfigured oxygen/water-activity modifier example notebook slice" in roadmap
     assert "PR-29\nexplicit oxygen/water-activity configured modifier wiring slice" in roadmap
     assert "PR-28\nconfigured environment modifier example notebook slice" in roadmap
@@ -118,7 +120,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-39: virtual-experiment solver diagnostics bridge"
+    current_next = "PR-40: virtual-experiment conservation diagnostics bridge"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -155,6 +157,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-36" not in text
         assert "Current next PR: **PR-37" not in text
         assert "Current next PR: **PR-38" not in text
+        assert "Current next PR: **PR-39" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -178,6 +181,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "conservation_diagnostics.csv" in status
     assert "conservation_diagnostics.csv" in next_steps
     assert "conservation_diagnostics.json" in next_steps
+    assert "DegradationScreenResult.conservation_diagnostics()" in next_steps
+    assert "inferred conserved quantities" in next_steps
     assert "solver_diagnostics.csv" in status
     assert "solver_diagnostics.csv" in next_steps
     assert "DegradationScreenResult.solver_diagnostics()" in next_steps
@@ -321,7 +326,9 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-38 | Solver diagnostics example notebook" in status
     assert "complete after PR #53 merged for the scoped public configured-workflow example notebook slice" in status
     assert "PR-39 | Virtual-experiment solver diagnostics bridge" in status
-    assert "current next after PR #53 merged and PR-38 completed" in status
+    assert "complete after PR #54 merged for the scoped standard-table/accessor bridge" in status
+    assert "PR-40 | Virtual-experiment conservation diagnostics bridge" in status
+    assert "current next after PR #54 merged and PR-39 completed" in status
     assert "Future simulator capability follow-up" in status
     assert "Future | VALIDATION-DATA-001" in status
 
@@ -370,7 +377,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-39: virtual-experiment solver diagnostics bridge"
+    current_next = "PR-40: virtual-experiment conservation diagnostics bridge"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -408,6 +415,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-36" not in _current_next_lines(text)
         assert "PR-37" not in _current_next_lines(text)
         assert "PR-38" not in _current_next_lines(text)
+        assert "PR-39" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
@@ -415,7 +423,8 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "PR-36 configured-output solver diagnostics is complete after PR #51" in gate
     assert "PR-37 solver diagnostics visibility follow-up is complete after PR #52" in gate
     assert "PR-38\nsolver diagnostics example notebook is complete after PR #53" in gate
-    assert "selected\nPR-39 work is therefore a virtual-experiment solver diagnostics bridge" in gate
+    assert "PR-39\nvirtual-experiment solver diagnostics bridge is complete after PR #54" in gate
+    assert "selected PR-40 work is therefore a virtual-experiment conservation diagnostics\nbridge" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate
