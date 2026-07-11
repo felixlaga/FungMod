@@ -1,7 +1,7 @@
 schema_version: "1.0"
 catalogue_name: "FungMod Phase 1 current finding status"
-reviewed_commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
-verified_at: "2026-06-15T12:26:20Z"
+reviewed_commit_sha: "95253b838afdd645be67e9e6ebceab6f703cd9e3"
+verified_at: "2026-07-12"
 source_documents:
   - "AGENTS.md"
   - "FUNGMOD_PHASE_2_THERMODYNAMIC_AND_BALANCE_ENFORCEMENT.md"
@@ -14,6 +14,7 @@ notes:
   - "findings.yaml and priority_findings.txt were absent before this reconciliation; this catalogue is built from the audit artifacts present in foundation_progress/validation and the Phase 1 plan."
   - "Resolved technical findings do not imply empirical scientific validation."
   - "Phase 2 Task 1 adds an implementation design for the thermodynamic and balance blockers, but does not mark them resolved."
+  - "PR-42 chain findings were refreshed on codex/pr42-linear-chain-generalization from baseline 95253b838afdd645be67e9e6ebceab6f703cd9e3; arbitrary-length linear support is software verification, not empirical validation."
 findings:
   - id: "P1-AUDIT-NATIVE-001"
     original_severity: "critical"
@@ -401,21 +402,21 @@ findings:
     current_status: "partially_resolved"
     title: "BIO-002 scope and genericity"
     original_claim: "BIO-002 needed review to ensure enzyme-chain logic was not hardcoded to cellulose/cellobiose/glucose and did not overclaim biology."
-    current_assessment: "The two-step extracellular enzyme-chain assembler is data/template-driven and has an unrelated polymer_X to oligomer_Y to monomer_Z genericity test. It remains a scoped two-step chain, not arbitrary pathway biology."
-    technical_status: "Generic two-step chain assembly is implemented and tested; arbitrary branching and arbitrary-length chains are not implemented."
+    current_assessment: "The extracellular enzyme-chain assembler is data/template-driven and now supports ordered arbitrary-length linear chains with at least two steps. An unrelated artificial polymer_X to oligomer_Y to fragment_Q to monomer_Z three-step framework benchmark proves the generic path; branching and cycles remain unsupported."
+    technical_status: "Arbitrary-length linear chain assembly is implemented and tested while branching, cycles, and general pathway graphs remain unsupported."
     scientific_status: "BIO-002 remains exploratory/proposal-backed and does not validate a real organismal degradation pathway."
     evidence:
       code:
         - path: "src/fungal_model/screening/enzyme_chain.py"
           symbols: ["build_extracellular_enzyme_chain_config", "write_enzyme_chain_standard_tables"]
-          explanation: "The assembler reads chain state roles, product maps, outputs, limitations, and suggested experiments from template data."
+          explanation: "The assembler reads chain state roles, ordered process templates, product maps, modifiers, conservation, outputs, limitations, and suggested experiments from template data and validates linear topology before execution."
         - path: "data_registry/case_templates/case_templates.yml"
           symbols: ["bio002_extracellular_enzyme_chain_template"]
           explanation: "BIO-002 chain metadata lives in registry template data."
       tests:
         - path: "tests/test_bio002_generic_chain_assembly.py"
-          test_names: ["test_second_unrelated_chain_assembles_runs_and_writes_tables", "test_generic_implementation_has_no_demo_biological_name_guardrail"]
-          explanation: "Tests prove a materially different non-specific chain can run and that implementation source avoids demo biological names."
+          test_names: ["test_artificial_three_step_chain_assembles_runs_and_writes_tables", "test_linear_chain_rejects_branching_product_map", "test_linear_chain_rejects_cycles", "test_generic_implementation_has_no_demo_biological_name_guardrail"]
+          explanation: "Tests prove a materially different artificial three-step chain can run with conservation, outputs, and an existing modifier while branching/cycles fail and implementation source avoids demo biological names."
         - path: "tests/test_bio002_extracellular_enzyme_chain.py"
           test_names: ["test_bio002_chain_writes_standard_tables"]
           explanation: "Tests cover the BIO-002 demonstration path and standard-table outputs."
@@ -423,44 +424,46 @@ findings:
         - path: "foundation_progress/BIO_002_ENZYME_CHAIN_DEGRADATION.md"
           explanation: "BIO-002 scope, generic contract, and limitations are documented."
     verification:
-      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
-      verified_at: "2026-06-15T12:26:20Z"
+      commit_sha: "95253b838afdd645be67e9e6ebceab6f703cd9e3"
+      verified_at: "2026-07-12"
+      working_tree: "codex/pr42-linear-chain-generalization"
       commands_run:
-        - ".venv/bin/python -m pytest tests/test_bio002_generic_chain_assembly.py tests/test_bio002_extracellular_enzyme_chain.py"
-    remaining_risk: "Arbitrary-length or branching process-chain biology remains out of scope."
-    recommended_next_action: "Keep BIO-002 scoped; address arbitrary chain topology only in a future dedicated design task."
+        - "MPLCONFIGDIR=/private/tmp/fungmod-mpl-cache .venv/bin/python -m pytest tests/test_bio002_generic_chain_assembly.py tests/test_bio002_extracellular_enzyme_chain.py tests/test_case001_researcher_enzyme_chain_virtual_experiment.py tests/test_registry_case_templates.py tests/test_config_driven_case_assembly.py -q"
+    remaining_risk: "Branching, cycles, converging multi-reactant steps, and general pathway graphs remain out of scope."
+    recommended_next_action: "Keep biology claims template-specific and do not add branching or graph topology without a separate explicit design, evidence, and test task."
 
   - id: "P1-AUDIT-CHAIN-001"
     original_severity: "high"
-    current_severity: "high"
-    current_status: "confirmed"
-    title: "Arbitrary-length and branching process chains are not implemented"
+    current_severity: "medium"
+    current_status: "partially_resolved"
+    title: "Arbitrary-length linear chains are implemented; branching remains unsupported"
     original_claim: "The audit required checking support for arbitrary-length and branching process chains."
-    current_assessment: "Current BIO-002 code supports a reusable two-step chain pattern, but there is no evidence of arbitrary-length or branching pathway assembly."
-    technical_status: "Confirmed missing capability beyond the scoped two-step chain."
-    scientific_status: "Complex extracellular pathway claims should not be made without explicit topology support, parameters, tests, and limitations."
+    current_assessment: "PR-42 removes the exactly-two-step limitation for ordered acyclic linear chains and adds a three-step execution proof plus fail-fast topology validation. Branching, cycles, converging steps, and general pathway graphs remain unsupported."
+    technical_status: "Partially resolved: arbitrary-length linear topology is implemented for two or more existing process-law steps; non-linear graph topology is explicitly rejected."
+    scientific_status: "Software topology support does not validate any complex extracellular pathway; scientific claims still require explicit template records, parameters, provenance, maturity, assumptions, limitations, and evidence."
     evidence:
       code:
         - path: "src/fungal_model/screening/enzyme_chain.py"
           symbols: ["ChainTemplateSpec", "build_extracellular_enzyme_chain_config"]
-          explanation: "The current assembler expects a defined chain template with surface and homogeneous steps, not an arbitrary graph solver."
+          explanation: "ChainTemplateSpec carries validated linear topology, and assembly rejects disconnected, branching, cyclic, repeated-state, or malformed ordered process maps before execution."
         - path: "data_registry/case_templates/case_templates.yml"
-          symbols: ["process_sequence"]
-          explanation: "Existing templates encode explicit process sequence data."
+          symbols: ["process_templates", "product_maps", "conservation", "chain_outputs"]
+          explanation: "Registry templates encode ordered process and stoichiometric-map sequences plus explicit conservation and output semantics."
       tests:
         - path: "tests/test_bio002_generic_chain_assembly.py"
-          test_names: ["test_second_unrelated_chain_assembles_runs_and_writes_tables"]
-          explanation: "The genericity test covers a second two-step chain, not arbitrary-length or branching chains."
+          test_names: ["test_artificial_three_step_chain_assembles_runs_and_writes_tables", "test_linear_chain_rejects_disconnected_ordered_steps", "test_linear_chain_rejects_branching_product_map", "test_linear_chain_rejects_cycles"]
+          explanation: "The artificial three-step benchmark proves arbitrary-length linear execution while focused tests prove disconnected, branching, and cyclic topologies remain unsupported."
       documentation:
         - path: "README.md"
-          explanation: "README describes BIO-002 as an extracellular enzyme-chain assembler, not a general pathway graph engine."
+          explanation: "README describes arbitrary-length linear chain support and explicitly excludes branching and cycles."
     verification:
-      commit_sha: "2102710a54279574d7ef0bb2edf5ae19632e84ad"
-      verified_at: "2026-06-15T12:26:20Z"
+      commit_sha: "95253b838afdd645be67e9e6ebceab6f703cd9e3"
+      verified_at: "2026-07-12"
+      working_tree: "codex/pr42-linear-chain-generalization"
       commands_run:
-        - ".venv/bin/python -m pytest tests/test_bio002_generic_chain_assembly.py"
-    remaining_risk: "Future multi-step biology could outgrow the current two-step assumptions."
-    recommended_next_action: "Track as a confirmed future architecture/science blocker; do not implement in P1.2."
+        - "MPLCONFIGDIR=/private/tmp/fungmod-mpl-cache .venv/bin/python -m pytest tests/test_bio002_generic_chain_assembly.py tests/test_bio002_extracellular_enzyme_chain.py tests/test_case001_researcher_enzyme_chain_virtual_experiment.py tests/test_registry_case_templates.py tests/test_config_driven_case_assembly.py -q"
+    remaining_risk: "Future branching or cyclic pathway needs would require a separate graph-topology design and stronger scientific/modelability contracts."
+    recommended_next_action: "Retain explicit branching/cycle rejection; address graph topology only in a dedicated future task with no inferred biology or parameters."
 
   - id: "V001-PC001"
     original_severity: "critical"

@@ -1,20 +1,19 @@
 proposal_kind: bio_mechanism_proposal
 milestone_id: BIO-002
 mechanism_id: extracellular_enzyme_chain
-general_process_family: extracellular two-step enzyme-chain degradation
+general_process_family: extracellular ordered linear enzyme-chain degradation
 mathematical_law: >
-  A configured surface-catalysis step converts a substrate pool into a soluble
-  intermediate through an explicit product map, and a configured homogeneous
-  Michaelis-Menten step converts the intermediate into a soluble product through
-  a second explicit product map. Product dynamics and conserved-equivalent
-  checks use template-declared stoichiometric coefficients and conservation
-  weights.
+  An ordered sequence of at least two configured existing process laws converts
+  a substrate pool through one or more intermediate pools into a
+  final product. Each step has one explicit reactant role, one explicit product
+  role, and one stoichiometric product map. Product dynamics and
+  conserved-equivalent checks use template-declared coefficients and weights.
 state_variables:
   - name: substrate_pool
     role: substrate
     units: template-declared amount or concentration units
   - name: soluble_intermediate_pool
-    role: intermediate
+    role: intermediate or indexed intermediate_N
     units: template-declared amount or concentration units compatible with the chain
   - name: soluble_product_pool
     role: product
@@ -23,7 +22,7 @@ state_variables:
     role: surface_catalyst
     units: template-declared catalyst concentration units
   - name: homogeneous_catalyst_pool
-    role: homogeneous_catalyst
+    role: homogeneous_catalyst or indexed catalyst_N/enzyme_N
     units: template-declared catalyst concentration units
 parameters:
   - symbol: surface_rate_constant
@@ -67,13 +66,15 @@ summary_metrics:
   - template-labeled final derived metrics
   - configured process-rate maxima
 assumptions:
-  - The chain has exactly two configured process steps from substrate to intermediate to product.
+  - The chain is ordered, acyclic, and linear, with at least two configured process steps.
+  - Every step consumes exactly the preceding step product; branching, cycles, and converging reactants are unsupported.
   - State roles, entity records, process sequence, product maps, and output labels are supplied by the template.
   - Conserved-equivalent mass balance is meaningful only when the template declares compatible equivalent units.
 not_in_scope:
   - Whole-organism growth, secretion, uptake, biomass, or physiology.
   - Dataset curation or empirical parameter validation.
   - Additional substrate chemistry or additional biological mechanisms.
+  - Branching, cyclic, or general graph pathway assembly.
 unknowns:
   - Parameter values require separate evidence or exploratory registry records.
   - Equivalent-unit compatibility must be reviewed for each demonstration template.
@@ -87,15 +88,16 @@ blocking_failure_modes:
   - Non-positive or non-finite stoichiometric coefficient or conservation weight.
   - Conservation weights that are inconsistent with declared product-map stoichiometry.
   - Output metrics that reference unknown state roles or undeclared derived series.
+  - Fewer than two steps, disconnected/reordered steps, branching maps, cycles, or process/map role mismatches.
 tests_required:
   - Existing demonstration chain preserves the selected two-to-one soluble-product stoichiometry.
-  - A second unrelated chain with different state names and non-default yields runs through the same assembler.
+  - An unrelated artificial three-step chain with different state names, catalysts, non-default yields, and an existing modifier runs through the same assembler.
   - Malformed chain templates fail with structured assembly errors.
   - Output tables use configured labels rather than mechanism-code biological names.
 limitations:
   - This is reusable software architecture and process-mechanism verification, not broad biological validation.
   - The first configured surface step remains exploratory unless calibrated or constrained by evidence.
-  - The mechanism assumes a two-step extracellular chain and does not represent additional pathways.
+  - The mechanism supports only ordered linear topology and does not represent branching or cyclic pathways.
 demo_case:
   case_id: CASE-001
   purpose: Demonstrate the reusable mechanism on one explicit substrate-to-product setup.

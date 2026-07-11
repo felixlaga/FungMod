@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GENERIC_TEMPLATE_ID = "bio002_polymer_x_oligomer_y_monomer_z_template"
 
 
-def test_second_unrelated_chain_assembles_runs_and_writes_tables(tmp_path: Path) -> None:
+def test_artificial_three_step_chain_assembles_runs_and_writes_tables(tmp_path: Path) -> None:
     registry_dir = _copy_registry(tmp_path)
     _insert_generic_chain_fixture(registry_dir)
     registry = load_registry(registry_dir / "registry_index.yml")
@@ -41,27 +41,58 @@ def test_second_unrelated_chain_assembles_runs_and_writes_tables(tmp_path: Path)
     assert [process.process_type for process in config.processes] == [
         "surface_catalysis",
         "homogeneous_michaelis_menten",
+        "homogeneous_michaelis_menten",
     ]
     assert [process.id for process in config.processes] == [
         "x_surface_to_y_fixture",
-        "y_to_z_homogeneous_fixture",
+        "y_to_q_homogeneous_fixture",
+        "q_to_z_homogeneous_fixture",
     ]
-    assert all(process.modifiers == () for process in config.processes)
+    config_data = config.to_dict()
+    assert config_data["case_template"]["chain_topology"] == {
+        "topology_type": "linear",
+        "process_ids": [
+            "x_surface_to_y_fixture",
+            "y_to_q_homogeneous_fixture",
+            "q_to_z_homogeneous_fixture",
+        ],
+        "product_map_ids": ["x_to_y_fixture_map", "y_to_q_fixture_map", "q_to_z_fixture_map"],
+        "state_roles": ["substrate", "intermediate_1", "intermediate_2", "product"],
+        "state_names": ["polymer_x_pool", "oligomer_y_pool", "fragment_q_pool", "monomer_z_pool"],
+        "branching_supported": False,
+        "cycles_supported": False,
+    }
+    assert config_data["processes"][0]["modifiers"] == []
+    assert config_data["processes"][1]["modifiers"] == []
+    assert config_data["processes"][2]["modifiers"] == [
+        {
+            "type": "product_inhibition",
+            "product_state": "monomer_z_pool",
+            "inhibition_constant": "K_i_z_fixture",
+        }
+    ]
     product_maps = {reference.id: reference.data for reference in config.entities.product_maps}
     assert product_maps["x_to_y_fixture_map"]["products"] == {"oligomer_y_pool": 1.5}
-    assert product_maps["y_to_z_fixture_map"]["products"] == {"monomer_z_pool": 3.0}
+    assert product_maps["y_to_q_fixture_map"]["products"] == {"fragment_q_pool": 2.0}
+    assert product_maps["q_to_z_fixture_map"]["products"] == {"monomer_z_pool": 3.0}
 
     polymer = result.state("polymer_x_pool").to("mM").magnitude
     oligomer = result.state("oligomer_y_pool").to("mM").magnitude
+    fragment = result.state("fragment_q_pool").to("mM").magnitude
     monomer = result.state("monomer_z_pool").to("mM").magnitude
-    conserved = polymer + (2.0 / 3.0) * oligomer + (2.0 / 9.0) * monomer
+    conserved = polymer + (2.0 / 3.0) * oligomer + (1.0 / 3.0) * fragment + (1.0 / 9.0) * monomer
 
     assert result.solver_metadata["success"] is True
     assert polymer[-1] < polymer[0]
     assert np.max(oligomer) > oligomer[0]
+    assert np.max(fragment) > fragment[0]
     assert monomer[-1] > monomer[0]
     assert conserved[-1] == pytest.approx(conserved[0], rel=1.0e-6, abs=1.0e-6)
-    assert set(result.process_rates) == {"x_surface_to_y_fixture", "y_to_z_homogeneous_fixture"}
+    assert set(result.process_rates) == {
+        "x_surface_to_y_fixture",
+        "y_to_q_homogeneous_fixture",
+        "q_to_z_homogeneous_fixture",
+    }
 
     for path in tables.values():
         assert Path(path).exists()
@@ -73,10 +104,99 @@ def test_second_unrelated_chain_assembles_runs_and_writes_tables(tmp_path: Path)
 
     assert "z_equivalent_yield" in metrics
     assert "x_pool_depleted_fraction" in metrics
-    assert {"polymer_x_remaining", "oligomer_y_amount", "monomer_z_amount"}.issubset(series_names)
+    assert {"polymer_x_remaining", "oligomer_y_amount", "fragment_q_amount", "monomer_z_amount"}.issubset(
+        series_names
+    )
     assert "final_glucose_yield" not in metrics
     assert "glucose_yield" not in series_names
     assert {row["metric"] for row in thresholds} == {"x_pool_depleted_fraction"}
+
+
+def test_linear_chain_requires_at_least_two_processes(tmp_path: Path) -> None:
+    registry_dir = _registry_with_modified_chain(
+        tmp_path,
+        lambda template: template["process_state_metadata"].update(
+            {"process_templates": template["process_state_metadata"]["process_templates"][:1]}
+        ),
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="at least two ordered process_templates"):
+        build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
+
+
+def test_linear_chain_rejects_process_product_map_count_mismatch(tmp_path: Path) -> None:
+    def add_disconnected_map(template: dict[str, Any]) -> None:
+        template["process_state_metadata"]["product_maps"].append(
+            {
+                "id": "disconnected_fixture_map",
+                "name": "Disconnected artificial fixture map",
+                "product_map_type": "stoichiometric",
+                "reactants": {"intermediate_1": 1.0},
+                "products": {"product": 1.0},
+                "notes": "Malformed topology fixture only.",
+            }
+        )
+
+    registry_dir = _registry_with_modified_chain(tmp_path, add_disconnected_map)
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="exactly one product map per process template"):
+        build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
+
+
+def test_linear_chain_rejects_disconnected_ordered_steps(tmp_path: Path) -> None:
+    def disconnect_second_step(template: dict[str, Any]) -> None:
+        metadata = template["process_state_metadata"]
+        metadata["product_maps"][1]["reactants"] = {"substrate": 1.0}
+        metadata["process_templates"][1]["state_roles"]["substrate"] = "substrate"
+
+    registry_dir = _registry_with_modified_chain(tmp_path, disconnect_second_step)
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="disconnected or non-linear"):
+        build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
+
+
+def test_linear_chain_rejects_branching_product_map(tmp_path: Path) -> None:
+    registry_dir = _registry_with_modified_chain(
+        tmp_path,
+        lambda template: template["process_state_metadata"]["product_maps"][0]["products"].update(
+            {"intermediate_2": 1.0}
+        ),
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="branching is unsupported"):
+        build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
+
+
+def test_linear_chain_rejects_cycles(tmp_path: Path) -> None:
+    def introduce_cycle(template: dict[str, Any]) -> None:
+        metadata = template["process_state_metadata"]
+        metadata["product_maps"][1]["products"] = {"substrate": 1.0}
+        metadata["process_templates"][1]["state_roles"]["product"] = "substrate"
+        metadata["product_maps"][2]["reactants"] = {"substrate": 1.0}
+        metadata["process_templates"][2]["state_roles"]["substrate"] = "substrate"
+
+    registry_dir = _registry_with_modified_chain(tmp_path, introduce_cycle)
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="cycle or repeated state"):
+        build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
+
+
+def test_linear_chain_rejects_process_map_role_mismatch(tmp_path: Path) -> None:
+    registry_dir = _registry_with_modified_chain(
+        tmp_path,
+        lambda template: template["process_state_metadata"]["process_templates"][1]["state_roles"].update(
+            {"product": "product"}
+        ),
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="state-role mapping does not match product map"):
+        build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
 
 
 @pytest.mark.parametrize("bad_coefficient", [0.0, -1.0, float("nan"), float("inf")])
@@ -87,7 +207,7 @@ def test_chain_product_maps_reject_non_positive_or_non_finite_coefficients(
     registry_dir = _registry_with_modified_chain(
         tmp_path,
         lambda template: template["process_state_metadata"]["product_maps"][0]["products"].update(
-            {"intermediate": bad_coefficient}
+            {"intermediate_1": bad_coefficient}
         ),
     )
     registry = load_registry(registry_dir / "registry_index.yml")
@@ -110,7 +230,9 @@ def test_chain_product_maps_reject_empty_required_maps(tmp_path: Path) -> None:
 def test_chain_product_maps_reject_unknown_state_roles(tmp_path: Path) -> None:
     registry_dir = _registry_with_modified_chain(
         tmp_path,
-        lambda template: template["process_state_metadata"]["product_maps"][0]["products"].update({"unknown": 1.5}),
+        lambda template: template["process_state_metadata"]["product_maps"][0].update(
+            {"products": {"unknown": 1.5}}
+        ),
     )
     registry = load_registry(registry_dir / "registry_index.yml")
 
@@ -193,56 +315,64 @@ def _generic_chain_template() -> dict[str, Any]:
     return {
         "record_id": GENERIC_TEMPLATE_ID,
         "case_template_id": GENERIC_TEMPLATE_ID,
-        "name": "BIO-002 polymer X to monomer Z generic chain fixture",
+        "name": "Artificial polymer X to monomer Z three-step chain fixture",
         "maturity": "toy_development",
         "provenance": {
             "source": "BIO-002 genericity test fixture",
             "confidence_level": "testing",
             "bio_milestone": "BIO-002",
-            "notes": "Artificial fixture proving chain assembly is data-driven.",
+            "notes": "Artificial framework benchmark proving arbitrary-length linear assembly is data-driven.",
         },
         "schema_version": "1",
         "process_type": "extracellular_enzyme_chain",
         "state_roles": {
             "substrate": "polymer_x_pool",
-            "intermediate": "oligomer_y_pool",
+            "intermediate_1": "oligomer_y_pool",
+            "intermediate_2": "fragment_q_pool",
             "product": "monomer_z_pool",
             "surface_catalyst": "catalyst_alpha_pool",
             "homogeneous_catalyst": "catalyst_beta_pool",
+            "catalyst_3": "catalyst_gamma_pool",
         },
         "initial_state_mapping": {
             "substrate": {"parameter_role": "x_initial", "units_from_role": "x_initial"},
-            "intermediate": {"value": 0.0, "units": "mM"},
+            "intermediate_1": {"value": 0.0, "units": "mM"},
+            "intermediate_2": {"value": 0.0, "units": "mM"},
             "product": {"value": 0.0, "units": "mM"},
             "surface_catalyst": {"parameter_role": "alpha_initial", "units_from_role": "alpha_initial"},
             "homogeneous_catalyst": {"parameter_role": "beta_initial", "units_from_role": "beta_initial"},
+            "catalyst_3": {"parameter_role": "gamma_initial", "units_from_role": "gamma_initial"},
         },
         "product_map": {
-            "id": "y_to_z_fixture_map",
+            "id": "q_to_z_fixture_map",
             "product_map_type": "stoichiometric",
-            "substrate_state_role": "intermediate",
+            "substrate_state_role": "intermediate_2",
             "product_state_role": "product",
             "stoichiometric_yield": 3.0,
             "notes": "Legacy summary field kept consistent with the chain map.",
         },
-        "stoichiometric_yields": {"intermediate": 1.5, "product": 3.0},
+        "stoichiometric_yields": {"intermediate_1": 1.5, "intermediate_2": 2.0, "product": 3.0},
         "time_grid": {"start": 0.0, "stop": 400.0, "points": 81, "units": "second"},
         "observable_roles": [
             "substrate",
-            "intermediate",
+            "intermediate_1",
+            "intermediate_2",
             "product",
             "surface_catalyst",
             "homogeneous_catalyst",
+            "catalyst_3",
         ],
         "output_state_roles": {
             "substrate": "polymer_x_pool",
-            "intermediate": "oligomer_y_pool",
+            "intermediate_1": "oligomer_y_pool",
+            "intermediate_2": "fragment_q_pool",
             "product": "monomer_z_pool",
             "surface_catalyst": "catalyst_alpha_pool",
             "homogeneous_catalyst": "catalyst_beta_pool",
+            "catalyst_3": "catalyst_gamma_pool",
         },
         "process_state_metadata": {
-            "config_name": "BIO-002 generic polymer X chain fixture",
+            "config_name": "Artificial three-step linear chain framework benchmark",
             "config_mode": "toy",
             "config_maturity": "framework_benchmark",
             "public_path": False,
@@ -251,11 +381,15 @@ def _generic_chain_template() -> dict[str, Any]:
                 "x_initial": "fixture_x_initial_concentration",
                 "alpha_initial": "fixture_alpha_initial_concentration",
                 "beta_initial": "fixture_beta_initial_concentration",
+                "gamma_initial": "fixture_gamma_initial_concentration",
                 "surface_rate_constant": "fixture_x_to_y_surface_rate",
                 "adsorption_constant": "fixture_alpha_adsorption_constant",
                 "accessible_surface_area": "fixture_x_accessible_surface_area",
-                "km": "fixture_y_to_z_km",
-                "kcat": "fixture_y_to_z_kcat",
+                "km_y_to_q": "fixture_y_to_q_km",
+                "kcat_y_to_q": "fixture_y_to_q_kcat",
+                "km_q_to_z": "fixture_q_to_z_km",
+                "kcat_q_to_z": "fixture_q_to_z_kcat",
+                "terminal_inhibition_constant": "fixture_z_inhibition_constant",
             },
             "product_maps": [
                 {
@@ -263,16 +397,24 @@ def _generic_chain_template() -> dict[str, Any]:
                     "name": "Fixture X to Y stoichiometric map",
                     "product_map_type": "stoichiometric",
                     "reactants": {"substrate": 1.0},
-                    "products": {"intermediate": 1.5},
+                    "products": {"intermediate_1": 1.5},
                     "notes": "Artificial 1.5 yield fixture.",
                 },
                 {
-                    "id": "y_to_z_fixture_map",
-                    "name": "Fixture Y to Z stoichiometric map",
+                    "id": "y_to_q_fixture_map",
+                    "name": "Fixture Y to Q stoichiometric map",
                     "product_map_type": "stoichiometric",
-                    "reactants": {"intermediate": 1.0},
+                    "reactants": {"intermediate_1": 1.0},
+                    "products": {"intermediate_2": 2.0},
+                    "notes": "Artificial 2.0 yield framework fixture.",
+                },
+                {
+                    "id": "q_to_z_fixture_map",
+                    "name": "Fixture Q to Z stoichiometric map",
+                    "product_map_type": "stoichiometric",
+                    "reactants": {"intermediate_2": 1.0},
                     "products": {"product": 3.0},
-                    "notes": "Artificial 3.0 yield fixture.",
+                    "notes": "Artificial 3.0 yield framework fixture.",
                 },
             ],
             "process_templates": [
@@ -282,7 +424,7 @@ def _generic_chain_template() -> dict[str, Any]:
                     "state_roles": {
                         "substrate": "substrate",
                         "catalyst": "surface_catalyst",
-                        "product": "intermediate",
+                        "product": "intermediate_1",
                     },
                     "fixed_states": {
                         "bond_type": "fixture_linkage_x",
@@ -298,17 +440,37 @@ def _generic_chain_template() -> dict[str, Any]:
                     "assumptions": ["Artificial surface step fixture."],
                 },
                 {
-                    "id": "y_to_z_homogeneous_fixture",
+                    "id": "y_to_q_homogeneous_fixture",
                     "process_type": "homogeneous_michaelis_menten",
                     "state_roles": {
-                        "substrate": "intermediate",
-                        "product": "product",
+                        "substrate": "intermediate_1",
+                        "product": "intermediate_2",
                         "enzyme": "homogeneous_catalyst",
                     },
-                    "parameter_roles": {"km": "km", "kcat": "kcat"},
+                    "parameter_roles": {"km": "km_y_to_q", "kcat": "kcat_y_to_q"},
                     "fixed_parameters": {"rate_units": "mM / second"},
-                    "product_map": "y_to_z_fixture_map",
+                    "product_map": "y_to_q_fixture_map",
                     "assumptions": ["Artificial homogeneous step fixture."],
+                },
+                {
+                    "id": "q_to_z_homogeneous_fixture",
+                    "process_type": "homogeneous_michaelis_menten",
+                    "state_roles": {
+                        "substrate": "intermediate_2",
+                        "product": "product",
+                        "enzyme": "catalyst_3",
+                    },
+                    "parameter_roles": {"km": "km_q_to_z", "kcat": "kcat_q_to_z"},
+                    "fixed_parameters": {"rate_units": "mM / second"},
+                    "product_map": "q_to_z_fixture_map",
+                    "modifiers": [
+                        {
+                            "type": "product_inhibition",
+                            "product_state_role": "product",
+                            "inhibition_constant_role": "terminal_inhibition_constant",
+                        }
+                    ],
+                    "assumptions": ["Artificial terminal homogeneous step fixture."],
                 },
             ],
             "conservation": {
@@ -316,17 +478,20 @@ def _generic_chain_template() -> dict[str, Any]:
                 "closed_system": True,
                 "state_weights": {
                     "substrate": 1.0,
-                    "intermediate": 2.0 / 3.0,
-                    "product": 2.0 / 9.0,
+                    "intermediate_1": 2.0 / 3.0,
+                    "intermediate_2": 1.0 / 3.0,
+                    "product": 1.0 / 9.0,
                 },
             },
             "chain_outputs": {
                 "state_series": [
                     {"role": "substrate", "label": "polymer_x_remaining"},
-                    {"role": "intermediate", "label": "oligomer_y_amount"},
+                    {"role": "intermediate_1", "label": "oligomer_y_amount"},
+                    {"role": "intermediate_2", "label": "fragment_q_amount"},
                     {"role": "product", "label": "monomer_z_amount"},
                     {"role": "surface_catalyst", "label": "alpha_catalyst_amount"},
                     {"role": "homogeneous_catalyst", "label": "beta_catalyst_amount"},
+                    {"role": "catalyst_3", "label": "gamma_catalyst_amount"},
                 ],
                 "derived_series": [
                     {
@@ -372,11 +537,11 @@ def _generic_chain_template() -> dict[str, Any]:
             ],
         },
         "limitations": [
-            "Artificial generic chain fixture only.",
+            "Artificial three-step linear chain framework fixture only.",
             "No organism-specific process code or empirical biology is represented.",
         ],
         "validity_notes": ["Software-test fixture; not a scientific data record."],
-        "notes": "Artificial BIO-002 generic chain assembly fixture.",
+        "notes": "Artificial arbitrary-length linear chain assembly fixture; not scientific or validation data.",
     }
 
 
@@ -472,6 +637,26 @@ def _generic_chain_entities() -> dict[str, Any]:
                     "parameters": [],
                 },
             },
+            {
+                "id": "catalyst_gamma_fixture",
+                "data": {
+                    "kind": "enzyme",
+                    "name": "Catalyst gamma fixture",
+                    "enzyme_class": "catalyst_gamma_fixture",
+                    "target_bond_types": ["fixture_linkage_q"],
+                    "target_substrate_classes": ["fragment_q_fixture"],
+                    "target_substrate_names": ["Fragment Q fixture"],
+                    "validity_labels": ["framework_benchmark", "testing"],
+                    "provenance": {
+                        "source": "Artificial three-step chain framework fixture",
+                        "confidence_level": "testing",
+                        "notes": "Artificial terminal catalyst fixture; not scientific evidence.",
+                    },
+                    "catalytic_parameters": [],
+                    "adsorption_parameters": [],
+                    "parameters": [],
+                },
+            },
         ],
     }
 
@@ -481,11 +666,15 @@ def _generic_chain_parameters() -> list[dict[str, Any]]:
         _parameter("fixture_x_initial_concentration", "X_initial", "extracellular_enzyme_chain", 6.0, "mM"),
         _parameter("fixture_alpha_initial_concentration", "E_alpha_initial", "extracellular_enzyme_chain", 1.0, "mM"),
         _parameter("fixture_beta_initial_concentration", "E_beta_initial", "extracellular_enzyme_chain", 0.5, "mM"),
+        _parameter("fixture_gamma_initial_concentration", "E_gamma_initial", "extracellular_enzyme_chain", 0.4, "mM"),
         _parameter("fixture_x_to_y_surface_rate", "k_surface_x_to_y", "surface_catalysis", 0.01, "mM / meter ** 2 / second"),
         _parameter("fixture_alpha_adsorption_constant", "K_ads_alpha", "surface_catalysis", 1.0, "1 / mM"),
         _parameter("fixture_x_accessible_surface_area", "A_x_accessible", "surface_catalysis", 1.0, "meter ** 2"),
-        _parameter("fixture_y_to_z_km", "Km_y", "homogeneous_michaelis_menten", 0.8, "mM"),
-        _parameter("fixture_y_to_z_kcat", "kcat_y_to_z", "homogeneous_michaelis_menten", 0.04, "1 / second"),
+        _parameter("fixture_y_to_q_km", "Km_y_to_q", "homogeneous_michaelis_menten", 0.8, "mM"),
+        _parameter("fixture_y_to_q_kcat", "kcat_y_to_q", "homogeneous_michaelis_menten", 0.04, "1 / second"),
+        _parameter("fixture_q_to_z_km", "Km_q_to_z", "homogeneous_michaelis_menten", 0.6, "mM"),
+        _parameter("fixture_q_to_z_kcat", "kcat_q_to_z", "homogeneous_michaelis_menten", 0.03, "1 / second"),
+        _parameter("fixture_z_inhibition_constant", "K_i_z_fixture", "homogeneous_michaelis_menten", 8.0, "mM"),
     ]
 
 

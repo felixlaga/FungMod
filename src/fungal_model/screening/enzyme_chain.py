@@ -29,7 +29,8 @@ from fungal_model.workflows import run_configured_model
 EXTRACELLULAR_ENZYME_CHAIN_PROCESS_TYPE = "extracellular_enzyme_chain"
 BIO002_ENZYME_CHAIN_TEMPLATE_ID = "bio002_extracellular_enzyme_chain_template"
 
-_CHAIN_CORE_ROLES = ("substrate", "intermediate", "product")
+_CHAIN_ENDPOINT_ROLES = ("substrate", "product")
+_LINEAR_PROCESS_INPUT_FIELDS = ("substrate", "source")
 _LEGACY_PRODUCT_MAP_FIELDS = frozenset(
     {
         "substrate_state",
@@ -56,6 +57,16 @@ class ChainConservationSpec:
 
 
 @dataclass(frozen=True)
+class ChainTopologySpec:
+    """Validated ordered topology for a non-branching process chain."""
+
+    process_ids: tuple[str, ...]
+    product_map_ids: tuple[str, ...]
+    state_roles: tuple[str, ...]
+    state_names: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ChainTemplateSpec:
     """Validated template data needed by the generic chain assembler."""
 
@@ -66,6 +77,7 @@ class ChainTemplateSpec:
     parameter_records: Mapping[str, ParameterRecord]
     product_maps: tuple[Mapping[str, Any], ...]
     processes: tuple[Mapping[str, Any], ...]
+    topology: ChainTopologySpec
     conservation: ChainConservationSpec
     outputs: Mapping[str, Any]
     environment_id: str | None
@@ -231,12 +243,14 @@ def _chain_spec(
         requires_environment=_process_templates_require_environment(processes),
         template_id=template.case_template_id,
     )
-    if len(processes) != 2:
-        raise EnzymeChainAssemblyError(
-            f"Template {template.case_template_id!r} must declare exactly two process_templates for a two-step chain."
-        )
     _validate_product_map_ids(template, product_maps)
     _validate_process_templates(template, processes, state_roles=state_roles, parameter_records=parameter_records)
+    topology = _linear_chain_topology(
+        template=template,
+        processes=processes,
+        product_maps=product_maps,
+        state_roles=state_roles,
+    )
     conservation = _conservation_spec(
         template=template,
         metadata=metadata,
@@ -259,6 +273,7 @@ def _chain_spec(
         parameter_records=parameter_records,
         product_maps=product_maps,
         processes=processes,
+        topology=topology,
         conservation=conservation,
         outputs=outputs,
         environment_id=resolved_environment_id,
@@ -274,7 +289,7 @@ def _chain_template(registry: FungModRegistry, template_id: str) -> CaseTemplate
         raise EnzymeChainAssemblyError(
             f"Template {template_id!r} must use process_type={EXTRACELLULAR_ENZYME_CHAIN_PROCESS_TYPE!r}."
         )
-    for role in _CHAIN_CORE_ROLES:
+    for role in _CHAIN_ENDPOINT_ROLES:
         if role not in template.state_roles:
             raise EnzymeChainAssemblyError(f"Template {template_id!r} is missing state role {role!r}.")
     return template
@@ -820,6 +835,113 @@ def _validate_process_templates(
                 )
 
 
+def _linear_chain_topology(
+    *,
+    template: CaseTemplateRecord,
+    processes: Sequence[Mapping[str, Any]],
+    product_maps: Sequence[Mapping[str, Any]],
+    state_roles: Mapping[str, str],
+) -> ChainTopologySpec:
+    template_id = template.case_template_id
+    if len(processes) < 2:
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} must declare at least two ordered process_templates for a linear chain."
+        )
+    if len(product_maps) != len(processes):
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} linear chain must declare exactly one product map per process template; "
+            f"found {len(product_maps)} product maps and {len(processes)} processes."
+        )
+
+    maps_by_id = {
+        _required_text(spec, "id", field_name="process_state_metadata.product_maps"): spec
+        for spec in product_maps
+    }
+    process_ids: list[str] = []
+    product_map_ids: list[str] = []
+    links: list[tuple[str, str]] = []
+    for index, process in enumerate(processes):
+        process_id = _required_text(process, "id", field_name="process_state_metadata.process_templates")
+        if process_id in process_ids:
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} repeats process template id {process_id!r}."
+            )
+        process_ids.append(process_id)
+
+        map_id = _required_text(process, "product_map", field_name=f"process_template {process_id}")
+        if map_id in product_map_ids:
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} non-linear chain reuses product map {map_id!r}; "
+                "branching and cycles are unsupported."
+            )
+        product_map_ids.append(map_id)
+        product_map = maps_by_id[map_id]
+        reactants = _mapping(product_map.get("reactants"), field_name=f"product_map {map_id}.reactants")
+        products = _mapping(product_map.get("products"), field_name=f"product_map {map_id}.products")
+        if len(reactants) != 1 or len(products) != 1:
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} product map {map_id!r} is non-linear: linear chains require "
+                "exactly one reactant role and one product role per step; branching is unsupported."
+            )
+        reactant_role = str(next(iter(reactants)))
+        product_role = str(next(iter(products)))
+        for role in (reactant_role, product_role):
+            if role not in state_roles:
+                raise EnzymeChainAssemblyError(
+                    f"Template {template_id!r} product map {map_id!r} references unknown state role {role!r}."
+                )
+
+        process_state_roles = _mapping(
+            process.get("state_roles"),
+            field_name=f"process_template {process_id}.state_roles",
+        )
+        input_fields = [field for field in _LINEAR_PROCESS_INPUT_FIELDS if field in process_state_roles]
+        if len(input_fields) != 1 or "product" not in process_state_roles:
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} process {process_id!r} must map exactly one linear input field "
+                "('substrate' or 'source') and the 'product' field."
+            )
+        process_input_role = str(process_state_roles[input_fields[0]])
+        process_product_role = str(process_state_roles["product"])
+        if process_input_role != reactant_role or process_product_role != product_role:
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} process {process_id!r} state-role mapping does not match product map "
+                f"{map_id!r}: expected {reactant_role!r} -> {product_role!r}."
+            )
+        if links and links[-1][1] != reactant_role:
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} process {process_id!r} is disconnected or non-linear: ordered step "
+                f"{index + 1} consumes {reactant_role!r}, but the previous step produces {links[-1][1]!r}. "
+                "Branching and reordered steps are unsupported."
+            )
+        links.append((reactant_role, product_role))
+
+    unused_maps = sorted(set(maps_by_id).difference(product_map_ids))
+    if unused_maps:
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} has disconnected product map(s) not used by the ordered process chain: "
+            f"{', '.join(unused_maps)}."
+        )
+    topology_roles = (links[0][0], *(product_role for _, product_role in links))
+    topology_names = tuple(state_roles[role] for role in topology_roles)
+    if len(set(topology_roles)) != len(topology_roles) or len(set(topology_names)) != len(topology_names):
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} declares a cycle or repeated state in its ordered process chain; "
+            "only acyclic linear chains are supported."
+        )
+    if topology_roles[0] != "substrate" or topology_roles[-1] != "product":
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} linear chain must start at state role 'substrate' and end at state role "
+            f"'product'; found {topology_roles[0]!r} -> {topology_roles[-1]!r}."
+        )
+    return ChainTopologySpec(
+        process_ids=tuple(process_ids),
+        product_map_ids=tuple(product_map_ids),
+        state_roles=topology_roles,
+        state_names=topology_names,
+    )
+
+
 def _conservation_spec(
     *,
     template: CaseTemplateRecord,
@@ -1079,6 +1201,15 @@ def _case_template_config(chain: ChainTemplateSpec) -> dict[str, Any]:
         "state_roles": dict(chain.state_roles),
         "observable_roles": list(chain.template.observable_roles),
         "output_state_roles": dict(chain.template.output_state_roles),
+        "chain_topology": {
+            "topology_type": "linear",
+            "process_ids": list(chain.topology.process_ids),
+            "product_map_ids": list(chain.topology.product_map_ids),
+            "state_roles": list(chain.topology.state_roles),
+            "state_names": list(chain.topology.state_names),
+            "branching_supported": False,
+            "cycles_supported": False,
+        },
         "limitations": list(chain.template.limitations),
         "validity_notes": list(chain.template.validity_notes),
         "conservation": {

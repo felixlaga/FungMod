@@ -26,6 +26,88 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-42 Arbitrary-Length Linear Enzyme-Chain Assembly
+
+Date: 2026-07-12
+
+Status: `complete` for implementation and local software verification once
+merged; PR-41 is complete after PR #56, and PR-42 is the current-next PR.
+
+Completed in this pass:
+
+- Replaced the exactly-two-process guard in the registry/template-driven
+  extracellular enzyme-chain assembler with explicit ordered linear-topology
+  validation for two or more process templates.
+- Added bounded indexed intermediate/catalyst/enzyme state-role support while
+  preserving every existing case-template role and schema version.
+- Require one unique one-reactant/one-product stoichiometric map per ordered
+  process, exact process/map state-role agreement, contiguous step order,
+  unique topology states, and `substrate`/`product` endpoints.
+- Emit the validated process, product-map, role, and state sequences as
+  inspectable `case_template.chain_topology` config metadata.
+- Reject fewer than two steps, process/map count mismatches, repeated process
+  or product-map IDs, disconnected/reordered steps, branching maps, cycles,
+  repeated states, and process/map role mismatches before model execution.
+- Extended the unrelated copied-registry framework benchmark to three process
+  steps, four topology states, three catalyst states, explicit conservation
+  weights, an existing product-inhibition modifier on the third step, and the
+  existing configured execution/standard-table path. The fixture is artificial
+  software evidence only, not scientific or validation data.
+- Preserved the existing BIO-002 two-step template, configured process/state
+  IDs, researcher-facing CASE-001 API path, conservation semantics, modifiers,
+  provenance, maturity, assumptions, limitations, and standard output labels.
+- Updated README capability text, BIO-002 documentation, roadmap/status queue,
+  validation-gate wording, and Phase 1 finding status so arbitrary-length
+  linear support is explicit while branching and cycles remain unsupported.
+
+Tests added or modified: expanded
+`tests/test_bio002_generic_chain_assembly.py` for three-step assembly/execution,
+conservation and output semantics, third-step modifier mapping, minimum-length,
+disconnected, branching, cyclic, and malformed topology rejection; preserved
+the existing BIO-002 and researcher API regression suites.
+
+No new rate law, production constant, empirical record, validation data,
+calibration claim, inferred parameter, hidden notebook science,
+substrate/fungus-specific generic branch, or scientific validation claim was
+added. Existing two-step scientific/numerical behavior and public helper
+signatures are backward compatible. The new behavior is limited to templates
+that previously failed solely because they declared more than two valid linear
+steps.
+
+Remaining ambiguity and risk: the schema intentionally supports only ordered
+acyclic linear topology. Branching, converging multi-reactant steps, cycles,
+and general pathway graphs remain unsupported and must not be claimed.
+
+Recommended next task: add the bounded public-API conservation diagnostics
+example notebook already queued after PR-42, without changing configured-output
+artifacts or scientific behavior.
+
+Verification:
+
+- Focused chain baseline before edits: 21 passed.
+- Focused chain/registry/API/modifier suite: 54 passed.
+- Broad relevant suite spanning chain assembly, modifier mapping, registry
+  templates, BIO readiness, modelability, ensembles, public APIs, environment
+  grids, hardcoding guardrails, roadmap status, and findings: 130 passed.
+- `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache .venv/bin/python -m ruff check src tests`
+  - Result: all checks passed.
+- `.venv/bin/python -m pyright --pythonpath "$(.venv/bin/python -c 'import sys; print(sys.executable)')"`
+  - Result: 0 errors, 0 warnings, 0 informations.
+- `git diff --check`
+  - Result: passed.
+- Unfiltered full coverage gate before the final additional malformed-topology
+  test: 700 passed, 1 failed, total coverage 84.63%. The sole failure was
+  `test_no_notebook_checkpoints_remain_in_working_tree` because the ignored
+  pre-existing file
+  `notebooks/examples/.ipynb_checkpoints/10_virtual_experiment_product_tour-checkpoint.ipynb`
+  remains in the shared workspace. Its filesystem timestamp is 2026-06-20 and
+  PR-42 did not create, modify, delete, or stage it.
+- Final-tree full coverage gate excluding only that unrelated workspace-hygiene
+  assertion: 701 passed, 1 deselected; total coverage 84.64%.
+- One initial broad-suite command named nonexistent `tests/test_modelability.py`
+  and collected no tests; it was corrected to `tests/test_modelability_report.py`
+  in the 130-test green run above.
+
 ## PR-41 Pyright Optional-Member-Access Ratchet
 
 Date: 2026-07-11
