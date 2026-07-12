@@ -26,12 +26,74 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-43 Process-Bound Entropy-Production-Rate Timeseries
+
+Date: 2026-07-12
+
+Status: `current` for the bounded THERMO-003 configured-output diagnostics
+slice; PR-42 is complete after PR #57, and broader THERMO-003 remains
+`partial`.
+
+Completed in this pass:
+
+- Added a typed optional
+  `outputs.entropy_production_rate_timeseries` configured contract that binds a
+  known process id to explicit sourced condition-specific delta Gibbs,
+  positive temperature, reaction-extent-rate interpretation, target
+  extent-rate units, provenance refs, and an optional sourced unit-bearing
+  native-rate conversion.
+- Derived `entropy_production_rate(t) = -DeltaG * extent_rate(t) / T` after the
+  solver finishes, from the native `SimulationResult.process_rates` trajectory
+  only. Direct molar extent-rate trajectories and explicitly converted mass
+  rates are covered by artificial framework benchmarks.
+- Added configured `entropy_production_rate_timeseries.json` and `.csv`
+  artifacts with process/time/value/units/provenance/status/guardrail fields,
+  automatic output-manifest inclusion, and Markdown/HTML/index report
+  visibility.
+- Added explicit failures for unknown configured processes, absent native
+  trajectories, incompatible or undefined units, nonpositive temperature,
+  non-finite or misaligned trajectories, and unsupported metadata. No default
+  conversion or inferred value is used.
+
+Tests added or modified: `tests/test_configured_model_workflow.py` covers the
+converted-rate path, direct molar-rate path, artifact schema and values,
+manifest/report visibility, and each required failure boundary.
+
+What did not change: the ODE right-hand side, process rate laws, solver
+settings, state trajectories, native process-rate trajectories, existing
+scalar `entropy_production_rate_metadata` validator and thermodynamic-summary
+row contract, validation/calibration behavior, and biology are unchanged.
+
+Scientific behavior impact: additive diagnostics only. Delta G remains a
+caller-supplied condition-specific constant for each configured diagnostic;
+there is no inferred Q/activity/concentration/redox/electron balance, dynamic
+Delta G, energy gate, or solver-time thermodynamic enforcement.
+
+Backward compatibility: existing configs emit no new artifact and follow the
+same result/output behavior. Existing scalar entropy metadata remains
+supported unchanged. The new contract is opt-in and rejects incomplete or
+dimensionally dishonest metadata.
+
+Remaining ambiguity and risk: callers remain responsible for the scientific
+meaning and provenance of the declared process-rate-to-reaction-extent mapping.
+The software verifies units and explicit metadata, not empirical validity or
+whether a constant condition-specific Delta G is appropriate across a run.
+
+Recommended next task: review and merge PR-43 as the bounded process-rate
+diagnostics slice while keeping THERMO-003 partial. Then take the requested
+provider UX as a separately scoped PR-44 rather than adding it to this
+thermodynamics slice.
+
+Verification:
+
+- Focused configured-workflow suite: 44 passed.
+
 ## PR-42 Arbitrary-Length Linear Enzyme-Chain Assembly
 
 Date: 2026-07-12
 
-Status: `complete` for implementation and local software verification once
-merged; PR-41 is complete after PR #56, and PR-42 is the current-next PR.
+Status: `complete` after PR #57 merged for the bounded arbitrary-length linear
+enzyme-chain assembly slice.
 
 Completed in this pass:
 
@@ -78,9 +140,9 @@ Remaining ambiguity and risk: the schema intentionally supports only ordered
 acyclic linear topology. Branching, converging multi-reactant steps, cycles,
 and general pathway graphs remain unsupported and must not be claimed.
 
-Recommended next task: add the bounded public-API conservation diagnostics
-example notebook already queued after PR-42, without changing configured-output
-artifacts or scientific behavior.
+Recommended next task: implement PR-43 as a bounded process-bound
+entropy-production-rate configured-output diagnostic from native process-rate
+trajectories only when explicit dimensionally compatible metadata are present.
 
 Verification:
 

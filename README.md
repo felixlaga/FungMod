@@ -41,6 +41,10 @@ basic kinetics layer:
   and report/index visibility for existing summary artifacts plus a standard
   virtual-experiment thermodynamic diagnostics table derived from existing
   per-sample configured summary artifacts,
+- configured process-bound entropy-production-rate JSON/CSV timeseries derived
+  after simulation from native process-rate trajectories only when explicit
+  sourced delta-G, positive temperature, reaction-extent interpretation, and
+  dimensionally compatible extent-rate conversion metadata are supplied,
 - configured conservation JSON/CSV diagnostics copied from existing
   `SimulationResult` trajectories and explicit configured `mass_balance`
   `conserved_weights`, for drift inspection only, plus a standard
@@ -264,6 +268,17 @@ process counts only. If solver metadata is absent, the JSON reports
 change solver behavior, infer scientific values, define numerical quality
 thresholds, add validation/calibration evidence, compare against empirical
 data, or enforce thermodynamics.
+When explicitly configured, bundles also include
+`entropy_production_rate_timeseries.json` and
+`entropy_production_rate_timeseries.csv`. These artifacts evaluate
+`-DeltaG * extent_rate(t) / T` after simulation for a named configured process,
+using its native `SimulationResult.process_rates` trajectory and only explicit
+sourced metadata. Mass-, concentration-, or other non-molar native rates
+require an explicit unit-bearing conversion to amount-of-substance per time.
+Missing processes, undefined or incompatible units, nonpositive temperature,
+and unsupported metadata fail explicitly. The artifacts do not infer dynamic
+Delta G, activities, reaction quotients, concentrations, redox/electron
+balances, validation evidence, or solver-time enforcement.
 Quicklook plots include a presentation-only trajectory-band figure generated
 from `trajectory_quantiles.csv`; it is for inspection, not validation or
 calibration.
@@ -292,6 +307,9 @@ contains `thermodynamic_summary.json` and `thermodynamic_summary.csv`, it adds
 an explicit thermodynamic-diagnostics inspection section and links those
 artifacts without inferring activities, reaction quotients, concentrations,
 redox chemistry, validation evidence, or solver-time thermodynamic enforcement.
+The same section and report index expose configured
+`entropy_production_rate_timeseries.json`/`.csv` artifacts when present, with
+their process binding, provenance, units, status, and no-inference guardrails.
 When it is pointed at a configured-output folder with existing
 `solver_diagnostics.json` and `solver_diagnostics.csv`, it adds an explicit
 solver-diagnostics inspection section and links those artifacts without
@@ -567,6 +585,8 @@ configuration-facing artifacts:
 - `conservation_diagnostics.csv`
 - `solver_diagnostics.json`
 - `solver_diagnostics.csv`
+- optional `entropy_production_rate_timeseries.json`
+- optional `entropy_production_rate_timeseries.csv`
 - `merged_parameters.json`
 - `solver_settings.json`
 - `entity_snapshots/`

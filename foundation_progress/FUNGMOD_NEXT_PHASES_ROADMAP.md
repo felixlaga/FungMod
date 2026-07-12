@@ -69,8 +69,9 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-42 arbitrary-length linear enzyme-chain assembly
-after the PR-41 Pyright optional-member-access ratchet merged as PR #56, the
+The current next PR is PR-43 process-bound entropy-production-rate timeseries
+after PR-42 arbitrary-length linear enzyme-chain assembly merged as PR #57,
+the PR-41 Pyright optional-member-access ratchet merged as PR #56, the
 PR-40 virtual-experiment conservation diagnostics bridge merged as PR #55,
 the PR-39 virtual-experiment solver diagnostics bridge,
 the PR-38 solver diagnostics example notebook,
@@ -164,16 +165,22 @@ scientific modules using explicit contracts or precise annotations only after
 PR #56. It did not add guessed values, silent fallbacks, `Any` casts, blanket
 suppressions, or scientific, numerical, solver, calibration-result,
 validation-data, biology, public-API, or output-schema behavior changes. The
-current PR-42 slice generalizes the registry/template-driven extracellular
+completed PR-42 slice generalized the registry/template-driven extracellular
 enzyme-chain assembler from exactly two steps to ordered linear chains with at
 least two existing process-law steps. It preserves explicit conservation,
 parameter roles, modifiers, provenance, maturity, assumptions, limitations,
 standard outputs, fail-fast modelability, the BIO-002 two-step template, and
 the researcher API. An artificial three-step framework benchmark proves the
 generic path; branching, cycles, disconnected chains, and malformed topology
-remain explicitly unsupported. No new rate law, production constant,
+remain explicitly unsupported after PR #57. No new rate law, production constant,
 empirical record, validation data, calibration, inferred parameter, or hidden
-notebook science is added. The completed PR-24 BIO-003 slice added a
+notebook science was added. The current PR-43 slice adds post-simulation,
+process-bound entropy-production-rate JSON/CSV trajectories from native
+process-rate trajectories only when explicit sourced condition-specific delta
+Gibbs, positive temperature, reaction-extent interpretation, and dimensionally
+compatible extent-rate units or conversion metadata are supplied. It fails on
+missing processes or dishonest metadata and adds no inferred thermodynamics,
+dynamic delta G, or solver-time enforcement. The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
 researcher-facing BIO-002 example without adding validation data, calibration,
@@ -263,13 +270,18 @@ configured conservation artifacts, with report/index visibility and header-only
 output when artifacts are absent after PR #55. The completed PR-41 slice is
 limited to the global Pyright optional-member-access ratchet and explicit
 nullable-state narrowing that resolved FD-005 after PR #56 without runtime
-behavior changes. The current PR-42 slice is limited to arbitrary-length
+behavior changes. The completed PR-42 slice is limited to arbitrary-length
 ordered linear chain topology over existing process laws; branching and cycles
-remain unsupported.
+remain unsupported after PR #57. The current PR-43 slice is limited to
+configured-output process-bound entropy-production-rate trajectories derived
+after simulation from existing native process-rate trajectories plus explicit
+sourced and dimensionally compatible metadata; it does not alter solver or
+process behavior.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
-diagnostics notebook coverage for explicit-Q and entropy-rate rows. The
+diagnostics notebook coverage for explicit-Q and entropy-rate rows, plus the
+bounded PR-43 process-bound entropy-production-rate timeseries. The
 completed PR-14 slice added only a JSON summary budget over existing explicit
 entropy-rate metadata rows; it did not infer thermodynamics or change solver
 behavior. The completed PR-15 slice should make that budget inspectable in the
@@ -336,10 +348,11 @@ PR-38 completed after PR #53 as a solver diagnostics example notebook. PR-39
 completed after PR #54 as a virtual-experiment solver diagnostics bridge. PR-40
 completed after PR #55 as a virtual-experiment conservation diagnostics bridge.
 PR-41 completed after PR #56 as a Pyright optional-member-access ratchet. The
-current PR-42 slice is arbitrary-length linear enzyme-chain assembly rather
-than ingestion, digitization, fabricated validation data, calibration, or
-empirical comparison; branching and cycles remain unsupported, and the
-recommended next simulator-building follow-up is a
+PR-42 arbitrary-length linear enzyme-chain assembly slice completed after PR
+#57; branching and cycles remain unsupported. The current PR-43 slice is
+process-bound entropy-production-rate configured diagnostics rather than
+ingestion, digitization, fabricated validation data, calibration, or empirical
+comparison, and the recommended next simulator-building follow-up is a
 bounded public-API conservation diagnostics example notebook over the standard
 table/accessor and header-only guardrail.
 
@@ -1444,12 +1457,15 @@ Do not emit thermodynamic state, entropy production, redox behavior, or
 organism-specific physiology unless the equations, parameters, provenance,
 maturity labels, and tests exist.
 
-Current scoped support remains metadata-only: explicit reaction-quotient Gibbs
-diagnostics use caller-supplied Q/T metadata, and explicit entropy-production
-rate diagnostics use caller-supplied condition-specific delta G, reaction
-extent rate, and temperature metadata. These checks do not infer activities,
-reaction quotients, concentrations, redox potentials, electron balances, or
-solver-time thermodynamic feasibility.
+Current scoped support remains explicit-metadata-only: reaction-quotient Gibbs
+diagnostics use caller-supplied Q/T metadata; scalar entropy-production-rate
+diagnostics use caller-supplied condition-specific delta G, reaction extent
+rate, and temperature metadata; and configured process-bound timeseries derive
+`-DeltaG * extent_rate(t) / T` after simulation from a named native process-rate
+trajectory only when sourced, dimensionally compatible metadata are supplied.
+These diagnostics do not infer activities, reaction quotients, concentrations,
+redox potentials, electron balances, dynamic delta G, or solver-time
+thermodynamic feasibility.
 
 ---
 

@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-42: arbitrary-length linear enzyme-chain assembly**.
+Current next PR: **PR-43: process-bound entropy-production-rate timeseries**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -38,10 +38,12 @@ PR-37 solver diagnostics visibility follow-up is complete after PR #52. PR-38
 solver diagnostics example notebook is complete after PR #53. PR-39
 virtual-experiment solver diagnostics bridge is complete after PR #54. PR-40
 virtual-experiment conservation diagnostics bridge is complete after PR #55.
-PR-41 Pyright optional-member-access ratchet is complete after PR #56. The
-selected PR-42 work is therefore arbitrary-length linear enzyme-chain assembly,
-not validation ingestion. A future validation ingestion PR must not ingest,
-digitize, or fabricate data unless those evidence requirements are met.
+PR-41 Pyright optional-member-access ratchet is complete after PR #56. PR-42
+arbitrary-length linear enzyme-chain assembly is complete after PR #57. The
+selected PR-43 work is therefore bounded process-bound entropy-production-rate
+configured diagnostics, not validation ingestion.
+A future validation ingestion PR must not ingest, digitize, or
+fabricate data unless those evidence requirements are met.
 This gate does not complete VALIDATION-DATA-001.
 
 ## Candidate Evidence Checked

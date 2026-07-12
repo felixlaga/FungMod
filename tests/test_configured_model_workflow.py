@@ -17,13 +17,18 @@ from fungal_model import (
     run_configured_model,
 )
 from fungal_model.api.report import write_virtual_experiment_report
-from fungal_model.io.model_config import load_model_config
+from fungal_model.core.units import Q_
+from fungal_model.io.model_config import ModelConfigError, load_model_config
 from fungal_model.plugins.pet import pet_substrate_loader_registry
 from fungal_model.results import SimulationResult
 from fungal_model.workflows import (
     ConfiguredInputLoader,
     ConfiguredOutputWriter,
     ConfiguredProcessAssembler,
+)
+from fungal_model.workflows.configured_outputs import (
+    ConfiguredEntropyProductionError,
+    _entropy_production_rate_timeseries,
 )
 
 
@@ -164,6 +169,235 @@ def test_configured_output_report_exposes_conservation_diagnostics_artifacts(tmp
     assert 'href="../conservation_diagnostics.csv"' in html
     assert 'href="../conservation_diagnostics.json"' in index
     assert 'href="../conservation_diagnostics.csv"' in index
+
+
+def test_configured_output_writes_process_bound_entropy_production_rate_timeseries(tmp_path) -> None:
+    config_path = _entropy_timeseries_config(tmp_path, include_conversion=True)
+    output_dir = tmp_path / "entropy_timeseries"
+
+    result = run_configured_model(config_path, output_dir=output_dir)
+
+    diagnostics = json.loads(
+        (output_dir / "entropy_production_rate_timeseries.json").read_text(encoding="utf-8")
+    )
+    with (output_dir / "entropy_production_rate_timeseries.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    manifest = json.loads((output_dir / "output_manifest.json").read_text(encoding="utf-8"))
+    serialized_config = json.loads(
+        (output_dir / "input_model_config.json").read_text(encoding="utf-8")
+    )
+
+    assert diagnostics["kind"] == "configured_process_entropy_production_rate_timeseries"
+    assert diagnostics["diagnostic_count"] == 1
+    assert diagnostics["evaluated_count"] == 1
+    assert diagnostics["row_count"] == 11
+    assert diagnostics["status"] == "evaluated"
+    assert diagnostics["has_dynamic_delta_gibbs"] is False
+    assert diagnostics["has_solver_time_enforcement"] is False
+    assert diagnostics["diagnostics"][0]["process_id"] == "a_to_b"
+    assert diagnostics["diagnostics"][0]["process_rate_units"] == "kilogram / second"
+    assert diagnostics["diagnostics"][0]["extent_rate_units"] == "mole / second"
+    assert diagnostics["diagnostics"][0]["process_rate_to_extent_rate"] == {
+        "value": 2.0,
+        "units": "mole / kilogram",
+        "source": "Artificial framework-benchmark mass-to-extent conversion.",
+    }
+    assert diagnostics["rows"][0]["process_rate"] == pytest.approx(0.1)
+    assert diagnostics["rows"][0]["extent_rate"] == pytest.approx(0.2)
+    assert diagnostics["rows"][0]["entropy_production_rate"] == pytest.approx(100.0 / 3.0)
+    assert diagnostics["rows"][0]["entropy_production_rate_units"] == "joule / kelvin / second"
+    assert diagnostics["rows"][0]["provenance_refs"] == ["framework-benchmark:process-entropy"]
+    assert diagnostics["rows"][0]["status"] == "evaluated"
+    assert "Post-simulation diagnostic" in diagnostics["rows"][0]["guardrails"]
+    assert rows[0]["process_id"] == "a_to_b"
+    assert float(rows[0]["entropy_production_rate"]) == pytest.approx(100.0 / 3.0)
+    assert "entropy_production_rate_timeseries.json" in manifest["files"]
+    assert "entropy_production_rate_timeseries.csv" in manifest["files"]
+    assert serialized_config["outputs"]["entropy_production_rate_timeseries"][0] == {
+        "id": "a_to_b_entropy_rate",
+        "process_id": "a_to_b",
+        "process_rate_interpretation": "reaction_extent_rate",
+        "condition_specific_delta_gibbs": {
+            "value": -50.0,
+            "units": "kilojoule / mole",
+            "source": "Artificial framework-benchmark condition-specific delta Gibbs.",
+        },
+        "temperature": {
+            "value": 300.0,
+            "units": "kelvin",
+            "source": "Artificial framework-benchmark temperature.",
+        },
+        "extent_rate_units": "mole / second",
+        "process_rate_to_extent_rate": {
+            "value": 2.0,
+            "units": "mole / kilogram",
+            "source": "Artificial framework-benchmark mass-to-extent conversion.",
+        },
+        "provenance_refs": ["framework-benchmark:process-entropy"],
+    }
+    assert result.process_rates["a_to_b"].units == "kilogram / second"
+    assert result.derived_quantities == {}
+
+
+def test_process_entropy_timeseries_accepts_direct_molar_extent_rate(tmp_path) -> None:
+    config_path = _entropy_timeseries_config(
+        tmp_path,
+        include_conversion=False,
+        state_units="mole",
+        filename="direct_molar_entropy.yml",
+    )
+    output_dir = tmp_path / "direct_molar_entropy"
+
+    run_configured_model(config_path, output_dir=output_dir)
+
+    diagnostics = json.loads(
+        (output_dir / "entropy_production_rate_timeseries.json").read_text(encoding="utf-8")
+    )
+    assert diagnostics["diagnostics"][0]["process_rate_units"] == "mole / second"
+    assert diagnostics["diagnostics"][0]["process_rate_to_extent_rate"] is None
+    assert diagnostics["rows"][0]["extent_rate"] == pytest.approx(0.1)
+    assert diagnostics["rows"][0]["entropy_production_rate"] == pytest.approx(50.0 / 3.0)
+
+
+def test_process_entropy_timeseries_preserves_the_thermodynamic_sign(tmp_path) -> None:
+    config_path = _entropy_timeseries_config(
+        tmp_path,
+        include_conversion=False,
+        state_units="mole",
+        delta_gibbs_value=50.0,
+        filename="positive_delta_g_entropy.yml",
+    )
+    output_dir = tmp_path / "positive_delta_g_entropy"
+
+    run_configured_model(config_path, output_dir=output_dir)
+
+    diagnostics = json.loads(
+        (output_dir / "entropy_production_rate_timeseries.json").read_text(encoding="utf-8")
+    )
+    assert diagnostics["rows"][0]["extent_rate"] == pytest.approx(0.1)
+    assert diagnostics["rows"][0]["entropy_production_rate"] == pytest.approx(-50.0 / 3.0)
+
+
+def test_process_entropy_timeseries_is_visible_in_configured_report(tmp_path) -> None:
+    config_path = _entropy_timeseries_config(tmp_path, include_conversion=True)
+    output_dir = tmp_path / "entropy_report"
+    run_configured_model(config_path, output_dir=output_dir)
+
+    report_path = write_virtual_experiment_report(
+        table_dir=output_dir,
+        output_dir=output_dir / "report",
+        include_html=True,
+        include_index=True,
+    )
+    report = report_path.read_text(encoding="utf-8")
+    html = report_path.with_suffix(".html").read_text(encoding="utf-8")
+    index = report_path.with_name("index.html").read_text(encoding="utf-8")
+
+    assert "Process-bound entropy-production-rate timeseries" in report
+    assert "dynamic delta Gibbs `False`" in report
+    assert "solver-time enforcement `False`" in report
+    assert "Rows from `entropy_production_rate_timeseries.csv`" in report
+    assert "No inferred reaction quotient" in report
+    assert 'href="../entropy_production_rate_timeseries.json"' in html
+    assert 'href="../entropy_production_rate_timeseries.csv"' in html
+    assert 'href="../entropy_production_rate_timeseries.json"' in index
+    assert 'href="../entropy_production_rate_timeseries.csv"' in index
+
+
+@pytest.mark.parametrize(
+    ("config_changes", "message"),
+    [
+        ({"process_id": "missing_process"}, "binds unknown configured process"),
+        ({"include_conversion": False}, "is not compatible with extent-rate units"),
+        ({"extent_rate_units": "unknown_extent_unit / second"}, "is not compatible with extent-rate units"),
+        ({"delta_gibbs_units": "kilogram"}, "must be compatible with energy per amount"),
+        ({"temperature_units": "second"}, "temperature must be compatible with kelvin"),
+        ({"temperature_value": 0.0}, "temperature must be positive in kelvin"),
+        ({"conversion_value": 0.0}, "process_rate_to_extent_rate must be positive"),
+        ({"delta_gibbs_value": [-50.0]}, "must be a finite scalar"),
+    ],
+)
+def test_process_entropy_timeseries_fails_explicitly_for_unsupported_evaluation(
+    tmp_path,
+    config_changes,
+    message,
+) -> None:
+    config_path = _entropy_timeseries_config(
+        tmp_path,
+        filename="invalid_entropy.yml",
+        **config_changes,
+    )
+    output_dir = tmp_path / "invalid_entropy"
+
+    with pytest.raises(ValueError, match=message):
+        run_configured_model(config_path, output_dir=output_dir)
+
+    assert not (output_dir / "entropy_production_rate_timeseries.json").exists()
+    assert not (output_dir / "output_manifest.json").exists()
+
+
+def test_process_entropy_timeseries_rejects_unsupported_metadata(tmp_path) -> None:
+    config_path = _entropy_timeseries_config(tmp_path, filename="unsupported_entropy.yml")
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["outputs"]["entropy_production_rate_timeseries"][0]["dynamic_delta_gibbs"] = True
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ModelConfigError, match="unsupported fields"):
+        load_model_config(config_path)
+
+
+def test_process_entropy_timeseries_requires_sourced_metadata(tmp_path) -> None:
+    config_path = _entropy_timeseries_config(tmp_path, filename="missing_entropy_metadata.yml")
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["outputs"]["entropy_production_rate_timeseries"][0].pop("temperature")
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ModelConfigError, match="temperature must be a mapping"):
+        load_model_config(config_path)
+
+
+def test_process_entropy_timeseries_requires_explicit_extent_rate_interpretation(
+    tmp_path,
+) -> None:
+    config_path = _entropy_timeseries_config(tmp_path, filename="invalid_interpretation.yml")
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["outputs"]["entropy_production_rate_timeseries"][0][
+        "process_rate_interpretation"
+    ] = "mass_rate"
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ModelConfigError, match="must be 'reaction_extent_rate'"):
+        load_model_config(config_path)
+
+
+def test_process_entropy_timeseries_rejects_missing_native_trajectory(tmp_path) -> None:
+    config_path = _entropy_timeseries_config(
+        tmp_path,
+        include_conversion=False,
+        state_units="mole",
+        filename="missing_native_rate.yml",
+    )
+    result = run_configured_model(config_path, output_dir=tmp_path / "complete_result")
+    result.process_rates.clear()
+
+    with pytest.raises(ConfiguredEntropyProductionError, match="no native process-rate trajectory"):
+        _entropy_production_rate_timeseries(load_model_config(config_path), result)
+
+
+def test_process_entropy_timeseries_rejects_time_misalignment(tmp_path) -> None:
+    config_path = _entropy_timeseries_config(
+        tmp_path,
+        include_conversion=False,
+        state_units="mole",
+        filename="misaligned_native_rate.yml",
+    )
+    result = run_configured_model(config_path, output_dir=tmp_path / "complete_result")
+    result.process_rates["a_to_b"] = Q_([0.1, 0.09], "mole / second")
+
+    with pytest.raises(ConfiguredEntropyProductionError, match="does not align with result time"):
+        _entropy_production_rate_timeseries(load_model_config(config_path), result)
 
 
 def test_configured_output_writes_zero_evaluated_conservation_diagnostics_without_mass_balance(
@@ -964,6 +1198,53 @@ def _homogeneous_config_without_mass_balance(tmp_path: Path) -> Path:
         if validator["validator_type"] != "mass_balance"
     ]
     config_path = tmp_path / "toy_homogeneous_without_mass_balance.yml"
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    return config_path
+
+
+def _entropy_timeseries_config(
+    tmp_path: Path,
+    *,
+    process_id: str = "a_to_b",
+    delta_gibbs_value: object = -50.0,
+    delta_gibbs_units: str = "kilojoule / mole",
+    temperature_value: float = 300.0,
+    temperature_units: str = "kelvin",
+    extent_rate_units: str = "mole / second",
+    include_conversion: bool = True,
+    conversion_value: float = 2.0,
+    state_units: str = "kilogram",
+    filename: str = "toy_process_entropy.yml",
+) -> Path:
+    data = yaml.safe_load((MODEL_CONFIGS / "toy_homogeneous_ab.yml").read_text(encoding="utf-8"))
+    data = deepcopy(data)
+    for state in data["initial_state"]["states"].values():
+        state["units"] = state_units
+    diagnostic = {
+        "id": "a_to_b_entropy_rate",
+        "process_id": process_id,
+        "process_rate_interpretation": "reaction_extent_rate",
+        "condition_specific_delta_gibbs": {
+            "value": delta_gibbs_value,
+            "units": delta_gibbs_units,
+            "source": "Artificial framework-benchmark condition-specific delta Gibbs.",
+        },
+        "temperature": {
+            "value": temperature_value,
+            "units": temperature_units,
+            "source": "Artificial framework-benchmark temperature.",
+        },
+        "extent_rate_units": extent_rate_units,
+        "provenance_refs": ["framework-benchmark:process-entropy"],
+    }
+    if include_conversion:
+        diagnostic["process_rate_to_extent_rate"] = {
+            "value": conversion_value,
+            "units": "mole / kilogram",
+            "source": "Artificial framework-benchmark mass-to-extent conversion.",
+        }
+    data["outputs"]["entropy_production_rate_timeseries"] = [diagnostic]
+    config_path = tmp_path / filename
     config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return config_path
 

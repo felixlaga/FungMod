@@ -40,6 +40,7 @@ from fungal_model.geometry import (
 from fungal_model.io import (
     ConfigReference,
     EntityConfigRefs,
+    EntropyProductionRateTimeseriesConfig,
     GeometryLoaderRegistry,
     InitialStateConfig,
     load_enzyme,
@@ -142,6 +143,7 @@ __all__ = [
     "DegradationScreenResult",
     "Enzyme",
     "EntityConfigRefs",
+    "EntropyProductionRateTimeseriesConfig",
     "EquilibriumSurfaceCoverageModel",
     "Environment",
     "EnvironmentCase",
