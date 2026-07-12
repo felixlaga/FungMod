@@ -13,6 +13,7 @@ from fungal_model import (
     EnvironmentGrid,
     Parameter,
     ParameterSet,
+    SourceProviderError,
     VirtualExperiment,
     VirtualExperimentError,
     environment_grid,
@@ -22,6 +23,7 @@ from fungal_model import (
     load_product_map,
     load_substrate,
     run_configured_model,
+    source_proposal,
     virtual_experiment,
 )
 from fungal_model.plugins import pet as pet_plugin
@@ -64,6 +66,8 @@ RESEARCHER_PUBLIC_API = {
     "EnvironmentCase": EnvironmentCase,
     "DegradationScreenResult": DegradationScreenResult,
     "VirtualExperimentError": VirtualExperimentError,
+    "source_proposal": source_proposal,
+    "SourceProviderError": SourceProviderError,
 }
 
 PET_PLUGIN_ONLY_NAMES = (
@@ -102,6 +106,7 @@ def test_current_researcher_public_api_is_exported() -> None:
         "EnvironmentCase",
         "DegradationScreenResult",
         "VirtualExperimentError",
+        "SourceProviderError",
     }
     for name, expected in RESEARCHER_PUBLIC_API.items():
         assert name in fungal_model.__all__

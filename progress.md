@@ -26,13 +26,85 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-44 Researcher Source-Provider Onboarding UX
+
+Date: 2026-07-12
+
+Status: `current` for the bounded public SABIO-RK provider UX slice; PR-43 is
+complete after PR #58, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added top-level `source_proposal(provider="sabiork", ...)` onboarding that
+  requires only one friendly scientific selector and returns the existing
+  review-only `RegistryProposal`.
+- Reused existing `SabioRKSource` discovery, parsing, filtering, and proposal
+  generation. Common `reaction_id`, EC number, enzyme, substrate,
+  organism/source, and entry identifiers derive the source query without
+  exposing raw Solr syntax in the new API.
+- Moved the existing SABIO-RK HTTP/freeze implementation into the package and
+  kept the fetch CLI as a thin wrapper, so explicit `refresh=True` freezes the
+  raw response plus fetch metadata through one implementation.
+- Kept SABIO-RK keyless: no credential is required, read, used, stored, or
+  included in query/cache/proposal artifacts. A supplied credential fails with
+  a redacted provider-specific error before any filesystem or transport action.
+- Unknown providers list only `sabiork`; no BRENDA, CAZy, or other provider is
+  claimed.
+
+Tests added or modified: `tests/test_source_provider_api.py` covers the minimal
+no-key call, injected fake transport refresh/freeze, friendly query derivation,
+secret redaction and non-persistence, review-only proposal gate, production
+registry immutability, unknown provider, missing selector, and refresh failure.
+Existing SABIO-RK adapter/discovery/fetch and public-API guardrails remain
+covered.
+
+What did not change: existing `SabioRKSource` and `live_fetcher` signatures,
+source parsing/proposal schemas, production registry records, simulation and
+test network behavior, biology, solver behavior, thermodynamics, validation
+data, calibration, and empirical comparison are unchanged.
+
+Scientific behavior impact: none. Source records remain review-only proposals
+and are never trusted or promoted into simulation automatically. Live refresh
+is explicit and outside simulation/tests.
+
+Backward compatibility: additive top-level API plus internal fetch-code reuse;
+the existing adapter and CLI contracts remain available.
+
+Remaining ambiguity and risk: SABIO-RK source completeness and scientific
+suitability still require human review. Only SABIO-RK is implemented, and live
+service behavior remains external to offline verification.
+
+Recommended next task: review and merge PR-44, then add the bounded public-API
+conservation diagnostics example notebook over the existing standard
+table/accessor and header-only guardrail.
+
+Verification:
+
+- Focused source/public/status suite: 52 passed.
+- Broad SABIO-RK, Reaction 618, notebook, registry, public-API, virtual-
+  experiment, active-instruction, and roadmap suite: 124 passed.
+- `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache .venv/bin/python -m ruff check src tests scripts/fetch_sabiork_kinlaw_entries.py`
+  - Result: all checks passed.
+- `.venv/bin/python -m pyright --pythonpath .venv/bin/python`
+  - Result: 0 errors, 0 warnings, 0 informations.
+- `git diff --check`
+  - Result: passed.
+- Full coverage gate: 748 passed, 1 failed; total coverage 84.71%. The sole
+  failure was the unrelated pre-existing ignored checkpoint file
+  `notebooks/examples/.ipynb_checkpoints/10_virtual_experiment_product_tour-checkpoint.ipynb`
+  detected by `test_no_notebook_checkpoints_remain_in_working_tree`; PR-44 did
+  not create, modify, delete, or stage it.
+- Final-tree full suite excluding only that unrelated workspace-hygiene
+  assertion: 748 passed, 1 deselected.
+
 ## PR-43 Process-Bound Entropy-Production-Rate Timeseries
 
 Date: 2026-07-12
 
-Status: `current` for the bounded THERMO-003 configured-output diagnostics
-slice; PR-42 is complete after PR #57, and broader THERMO-003 remains
-`partial`.
+Status: `complete` after PR #58 merged for the bounded THERMO-003
+configured-output diagnostics slice; PR-42 is complete after PR #57, and
+broader THERMO-003 remains `partial`.
 
 Completed in this pass:
 

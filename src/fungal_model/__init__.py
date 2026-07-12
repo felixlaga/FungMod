@@ -20,12 +20,15 @@ from fungal_model.core.simulation import SolverSettings
 from fungal_model.entities import Environment
 from fungal_model.entities import Enzyme
 from fungal_model.api import (
+    AVAILABLE_SOURCE_PROVIDERS,
     DegradationScreenResult,
     EnvironmentCase,
     EnvironmentGrid,
+    SourceProviderError,
     VirtualExperiment,
     VirtualExperimentError,
     environment_grid,
+    source_proposal,
     virtual_experiment,
 )
 from fungal_model.fungi.base import Fungus
@@ -124,6 +127,7 @@ from fungal_model.workflows import (
 )
 
 __all__ = [
+    "AVAILABLE_SOURCE_PROVIDERS",
     "AssembledModel",
     "AssemblyReport",
     "Assumption",
@@ -210,6 +214,7 @@ __all__ = [
     "SlabGeometry",
     "SolverSettings",
     "StateVariableSpec",
+    "SourceProviderError",
     "Substrate",
     "SubstrateLoaderRegistry",
     "SurfaceCatalysisModel",
@@ -225,6 +230,7 @@ __all__ = [
     "WaterActivityModifier",
     "WellMixedGeometry",
     "run_configured_model",
+    "source_proposal",
     "virtual_experiment",
     "__version__",
 ]

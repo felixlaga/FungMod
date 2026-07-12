@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-43: process-bound entropy-production-rate timeseries**.
+Current next PR: **PR-44: researcher source-provider onboarding UX**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -39,9 +39,10 @@ solver diagnostics example notebook is complete after PR #53. PR-39
 virtual-experiment solver diagnostics bridge is complete after PR #54. PR-40
 virtual-experiment conservation diagnostics bridge is complete after PR #55.
 PR-41 Pyright optional-member-access ratchet is complete after PR #56. PR-42
-arbitrary-length linear enzyme-chain assembly is complete after PR #57. The
-selected PR-43 work is therefore bounded process-bound entropy-production-rate
-configured diagnostics, not validation ingestion.
+arbitrary-length linear enzyme-chain assembly is complete after PR #57. PR-43
+process-bound entropy-production-rate diagnostics is complete after PR #58.
+The selected PR-44 work is therefore bounded researcher source-provider
+onboarding over review-only SABIO-RK proposals, not validation ingestion.
 A future validation ingestion PR must not ingest, digitize, or
 fabricate data unless those evidence requirements are met.
 This gate does not complete VALIDATION-DATA-001.
