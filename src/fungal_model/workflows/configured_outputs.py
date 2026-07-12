@@ -16,10 +16,14 @@ from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
-from pint.errors import DimensionalityError
+from pint.errors import DimensionalityError, PintError
 
-from fungal_model.core.units import Quantity, is_quantity
-from fungal_model.io.model_config import ConfigReference, ModelConfig
+from fungal_model.core.units import Q_, Quantity, is_quantity
+from fungal_model.io.model_config import (
+    ConfigReference,
+    EntropyProductionRateTimeseriesConfig,
+    ModelConfig,
+)
 from fungal_model.results import SimulationResult
 from fungal_model.workflows.configured_inputs import ConfiguredInputs
 
@@ -40,6 +44,12 @@ class ConfiguredOutputWriter:
         destination = self.output_directory(config, output_dir)
         if destination is None:
             return None
+        _clear_stale_entropy_artifacts(destination)
+        entropy_timeseries = (
+            _entropy_production_rate_timeseries(config, result)
+            if config.outputs.entropy_production_rate_timeseries
+            else None
+        )
         result.save(destination, mass_balance_weights=_mass_balance_weights(config))
         self.write_configured_bundle(
             destination,
@@ -47,6 +57,7 @@ class ConfiguredOutputWriter:
             inputs=inputs,
             decisions=decisions,
             result=result,
+            entropy_timeseries=entropy_timeseries,
         )
         return destination
 
@@ -65,7 +76,11 @@ class ConfiguredOutputWriter:
         inputs: ConfiguredInputs,
         decisions: tuple[Any, ...],
         result: SimulationResult,
+        entropy_timeseries: dict[str, Any] | None = None,
     ) -> None:
+        _clear_stale_entropy_artifacts(destination)
+        if entropy_timeseries is None and config.outputs.entropy_production_rate_timeseries:
+            entropy_timeseries = _entropy_production_rate_timeseries(config, result)
         _write_json(destination / "input_model_config.json", config.to_dict())
         _write_json(destination / "configured_model_run.json", _run_summary(config, result))
         _write_json(destination / "configured_metadata.json", _configured_metadata(config, result))
@@ -103,6 +118,16 @@ class ConfiguredOutputWriter:
                 destination / "thermodynamic_summary.csv",
                 thermodynamic_summary["rows"],
             )
+        if entropy_timeseries is not None:
+            _write_json(
+                destination / "entropy_production_rate_timeseries.json",
+                entropy_timeseries,
+            )
+            _write_csv_with_fieldnames(
+                destination / "entropy_production_rate_timeseries.csv",
+                entropy_timeseries["rows"],
+                _ENTROPY_PRODUCTION_RATE_TIMESERIES_COLUMNS,
+            )
         conservation_diagnostics = _conservation_diagnostics(config, result)
         _write_json(destination / "conservation_diagnostics.json", conservation_diagnostics)
         _write_csv_with_fieldnames(
@@ -124,6 +149,15 @@ class ConfiguredOutputWriter:
         _write_json(destination / "solver_settings.json", _solver_settings(result))
         _write_entity_snapshots(destination, config=config, inputs=inputs)
         _write_output_manifest(destination, config=config, result=result)
+
+
+def _clear_stale_entropy_artifacts(destination: Path) -> None:
+    for filename in (
+        "entropy_production_rate_timeseries.json",
+        "entropy_production_rate_timeseries.csv",
+        "output_manifest.json",
+    ):
+        (destination / filename).unlink(missing_ok=True)
 
 
 def _mass_balance_weights(config: ModelConfig) -> Mapping[str, float] | None:
@@ -483,6 +517,277 @@ def _thermodynamic_summary_row(item: Mapping[str, Any]) -> dict[str, Any]:
         "missing_metadata": details_map.get("missing_metadata", []),
         "provenance_refs": details_map.get("provenance_refs", []),
     }
+
+
+class ConfiguredEntropyProductionError(ValueError):
+    """Raised when configured process entropy diagnostics cannot be evaluated honestly."""
+
+
+_ENTROPY_PRODUCTION_RATE_GUARDRAIL = (
+    "Post-simulation diagnostic from an explicitly bound native process-rate trajectory, "
+    "explicit condition-specific delta Gibbs, explicit positive temperature, and any "
+    "explicit unit conversion shown in this artifact. No dynamic delta Gibbs, inferred "
+    "activities or concentrations, solver-time enforcement, validation, calibration, or "
+    "biological claim."
+)
+
+_ENTROPY_PRODUCTION_RATE_TIMESERIES_COLUMNS = (
+    "diagnostic_id",
+    "process_id",
+    "index",
+    "time",
+    "time_units",
+    "process_rate",
+    "process_rate_units",
+    "extent_rate",
+    "extent_rate_units",
+    "condition_specific_delta_gibbs",
+    "condition_specific_delta_gibbs_units",
+    "temperature",
+    "temperature_units",
+    "entropy_production_rate",
+    "entropy_production_rate_units",
+    "status",
+    "condition_specific_delta_gibbs_source",
+    "temperature_source",
+    "process_rate_to_extent_rate_source",
+    "provenance_refs",
+    "guardrails",
+)
+
+
+def _entropy_production_rate_timeseries(
+    config: ModelConfig,
+    result: SimulationResult,
+) -> dict[str, Any]:
+    diagnostics: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
+    configured_process_ids = {process.id for process in config.processes}
+    for metadata in config.outputs.entropy_production_rate_timeseries:
+        if metadata.process_id not in configured_process_ids:
+            raise ConfiguredEntropyProductionError(
+                f"Entropy diagnostic {metadata.id!r} binds unknown configured process "
+                f"{metadata.process_id!r}."
+            )
+        process_rate = result.process_rates.get(metadata.process_id)
+        if process_rate is None:
+            raise ConfiguredEntropyProductionError(
+                f"Entropy diagnostic {metadata.id!r} process {metadata.process_id!r} "
+                "has no native process-rate trajectory in SimulationResult."
+            )
+        diagnostic, diagnostic_rows = _process_entropy_diagnostic(
+            metadata=metadata,
+            process_rate=process_rate,
+            time=result.time,
+        )
+        diagnostics.append(diagnostic)
+        rows.extend(diagnostic_rows)
+    return {
+        "kind": "configured_process_entropy_production_rate_timeseries",
+        "diagnostic_count": len(diagnostics),
+        "evaluated_count": len(diagnostics),
+        "row_count": len(rows),
+        "status": "evaluated",
+        "equation": "entropy_production_rate(t) = -condition_specific_delta_gibbs * extent_rate(t) / temperature",
+        "has_dynamic_delta_gibbs": False,
+        "has_solver_time_enforcement": False,
+        "supported_scope": (
+            "Explicit process-bound post-simulation entropy-production-rate trajectories "
+            "derived from native process-rate trajectories and dimensionally compatible "
+            "caller-supplied metadata only."
+        ),
+        "unsupported_scope": (
+            "No inferred reaction quotient, activity, concentration, redox potential, "
+            "electron balance, dynamic delta Gibbs, solver-time enforcement, validation, "
+            "calibration, or biological interpretation."
+        ),
+        "diagnostics": diagnostics,
+        "rows": rows,
+    }
+
+
+def _process_entropy_diagnostic(
+    *,
+    metadata: EntropyProductionRateTimeseriesConfig,
+    process_rate: Quantity,
+    time: Quantity,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    delta_gibbs = _sourced_scalar_quantity(
+        metadata.condition_specific_delta_gibbs,
+        diagnostic_id=metadata.id,
+        field_name="condition_specific_delta_gibbs",
+    )
+    temperature = _sourced_scalar_quantity(
+        metadata.temperature,
+        diagnostic_id=metadata.id,
+        field_name="temperature",
+    )
+    if _is_temperature_interval(temperature):
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {metadata.id!r} temperature must be an absolute "
+            "temperature, not a temperature interval."
+        )
+    try:
+        delta_gibbs_canonical = delta_gibbs.to("joule / mole")
+    except DimensionalityError as exc:
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {metadata.id!r} condition_specific_delta_gibbs must be "
+            "compatible with energy per amount of substance."
+        ) from exc
+    try:
+        temperature_canonical = temperature.to("kelvin")
+    except DimensionalityError as exc:
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {metadata.id!r} temperature must be compatible with kelvin."
+        ) from exc
+    if float(temperature_canonical.magnitude) <= 0.0:
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {metadata.id!r} temperature must be positive in kelvin."
+        )
+
+    conversion = None
+    converted_rate = process_rate
+    if metadata.process_rate_to_extent_rate is not None:
+        conversion = _sourced_scalar_quantity(
+            metadata.process_rate_to_extent_rate,
+            diagnostic_id=metadata.id,
+            field_name="process_rate_to_extent_rate",
+        )
+        if float(conversion.magnitude) <= 0.0:
+            raise ConfiguredEntropyProductionError(
+                f"Entropy diagnostic {metadata.id!r} process_rate_to_extent_rate must be positive."
+            )
+        converted_rate = process_rate * conversion
+    try:
+        Q_(1.0, metadata.extent_rate_units).to("mole / second")
+        extent_rate = converted_rate.to(metadata.extent_rate_units)
+    except (PintError, TypeError, ValueError) as exc:
+        conversion_note = "with the explicit conversion" if conversion is not None else "without an explicit conversion"
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {metadata.id!r} native process rate {process_rate.units} "
+            f"is not compatible with extent-rate units {metadata.extent_rate_units!r} "
+            f"{conversion_note}."
+        ) from exc
+
+    time_values = np.asarray(time.magnitude, dtype=float)
+    process_rate_values = np.asarray(process_rate.magnitude, dtype=float)
+    extent_rate_values = np.asarray(extent_rate.magnitude, dtype=float)
+    if time_values.ndim != 1 or process_rate_values.ndim != 1 or extent_rate_values.ndim != 1:
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {metadata.id!r} requires one-dimensional time and process-rate trajectories."
+        )
+    if time_values.shape != process_rate_values.shape or time_values.shape != extent_rate_values.shape:
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {metadata.id!r} process-rate trajectory does not align with result time."
+        )
+    if not (
+        np.all(np.isfinite(time_values))
+        and np.all(np.isfinite(process_rate_values))
+        and np.all(np.isfinite(extent_rate_values))
+    ):
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {metadata.id!r} time and process-rate trajectories must be finite."
+        )
+
+    extent_rate_canonical = extent_rate.to("mole / second")
+    entropy_rate = (
+        -delta_gibbs_canonical * extent_rate_canonical / temperature_canonical
+    ).to("joule / second / kelvin")
+    entropy_values = np.asarray(entropy_rate.magnitude, dtype=float)
+    if not np.all(np.isfinite(entropy_values)):
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {metadata.id!r} produced non-finite entropy-production rates."
+        )
+
+    rows = [
+        {
+            "diagnostic_id": metadata.id,
+            "process_id": metadata.process_id,
+            "index": index,
+            "time": float(time_value),
+            "time_units": str(time.units),
+            "process_rate": float(process_rate_value),
+            "process_rate_units": str(process_rate.units),
+            "extent_rate": float(extent_rate_value),
+            "extent_rate_units": str(extent_rate.units),
+            "condition_specific_delta_gibbs": float(delta_gibbs.magnitude),
+            "condition_specific_delta_gibbs_units": str(delta_gibbs.units),
+            "temperature": float(temperature_canonical.magnitude),
+            "temperature_units": str(temperature_canonical.units),
+            "entropy_production_rate": float(entropy_value),
+            "entropy_production_rate_units": str(entropy_rate.units),
+            "status": "evaluated",
+            "condition_specific_delta_gibbs_source": metadata.condition_specific_delta_gibbs["source"],
+            "temperature_source": metadata.temperature["source"],
+            "process_rate_to_extent_rate_source": (
+                "" if metadata.process_rate_to_extent_rate is None else metadata.process_rate_to_extent_rate["source"]
+            ),
+            "provenance_refs": list(metadata.provenance_refs),
+            "guardrails": _ENTROPY_PRODUCTION_RATE_GUARDRAIL,
+        }
+        for index, (
+            time_value,
+            process_rate_value,
+            extent_rate_value,
+            entropy_value,
+        ) in enumerate(
+            zip(
+                time_values,
+                process_rate_values,
+                extent_rate_values,
+                entropy_values,
+                strict=True,
+            )
+        )
+    ]
+    return (
+        {
+            "diagnostic_id": metadata.id,
+            "process_id": metadata.process_id,
+            "status": "evaluated",
+            "process_rate_interpretation": metadata.process_rate_interpretation,
+            "process_rate_units": str(process_rate.units),
+            "extent_rate_units": str(extent_rate.units),
+            "entropy_production_rate_units": str(entropy_rate.units),
+            "condition_specific_delta_gibbs": dict(metadata.condition_specific_delta_gibbs),
+            "temperature": dict(metadata.temperature),
+            "process_rate_to_extent_rate": (
+                None
+                if metadata.process_rate_to_extent_rate is None
+                else dict(metadata.process_rate_to_extent_rate)
+            ),
+            "provenance_refs": list(metadata.provenance_refs),
+            "guardrails": _ENTROPY_PRODUCTION_RATE_GUARDRAIL,
+        },
+        rows,
+    )
+
+
+def _sourced_scalar_quantity(
+    metadata: Mapping[str, Any],
+    *,
+    diagnostic_id: str,
+    field_name: str,
+) -> Quantity:
+    try:
+        quantity = Q_(metadata["value"], str(metadata["units"]))
+        values = np.asarray(quantity.magnitude, dtype=float)
+    except (PintError, TypeError, ValueError) as exc:
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {diagnostic_id!r} {field_name} must be a numeric unit-bearing scalar."
+        ) from exc
+    if values.ndim != 0 or not np.isfinite(values.item()):
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {diagnostic_id!r} {field_name} must be a finite scalar."
+        )
+    return Q_(float(values.item()), quantity.units)
+
+
+def _is_temperature_interval(quantity: Quantity) -> bool:
+    return re.search(
+        r"(?<![A-Za-z0-9_])delta_[A-Za-z0-9_]+",
+        str(quantity.units),
+    ) is not None
 
 
 _CONSERVATION_DIAGNOSTIC_ALLOWED_USE = (

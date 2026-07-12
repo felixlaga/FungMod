@@ -375,21 +375,137 @@ class ValidatorConfig:
 
 
 @dataclass(frozen=True)
+class EntropyProductionRateTimeseriesConfig:
+    """Explicit metadata for one process-bound entropy-rate trajectory."""
+
+    id: str
+    process_id: str
+    process_rate_interpretation: str
+    condition_specific_delta_gibbs: Mapping[str, Any]
+    temperature: Mapping[str, Any]
+    extent_rate_units: str
+    process_rate_to_extent_rate: Mapping[str, Any] | None
+    provenance_refs: tuple[str, ...]
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "EntropyProductionRateTimeseriesConfig":
+        allowed = {
+            "id",
+            "process_id",
+            "process_rate_interpretation",
+            "condition_specific_delta_gibbs",
+            "temperature",
+            "extent_rate_units",
+            "process_rate_to_extent_rate",
+            "provenance_refs",
+        }
+        unsupported = sorted(str(key) for key in data if key not in allowed)
+        if unsupported:
+            raise ModelConfigError(
+                "Entropy-production-rate timeseries config contains unsupported fields: "
+                f"{unsupported}."
+            )
+        identifier = str(data.get("id") or "").strip()
+        process_id = str(data.get("process_id") or "").strip()
+        interpretation = str(data.get("process_rate_interpretation") or "").strip()
+        extent_rate_units = str(data.get("extent_rate_units") or "").strip()
+        if not identifier or not process_id or not interpretation or not extent_rate_units:
+            raise ModelConfigError(
+                "Entropy-production-rate timeseries config requires id, process_id, "
+                "process_rate_interpretation, and extent_rate_units."
+            )
+        if interpretation != "reaction_extent_rate":
+            raise ModelConfigError(
+                "Entropy-production-rate timeseries process_rate_interpretation must be "
+                "'reaction_extent_rate'."
+            )
+        delta_gibbs = _sourced_quantity_mapping(
+            data.get("condition_specific_delta_gibbs"),
+            field_name=f"outputs.entropy_production_rate_timeseries.{identifier}.condition_specific_delta_gibbs",
+        )
+        temperature = _sourced_quantity_mapping(
+            data.get("temperature"),
+            field_name=f"outputs.entropy_production_rate_timeseries.{identifier}.temperature",
+        )
+        conversion_value = data.get("process_rate_to_extent_rate")
+        conversion = (
+            None
+            if conversion_value is None
+            else _sourced_quantity_mapping(
+                conversion_value,
+                field_name=(
+                    f"outputs.entropy_production_rate_timeseries.{identifier}."
+                    "process_rate_to_extent_rate"
+                ),
+            )
+        )
+        provenance_value = data.get("provenance_refs")
+        if not isinstance(provenance_value, list | tuple):
+            raise ModelConfigError(
+                "Entropy-production-rate timeseries provenance_refs must be a non-empty sequence."
+            )
+        if not provenance_value or any(
+            not isinstance(item, str) or not item.strip() for item in provenance_value
+        ):
+            raise ModelConfigError(
+                "Entropy-production-rate timeseries provenance_refs must contain non-empty strings."
+            )
+        provenance_refs = tuple(item.strip() for item in provenance_value)
+        return cls(
+            id=identifier,
+            process_id=process_id,
+            process_rate_interpretation=interpretation,
+            condition_specific_delta_gibbs=delta_gibbs,
+            temperature=temperature,
+            extent_rate_units=extent_rate_units,
+            process_rate_to_extent_rate=conversion,
+            provenance_refs=provenance_refs,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "process_id": self.process_id,
+            "process_rate_interpretation": self.process_rate_interpretation,
+            "condition_specific_delta_gibbs": deepcopy(dict(self.condition_specific_delta_gibbs)),
+            "temperature": deepcopy(dict(self.temperature)),
+            "extent_rate_units": self.extent_rate_units,
+            "process_rate_to_extent_rate": (
+                None
+                if self.process_rate_to_extent_rate is None
+                else deepcopy(dict(self.process_rate_to_extent_rate))
+            ),
+            "provenance_refs": list(self.provenance_refs),
+        }
+
+
+@dataclass(frozen=True)
 class OutputConfig:
     """Output settings for a configured run."""
 
     directory: str | None = None
     save: tuple[str, ...] = ()
     plots: tuple[str, ...] = ()
+    entropy_production_rate_timeseries: tuple[EntropyProductionRateTimeseriesConfig, ...] = ()
     raw: Mapping[str, Any] | None = None
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "OutputConfig":
         directory = data.get("directory")
+        entropy_timeseries = tuple(
+            EntropyProductionRateTimeseriesConfig.from_mapping(item)
+            for item in _as_sequence(data.get("entropy_production_rate_timeseries", ()))
+        )
+        diagnostic_ids = [item.id for item in entropy_timeseries]
+        if len(diagnostic_ids) != len(set(diagnostic_ids)):
+            raise ModelConfigError(
+                "Entropy-production-rate timeseries config ids must be unique."
+            )
         return cls(
             directory=None if directory is None else str(directory),
             save=tuple(str(item) for item in data.get("save", ()) or ()),
             plots=tuple(str(item) for item in data.get("plots", ()) or ()),
+            entropy_production_rate_timeseries=entropy_timeseries,
             raw=deepcopy(dict(data)),
         )
 
@@ -695,6 +811,7 @@ __all__ = [
     "ModelConfigValidationResult",
     "ConfigReference",
     "EntityConfigRefs",
+    "EntropyProductionRateTimeseriesConfig",
     "InitialStateConfig",
     "OutputConfig",
     "ParameterSetConfig",
@@ -764,3 +881,18 @@ def _mapping(value: Any, *, field_name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ModelConfigError(f"{field_name} must be a mapping.")
     return value
+
+
+def _sourced_quantity_mapping(value: Any, *, field_name: str) -> Mapping[str, Any]:
+    data = _mapping(value, field_name=field_name)
+    unsupported = sorted(str(key) for key in data if key not in {"value", "units", "source"})
+    if unsupported:
+        raise ModelConfigError(f"{field_name} contains unsupported fields: {unsupported}.")
+    missing = [key for key in ("value", "units", "source") if key not in data]
+    if missing:
+        raise ModelConfigError(f"{field_name} requires value, units, and source; missing {missing}.")
+    if str(data["units"]).strip() == "":
+        raise ModelConfigError(f"{field_name} units must be non-empty.")
+    if not isinstance(data["source"], str) or not data["source"].strip():
+        raise ModelConfigError(f"{field_name} source must be a non-empty string.")
+    return deepcopy(dict(data))

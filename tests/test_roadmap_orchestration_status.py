@@ -68,10 +68,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-42: arbitrary-length linear enzyme-chain assembly"
+    current_next = "PR-43: process-bound entropy-production-rate timeseries"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-42 arbitrary-length linear enzyme-chain assembly" in roadmap
+    assert "The current next PR is PR-43 process-bound entropy-production-rate timeseries" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
@@ -85,7 +85,8 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "completed\nPR-40 slice is limited to a standard virtual-experiment" in roadmap
     assert "`conservation_diagnostics.csv` table/accessor bridge" in roadmap
     assert "completed PR-41 slice enabled Pyright `reportOptionalMemberAccess`" in roadmap
-    assert "current PR-42 slice generalizes the registry/template-driven extracellular" in roadmap
+    assert "completed PR-42 slice generalized the registry/template-driven extracellular" in roadmap
+    assert "current PR-43 slice adds post-simulation" in roadmap
     assert "branching, cycles, disconnected chains, and malformed topology" in roadmap
     assert "35 baseline nullable-member errors across 11" in roadmap
     assert "scientific modules using explicit contracts" in roadmap
@@ -125,7 +126,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-42: arbitrary-length linear enzyme-chain assembly"
+    current_next = "PR-43: process-bound entropy-production-rate timeseries"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -339,7 +340,12 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "complete after PR #56 merged for the scoped typing-quality ratchet" in status
     assert "35 baseline nullable-member errors across 11 scientific modules" in status
     assert "PR-42 | Arbitrary-length linear enzyme-chain assembly" in status
-    assert "current next after PR #56 merged and PR-41 completed" in status
+    assert "complete after PR #57 merged for the bounded linear-topology slice" in status
+    assert "PR-43 | THERMO-003 process-bound entropy-production-rate timeseries" in status
+    assert "current next after PR #57 merged and PR-42 completed" in status
+    assert "entropy_production_rate_timeseries.json" in next_steps
+    assert "entropy_production_rate_timeseries.json" in _read(README)
+    assert "no silent conversion" in status
     assert "Branching and cycles remain unsupported" in status
     assert "Future simulator capability follow-up" in status
     assert "Future | VALIDATION-DATA-001" in status
@@ -389,7 +395,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-42: arbitrary-length linear enzyme-chain assembly"
+    current_next = "PR-43: process-bound entropy-production-rate timeseries"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -430,6 +436,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-39" not in _current_next_lines(text)
         assert "PR-40" not in _current_next_lines(text)
         assert "PR-41" not in _current_next_lines(text)
+        assert "PR-42" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
@@ -440,7 +447,8 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "PR-39\nvirtual-experiment solver diagnostics bridge is complete after PR #54" in gate
     assert "PR-40\nvirtual-experiment conservation diagnostics bridge is complete after PR #55" in gate
     assert "PR-41 Pyright optional-member-access ratchet is complete after PR #56" in gate
-    assert "selected PR-42 work is therefore arbitrary-length linear enzyme-chain assembly" in gate
+    assert "arbitrary-length linear enzyme-chain assembly is complete after PR #57" in gate
+    assert "selected PR-43 work is therefore bounded process-bound entropy-production-rate" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate

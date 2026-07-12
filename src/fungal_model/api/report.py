@@ -52,6 +52,8 @@ STANDARD_CONSERVATION_DIAGNOSTIC_FIELDS = frozenset(
 THERMODYNAMIC_FILENAMES = {
     "thermodynamic_summary_json": "thermodynamic_summary.json",
     "thermodynamic_summary_csv": "thermodynamic_summary.csv",
+    "entropy_production_rate_timeseries_json": "entropy_production_rate_timeseries.json",
+    "entropy_production_rate_timeseries_csv": "entropy_production_rate_timeseries.csv",
 }
 
 SOLVER_DIAGNOSTIC_FILENAMES = {
@@ -100,6 +102,12 @@ def write_virtual_experiment_report(
     )
     thermodynamic_summary = _read_json_mapping(table_root / THERMODYNAMIC_FILENAMES["thermodynamic_summary_json"])
     thermodynamic_rows = _read_rows(table_root / THERMODYNAMIC_FILENAMES["thermodynamic_summary_csv"])
+    entropy_timeseries = _read_json_mapping(
+        table_root / THERMODYNAMIC_FILENAMES["entropy_production_rate_timeseries_json"]
+    )
+    entropy_timeseries_rows = _read_rows(
+        table_root / THERMODYNAMIC_FILENAMES["entropy_production_rate_timeseries_csv"]
+    )
     solver_diagnostics = _read_json_mapping(table_root / SOLVER_DIAGNOSTIC_FILENAMES["solver_diagnostics_json"])
     solver_rows = _read_configured_solver_rows(table_root / SOLVER_DIAGNOSTIC_FILENAMES["solver_diagnostics_csv"])
     markdown = _render_report(
@@ -109,6 +117,8 @@ def write_virtual_experiment_report(
         conservation_rows=conservation_rows,
         thermodynamic_summary=thermodynamic_summary,
         thermodynamic_rows=thermodynamic_rows,
+        entropy_timeseries=entropy_timeseries,
+        entropy_timeseries_rows=entropy_timeseries_rows,
         solver_diagnostics=solver_diagnostics,
         solver_rows=solver_rows,
     )
@@ -199,6 +209,8 @@ def _render_report(
     conservation_rows: Sequence[Mapping[str, str]],
     thermodynamic_summary: Mapping[str, Any],
     thermodynamic_rows: Sequence[Mapping[str, str]],
+    entropy_timeseries: Mapping[str, Any],
+    entropy_timeseries_rows: Sequence[Mapping[str, str]],
     solver_diagnostics: Mapping[str, Any],
     solver_rows: Sequence[Mapping[str, str]],
 ) -> str:
@@ -261,6 +273,8 @@ def _render_report(
             thermodynamic_summary,
             thermodynamic_rows,
             standard_rows=thermodynamic_diagnostics,
+            entropy_timeseries=entropy_timeseries,
+            entropy_timeseries_rows=entropy_timeseries_rows,
         ),
         "",
         "## Configured solver diagnostics",
@@ -544,16 +558,20 @@ def _thermodynamic_summary_lines(
     rows: Sequence[Mapping[str, str]],
     *,
     standard_rows: Sequence[Mapping[str, str]],
+    entropy_timeseries: Mapping[str, Any],
+    entropy_timeseries_rows: Sequence[Mapping[str, str]],
 ) -> list[str]:
-    if not summary and not rows and not standard_rows:
+    if not summary and not rows and not standard_rows and not entropy_timeseries and not entropy_timeseries_rows:
         return ["No configured thermodynamic-summary artifacts were present."]
 
     lines = [
         "These diagnostics inspect existing configured-output `thermodynamic_summary.json` "
         "and `thermodynamic_summary.csv` artifacts, including rows copied into standard "
-        "`thermodynamic_diagnostics.csv`, only. They do not infer activities, reaction quotients, "
-        "concentrations, redox potentials, electron balances, validation evidence, or solver-time "
-        "thermodynamic enforcement."
+        "`thermodynamic_diagnostics.csv`, plus configured process-bound "
+        "`entropy_production_rate_timeseries.json`/`.csv` artifacts when present. They do not "
+        "infer activities, reaction quotients, concentrations, redox potentials, electron "
+        "balances, validation evidence, or solver-time thermodynamic enforcement; they also "
+        "do not infer dynamic delta Gibbs."
     ]
     if summary:
         lines.append(
@@ -603,6 +621,32 @@ def _thermodynamic_summary_lines(
             f"- `{_value(row, 'name')}`: status `{_value(row, 'status')}`; "
             f"passed `{_value(row, 'passed')}`; severity `{_value(row, 'severity')}`"
             f"{suffix}{message_suffix}."
+        )
+    if entropy_timeseries:
+        lines.append(
+            "- Process-bound entropy-production-rate timeseries: "
+            f"status `{_summary_value(entropy_timeseries, 'status')}`; "
+            f"diagnostics={_summary_value(entropy_timeseries, 'diagnostic_count')}; "
+            f"rows={_summary_value(entropy_timeseries, 'row_count')}; "
+            f"dynamic delta Gibbs `{_summary_value(entropy_timeseries, 'has_dynamic_delta_gibbs')}`; "
+            f"solver-time enforcement `{_summary_value(entropy_timeseries, 'has_solver_time_enforcement')}`."
+        )
+        for field, label in (
+            ("supported_scope", "Process-timeseries supported scope"),
+            ("unsupported_scope", "Process-timeseries unsupported scope"),
+        ):
+            value = _summary_value(entropy_timeseries, field)
+            if value:
+                lines.append(f"- {label}: {value}")
+    if entropy_timeseries_rows:
+        lines.append("Rows from `entropy_production_rate_timeseries.csv`:")
+    for row in entropy_timeseries_rows[:12]:
+        lines.append(
+            f"- `{_value(row, 'diagnostic_id')}` process `{_value(row, 'process_id')}` at "
+            f"{_value(row, 'time')} {_value(row, 'time_units')}: "
+            f"entropy_production_rate={_value(row, 'entropy_production_rate')} "
+            f"{_display_units(_value(row, 'entropy_production_rate_units'))}; "
+            f"status `{_value(row, 'status')}`. Guardrail: {_value(row, 'guardrails')}"
         )
     if standard_rows:
         lines.append(
