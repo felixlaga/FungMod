@@ -104,6 +104,39 @@ def test_fetch_metadata_records_warning_for_total_count_drift() -> None:
     json.dumps(metadata)
 
 
+def test_cli_labels_derived_export_without_raw_mislabel(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fetcher = _load_fetcher()
+    bundle_dir = tmp_path / "query" / "snapshot"
+    export_path = bundle_dir / "derived" / "combined_export.json"
+    metadata_path = bundle_dir / "fetch_metadata.json"
+
+    def fake_fetch_and_save_export(**_kwargs: object) -> tuple[Path, Path]:
+        return export_path, metadata_path
+
+    monkeypatch.setattr(fetcher, "fetch_and_save_export", fake_fetch_and_save_export)
+
+    result = fetcher.main(
+        [
+            "--query",
+            "SabioReactionID:618",
+            "--output-dir",
+            str(tmp_path),
+        ]
+    )
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert f"Saved derived combined export: {export_path}" in output
+    assert f"Saved snapshot bundle: {bundle_dir}" in output
+    assert f"Saved raw pages: {bundle_dir / 'raw'}" in output
+    assert f"Saved fetch metadata: {metadata_path}" in output
+    assert "Saved raw export:" not in output
+
+
 def test_paginated_fetch_preserves_each_raw_body_and_writes_derived_export(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

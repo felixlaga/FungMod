@@ -72,7 +72,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (SabioRKFetchError, HTTPError, URLError, OSError) as exc:
         print(f"SABIO-RK fetch failed: {exc}", file=sys.stderr)
         return 1
-    print(f"Saved raw export: {export_path}")
+    bundle_dir = export_path.parent.parent
+    print(f"Saved derived combined export: {export_path}")
+    print(f"Saved snapshot bundle: {bundle_dir}")
+    print(f"Saved raw pages: {bundle_dir / 'raw'}")
     print(f"Saved fetch metadata: {metadata_path}")
     return 0
 
