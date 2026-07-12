@@ -444,11 +444,13 @@ class EntropyProductionRateTimeseriesConfig:
             raise ModelConfigError(
                 "Entropy-production-rate timeseries provenance_refs must be a non-empty sequence."
             )
-        provenance_refs = tuple(str(item).strip() for item in provenance_value)
-        if not provenance_refs or any(not item for item in provenance_refs):
+        if not provenance_value or any(
+            not isinstance(item, str) or not item.strip() for item in provenance_value
+        ):
             raise ModelConfigError(
                 "Entropy-production-rate timeseries provenance_refs must contain non-empty strings."
             )
+        provenance_refs = tuple(item.strip() for item in provenance_value)
         return cls(
             id=identifier,
             process_id=process_id,
@@ -889,6 +891,8 @@ def _sourced_quantity_mapping(value: Any, *, field_name: str) -> Mapping[str, An
     missing = [key for key in ("value", "units", "source") if key not in data]
     if missing:
         raise ModelConfigError(f"{field_name} requires value, units, and source; missing {missing}.")
-    if str(data["units"]).strip() == "" or str(data["source"]).strip() == "":
-        raise ModelConfigError(f"{field_name} units and source must be non-empty.")
+    if str(data["units"]).strip() == "":
+        raise ModelConfigError(f"{field_name} units must be non-empty.")
+    if not isinstance(data["source"], str) or not data["source"].strip():
+        raise ModelConfigError(f"{field_name} source must be a non-empty string.")
     return deepcopy(dict(data))

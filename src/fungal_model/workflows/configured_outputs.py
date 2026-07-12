@@ -44,6 +44,12 @@ class ConfiguredOutputWriter:
         destination = self.output_directory(config, output_dir)
         if destination is None:
             return None
+        _clear_stale_entropy_artifacts(destination)
+        entropy_timeseries = (
+            _entropy_production_rate_timeseries(config, result)
+            if config.outputs.entropy_production_rate_timeseries
+            else None
+        )
         result.save(destination, mass_balance_weights=_mass_balance_weights(config))
         self.write_configured_bundle(
             destination,
@@ -51,6 +57,7 @@ class ConfiguredOutputWriter:
             inputs=inputs,
             decisions=decisions,
             result=result,
+            entropy_timeseries=entropy_timeseries,
         )
         return destination
 
@@ -69,7 +76,11 @@ class ConfiguredOutputWriter:
         inputs: ConfiguredInputs,
         decisions: tuple[Any, ...],
         result: SimulationResult,
+        entropy_timeseries: dict[str, Any] | None = None,
     ) -> None:
+        _clear_stale_entropy_artifacts(destination)
+        if entropy_timeseries is None and config.outputs.entropy_production_rate_timeseries:
+            entropy_timeseries = _entropy_production_rate_timeseries(config, result)
         _write_json(destination / "input_model_config.json", config.to_dict())
         _write_json(destination / "configured_model_run.json", _run_summary(config, result))
         _write_json(destination / "configured_metadata.json", _configured_metadata(config, result))
@@ -107,8 +118,7 @@ class ConfiguredOutputWriter:
                 destination / "thermodynamic_summary.csv",
                 thermodynamic_summary["rows"],
             )
-        if config.outputs.entropy_production_rate_timeseries:
-            entropy_timeseries = _entropy_production_rate_timeseries(config, result)
+        if entropy_timeseries is not None:
             _write_json(
                 destination / "entropy_production_rate_timeseries.json",
                 entropy_timeseries,
@@ -139,6 +149,15 @@ class ConfiguredOutputWriter:
         _write_json(destination / "solver_settings.json", _solver_settings(result))
         _write_entity_snapshots(destination, config=config, inputs=inputs)
         _write_output_manifest(destination, config=config, result=result)
+
+
+def _clear_stale_entropy_artifacts(destination: Path) -> None:
+    for filename in (
+        "entropy_production_rate_timeseries.json",
+        "entropy_production_rate_timeseries.csv",
+        "output_manifest.json",
+    ):
+        (destination / filename).unlink(missing_ok=True)
 
 
 def _mass_balance_weights(config: ModelConfig) -> Mapping[str, float] | None:
@@ -603,6 +622,11 @@ def _process_entropy_diagnostic(
         diagnostic_id=metadata.id,
         field_name="temperature",
     )
+    if _is_temperature_interval(temperature):
+        raise ConfiguredEntropyProductionError(
+            f"Entropy diagnostic {metadata.id!r} temperature must be an absolute "
+            "temperature, not a temperature interval."
+        )
     try:
         delta_gibbs_canonical = delta_gibbs.to("joule / mole")
     except DimensionalityError as exc:
@@ -757,6 +781,13 @@ def _sourced_scalar_quantity(
             f"Entropy diagnostic {diagnostic_id!r} {field_name} must be a finite scalar."
         )
     return Q_(float(values.item()), quantity.units)
+
+
+def _is_temperature_interval(quantity: Quantity) -> bool:
+    return re.search(
+        r"(?<![A-Za-z0-9_])delta_[A-Za-z0-9_]+",
+        str(quantity.units),
+    ) is not None
 
 
 _CONSERVATION_DIAGNOSTIC_ALLOWED_USE = (

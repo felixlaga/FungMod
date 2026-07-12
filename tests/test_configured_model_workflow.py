@@ -280,6 +280,48 @@ def test_process_entropy_timeseries_preserves_the_thermodynamic_sign(tmp_path) -
     assert diagnostics["rows"][0]["entropy_production_rate"] == pytest.approx(-50.0 / 3.0)
 
 
+def test_process_entropy_timeseries_accepts_absolute_celsius_temperature(tmp_path) -> None:
+    config_path = _entropy_timeseries_config(
+        tmp_path,
+        temperature_value=25.0,
+        temperature_units="degC",
+        filename="absolute_celsius_entropy.yml",
+    )
+    output_dir = tmp_path / "absolute_celsius_entropy"
+
+    run_configured_model(config_path, output_dir=output_dir)
+
+    diagnostics = json.loads(
+        (output_dir / "entropy_production_rate_timeseries.json").read_text(encoding="utf-8")
+    )
+    assert diagnostics["rows"][0]["temperature"] == pytest.approx(298.15)
+    assert diagnostics["rows"][0]["temperature_units"] == "kelvin"
+
+
+@pytest.mark.parametrize(
+    "temperature_units",
+    [
+        "delta_degC",
+        "delta_degree_Celsius",
+        "delta_degF",
+        "delta_degree_Fahrenheit",
+    ],
+)
+def test_process_entropy_timeseries_rejects_temperature_interval_units(
+    tmp_path,
+    temperature_units,
+) -> None:
+    config_path = _entropy_timeseries_config(
+        tmp_path,
+        temperature_value=25.0,
+        temperature_units=temperature_units,
+        filename="temperature_interval_entropy.yml",
+    )
+
+    with pytest.raises(ValueError, match="absolute temperature, not a temperature interval"):
+        run_configured_model(config_path, output_dir=tmp_path / "temperature_interval_entropy")
+
+
 def test_process_entropy_timeseries_is_visible_in_configured_report(tmp_path) -> None:
     config_path = _entropy_timeseries_config(tmp_path, include_conversion=True)
     output_dir = tmp_path / "entropy_report"
@@ -338,6 +380,34 @@ def test_process_entropy_timeseries_fails_explicitly_for_unsupported_evaluation(
     assert not (output_dir / "output_manifest.json").exists()
 
 
+def test_process_entropy_timeseries_failed_same_directory_rerun_clears_stale_artifacts(
+    tmp_path,
+) -> None:
+    config_path = _entropy_timeseries_config(tmp_path, filename="same_directory_entropy.yml")
+    output_dir = tmp_path / "same_directory_output"
+    run_configured_model(config_path, output_dir=output_dir)
+
+    entropy_json = output_dir / "entropy_production_rate_timeseries.json"
+    entropy_csv = output_dir / "entropy_production_rate_timeseries.csv"
+    manifest_path = output_dir / "output_manifest.json"
+    assert entropy_json.exists()
+    assert entropy_csv.exists()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert entropy_json.name in manifest["files"]
+    assert entropy_csv.name in manifest["files"]
+
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["outputs"]["entropy_production_rate_timeseries"][0]["temperature"]["value"] = 0.0
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="temperature must be positive in kelvin"):
+        run_configured_model(config_path, output_dir=output_dir)
+
+    assert not entropy_json.exists()
+    assert not entropy_csv.exists()
+    assert not manifest_path.exists()
+
+
 def test_process_entropy_timeseries_rejects_unsupported_metadata(tmp_path) -> None:
     config_path = _entropy_timeseries_config(tmp_path, filename="unsupported_entropy.yml")
     data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
@@ -355,6 +425,41 @@ def test_process_entropy_timeseries_requires_sourced_metadata(tmp_path) -> None:
     config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(ModelConfigError, match="temperature must be a mapping"):
+        load_model_config(config_path)
+
+
+@pytest.mark.parametrize("invalid_source", [None, 7, {"ref": "source"}, ["source"], "   "])
+def test_process_entropy_timeseries_source_must_be_a_non_empty_string(
+    tmp_path,
+    invalid_source,
+) -> None:
+    config_path = _entropy_timeseries_config(tmp_path, filename="invalid_source.yml")
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["outputs"]["entropy_production_rate_timeseries"][0][
+        "condition_specific_delta_gibbs"
+    ]["source"] = invalid_source
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ModelConfigError, match="source must be a non-empty string"):
+        load_model_config(config_path)
+
+
+@pytest.mark.parametrize(
+    "invalid_refs",
+    [None, 7, [None], [7], [{"ref": "source"}], [["source"]], ["   "], []],
+)
+def test_process_entropy_timeseries_provenance_refs_require_non_empty_strings(
+    tmp_path,
+    invalid_refs,
+) -> None:
+    config_path = _entropy_timeseries_config(tmp_path, filename="invalid_provenance_refs.yml")
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["outputs"]["entropy_production_rate_timeseries"][0][
+        "provenance_refs"
+    ] = invalid_refs
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ModelConfigError, match="provenance_refs must"):
         load_model_config(config_path)
 
 
