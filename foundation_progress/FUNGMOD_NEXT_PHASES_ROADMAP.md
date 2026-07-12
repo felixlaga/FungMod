@@ -61,14 +61,16 @@ written:
 - API-003 is complete for existing registry records, aliases, environment
   grids, scientific/exploratory modes, and table access;
 - BIO-READINESS-LITE is complete for the template, validator, and tests;
-- BIO-002 is complete for scoped reusable two-step enzyme-chain assembly and
-  software verification, but partial relative to broad pathway biology;
+- BIO-002 is complete for arbitrary-length linear enzyme-chain assembly and
+  software verification, but partial relative to branching graphs and broad
+  pathway biology;
 - Phase 2 static balance checks are complete for scoped static metadata,
   validators, assembly-time checks, and process-reaction binding, but partial
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-41 Pyright optional-member-access ratchet after the
+The current next PR is PR-42 arbitrary-length linear enzyme-chain assembly
+after the PR-41 Pyright optional-member-access ratchet merged as PR #56, the
 PR-40 virtual-experiment conservation diagnostics bridge merged as PR #55,
 the PR-39 virtual-experiment solver diagnostics bridge,
 the PR-38 solver diagnostics example notebook,
@@ -156,12 +158,22 @@ virtual-experiment bridge over existing per-sample configured-output
 infer conserved quantities, tolerances, pass/fail thresholds, validation evidence,
 chemistry, thermodynamics, calibration, empirical comparison, or biology, and
 it did not change configured-output conservation artifact behavior.
-The current PR-41 slice enables Pyright `reportOptionalMemberAccess` globally
-and narrows the 35 baseline nullable-member errors across 11 scientific modules using
-explicit contracts or precise annotations only. It does not add guessed values,
-silent fallbacks, `Any` casts, blanket suppressions, or scientific, numerical,
-solver, calibration-result, validation-data, biology, public-API, or
-output-schema behavior changes. The completed PR-24 BIO-003 slice added a
+The completed PR-41 slice enabled Pyright `reportOptionalMemberAccess`
+globally and narrowed the 35 baseline nullable-member errors across 11
+scientific modules using explicit contracts or precise annotations only after
+PR #56. It did not add guessed values, silent fallbacks, `Any` casts, blanket
+suppressions, or scientific, numerical, solver, calibration-result,
+validation-data, biology, public-API, or output-schema behavior changes. The
+current PR-42 slice generalizes the registry/template-driven extracellular
+enzyme-chain assembler from exactly two steps to ordered linear chains with at
+least two existing process-law steps. It preserves explicit conservation,
+parameter roles, modifiers, provenance, maturity, assumptions, limitations,
+standard outputs, fail-fast modelability, the BIO-002 two-step template, and
+the researcher API. An artificial three-step framework benchmark proves the
+generic path; branching, cycles, disconnected chains, and malformed topology
+remain explicitly unsupported. No new rate law, production constant,
+empirical record, validation data, calibration, inferred parameter, or hidden
+notebook science is added. The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
 researcher-facing BIO-002 example without adding validation data, calibration,
@@ -248,10 +260,12 @@ over those existing per-sample configured artifacts after PR #54. The completed
 PR-40 slice is limited to a standard virtual-experiment
 `conservation_diagnostics.csv` table/accessor bridge over existing per-sample
 configured conservation artifacts, with report/index visibility and header-only
-output when artifacts are absent after PR #55. The current PR-41 slice is
+output when artifacts are absent after PR #55. The completed PR-41 slice is
 limited to the global Pyright optional-member-access ratchet and explicit
-nullable-state narrowing needed to resolve FD-005 without runtime behavior
-changes.
+nullable-state narrowing that resolved FD-005 after PR #56 without runtime
+behavior changes. The current PR-42 slice is limited to arbitrary-length
+ordered linear chain topology over existing process laws; branching and cycles
+remain unsupported.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -321,9 +335,11 @@ diagnostics. PR-37 completed after PR #52 as a diagnostics visibility follow-up.
 PR-38 completed after PR #53 as a solver diagnostics example notebook. PR-39
 completed after PR #54 as a virtual-experiment solver diagnostics bridge. PR-40
 completed after PR #55 as a virtual-experiment conservation diagnostics bridge.
-The current PR-41 slice is a Pyright optional-member-access ratchet rather than
-ingestion, digitization, fabricated validation data, calibration, or empirical
-comparison; the recommended next simulator-building follow-up is a
+PR-41 completed after PR #56 as a Pyright optional-member-access ratchet. The
+current PR-42 slice is arbitrary-length linear enzyme-chain assembly rather
+than ingestion, digitization, fabricated validation data, calibration, or
+empirical comparison; branching and cycles remain unsupported, and the
+recommended next simulator-building follow-up is a
 bounded public-API conservation diagnostics example notebook over the standard
 table/accessor and header-only guardrail.
 

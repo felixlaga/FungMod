@@ -1,8 +1,10 @@
 # Phase 1 Current Finding Status
 
-Reviewed commit: `2102710a54279574d7ef0bb2edf5ae19632e84ad`
+Reviewed baseline commit: `95253b838afdd645be67e9e6ebceab6f703cd9e3`
 
-Verified at: `2026-06-15T12:26:20Z`
+PR-42 implementation branch: `codex/pr42-linear-chain-generalization`
+
+Verified at: `2026-07-12`
 
 This report summarizes the Phase 1 reconciled critical/high audit claims.
 Detailed current evidence is in `findings.yaml`; P1.3 and P1.4 superseded the
@@ -22,8 +24,8 @@ initial P1.2 execution-path and process-to-`Reaction` adapter rows.
 | P1-AUDIT-ENV-001 | high | partially_resolved | medium | Environment modifiers and metadata-only grid guards exist. | No validated general environmental response model. | Future ENV response task. |
 | P1-AUDIT-SUBSTRATE-001 | high | stale | medium | Non-PET substrates and BIO-001/BIO-002 paths exist. | Breadth is not empirical validation. | Keep maturity labels. |
 | P1-AUDIT-BIO001-001 | high | partially_resolved | medium | Product amount naming and proxy labelling are fixed. | BIO-001 remains exploratory and unvalidated. | Future validation-data task. |
-| P1-AUDIT-BIO002-001 | high | partially_resolved | medium | Two-step chain genericity is tested with an unrelated fixture. | Not arbitrary pathway biology. | Future chain-topology design. |
-| P1-AUDIT-CHAIN-001 | high | confirmed | high | Current chain support is scoped two-step, not arbitrary-length/branching. | Complex pathway claims remain unsupported. | Future chain-topology task. |
+| P1-AUDIT-BIO002-001 | high | partially_resolved | medium | Arbitrary-length linear chain genericity is tested with an unrelated artificial three-step framework benchmark; existing two-step behavior is preserved. | Not empirical validation or arbitrary pathway biology; branching and cycles remain unsupported. | Preserve template-specific claims and topology guardrails. |
+| P1-AUDIT-CHAIN-001 | high | partially_resolved | medium | Ordered acyclic linear chains of two or more existing process-law steps are supported; disconnected, branching, cyclic, and malformed topologies fail before execution. | Complex graph/pathway claims remain unsupported and scientifically unvalidated. | Future graph-topology task only if explicitly justified. |
 | V001-PC001 | critical | partially_resolved | high | Versioned schema and data dictionary exist; some standard outputs remain absent. | Schema does not validate predictions. | Later schema/output task. |
 | V001-PC002 | high | resolved | none | Public scientific simulation exists and rejects inappropriate inputs. | Scientific means exact/unvalidated. | Preserve output labels. |
 | V001-PC003 | critical | resolved | none | BIO-001 no longer emits mass-valued concentration wording. | BIO-001 remains exploratory. | Preserve tests. |
@@ -49,7 +51,8 @@ initial P1.2 execution-path and process-to-`Reaction` adapter rows.
 
 ## Confirmed Engineering Blockers
 
-- Arbitrary-length and branching process chains are not implemented.
+- Arbitrary-length linear process chains are implemented; branching, cycles,
+  and general pathway graphs remain unsupported.
 - Full execution-path mapping was completed in P1.3; adapter retirement was
   completed in P1.4.
 - Bayesian calibration and Sobol/global sensitivity remain absent.

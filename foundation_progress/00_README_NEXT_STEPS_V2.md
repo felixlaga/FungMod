@@ -3,13 +3,14 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status as of PR-40 after PR #55 merged, with PR-41 selected:
+Scoped status after PR-41 merged as PR #56, with PR-42 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
 PRE-BIO-001 / ASSEMBLY-001 basics: complete for current template-backed cases.
 BIO-READINESS-LITE: complete for the proposal template, validator, and tests.
-BIO-002: complete for scoped reusable two-step enzyme-chain assembly.
+BIO-002: complete for arbitrary-length linear enzyme-chain assembly; branching
+and cycles remain unsupported.
 CASE-001: complete once PR-02 is merged for the researcher-facing named API path.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
@@ -187,7 +188,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-41: Pyright optional-member-access ratchet**.
+Current next PR: **PR-42: arbitrary-length linear enzyme-chain assembly**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -221,11 +222,13 @@ solver diagnostics artifacts after PR #52. PR-38 completed the configured
 solver diagnostics example notebook after PR #53. PR-39 completed the standard
 virtual-experiment solver diagnostics table/accessor bridge after PR #54.
 PR-40 completed the standard virtual-experiment conservation diagnostics
-table/accessor bridge after PR #55. The selected PR-41 work enables Pyright
-`reportOptionalMemberAccess` globally and narrows the 35 baseline errors across
-11 scientific modules without guessed values, `Any` casts, suppressions, or
-scientific/numerical behavior changes.
-Recommended next after PR-41: add a bounded public-API conservation diagnostics
+table/accessor bridge after PR #55. PR-41 completed the Pyright
+optional-member-access ratchet after PR #56 without scientific or numerical
+behavior changes. The selected PR-42 work generalizes the existing
+registry/template-driven chain assembler to ordered linear chains of two or
+more existing process laws, preserves current two-step behavior and explicit
+metadata, and rejects branching and cycles before execution.
+Recommended next after PR-42: add a bounded public-API conservation diagnostics
 example notebook over the standard table/accessor and header-only guardrail.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:

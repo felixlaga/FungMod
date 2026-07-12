@@ -56,6 +56,25 @@ def test_bio002_chain_config_assembles_two_generic_processes_from_template() -> 
         "bio002_surface_cellulose_to_cellobiose",
         "bio002_cellobiose_to_glucose_mm",
     ]
+    assert config.to_dict()["case_template"]["chain_topology"] == {
+        "topology_type": "linear",
+        "process_ids": [
+            "bio002_surface_cellulose_to_cellobiose",
+            "bio002_cellobiose_to_glucose_mm",
+        ],
+        "product_map_ids": [
+            "bio002_cellulose_to_cellobiose_map",
+            "bio002_cellobiose_to_glucose_map",
+        ],
+        "state_roles": ["substrate", "intermediate", "product"],
+        "state_names": [
+            "solid_cellulose_equivalent_concentration",
+            "cellobiose_concentration",
+            "beta_D_glucose_concentration",
+        ],
+        "branching_supported": False,
+        "cycles_supported": False,
+    }
     assert {reference.id for reference in config.entities.product_maps} == {
         "bio002_cellulose_to_cellobiose_map",
         "bio002_cellobiose_to_glucose_map",

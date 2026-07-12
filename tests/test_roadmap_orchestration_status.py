@@ -45,7 +45,7 @@ def test_status_tracker_reconciles_completed_scoped_slices_without_overclaiming(
         "ASSEMBLY-001 case-template assembly basics": "complete for current Reaction 618 and BIO-001 template-backed assembly basics; partial relative to arbitrary reaction onboarding",
         "API-003 researcher-facing virtual experiment API": "complete for existing registry records, aliases, environment grids, scientific/exploratory modes, and table access",
         "BIO-READINESS-LITE scaffold": "complete for proposal template, validator, and tests",
-        "BIO-002 reusable two-step extracellular enzyme chain": "complete for scoped reusable two-step chain assembly and software verification; partial relative to broad pathway biology",
+        "BIO-002 reusable linear extracellular enzyme chain": "complete for arbitrary-length linear chain assembly and software verification; partial relative to branching graphs and broad pathway biology",
         "Phase 2 static balance checks": "complete for scoped static metadata, validator, assembly-time balance checks, and corrective process-reaction binding; partial relative to dynamic thermodynamic feasibility",
     }
 
@@ -68,10 +68,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-41: Pyright optional-member-access ratchet"
+    current_next = "PR-42: arbitrary-length linear enzyme-chain assembly"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-41 Pyright optional-member-access ratchet" in roadmap
+    assert "The current next PR is PR-42 arbitrary-length linear enzyme-chain assembly" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
@@ -84,8 +84,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "completed PR-39 slice is limited\nto a standard virtual-experiment `solver_diagnostics.csv`" in roadmap
     assert "completed\nPR-40 slice is limited to a standard virtual-experiment" in roadmap
     assert "`conservation_diagnostics.csv` table/accessor bridge" in roadmap
-    assert "current PR-41 slice enables Pyright `reportOptionalMemberAccess` globally" in roadmap
-    assert "35 baseline nullable-member errors across 11 scientific modules" in roadmap
+    assert "completed PR-41 slice enabled Pyright `reportOptionalMemberAccess`" in roadmap
+    assert "current PR-42 slice generalizes the registry/template-driven extracellular" in roadmap
+    assert "branching, cycles, disconnected chains, and malformed topology" in roadmap
+    assert "35 baseline nullable-member errors across 11" in roadmap
+    assert "scientific modules using explicit contracts" in roadmap
     assert "PR-30\nconfigured oxygen/water-activity modifier example notebook slice" in roadmap
     assert "PR-29\nexplicit oxygen/water-activity configured modifier wiring slice" in roadmap
     assert "PR-28\nconfigured environment modifier example notebook slice" in roadmap
@@ -122,7 +125,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-41: Pyright optional-member-access ratchet"
+    current_next = "PR-42: arbitrary-length linear enzyme-chain assembly"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -333,8 +336,11 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-40 | Virtual-experiment conservation diagnostics bridge" in status
     assert "complete after PR #55 merged for the scoped standard-table/accessor bridge" in status
     assert "PR-41 | Pyright optional-member-access ratchet" in status
-    assert "current next after PR #55 merged and PR-40 completed" in status
+    assert "complete after PR #56 merged for the scoped typing-quality ratchet" in status
     assert "35 baseline nullable-member errors across 11 scientific modules" in status
+    assert "PR-42 | Arbitrary-length linear enzyme-chain assembly" in status
+    assert "current next after PR #56 merged and PR-41 completed" in status
+    assert "Branching and cycles remain unsupported" in status
     assert "Future simulator capability follow-up" in status
     assert "Future | VALIDATION-DATA-001" in status
 
@@ -383,7 +389,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-41: Pyright optional-member-access ratchet"
+    current_next = "PR-42: arbitrary-length linear enzyme-chain assembly"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -423,6 +429,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-38" not in _current_next_lines(text)
         assert "PR-39" not in _current_next_lines(text)
         assert "PR-40" not in _current_next_lines(text)
+        assert "PR-41" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
@@ -432,7 +439,8 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "PR-38\nsolver diagnostics example notebook is complete after PR #53" in gate
     assert "PR-39\nvirtual-experiment solver diagnostics bridge is complete after PR #54" in gate
     assert "PR-40\nvirtual-experiment conservation diagnostics bridge is complete after PR #55" in gate
-    assert "selected PR-41 work is therefore a Pyright optional-member-access quality\nratchet" in gate
+    assert "PR-41 Pyright optional-member-access ratchet is complete after PR #56" in gate
+    assert "selected PR-42 work is therefore arbitrary-length linear enzyme-chain assembly" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate

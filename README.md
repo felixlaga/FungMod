@@ -120,9 +120,11 @@ basic kinetics layer:
 - an offline-first SABIO-RK source adapter that loads frozen kinetic-law
   snapshots and writes review-only proposed records without mutating the
   simulation registry;
-- a registry-backed BIO-002 extracellular enzyme-chain assembler whose
-  stoichiometry, conserved quantities, entities, and output labels come from
-  template data rather than mechanism-code biological names;
+- a registry-backed extracellular enzyme-chain assembler for ordered linear
+  chains of two or more implemented process steps, whose stoichiometry,
+  conserved quantities, entities, modifiers, and output labels come from
+  template data rather than mechanism-code biological names; branching and
+  cycles fail explicitly as unsupported;
 - a scoped CASE-001 researcher-facing path that runs the existing BIO-002
   cellulose-equivalent enzyme-chain virtual experiment from names and aliases
   through the top-level `virtual_experiment(...)` API.

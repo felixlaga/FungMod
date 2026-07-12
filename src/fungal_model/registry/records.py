@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -26,6 +27,9 @@ CASE_TEMPLATE_ALLOWED_STATE_ROLES = frozenset(
         "homogeneous_catalyst",
         "accessibility_proxy",
     }
+)
+CASE_TEMPLATE_INDEXED_STATE_ROLE_PATTERN = re.compile(
+    r"^(?:intermediate|catalyst|enzyme)_[a-z0-9][a-z0-9_]*$"
 )
 
 
@@ -402,12 +406,19 @@ def _case_template_state_role_issues(
         state_text = str(state_name).strip()
         if not role_text:
             issues.append({"field": field_name, "message": "State role names must be nonempty."})
-        if role_text and role_text not in CASE_TEMPLATE_ALLOWED_STATE_ROLES:
+        if (
+            role_text
+            and role_text not in CASE_TEMPLATE_ALLOWED_STATE_ROLES
+            and CASE_TEMPLATE_INDEXED_STATE_ROLE_PATTERN.fullmatch(role_text) is None
+        ):
             issues.append(
                 {
                     "field": f"{field_name}.{role_text}",
                     "message": "Unsupported case-template state role.",
-                    "details": {"allowed_roles": sorted(CASE_TEMPLATE_ALLOWED_STATE_ROLES)},
+                    "details": {
+                        "allowed_roles": sorted(CASE_TEMPLATE_ALLOWED_STATE_ROLES),
+                        "allowed_indexed_role_pattern": CASE_TEMPLATE_INDEXED_STATE_ROLE_PATTERN.pattern,
+                    },
                 }
             )
         if not state_text:
