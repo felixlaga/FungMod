@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status after PR-42 merged as PR #57, with PR-43 selected:
+Scoped status after PR-43 merged as PR #58, with PR-44 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -62,7 +62,7 @@ entropy-rate output rows, and a configured entropy-budget JSON summary over
 numeric explicit entropy-rate rows; there are still no inferred activities,
 concentrations, redox potentials, electron balances, or solver-time
 thermodynamic enforcement.
-The selected PR-43 slice adds opt-in process-bound
+The completed PR-43 slice adds opt-in process-bound
 `entropy_production_rate_timeseries.json`/`.csv` diagnostics after simulation
 from native process-rate trajectories only when explicit sourced delta G,
 positive temperature, reaction-extent interpretation, and dimensionally
@@ -194,7 +194,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-43: process-bound entropy-production-rate timeseries**.
+Current next PR: **PR-44: researcher source-provider onboarding UX**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -234,11 +234,18 @@ behavior changes. The completed PR-42 work generalized the existing
 registry/template-driven chain assembler to ordered linear chains of two or
 more existing process laws, preserves current two-step behavior and explicit
 metadata, and rejects branching and cycles before execution.
-PR-42 is complete after PR #57. The selected PR-43 work derives process-bound
+PR-42 is complete after PR #57. PR-43 is complete after PR #58; it derives process-bound
 entropy-production-rate trajectories after simulation only from native
 process-rate trajectories plus explicit sourced, dimensionally compatible
 metadata; missing or incompatible metadata fails instead of falling back.
-Recommended next after PR-43: add a bounded public-API conservation diagnostics
+The selected PR-44 work adds the bounded top-level `provider="sabiork"`
+researcher source-proposal UX over existing fetch/freeze/parser/proposal
+behavior. It accepts officially quoted/escaped friendly scientific selectors
+and strict numeric SABIO IDs, requires no SABIO-RK key, keeps refresh explicit
+through the shared fetch/freeze path, preserves checksummed raw pages in unique
+query-specific bundles, and emits review-only proposals without registry or
+simulation promotion. No BRENDA, CAZy, or other provider is claimed.
+Recommended next after PR-44: add a bounded public-API conservation diagnostics
 example notebook over the standard table/accessor and header-only guardrail.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:

@@ -26,13 +26,95 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-44 Researcher Source-Provider Onboarding UX
+
+Date: 2026-07-12
+
+Status: `current` for the bounded public SABIO-RK provider UX slice; PR-43 is
+complete after PR #58, and VALIDATION-DATA-001 remains `deferred;
+blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added top-level `source_proposal(provider="sabiork", ...)` onboarding that
+  requires only one friendly scientific selector and returns the existing
+  review-only `RegistryProposal`.
+- Reused existing `SabioRKSource` discovery, parsing, filtering, and proposal
+  generation. Common `reaction_id`, EC number, enzyme, substrate,
+  organism/source, and entry identifiers derive the source query without
+  exposing raw Solr syntax in the new API.
+- Moved the existing SABIO-RK HTTP/freeze implementation into the package and
+  kept the fetch CLI as a thin wrapper, so explicit `refresh=True` freezes the
+  raw response plus fetch metadata through one implementation.
+- Hardened the review follow-up so every refresh writes a unique query-specific
+  snapshot bundle. Exact HTTP page bodies remain separate under `raw/`, the
+  parser reads `derived/combined_export.json`, and `fetch_metadata.json` binds
+  every artifact with SHA-256 checksums instead of sharing or overwriting files.
+- Applied the official SABIO-RK query semantics: all text terms are quoted,
+  embedded quotes/backslashes are escaped, boolean/operator text remains
+  literal inside quotes, the documented `Enzymename` field is used, and SABIO
+  reaction/entry IDs accept only positive unquoted decimal forms.
+- Removed `live_fetcher` from the new top-level `source_proposal(...)`
+  signature so public refresh cannot bypass shared freeze/provenance handling.
+  The legacy `SabioRKSource(live_fetcher=...)` hook remains backward compatible.
+- Kept SABIO-RK keyless: no credential is required, read, used, stored, or
+  included in query/cache/proposal artifacts. A supplied credential fails with
+  a redacted provider-specific error before any filesystem or transport action.
+- Unknown providers list only `sabiork`; no BRENDA, CAZy, or other provider is
+  claimed.
+
+Tests added or modified: `tests/test_source_provider_api.py` covers the minimal
+no-key call, injected fake transport refresh/freeze, friendly query derivation,
+official quote/backslash/operator escaping, strict numeric IDs, two-query
+immutable bundle/metadata pairing, multi-page raw preservation and checksums,
+secret redaction and non-persistence, review-only proposal gate, production
+registry immutability, unknown provider, missing selector, public-signature
+containment, and refresh failure. Existing SABIO-RK adapter/discovery/fetch and
+public-API guardrails remain covered.
+
+What did not change: existing `SabioRKSource` and `live_fetcher` signatures,
+source parsing/proposal schemas, production registry records, simulation and
+test network behavior, biology, solver behavior, thermodynamics, validation
+data, calibration, and empirical comparison are unchanged.
+
+Scientific behavior impact: none. Source records remain review-only proposals
+and are never trusted or promoted into simulation automatically. Live refresh
+is explicit and outside simulation/tests.
+
+Backward compatibility: the existing `SabioRKSource` constructor,
+`live_fetcher` hook, parser/proposal behavior, and fetch CLI command remain
+available. The fetch CLI now writes its returned export and metadata inside a
+unique nested bundle instead of shared output filenames. The unmerged new
+top-level API intentionally removes its custom-fetcher bypass before release.
+
+Remaining ambiguity and risk: SABIO-RK source completeness and scientific
+suitability still require human review. Only SABIO-RK is implemented, and live
+service behavior remains external to offline verification.
+
+Recommended next task: review and merge PR-44, then add the bounded public-API
+conservation diagnostics example notebook over the existing standard
+table/accessor and header-only guardrail.
+
+Verification:
+
+- Focused source/public/status suite after the review follow-up: 64 passed.
+- Broad SABIO-RK, Reaction 618, notebook, registry, public-API, virtual-
+  experiment, active-instruction, repository-hygiene, and roadmap suite after
+  the review follow-up: 140 passed.
+- `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache .venv/bin/python -m ruff check src tests scripts/fetch_sabiork_kinlaw_entries.py`
+  - Result: all checks passed.
+- `.venv/bin/python -m pyright --pythonpath .venv/bin/python`
+  - Result: 0 errors, 0 warnings, 0 informations.
+- `git diff --check`
+  - Result: passed.
+
 ## PR-43 Process-Bound Entropy-Production-Rate Timeseries
 
 Date: 2026-07-12
 
-Status: `current` for the bounded THERMO-003 configured-output diagnostics
-slice; PR-42 is complete after PR #57, and broader THERMO-003 remains
-`partial`.
+Status: `complete` after PR #58 merged for the bounded THERMO-003
+configured-output diagnostics slice; PR-42 is complete after PR #57, and
+broader THERMO-003 remains `partial`.
 
 Completed in this pass:
 

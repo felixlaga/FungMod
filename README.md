@@ -121,8 +121,9 @@ basic kinetics layer:
   explicit environment modifier records, using process-template modifier roles
   and explicit environment ids only, with package-generated environment
   entities emitted from exact registry environment values when required;
-- an offline-first SABIO-RK source adapter that loads frozen kinetic-law
-  snapshots and writes review-only proposed records without mutating the
+- a top-level, offline-first SABIO-RK source-provider API that derives source
+  queries from friendly scientific fields, loads frozen kinetic-law snapshots
+  by default, and returns review-only proposed records without mutating the
   simulation registry;
 - a registry-backed extracellular enzyme-chain assembler for ordered linear
   chains of two or more implemented process steps, whose stoichiometry,
@@ -181,6 +182,32 @@ Coverage currently has an 80% minimum gate.
 Branch protection expectations are documented in `.github/BRANCH_PROTECTION.md`.
 The protected default branch should require pull requests, passing CI,
 up-to-date branches, no force pushes, and no unaudited direct bypass.
+
+## Propose Source Records
+
+Researchers can create a review-only SABIO-RK registry proposal with one
+scientific identifier. SABIO-RK does not require an API key, so no credential
+is supplied or read from an environment variable:
+
+```python
+from fungal_model import source_proposal
+
+proposal = source_proposal(provider="sabiork", reaction_id="618")
+proposal.write("data/proposed_records/sabiork/reaction_618")
+```
+
+`source_proposal(...)` also accepts friendly `ec_number`, `enzyme`, `substrate`,
+`organism`/`source`, and `entry_id` selectors. It does not expose raw Solr syntax.
+Text selectors are quoted and escaped according to the SABIO-RK REST query
+contract; SABIO reaction and entry identifiers must be positive decimal IDs.
+Frozen snapshots are the default. `refresh=True` is the only public path that
+performs a live fetch. Each refresh creates a unique query-specific snapshot
+bundle under the cache: exact HTTP page bodies are preserved separately under
+`raw/`, a checksummed parser input is written under
+`derived/combined_export.json`, and `fetch_metadata.json` binds those artifacts.
+The returned records remain `proposed_review_required` and are never promoted
+into `data_registry/` or used by simulation automatically. Only
+`provider="sabiork"` is currently implemented.
 
 ## Run A Virtual Experiment
 
@@ -382,6 +409,8 @@ loading, model assembly, execution, and result inspection:
 - `EnvironmentCase`
 - `DegradationScreenResult`
 - `VirtualExperimentError`
+- `source_proposal`
+- `SourceProviderError`
 - `run_configured_model`
 - `load_model_config`
 - `load_substrate`
@@ -512,11 +541,14 @@ Product maps live under `data/product_maps/` and are loaded through
 metadata, so product release mappings do not have to be embedded in process
 code or a substrate-specific workflow.
 
-Source discovery is intentionally separate from simulation. `SabioRKSource`
-loads frozen SABIO-RK kinetic-law snapshots by default and can refresh only
-through an explicit live-fetch hook. Proposed product maps, parameter records,
-and process-compatibility records are written for human review under a proposal
-bundle; they are not silently committed into the simulation registry. Use
+Source discovery is intentionally separate from simulation. The top-level
+`source_proposal(...)` API composes the existing `SabioRKSource` parser and
+proposal behavior. Frozen SABIO-RK kinetic-law snapshots remain the default;
+live refresh is explicit and uses immutable query-specific bundles with raw
+page checksums and a separate derived combined export. Proposed product maps,
+parameter records, and process-compatibility records are written for human
+review under a proposal bundle; they are not silently committed into the
+simulation registry. Use
 `scripts/fetch_sabiork_kinlaw_entries.py` to freeze raw SABIO-RK exports and
 `scripts/propose_sabiork_source_records.py` to create review-only proposal
 artifacts from a frozen snapshot.

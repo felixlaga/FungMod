@@ -68,10 +68,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-43: process-bound entropy-production-rate timeseries"
+    current_next = "PR-44: researcher source-provider onboarding UX"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-43 process-bound entropy-production-rate timeseries" in roadmap
+    assert "The current next PR is PR-44 researcher source-provider onboarding UX" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
@@ -86,7 +86,8 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "`conservation_diagnostics.csv` table/accessor bridge" in roadmap
     assert "completed PR-41 slice enabled Pyright `reportOptionalMemberAccess`" in roadmap
     assert "completed PR-42 slice generalized the registry/template-driven extracellular" in roadmap
-    assert "current PR-43 slice adds post-simulation" in roadmap
+    assert "completed PR-43 slice adds post-simulation" in roadmap
+    assert "current PR-44" in roadmap
     assert "branching, cycles, disconnected chains, and malformed topology" in roadmap
     assert "35 baseline nullable-member errors across 11" in roadmap
     assert "scientific modules using explicit contracts" in roadmap
@@ -126,7 +127,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-43: process-bound entropy-production-rate timeseries"
+    current_next = "PR-44: researcher source-provider onboarding UX"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -165,6 +166,9 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-38" not in text
         assert "Current next PR: **PR-39" not in text
         assert "Current next PR: **PR-40" not in text
+        assert "Current next PR: **PR-41" not in text
+        assert "Current next PR: **PR-42" not in text
+        assert "Current next PR: **PR-43" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -342,7 +346,9 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-42 | Arbitrary-length linear enzyme-chain assembly" in status
     assert "complete after PR #57 merged for the bounded linear-topology slice" in status
     assert "PR-43 | THERMO-003 process-bound entropy-production-rate timeseries" in status
-    assert "current next after PR #57 merged and PR-42 completed" in status
+    assert "complete after PR #58 merged for the bounded configured-output diagnostics slice" in status
+    assert "PR-44 | Researcher source-provider onboarding UX" in status
+    assert "current after PR #58 merged and PR-43 completed" in status
     assert "entropy_production_rate_timeseries.json" in next_steps
     assert "entropy_production_rate_timeseries.json" in _read(README)
     assert "no silent conversion" in status
@@ -395,7 +401,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-43: process-bound entropy-production-rate timeseries"
+    current_next = "PR-44: researcher source-provider onboarding UX"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -437,6 +443,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-40" not in _current_next_lines(text)
         assert "PR-41" not in _current_next_lines(text)
         assert "PR-42" not in _current_next_lines(text)
+        assert "PR-43" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
@@ -448,7 +455,8 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "PR-40\nvirtual-experiment conservation diagnostics bridge is complete after PR #55" in gate
     assert "PR-41 Pyright optional-member-access ratchet is complete after PR #56" in gate
     assert "arbitrary-length linear enzyme-chain assembly is complete after PR #57" in gate
-    assert "selected PR-43 work is therefore bounded process-bound entropy-production-rate" in gate
+    assert "process-bound entropy-production-rate diagnostics is complete after PR #58" in gate
+    assert "selected PR-44 work is therefore bounded researcher source-provider" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate

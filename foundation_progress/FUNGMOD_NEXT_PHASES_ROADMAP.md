@@ -69,8 +69,9 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-43 process-bound entropy-production-rate timeseries
-after PR-42 arbitrary-length linear enzyme-chain assembly merged as PR #57,
+The current next PR is PR-44 researcher source-provider onboarding UX after
+PR-43 process-bound entropy-production-rate timeseries merged as PR #58 and
+PR-42 arbitrary-length linear enzyme-chain assembly merged as PR #57,
 the PR-41 Pyright optional-member-access ratchet merged as PR #56, the
 PR-40 virtual-experiment conservation diagnostics bridge merged as PR #55,
 the PR-39 virtual-experiment solver diagnostics bridge,
@@ -174,13 +175,21 @@ the researcher API. An artificial three-step framework benchmark proves the
 generic path; branching, cycles, disconnected chains, and malformed topology
 remain explicitly unsupported after PR #57. No new rate law, production constant,
 empirical record, validation data, calibration, inferred parameter, or hidden
-notebook science was added. The current PR-43 slice adds post-simulation,
+notebook science was added. The completed PR-43 slice adds post-simulation,
 process-bound entropy-production-rate JSON/CSV trajectories from native
 process-rate trajectories only when explicit sourced condition-specific delta
 Gibbs, positive temperature, reaction-extent interpretation, and dimensionally
 compatible extent-rate units or conversion metadata are supplied. It fails on
 missing processes or dishonest metadata and adds no inferred thermodynamics,
-dynamic delta G, or solver-time enforcement. The completed PR-24 BIO-003 slice added a
+dynamic delta G, or solver-time enforcement after PR #58. The current PR-44
+slice adds a top-level SABIO-RK provider UX over existing fetch/freeze,
+parsing, and review-only proposal behavior. Friendly scientific selectors
+replace raw query syntax for common use with official quoting/escaping and
+strict numeric SABIO IDs. Live refresh stays explicit on the shared
+fetch/freeze path and writes immutable query-specific bundles with checksummed
+raw pages plus a separate derived combined export; SABIO-RK does not require a
+credential, and no proposal enters simulation or the production registry
+automatically. The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
 researcher-facing BIO-002 example without adding validation data, calibration,
@@ -272,11 +281,14 @@ limited to the global Pyright optional-member-access ratchet and explicit
 nullable-state narrowing that resolved FD-005 after PR #56 without runtime
 behavior changes. The completed PR-42 slice is limited to arbitrary-length
 ordered linear chain topology over existing process laws; branching and cycles
-remain unsupported after PR #57. The current PR-43 slice is limited to
+remain unsupported after PR #57. The completed PR-43 slice is limited to
 configured-output process-bound entropy-production-rate trajectories derived
 after simulation from existing native process-rate trajectories plus explicit
 sourced and dimensionally compatible metadata; it does not alter solver or
-process behavior.
+process behavior after PR #58. The current PR-44 slice is limited to public
+source-provider onboarding for existing SABIO-RK behavior; it adds no provider
+beyond SABIO-RK, registry promotion, simulation-time fetch, scientific record,
+biology, solver behavior, thermodynamic behavior, or validation evidence.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -349,10 +361,11 @@ completed after PR #54 as a virtual-experiment solver diagnostics bridge. PR-40
 completed after PR #55 as a virtual-experiment conservation diagnostics bridge.
 PR-41 completed after PR #56 as a Pyright optional-member-access ratchet. The
 PR-42 arbitrary-length linear enzyme-chain assembly slice completed after PR
-#57; branching and cycles remain unsupported. The current PR-43 slice is
-process-bound entropy-production-rate configured diagnostics rather than
-ingestion, digitization, fabricated validation data, calibration, or empirical
-comparison, and the recommended next simulator-building follow-up is a
+#57; branching and cycles remain unsupported. PR-43 process-bound
+entropy-production-rate configured diagnostics completed after PR #58. The
+current PR-44 slice is review-gated SABIO-RK researcher source onboarding rather
+than ingestion, digitization, fabricated validation data, calibration, or
+empirical comparison, and the recommended next simulator-building follow-up is a
 bounded public-API conservation diagnostics example notebook over the standard
 table/accessor and header-only guardrail.
 
