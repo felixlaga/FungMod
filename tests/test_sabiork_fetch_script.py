@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import sys
@@ -8,6 +9,8 @@ from types import ModuleType
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+
+from fungal_model.sources.sabiork import fetch as sabiork_fetch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,6 +102,65 @@ def test_fetch_metadata_records_warning_for_total_count_drift() -> None:
         "SABIO-RK total_count differs from the browser count supplied for this milestone: expected 29, got 2."
     ]
     json.dumps(metadata)
+
+
+def test_paginated_fetch_preserves_each_raw_body_and_writes_derived_export(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fetcher = _load_fetcher()
+    page_bodies = {
+        1: json.dumps(
+            {
+                "meta": {"page": 1, "page_size": 1, "total_count": 2, "total_pages": 2},
+                "data": [{"EntryID": "1", "SabioReactionID": "618"}],
+            },
+            separators=(",", ":"),
+        ),
+        2: json.dumps(
+            {
+                "meta": {"page": 2, "page_size": 1, "total_count": 2, "total_pages": 2},
+                "data": [{"EntryID": "2", "SabioReactionID": "618"}],
+            },
+            indent=2,
+        ),
+    }
+
+    def fake_transport(url: str, *, timeout_seconds: float) -> object:
+        assert timeout_seconds == 30.0
+        page = int(parse_qs(urlparse(url).query)["page"][0])
+        return fetcher.HTTPResponseSnapshot(body=page_bodies[page], http_status=200, url=url)
+
+    monkeypatch.setattr(sabiork_fetch, "MIN_REQUEST_INTERVAL_SECONDS", 0.0)
+    export_path, metadata_path = fetcher.fetch_and_save_export(
+        query="SabioReactionID:618",
+        output_dir=tmp_path,
+        page_size=1,
+        expected_total_count=None,
+        transport=fake_transport,
+    )
+
+    bundle_dir = export_path.parent.parent
+    raw_page_1 = bundle_dir / "raw" / "page_0001.json"
+    raw_page_2 = bundle_dir / "raw" / "page_0002.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    derived = json.loads(export_path.read_text(encoding="utf-8"))
+
+    assert export_path == bundle_dir / "derived" / "combined_export.json"
+    assert raw_page_1.read_text(encoding="utf-8") == page_bodies[1]
+    assert raw_page_2.read_text(encoding="utf-8") == page_bodies[2]
+    assert [row["EntryID"] for row in derived["data"]] == ["1", "2"]
+    assert derived["meta"]["combined_from_pages"] is True
+    assert derived["meta"]["raw_pages_preserved"] is True
+    assert [page["path"] for page in metadata["raw_pages"]] == [
+        "raw/page_0001.json",
+        "raw/page_0002.json",
+    ]
+    assert metadata["raw_pages"][0]["sha256"] == hashlib.sha256(page_bodies[1].encode()).hexdigest()
+    assert metadata["raw_pages"][1]["sha256"] == hashlib.sha256(page_bodies[2].encode()).hexdigest()
+    assert metadata["derived_export"]["artifact_role"] == "derived_combined_export"
+    assert metadata["derived_export"]["source_page_count"] == 2
+    assert metadata["derived_export"]["sha256"] == hashlib.sha256(export_path.read_bytes()).hexdigest()
 
 
 def _fixture_payload() -> dict:

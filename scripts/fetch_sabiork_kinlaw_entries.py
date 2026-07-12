@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch and freeze a SABIO-RK kinetic-law JSON export."""
+"""Fetch and freeze a SABIO-RK kinetic-law snapshot bundle."""
 
 from __future__ import annotations
 
@@ -35,7 +35,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         description="Fetch a SABIO-RK kinlaw-entry JSON export and freeze it locally."
     )
     parser.add_argument("--query", required=True, help="SABIO-RK Solr query string, e.g. SabioReactionID:618.")
-    parser.add_argument("--output-dir", required=True, type=Path, help="Directory where raw JSON files are saved.")
+    parser.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+        help="Root directory for immutable query-specific snapshot bundles.",
+    )
     parser.add_argument("--base-url", default=BASE_URL)
     parser.add_argument("--endpoint", default=ENDPOINT)
     parser.add_argument("--page", default=DEFAULT_PAGE, type=int)

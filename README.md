@@ -198,11 +198,16 @@ proposal.write("data/proposed_records/sabiork/reaction_618")
 
 `source_proposal(...)` also accepts friendly `ec_number`, `enzyme`, `substrate`,
 `organism`/`source`, and `entry_id` selectors. It does not expose raw Solr syntax.
+Text selectors are quoted and escaped according to the SABIO-RK REST query
+contract; SABIO reaction and entry identifiers must be positive decimal IDs.
 Frozen snapshots are the default. `refresh=True` is the only public path that
-performs a live fetch, freezes the raw response and fetch metadata, then parses
-the snapshot. The returned records remain `proposed_review_required` and are
-never promoted into `data_registry/` or used by simulation automatically.
-Only `provider="sabiork"` is currently implemented.
+performs a live fetch. Each refresh creates a unique query-specific snapshot
+bundle under the cache: exact HTTP page bodies are preserved separately under
+`raw/`, a checksummed parser input is written under
+`derived/combined_export.json`, and `fetch_metadata.json` binds those artifacts.
+The returned records remain `proposed_review_required` and are never promoted
+into `data_registry/` or used by simulation automatically. Only
+`provider="sabiork"` is currently implemented.
 
 ## Run A Virtual Experiment
 
@@ -539,9 +544,11 @@ code or a substrate-specific workflow.
 Source discovery is intentionally separate from simulation. The top-level
 `source_proposal(...)` API composes the existing `SabioRKSource` parser and
 proposal behavior. Frozen SABIO-RK kinetic-law snapshots remain the default;
-live refresh is explicit. Proposed product maps, parameter records, and
-process-compatibility records are written for human review under a proposal
-bundle; they are not silently committed into the simulation registry. Use
+live refresh is explicit and uses immutable query-specific bundles with raw
+page checksums and a separate derived combined export. Proposed product maps,
+parameter records, and process-compatibility records are written for human
+review under a proposal bundle; they are not silently committed into the
+simulation registry. Use
 `scripts/fetch_sabiork_kinlaw_entries.py` to freeze raw SABIO-RK exports and
 `scripts/propose_sabiork_source_records.py` to create review-only proposal
 artifacts from a frozen snapshot.

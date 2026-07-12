@@ -240,8 +240,10 @@ process-rate trajectories plus explicit sourced, dimensionally compatible
 metadata; missing or incompatible metadata fails instead of falling back.
 The selected PR-44 work adds the bounded top-level `provider="sabiork"`
 researcher source-proposal UX over existing fetch/freeze/parser/proposal
-behavior. It accepts friendly scientific selectors, requires no SABIO-RK key,
-keeps refresh explicit, and emits review-only proposals without registry or
+behavior. It accepts officially quoted/escaped friendly scientific selectors
+and strict numeric SABIO IDs, requires no SABIO-RK key, keeps refresh explicit
+through the shared fetch/freeze path, preserves checksummed raw pages in unique
+query-specific bundles, and emits review-only proposals without registry or
 simulation promotion. No BRENDA, CAZy, or other provider is claimed.
 Recommended next after PR-44: add a bounded public-API conservation diagnostics
 example notebook over the standard table/accessor and header-only guardrail.

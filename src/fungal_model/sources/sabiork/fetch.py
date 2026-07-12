@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
+import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -20,6 +22,8 @@ DEFAULT_PAGE = 1
 DEFAULT_PAGE_SIZE = 1000
 EXPECTED_REACTION_618_TOTAL_COUNT = 29
 MIN_REQUEST_INTERVAL_SECONDS = 1.0
+ARTIFACT_LAYOUT_VERSION = "1.0"
+COMBINED_EXPORT_FILENAME = "combined_export.json"
 
 
 class SabioRKFetchError(RuntimeError):
@@ -97,6 +101,10 @@ def build_fetch_metadata(
     total_pages: int | None,
     requests_made: int,
     urls: Sequence[str],
+    snapshot_id: str | None = None,
+    query_key: str | None = None,
+    raw_pages: Sequence[Mapping[str, Any]] = (),
+    derived_export: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build JSON-safe fetch metadata for the source snapshot."""
 
@@ -106,7 +114,7 @@ def build_fetch_metadata(
             "SABIO-RK total_count differs from the browser count supplied for this milestone: "
             f"expected {expected_total_count}, got {total_count}."
         )
-    return {
+    metadata: dict[str, Any] = {
         "base_url": base_url.rstrip("/"),
         "endpoint": endpoint,
         "query": query,
@@ -120,6 +128,18 @@ def build_fetch_metadata(
         "source_urls": list(urls),
         "warnings": warnings,
     }
+    if snapshot_id is not None and query_key is not None and derived_export is not None:
+        metadata.update(
+            {
+                "artifact_layout_version": ARTIFACT_LAYOUT_VERSION,
+                "snapshot_id": snapshot_id,
+                "query_key": query_key,
+                "immutable_snapshot_bundle": True,
+                "raw_pages": [dict(item) for item in raw_pages],
+                "derived_export": dict(derived_export),
+            }
+        )
+    return metadata
 
 
 def fetch_and_save_export(
@@ -136,9 +156,15 @@ def fetch_and_save_export(
 ) -> tuple[Path, Path]:
     """Fetch a SABIO-RK export and freeze the raw response plus fetch metadata."""
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    export_path = output_dir / _raw_export_filename(query)
-    metadata_path = output_dir / "fetch_metadata.json"
+    query_key = query_bundle_key(query)
+    snapshot_id = _snapshot_id()
+    bundle_dir = output_dir / query_key / snapshot_id
+    raw_dir = bundle_dir / "raw"
+    derived_dir = bundle_dir / "derived"
+    raw_dir.mkdir(parents=True, exist_ok=False)
+    derived_dir.mkdir()
+    export_path = derived_dir / COMBINED_EXPORT_FILENAME
+    metadata_path = bundle_dir / "fetch_metadata.json"
     reaction_id = _reaction_id_from_query(query)
     fetch_text = transport or _fetch_text
 
@@ -150,9 +176,13 @@ def fetch_and_save_export(
         page_size=page_size,
     )
     first_response = fetch_text(first_url, timeout_seconds=timeout_seconds)
-    export_path.write_text(_with_trailing_newline(first_response.body), encoding="utf-8")
+    first_raw_path, first_raw_page = _write_raw_page(
+        response=first_response,
+        raw_dir=raw_dir,
+        page=page,
+    )
 
-    first_payload = _parse_json_body(first_response.body, export_path=export_path)
+    first_payload = _parse_json_body(first_response.body, export_path=first_raw_path)
     try:
         validate_kinlaw_export(first_payload, reaction_id=reaction_id)
         total_count = _required_meta_int(first_payload, "total_count")
@@ -171,13 +201,16 @@ def fetch_and_save_export(
             http_status=first_response.http_status,
             url=first_response.url,
             error=str(exc),
+            snapshot_id=snapshot_id,
+            query_key=query_key,
+            raw_pages=(first_raw_page,),
         )
         raise
 
     responses = [first_response]
-    payload = first_payload
+    raw_pages: list[Mapping[str, Any]] = [first_raw_page]
+    payload = _combined_paginated_payload(first_payload)
     if total_pages > 1:
-        payload = _combined_paginated_payload(first_payload)
         last_request_at = time.monotonic()
         for next_page in range(page + 1, total_pages + 1):
             elapsed = time.monotonic() - last_request_at
@@ -192,13 +225,27 @@ def fetch_and_save_export(
             )
             next_response = fetch_text(next_url, timeout_seconds=timeout_seconds)
             last_request_at = time.monotonic()
-            next_payload = _parse_json_body(next_response.body, export_path=export_path)
+            next_raw_path, next_raw_page = _write_raw_page(
+                response=next_response,
+                raw_dir=raw_dir,
+                page=next_page,
+            )
+            next_payload = _parse_json_body(next_response.body, export_path=next_raw_path)
             validate_kinlaw_export(next_payload, reaction_id=reaction_id)
             responses.append(next_response)
+            raw_pages.append(next_raw_page)
             payload["data"].extend(next_payload["data"])
-        payload["meta"]["combined_from_pages"] = True
-        payload["meta"]["pages_fetched"] = [response.url for response in responses]
-        _write_json(export_path, payload)
+    payload["meta"]["combined_from_pages"] = total_pages > 1
+    payload["meta"]["source_page_count"] = len(raw_pages)
+    payload["meta"]["raw_pages_preserved"] = True
+    payload["meta"]["pages_fetched"] = [response.url for response in responses]
+    _write_json(export_path, payload)
+    derived_export = {
+        "artifact_role": "derived_combined_export",
+        "path": str(export_path.relative_to(bundle_dir)),
+        "sha256": _sha256_bytes(export_path.read_bytes()),
+        "source_page_count": len(raw_pages),
+    }
 
     metadata = build_fetch_metadata(
         base_url=base_url,
@@ -213,6 +260,10 @@ def fetch_and_save_export(
         total_pages=total_pages,
         requests_made=len(responses),
         urls=tuple(response.url for response in responses),
+        snapshot_id=snapshot_id,
+        query_key=query_key,
+        raw_pages=raw_pages,
+        derived_export=derived_export,
     )
     _write_json(metadata_path, metadata)
     return export_path, metadata_path
@@ -262,6 +313,9 @@ def _write_error_metadata(
     http_status: int,
     url: str,
     error: str,
+    snapshot_id: str,
+    query_key: str,
+    raw_pages: Sequence[Mapping[str, Any]],
 ) -> None:
     _write_json(
         metadata_path,
@@ -275,6 +329,11 @@ def _write_error_metadata(
             "http_status": http_status,
             "source_urls": [url],
             "error": error,
+            "artifact_layout_version": ARTIFACT_LAYOUT_VERSION,
+            "snapshot_id": snapshot_id,
+            "query_key": query_key,
+            "immutable_snapshot_bundle": True,
+            "raw_pages": [dict(item) for item in raw_pages],
         },
     )
 
@@ -309,12 +368,41 @@ def _reaction_id_from_query(query: str) -> str | None:
     return None if match is None else match.group(1)
 
 
-def _raw_export_filename(query: str) -> str:
-    reaction_id = _reaction_id_from_query(query)
-    if reaction_id is not None:
-        return f"kinlaw_entries_reaction_{reaction_id}.json"
-    safe_query = re.sub(r"[^A-Za-z0-9_.-]+", "_", query).strip("_") or "query"
-    return f"kinlaw_entries_{safe_query}.json"
+def query_bundle_key(query: str) -> str:
+    """Return a filesystem-safe query identity with a collision-resistant digest."""
+
+    slug = re.sub(r"[^A-Za-z0-9_.-]+", "_", query).strip("_").lower() or "query"
+    digest = hashlib.sha256(query.encode("utf-8")).hexdigest()[:12]
+    return f"{slug[:80]}-{digest}"
+
+
+def _snapshot_id() -> str:
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    return f"{timestamp}-{uuid.uuid4().hex}"
+
+
+def _write_raw_page(
+    *,
+    response: HTTPResponseSnapshot,
+    raw_dir: Path,
+    page: int,
+) -> tuple[Path, Mapping[str, Any]]:
+    path = raw_dir / f"page_{page:04d}.json"
+    body = response.body.encode("utf-8")
+    path.write_bytes(body)
+    return path, {
+        "artifact_role": "raw_http_response",
+        "page": page,
+        "path": str(path.relative_to(raw_dir.parent)),
+        "sha256": _sha256_bytes(body),
+        "size_bytes": len(body),
+        "http_status": response.http_status,
+        "source_url": response.url,
+    }
+
+
+def _sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
 
 
 def _text_values(value: Any) -> set[str]:
@@ -356,12 +444,10 @@ def _utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-def _with_trailing_newline(text: str) -> str:
-    return text if text.endswith("\n") else text + "\n"
-
-
 __all__ = [
+    "ARTIFACT_LAYOUT_VERSION",
     "BASE_URL",
+    "COMBINED_EXPORT_FILENAME",
     "DEFAULT_PAGE",
     "DEFAULT_PAGE_SIZE",
     "ENDPOINT",
@@ -372,5 +458,6 @@ __all__ = [
     "build_fetch_metadata",
     "build_kinlaw_url",
     "fetch_and_save_export",
+    "query_bundle_key",
     "validate_kinlaw_export",
 ]

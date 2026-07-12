@@ -14,6 +14,7 @@ from typing import Any
 import yaml
 
 from fungal_model.data.sabiork import SabioRKExport, load_sabiork_kinlaw_export
+from fungal_model.sources.sabiork.fetch import COMBINED_EXPORT_FILENAME, query_bundle_key
 
 
 class SabioRKSourceError(ValueError):
@@ -538,7 +539,7 @@ class SabioRKSource:
             raise SabioRKSourceError(
                 "No SABIO-RK entries matched discovery filters. "
                 f"Filters: {_format_filters(filters)}. "
-                "Use a frozen local snapshot, or refresh=True only with an explicit live_fetcher."
+                "Use a frozen local snapshot, or refresh=True only with configured live refresh."
             )
         snapshot_paths = _unique_text(str(snapshot.export_path) for snapshot in snapshots)
         return SourceDiscoveryResult(
@@ -548,7 +549,7 @@ class SabioRKSource:
             filters=filters,
             missing_fields=_missing_fields(records),
             limitations=(
-                "Discovery uses frozen SABIO-RK kinetic-law snapshots unless refresh=True is supplied with a live_fetcher.",
+                "Discovery uses frozen SABIO-RK kinetic-law snapshots unless refresh=True explicitly uses configured live refresh.",
                 "Discovery output is not a simulation registry and is not trusted by VirtualExperiment automatically.",
                 "SABIO-RK entries may omit enzyme concentration, units, environmental context, or product curation details.",
             ),
@@ -614,7 +615,7 @@ class SabioRKSource:
             raise SabioRKSourceError(
                 "No frozen SABIO-RK kinetic-law exports were found for discovery. "
                 f"Searched under {target_dir} and local read-only fallback snapshot roots. "
-                "Use refresh=True only with an explicit live_fetcher."
+                "Use refresh=True only with configured live refresh."
             )
         return tuple(
             self.load_kinlaw_entries(path, query=_query_from_export_filename(path))
@@ -702,11 +703,13 @@ def _discovery_filters(
         ("enzyme", enzyme),
         ("ec_number", ec_number),
         ("reaction", reaction),
-        ("reaction_id", reaction_id),
-        ("entry_id", entry_id),
     ):
         if value not in {None, ""}:
             filters[key] = str(value)
+    for key, value in (("reaction_id", reaction_id), ("entry_id", entry_id)):
+        if value is None or value == "":
+            continue
+        filters[key] = _validated_sabio_identifier(value, field=key)
     return filters
 
 
@@ -723,18 +726,34 @@ def _source_query_from_filters(filters: Mapping[str, str]) -> str:
 def _freeform_source_query_from_filters(filters: Mapping[str, str]) -> str:
     parts: list[str] = []
     if filters.get("ec_number"):
-        parts.append(f"ECNumber:{filters['ec_number']}")
+        parts.append(f"ECNumber:{_quoted_sabio_text(filters['ec_number'])}")
     if filters.get("enzyme"):
-        parts.append(f"EnzymeName:{filters['enzyme']}")
+        parts.append(f"Enzymename:{_quoted_sabio_text(filters['enzyme'])}")
     if filters.get("substrate"):
-        parts.append(f"Substrate:{filters['substrate']}")
+        parts.append(f"Substrate:{_quoted_sabio_text(filters['substrate'])}")
     if filters.get("fungus/source"):
-        parts.append(f"Organism:{filters['fungus/source']}")
+        parts.append(f"Organism:{_quoted_sabio_text(filters['fungus/source'])}")
     if filters.get("reaction"):
-        parts.append(f"Reaction:{filters['reaction']}")
+        parts.append(f"Reaction:{_quoted_sabio_text(filters['reaction'])}")
     if filters.get("entry_id"):
         parts.append(f"EntryID:{filters['entry_id']}")
     return " AND ".join(parts)
+
+
+def _quoted_sabio_text(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def _validated_sabio_identifier(value: str | int, *, field: str) -> str:
+    if isinstance(value, bool):
+        raise SabioRKSourceError(f"{field} must be a positive decimal SABIO-RK identifier.")
+    text = str(value)
+    if re.fullmatch(r"[1-9][0-9]*", text) is None:
+        raise SabioRKSourceError(
+            f"{field} must be a positive decimal SABIO-RK identifier without signs or whitespace."
+        )
+    return text
 
 
 def _record_matches_discovery_filters(
@@ -1045,6 +1064,7 @@ def _proposed_parameter_symbol(
 
 def _find_cached_export(cache_dir: Path, query: str) -> Path:
     filename = _raw_export_filename(query)
+    query_key = query_bundle_key(query)
     reaction_id = _reaction_id_from_query(query)
     reaction_folder = () if reaction_id is None else (cache_dir / f"reaction_{reaction_id}" / "raw" / filename,)
     direct_candidates = (
@@ -1065,14 +1085,22 @@ def _find_cached_export(cache_dir: Path, query: str) -> Path:
             *tuple(sorted(root.glob(f"**/{filename}"))),
         )
     )
-    candidates = _unique_paths((*direct_candidates, *fallback_candidates))
+    bundle_candidates = tuple(
+        candidate
+        for root in _local_snapshot_roots(cache_dir)
+        for candidate in sorted(
+            root.glob(f"**/{query_key}/*/derived/{COMBINED_EXPORT_FILENAME}"),
+            reverse=True,
+        )
+    )
+    candidates = _unique_paths((*bundle_candidates, *direct_candidates, *fallback_candidates))
     for candidate in candidates:
         if candidate.exists():
             return candidate
     raise SabioRKSourceError(
         "No frozen SABIO-RK kinetic-law export was found. Looked for: "
         + ", ".join(str(path) for path in candidates)
-        + ". Use refresh=True only with an explicit live_fetcher."
+        + ". Use refresh=True only with configured live refresh."
     )
 
 
@@ -1085,6 +1113,7 @@ def _find_all_cached_exports(cache_dir: Path) -> tuple[Path, ...]:
             *tuple(sorted(root.glob("kinlaw_entries*.json"))),
             *tuple(sorted(root.glob("**/raw/kinlaw_entries*.json"))),
             *tuple(sorted(root.glob("**/kinlaw_entries*.json"))),
+            *tuple(sorted(root.glob(f"**/derived/{COMBINED_EXPORT_FILENAME}"))),
         )
     )
     return tuple(path for path in _unique_paths(candidates) if path.exists())
@@ -1114,6 +1143,12 @@ def _unique_paths(paths: Sequence[Path]) -> tuple[Path, ...]:
 
 
 def _query_from_export_filename(path: Path) -> str:
+    metadata_path = _metadata_path_for_export(path)
+    if metadata_path is not None:
+        metadata = _load_metadata(metadata_path)
+        metadata_query = metadata.get("query")
+        if isinstance(metadata_query, str) and metadata_query:
+            return metadata_query
     match = re.search(r"kinlaw_entries_reaction_([A-Za-z0-9_.-]+)\.json$", path.name)
     if match:
         return f"SabioReactionID:{match.group(1)}"
@@ -1121,8 +1156,11 @@ def _query_from_export_filename(path: Path) -> str:
 
 
 def _metadata_path_for_export(export_path: Path) -> Path | None:
-    candidate = export_path.parent / "fetch_metadata.json"
-    return candidate if candidate.exists() else None
+    candidates = (
+        export_path.parent / "fetch_metadata.json",
+        export_path.parent.parent / "fetch_metadata.json",
+    )
+    return next((candidate for candidate in candidates if candidate.exists()), None)
 
 
 def _load_metadata(path: Path | None) -> Mapping[str, Any]:

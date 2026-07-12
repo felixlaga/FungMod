@@ -46,6 +46,17 @@ Completed in this pass:
 - Moved the existing SABIO-RK HTTP/freeze implementation into the package and
   kept the fetch CLI as a thin wrapper, so explicit `refresh=True` freezes the
   raw response plus fetch metadata through one implementation.
+- Hardened the review follow-up so every refresh writes a unique query-specific
+  snapshot bundle. Exact HTTP page bodies remain separate under `raw/`, the
+  parser reads `derived/combined_export.json`, and `fetch_metadata.json` binds
+  every artifact with SHA-256 checksums instead of sharing or overwriting files.
+- Applied the official SABIO-RK query semantics: all text terms are quoted,
+  embedded quotes/backslashes are escaped, boolean/operator text remains
+  literal inside quotes, the documented `Enzymename` field is used, and SABIO
+  reaction/entry IDs accept only positive unquoted decimal forms.
+- Removed `live_fetcher` from the new top-level `source_proposal(...)`
+  signature so public refresh cannot bypass shared freeze/provenance handling.
+  The legacy `SabioRKSource(live_fetcher=...)` hook remains backward compatible.
 - Kept SABIO-RK keyless: no credential is required, read, used, stored, or
   included in query/cache/proposal artifacts. A supplied credential fails with
   a redacted provider-specific error before any filesystem or transport action.
@@ -54,10 +65,12 @@ Completed in this pass:
 
 Tests added or modified: `tests/test_source_provider_api.py` covers the minimal
 no-key call, injected fake transport refresh/freeze, friendly query derivation,
+official quote/backslash/operator escaping, strict numeric IDs, two-query
+immutable bundle/metadata pairing, multi-page raw preservation and checksums,
 secret redaction and non-persistence, review-only proposal gate, production
-registry immutability, unknown provider, missing selector, and refresh failure.
-Existing SABIO-RK adapter/discovery/fetch and public-API guardrails remain
-covered.
+registry immutability, unknown provider, missing selector, public-signature
+containment, and refresh failure. Existing SABIO-RK adapter/discovery/fetch and
+public-API guardrails remain covered.
 
 What did not change: existing `SabioRKSource` and `live_fetcher` signatures,
 source parsing/proposal schemas, production registry records, simulation and
@@ -68,8 +81,11 @@ Scientific behavior impact: none. Source records remain review-only proposals
 and are never trusted or promoted into simulation automatically. Live refresh
 is explicit and outside simulation/tests.
 
-Backward compatibility: additive top-level API plus internal fetch-code reuse;
-the existing adapter and CLI contracts remain available.
+Backward compatibility: the existing `SabioRKSource` constructor,
+`live_fetcher` hook, parser/proposal behavior, and fetch CLI command remain
+available. The fetch CLI now writes its returned export and metadata inside a
+unique nested bundle instead of shared output filenames. The unmerged new
+top-level API intentionally removes its custom-fetcher bypass before release.
 
 Remaining ambiguity and risk: SABIO-RK source completeness and scientific
 suitability still require human review. Only SABIO-RK is implemented, and live
@@ -81,22 +97,16 @@ table/accessor and header-only guardrail.
 
 Verification:
 
-- Focused source/public/status suite: 52 passed.
+- Focused source/public/status suite after the review follow-up: 64 passed.
 - Broad SABIO-RK, Reaction 618, notebook, registry, public-API, virtual-
-  experiment, active-instruction, and roadmap suite: 124 passed.
+  experiment, active-instruction, repository-hygiene, and roadmap suite after
+  the review follow-up: 140 passed.
 - `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache .venv/bin/python -m ruff check src tests scripts/fetch_sabiork_kinlaw_entries.py`
   - Result: all checks passed.
 - `.venv/bin/python -m pyright --pythonpath .venv/bin/python`
   - Result: 0 errors, 0 warnings, 0 informations.
 - `git diff --check`
   - Result: passed.
-- Full coverage gate: 748 passed, 1 failed; total coverage 84.71%. The sole
-  failure was the unrelated pre-existing ignored checkpoint file
-  `notebooks/examples/.ipynb_checkpoints/10_virtual_experiment_product_tour-checkpoint.ipynb`
-  detected by `test_no_notebook_checkpoints_remain_in_working_tree`; PR-44 did
-  not create, modify, delete, or stage it.
-- Final-tree full suite excluding only that unrelated workspace-hygiene
-  assertion: 748 passed, 1 deselected.
 
 ## PR-43 Process-Bound Entropy-Production-Rate Timeseries
 

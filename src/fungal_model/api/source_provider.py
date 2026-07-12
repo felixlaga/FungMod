@@ -37,7 +37,6 @@ def source_proposal(
     credential: str | None = None,
     refresh: bool = False,
     cache_dir: str | Path = "data/source_snapshots/sabiork",
-    live_fetcher: LiveKinlawFetcher | None = None,
     transport: SabioRKTransport | None = None,
 ) -> RegistryProposal:
     """Discover SABIO-RK records and return a review-only registry proposal.
@@ -66,14 +65,10 @@ def source_proposal(
             "The sabiork provider requires at least one scientific selector: reaction_id, "
             "ec_number, enzyme, substrate, organism/source, or entry_id."
         )
-    if transport is not None and live_fetcher is not None:
-        raise SourceProviderError("Provide either transport or live_fetcher, not both.")
     if transport is not None and not refresh:
         raise SourceProviderError("A transport is used only for an explicit refresh=True call.")
 
-    fetcher = live_fetcher
-    if refresh and fetcher is None:
-        fetcher = _sabiork_live_fetcher(transport=transport)
+    fetcher = _sabiork_live_fetcher(transport=transport) if refresh else None
     adapter = SabioRKSource(cache_dir=cache_dir, live_fetcher=fetcher)
     try:
         discovery = adapter.discover_for_virtual_experiment(

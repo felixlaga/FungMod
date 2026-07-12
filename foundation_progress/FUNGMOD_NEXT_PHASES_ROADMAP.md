@@ -184,9 +184,12 @@ missing processes or dishonest metadata and adds no inferred thermodynamics,
 dynamic delta G, or solver-time enforcement after PR #58. The current PR-44
 slice adds a top-level SABIO-RK provider UX over existing fetch/freeze,
 parsing, and review-only proposal behavior. Friendly scientific selectors
-replace raw query syntax for common use; live refresh stays explicit, SABIO-RK
-does not require a credential, and no proposal enters simulation or the
-production registry automatically. The completed PR-24 BIO-003 slice added a
+replace raw query syntax for common use with official quoting/escaping and
+strict numeric SABIO IDs. Live refresh stays explicit on the shared
+fetch/freeze path and writes immutable query-specific bundles with checksummed
+raw pages plus a separate derived combined export; SABIO-RK does not require a
+credential, and no proposal enters simulation or the production registry
+automatically. The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
 researcher-facing BIO-002 example without adding validation data, calibration,
