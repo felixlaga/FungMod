@@ -340,6 +340,69 @@ def test_product_map_blocks_invalid_stoichiometric_yield_values(
         )
 
 
+def test_product_map_blocks_oversized_participant_stoichiometry_without_aborting(
+    tmp_path: Path,
+) -> None:
+    payload = _proposal().to_dict()
+    payload["proposed_records"]["product_maps"][0]["products"][0]["stoichiometry"] = 10**400
+    bundle = tmp_path / "oversized_participant"
+    _write_manifest(bundle, payload)
+
+    result = review_source_proposal(bundle)
+    blocked = next(record for record in result.records if record.record_id == REJECTED_PRODUCT_MAP_ID)
+    assert blocked.classification == "blocked_excluded"
+    assert any("finite positive numeric stoichiometry" in reason for reason in blocked.reasons)
+
+    for decision in ("reject", "defer"):
+        reviewed = review_source_proposal(
+            bundle,
+            curator="Dr Curator",
+            decisions={REJECTED_PRODUCT_MAP_ID: _decision(decision, "Oversized stoichiometry is malformed")},
+        )
+        reviewed_map = next(record for record in reviewed.records if record.record_id == REJECTED_PRODUCT_MAP_ID)
+        assert reviewed_map.decision == decision
+        assert reviewed_map.explicit_decision is True
+        assert reviewed_map.classification == "blocked_excluded"
+
+    with pytest.raises(CurationError, match="cannot be accepted.*finite positive numeric stoichiometry"):
+        review_source_proposal(
+            bundle,
+            curator="Dr Curator",
+            decisions={REJECTED_PRODUCT_MAP_ID: _decision("accept", "Attempted oversized acceptance")},
+        )
+
+
+def test_product_map_blocks_oversized_yield_without_aborting(tmp_path: Path) -> None:
+    payload = _proposal().to_dict()
+    yields = payload["proposed_records"]["product_maps"][0]["stoichiometric_yields"]
+    yields[next(iter(yields))] = 10**400
+    bundle = tmp_path / "oversized_yield"
+    _write_manifest(bundle, payload)
+
+    result = review_source_proposal(bundle)
+    blocked = next(record for record in result.records if record.record_id == REJECTED_PRODUCT_MAP_ID)
+    assert blocked.classification == "blocked_excluded"
+    assert "field 'stoichiometric_yields' must be positive finite numeric mapping" in blocked.reasons
+
+    for decision in ("reject", "defer"):
+        reviewed = review_source_proposal(
+            bundle,
+            curator="Dr Curator",
+            decisions={REJECTED_PRODUCT_MAP_ID: _decision(decision, "Oversized yield is malformed")},
+        )
+        reviewed_map = next(record for record in reviewed.records if record.record_id == REJECTED_PRODUCT_MAP_ID)
+        assert reviewed_map.decision == decision
+        assert reviewed_map.explicit_decision is True
+        assert reviewed_map.classification == "blocked_excluded"
+
+    with pytest.raises(CurationError, match="cannot be accepted.*positive finite numeric mapping"):
+        review_source_proposal(
+            bundle,
+            curator="Dr Curator",
+            decisions={REJECTED_PRODUCT_MAP_ID: _decision("accept", "Attempted oversized acceptance")},
+        )
+
+
 def test_product_map_yield_consistency_uses_tight_tolerance(tmp_path: Path) -> None:
     payload = _proposal().to_dict()
     yields = payload["proposed_records"]["product_maps"][0]["stoichiometric_yields"]

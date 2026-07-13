@@ -48,7 +48,9 @@ Completed in this pass:
   finite positive numerics, map unambiguously to product participant names or
   ids through the existing SABIO token normalization, and match participant
   stoichiometry within `1e-12` relative tolerance and zero absolute tolerance.
-  No stoichiometric conversion or fallback is performed.
+  Float-conversion overflow from oversized JSON integers is classified as
+  malformed rather than aborting review. No stoichiometric conversion or
+  fallback is performed.
 - Added explicit `accept`, `reject`, and `defer` decisions requiring curator
   identity, reason, ISO curation date, closed review-only/pending-promotion
   allowed use, and limitations. Acceptance additionally requires complete
@@ -79,7 +81,9 @@ registry immutability, deterministic transactional outputs and checksums,
 malformed/duplicate/path/decision failures, owned output replacement, canonical
 serialization, full path-component symlink rejection, strict product-map
 participant/yield stoichiometry and consistency, and offline socket
-containment.
+containment. Oversized participant stoichiometry and yield integers are covered
+as blocked records that cannot be accepted but can be explicitly rejected or
+deferred.
 `tests/test_roadmap_orchestration_status.py` keeps PR-44/PR-45, partial
 CURATION-001, future promotion, and deferred validation wording synchronized.
 
@@ -111,9 +115,9 @@ until source-backed observations satisfy its evidence gate.
 
 Verification:
 
-- Focused curation, source-provider, and discovery suite: 73 passed.
+- Focused curation, source-provider, and discovery suite: 75 passed.
 - Broad curation, SABIO-RK source/discovery/parser/fetch, Reaction 618,
-  registry, public-API, instruction-hierarchy, and roadmap suite: 167 passed.
+  registry, public-API, instruction-hierarchy, and roadmap suite: 169 passed.
 - `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache .venv/bin/python -m ruff check src tests`
   - Result: all checks passed.
 - `.venv/bin/python -m pyright --pythonpath .venv/bin/python`

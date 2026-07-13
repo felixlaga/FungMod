@@ -622,7 +622,7 @@ def _parsed_positive_number(value: Any) -> float | None:
         return None
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return None
     return parsed if math.isfinite(parsed) and parsed > 0.0 else None
 
@@ -652,7 +652,13 @@ def _case_template_product_map(value: Any) -> bool:
 
 
 def _finite_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        parsed = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return False
+    return math.isfinite(parsed)
 
 
 def _normalize_decisions(
