@@ -90,9 +90,10 @@ bundles, index traversal/symlink/out-of-root destinations, target-schema and
 loader-fidelity failures for unknown and omitted/defaulted fields, prospective
 full-registry validation failures, type-exact boolean/integer-versus-float
 comparisons, accepted-record blocker and provenance revalidation for memory and
-checksum-valid written bundles, deterministic digests/artifacts, refusal after
-plan mutation, safe owned output replacement, bidirectional registry-root
-overlap refusal with byte-preservation proof, and public exports.
+checksum-valid written bundles, shared ISO-date validation for accepted records
+from both input forms, deterministic digests/artifacts, refusal after plan
+mutation, safe owned output replacement, bidirectional registry-root overlap
+refusal with byte-preservation proof, and public exports.
 `tests/test_roadmap_orchestration_status.py` keeps the PR-45/PR-46/PR-47 queue,
 partial CURATION-001 status, and deferred validation wording synchronized.
 
@@ -127,12 +128,13 @@ its evidence gate.
 
 Verification:
 
-- Focused registry-promotion plan suite: 32 passed.
-- Focused promotion/curation/orchestration suite: 82 passed.
+- Focused registry-promotion plan suite: 34 passed.
+- Focused promotion/curation/orchestration suite: 84 passed.
+- Combined promotion/curation/registry-loading/public/status suite: 104 passed.
 - Broad curation, registry, public-API, instruction, hygiene, source-provider,
-  virtual-experiment, and roadmap suite: 221 passed.
+  virtual-experiment, and roadmap suite: 223 passed.
 - `MPLCONFIGDIR=/private/tmp/fungmod-mpl-cache PYTHONPATH=src /Users/felix/Documents/GitHub/FungMod/.venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`
-  - Result: 836 passed in 124.27 seconds; total coverage 84.74%, above
+  - Result: 838 passed in 127.10 seconds; total coverage 84.74%, above
     the required 80%; `registry_promotion.py` coverage 80%.
 - `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache PYTHONPATH=src /Users/felix/Documents/GitHub/FungMod/.venv/bin/python -m ruff check src tests`
   - Result: all checks passed. The main checkout interpreter is used because

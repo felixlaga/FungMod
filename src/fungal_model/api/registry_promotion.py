@@ -29,6 +29,7 @@ from fungal_model.api.curation import (
     CURATION_SCHEMA_VERSION,
     CurationRecord,
     CurationResult,
+    curation_date_is_iso,
     curation_source_provenance_missing,
 )
 from fungal_model.registry.loaders import load_registry
@@ -615,6 +616,12 @@ def _validate_accepted_curation(record_id: str, curation: Mapping[str, Any]) -> 
             raise RegistryPromotionPlanError(
                 f"Accepted record {record_id!r} requires non-empty curation.{field}."
             )
+    curation_date = curation.get("curation_date")
+    assert isinstance(curation_date, str)
+    if not curation_date_is_iso(curation_date):
+        raise RegistryPromotionPlanError(
+            f"Accepted record {record_id!r} requires curation_date in YYYY-MM-DD form."
+        )
     limitations = curation.get("limitations")
     if not _nonempty_string_sequence(limitations):
         raise RegistryPromotionPlanError(

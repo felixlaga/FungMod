@@ -89,6 +89,7 @@ def _curation_record(
     missing_fields: tuple[str, ...] = (),
     reasons: tuple[str, ...] = (),
     source_provenance: dict[str, Any] | None = None,
+    curation_date: str | None = None,
 ) -> CurationRecord:
     return CurationRecord(
         record_type=record_type,
@@ -105,7 +106,11 @@ def _curation_record(
             if explicit_decision
             else ""
         ),
-        curation_date="2026-07-13" if explicit_decision else "",
+        curation_date=(
+            curation_date
+            if curation_date is not None
+            else "2026-07-13" if explicit_decision else ""
+        ),
         allowed_use=(
             CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION
             if decision == "accept"
@@ -381,6 +386,33 @@ def test_accepted_curation_with_empty_provenance_is_rejected_for_memory_and_owne
     with pytest.raises(
         RegistryPromotionPlanError,
         match="incomplete source provenance.*source_database.*source_entry_ids",
+    ):
+        plan_registry_promotion(curation_input, registry_index=registry_index)
+
+    assert _registry_snapshot(registry_index) == before
+
+
+@pytest.mark.parametrize("written_bundle", [False, True])
+def test_accepted_curation_with_invalid_iso_date_is_rejected_for_both_inputs(
+    tmp_path: Path,
+    written_bundle: bool,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    before = _registry_snapshot(registry_index)
+    result = _curation_result(
+        _curation_record(
+            "parameter_records",
+            _synthetic_parameter(),
+            curation_date="not-an-iso-date",
+        )
+    )
+    curation_input: CurationResult | Path = result
+    if written_bundle:
+        curation_input = result.write(tmp_path / "dated_curation_bundle").output_directory
+
+    with pytest.raises(
+        RegistryPromotionPlanError,
+        match="requires curation_date in YYYY-MM-DD form",
     ):
         plan_registry_promotion(curation_input, registry_index=registry_index)
 

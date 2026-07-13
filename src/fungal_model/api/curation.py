@@ -722,12 +722,22 @@ def _validate_decision(record_id: str, decision: CurationDecision) -> None:
             f"Decision {decision.decision!r} for {record_id!r} requires allowed_use "
             f"{expected_allowed_use!r}."
         )
-    try:
-        date.fromisoformat(decision.curation_date)
-    except ValueError as exc:
-        raise CurationError(f"Decision for {record_id!r} requires curation_date in YYYY-MM-DD form.") from exc
+    if not curation_date_is_iso(decision.curation_date):
+        raise CurationError(
+            f"Decision for {record_id!r} requires curation_date in YYYY-MM-DD form."
+        )
     if not _nonempty_string_sequence(decision.limitations):
         raise CurationError(f"Decision for {record_id!r} requires explicit non-empty limitations.")
+
+
+def curation_date_is_iso(value: str) -> bool:
+    """Return whether a curation date satisfies the CURATION-001 ISO-date rule."""
+
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
 
 
 def _write_bundle(root: Path, result: CurationResult) -> None:
