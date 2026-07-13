@@ -69,7 +69,8 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-44 researcher source-provider onboarding UX after
+The current next PR is PR-45 source-proposal curation review bundle after
+PR-44 researcher source-provider onboarding merged as PR #59,
 PR-43 process-bound entropy-production-rate timeseries merged as PR #58 and
 PR-42 arbitrary-length linear enzyme-chain assembly merged as PR #57,
 the PR-41 Pyright optional-member-access ratchet merged as PR #56, the
@@ -181,15 +182,20 @@ process-rate trajectories only when explicit sourced condition-specific delta
 Gibbs, positive temperature, reaction-extent interpretation, and dimensionally
 compatible extent-rate units or conversion metadata are supplied. It fails on
 missing processes or dishonest metadata and adds no inferred thermodynamics,
-dynamic delta G, or solver-time enforcement after PR #58. The current PR-44
-slice adds a top-level SABIO-RK provider UX over existing fetch/freeze,
+dynamic delta G, or solver-time enforcement after PR #58. The completed PR-44
+slice added a top-level SABIO-RK provider UX over existing fetch/freeze,
 parsing, and review-only proposal behavior. Friendly scientific selectors
 replace raw query syntax for common use with official quoting/escaping and
 strict numeric SABIO IDs. Live refresh stays explicit on the shared
 fetch/freeze path and writes immutable query-specific bundles with checksummed
 raw pages plus a separate derived combined export; SABIO-RK does not require a
 credential, and no proposal enters simulation or the production registry
-automatically. The completed PR-24 BIO-003 slice added a
+automatically after PR #59. The current PR-45 slice validates in-memory or
+written source proposals, classifies exact schema blockers, and writes
+explicit curator decision bundles while leaving absent decisions deferred.
+It does not mutate the production registry or claim scientific validation;
+CURATION-001 remains partial until a separate promotion step exists. The
+completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
 researcher-facing BIO-002 example without adding validation data, calibration,
@@ -285,10 +291,12 @@ remain unsupported after PR #57. The completed PR-43 slice is limited to
 configured-output process-bound entropy-production-rate trajectories derived
 after simulation from existing native process-rate trajectories plus explicit
 sourced and dimensionally compatible metadata; it does not alter solver or
-process behavior after PR #58. The current PR-44 slice is limited to public
-source-provider onboarding for existing SABIO-RK behavior; it adds no provider
-beyond SABIO-RK, registry promotion, simulation-time fetch, scientific record,
-biology, solver behavior, thermodynamic behavior, or validation evidence.
+process behavior after PR #58. The completed PR-44 slice is limited to public
+source-provider onboarding for existing SABIO-RK behavior after PR #59. The
+current PR-45 slice is limited to review-only curation decisions over those
+proposals; it adds no automatic trust, registry promotion, simulation-time
+fetch, scientific record, biology, solver behavior, thermodynamic behavior, or
+validation evidence.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -362,12 +370,12 @@ completed after PR #55 as a virtual-experiment conservation diagnostics bridge.
 PR-41 completed after PR #56 as a Pyright optional-member-access ratchet. The
 PR-42 arbitrary-length linear enzyme-chain assembly slice completed after PR
 #57; branching and cycles remain unsupported. PR-43 process-bound
-entropy-production-rate configured diagnostics completed after PR #58. The
-current PR-44 slice is review-gated SABIO-RK researcher source onboarding rather
-than ingestion, digitization, fabricated validation data, calibration, or
-empirical comparison, and the recommended next simulator-building follow-up is a
-bounded public-API conservation diagnostics example notebook over the standard
-table/accessor and header-only guardrail.
+entropy-production-rate configured diagnostics completed after PR #58. PR-44
+review-gated SABIO-RK researcher source onboarding completed after PR #59. The
+current PR-45 slice is a review/decision bundle rather than production registry
+promotion, ingestion, digitization, fabricated validation data, calibration,
+or empirical comparison. Actual registry promotion remains a separate
+next/later CURATION-001 follow-up.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod

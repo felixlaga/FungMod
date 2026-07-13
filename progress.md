@@ -26,13 +26,109 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-45 CURATION-001 Source-Proposal Review And Decision Bundle
+
+Date: 2026-07-13
+
+Status: `current` for the bounded proposal-review and curator-decision bundle;
+PR-44 is complete after PR #59, CURATION-001 remains `partial`, and
+VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added top-level `review_source_proposal(...)` support for either an in-memory
+  `RegistryProposal` or its written `proposal_manifest.json` bundle through one
+  normalization and validation path.
+- Added per-record `eligible_for_review` versus `blocked_excluded`
+  classification with exact missing fields and reasons. Unknown biology,
+  parameters, units, and review-required fields remain explicit and are never
+  filled or inferred.
+- Added explicit `accept`, `reject`, and `defer` decisions requiring curator
+  identity, reason, ISO curation date, allowed use, limitations, and proposal
+  source snapshot/entry provenance. Every omitted decision remains deferred,
+  and blocked records cannot be accepted.
+- Added deterministic `curation_report.md`, `eligible_records.csv`,
+  `excluded_records.csv`, `proposed_registry_records.yml`,
+  `accepted_registry_records.yml`, `rejected_registry_records.yml`, and
+  checksummed `curation_manifest.json` artifacts with transactional directory
+  replacement for repeated writes.
+- Preserved proposed record values and metadata verbatim, including source and
+  normalized values/units plus conversion metadata when present. Accepted
+  artifacts add a curator decision block but retain review-only separation.
+- Rejected malformed manifests, duplicate record IDs, unknown decisions,
+  incomplete decision metadata, unknown decision record IDs, path traversal,
+  symlink inputs/outputs, and writes beneath `data_registry/`.
+- Exported the concise API at top level and added a README example with the
+  explicit non-promotion boundary.
+
+Tests added or modified: `tests/test_curation_review.py` covers normal frozen
+SABIO-RK review, all-deferred default behavior, explicit accepted/rejected
+decisions, exact blockers, provenance, value/unit/conversion preservation,
+registry immutability, deterministic transactional outputs and checksums,
+malformed/duplicate/path/decision failures, and offline socket containment.
+`tests/test_roadmap_orchestration_status.py` keeps PR-44/PR-45, partial
+CURATION-001, future promotion, and deferred validation wording synchronized.
+
+What did not change: `data_registry/`, simulation eligibility, source proposal
+generation, live-source behavior, parser behavior, process laws, solver and
+thermodynamic behavior, biology, parameters, units, validation data,
+calibration, and empirical comparison are unchanged.
+
+Scientific behavior impact: none. This slice validates proposal structure and
+records human decisions only. It does not establish scientific validity or
+authorize simulation.
+
+Backward compatibility: all existing source-provider, proposal, registry, and
+simulation APIs remain unchanged. The curation API and artifacts are additive.
+
+Remaining ambiguity and risk: curator decisions still require human scientific
+judgment. Acceptance in this bundle is not production registry promotion, and
+CURATION-001 remains partial until a separate explicit promotion operation is
+implemented and reviewed.
+
+Risk level: low to moderate. Runtime scope is isolated from simulation and the
+production registry, while file/bundle validation and replacement behavior are
+new public surfaces.
+
+Recommended next task: review and merge PR-45, then implement production
+registry promotion as a separate bounded CURATION-001 follow-up with explicit
+destination control and registry-schema validation. Keep validation deferred
+until source-backed observations satisfy its evidence gate.
+
+Verification:
+
+- Focused curation, source-provider, and discovery suite: 46 passed.
+- Broad curation, SABIO-RK source/discovery/parser/fetch, Reaction 618,
+  registry, public-API, instruction-hierarchy, and roadmap suite: 140 passed.
+- `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache .venv/bin/python -m ruff check src tests`
+  - Result: all checks passed.
+- `.venv/bin/python -m pyright --pythonpath .venv/bin/python`
+  - Result: 0 errors, 0 warnings, 0 informations.
+- `git diff --check`
+  - Result: passed.
+- Unfiltered full coverage gate: 773 passed, 1 failed; total coverage 84.85%.
+  The sole failure was the unrelated repository-hygiene assertion because the
+  ignored pre-existing
+  `notebooks/examples/.ipynb_checkpoints/10_virtual_experiment_product_tour-checkpoint.ipynb`
+  remains in the shared workspace with a 2026-06-20 timestamp. PR-45 did not
+  create, modify, delete, or stage it.
+- Final-tree full coverage gate excluding only that unrelated workspace-hygiene
+  assertion: 773 passed, 1 deselected; total coverage 84.85%. The new curation
+  module has 84% branch-aware coverage.
+- One initial broad-suite command named nonexistent
+  `tests/test_active_instruction_docs.py` and collected no tests; it was
+  corrected to `tests/test_active_instruction_hierarchy.py` in the green broad
+  run. A module-targeted coverage command also hit a NumPy collection error;
+  the repository-standard `--cov=fungal_model` commands collected and ran
+  normally.
+
 ## PR-44 Researcher Source-Provider Onboarding UX
 
 Date: 2026-07-12
 
-Status: `current` for the bounded public SABIO-RK provider UX slice; PR-43 is
-complete after PR #58, and VALIDATION-DATA-001 remains `deferred;
-blocked/partial` for ingestion.
+Status: `complete` after PR #59 merged for the bounded public SABIO-RK provider
+UX slice; PR-43 is complete after PR #58, and VALIDATION-DATA-001 remains
+`deferred; blocked/partial` for ingestion.
 
 Completed in this pass:
 
@@ -91,9 +187,9 @@ Remaining ambiguity and risk: SABIO-RK source completeness and scientific
 suitability still require human review. Only SABIO-RK is implemented, and live
 service behavior remains external to offline verification.
 
-Recommended next task: review and merge PR-44, then add the bounded public-API
-conservation diagnostics example notebook over the existing standard
-table/accessor and header-only guardrail.
+Recommended next task: implement PR-45 as a bounded CURATION-001
+source-proposal review and explicit decision bundle without production registry
+promotion.
 
 Verification:
 

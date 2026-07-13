@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status after PR-43 merged as PR #58, with PR-44 selected:
+Scoped status after PR-44 merged as PR #59, with PR-45 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -194,7 +194,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-44: researcher source-provider onboarding UX**.
+Current next PR: **PR-45: source-proposal curation review bundle**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -238,15 +238,20 @@ PR-42 is complete after PR #57. PR-43 is complete after PR #58; it derives proce
 entropy-production-rate trajectories after simulation only from native
 process-rate trajectories plus explicit sourced, dimensionally compatible
 metadata; missing or incompatible metadata fails instead of falling back.
-The selected PR-44 work adds the bounded top-level `provider="sabiork"`
+The completed PR-44 work added the bounded top-level `provider="sabiork"`
 researcher source-proposal UX over existing fetch/freeze/parser/proposal
 behavior. It accepts officially quoted/escaped friendly scientific selectors
 and strict numeric SABIO IDs, requires no SABIO-RK key, keeps refresh explicit
 through the shared fetch/freeze path, preserves checksummed raw pages in unique
 query-specific bundles, and emits review-only proposals without registry or
-simulation promotion. No BRENDA, CAZy, or other provider is claimed.
-Recommended next after PR-44: add a bounded public-API conservation diagnostics
-example notebook over the standard table/accessor and header-only guardrail.
+simulation promotion. No BRENDA, CAZy, or other provider is claimed. PR-44 is
+complete after PR #59.
+The selected PR-45 work adds bounded CURATION-001 schema review and explicit
+curator decision bundles for in-memory or written source proposals. It keeps
+omitted decisions deferred, reports exact blockers, writes deterministic
+review artifacts, and does not mutate `data_registry/`, promote records into
+simulation, or claim scientific validation. CURATION-001 remains partial;
+actual production registry promotion is a separate next/later PR.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer
