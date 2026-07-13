@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status after PR-45 merged as PR #60 (`5ac7864`), with PR-46 selected:
+Scoped status after PR-46 merged as PR #61 (`2b6c639`), with PR-47 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -12,6 +12,8 @@ BIO-READINESS-LITE: complete for the proposal template, validator, and tests.
 BIO-002: complete for arbitrary-length linear enzyme-chain assembly; branching
 and cycles remain unsupported.
 CASE-001: complete once PR-02 is merged for the researcher-facing named API path.
+CURATION-001: complete for the active acceptance criteria once current PR-47
+merges; promotion does not imply scientific validation or simulation authority.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
@@ -194,7 +196,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-46: registry-promotion preview plan**.
+Current next PR: **PR-47: digest-confirmed transactional registry apply**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -252,7 +254,7 @@ omitted decisions deferred, reports exact blockers, writes deterministic
 review artifacts, and does not mutate `data_registry/`, promote records into
 simulation, or claim scientific validation. PR-45 is complete after PR #60
 merged as `5ac7864`.
-The selected PR-46 work adds the preview-only
+The completed PR-46 work added the preview-only
 `plan_registry_promotion(...)` API for explicit accept decisions. It
 checksum-verifies written curation bundles, resolves only
 registry-index destinations, rejects unsafe paths, validates candidates and the
@@ -260,11 +262,28 @@ combined prospective registry through existing loaders, requires would-be adds
 to round-trip to the exact candidate mapping without silently dropped or
 synthesized/defaulted fields, classifies addable,
 exact-duplicate/no-op, conflict, and blocked/unsupported records, and emits
-exact prospective YAML plus hashes/digests. It has no registry mutation,
-overwrite, apply operation, version policy, simulation promotion, or scientific
-validation claim. Product maps remain blocked pending a destination contract.
-CURATION-001 remains partial; PR-47 digest-confirmed transactional apply is the
-separate next/later concern.
+exact prospective YAML plus hashes/digests. PR-46 is complete after PR #61
+merged as `2b6c639` and has no registry mutation path of its own.
+
+The selected PR-47 work adds `apply_registry_promotion(...)` over intentional
+plan schema `2.0.0`. Addable prospective records now carry deterministic
+`provenance.fungmod_curation` audit metadata, and written schema `1.0.0` plans
+remain preview-only and must be regenerated before apply. Apply requires the
+exact plan digest and exact next numeric patch version, resolves destinations
+only from the current index, rechecks full-root and target drift, stages and
+loader-validates a complete same-filesystem registry copy, excludes concurrent
+or reentrant cooperating writers, and swaps with verified rollback. Results
+record plan/confirmation binding, versions, digests, changed hashes, IDs, and
+transaction/cleanup state. Product maps remain blocked. No scientific fields,
+package version, solver/biology behavior, validation data, simulation
+authorization, or scientific-validation claim is added. The active
+CURATION-001 acceptance criteria are satisfied once PR-47 merges.
+
+Recommended next task after PR-47: PR-48 PRODUCT-001 per-process
+rate-trajectory fidelity over existing configured `process_rates.csv` rows.
+Preserve process IDs/rates in a standard table/accessor without a new rate law,
+inferred rate, solver change, biology, validation data, calibration, or
+empirical claim.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

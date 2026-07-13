@@ -1,7 +1,4 @@
-"""Deterministic preview plans for accepted curation records.
-
-This module intentionally has no production registry mutation or apply API.
-"""
+"""Deterministic plans and transactional apply for accepted curation records."""
 
 from __future__ import annotations
 
@@ -9,6 +6,7 @@ import csv
 import hashlib
 import hmac
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -33,10 +31,15 @@ from fungal_model.api.curation import (
     curation_source_provenance_missing,
 )
 from fungal_model.registry.loaders import load_registry
+from fungal_model.registry.store import FungModRegistry
 
 
-REGISTRY_PROMOTION_PLAN_SCHEMA_VERSION = "1.0.0"
+REGISTRY_PROMOTION_PLAN_SCHEMA_VERSION = "2.0.0"
 REGISTRY_PROMOTION_PLAN_MANIFEST_KIND = "fungmod_registry_promotion_plan_manifest"
+
+_PROMOTION_APPLY_POLICY = "digest_confirmed_transactional_registry_root_swap"
+_PROMOTION_VERSION_POLICY = "strict_next_numeric_patch_version"
+_CURATION_AUDIT_PROVENANCE_KEY = "fungmod_curation"
 
 PromotionClassification = Literal[
     "addable",
@@ -64,10 +67,15 @@ _CURATION_BUNDLE_FILES = frozenset(
     }
 )
 _SHA256_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
+_STRICT_VERSION_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 
 
 class RegistryPromotionPlanError(ValueError):
     """Raised when a safe deterministic promotion preview cannot be built."""
+
+
+class RegistryPromotionApplyError(RegistryPromotionPlanError):
+    """Raised when a registry promotion cannot be applied or rolled back safely."""
 
 
 @dataclass(frozen=True)
@@ -138,8 +146,70 @@ class RegistryPromotionPlanWriteResult:
 
 
 @dataclass(frozen=True)
+class RegistryPromotionAppliedFile:
+    """One exact file transition committed by registry promotion."""
+
+    registry_path: str
+    before_sha256: str
+    after_sha256: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "registry_path": self.registry_path,
+            "before_sha256": self.before_sha256,
+            "after_sha256": self.after_sha256,
+        }
+
+
+@dataclass(frozen=True)
+class RegistryPromotionApplyResult:
+    """Confirmed result of one complete registry-root transaction."""
+
+    registry_index_path: Path
+    registry_root: Path
+    old_registry_version: str
+    new_registry_version: str
+    plan_digest: str
+    confirmation_digest: str
+    before_registry_digest: str
+    planned_registry_digest: str
+    applied_registry_digest: str
+    changed_files: tuple[RegistryPromotionAppliedFile, ...]
+    applied_record_ids: tuple[str, ...]
+    exact_duplicate_record_ids: tuple[str, ...]
+    transaction_status: Literal["committed"]
+    rollback_status: Literal["not_required"]
+    backup_cleanup_status: Literal["complete"]
+    production_registry_mutated: Literal[True]
+    scientific_validation_claimed: Literal[False]
+    simulation_authorized: Literal[False]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "registry_index_path": str(self.registry_index_path),
+            "registry_root": str(self.registry_root),
+            "old_registry_version": self.old_registry_version,
+            "new_registry_version": self.new_registry_version,
+            "plan_digest": self.plan_digest,
+            "confirmation_digest": self.confirmation_digest,
+            "before_registry_digest": self.before_registry_digest,
+            "planned_registry_digest": self.planned_registry_digest,
+            "applied_registry_digest": self.applied_registry_digest,
+            "changed_files": [item.to_dict() for item in self.changed_files],
+            "applied_record_ids": list(self.applied_record_ids),
+            "exact_duplicate_record_ids": list(self.exact_duplicate_record_ids),
+            "transaction_status": self.transaction_status,
+            "rollback_status": self.rollback_status,
+            "backup_cleanup_status": self.backup_cleanup_status,
+            "production_registry_mutated": self.production_registry_mutated,
+            "scientific_validation_claimed": self.scientific_validation_claimed,
+            "simulation_authorized": self.simulation_authorized,
+        }
+
+
+@dataclass(frozen=True)
 class RegistryPromotionPlan:
-    """Validated preview of accepted records without a registry apply operation."""
+    """Validated preview whose exact digest can authorize transactional apply."""
 
     input_kind: Literal["curation_result", "written_curation_bundle"]
     registry_index_path: Path
@@ -180,9 +250,10 @@ class RegistryPromotionPlan:
             "prospective_registry_validated": True,
             "production_registry_mutated": False,
             "scientific_validation_claimed": False,
-            "apply_available": False,
-            "apply_policy": "deferred_to_pr47_digest_confirmed_transactional_apply",
-            "version_policy": "not_defined_deferred_to_later_apply_contract",
+            "simulation_authorized": False,
+            "apply_available": True,
+            "apply_policy": _PROMOTION_APPLY_POLICY,
+            "version_policy": _PROMOTION_VERSION_POLICY,
         }
 
     def write(self, output_dir: str | Path) -> RegistryPromotionPlanWriteResult:
@@ -230,7 +301,15 @@ class _RegistryIndex:
     path: Path
     root: Path
     sha256: str
+    version: str
+    payload: Mapping[str, Any]
     targets: Mapping[str, _TargetFile]
+
+
+@dataclass
+class _ApplyTransactionState:
+    transaction_status: Literal["not_started", "failed", "committed"] = "not_started"
+    rollback_status: Literal["not_required", "complete", "unproven"] = "not_required"
 
 
 def plan_registry_promotion(
@@ -317,17 +396,34 @@ def plan_registry_promotion(
             )
             continue
 
-        candidate_content = _merged_target_content(target, (item.target_record,))
+        try:
+            promoted_item = replace(
+                item,
+                target_record=_target_record_with_curation_audit(item),
+            )
+        except RegistryPromotionPlanError as exc:
+            candidates.append(
+                _candidate(
+                    item,
+                    registry_key=registry_key,
+                    classification="blocked_unsupported",
+                    reason=str(exc),
+                    target=target,
+                )
+            )
+            continue
+
+        candidate_content = _merged_target_content(target, (promoted_item.target_record,))
         validation_error = _staged_candidate_validation_error(
             index,
             target=target,
-            candidate=item,
+            candidate=promoted_item,
             overrides={target.relative_path: candidate_content},
         )
         if validation_error is not None:
             candidates.append(
                 _candidate(
-                    item,
+                    promoted_item,
                     registry_key=registry_key,
                     classification="blocked_unsupported",
                     reason=validation_error,
@@ -338,14 +434,14 @@ def plan_registry_promotion(
 
         candidates.append(
             _candidate(
-                item,
+                promoted_item,
                 registry_key=registry_key,
                 classification="addable",
                 reason="accepted_record_is_addable_without_overwrite",
                 target=target,
             )
         )
-        accepted_by_key.setdefault(registry_key, []).append(item)
+        accepted_by_key.setdefault(registry_key, []).append(promoted_item)
 
     prospective_files: list[ProspectiveRegistryFile] = []
     overrides: dict[str, str] = {}
@@ -410,6 +506,194 @@ def plan_registry_promotion(
     )
 
 
+def apply_registry_promotion(
+    plan_or_written_plan_bundle: RegistryPromotionPlan | str | Path,
+    *,
+    confirmation_digest: str,
+    new_registry_version: str,
+    registry_index: str | Path | None = None,
+) -> RegistryPromotionApplyResult:
+    """Apply one exact plan through a locked, full-registry-root transaction."""
+
+    try:
+        return _apply_registry_promotion(
+            plan_or_written_plan_bundle,
+            confirmation_digest=confirmation_digest,
+            new_registry_version=new_registry_version,
+            registry_index=registry_index,
+        )
+    except RegistryPromotionApplyError:
+        raise
+    except RegistryPromotionPlanError as exc:
+        raise RegistryPromotionApplyError(str(exc)) from exc
+
+
+def _apply_registry_promotion(
+    plan_or_written_plan_bundle: RegistryPromotionPlan | str | Path,
+    *,
+    confirmation_digest: str,
+    new_registry_version: str,
+    registry_index: str | Path | None = None,
+) -> RegistryPromotionApplyResult:
+    """Apply one exact plan through a locked, full-registry-root transaction.
+
+    Written bundles require an explicit current ``registry_index``. Absolute
+    paths serialized in a bundle are integrity-bound review metadata only and
+    are never used as write destinations.
+    """
+
+    if isinstance(plan_or_written_plan_bundle, RegistryPromotionPlan):
+        plan = plan_or_written_plan_bundle
+        selected_index = (
+            plan.registry_index_path if registry_index is None else Path(registry_index)
+        )
+    else:
+        plan = _plan_from_written_bundle(plan_or_written_plan_bundle)
+        if registry_index is None:
+            raise RegistryPromotionApplyError(
+                "Applying a written promotion-plan bundle requires an explicit current "
+                "registry_index; manifest absolute paths are never trusted as destinations."
+            )
+        selected_index = Path(registry_index)
+
+    _verify_plan_digest(plan)
+    if type(confirmation_digest) is not str or not hmac.compare_digest(
+        confirmation_digest,
+        plan.plan_digest,
+    ):
+        raise RegistryPromotionApplyError(
+            "confirmation_digest must type- and value-exactly match plan.plan_digest."
+        )
+    _validate_apply_candidate_set(plan)
+
+    initial_index = _load_registry_index(selected_index)
+    transaction_state = _ApplyTransactionState()
+    with _registry_apply_lock(
+        initial_index.root,
+        plan.plan_digest,
+        transaction_state=transaction_state,
+    ):
+        current_index = _load_registry_index(selected_index)
+        if current_index.root != initial_index.root:
+            raise RegistryPromotionApplyError(
+                "Registry index root changed while acquiring the single-writer lock."
+            )
+        old_version = _validate_version_transition(
+            current_index,
+            new_registry_version=new_registry_version,
+        )
+        overrides = _revalidate_plan_against_current_registry(plan, current_index)
+        index_content = _updated_registry_index_content(
+            current_index,
+            new_registry_version=new_registry_version,
+        )
+
+        stage_container = Path(
+            tempfile.mkdtemp(
+                prefix=f".{current_index.root.name}.promotion-stage-",
+                dir=current_index.root.parent,
+            )
+        )
+        stage_root = stage_container / current_index.root.name
+        stage_body_error: BaseException | None = None
+        try:
+            if stage_container.stat().st_dev != current_index.root.stat().st_dev:
+                raise RegistryPromotionApplyError(
+                    "Promotion stage is not on the registry root filesystem."
+                )
+            _registry_tree_hashes(current_index.root)
+            shutil.copytree(
+                current_index.root,
+                stage_root,
+                copy_function=shutil.copy2,
+            )
+            for relative_path, content in overrides.items():
+                destination = stage_root / relative_path
+                if not destination.is_file() or destination.is_symlink():
+                    raise RegistryPromotionApplyError(
+                        f"Staged promotion target is not a safe regular file: {relative_path}"
+                    )
+                destination.write_text(content, encoding="utf-8")
+            staged_index_path = stage_root / current_index.path.relative_to(current_index.root)
+            staged_index_path.write_text(index_content, encoding="utf-8")
+
+            staged_index = _load_registry_index(staged_index_path)
+            _validate_staged_apply(
+                plan,
+                source_index=current_index,
+                staged_index=staged_index,
+                new_registry_version=new_registry_version,
+                expected_target_overrides=overrides,
+            )
+            applied_digest = _registry_digest(staged_index, overrides={})
+            changed_files = _applied_file_transitions(
+                source_index=current_index,
+                staged_index=staged_index,
+                expected_target_overrides=overrides,
+            )
+
+            # This is intentionally the final source read before the first rename.
+            final_source = _load_registry_index(selected_index)
+            if final_source.root != current_index.root:
+                raise RegistryPromotionApplyError(
+                    "Registry root changed before the transactional swap."
+                )
+            _revalidate_plan_against_current_registry(plan, final_source)
+            _validate_current_registry(final_source)
+            applied_index = _commit_staged_registry(
+                stage_root=stage_root,
+                source_root=final_source.root,
+                index_relative_path=final_source.path.relative_to(final_source.root),
+                before_registry_digest=plan.before_registry_digest,
+                applied_registry_digest=applied_digest,
+                plan_digest=plan.plan_digest,
+                new_registry_version=new_registry_version,
+                plan=plan,
+                transaction_state=transaction_state,
+            )
+        except BaseException as exc:
+            stage_body_error = exc
+            raise
+        finally:
+            try:
+                shutil.rmtree(stage_container)
+            except OSError as exc:
+                prior_error = (
+                    "" if stage_body_error is None else f"; prior_error={stage_body_error}"
+                )
+                raise RegistryPromotionApplyError(
+                    f"transaction_status={transaction_state.transaction_status}; "
+                    f"rollback_status={transaction_state.rollback_status}; "
+                    f"stage_cleanup_status=failed; stage_path={stage_container}; cause={exc}"
+                    f"{prior_error}"
+                ) from exc
+
+    return RegistryPromotionApplyResult(
+        registry_index_path=applied_index.path,
+        registry_root=applied_index.root,
+        old_registry_version=old_version,
+        new_registry_version=new_registry_version,
+        plan_digest=plan.plan_digest,
+        confirmation_digest=confirmation_digest,
+        before_registry_digest=plan.before_registry_digest,
+        planned_registry_digest=plan.prospective_registry_digest,
+        applied_registry_digest=applied_digest,
+        changed_files=changed_files,
+        applied_record_ids=tuple(
+            sorted(item.record_id for item in plan.addable_records)
+        ),
+        exact_duplicate_record_ids=tuple(
+            sorted(item.record_id for item in plan.exact_duplicates)
+        ),
+        transaction_status="committed",
+        rollback_status="not_required",
+        backup_cleanup_status="complete",
+        production_registry_mutated=True,
+        scientific_validation_claimed=False,
+        simulation_authorized=False,
+    )
+
+
 def _candidate(
     item: _AcceptedRecord,
     *,
@@ -457,13 +741,22 @@ def _plan_digest_payload(
         "prospective_files": [item.to_dict() for item in prospective_files],
         "production_registry_mutated": False,
         "scientific_validation_claimed": False,
-        "apply_available": False,
-        "apply_policy": "deferred_to_pr47_digest_confirmed_transactional_apply",
-        "version_policy": "not_defined_deferred_to_later_apply_contract",
+        "simulation_authorized": False,
+        "apply_available": True,
+        "apply_policy": _PROMOTION_APPLY_POLICY,
+        "version_policy": _PROMOTION_VERSION_POLICY,
     }
 
 
 def _verify_plan_digest(plan: RegistryPromotionPlan) -> None:
+    if (
+        type(plan.plan_digest) is not str
+        or _SHA256_PATTERN.fullmatch(plan.plan_digest) is None
+        or plan.plan_digest != plan.plan_digest.lower()
+    ):
+        raise RegistryPromotionPlanError(
+            "Registry promotion plan_digest must be a lowercase SHA-256 hex digest."
+        )
     payload = _plan_digest_payload(
         input_kind=plan.input_kind,
         registry_index_path=plan.registry_index_path,
@@ -478,6 +771,917 @@ def _verify_plan_digest(plan: RegistryPromotionPlan) -> None:
         raise RegistryPromotionPlanError(
             "Registry promotion plan contents changed after construction; refusing to write."
         )
+
+
+def _plan_from_written_bundle(value: str | Path) -> RegistryPromotionPlan:
+    manifest_path = _promotion_plan_manifest_path(value)
+    manifest = _read_json_mapping(manifest_path, label="Promotion-plan manifest")
+    if manifest.get("kind") != REGISTRY_PROMOTION_PLAN_MANIFEST_KIND:
+        raise RegistryPromotionApplyError(
+            f"Written input is not an owned promotion-plan bundle of kind "
+            f"{REGISTRY_PROMOTION_PLAN_MANIFEST_KIND!r}."
+        )
+    schema_version = manifest.get("schema_version")
+    if schema_version != REGISTRY_PROMOTION_PLAN_SCHEMA_VERSION:
+        if schema_version == "1.0.0":
+            raise RegistryPromotionApplyError(
+                "Pre-PR-47 promotion-plan schema '1.0.0' is preview-only and lacks "
+                "durable curation audit provenance; regenerate the plan before apply."
+            )
+        raise RegistryPromotionApplyError(
+            f"Unsupported promotion-plan schema version {schema_version!r}."
+        )
+    _validate_plan_manifest_contract(manifest)
+
+    raw_candidates = manifest.get("candidates")
+    raw_prospective = manifest.get("prospective_files")
+    if not isinstance(raw_candidates, list) or not isinstance(raw_prospective, list):
+        raise RegistryPromotionApplyError(
+            "Promotion-plan manifest requires candidates and prospective_files lists."
+        )
+    candidates = tuple(
+        _candidate_from_manifest(item, index=index)
+        for index, item in enumerate(raw_candidates)
+    )
+
+    root = manifest_path.parent
+    prospective_files = tuple(
+        _prospective_file_from_manifest(root, item, index=index)
+        for index, item in enumerate(raw_prospective)
+    )
+    expected_artifacts = {
+        "promotion_report.md",
+        "candidate_classifications.yml",
+        *(
+            f"prospective_registry/{item.target_registry_path}"
+            for item in prospective_files
+        ),
+    }
+    declared = _verify_plan_bundle_artifacts(
+        root,
+        manifest,
+        expected_artifacts=expected_artifacts,
+    )
+    candidate_payload = _read_yaml_mapping(
+        declared["candidate_classifications.yml"],
+        label="Promotion candidate classifications",
+    )
+    if candidate_payload.get("kind") != "fungmod_registry_promotion_plan_candidates":
+        raise RegistryPromotionApplyError(
+            "Promotion candidate artifact has an unsupported kind."
+        )
+    if candidate_payload.get("schema_version") != REGISTRY_PROMOTION_PLAN_SCHEMA_VERSION:
+        raise RegistryPromotionApplyError(
+            "Promotion candidate artifact has an unsupported schema version."
+        )
+    if candidate_payload.get("plan_digest") != manifest.get("plan_digest"):
+        raise RegistryPromotionApplyError(
+            "Promotion candidate artifact plan digest does not match its manifest."
+        )
+    if candidate_payload.get("production_registry_mutated") is not False:
+        raise RegistryPromotionApplyError(
+            "Promotion candidate artifact must declare production_registry_mutated: false."
+        )
+    if candidate_payload.get("scientific_validation_claimed") is not False:
+        raise RegistryPromotionApplyError(
+            "Promotion candidate artifact must declare scientific_validation_claimed: false."
+        )
+    if not _type_exact_equal(
+        candidate_payload.get("records"),
+        [item.to_dict() for item in candidates],
+    ):
+        raise RegistryPromotionApplyError(
+            "Promotion candidate artifact does not exactly match manifest candidates."
+        )
+
+    input_kind = manifest.get("input_kind")
+    if input_kind not in {"curation_result", "written_curation_bundle"}:
+        raise RegistryPromotionApplyError(
+            f"Promotion-plan manifest has unsupported input_kind {input_kind!r}."
+        )
+    plan = RegistryPromotionPlan(
+        input_kind=input_kind,
+        registry_index_path=Path(_required_manifest_string(manifest, "registry_index_path")),
+        registry_root=Path(_required_manifest_string(manifest, "registry_root")),
+        registry_index_sha256=_required_digest(manifest, "registry_index_sha256"),
+        before_registry_digest=_required_digest(manifest, "before_registry_digest"),
+        prospective_registry_digest=_required_digest(
+            manifest,
+            "prospective_registry_digest",
+        ),
+        candidates=candidates,
+        prospective_files=prospective_files,
+        plan_digest=_required_digest(manifest, "plan_digest"),
+    )
+    _verify_plan_digest(plan)
+    if not _type_exact_equal(manifest.get("summary"), plan.summary()):
+        raise RegistryPromotionApplyError(
+            "Promotion-plan manifest summary does not match its exact plan contents."
+        )
+    _validate_bundle_candidate_prospective_consistency(plan)
+    return plan
+
+
+def _promotion_plan_manifest_path(value: str | Path) -> Path:
+    path = Path(value)
+    if ".." in path.parts:
+        raise RegistryPromotionApplyError(
+            f"Promotion-plan bundle path traversal is not allowed: {path}"
+        )
+    _reject_symlink_components(path, label="Promotion-plan bundle path")
+    manifest = path / "promotion_plan.json" if path.is_dir() else path
+    if manifest.name != "promotion_plan.json":
+        raise RegistryPromotionApplyError(
+            "Written promotion-plan input must be a bundle directory or promotion_plan.json."
+        )
+    _reject_symlink_components(manifest, label="Promotion-plan manifest path")
+    if not manifest.is_file():
+        raise RegistryPromotionApplyError(
+            f"Promotion-plan manifest does not exist: {manifest}"
+        )
+    return manifest.resolve(strict=True)
+
+
+def _validate_plan_manifest_contract(manifest: Mapping[str, Any]) -> None:
+    required_values = {
+        "production_registry_mutated": False,
+        "scientific_validation_claimed": False,
+        "simulation_authorized": False,
+        "apply_available": True,
+        "apply_policy": _PROMOTION_APPLY_POLICY,
+        "version_policy": _PROMOTION_VERSION_POLICY,
+    }
+    for field, expected in required_values.items():
+        if not _type_exact_equal(manifest.get(field), expected):
+            raise RegistryPromotionApplyError(
+                f"Promotion-plan manifest requires {field}: {expected!r}."
+            )
+
+
+def _candidate_from_manifest(value: Any, *, index: int) -> RegistryPromotionCandidate:
+    if not isinstance(value, Mapping):
+        raise RegistryPromotionApplyError(
+            f"Promotion candidate at index {index} must be a mapping."
+        )
+    expected_fields = {
+        "record_type",
+        "registry_key",
+        "record_id",
+        "classification",
+        "reason",
+        "target_path",
+        "target_registry_path",
+        "before_sha256",
+        "after_sha256",
+        "target_record",
+        "curation_metadata",
+    }
+    if set(value) != expected_fields:
+        raise RegistryPromotionApplyError(
+            f"Promotion candidate at index {index} has an unexpected field set."
+        )
+    classification = value.get("classification")
+    if classification not in {
+        "addable",
+        "exact_duplicate",
+        "conflict",
+        "blocked_unsupported",
+    }:
+        raise RegistryPromotionApplyError(
+            f"Promotion candidate at index {index} has invalid classification."
+        )
+    target_record = value.get("target_record")
+    curation_metadata = value.get("curation_metadata")
+    if not isinstance(target_record, Mapping) or not isinstance(curation_metadata, Mapping):
+        raise RegistryPromotionApplyError(
+            f"Promotion candidate at index {index} requires target and curation mappings."
+        )
+    registry_key = value.get("registry_key")
+    target_path = value.get("target_path")
+    target_registry_path = value.get("target_registry_path")
+    if registry_key is not None and not isinstance(registry_key, str):
+        raise RegistryPromotionApplyError(
+            f"Promotion candidate at index {index} has invalid registry_key."
+        )
+    if target_path is not None and not isinstance(target_path, str):
+        raise RegistryPromotionApplyError(
+            f"Promotion candidate at index {index} has invalid target_path."
+        )
+    if target_registry_path is not None:
+        _validate_relative_registry_path(
+            target_registry_path,
+            label=f"Promotion candidate at index {index} target_registry_path",
+        )
+    return RegistryPromotionCandidate(
+        record_type=_required_manifest_string(value, "record_type"),
+        registry_key=registry_key,
+        record_id=_required_manifest_string(value, "record_id"),
+        classification=classification,
+        reason=_required_manifest_string(value, "reason"),
+        target_path=None if target_path is None else Path(target_path),
+        target_registry_path=target_registry_path,
+        before_sha256=_optional_manifest_digest(value, "before_sha256"),
+        after_sha256=_optional_manifest_digest(value, "after_sha256"),
+        target_record=deepcopy(dict(target_record)),
+        curation_metadata=deepcopy(dict(curation_metadata)),
+    )
+
+
+def _prospective_file_from_manifest(
+    root: Path,
+    value: Any,
+    *,
+    index: int,
+) -> ProspectiveRegistryFile:
+    if not isinstance(value, Mapping):
+        raise RegistryPromotionApplyError(
+            f"Prospective registry file at index {index} must be a mapping."
+        )
+    expected_fields = {
+        "registry_key",
+        "target_path",
+        "target_registry_path",
+        "before_sha256",
+        "after_sha256",
+        "artifact_path",
+    }
+    if set(value) != expected_fields:
+        raise RegistryPromotionApplyError(
+            f"Prospective registry file at index {index} has an unexpected field set."
+        )
+    target_registry_path = _required_manifest_string(value, "target_registry_path")
+    _validate_relative_registry_path(
+        target_registry_path,
+        label=f"Prospective registry file at index {index} target_registry_path",
+    )
+    artifact_path = _required_manifest_string(value, "artifact_path")
+    expected_artifact = f"prospective_registry/{target_registry_path}"
+    if artifact_path != expected_artifact:
+        raise RegistryPromotionApplyError(
+            f"Prospective registry artifact path must be {expected_artifact!r}."
+        )
+    artifact = root / artifact_path
+    _reject_symlink_components(artifact, label="Prospective registry artifact path")
+    try:
+        content = artifact.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise RegistryPromotionApplyError(
+            f"Cannot read prospective registry artifact {artifact}: {exc}"
+        ) from exc
+    after_sha256 = _required_digest(value, "after_sha256")
+    if not hmac.compare_digest(
+        _sha256_bytes(content.encode("utf-8")),
+        after_sha256,
+    ):
+        raise RegistryPromotionApplyError(
+            f"Prospective registry content hash does not match for {target_registry_path!r}."
+        )
+    return ProspectiveRegistryFile(
+        registry_key=_required_manifest_string(value, "registry_key"),
+        target_path=Path(_required_manifest_string(value, "target_path")),
+        target_registry_path=target_registry_path,
+        before_sha256=_required_digest(value, "before_sha256"),
+        after_sha256=after_sha256,
+        content=content,
+    )
+
+
+def _verify_plan_bundle_artifacts(
+    root: Path,
+    manifest: Mapping[str, Any],
+    *,
+    expected_artifacts: set[str],
+) -> dict[str, Path]:
+    files = manifest.get("files")
+    if not isinstance(files, Mapping) or set(files) != expected_artifacts:
+        raise RegistryPromotionApplyError(
+            "Promotion-plan manifest artifact set does not match its owned schema."
+        )
+    actual_hashes = _bundle_tree_hashes(root)
+    if set(actual_hashes) != expected_artifacts | {"promotion_plan.json"}:
+        raise RegistryPromotionApplyError(
+            "Promotion-plan bundle contains missing or undeclared artifacts."
+        )
+    declared: dict[str, Path] = {}
+    for name in sorted(expected_artifacts):
+        _validate_relative_registry_path(name, label="Promotion-plan artifact path")
+        expected_digest = _required_digest(files, name)
+        if not hmac.compare_digest(actual_hashes[name], expected_digest):
+            raise RegistryPromotionApplyError(
+                f"Promotion-plan artifact checksum mismatch for {name!r}."
+            )
+        declared[name] = (root / name).resolve(strict=True)
+    return declared
+
+
+def _bundle_tree_hashes(root: Path) -> dict[str, str]:
+    hashes: dict[str, str] = {}
+    for current_root, raw_directories, raw_files in os.walk(
+        root,
+        topdown=True,
+        onerror=_raise_bundle_walk_error,
+        followlinks=False,
+    ):
+        current = Path(current_root)
+        for name in sorted(raw_directories):
+            path = current / name
+            if path.is_symlink() or not path.is_dir():
+                raise RegistryPromotionApplyError(
+                    f"Promotion-plan bundle contains an unsafe entry: {path}"
+                )
+        for name in sorted(raw_files):
+            path = current / name
+            if path.is_symlink() or not path.is_file():
+                raise RegistryPromotionApplyError(
+                    f"Promotion-plan bundle contains an unsafe entry: {path}"
+                )
+            hashes[path.relative_to(root).as_posix()] = _sha256_bytes(path.read_bytes())
+    return hashes
+
+
+def _validate_bundle_candidate_prospective_consistency(
+    plan: RegistryPromotionPlan,
+) -> None:
+    prospective_by_key: dict[str, ProspectiveRegistryFile] = {}
+    for prospective in plan.prospective_files:
+        if prospective.registry_key in prospective_by_key:
+            raise RegistryPromotionApplyError(
+                f"Promotion plan repeats prospective registry key {prospective.registry_key!r}."
+            )
+        prospective_by_key[prospective.registry_key] = prospective
+
+    addable_by_key: dict[str, list[RegistryPromotionCandidate]] = {}
+    for candidate in plan.candidates:
+        if candidate.classification != "addable":
+            continue
+        if candidate.registry_key is None:
+            raise RegistryPromotionApplyError(
+                f"Addable record {candidate.record_id!r} lacks a registry key."
+            )
+        addable_by_key.setdefault(candidate.registry_key, []).append(candidate)
+    if set(prospective_by_key) != set(addable_by_key):
+        raise RegistryPromotionApplyError(
+            "Promotion plan addable candidates and prospective files do not match."
+        )
+    for key, candidates in addable_by_key.items():
+        prospective = prospective_by_key[key]
+        payload = _yaml_mapping_from_text(
+            prospective.content,
+            label=f"Prospective registry file {prospective.target_registry_path}",
+        )
+        if payload.get("kind") != "fungmod_registry_records" or payload.get("record_type") != key:
+            raise RegistryPromotionApplyError(
+                f"Prospective registry content for {key!r} has the wrong kind or record type."
+            )
+        records = payload.get("records")
+        if not isinstance(records, list):
+            raise RegistryPromotionApplyError(
+                f"Prospective registry content for {key!r} requires a records list."
+            )
+        for candidate in candidates:
+            matches = [
+                item
+                for item in records
+                if isinstance(item, Mapping)
+                and _type_exact_equal(item, candidate.target_record)
+            ]
+            if len(matches) != 1:
+                raise RegistryPromotionApplyError(
+                    f"Prospective registry content does not contain exactly one exact "
+                    f"record for {candidate.record_id!r}."
+                )
+
+
+def _required_manifest_string(value: Mapping[str, Any], field: str) -> str:
+    item = value.get(field)
+    if not isinstance(item, str) or not item:
+        raise RegistryPromotionApplyError(
+            f"Promotion-plan field {field!r} must be a non-empty string."
+        )
+    return item
+
+
+def _required_digest(value: Mapping[str, Any], field: str) -> str:
+    digest = _required_manifest_string(value, field)
+    if _SHA256_PATTERN.fullmatch(digest) is None or digest != digest.lower():
+        raise RegistryPromotionApplyError(
+            f"Promotion-plan field {field!r} must be a lowercase SHA-256 digest."
+        )
+    return digest
+
+
+def _optional_manifest_digest(value: Mapping[str, Any], field: str) -> str | None:
+    digest = value.get(field)
+    if digest is None:
+        return None
+    return _required_digest(value, field)
+
+
+def _validate_relative_registry_path(value: Any, *, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise RegistryPromotionApplyError(f"{label} must be a non-empty string.")
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts:
+        raise RegistryPromotionApplyError(f"{label} must be a safe relative path.")
+    return value
+
+
+def _yaml_mapping_from_text(value: str, *, label: str) -> Mapping[str, Any]:
+    try:
+        payload = yaml.safe_load(value)
+    except yaml.YAMLError as exc:
+        raise RegistryPromotionApplyError(f"Malformed {label}: {exc}") from exc
+    if not isinstance(payload, Mapping):
+        raise RegistryPromotionApplyError(f"{label} must contain a YAML mapping.")
+    return payload
+
+
+def _validate_apply_candidate_set(plan: RegistryPromotionPlan) -> None:
+    if plan.conflicts or plan.blocked_records:
+        raise RegistryPromotionApplyError(
+            "Promotion apply refuses any plan containing conflict or blocked_unsupported candidates."
+        )
+    if not plan.addable_records:
+        raise RegistryPromotionApplyError(
+            "Promotion apply requires at least one addable record; exact duplicates alone are a no-op."
+        )
+    identifiers = [item.record_id for item in plan.candidates]
+    if len(identifiers) != len(set(identifiers)):
+        raise RegistryPromotionApplyError(
+            "Promotion apply refuses duplicate candidate record IDs."
+        )
+    for candidate in plan.candidates:
+        _validate_accepted_curation(candidate.record_id, candidate.curation_metadata)
+        _validate_target_record(candidate.record_id, candidate.target_record)
+        expected_key = _CURATION_TO_REGISTRY_KEY.get(candidate.record_type)
+        if expected_key is None or candidate.record_type == "product_maps":
+            raise RegistryPromotionApplyError(
+                f"Promotion apply does not support record type {candidate.record_type!r}."
+            )
+        if candidate.registry_key != expected_key:
+            raise RegistryPromotionApplyError(
+                f"Promotion candidate {candidate.record_id!r} has inconsistent registry mapping."
+            )
+        if candidate.classification == "addable":
+            if candidate.reason != "accepted_record_is_addable_without_overwrite":
+                raise RegistryPromotionApplyError(
+                    f"Addable candidate {candidate.record_id!r} has an unsupported reason."
+                )
+            _validate_exact_curation_audit(candidate)
+        elif candidate.classification == "exact_duplicate":
+            if candidate.reason != "exact_record_content_already_present_no_op":
+                raise RegistryPromotionApplyError(
+                    f"Exact duplicate {candidate.record_id!r} has an unsupported reason."
+                )
+        else:
+            raise RegistryPromotionApplyError(
+                f"Promotion apply refuses candidate classification {candidate.classification!r}."
+            )
+    _validate_bundle_candidate_prospective_consistency(plan)
+
+
+def _validate_exact_curation_audit(candidate: RegistryPromotionCandidate) -> None:
+    provenance = candidate.target_record.get("provenance")
+    if not isinstance(provenance, Mapping):
+        raise RegistryPromotionApplyError(
+            f"Addable candidate {candidate.record_id!r} lacks mapping provenance."
+        )
+    audit = provenance.get(_CURATION_AUDIT_PROVENANCE_KEY)
+    expected = _curation_audit_payload(candidate.curation_metadata)
+    if not _type_exact_equal(audit, expected):
+        raise RegistryPromotionApplyError(
+            f"Addable candidate {candidate.record_id!r} lacks exact durable curation audit metadata."
+        )
+
+
+def _validate_version_transition(
+    index: _RegistryIndex,
+    *,
+    new_registry_version: str,
+) -> str:
+    current_version = index.payload.get("version")
+    if type(current_version) is not str:
+        raise RegistryPromotionApplyError(
+            "Current registry version must be a strict numeric MAJOR.MINOR.PATCH string."
+        )
+    if type(new_registry_version) is not str:
+        raise RegistryPromotionApplyError(
+            "new_registry_version must be a strict numeric MAJOR.MINOR.PATCH string."
+        )
+    current = _strict_version_parts(current_version, label="Current registry version")
+    proposed = _strict_version_parts(new_registry_version, label="new_registry_version")
+    expected = (current[0], current[1], current[2] + 1)
+    if proposed != expected:
+        expected_text = ".".join(str(item) for item in expected)
+        raise RegistryPromotionApplyError(
+            f"new_registry_version must be exactly the next patch version {expected_text!r}."
+        )
+    return current_version
+
+
+def _strict_version_parts(value: str, *, label: str) -> tuple[int, int, int]:
+    match = _STRICT_VERSION_PATTERN.fullmatch(value)
+    if match is None:
+        raise RegistryPromotionApplyError(
+            f"{label} must be strict numeric MAJOR.MINOR.PATCH without prerelease or leading zeros."
+        )
+    major, minor, patch = match.groups()
+    return int(major), int(minor), int(patch)
+
+
+def _revalidate_plan_against_current_registry(
+    plan: RegistryPromotionPlan,
+    index: _RegistryIndex,
+) -> dict[str, str]:
+    _validate_current_registry(index)
+    if not hmac.compare_digest(index.sha256, plan.registry_index_sha256):
+        raise RegistryPromotionApplyError(
+            "Registry index SHA changed after planning; refusing stale promotion apply."
+        )
+    before_digest = _registry_digest(index, overrides={})
+    if not hmac.compare_digest(before_digest, plan.before_registry_digest):
+        raise RegistryPromotionApplyError(
+            "Registry root digest changed after planning; refusing stale promotion apply."
+        )
+
+    addable_by_key: dict[str, list[RegistryPromotionCandidate]] = {}
+    prospective_by_key = {item.registry_key: item for item in plan.prospective_files}
+    if len(prospective_by_key) != len(plan.prospective_files):
+        raise RegistryPromotionApplyError("Promotion plan repeats a prospective registry key.")
+    for candidate in plan.candidates:
+        registry_key = candidate.registry_key
+        if registry_key is None:
+            raise RegistryPromotionApplyError(
+                f"Promotion candidate {candidate.record_id!r} lacks a registry key."
+            )
+        target = index.targets.get(registry_key)
+        if target is None:
+            raise RegistryPromotionApplyError(
+                f"Current registry index has no destination for {registry_key!r}."
+            )
+        if candidate.target_registry_path != target.relative_path:
+            raise RegistryPromotionApplyError(
+                f"Promotion candidate {candidate.record_id!r} destination no longer matches "
+                "the current registry index mapping."
+            )
+        if candidate.before_sha256 != target.before_sha256:
+            raise RegistryPromotionApplyError(
+                f"Promotion candidate {candidate.record_id!r} target hash is stale."
+            )
+        existing = _record_by_id(target, candidate.record_id)
+        if candidate.classification == "addable":
+            if existing is not None:
+                raise RegistryPromotionApplyError(
+                    f"Promotion candidate {candidate.record_id!r} now exists; overwrite is forbidden."
+                )
+            addable_by_key.setdefault(registry_key, []).append(candidate)
+        elif candidate.classification == "exact_duplicate":
+            if existing is None or not _type_exact_equal(existing, candidate.target_record):
+                raise RegistryPromotionApplyError(
+                    f"Exact duplicate {candidate.record_id!r} no longer matches raw registry content."
+                )
+            if candidate.after_sha256 != target.before_sha256:
+                raise RegistryPromotionApplyError(
+                    f"Exact duplicate {candidate.record_id!r} has inconsistent no-op hashes."
+                )
+
+    if set(addable_by_key) != set(prospective_by_key):
+        raise RegistryPromotionApplyError(
+            "Addable candidate destinations do not match prospective registry files."
+        )
+    overrides: dict[str, str] = {}
+    for registry_key, candidates in sorted(addable_by_key.items()):
+        target = index.targets[registry_key]
+        prospective = prospective_by_key[registry_key]
+        if prospective.target_registry_path != target.relative_path:
+            raise RegistryPromotionApplyError(
+                f"Prospective destination for {registry_key!r} no longer matches the current index."
+            )
+        if prospective.before_sha256 != target.before_sha256:
+            raise RegistryPromotionApplyError(
+                f"Prospective before hash for {registry_key!r} is stale."
+            )
+        expected_content = _merged_target_content(
+            target,
+            tuple(
+                item.target_record
+                for item in sorted(candidates, key=lambda value: value.record_id)
+            ),
+        )
+        if prospective.content != expected_content:
+            raise RegistryPromotionApplyError(
+                f"Prospective content for {registry_key!r} is not the exact current merge."
+            )
+        expected_hash = _sha256_bytes(expected_content.encode("utf-8"))
+        if not hmac.compare_digest(expected_hash, prospective.after_sha256):
+            raise RegistryPromotionApplyError(
+                f"Prospective after hash for {registry_key!r} does not match its content."
+            )
+        if any(item.after_sha256 != expected_hash for item in candidates):
+            raise RegistryPromotionApplyError(
+                f"Addable candidate after hashes for {registry_key!r} are inconsistent."
+            )
+        overrides[target.relative_path] = expected_content
+    planned_digest = _registry_digest(index, overrides=overrides)
+    if not hmac.compare_digest(planned_digest, plan.prospective_registry_digest):
+        raise RegistryPromotionApplyError(
+            "Recomputed prospective registry digest does not match the confirmed plan."
+        )
+    return overrides
+
+
+def _updated_registry_index_content(
+    index: _RegistryIndex,
+    *,
+    new_registry_version: str,
+) -> str:
+    payload = deepcopy(dict(index.payload))
+    payload["version"] = new_registry_version
+    content = yaml.safe_dump(
+        payload,
+        sort_keys=False,
+        allow_unicode=False,
+        default_flow_style=False,
+    )
+    reloaded = _yaml_mapping_from_text(content, label="Updated registry index")
+    if not _type_exact_equal(reloaded, payload):
+        raise RegistryPromotionApplyError(
+            "Updated registry index did not round-trip type-exactly."
+        )
+    return content
+
+
+@contextmanager
+def _registry_apply_lock(
+    root: Path,
+    plan_digest: str,
+    *,
+    transaction_state: _ApplyTransactionState,
+) -> Iterator[Path]:
+    lock_path = root.parent / f".{root.name}.fungmod-registry-promotion.lock"
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    try:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except FileExistsError as exc:
+        raise RegistryPromotionApplyError(
+            f"Registry promotion single-writer lock is already held: {lock_path}"
+        ) from exc
+    payload = (
+        json.dumps(
+            {"pid": os.getpid(), "plan_digest": plan_digest},
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("utf-8")
+    initialization_error: OSError | None = None
+    try:
+        written = os.write(descriptor, payload)
+        if written != len(payload):
+            raise OSError("single-writer lock payload was only partially written")
+    except OSError as exc:
+        initialization_error = exc
+    try:
+        os.close(descriptor)
+    except OSError as exc:
+        if initialization_error is None:
+            initialization_error = exc
+    if initialization_error is not None:
+        try:
+            lock_path.unlink()
+        except OSError as cleanup_error:
+            raise RegistryPromotionApplyError(
+                "transaction_status=not_started; rollback_status=not_required; "
+                f"lock_cleanup_status=failed; lock_path={lock_path}; "
+                f"cause={cleanup_error}; prior_error={initialization_error}"
+            ) from cleanup_error
+        raise RegistryPromotionApplyError(
+            f"Registry promotion lock initialization failed at {lock_path}: "
+            f"{initialization_error}"
+        ) from initialization_error
+    body_error: BaseException | None = None
+    try:
+        yield lock_path
+    except BaseException as exc:
+        body_error = exc
+        raise
+    finally:
+        try:
+            lock_path.unlink()
+        except OSError as exc:
+            prior_error = "" if body_error is None else f"; prior_error={body_error}"
+            raise RegistryPromotionApplyError(
+                f"transaction_status={transaction_state.transaction_status}; "
+                f"rollback_status={transaction_state.rollback_status}; "
+                f"lock_cleanup_status=failed; lock_path={lock_path}; cause={exc}"
+                f"{prior_error}"
+            ) from exc
+
+
+def _validate_staged_apply(
+    plan: RegistryPromotionPlan,
+    *,
+    source_index: _RegistryIndex,
+    staged_index: _RegistryIndex,
+    new_registry_version: str,
+    expected_target_overrides: Mapping[str, str],
+) -> None:
+    if staged_index.version != new_registry_version:
+        raise RegistryPromotionApplyError(
+            "Staged registry index does not contain the requested new version."
+        )
+    expected_index_payload = deepcopy(dict(source_index.payload))
+    expected_index_payload["version"] = new_registry_version
+    if not _type_exact_equal(staged_index.payload, expected_index_payload):
+        raise RegistryPromotionApplyError(
+            "Staged registry index changed fields other than version."
+        )
+    source_hashes = _registry_tree_hashes(source_index.root)
+    staged_hashes = _registry_tree_hashes(staged_index.root)
+    if set(source_hashes) != set(staged_hashes):
+        raise RegistryPromotionApplyError(
+            "Staged registry is not a complete copy of the source registry root."
+        )
+    index_relative_path = source_index.path.relative_to(source_index.root).as_posix()
+    allowed_changes = {index_relative_path, *expected_target_overrides}
+    unexpected_changes = sorted(
+        path
+        for path in source_hashes
+        if source_hashes[path] != staged_hashes[path] and path not in allowed_changes
+    )
+    if unexpected_changes:
+        raise RegistryPromotionApplyError(
+            f"Staged registry changed unplanned files: {unexpected_changes}."
+        )
+    for relative_path, content in expected_target_overrides.items():
+        if staged_hashes[relative_path] != _sha256_bytes(content.encode("utf-8")):
+            raise RegistryPromotionApplyError(
+                f"Staged target content hash mismatch for {relative_path!r}."
+            )
+
+    try:
+        registry = load_registry(staged_index.path)
+    except Exception as exc:
+        raise RegistryPromotionApplyError(
+            f"Full staged registry validation failed: {_format_validation_error(exc)}"
+        ) from exc
+    if registry.version != new_registry_version:
+        raise RegistryPromotionApplyError(
+            "Full staged registry loader returned the wrong version."
+        )
+    _validate_runtime_promoted_records(plan, registry, label="Staged runtime registry")
+
+
+def _validate_runtime_promoted_records(
+    plan: RegistryPromotionPlan,
+    registry: FungModRegistry,
+    *,
+    label: str,
+) -> None:
+    for candidate in plan.addable_records:
+        assert candidate.registry_key is not None
+        runtime_records = getattr(registry, candidate.registry_key, None)
+        if not isinstance(runtime_records, Mapping):
+            raise RegistryPromotionApplyError(
+                f"{label} lacks mapping {candidate.registry_key!r}."
+            )
+        runtime_record = runtime_records.get(candidate.record_id)
+        if runtime_record is None or not hasattr(runtime_record, "to_dict"):
+            raise RegistryPromotionApplyError(
+                f"{label} lacks promoted record {candidate.record_id!r}."
+            )
+        if not _type_exact_equal(runtime_record.to_dict(), candidate.target_record):
+            raise RegistryPromotionApplyError(
+                f"{label} promoted record {candidate.record_id!r} lost loader fidelity."
+            )
+
+
+def _applied_file_transitions(
+    *,
+    source_index: _RegistryIndex,
+    staged_index: _RegistryIndex,
+    expected_target_overrides: Mapping[str, str],
+) -> tuple[RegistryPromotionAppliedFile, ...]:
+    source_hashes = _registry_tree_hashes(source_index.root)
+    staged_hashes = _registry_tree_hashes(staged_index.root)
+    index_relative_path = source_index.path.relative_to(source_index.root).as_posix()
+    changed_paths = sorted({index_relative_path, *expected_target_overrides})
+    transitions = tuple(
+        RegistryPromotionAppliedFile(
+            registry_path=path,
+            before_sha256=source_hashes[path],
+            after_sha256=staged_hashes[path],
+        )
+        for path in changed_paths
+    )
+    if any(item.before_sha256 == item.after_sha256 for item in transitions):
+        raise RegistryPromotionApplyError(
+            "Promotion transaction contains a declared changed file with identical hashes."
+        )
+    return transitions
+
+
+def _commit_staged_registry(
+    *,
+    stage_root: Path,
+    source_root: Path,
+    index_relative_path: Path,
+    before_registry_digest: str,
+    applied_registry_digest: str,
+    plan_digest: str,
+    new_registry_version: str,
+    plan: RegistryPromotionPlan,
+    transaction_state: _ApplyTransactionState,
+) -> _RegistryIndex:
+    backup = source_root.parent / (
+        f".{source_root.name}.promotion-backup-{plan_digest[:12]}"
+    )
+    if os.path.lexists(backup):
+        raise RegistryPromotionApplyError(
+            f"Refusing transaction while a promotion backup path already exists: {backup}"
+        )
+    pre_swap_index = _load_registry_index(source_root / index_relative_path)
+    pre_swap_digest = _registry_digest(pre_swap_index, overrides={})
+    if not hmac.compare_digest(pre_swap_digest, before_registry_digest):
+        raise RegistryPromotionApplyError(
+            "Registry root digest changed immediately before the transactional swap."
+        )
+    moved_source = False
+    installed_stage = False
+    try:
+        _replace_registry_path(source_root, backup, phase="backup")
+        moved_source = True
+        _replace_registry_path(stage_root, source_root, phase="install")
+        installed_stage = True
+        installed_index = _load_registry_index(source_root / index_relative_path)
+        installed_registry = load_registry(installed_index.path)
+        if installed_registry.version != new_registry_version:
+            raise RegistryPromotionApplyError(
+                "Installed registry runtime version differs from the confirmed new version."
+            )
+        if _registry_digest(installed_index, overrides={}) != applied_registry_digest:
+            raise RegistryPromotionApplyError(
+                "Installed registry digest differs from the validated stage."
+            )
+        _validate_runtime_promoted_records(
+            plan,
+            installed_registry,
+            label="Installed runtime registry",
+        )
+    except Exception as transaction_error:
+        transaction_state.transaction_status = "failed"
+        if moved_source:
+            try:
+                if source_root.exists() and not installed_stage:
+                    possible_install = _load_registry_index(source_root / index_relative_path)
+                    installed_stage = (
+                        _registry_digest(possible_install, overrides={})
+                        == applied_registry_digest
+                    )
+                if installed_stage:
+                    _replace_registry_path(
+                        source_root,
+                        stage_root,
+                        phase="remove_failed_install",
+                    )
+                elif source_root.exists():
+                    raise RegistryPromotionApplyError(
+                        "Unexpected registry root appeared during rollback."
+                    )
+                _replace_registry_path(backup, source_root, phase="rollback")
+                restored_index = _load_registry_index(source_root / index_relative_path)
+                _validate_current_registry(restored_index)
+                restored_digest = _registry_digest(restored_index, overrides={})
+                if restored_digest != before_registry_digest:
+                    raise RegistryPromotionApplyError(
+                        "Restored registry digest does not match the pre-transaction digest."
+                    )
+                transaction_state.rollback_status = "complete"
+            except Exception as rollback_error:
+                transaction_state.rollback_status = "unproven"
+                raise RegistryPromotionApplyError(
+                    "transaction_status=failed; rollback_status=unproven; "
+                    f"backup_path={backup}; cause={transaction_error}"
+                ) from rollback_error
+        raise RegistryPromotionApplyError(
+            f"transaction_status=failed; rollback_status={transaction_state.rollback_status}; "
+            f"cause={transaction_error}"
+        ) from transaction_error
+
+    transaction_state.transaction_status = "committed"
+    transaction_state.rollback_status = "not_required"
+    try:
+        shutil.rmtree(backup)
+    except OSError as exc:
+        raise RegistryPromotionApplyError(
+            "transaction_status=committed; rollback_status=not_required; "
+            f"backup_cleanup_status=failed; backup_path={backup}; cause={exc}"
+        ) from exc
+    return installed_index
+
+
+def _replace_registry_path(source: Path, destination: Path, *, phase: str) -> None:
+    del phase
+    source.replace(destination)
 
 
 def _accepted_records(
@@ -655,6 +1859,37 @@ def _validate_target_record(record_id: str, record: Mapping[str, Any]) -> None:
             f"Accepted record id {record_id!r} does not match its target record payload."
         )
     _require_string_mapping_keys(record, label=f"Accepted record {record_id!r}")
+
+
+def _target_record_with_curation_audit(record: _AcceptedRecord) -> Mapping[str, Any]:
+    target_record = deepcopy(dict(record.target_record))
+    provenance = target_record.get("provenance")
+    if not isinstance(provenance, Mapping):
+        raise RegistryPromotionPlanError(
+            "curation_audit_requires_mapping_target_provenance"
+        )
+    if _CURATION_AUDIT_PROVENANCE_KEY in provenance:
+        raise RegistryPromotionPlanError(
+            "curation_audit_provenance_key_already_exists_no_overwrite"
+        )
+    updated_provenance = deepcopy(dict(provenance))
+    updated_provenance[_CURATION_AUDIT_PROVENANCE_KEY] = _curation_audit_payload(
+        record.curation_metadata
+    )
+    target_record["provenance"] = updated_provenance
+    return target_record
+
+
+def _curation_audit_payload(curation: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "curator": curation.get("curator"),
+        "curation_date": curation.get("curation_date"),
+        "decision": curation.get("decision"),
+        "decision_reason": curation.get("decision_reason"),
+        "limitations": deepcopy(curation.get("limitations")),
+        "source_provenance": deepcopy(curation.get("source_provenance")),
+        "allowed_use_decision": curation.get("allowed_use"),
+    }
 
 
 def _curation_manifest_path(value: str | Path) -> Path:
@@ -848,10 +2083,14 @@ def _load_registry_index(value: str | Path) -> _RegistryIndex:
             payload=target_payload,
         )
 
+    raw_version = payload.get("version")
+    version = raw_version if isinstance(raw_version, str) else ""
     return _RegistryIndex(
         path=index_path,
         root=root,
         sha256=_sha256_bytes(index_path.read_bytes()),
+        version=version,
+        payload=payload,
         targets=targets,
     )
 
@@ -959,17 +2198,17 @@ def _staged_registry(
     prefix: str,
 ) -> Iterator[tuple[Path, Path]]:
     with tempfile.TemporaryDirectory(prefix=prefix) as temp_dir:
-        stage = Path(temp_dir)
-        staged_index = stage / index.path.name
-        shutil.copyfile(index.path, staged_index)
-        for target in index.targets.values():
-            destination = stage / target.relative_path
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            override = overrides.get(target.relative_path)
-            if override is None:
-                shutil.copyfile(target.path, destination)
-            else:
-                destination.write_text(override, encoding="utf-8")
+        _registry_tree_hashes(index.root)
+        stage = Path(temp_dir) / index.root.name
+        shutil.copytree(index.root, stage, copy_function=shutil.copy2)
+        staged_index = stage / index.path.relative_to(index.root)
+        for relative_path, content in overrides.items():
+            destination = stage / relative_path
+            if not destination.is_file():
+                raise RegistryPromotionPlanError(
+                    f"Prospective registry override is not an existing regular file: {relative_path}"
+                )
+            destination.write_text(content, encoding="utf-8")
         yield staged_index, stage
 
 
@@ -1006,15 +2245,60 @@ def _field_path(parent: str, field: str) -> str:
 
 
 def _registry_digest(index: _RegistryIndex, *, overrides: Mapping[str, str]) -> str:
-    file_hashes = {index.path.name: index.sha256}
-    for target in index.targets.values():
-        override = overrides.get(target.relative_path)
-        file_hashes[target.relative_path] = (
-            target.before_sha256
-            if override is None
-            else _sha256_bytes(override.encode("utf-8"))
-        )
+    file_hashes = _registry_tree_hashes(index.root)
+    for relative_path, content in overrides.items():
+        if relative_path not in file_hashes:
+            raise RegistryPromotionPlanError(
+                f"Registry digest override is not an existing regular file: {relative_path}"
+            )
+        file_hashes[relative_path] = _sha256_bytes(content.encode("utf-8"))
     return _sha256_json(file_hashes)
+
+
+def _registry_tree_hashes(root: Path) -> dict[str, str]:
+    hashes: dict[str, str] = {}
+    for current_root, raw_directories, raw_files in os.walk(
+        root,
+        topdown=True,
+        onerror=_raise_registry_walk_error,
+        followlinks=False,
+    ):
+        current = Path(current_root)
+        for name in sorted(raw_directories):
+            path = current / name
+            if path.is_symlink():
+                raise RegistryPromotionPlanError(
+                    f"Registry root contains an unsafe symlink: {path}"
+                )
+            if not path.is_dir():
+                raise RegistryPromotionPlanError(
+                    f"Registry root contains an unsafe special entry: {path}"
+                )
+        for name in sorted(raw_files):
+            path = current / name
+            if path.is_symlink():
+                raise RegistryPromotionPlanError(
+                    f"Registry root contains an unsafe symlink: {path}"
+                )
+            if not path.is_file():
+                raise RegistryPromotionPlanError(
+                    f"Registry root contains an unsafe special entry: {path}"
+                )
+            relative = path.relative_to(root).as_posix()
+            hashes[relative] = _sha256_bytes(path.read_bytes())
+    return dict(sorted(hashes.items()))
+
+
+def _raise_bundle_walk_error(error: OSError) -> None:
+    raise RegistryPromotionApplyError(
+        f"Cannot inspect promotion-plan bundle safely: {error}"
+    ) from error
+
+
+def _raise_registry_walk_error(error: OSError) -> None:
+    raise RegistryPromotionPlanError(
+        f"Cannot inspect registry root safely: {error}"
+    ) from error
 
 
 def _write_plan_bundle(root: Path, plan: RegistryPromotionPlan) -> None:
@@ -1069,9 +2353,10 @@ def _write_plan_bundle(root: Path, plan: RegistryPromotionPlan) -> None:
         "files": artifact_checksums,
         "production_registry_mutated": False,
         "scientific_validation_claimed": False,
-        "apply_available": False,
-        "apply_policy": "deferred_to_pr47_digest_confirmed_transactional_apply",
-        "version_policy": "not_defined_deferred_to_later_apply_contract",
+        "simulation_authorized": False,
+        "apply_available": True,
+        "apply_policy": _PROMOTION_APPLY_POLICY,
+        "version_policy": _PROMOTION_VERSION_POLICY,
     }
     manifest_path.write_text(
         json.dumps(_canonicalize(manifest), indent=2, sort_keys=True, ensure_ascii=True) + "\n",
@@ -1111,7 +2396,7 @@ def _promotion_report(plan: RegistryPromotionPlan) -> str:
         "",
         "## Scope",
         "",
-        "This is a deterministic preview only. It does not mutate the production registry, authorize simulation, claim scientific validation, define a registry version bump, or provide an apply operation. Digest-confirmed transactional apply and version policy remain later concerns.",
+        "This is a deterministic preview and confirmation artifact. It does not mutate the production registry, authorize simulation, or claim scientific validation. Applying it requires the exact plan digest, the exact next numeric patch version, a safe current registry index, and the separate transactional apply operation.",
         "",
         "## Candidate Classifications",
         "",
@@ -1333,9 +2618,13 @@ __all__ = [
     "ProspectiveRegistryFile",
     "REGISTRY_PROMOTION_PLAN_MANIFEST_KIND",
     "REGISTRY_PROMOTION_PLAN_SCHEMA_VERSION",
+    "RegistryPromotionAppliedFile",
+    "RegistryPromotionApplyError",
+    "RegistryPromotionApplyResult",
     "RegistryPromotionCandidate",
     "RegistryPromotionPlan",
     "RegistryPromotionPlanError",
     "RegistryPromotionPlanWriteResult",
+    "apply_registry_promotion",
     "plan_registry_promotion",
 ]

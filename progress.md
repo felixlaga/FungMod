@@ -26,13 +26,129 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-47 CURATION-001 Digest-Confirmed Transactional Apply
+
+Date: 2026-07-13
+
+Status: `current` for the bounded transactional apply slice; PR-46 is complete
+after PR #61 merged as `2b6c639`. The current implementation satisfies the
+active CURATION-001 acceptance criteria, so CURATION-001 becomes `complete`
+for that declared scope once PR-47 merges. VALIDATION-DATA-001 remains
+`deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added top-level `apply_registry_promotion(...)` for an in-memory
+  `RegistryPromotionPlan` or its owned written bundle. Written apply requires
+  an explicit current registry index and never uses manifest absolute paths as
+  write destinations.
+- Intentionally advanced the promotion-plan schema from `1.0.0` to `2.0.0`.
+  Planning now inserts deterministic non-scientific
+  `provenance.fungmod_curation` audit metadata into each addable prospective
+  record and binds every regular registry-root file into before/prospective
+  digests. Pre-PR-47 written `1.0.0` bundles are rejected at apply rather than
+  silently reinterpreted.
+- Revalidates the exact plan/confirmation digest, candidate and prospective
+  consistency, accepted curation metadata, ISO date, source provenance,
+  blockers, loader fidelity, current index SHA, full before-root digest, every
+  target before hash, index destinations, path/root/symlink/shared-target
+  safety, no-overwrite state, and `load_registry(...)` immediately before the
+  transaction.
+- Requires a strict numeric current `MAJOR.MINOR.PATCH` version and exactly the
+  next patch version. Apply changes only the index version and exact planned
+  target bytes; package version and all scientific fields remain unchanged.
+- Copies the complete registry root into a same-filesystem sibling stage,
+  preserves unrelated regular files, rejects unsafe symlinks/special entries,
+  validates the full staged registry, verifies promoted runtime records
+  type-exactly, and records exact changed-file before/after hashes.
+- Uses an atomic exclusive sibling lock for cooperating single-writer and
+  reentrant exclusion. The directory-level swap retains a byte-exact backup
+  through installed version/digest/runtime verification, rolls back
+  deterministically on injected failure, verifies rollback digest/loader state,
+  and reports committed cleanup failures without implying rollback.
+- Added `RegistryPromotionApplyResult` with old/new versions, confirmed
+  `plan_digest`/`confirmation_digest`, before/planned/applied registry digests,
+  exact changed files/hashes, applied and exact-duplicate IDs, transaction,
+  rollback, and backup-cleanup status, plus explicit
+  `production_registry_mutated: true`,
+  `scientific_validation_claimed: false`, and
+  `simulation_authorized: false`.
+- Kept product maps blocked pending a destination contract, conflicts and
+  blocked candidates non-applicable, exact duplicates no-op only, and at least
+  one addable record mandatory. No receipt is written to a hidden location.
+
+Tests added or modified: `tests/test_registry_promotion_apply.py` exercises
+in-memory and written-bundle success on copied registries, parameter and fungus
+record types, exact confirmation, plan and artifact tampering, schema
+compatibility, index/target/unrelated drift, conflict/blocked/no-addable plans,
+strict patch versions, unsafe destinations, untrusted manifest absolute paths,
+durable audit provenance, unchanged scientific fields and target allowed-use,
+complete staged loading, byte-exact commit rollback, rollback failure,
+committed backup/lock cleanup failure truthfulness, concurrent/reentrant lock
+refusal, debris cleanup, and public exports. The repository's real
+`data_registry/` is never an apply target in tests.
+`tests/test_registry_promotion_plan.py` now covers schema `2.0.0`, deterministic
+audit metadata, and unchanged raw exact-duplicate semantics.
+`tests/test_roadmap_orchestration_status.py` keeps PR-46 completion, PR-47
+current status, scoped CURATION-001 completion, PR-48 build-first follow-up,
+and deferred validation wording synchronized.
+
+What did not change: no repository `data_registry/` record or version, package
+version, source-provider/curation decision, simulation eligibility, process
+law, solver, thermodynamic behavior, biology, parameter value/unit/maturity,
+validation data, calibration, or empirical comparison changed.
+
+Scientific behavior impact: none. This is an administrative production
+registry mutation contract over exact reviewed bytes. Promotion is not
+scientific validation and does not authorize simulation.
+
+Backward compatibility: the public apply API/result types are additive, but
+promotion-plan schema `2.0.0` intentionally supersedes preview-only written
+schema `1.0.0`. Existing `1.0.0` bundles remain readable review artifacts but
+must be regenerated before apply. Planning now includes audit metadata in
+addable prospective YAML and full-root digests; exact-duplicate raw-content
+classification remains unchanged.
+
+Remaining ambiguity and risk: the lock is cooperative between callers using
+this API; external filesystem writers cannot be forced to honor it, so source
+digests are rechecked immediately before swap. Directory swaps assume local
+same-filesystem rename semantics. Rollback failure is fail-closed and reports
+the exact backup path because automatic recovery cannot then be proven.
+Product-map destination ownership remains undefined and blocked. Exact
+duplicates remain no-op and therefore do not rewrite an existing production
+record solely to attach this plan's curation audit.
+
+Risk level: high for filesystem integrity, bounded by copied-registry
+adversarial tests, full-tree staging, digest rechecks, locking, installed-state
+verification, deterministic rollback, and explicit cleanup-state reporting;
+scientific risk is low because no scientific content is inferred or changed.
+
+Recommended next task after PR-47 merges: PR-48, a bounded PRODUCT-001
+per-process rate-trajectory fidelity slice. Preserve process IDs and rates from
+existing configured `process_rates.csv` rows in a standard researcher-facing
+table/accessor instead of collapsing multi-process rows by time index. Add no
+new rate law, inferred rate, solver change, biology, validation data,
+calibration, or empirical claim.
+
+Verification:
+
+- Focused registry-promotion plan/apply and roadmap-status suite: 90 passed in
+  18.18s.
+- Broad registry, curation, source-provider, researcher-API, and status suite:
+  252 passed in 35.71s.
+- Full suite from scratch with coverage: 885 passed in 182.00s; total coverage
+  84.51% against the required 80% gate, with
+  `src/fungal_model/api/registry_promotion.py` at 79%.
+- Full Ruff: passed for `src` and `tests`.
+- Full Pyright: 0 errors, 0 warnings, 0 informations.
+- Unstaged and staged diff checks: passed.
+
 ## PR-46 CURATION-001 Registry-Promotion Preview Plan
 
 Date: 2026-07-13
 
-Status: `current` for the bounded registry-promotion preview/plan; PR-45 is
-complete after PR #60 merged as `5ac7864`, CURATION-001 remains `partial`, and
-VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+Status: `complete` for the bounded registry-promotion preview/plan after PR #61
+merged as `2b6c639`; PR-45 is complete after PR #60 merged as `5ac7864`.
 
 Completed in this pass:
 

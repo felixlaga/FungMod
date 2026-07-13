@@ -166,7 +166,7 @@ def test_schema_valid_parameter_is_addable_without_registry_mutation(tmp_path: P
 
     assert isinstance(plan, RegistryPromotionPlan)
     assert plan.summary() == {
-        "schema_version": "1.0.0",
+        "schema_version": "2.0.0",
         "accepted_records_considered": 1,
         "addable_count": 1,
         "exact_duplicate_count": 0,
@@ -176,9 +176,10 @@ def test_schema_valid_parameter_is_addable_without_registry_mutation(tmp_path: P
         "prospective_registry_validated": True,
         "production_registry_mutated": False,
         "scientific_validation_claimed": False,
-        "apply_available": False,
-        "apply_policy": "deferred_to_pr47_digest_confirmed_transactional_apply",
-        "version_policy": "not_defined_deferred_to_later_apply_contract",
+        "simulation_authorized": False,
+        "apply_available": True,
+        "apply_policy": "digest_confirmed_transactional_registry_root_swap",
+        "version_policy": "strict_next_numeric_patch_version",
     }
     candidate = plan.candidates[0]
     assert candidate.registry_key == "parameters"
@@ -188,12 +189,26 @@ def test_schema_valid_parameter_is_addable_without_registry_mutation(tmp_path: P
     assert target_path is not None
     assert candidate.before_sha256 == hashlib.sha256(target_path.read_bytes()).hexdigest()
     assert candidate.after_sha256 == plan.prospective_files[0].after_sha256
-    assert candidate.target_record == payload
+    expected_promoted = deepcopy(payload)
+    expected_promoted["provenance"]["fungmod_curation"] = {
+        "curator": "Synthetic Test Curator",
+        "curation_date": "2026-07-13",
+        "decision": "accept",
+        "decision_reason": "Synthetic record accepted for promotion-plan software testing.",
+        "limitations": ["Synthetic software fixture; no scientific validation is claimed."],
+        "source_provenance": {
+            "source_database": "synthetic_fixture",
+            "source_entry_ids": ["fixture-1"],
+            "source_snapshot_path": "synthetic/software/fixture.json",
+        },
+        "allowed_use_decision": CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
+    }
+    assert candidate.target_record == expected_promoted
     assert plan.before_registry_digest != plan.prospective_registry_digest
 
     prospective = yaml.safe_load(plan.prospective_files[0].content)
     assert prospective["record_type"] == "parameters"
-    assert prospective["records"][-1] == payload
+    assert prospective["records"][-1] == expected_promoted
     assert _registry_snapshot(registry_index) == before
 
 
@@ -333,7 +348,11 @@ def test_written_owned_curation_bundle_maps_parameter_records_and_verifies_artif
     assert plan.input_kind == "written_curation_bundle"
     assert plan.candidates[0].record_type == "parameter_records"
     assert plan.candidates[0].registry_key == "parameters"
-    assert plan.candidates[0].target_record == _synthetic_parameter()
+    promoted = deepcopy(plan.candidates[0].target_record)
+    audit = promoted["provenance"].pop("fungmod_curation")
+    assert promoted == _synthetic_parameter()
+    assert audit["curator"] == "Synthetic Test Curator"
+    assert audit["source_provenance"]["source_entry_ids"] == ["fixture-1"]
     assert plan.candidates[0].curation_metadata["decision"] == "accept"
 
 
@@ -706,7 +725,7 @@ def test_plan_write_refuses_owned_output_ancestor_containing_registry(
     assert _registry_snapshot(registry_index) == before
 
 
-def test_public_export_exposes_preview_only_api() -> None:
+def test_public_export_exposes_plan_api_without_a_mutating_plan_method() -> None:
     assert fungal_model.plan_registry_promotion is plan_registry_promotion
     assert fungal_model.RegistryPromotionPlan is RegistryPromotionPlan
     assert not hasattr(RegistryPromotionPlan, "apply")

@@ -125,6 +125,10 @@ basic kinetics layer:
   queries from friendly scientific fields, loads frozen kinetic-law snapshots
   by default, and returns review-only proposed records without mutating the
   simulation registry;
+- a digest-confirmed CURATION-001 apply API that transactionally promotes exact
+  reviewed registry-plan bytes on copied or explicitly selected registries,
+  with strict next-patch versioning, full-root drift detection, durable curator
+  audit provenance, rollback, and no automatic simulation or validation claim;
 - a registry-backed extracellular enzyme-chain assembler for ordered linear
   chains of two or more implemented process steps, whose stoichiometry,
   conserved quantities, entities, modifiers, and output labels come from
@@ -247,17 +251,23 @@ Product-map participants also require parseable finite positive stoichiometry,
 and each finite positive product yield must match exactly one product name or
 id and its participant stoichiometry; no conversion is inferred.
 
-Preview the registry effect of the explicitly accepted decisions without
-writing any registry file:
+Plan the registry effect of the explicitly accepted decisions, then apply only
+that exact confirmed plan with an explicit next patch version:
 
 ```python
-from fungal_model import plan_registry_promotion
+from fungal_model import apply_registry_promotion, plan_registry_promotion
 
 plan = plan_registry_promotion(
     review,
     registry_index="data_registry/registry_index.yml",
 )
 plan.write("data/proposed_records/sabiork/reaction_618_promotion_plan")
+
+result = apply_registry_promotion(
+    plan,
+    confirmation_digest=plan.plan_digest,
+    new_registry_version="0.1.1",
+)
 ```
 
 `plan_registry_promotion(...)` accepts either the in-memory `CurationResult` or
@@ -270,17 +280,34 @@ paths, before hashes, deterministic prospective YAML, post hashes, and a full
 prospective-registry digest are reviewable in memory or in the optional owned
 plan bundle. A would-be addable must also round-trip through the loader to the
 same record mapping, so unknown fields that a loader would silently drop and
-omitted fields that it would synthesize/default are blocked. Raw stored content
-still defines exact-duplicate/no-op classification. `parameter_records` map to
-the registry index's `parameters` destination; product maps remain blocked as
-`unsupported_pending_destination_contract` because they are outside
-`registry_index.yml`.
+omitted fields that it would synthesize/default are blocked. Plan schema
+`2.0.0` intentionally adds apply binding, full registry-tree digests, and
+deterministic non-scientific `provenance.fungmod_curation` audit metadata with
+the curator, curation date, decision reason, limitations, source provenance,
+and allowed-use decision. Apply writes those exact prospective bytes; it does
+not transform scientific values, units, maturity, target `allowed_use`,
+mechanisms, or IDs. Pre-PR-47 written schema `1.0.0` remains preview-only and
+is explicitly rejected at apply because it lacks that durable audit contract.
 
-This API has no apply or mutation operation. It never overwrites record IDs or
-changes scientific fields. It never writes registry/index/record files,
-promotes a record into simulation, claims scientific validation, or invents a
-version bump policy. Digest-confirmed transactional apply and registry version
-policy remain a later PR-47 concern.
+`apply_registry_promotion(...)` accepts an in-memory plan or its owned written
+bundle. Written bundles require an explicit current `registry_index`; manifest
+absolute paths are review metadata and are never write destinations. Apply
+rechecks the confirmation digest, artifacts, index and full-root digests,
+target hashes, loader fidelity, no-overwrite/path boundaries, and the complete
+staged registry. Versions must be strict numeric `MAJOR.MINOR.PATCH`, with
+exactly one patch increment. A sibling single-writer lock excludes concurrent
+and reentrant cooperating applies; a same-filesystem full-root stage is swapped
+at directory level with verified backup rollback. The structured result records
+the plan/confirmation binding, old/new versions, before/planned/applied digests,
+exact changed-file hashes, applied IDs, and transaction/rollback/cleanup status.
+
+Raw stored content still defines exact-duplicate/no-op classification, and an
+exact duplicate is never rewritten merely to add audit metadata. Plans with a
+conflict or blocked candidate, or without at least one addable record, cannot
+apply. `parameter_records` map to the registry index's `parameters`
+destination; product maps remain blocked as
+`unsupported_pending_destination_contract`. Production promotion does not
+authorize simulation, alter package version, or claim scientific validation.
 
 ## Run A Virtual Experiment
 
@@ -646,10 +673,13 @@ type-exact scalar values through its actual target loader; silently dropped,
 synthesized/defaulted, or type-converted fields are blocked. Exact duplicates
 are compared against raw stored content with the same scalar-type fidelity.
 Owned review output cannot overlap a registry root in either direction, and a
-write rechecks the immutable plan digest before touching its destination. It is
-preview-only and cannot mutate the registry. CURATION-001 remains partial until
-the separately reviewed PR-47 digest-confirmed transactional apply contract is
-implemented.
+write rechecks the immutable plan digest before touching its destination. The
+top-level `apply_registry_promotion(...)` API now supplies the separately
+reviewed digest-confirmed transaction, exact-next-patch version policy,
+full-root staging, single-writer lock, rollback, and structured apply result.
+This completes the active CURATION-001 acceptance contract once PR-47 merges,
+without making promoted records scientifically validated or automatically
+simulation-authorized.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
 The current library provides factories for first-order, mass-action,
