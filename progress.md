@@ -26,12 +26,131 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-46 CURATION-001 Registry-Promotion Preview Plan
+
+Date: 2026-07-13
+
+Status: `current` for the bounded registry-promotion preview/plan; PR-45 is
+complete after PR #60 merged as `5ac7864`, CURATION-001 remains `partial`, and
+VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
+
+Completed in this pass:
+
+- Added top-level `plan_registry_promotion(...)` support for an in-memory
+  `CurationResult` or a written owned curation bundle. Written inputs verify the
+  curation manifest kind/schema and every declared artifact checksum before
+  accepted records are read.
+- Limited consideration to explicit accepted decisions. Rejected, deferred,
+  omitted, blocked, malformed, and non-owned inputs cannot enter a plan.
+- Mapped curation `parameter_records` only to the registry index's `parameters`
+  key and resolved every supported destination solely from the supplied
+  `registry_index.yml` records mapping. Traversal, absolute/out-of-root paths,
+  symlink components, shared target files, malformed record files, and missing
+  destinations fail or remain explicitly blocked.
+- Added deterministic per-record `addable`, `exact_duplicate`, `conflict`, and
+  `blocked_unsupported` classifications. Existing IDs are never overwritten;
+  product maps are blocked as `unsupported_pending_destination_contract`
+  because they remain outside the registry index.
+- Preserved accepted target-record fields without scientific inference or
+  transformation while keeping curator-decision metadata separately visible in
+  the plan. Each addable candidate is validated through the actual
+  `load_registry(...)` path in a temporary copied registry and must round-trip
+  to the exact candidate mapping through the loaded record's existing
+  `to_dict()` schema. Unknown fields that loaders would silently drop and
+  omitted fields they would synthesize/default are blocked. Scalar comparisons
+  are recursively type-exact, so booleans, integers, and floats cannot silently
+  compare equal after loader conversion. Exact duplicates remain raw
+  stored-content comparisons with the same scalar-type fidelity before this
+  addable-only fidelity gate.
+- Revalidated every accepted record against the existing CURATION-001 contract:
+  unresolved `missing_fields` or `reasons` and incomplete source provenance are
+  rejected for both in-memory and checksum-valid written bundles.
+- Added exact prospective YAML content, target paths, before/post SHA-256
+  values, an unchanged-registry digest, a prospective full-registry digest, and
+  a deterministic plan digest. The complete combined prospective registry is
+  loaded and validated again before a plan is returned.
+- Added optional deterministic `promotion_plan.json`,
+  `candidate_classifications.yml`, `promotion_report.md`, and
+  `prospective_registry/` review artifacts with transactional replacement only
+  for an existing folder carrying the owned plan manifest kind/version. Output
+  paths that equal, descend from, or contain a registry root are rejected before
+  replacement, and write-time digest verification rejects mutated nested plan
+  payloads before creating output.
+- Kept the API preview-only: there is no `apply()` path, production registry
+  mutation, record overwrite, simulation promotion, version bump policy,
+  scientific validation claim, live API behavior, biology, solver, calibration,
+  or validation-data change. Digest-confirmed transactional apply and version
+  policy remain PR-47 concerns.
+
+Tests added or modified: `tests/test_registry_promotion_plan.py` covers a
+schema-valid addable parameter, byte-for-byte registry immutability, exact
+duplicate/no-op, same-ID conflict, unsupported product maps, reject/defer
+exclusion, valid and checksum-tampered written bundles, malformed/non-owned
+bundles, index traversal/symlink/out-of-root destinations, target-schema and
+loader-fidelity failures for unknown and omitted/defaulted fields, prospective
+full-registry validation failures, type-exact boolean/integer-versus-float
+comparisons, accepted-record blocker and provenance revalidation for memory and
+checksum-valid written bundles, shared ISO-date validation for accepted records
+from both input forms, deterministic digests/artifacts, refusal after plan
+mutation, safe owned output replacement, bidirectional registry-root overlap
+refusal with byte-preservation proof, and public exports.
+`tests/test_roadmap_orchestration_status.py` keeps the PR-45/PR-46/PR-47 queue,
+partial CURATION-001 status, and deferred validation wording synchronized.
+
+What did not change: `data_registry/`, registry versions, source proposal or
+curation-decision behavior, simulation eligibility, live-source behavior,
+process laws, solver and thermodynamic behavior, biology, parameters, units,
+validation data, calibration, and empirical comparison are unchanged.
+
+Scientific behavior impact: none. This slice validates and previews exact file
+content only; it does not establish scientific validity or authorize any record
+for simulation.
+
+Backward compatibility: all existing source-provider, curation, registry, and
+simulation APIs remain unchanged. The preview API, result types, and artifacts
+are additive, and no apply method exists.
+
+Remaining ambiguity and risk: registry version policy and the exact
+digest-confirmed transactional apply authorization remain intentionally
+undefined until PR-47. Product-map destination ownership also remains undefined
+and therefore blocked. Human curator decisions remain outside software
+validation.
+
+Risk level: moderate. The runtime scope is isolated from production mutation,
+but it introduces security-sensitive path/checksum handling and exact
+prospective file/digest contracts that PR-47 may later consume.
+
+Recommended next task: review and merge PR-46, then implement PR-47 as a
+separately reviewed digest-confirmed transactional apply operation with an
+explicit version policy, rollback behavior, and unchanged no-overwrite/path
+boundaries. Keep validation deferred until source-backed observations satisfy
+its evidence gate.
+
+Verification:
+
+- Focused registry-promotion plan suite: 34 passed.
+- Focused promotion/curation/orchestration suite: 84 passed.
+- Combined promotion/curation/registry-loading/public/status suite: 104 passed.
+- Broad curation, registry, public-API, instruction, hygiene, source-provider,
+  virtual-experiment, and roadmap suite: 223 passed.
+- `MPLCONFIGDIR=/private/tmp/fungmod-mpl-cache PYTHONPATH=src /Users/felix/Documents/GitHub/FungMod/.venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`
+  - Result: 838 passed in 127.10 seconds; total coverage 84.74%, above
+    the required 80%; `registry_promotion.py` coverage 80%.
+- `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache PYTHONPATH=src /Users/felix/Documents/GitHub/FungMod/.venv/bin/python -m ruff check src tests`
+  - Result: all checks passed. The main checkout interpreter is used because
+    ignored virtual environments are not copied into git worktrees.
+- `PYTHONPATH=src /Users/felix/Documents/GitHub/FungMod/.venv/bin/python -m pyright --pythonpath /Users/felix/Documents/GitHub/FungMod/.venv/bin/python`
+  - Result: 0 errors, 0 warnings, 0 informations.
+- `git diff --check`
+  - Result: passed.
+
 ## PR-45 CURATION-001 Source-Proposal Review And Decision Bundle
 
 Date: 2026-07-13
 
-Status: `current` for the bounded proposal-review and curator-decision bundle;
-PR-44 is complete after PR #59, CURATION-001 remains `partial`, and
+Status: `complete` for the bounded proposal-review and curator-decision bundle
+after PR #60 merged as `5ac7864`; PR-44 is complete after PR #59,
+CURATION-001 remains `partial`, and
 VALIDATION-DATA-001 remains `deferred; blocked/partial` for ingestion.
 
 Completed in this pass:
@@ -108,10 +227,11 @@ Risk level: low to moderate. Runtime scope is isolated from simulation and the
 production registry, while file/bundle validation and replacement behavior are
 new public surfaces.
 
-Recommended next task: review and merge PR-45, then implement production
-registry promotion as a separate bounded CURATION-001 follow-up with explicit
-destination control and registry-schema validation. Keep validation deferred
-until source-backed observations satisfy its evidence gate.
+Recommended next task after this completed slice: implement PR-46 as a bounded
+registry-promotion preview plan with explicit destination control and
+registry-schema validation, leaving digest-confirmed transactional apply and
+version policy to PR-47. Keep validation deferred until source-backed
+observations satisfy its evidence gate.
 
 Verification:
 

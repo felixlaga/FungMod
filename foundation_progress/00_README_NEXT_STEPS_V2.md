@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status after PR-44 merged as PR #59, with PR-45 selected:
+Scoped status after PR-45 merged as PR #60 (`5ac7864`), with PR-46 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -194,7 +194,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-45: source-proposal curation review bundle**.
+Current next PR: **PR-46: registry-promotion preview plan**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -246,12 +246,25 @@ through the shared fetch/freeze path, preserves checksummed raw pages in unique
 query-specific bundles, and emits review-only proposals without registry or
 simulation promotion. No BRENDA, CAZy, or other provider is claimed. PR-44 is
 complete after PR #59.
-The selected PR-45 work adds bounded CURATION-001 schema review and explicit
+The completed PR-45 work added bounded CURATION-001 schema review and explicit
 curator decision bundles for in-memory or written source proposals. It keeps
 omitted decisions deferred, reports exact blockers, writes deterministic
 review artifacts, and does not mutate `data_registry/`, promote records into
-simulation, or claim scientific validation. CURATION-001 remains partial;
-actual production registry promotion is a separate next/later PR.
+simulation, or claim scientific validation. PR-45 is complete after PR #60
+merged as `5ac7864`.
+The selected PR-46 work adds the preview-only
+`plan_registry_promotion(...)` API for explicit accept decisions. It
+checksum-verifies written curation bundles, resolves only
+registry-index destinations, rejects unsafe paths, validates candidates and the
+combined prospective registry through existing loaders, requires would-be adds
+to round-trip to the exact candidate mapping without silently dropped or
+synthesized/defaulted fields, classifies addable,
+exact-duplicate/no-op, conflict, and blocked/unsupported records, and emits
+exact prospective YAML plus hashes/digests. It has no registry mutation,
+overwrite, apply operation, version policy, simulation promotion, or scientific
+validation claim. Product maps remain blocked pending a destination contract.
+CURATION-001 remains partial; PR-47 digest-confirmed transactional apply is the
+separate next/later concern.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

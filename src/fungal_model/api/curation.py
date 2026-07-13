@@ -462,7 +462,7 @@ def _review_record(
         reasons.append("missing required fields: " + ", ".join(sorted(missing)))
 
     provenance = _source_provenance(record, source_snapshot_path=source_snapshot_path)
-    provenance_missing = _provenance_missing(provenance)
+    provenance_missing = curation_source_provenance_missing(provenance)
     if provenance_missing:
         missing.update(f"source_provenance.{field}" for field in provenance_missing)
         reasons.append("missing source provenance: " + ", ".join(provenance_missing))
@@ -499,7 +499,11 @@ def _source_provenance(record: Mapping[str, Any], *, source_snapshot_path: str) 
     }
 
 
-def _provenance_missing(provenance: Mapping[str, Any]) -> tuple[str, ...]:
+def curation_source_provenance_missing(
+    provenance: Mapping[str, Any],
+) -> tuple[str, ...]:
+    """Return missing fields under the CURATION-001 source-provenance contract."""
+
     missing: list[str] = []
     if not _nonblank_text(provenance.get("source_database")):
         missing.append("source_database")
@@ -718,12 +722,22 @@ def _validate_decision(record_id: str, decision: CurationDecision) -> None:
             f"Decision {decision.decision!r} for {record_id!r} requires allowed_use "
             f"{expected_allowed_use!r}."
         )
-    try:
-        date.fromisoformat(decision.curation_date)
-    except ValueError as exc:
-        raise CurationError(f"Decision for {record_id!r} requires curation_date in YYYY-MM-DD form.") from exc
+    if not curation_date_is_iso(decision.curation_date):
+        raise CurationError(
+            f"Decision for {record_id!r} requires curation_date in YYYY-MM-DD form."
+        )
     if not _nonempty_string_sequence(decision.limitations):
         raise CurationError(f"Decision for {record_id!r} requires explicit non-empty limitations.")
+
+
+def curation_date_is_iso(value: str) -> bool:
+    """Return whether a curation date satisfies the CURATION-001 ISO-date rule."""
+
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
 
 
 def _write_bundle(root: Path, result: CurationResult) -> None:

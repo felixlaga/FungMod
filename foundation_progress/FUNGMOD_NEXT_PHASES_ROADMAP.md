@@ -69,8 +69,9 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-45 source-proposal curation review bundle after
-PR-44 researcher source-provider onboarding merged as PR #59,
+The current next PR is PR-46 registry-promotion preview plan after PR-45
+source-proposal curation review merged as PR #60 (`5ac7864`) and PR-44
+researcher source-provider onboarding merged as PR #59,
 PR-43 process-bound entropy-production-rate timeseries merged as PR #58 and
 PR-42 arbitrary-length linear enzyme-chain assembly merged as PR #57,
 the PR-41 Pyright optional-member-access ratchet merged as PR #56, the
@@ -190,12 +191,24 @@ strict numeric SABIO IDs. Live refresh stays explicit on the shared
 fetch/freeze path and writes immutable query-specific bundles with checksummed
 raw pages plus a separate derived combined export; SABIO-RK does not require a
 credential, and no proposal enters simulation or the production registry
-automatically after PR #59. The current PR-45 slice validates in-memory or
-written source proposals, classifies exact schema blockers, and writes
-explicit curator decision bundles while leaving absent decisions deferred.
-It does not mutate the production registry or claim scientific validation;
-CURATION-001 remains partial until a separate promotion step exists. The
-completed PR-24 BIO-003 slice added a
+automatically after PR #59. The completed PR-45 slice validates in-memory or
+written source proposals, classifies exact schema blockers, and writes explicit
+curator decision bundles while leaving absent decisions deferred. It does not
+mutate the production registry or claim scientific validation after PR #60.
+The current PR-46 `plan_registry_promotion(...)` slice checksum-verifies written
+curation bundles, revalidates that explicit accepts have no curation blockers
+and carry complete source provenance, and resolves index-declared destinations.
+It validates candidates and combined prospective content through existing
+registry loaders, requires scalar-type-exact loader round-trip fidelity for
+would-be adds so dropped, synthesized/defaulted, or type-converted fields are
+blocked, and preserves raw stored-content semantics for exact duplicates. It
+emits deterministic classifications, exact YAML, hashes, and digests; owned
+review output cannot overlap a registry root in either direction and is refused
+if the plan payload no longer matches its construction digest. It
+has no mutation, overwrite, apply operation, version policy, simulation
+promotion, or validation claim; CURATION-001 remains partial until PR-47
+provides a separately reviewed digest-confirmed transactional apply contract.
+The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
 researcher-facing BIO-002 example without adding validation data, calibration,
@@ -293,10 +306,14 @@ after simulation from existing native process-rate trajectories plus explicit
 sourced and dimensionally compatible metadata; it does not alter solver or
 process behavior after PR #58. The completed PR-44 slice is limited to public
 source-provider onboarding for existing SABIO-RK behavior after PR #59. The
-current PR-45 slice is limited to review-only curation decisions over those
-proposals; it adds no automatic trust, registry promotion, simulation-time
-fetch, scientific record, biology, solver behavior, thermodynamic behavior, or
-validation evidence.
+completed PR-45 slice is limited to review-only curation decisions over those
+proposals after PR #60; it adds no automatic trust, registry promotion,
+simulation-time fetch, scientific record, biology, solver behavior,
+thermodynamic behavior, or validation evidence. The current PR-46 slice is
+limited to an immutable registry-promotion preview over explicit accepts. It
+adds no production write/apply path, overwrite, version policy, automatic
+simulation eligibility, scientific-field transformation, biology, solver,
+calibration, thermodynamic behavior, or validation evidence.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -371,11 +388,12 @@ PR-41 completed after PR #56 as a Pyright optional-member-access ratchet. The
 PR-42 arbitrary-length linear enzyme-chain assembly slice completed after PR
 #57; branching and cycles remain unsupported. PR-43 process-bound
 entropy-production-rate configured diagnostics completed after PR #58. PR-44
-review-gated SABIO-RK researcher source onboarding completed after PR #59. The
-current PR-45 slice is a review/decision bundle rather than production registry
-promotion, ingestion, digitization, fabricated validation data, calibration,
-or empirical comparison. Actual registry promotion remains a separate
-next/later CURATION-001 follow-up.
+review-gated SABIO-RK researcher source onboarding completed after PR #59.
+PR-45 source-proposal review/decision bundles completed after PR #60. The
+current PR-46 slice is a registry-promotion preview plan rather than production
+registry mutation/apply, ingestion, digitization, fabricated validation data,
+calibration, or empirical comparison. Digest-confirmed transactional apply and
+version policy remain the separate PR-47 CURATION-001 follow-up.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
@@ -1252,6 +1270,14 @@ proposed_registry_records.yml
 accepted_registry_records.yml
 rejected_registry_records.yml
 ```
+
+Scoped status after PR #60: PR-45 supplies owned curator decision bundles, and
+the current PR-46 supplies a checksum-verified, index-resolved, loader-validated
+promotion preview with exact prospective YAML and digests. PR-46 has no apply
+or registry mutation path and does not define version policy. Product maps are
+blocked pending a destination contract. CURATION-001 therefore remains partial;
+PR-47 digest-confirmed transactional apply is still required for explicit
+production promotion.
 
 ## CURATION-001 acceptance criteria
 
