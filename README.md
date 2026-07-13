@@ -209,6 +209,44 @@ The returned records remain `proposed_review_required` and are never promoted
 into `data_registry/` or used by simulation automatically. Only
 `provider="sabiork"` is currently implemented.
 
+Review an in-memory proposal, or pass the directory written by
+`proposal.write(...)`, without promoting any record:
+
+```python
+from fungal_model import CurationDecision, review_source_proposal
+
+review = review_source_proposal(
+    proposal,
+    curator="Researcher Name",
+    decisions={
+        "proposed_sabiork_parameter_618_35622_kcat_cellobiose": CurationDecision(
+            decision="defer",
+            reason="Explicit original/converted conversion metadata is not yet supplied.",
+            curation_date="2026-07-13",
+            allowed_use="review_only_not_simulation_registry",
+            limitations=("Not scientifically validated or promoted for simulation.",),
+        )
+    },
+)
+review.write("data/proposed_records/sabiork/reaction_618_curation")
+```
+
+Records without a complete explicit `accept`, `reject`, or `defer` decision
+remain deferred. Schema blockers and exact missing fields are reported without
+filling unknown biology or parameters. The resulting CURATION-001 files are
+decision artifacts only: even `accepted_registry_records.yml` does not mutate
+`data_registry/`, promote records into simulation, or claim scientific
+validation. Accepted decisions require complete source provenance and explicit
+original/converted parameter values, units, and conversion method when the
+record is a parameter. Rejected and deferred decisions may preserve provenance
+blockers with curator rationale. Decision allowed use is restricted to
+`review_only_not_simulation_registry` or
+`pending_registry_promotion_review`; scientific, validation, and simulation
+use cannot be declared by this API.
+Product-map participants also require parseable finite positive stoichiometry,
+and each finite positive product yield must match exactly one product name or
+id and its participant stoichiometry; no conversion is inferred.
+
 ## Run A Virtual Experiment
 
 ```python
@@ -411,6 +449,10 @@ loading, model assembly, execution, and result inspection:
 - `VirtualExperimentError`
 - `source_proposal`
 - `SourceProviderError`
+- `review_source_proposal`
+- `CurationDecision`
+- `CurationResult`
+- `CurationError`
 - `run_configured_model`
 - `load_model_config`
 - `load_substrate`
@@ -552,6 +594,15 @@ simulation registry. Use
 `scripts/fetch_sabiork_kinlaw_entries.py` to freeze raw SABIO-RK exports and
 `scripts/propose_sabiork_source_records.py` to create review-only proposal
 artifacts from a frozen snapshot.
+
+The top-level `review_source_proposal(...)` API validates either the in-memory
+`RegistryProposal` or its written manifest through the same curation path. It
+writes deterministic review CSV/YAML/report/checksum artifacts, requires
+complete curator metadata for every explicit decision, validates record types
+and content without inferring conversion data, and defaults every omitted
+decision to deferred. Repeated writes replace only an existing curation folder
+with the expected owned manifest kind/version. CURATION-001 remains partial:
+these artifacts do not perform production registry promotion.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
 The current library provides factories for first-order, mass-action,

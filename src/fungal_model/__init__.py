@@ -21,6 +21,9 @@ from fungal_model.entities import Environment
 from fungal_model.entities import Enzyme
 from fungal_model.api import (
     AVAILABLE_SOURCE_PROVIDERS,
+    CurationDecision,
+    CurationError,
+    CurationResult,
     DegradationScreenResult,
     EnvironmentCase,
     EnvironmentGrid,
@@ -28,6 +31,7 @@ from fungal_model.api import (
     VirtualExperiment,
     VirtualExperimentError,
     environment_grid,
+    review_source_proposal,
     source_proposal,
     virtual_experiment,
 )
@@ -128,6 +132,9 @@ from fungal_model.workflows import (
 
 __all__ = [
     "AVAILABLE_SOURCE_PROVIDERS",
+    "CurationDecision",
+    "CurationError",
+    "CurationResult",
     "AssembledModel",
     "AssemblyReport",
     "Assumption",
@@ -230,6 +237,7 @@ __all__ = [
     "WaterActivityModifier",
     "WellMixedGeometry",
     "run_configured_model",
+    "review_source_proposal",
     "source_proposal",
     "virtual_experiment",
     "__version__",
