@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-45: source-proposal curation review bundle**.
+Current next PR: **PR-46: registry-promotion preview plan**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -42,8 +42,12 @@ PR-41 Pyright optional-member-access ratchet is complete after PR #56. PR-42
 arbitrary-length linear enzyme-chain assembly is complete after PR #57. PR-43
 process-bound entropy-production-rate diagnostics is complete after PR #58.
 PR-44 researcher source-provider onboarding is complete after PR #59. The
-selected PR-45 work is therefore bounded CURATION-001 proposal review and
-decision-bundle behavior, not registry promotion or validation ingestion.
+PR-45 CURATION-001 proposal-review and decision-bundle work is complete after
+PR #60 merged as `5ac7864`. The selected PR-46 work is therefore bounded
+registry-promotion preview/plan behavior with checksum, destination, schema,
+classification, exact-content, and digest review. It has no registry mutation,
+apply operation, version policy, simulation promotion, or validation ingestion;
+digest-confirmed transactional apply remains PR-47.
 A future validation ingestion PR must not ingest, digitize, or
 fabricate data unless those evidence requirements are met.
 This gate does not complete VALIDATION-DATA-001.

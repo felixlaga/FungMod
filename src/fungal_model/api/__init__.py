@@ -7,6 +7,14 @@ from fungal_model.api.curation import (
     review_source_proposal,
 )
 from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid, environment_grid
+from fungal_model.api.registry_promotion import (
+    ProspectiveRegistryFile,
+    RegistryPromotionCandidate,
+    RegistryPromotionPlan,
+    RegistryPromotionPlanError,
+    RegistryPromotionPlanWriteResult,
+    plan_registry_promotion,
+)
 from fungal_model.api.source_provider import (
     AVAILABLE_SOURCE_PROVIDERS,
     SourceProviderError,
@@ -29,6 +37,12 @@ __all__ = [
     "EnvironmentCase",
     "EnvironmentGrid",
     "environment_grid",
+    "plan_registry_promotion",
+    "ProspectiveRegistryFile",
+    "RegistryPromotionCandidate",
+    "RegistryPromotionPlan",
+    "RegistryPromotionPlanError",
+    "RegistryPromotionPlanWriteResult",
     "review_source_proposal",
     "source_proposal",
     "SourceProviderError",

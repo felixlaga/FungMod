@@ -247,6 +247,41 @@ Product-map participants also require parseable finite positive stoichiometry,
 and each finite positive product yield must match exactly one product name or
 id and its participant stoichiometry; no conversion is inferred.
 
+Preview the registry effect of the explicitly accepted decisions without
+writing any registry file:
+
+```python
+from fungal_model import plan_registry_promotion
+
+plan = plan_registry_promotion(
+    review,
+    registry_index="data_registry/registry_index.yml",
+)
+plan.write("data/proposed_records/sabiork/reaction_618_promotion_plan")
+```
+
+`plan_registry_promotion(...)` accepts either the in-memory `CurationResult` or
+its written owned curation bundle. Written inputs verify the manifest
+kind/schema and every declared artifact checksum before accepted records are
+trusted. Only explicit `accept` decisions are considered. Candidates are
+validated through the actual destination registry loader and classified as
+addable, exact duplicate/no-op, conflict, or blocked/unsupported. Exact target
+paths, before hashes, deterministic prospective YAML, post hashes, and a full
+prospective-registry digest are reviewable in memory or in the optional owned
+plan bundle. A would-be addable must also round-trip through the loader to the
+same record mapping, so unknown fields that a loader would silently drop and
+omitted fields that it would synthesize/default are blocked. Raw stored content
+still defines exact-duplicate/no-op classification. `parameter_records` map to
+the registry index's `parameters` destination; product maps remain blocked as
+`unsupported_pending_destination_contract` because they are outside
+`registry_index.yml`.
+
+This API has no apply or mutation operation. It never overwrites record IDs or
+changes scientific fields. It never writes registry/index/record files,
+promotes a record into simulation, claims scientific validation, or invents a
+version bump policy. Digest-confirmed transactional apply and registry version
+policy remain a later PR-47 concern.
+
 ## Run A Virtual Experiment
 
 ```python
@@ -601,8 +636,15 @@ writes deterministic review CSV/YAML/report/checksum artifacts, requires
 complete curator metadata for every explicit decision, validates record types
 and content without inferring conversion data, and defaults every omitted
 decision to deferred. Repeated writes replace only an existing curation folder
-with the expected owned manifest kind/version. CURATION-001 remains partial:
-these artifacts do not perform production registry promotion.
+with the expected owned manifest kind/version. The top-level
+`plan_registry_promotion(...)` API now verifies explicit accepts, resolves only
+index-declared destinations, classifies no-op/conflict/unsupported cases, and
+validates exact prospective YAML through a temporary full-registry copy. Each
+would-be add also has to round-trip faithfully through its actual target loader;
+silently dropped or synthesized/defaulted fields are blocked. It is preview-only
+and cannot mutate the registry. CURATION-001 remains partial until
+the separately reviewed PR-47 digest-confirmed transactional apply contract is
+implemented.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
 The current library provides factories for first-order, mass-action,

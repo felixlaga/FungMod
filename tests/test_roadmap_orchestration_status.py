@@ -63,15 +63,49 @@ def test_status_tracker_reconciles_completed_scoped_slices_without_overclaiming(
         assert boundary in text
 
 
+def test_pr46_registry_promotion_preview_contract_is_synchronized() -> None:
+    readme = _read(README)
+    status = _read(STATUS_DOC)
+    next_steps = _read(NEXT_STEPS)
+    roadmap = _read(ACTIVE_ROADMAP)
+    validation_gate = _read(VALIDATION_GATE)
+    progress = _read(PROGRESS_LEDGER)
+
+    for text in (readme, status, next_steps, roadmap, progress):
+        assert "plan_registry_promotion" in text
+        assert "CURATION-001 remains partial" in text
+
+    for text in (status, next_steps, roadmap, validation_gate, progress):
+        assert "PR-45" in text
+        assert "PR #60" in text
+        assert "PR-46" in text
+        assert "PR-47" in text
+
+    for phrase in (
+        "checksum-verifies written curation bundles",
+        "round-trip to the exact candidate mapping",
+        "exact prospective YAML",
+        "no registry mutation",
+        "Product maps remain blocked",
+        "digest-confirmed transactional apply",
+    ):
+        assert phrase in next_steps
+
+    assert "unsupported_pending_destination_contract" in readme
+    assert "parameter_records" in readme
+    assert "version bump policy" in readme
+    assert "no `apply()` path" in progress
+
+
 def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> None:
     status = _read(STATUS_DOC)
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-45: source-proposal curation review bundle"
+    current_next = "PR-46: registry-promotion preview plan"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-45 source-proposal curation review bundle" in roadmap
+    assert "The current next PR is PR-46 registry-promotion preview plan" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
@@ -88,7 +122,9 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "completed PR-42 slice generalized the registry/template-driven extracellular" in roadmap
     assert "completed PR-43 slice adds post-simulation" in roadmap
     assert "completed PR-44" in roadmap
-    assert "current PR-45" in roadmap
+    assert "completed PR-45" in roadmap
+    assert "current PR-46" in roadmap
+    assert "PR-47" in roadmap
     assert "branching, cycles, disconnected chains, and malformed topology" in roadmap
     assert "35 baseline nullable-member errors across 11" in roadmap
     assert "scientific modules using explicit contracts" in roadmap
@@ -128,7 +164,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-45: source-proposal curation review bundle"
+    current_next = "PR-46: registry-promotion preview plan"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -171,6 +207,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-42" not in text
         assert "Current next PR: **PR-43" not in text
         assert "Current next PR: **PR-44" not in text
+        assert "Current next PR: **PR-45" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -352,12 +389,14 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-44 | Researcher source-provider onboarding UX" in status
     assert "complete after PR #59 merged" in status
     assert "PR-45 | CURATION-001 source-proposal review and decision bundle" in status
+    assert "complete after PR #60 merged as `5ac7864`" in status
+    assert "PR-46 | CURATION-001 registry-promotion preview plan" in status
+    assert "PR-47 | CURATION-001 digest-confirmed transactional apply" in status
     assert "CURATION-001 remains partial" in status
     assert "entropy_production_rate_timeseries.json" in next_steps
     assert "entropy_production_rate_timeseries.json" in _read(README)
     assert "no silent conversion" in status
     assert "Branching and cycles remain unsupported" in status
-    assert "Future CURATION-001 follow-up" in status
     assert "Future | VALIDATION-DATA-001" in status
 
 
@@ -405,7 +444,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-45: source-proposal curation review bundle"
+    current_next = "PR-46: registry-promotion preview plan"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -449,6 +488,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-42" not in _current_next_lines(text)
         assert "PR-43" not in _current_next_lines(text)
         assert "PR-44" not in _current_next_lines(text)
+        assert "PR-45" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
@@ -462,7 +502,9 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "arbitrary-length linear enzyme-chain assembly is complete after PR #57" in gate
     assert "process-bound entropy-production-rate diagnostics is complete after PR #58" in gate
     assert "PR-44 researcher source-provider onboarding is complete after PR #59" in gate
-    assert "selected PR-45 work is therefore bounded CURATION-001" in gate
+    assert "PR-45 CURATION-001 proposal-review and decision-bundle work is complete" in gate
+    assert "selected PR-46 work is therefore bounded" in gate
+    assert "digest-confirmed transactional apply remains PR-47" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate
