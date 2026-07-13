@@ -40,24 +40,29 @@ Completed in this pass:
   `RegistryProposal` or its written `proposal_manifest.json` bundle through one
   normalization and validation path.
 - Added per-record `eligible_for_review` versus `blocked_excluded`
-  classification with exact missing fields and reasons. Unknown biology,
-  parameters, units, and review-required fields remain explicit and are never
-  filled or inferred.
+  classification with exact missing fields and typed record-specific schema
+  reasons. Unknown biology, parameters, units, and review-required fields
+  remain explicit and are never filled or inferred.
 - Added explicit `accept`, `reject`, and `defer` decisions requiring curator
-  identity, reason, ISO curation date, allowed use, limitations, and proposal
-  source snapshot/entry provenance. Every omitted decision remains deferred,
-  and blocked records cannot be accepted.
+  identity, reason, ISO curation date, closed review-only/pending-promotion
+  allowed use, and limitations. Acceptance additionally requires complete
+  source database, snapshot-or-URL, entry provenance, and explicit original
+  and converted parameter values/units/conversion method. Reject/defer may
+  preserve provenance blockers. Every omitted decision remains deferred, and
+  blocked records cannot be accepted.
 - Added deterministic `curation_report.md`, `eligible_records.csv`,
   `excluded_records.csv`, `proposed_registry_records.yml`,
   `accepted_registry_records.yml`, `rejected_registry_records.yml`, and
-  checksummed `curation_manifest.json` artifacts with transactional directory
-  replacement for repeated writes.
+  checksummed `curation_manifest.json` artifacts with canonical serialization
+  and transactional repeated-write replacement only for directories carrying
+  the expected owned curation manifest kind/version.
 - Preserved proposed record values and metadata verbatim, including source and
   normalized values/units plus conversion metadata when present. Accepted
   artifacts add a curator decision block but retain review-only separation.
 - Rejected malformed manifests, duplicate record IDs, unknown decisions,
   incomplete decision metadata, unknown decision record IDs, path traversal,
-  symlink inputs/outputs, and writes beneath `data_registry/`.
+  symlinks in every existing input/output path component, unowned output
+  directories, and writes beneath `data_registry/`.
 - Exported the concise API at top level and added a README example with the
   explicit non-promotion boundary.
 
@@ -97,9 +102,9 @@ until source-backed observations satisfy its evidence gate.
 
 Verification:
 
-- Focused curation, source-provider, and discovery suite: 46 passed.
+- Focused curation, source-provider, and discovery suite: 56 passed.
 - Broad curation, SABIO-RK source/discovery/parser/fetch, Reaction 618,
-  registry, public-API, instruction-hierarchy, and roadmap suite: 140 passed.
+  registry, public-API, instruction-hierarchy, and roadmap suite: 150 passed.
 - `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache .venv/bin/python -m ruff check src tests`
   - Result: all checks passed.
 - `.venv/bin/python -m pyright --pythonpath .venv/bin/python`
@@ -112,9 +117,9 @@ Verification:
   `notebooks/examples/.ipynb_checkpoints/10_virtual_experiment_product_tour-checkpoint.ipynb`
   remains in the shared workspace with a 2026-06-20 timestamp. PR-45 did not
   create, modify, delete, or stage it.
-- Final-tree full coverage gate excluding only that unrelated workspace-hygiene
-  assertion: 773 passed, 1 deselected; total coverage 84.85%. The new curation
-  module has 84% branch-aware coverage.
+- Final correction-tree full coverage gate excluding only that unrelated
+  workspace-hygiene assertion: 783 passed, 1 deselected; total coverage 84.93%.
+  The curation module has 88% branch-aware coverage.
 - One initial broad-suite command named nonexistent
   `tests/test_active_instruction_docs.py` and collected no tests; it was
   corrected to `tests/test_active_instruction_hierarchy.py` in the green broad

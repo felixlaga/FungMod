@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 import shutil
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -20,7 +21,15 @@ from fungal_model.sources.sabiork import PROPOSAL_STATUS, RegistryProposal
 
 
 CURATION_SCHEMA_VERSION = "1.0.0"
-CURATION_BUNDLE_ALLOWED_USE = "curation_decision_bundle_only_not_production_registry"
+CURATION_MANIFEST_KIND = "fungmod_curation_decision_bundle_manifest"
+CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY = "review_only_not_simulation_registry"
+CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION = "pending_registry_promotion_review"
+CURATION_DECISION_ALLOWED_USES = frozenset(
+    {
+        CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
+        CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
+    }
+)
 _DECISIONS = {"accept", "reject", "defer"}
 _RECORD_TYPES = (
     "fungi",
@@ -44,10 +53,11 @@ _TYPE_REQUIRED_FIELDS: Mapping[str, tuple[str, ...]] = {
     ),
     "parameter_records": (
         "parameter_symbol",
-        "source_value",
-        "source_units",
-        "normalized_start_value",
-        "normalized_units",
+        "original_value",
+        "original_units",
+        "converted_value",
+        "converted_units",
+        "conversion_method",
         "provenance.source_field",
     ),
     "process_compatibility": (
@@ -64,6 +74,66 @@ _TYPE_REQUIRED_FIELDS: Mapping[str, tuple[str, ...]] = {
         "stoichiometric_yields",
         "limitations",
     ),
+}
+_FIELD_RULES: Mapping[str, Mapping[str, str]] = {
+    "fungi": {
+        "scientific_name": "nonblank text",
+        "enzyme_classes": "nonempty sequence of nonblank text",
+    },
+    "substrates": {
+        "substrate_class": "nonblank text",
+        "products": "nonempty sequence of nonblank text",
+    },
+    "enzyme_classes": {
+        "ec_number": "nonblank text",
+        "compatible_processes": "nonempty sequence of nonblank text",
+    },
+    "product_maps": {
+        "product_map_type": "nonblank text",
+        "source_entry_id": "nonblank text",
+        "substrates": "nonempty participant sequence",
+        "products": "nonempty participant sequence",
+        "stoichiometric_yields": "positive finite numeric mapping",
+    },
+    "parameter_records": {
+        "parameter_symbol": "nonblank text",
+        "original_value": "finite number",
+        "original_units": "nonblank text",
+        "converted_value": "finite number",
+        "converted_units": "nonblank text",
+        "conversion_method": "nonblank text",
+        "provenance.source_field": "nonblank text",
+    },
+    "process_compatibility": {
+        "process_type": "nonblank text",
+        "enzyme_class": "nonblank text",
+        "substrate_class": "nonblank text",
+        "required_parameters": "nonempty sequence of nonblank text",
+        "parameter_roles": "nonempty nonblank text mapping",
+    },
+    "case_templates": {
+        "process_type": "nonblank text",
+        "state_roles": "nonempty nonblank text mapping",
+        "product_map": "case-template product-map mapping",
+        "stoichiometric_yields": "positive finite numeric mapping",
+        "limitations": "nonempty sequence of nonblank text",
+    },
+}
+_CANONICAL_SCALAR_SEQUENCE_KEYS = {
+    "aliases",
+    "compatible_processes",
+    "compatible_substrate_classes",
+    "enzyme_classes",
+    "limitations",
+    "missing_fields",
+    "products",
+    "reasons",
+    "required_bond_classes",
+    "required_parameters",
+    "review_required_fields",
+    "source_entry_ids",
+    "source_reaction_ids",
+    "validity_notes",
 }
 _CSV_FIELDS = (
     "record_type",
@@ -195,8 +265,7 @@ class CurationResult:
 
         root = _safe_output_path(output_dir)
         root.parent.mkdir(parents=True, exist_ok=True)
-        if root.exists() and not root.is_dir():
-            raise CurationError(f"Curation output path exists and is not a directory: {root}")
+        _validate_replaceable_destination(root)
 
         staging = Path(tempfile.mkdtemp(prefix=f".{root.name}.curation-", dir=root.parent))
         try:
@@ -247,16 +316,6 @@ def review_source_proposal(
                 "blocked_excluded" if reasons else "eligible_for_review"
             )
             decision = normalized_decisions.get(record_id)
-            provenance_missing = tuple(
-                field
-                for field in ("source_database", "source_entry_ids", "source_snapshot_path")
-                if _is_missing(provenance.get(field))
-            )
-            if decision is not None and provenance_missing:
-                raise CurationError(
-                    f"Record {record_id!r} cannot receive an explicit decision because source provenance "
-                    f"is incomplete: {', '.join(provenance_missing)}"
-                )
             if decision is not None and decision.decision == "accept" and reasons:
                 raise CurationError(
                     f"Record {record_id!r} cannot be accepted because it is blocked/excluded: "
@@ -275,8 +334,16 @@ def review_source_proposal(
                     curator=None if decision is None else curator.strip() if curator is not None else None,
                     decision_reason="" if decision is None else decision.reason,
                     curation_date="" if decision is None else decision.curation_date,
-                    allowed_use=CURATION_BUNDLE_ALLOWED_USE if decision is None else decision.allowed_use,
-                    limitations=limitations if decision is None else tuple(decision.limitations),
+                    allowed_use=(
+                        CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY
+                        if decision is None
+                        else decision.allowed_use
+                    ),
+                    limitations=(
+                        limitations
+                        if decision is None
+                        else tuple(sorted(str(value).strip() for value in decision.limitations))
+                    ),
                     source_provenance=provenance,
                 )
             )
@@ -295,13 +362,11 @@ def _proposal_payload(proposal_or_path: RegistryProposal | str | Path) -> Mappin
     path = Path(proposal_or_path)
     if ".." in path.parts:
         raise CurationError(f"Proposal path traversal is not allowed: {path}")
-    if path.is_symlink():
-        raise CurationError(f"Proposal symlinks are not allowed: {path}")
+    _reject_symlink_components(path, label="Proposal path")
     manifest = path / "proposal_manifest.json" if path.is_dir() else path
     if manifest.name != "proposal_manifest.json":
         raise CurationError("A written proposal input must be a bundle directory or proposal_manifest.json.")
-    if manifest.is_symlink():
-        raise CurationError(f"Proposal manifest symlinks are not allowed: {manifest}")
+    _reject_symlink_components(manifest, label="Proposal manifest path")
     try:
         payload = json.loads(manifest.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
@@ -324,7 +389,7 @@ def _validate_proposal(
     if not _nonempty_string_sequence(limitations_value):
         raise CurationError("Proposal field 'limitations' must be a non-empty list of explicit limitations.")
     assert isinstance(limitations_value, Sequence)
-    limitations = tuple(str(value).strip() for value in limitations_value)
+    limitations = tuple(sorted(str(value).strip() for value in limitations_value))
 
     proposed_records = payload.get("proposed_records")
     if not isinstance(proposed_records, Mapping):
@@ -373,7 +438,10 @@ def _review_record(
         *_TYPE_REQUIRED_FIELDS[record_type],
     )
     missing = {field for field in required_fields if _is_missing(_nested_value(record, field))}
-    for field in record.get("review_required_fields", []):
+    review_required_fields = record.get("review_required_fields", [])
+    if not isinstance(review_required_fields, Sequence) or isinstance(review_required_fields, (str, bytes)):
+        review_required_fields = []
+    for field in review_required_fields:
         if isinstance(field, str) and _is_missing(_nested_value(record, field)):
             missing.add(field)
 
@@ -382,34 +450,139 @@ def _review_record(
         reasons.append(f"proposal_status must be {PROPOSAL_STATUS!r}")
     if record.get("review_required") is not True:
         reasons.append("review_required must be true")
+    if record.get("allowed_use") != CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY:
+        reasons.append(
+            f"allowed_use must be {CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY!r} while proposed"
+        )
+    if "review_required_fields" in record and not _nonempty_string_sequence(record["review_required_fields"]):
+        reasons.append("review_required_fields must be a nonempty sequence of nonblank text when present")
+    reasons.extend(_record_schema_issues(record_type, record))
     if missing:
         reasons.append("missing required fields: " + ", ".join(sorted(missing)))
 
     provenance = _source_provenance(record, source_snapshot_path=source_snapshot_path)
-    provenance_missing = [
-        field
-        for field in ("source_database", "source_entry_ids", "source_snapshot_path")
-        if _is_missing(provenance.get(field))
-    ]
+    provenance_missing = _provenance_missing(provenance)
     if provenance_missing:
         missing.update(f"source_provenance.{field}" for field in provenance_missing)
         reasons.append("missing source provenance: " + ", ".join(provenance_missing))
-    return tuple(sorted(missing)), tuple(reasons), provenance
+    return tuple(sorted(missing)), tuple(sorted(set(reasons))), provenance
 
 
 def _source_provenance(record: Mapping[str, Any], *, source_snapshot_path: str) -> Mapping[str, Any]:
     nested = record.get("provenance")
-    provenance = deepcopy(dict(nested)) if isinstance(nested, Mapping) else {}
-    source_database = provenance.get("source_database") or record.get("source_database")
-    entry_ids = provenance.get("source_entry_ids")
-    if _is_missing(entry_ids) and not _is_missing(record.get("source_entry_id")):
+    has_nested = isinstance(nested, Mapping)
+    provenance = deepcopy(dict(nested)) if has_nested else {}
+    source_database = (
+        provenance.get("source_database")
+        if has_nested
+        else record.get("source_database")
+    )
+    entry_ids = provenance.get("source_entry_ids") if has_nested else None
+    if entry_ids is None and not _is_missing(record.get("source_entry_id")):
         entry_ids = [str(record["source_entry_id"])]
+    snapshot = (
+        provenance.get("source_snapshot_path", source_snapshot_path)
+        if has_nested
+        else source_snapshot_path
+    )
+    source_url = provenance.get("source_url") if has_nested else record.get("source_url")
+    if _nonempty_string_sequence(entry_ids):
+        assert isinstance(entry_ids, Sequence) and not isinstance(entry_ids, (str, bytes))
+        entry_ids = sorted(str(value).strip() for value in entry_ids)
     return {
         **provenance,
         "source_database": source_database,
         "source_entry_ids": entry_ids,
-        "source_snapshot_path": provenance.get("source_snapshot_path") or source_snapshot_path,
+        "source_snapshot_path": snapshot,
+        "source_url": source_url,
     }
+
+
+def _provenance_missing(provenance: Mapping[str, Any]) -> tuple[str, ...]:
+    missing: list[str] = []
+    if not _nonblank_text(provenance.get("source_database")):
+        missing.append("source_database")
+    if not _nonempty_string_sequence(provenance.get("source_entry_ids")):
+        missing.append("source_entry_ids")
+    if not (
+        _nonblank_text(provenance.get("source_snapshot_path"))
+        or _nonblank_text(provenance.get("source_url"))
+    ):
+        missing.append("source_snapshot_path_or_source_url")
+    return tuple(missing)
+
+
+def _record_schema_issues(record_type: str, record: Mapping[str, Any]) -> list[str]:
+    issues: list[str] = []
+    for field, rule in _FIELD_RULES[record_type].items():
+        value = _nested_value(record, field)
+        if _is_missing(value):
+            continue
+        if not _field_matches_rule(value, rule):
+            issues.append(f"field {field!r} must be {rule}")
+    return issues
+
+
+def _field_matches_rule(value: Any, rule: str) -> bool:
+    if rule == "nonblank text":
+        return _nonblank_text(value)
+    if rule == "nonempty sequence of nonblank text":
+        return _nonempty_string_sequence(value)
+    if rule == "nonempty participant sequence":
+        return _participant_sequence(value)
+    if rule == "positive finite numeric mapping":
+        return _positive_numeric_mapping(value)
+    if rule == "finite number":
+        return _finite_number(value)
+    if rule == "nonempty nonblank text mapping":
+        return _nonblank_text_mapping(value)
+    if rule == "nonempty mapping":
+        return isinstance(value, Mapping) and bool(value)
+    if rule == "case-template product-map mapping":
+        return _case_template_product_map(value)
+    raise AssertionError(f"Unknown curation field rule: {rule}")
+
+
+def _participant_sequence(value: Any) -> bool:
+    required = ("entry_id", "reaction_id", "role", "compound_name", "stoichiometry")
+    return (
+        isinstance(value, Sequence)
+        and not isinstance(value, (str, bytes))
+        and bool(value)
+        and all(
+            isinstance(item, Mapping)
+            and all(_nonblank_text(item.get(field)) for field in required)
+            for item in value
+        )
+    )
+
+
+def _positive_numeric_mapping(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and bool(value)
+        and all(
+            _nonblank_text(key) and _finite_number(item) and float(item) > 0.0
+            for key, item in value.items()
+        )
+    )
+
+
+def _nonblank_text_mapping(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and bool(value)
+        and all(_nonblank_text(key) and _nonblank_text(item) for key, item in value.items())
+    )
+
+
+def _case_template_product_map(value: Any) -> bool:
+    required = ("id", "product_map_type", "substrate_state_role", "product_state_role")
+    return isinstance(value, Mapping) and all(_nonblank_text(value.get(field)) for field in required)
+
+
+def _finite_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
 
 
 def _normalize_decisions(
@@ -453,6 +626,22 @@ def _validate_decision(record_id: str, decision: CurationDecision) -> None:
     for field, value in (("reason", decision.reason), ("curation_date", decision.curation_date), ("allowed_use", decision.allowed_use)):
         if not isinstance(value, str) or not value.strip():
             raise CurationError(f"Decision for {record_id!r} requires non-empty {field}.")
+    if decision.allowed_use not in CURATION_DECISION_ALLOWED_USES:
+        allowed = ", ".join(sorted(CURATION_DECISION_ALLOWED_USES))
+        raise CurationError(
+            f"Decision for {record_id!r} has unknown allowed_use {decision.allowed_use!r}; "
+            f"expected one of: {allowed}."
+        )
+    expected_allowed_use = (
+        CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION
+        if decision.decision == "accept"
+        else CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY
+    )
+    if decision.allowed_use != expected_allowed_use:
+        raise CurationError(
+            f"Decision {decision.decision!r} for {record_id!r} requires allowed_use "
+            f"{expected_allowed_use!r}."
+        )
     try:
         date.fromisoformat(decision.curation_date)
     except ValueError as exc:
@@ -476,18 +665,18 @@ def _write_bundle(root: Path, result: CurationResult) -> None:
         if key != "curation_manifest"
     }
     manifest = {
-        "kind": "fungmod_curation_decision_bundle_manifest",
+        "kind": CURATION_MANIFEST_KIND,
         "schema_version": CURATION_SCHEMA_VERSION,
         "source_query": result.source_query,
         "source_snapshot_path": result.source_snapshot_path,
         "summary": result.summary(),
         "files": checksums,
-        "allowed_use": CURATION_BUNDLE_ALLOWED_USE,
+        "allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
         "production_registry_mutated": False,
         "scientific_validation_claimed": False,
     }
     paths["curation_manifest"].write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        json.dumps(_canonicalize(manifest), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
@@ -513,7 +702,7 @@ def _records_payload(
         "kind": "fungmod_curation_decision_records",
         "schema_version": CURATION_SCHEMA_VERSION,
         "bundle_status": bundle_status,
-        "allowed_use": CURATION_BUNDLE_ALLOWED_USE,
+        "allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
         "source_query": result.source_query,
         "source_snapshot_path": result.source_snapshot_path,
         "production_registry_promotion": False,
@@ -522,7 +711,7 @@ def _records_payload(
 
 
 def _write_yaml(path: Path, payload: Mapping[str, Any]) -> None:
-    path.write_text(yaml.safe_dump(dict(payload), sort_keys=False), encoding="utf-8")
+    path.write_text(yaml.safe_dump(_canonicalize(payload), sort_keys=False), encoding="utf-8")
 
 
 def _write_csv(path: Path, records: Sequence[CurationRecord]) -> None:
@@ -541,7 +730,9 @@ def _write_csv(path: Path, records: Sequence[CurationRecord]) -> None:
                     "missing_fields": "; ".join(record.missing_fields),
                     "reasons": "; ".join(record.reasons),
                     "source_database": provenance.get("source_database", ""),
-                    "source_entry_ids": "; ".join(str(value) for value in provenance.get("source_entry_ids", [])),
+                    "source_entry_ids": "; ".join(
+                        sorted(str(value) for value in provenance.get("source_entry_ids", []))
+                    ),
                     "source_snapshot_path": provenance.get("source_snapshot_path", ""),
                     "allowed_use": record.allowed_use,
                 }
@@ -607,17 +798,69 @@ def _replace_directory(staging: Path, destination: Path) -> None:
     shutil.rmtree(backup)
 
 
+def _validate_replaceable_destination(destination: Path) -> None:
+    if not destination.exists():
+        return
+    if not destination.is_dir():
+        raise CurationError(f"Curation output path exists and is not a directory: {destination}")
+    manifest_path = destination / "curation_manifest.json"
+    _reject_symlink_components(manifest_path, label="Existing curation manifest path")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise CurationError(
+            "Refusing to replace an existing directory without a readable owned curation manifest: "
+            f"{destination}"
+        ) from exc
+    if not isinstance(manifest, Mapping):
+        raise CurationError(
+            f"Refusing to replace existing directory with non-object curation manifest: {destination}"
+        )
+    if (
+        manifest.get("kind") != CURATION_MANIFEST_KIND
+        or manifest.get("schema_version") != CURATION_SCHEMA_VERSION
+    ):
+        raise CurationError(
+            "Refusing to replace an existing directory not owned by this curation bundle "
+            f"kind/version: {destination}"
+        )
+
+
 def _safe_output_path(output_dir: str | Path) -> Path:
     path = Path(output_dir)
     if ".." in path.parts:
         raise CurationError(f"Curation output path traversal is not allowed: {path}")
-    if path.is_symlink():
-        raise CurationError(f"Curation output symlinks are not allowed: {path}")
+    _reject_symlink_components(path, label="Curation output path")
     resolved = path.resolve(strict=False)
     registry = (Path(__file__).resolve().parents[3] / "data_registry").resolve(strict=False)
     if resolved == registry or registry in resolved.parents:
         raise CurationError("CURATION-001 decision bundles cannot be written inside data_registry/.")
     return resolved
+
+
+def _reject_symlink_components(path: Path, *, label: str) -> None:
+    absolute = path if path.is_absolute() else Path.cwd() / path
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink():
+            raise CurationError(f"{label} contains a symlink component: {current}")
+
+
+def _canonicalize(value: Any, *, field_name: str | None = None) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            key: _canonicalize(value[key], field_name=str(key))
+            for key in sorted(value, key=lambda item: str(item))
+        }
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        items = [_canonicalize(item) for item in value]
+        if field_name in _CANONICAL_SCALAR_SEQUENCE_KEYS and all(
+            not isinstance(item, (Mapping, list, tuple)) for item in items
+        ):
+            return sorted(items, key=lambda item: json.dumps(item, sort_keys=True))
+        return items
+    return value
 
 
 def _required_text(payload: Mapping[str, Any], field: str, *, scope: str) -> str:
@@ -637,7 +880,11 @@ def _nested_value(record: Mapping[str, Any], field: str) -> Any:
 
 
 def _is_missing(value: Any) -> bool:
-    return value is None or value == "" or value == [] or value == {}
+    return value is None or value == "" or value == [] or value == {} or value == ()
+
+
+def _nonblank_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
 
 
 def _nonempty_string_sequence(value: Any) -> bool:
@@ -654,7 +901,10 @@ def _md(value: str) -> str:
 
 
 __all__ = [
-    "CURATION_BUNDLE_ALLOWED_USE",
+    "CURATION_DECISION_ALLOWED_USES",
+    "CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION",
+    "CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY",
+    "CURATION_MANIFEST_KIND",
     "CURATION_SCHEMA_VERSION",
     "CurationDecision",
     "CurationError",
