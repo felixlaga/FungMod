@@ -57,8 +57,14 @@ Completed in this pass:
   `load_registry(...)` path in a temporary copied registry and must round-trip
   to the exact candidate mapping through the loaded record's existing
   `to_dict()` schema. Unknown fields that loaders would silently drop and
-  omitted fields they would synthesize/default are blocked. Exact duplicates
-  remain raw stored-content comparisons before this addable-only fidelity gate.
+  omitted fields they would synthesize/default are blocked. Scalar comparisons
+  are recursively type-exact, so booleans, integers, and floats cannot silently
+  compare equal after loader conversion. Exact duplicates remain raw
+  stored-content comparisons with the same scalar-type fidelity before this
+  addable-only fidelity gate.
+- Revalidated every accepted record against the existing CURATION-001 contract:
+  unresolved `missing_fields` or `reasons` and incomplete source provenance are
+  rejected for both in-memory and checksum-valid written bundles.
 - Added exact prospective YAML content, target paths, before/post SHA-256
   values, an unchanged-registry digest, a prospective full-registry digest, and
   a deterministic plan digest. The complete combined prospective registry is
@@ -66,7 +72,10 @@ Completed in this pass:
 - Added optional deterministic `promotion_plan.json`,
   `candidate_classifications.yml`, `promotion_report.md`, and
   `prospective_registry/` review artifacts with transactional replacement only
-  for an existing folder carrying the owned plan manifest kind/version.
+  for an existing folder carrying the owned plan manifest kind/version. Output
+  paths that equal, descend from, or contain a registry root are rejected before
+  replacement, and write-time digest verification rejects mutated nested plan
+  payloads before creating output.
 - Kept the API preview-only: there is no `apply()` path, production registry
   mutation, record overwrite, simulation promotion, version bump policy,
   scientific validation claim, live API behavior, biology, solver, calibration,
@@ -79,8 +88,11 @@ duplicate/no-op, same-ID conflict, unsupported product maps, reject/defer
 exclusion, valid and checksum-tampered written bundles, malformed/non-owned
 bundles, index traversal/symlink/out-of-root destinations, target-schema and
 loader-fidelity failures for unknown and omitted/defaulted fields, prospective
-full-registry validation failures, deterministic digests/artifacts, safe owned
-output replacement, registry-root write refusal, and public exports.
+full-registry validation failures, type-exact boolean/integer-versus-float
+comparisons, accepted-record blocker and provenance revalidation for memory and
+checksum-valid written bundles, deterministic digests/artifacts, refusal after
+plan mutation, safe owned output replacement, bidirectional registry-root
+overlap refusal with byte-preservation proof, and public exports.
 `tests/test_roadmap_orchestration_status.py` keeps the PR-45/PR-46/PR-47 queue,
 partial CURATION-001 status, and deferred validation wording synchronized.
 
@@ -115,14 +127,13 @@ its evidence gate.
 
 Verification:
 
-- Focused registry-promotion plan suite: 22 passed.
-- Focused promotion/curation/orchestration suite: 72 passed.
-- Combined promotion/curation/registry/public/status suite: 92 passed.
-- Broad source, curation, registry, public-API, instruction, hygiene, and roadmap
-  suite: 228 passed.
+- Focused registry-promotion plan suite: 32 passed.
+- Focused promotion/curation/orchestration suite: 82 passed.
+- Broad curation, registry, public-API, instruction, hygiene, source-provider,
+  virtual-experiment, and roadmap suite: 221 passed.
 - `MPLCONFIGDIR=/private/tmp/fungmod-mpl-cache PYTHONPATH=src /Users/felix/Documents/GitHub/FungMod/.venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`
-  - Result: 826 passed in 153.15 seconds; total coverage 84.73%, above
-    the required 80%; `registry_promotion.py` coverage 79%.
+  - Result: 836 passed in 124.27 seconds; total coverage 84.74%, above
+    the required 80%; `registry_promotion.py` coverage 80%.
 - `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache PYTHONPATH=src /Users/felix/Documents/GitHub/FungMod/.venv/bin/python -m ruff check src tests`
   - Result: all checks passed. The main checkout interpreter is used because
     ignored virtual environments are not copied into git worktrees.

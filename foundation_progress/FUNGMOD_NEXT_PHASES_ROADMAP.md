@@ -196,11 +196,15 @@ written source proposals, classifies exact schema blockers, and writes explicit
 curator decision bundles while leaving absent decisions deferred. It does not
 mutate the production registry or claim scientific validation after PR #60.
 The current PR-46 `plan_registry_promotion(...)` slice checksum-verifies written
-curation bundles, considers explicit accepts only, resolves index-declared
-destinations, validates candidates and combined prospective content through
-existing registry loaders, requires exact loader round-trip fidelity for
-would-be adds so dropped or synthesized/defaulted fields are blocked,
-and emits deterministic classifications, exact YAML, hashes, and digests. It
+curation bundles, revalidates that explicit accepts have no curation blockers
+and carry complete source provenance, and resolves index-declared destinations.
+It validates candidates and combined prospective content through existing
+registry loaders, requires scalar-type-exact loader round-trip fidelity for
+would-be adds so dropped, synthesized/defaulted, or type-converted fields are
+blocked, and preserves raw stored-content semantics for exact duplicates. It
+emits deterministic classifications, exact YAML, hashes, and digests; owned
+review output cannot overlap a registry root in either direction and is refused
+if the plan payload no longer matches its construction digest. It
 has no mutation, overwrite, apply operation, version policy, simulation
 promotion, or validation claim; CURATION-001 remains partial until PR-47
 provides a separately reviewed digest-confirmed transactional apply contract.

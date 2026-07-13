@@ -86,14 +86,17 @@ def _curation_record(
     *,
     decision: str = "accept",
     explicit_decision: bool = True,
+    missing_fields: tuple[str, ...] = (),
+    reasons: tuple[str, ...] = (),
+    source_provenance: dict[str, Any] | None = None,
 ) -> CurationRecord:
     return CurationRecord(
         record_type=record_type,
         record_id=str(payload["record_id"]),
         proposed_record=deepcopy(payload),
         classification="eligible_for_review",
-        missing_fields=(),
-        reasons=(),
+        missing_fields=missing_fields,
+        reasons=reasons,
         decision=decision,  # type: ignore[arg-type]
         explicit_decision=explicit_decision,
         curator="Synthetic Test Curator" if explicit_decision else None,
@@ -109,11 +112,15 @@ def _curation_record(
             else CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY
         ),
         limitations=("Synthetic software fixture; no scientific validation is claimed.",),
-        source_provenance={
-            "source_database": "synthetic_fixture",
-            "source_entry_ids": ["fixture-1"],
-            "source_snapshot_path": "synthetic/software/fixture.json",
-        },
+        source_provenance=(
+            {
+                "source_database": "synthetic_fixture",
+                "source_entry_ids": ["fixture-1"],
+                "source_snapshot_path": "synthetic/software/fixture.json",
+            }
+            if source_provenance is None
+            else deepcopy(source_provenance)
+        ),
     )
 
 
@@ -217,6 +224,30 @@ def test_exact_duplicate_is_a_no_op(tmp_path: Path) -> None:
     assert plan.before_registry_digest == plan.prospective_registry_digest
 
 
+@pytest.mark.parametrize("candidate_value", [True, 1], ids=["bool", "int"])
+def test_non_float_scalar_is_not_an_exact_duplicate_of_raw_float_content(
+    tmp_path: Path,
+    candidate_value: bool | int,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    _, target = _read_target_records(registry_index, "parameters")
+    existing = next(
+        deepcopy(record)
+        for record in target["records"]
+        if type(record.get("value", {}).get("value")) is float
+        and record["value"]["value"] == 1.0
+    )
+    existing["value"]["value"] = candidate_value
+    result = _curation_result(_curation_record("parameter_records", existing))
+
+    plan = plan_registry_promotion(result, registry_index=registry_index)
+
+    candidate = plan.candidates[0]
+    assert candidate.classification == "conflict"
+    assert candidate.reason == "record_id_already_exists_with_different_content_no_overwrite"
+    assert plan.prospective_files == ()
+
+
 def test_same_id_with_different_content_is_conflict_and_never_overwritten(
     tmp_path: Path,
 ) -> None:
@@ -299,6 +330,61 @@ def test_written_owned_curation_bundle_maps_parameter_records_and_verifies_artif
     assert plan.candidates[0].registry_key == "parameters"
     assert plan.candidates[0].target_record == _synthetic_parameter()
     assert plan.candidates[0].curation_metadata["decision"] == "accept"
+
+
+@pytest.mark.parametrize("written_bundle", [False, True])
+def test_accepted_curation_with_blockers_is_rejected_for_memory_and_owned_bundle(
+    tmp_path: Path,
+    written_bundle: bool,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    before = _registry_snapshot(registry_index)
+    result = _curation_result(
+        _curation_record(
+            "parameter_records",
+            _synthetic_parameter(),
+            missing_fields=("value.units",),
+            reasons=("synthetic unresolved blocker",),
+        )
+    )
+    curation_input: CurationResult | Path = result
+    if written_bundle:
+        curation_input = result.write(tmp_path / "blocked_curation_bundle").output_directory
+
+    with pytest.raises(
+        RegistryPromotionPlanError,
+        match="requires empty curation missing_fields and reasons",
+    ):
+        plan_registry_promotion(curation_input, registry_index=registry_index)
+
+    assert _registry_snapshot(registry_index) == before
+
+
+@pytest.mark.parametrize("written_bundle", [False, True])
+def test_accepted_curation_with_empty_provenance_is_rejected_for_memory_and_owned_bundle(
+    tmp_path: Path,
+    written_bundle: bool,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    before = _registry_snapshot(registry_index)
+    result = _curation_result(
+        _curation_record(
+            "parameter_records",
+            _synthetic_parameter(),
+            source_provenance={},
+        )
+    )
+    curation_input: CurationResult | Path = result
+    if written_bundle:
+        curation_input = result.write(tmp_path / "provenance_curation_bundle").output_directory
+
+    with pytest.raises(
+        RegistryPromotionPlanError,
+        match="incomplete source provenance.*source_database.*source_entry_ids",
+    ):
+        plan_registry_promotion(curation_input, registry_index=registry_index)
+
+    assert _registry_snapshot(registry_index) == before
 
 
 def test_tampered_declared_written_bundle_artifact_is_rejected_before_records_are_trusted(
@@ -440,6 +526,27 @@ def test_target_loader_fidelity_blocks_omitted_defaulted_production_field(
     assert plan.prospective_files == ()
 
 
+@pytest.mark.parametrize("candidate_value", [True, 1], ids=["bool", "int"])
+def test_target_loader_fidelity_blocks_scalar_converted_to_float(
+    tmp_path: Path,
+    candidate_value: bool | int,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    candidate_payload = _synthetic_parameter()
+    candidate_payload["value"]["value"] = candidate_value
+    result = _curation_result(
+        _curation_record("parameter_records", candidate_payload)
+    )
+
+    plan = plan_registry_promotion(result, registry_index=registry_index)
+
+    candidate = plan.candidates[0]
+    assert candidate.classification == "blocked_unsupported"
+    assert candidate.reason.startswith("target_loader_fidelity_failed:")
+    assert "changed_fields=['value.value']" in candidate.reason
+    assert plan.prospective_files == ()
+
+
 def test_prospective_full_registry_validation_failure_aborts_plan(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -481,6 +588,30 @@ def test_plan_digest_and_written_artifacts_are_deterministic(tmp_path: Path) -> 
     assert _bundle_bytes(first_output) == _bundle_bytes(second_output)
 
 
+def test_mutated_nested_plan_mapping_is_rejected_before_any_output_is_written(
+    tmp_path: Path,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    plan = plan_registry_promotion(
+        _curation_result(
+            _curation_record("parameter_records", _synthetic_parameter())
+        ),
+        registry_index=registry_index,
+    )
+    target_record = plan.candidates[0].target_record
+    assert isinstance(target_record, dict)
+    target_record["name"] = "Mutated after plan construction"
+    output = tmp_path / "mutated_plan_output"
+
+    with pytest.raises(
+        RegistryPromotionPlanError,
+        match="contents changed after construction",
+    ):
+        plan.write(output)
+
+    assert not output.exists()
+
+
 def test_safe_owned_output_replacement_removes_stale_files_and_rejects_unowned(
     tmp_path: Path,
 ) -> None:
@@ -513,8 +644,34 @@ def test_plan_write_refuses_registry_root_destination(tmp_path: Path) -> None:
     registry_index = _copy_registry(tmp_path)
     plan = plan_registry_promotion(_curation_result(), registry_index=registry_index)
 
-    with pytest.raises(RegistryPromotionPlanError, match="inside a registry root"):
+    with pytest.raises(RegistryPromotionPlanError, match="overlaps a registry root"):
         plan.write(registry_index.parent / "review")
+
+
+def test_plan_write_refuses_owned_output_ancestor_containing_registry(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "owned_plan_parent"
+    registry_root = output / "registry"
+    shutil.copytree(DATA_REGISTRY, registry_root)
+    registry_index = registry_root / "registry_index.yml"
+    plan = plan_registry_promotion(_curation_result(), registry_index=registry_index)
+    (output / "promotion_plan.json").write_text(
+        json.dumps(
+            {
+                "kind": promotion_module.REGISTRY_PROMOTION_PLAN_MANIFEST_KIND,
+                "schema_version": promotion_module.REGISTRY_PROMOTION_PLAN_SCHEMA_VERSION,
+            }
+        ),
+        encoding="utf-8",
+    )
+    before = _registry_snapshot(registry_index)
+
+    with pytest.raises(RegistryPromotionPlanError, match="overlaps a registry root"):
+        plan.write(output)
+
+    assert registry_index.is_file()
+    assert _registry_snapshot(registry_index) == before
 
 
 def test_public_export_exposes_preview_only_api() -> None:

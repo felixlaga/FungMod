@@ -462,7 +462,7 @@ def _review_record(
         reasons.append("missing required fields: " + ", ".join(sorted(missing)))
 
     provenance = _source_provenance(record, source_snapshot_path=source_snapshot_path)
-    provenance_missing = _provenance_missing(provenance)
+    provenance_missing = curation_source_provenance_missing(provenance)
     if provenance_missing:
         missing.update(f"source_provenance.{field}" for field in provenance_missing)
         reasons.append("missing source provenance: " + ", ".join(provenance_missing))
@@ -499,7 +499,11 @@ def _source_provenance(record: Mapping[str, Any], *, source_snapshot_path: str) 
     }
 
 
-def _provenance_missing(provenance: Mapping[str, Any]) -> tuple[str, ...]:
+def curation_source_provenance_missing(
+    provenance: Mapping[str, Any],
+) -> tuple[str, ...]:
+    """Return missing fields under the CURATION-001 source-provenance contract."""
+
     missing: list[str] = []
     if not _nonblank_text(provenance.get("source_database")):
         missing.append("source_database")

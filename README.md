@@ -640,9 +640,14 @@ with the expected owned manifest kind/version. The top-level
 `plan_registry_promotion(...)` API now verifies explicit accepts, resolves only
 index-declared destinations, classifies no-op/conflict/unsupported cases, and
 validates exact prospective YAML through a temporary full-registry copy. Each
-would-be add also has to round-trip faithfully through its actual target loader;
-silently dropped or synthesized/defaulted fields are blocked. It is preview-only
-and cannot mutate the registry. CURATION-001 remains partial until
+accepted record is rechecked for unresolved curation blockers and complete
+source provenance. Each would-be add also has to round-trip faithfully and with
+type-exact scalar values through its actual target loader; silently dropped,
+synthesized/defaulted, or type-converted fields are blocked. Exact duplicates
+are compared against raw stored content with the same scalar-type fidelity.
+Owned review output cannot overlap a registry root in either direction, and a
+write rechecks the immutable plan digest before touching its destination. It is
+preview-only and cannot mutate the registry. CURATION-001 remains partial until
 the separately reviewed PR-47 digest-confirmed transactional apply contract is
 implemented.
 

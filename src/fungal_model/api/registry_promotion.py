@@ -29,6 +29,7 @@ from fungal_model.api.curation import (
     CURATION_SCHEMA_VERSION,
     CurationRecord,
     CurationResult,
+    curation_source_provenance_missing,
 )
 from fungal_model.registry.loaders import load_registry
 
@@ -186,6 +187,7 @@ class RegistryPromotionPlan:
     def write(self, output_dir: str | Path) -> RegistryPromotionPlanWriteResult:
         """Write only an owned review bundle containing this already-validated plan."""
 
+        _verify_plan_digest(self)
         root = _safe_output_path(output_dir, registry_root=self.registry_root)
         root.parent.mkdir(parents=True, exist_ok=True)
         _reject_symlink_components(root, label="Promotion-plan output path")
@@ -294,7 +296,7 @@ def plan_registry_promotion(
             classification: PromotionClassification
             reason: str
             after_sha256: str | None
-            if _canonicalize(existing) == _canonicalize(item.target_record):
+            if _type_exact_equal(existing, item.target_record):
                 classification = "exact_duplicate"
                 reason = "exact_record_content_already_present_no_op"
                 after_sha256 = target.before_sha256
@@ -384,22 +386,16 @@ def plan_registry_promotion(
         for item in candidates
     ]
     prospective_registry_digest = _registry_digest(index, overrides=overrides)
-    payload = {
-        "schema_version": REGISTRY_PROMOTION_PLAN_SCHEMA_VERSION,
-        "input_kind": input_kind,
-        "registry_index_path": str(index.path),
-        "registry_root": str(index.root),
-        "registry_index_sha256": index.sha256,
-        "before_registry_digest": before_registry_digest,
-        "prospective_registry_digest": prospective_registry_digest,
-        "candidates": [item.to_dict() for item in candidates],
-        "prospective_files": [item.to_dict() for item in prospective_files],
-        "production_registry_mutated": False,
-        "scientific_validation_claimed": False,
-        "apply_available": False,
-        "apply_policy": "deferred_to_pr47_digest_confirmed_transactional_apply",
-        "version_policy": "not_defined_deferred_to_later_apply_contract",
-    }
+    payload = _plan_digest_payload(
+        input_kind=input_kind,
+        registry_index_path=index.path,
+        registry_root=index.root,
+        registry_index_sha256=index.sha256,
+        before_registry_digest=before_registry_digest,
+        prospective_registry_digest=prospective_registry_digest,
+        candidates=candidates,
+        prospective_files=prospective_files,
+    )
     return RegistryPromotionPlan(
         input_kind=input_kind,
         registry_index_path=index.path,
@@ -435,6 +431,52 @@ def _candidate(
         target_record=deepcopy(item.target_record),
         curation_metadata=deepcopy(item.curation_metadata),
     )
+
+
+def _plan_digest_payload(
+    *,
+    input_kind: Literal["curation_result", "written_curation_bundle"],
+    registry_index_path: Path,
+    registry_root: Path,
+    registry_index_sha256: str,
+    before_registry_digest: str,
+    prospective_registry_digest: str,
+    candidates: Sequence[RegistryPromotionCandidate],
+    prospective_files: Sequence[ProspectiveRegistryFile],
+) -> dict[str, Any]:
+    return {
+        "schema_version": REGISTRY_PROMOTION_PLAN_SCHEMA_VERSION,
+        "input_kind": input_kind,
+        "registry_index_path": str(registry_index_path),
+        "registry_root": str(registry_root),
+        "registry_index_sha256": registry_index_sha256,
+        "before_registry_digest": before_registry_digest,
+        "prospective_registry_digest": prospective_registry_digest,
+        "candidates": [item.to_dict() for item in candidates],
+        "prospective_files": [item.to_dict() for item in prospective_files],
+        "production_registry_mutated": False,
+        "scientific_validation_claimed": False,
+        "apply_available": False,
+        "apply_policy": "deferred_to_pr47_digest_confirmed_transactional_apply",
+        "version_policy": "not_defined_deferred_to_later_apply_contract",
+    }
+
+
+def _verify_plan_digest(plan: RegistryPromotionPlan) -> None:
+    payload = _plan_digest_payload(
+        input_kind=plan.input_kind,
+        registry_index_path=plan.registry_index_path,
+        registry_root=plan.registry_root,
+        registry_index_sha256=plan.registry_index_sha256,
+        before_registry_digest=plan.before_registry_digest,
+        prospective_registry_digest=plan.prospective_registry_digest,
+        candidates=plan.candidates,
+        prospective_files=plan.prospective_files,
+    )
+    if not hmac.compare_digest(_sha256_json(payload), plan.plan_digest):
+        raise RegistryPromotionPlanError(
+            "Registry promotion plan contents changed after construction; refusing to write."
+        )
 
 
 def _accepted_records(
@@ -577,6 +619,26 @@ def _validate_accepted_curation(record_id: str, curation: Mapping[str, Any]) -> 
     if not _nonempty_string_sequence(limitations):
         raise RegistryPromotionPlanError(
             f"Accepted record {record_id!r} requires explicit curation limitations."
+        )
+    for field in ("missing_fields", "reasons"):
+        value = curation.get(field)
+        if (
+            not isinstance(value, Sequence)
+            or isinstance(value, (str, bytes, bytearray))
+            or bool(value)
+        ):
+            raise RegistryPromotionPlanError(
+                f"Accepted record {record_id!r} requires empty curation "
+                "missing_fields and reasons."
+            )
+    provenance = curation.get("source_provenance")
+    provenance_missing = curation_source_provenance_missing(
+        provenance if isinstance(provenance, Mapping) else {}
+    )
+    if provenance_missing:
+        raise RegistryPromotionPlanError(
+            f"Accepted record {record_id!r} has incomplete source provenance: "
+            f"{', '.join(provenance_missing)}."
         )
 
 
@@ -927,7 +989,7 @@ def _round_trip_differences(
             dropped.extend(nested_dropped)
             synthesized.extend(nested_synthesized)
             changed.extend(nested_changed)
-    elif _canonicalize(expected) != _canonicalize(actual):
+    elif not _type_exact_equal(expected, actual):
         changed.append(path or "<record>")
     return tuple(dropped), tuple(synthesized), tuple(changed)
 
@@ -1082,9 +1144,13 @@ def _safe_output_path(output_dir: str | Path, *, registry_root: Path) -> Path:
         strict=False
     )
     for forbidden in {registry_root.resolve(strict=False), package_registry}:
-        if resolved == forbidden or forbidden in resolved.parents:
+        if (
+            resolved == forbidden
+            or forbidden in resolved.parents
+            or resolved in forbidden.parents
+        ):
             raise RegistryPromotionPlanError(
-                "Registry promotion plans cannot be written inside a registry root."
+                "Promotion-plan output path overlaps a registry root."
             )
     return resolved
 
@@ -1182,6 +1248,38 @@ def _canonicalize(value: Any) -> Any:
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         return [_canonicalize(item) for item in value]
     return value
+
+
+def _type_exact_equal(left: Any, right: Any) -> bool:
+    if isinstance(left, Mapping) or isinstance(right, Mapping):
+        if not isinstance(left, Mapping) or not isinstance(right, Mapping):
+            return False
+        if len(left) != len(right):
+            return False
+        for left_key, left_value in left.items():
+            matching_keys = [
+                right_key
+                for right_key in right
+                if type(left_key) is type(right_key) and left_key == right_key
+            ]
+            if len(matching_keys) != 1:
+                return False
+            if not _type_exact_equal(left_value, right[matching_keys[0]]):
+                return False
+        return True
+
+    left_is_sequence = isinstance(left, Sequence) and not isinstance(
+        left, (str, bytes, bytearray)
+    )
+    right_is_sequence = isinstance(right, Sequence) and not isinstance(
+        right, (str, bytes, bytearray)
+    )
+    if left_is_sequence or right_is_sequence:
+        if not left_is_sequence or not right_is_sequence or len(left) != len(right):
+            return False
+        return all(_type_exact_equal(a, b) for a, b in zip(left, right))
+
+    return type(left) is type(right) and left == right
 
 
 def _format_validation_error(exc: Exception, *, stage: Path | None = None) -> str:
