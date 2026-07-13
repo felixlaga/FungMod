@@ -214,15 +214,18 @@ prospective YAML, rejects preview-only `1.0.0` bundles at apply, and requires an
 exact confirmation digest plus exact next numeric patch version. It re-resolves
 current index destinations, rechecks full-root drift, stages and validates a
 complete same-filesystem registry copy, locks cooperating writers, and commits
-with verified rollback and truthful cleanup state. It does not alter scientific
-fields or package version, authorize simulation, or claim scientific
-validation. The active CURATION-001 criteria are complete once PR-47 merges.
-The recommended next slice is PR-48 PRODUCT-001 per-process rate-trajectory
-fidelity: preserve existing configured process IDs/rates in a standard
-researcher-facing table/accessor instead of collapsing multi-process rows by
-time index. This is a build-first output-fidelity task, not validation, and must
-add no new rate law, inferred rate, solver change, biology, calibration, or
-empirical claim.
+with interruption-safe digest-reconciled rollback and truthful cleanup state.
+Plan applicability is candidate-derived, and overlapping target/curator source
+identities must agree exactly. It does not alter scientific fields or package
+version, authorize simulation, or claim scientific validation. The bounded
+apply contract completes once PR-47 merges, but CURATION-001 remains partial:
+the real frozen source path cannot yet yield a loader-fidelitous
+curator-authored production record. The recommended next slice is PR-48
+CURATION-001 curator-authored source-to-production registry-record bridge/schema
+workflow. It must use explicit curator-authored production fields and
+conversion metadata only, with no guessed conversion, fallback/default,
+invented science, automatic promotion, simulation authorization, validation
+data, calibration, or empirical claim.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -1293,10 +1296,13 @@ Scoped status after PR #61: PR-45 supplies owned curator decision bundles and
 PR-46 supplies checksum-verified, index-resolved, loader-validated promotion
 plans. The current PR-47 adds explicit digest-confirmed production apply with
 durable curation audit provenance, full-root drift detection/staging, strict
-next-patch versioning, locking, no overwrite, and verified rollback. Product
-maps remain blocked pending a destination contract. The active CURATION-001
-acceptance criteria are satisfied once PR-47 merges; this status does not claim
-scientific validation or automatic simulation authorization.
+next-patch versioning, candidate-derived applicability, source-identity
+consistency, locking, no overwrite, and interruption-safe verified rollback.
+Product maps remain blocked pending a destination contract. The bounded apply
+contract completes once PR-47 merges, while CURATION-001 remains partial until
+a real frozen source proposal can become a loader-fidelitous curator-authored
+production record without guessed conversions or defaults. This status does
+not claim scientific validation or automatic simulation authorization.
 
 ## CURATION-001 acceptance criteria
 
@@ -1307,6 +1313,9 @@ Complete when:
 - all simulation records have maturity and allowed-use policy;
 - curation reports are testable and versioned;
 - registry promotion is explicit.
+- at least one real frozen source record can be mapped into the exact production
+  loader schema through explicit curator-authored fields and conversion metadata
+  without guessed values, conversions, or defaults.
 ```
 
 ---

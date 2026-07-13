@@ -251,8 +251,9 @@ Product-map participants also require parseable finite positive stoichiometry,
 and each finite positive product yield must match exactly one product name or
 id and its participant stoichiometry; no conversion is inferred.
 
-Plan the registry effect of the explicitly accepted decisions, then apply only
-that exact confirmed plan with an explicit next patch version:
+Plan the registry effect of the curation decisions and inspect whether the
+whole candidate set is applicable. The deferred SABIO-RK review above has no
+addable accepted record, so its plan is intentionally not applied:
 
 ```python
 from fungal_model import apply_registry_promotion, plan_registry_promotion
@@ -263,11 +264,16 @@ plan = plan_registry_promotion(
 )
 plan.write("data/proposed_records/sabiork/reaction_618_promotion_plan")
 
-result = apply_registry_promotion(
-    plan,
-    confirmation_digest=plan.plan_digest,
-    new_registry_version="0.1.1",
-)
+summary = plan.summary()
+assert summary["apply_available"] is False
+
+# Entered only for a separately curator-authored, loader-fidelitous plan.
+if summary["apply_available"]:
+    result = apply_registry_promotion(
+        plan,
+        confirmation_digest=plan.plan_digest,
+        new_registry_version="0.1.1",
+    )
 ```
 
 `plan_registry_promotion(...)` accepts either the in-memory `CurationResult` or
@@ -288,6 +294,10 @@ and allowed-use decision. Apply writes those exact prospective bytes; it does
 not transform scientific values, units, maturity, target `allowed_use`,
 mechanisms, or IDs. Pre-PR-47 written schema `1.0.0` remains preview-only and
 is explicitly rejected at apply because it lacks that durable audit contract.
+When the target record's outer provenance also carries a source database,
+entry ID or IDs, snapshot path, or source URL, that normalized source identity
+must agree type- and value-exactly with the curator source provenance before
+audit metadata is embedded or applied.
 
 `apply_registry_promotion(...)` accepts an in-memory plan or its owned written
 bundle. Written bundles require an explicit current `registry_index`; manifest
@@ -300,14 +310,26 @@ and reentrant cooperating applies; a same-filesystem full-root stage is swapped
 at directory level with verified backup rollback. The structured result records
 the plan/confirmation binding, old/new versions, before/planned/applied digests,
 exact changed-file hashes, applied IDs, and transaction/rollback/cleanup status.
+An interruption around either root rename or installed-runtime verification is
+reconciled from the actual source, backup, and stage digests. The original
+interrupt is preserved only after the old root is proven restored; unproven
+rollback reports recovery paths and preserves the stage container.
 
 Raw stored content still defines exact-duplicate/no-op classification, and an
 exact duplicate is never rewritten merely to add audit metadata. Plans with a
 conflict or blocked candidate, or without at least one addable record, cannot
-apply. `parameter_records` map to the registry index's `parameters`
+apply, and their summaries and written manifests report
+`apply_available: false`. `parameter_records` map to the registry index's `parameters`
 destination; product maps remain blocked as
 `unsupported_pending_destination_contract`. Production promotion does not
 authorize simulation, alter package version, or claim scientific validation.
+
+The current frozen SABIO-RK source path still cannot produce a
+loader-fidelitous, curator-authored production registry record without an
+explicit source-to-production schema/conversion workflow. No guessed
+conversion, default, or missing scientific field is permitted. CURATION-001
+therefore remains partial after PR-47. The bounded PR-48 follow-up is that
+curator-authored source-to-production registry-record bridge.
 
 ## Run A Virtual Experiment
 
@@ -677,9 +699,11 @@ write rechecks the immutable plan digest before touching its destination. The
 top-level `apply_registry_promotion(...)` API now supplies the separately
 reviewed digest-confirmed transaction, exact-next-patch version policy,
 full-root staging, single-writer lock, rollback, and structured apply result.
-This completes the active CURATION-001 acceptance contract once PR-47 merges,
+This completes the bounded transactional-apply contract once PR-47 merges,
 without making promoted records scientifically validated or automatically
-simulation-authorized.
+simulation-authorized. CURATION-001 remains partial until a real frozen source
+record can be explicitly curated into a loader-fidelitous production record
+without guessed conversions or defaults.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
 The current library provides factories for first-order, mass-action,

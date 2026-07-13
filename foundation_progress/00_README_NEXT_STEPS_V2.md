@@ -12,8 +12,8 @@ BIO-READINESS-LITE: complete for the proposal template, validator, and tests.
 BIO-002: complete for arbitrary-length linear enzyme-chain assembly; branching
 and cycles remain unsupported.
 CASE-001: complete once PR-02 is merged for the researcher-facing named API path.
-CURATION-001: complete for the active acceptance criteria once current PR-47
-merges; promotion does not imply scientific validation or simulation authority.
+CURATION-001: partial after the current PR-47 transactional apply contract; a
+curator-authored source-to-production registry-record bridge is still missing.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
@@ -276,14 +276,19 @@ or reentrant cooperating writers, and swaps with verified rollback. Results
 record plan/confirmation binding, versions, digests, changed hashes, IDs, and
 transaction/cleanup state. Product maps remain blocked. No scientific fields,
 package version, solver/biology behavior, validation data, simulation
-authorization, or scientific-validation claim is added. The active
-CURATION-001 acceptance criteria are satisfied once PR-47 merges.
+authorization, or scientific-validation claim is added. Applicability is true
+only for at least one addable record with no conflict or blocked candidate;
+source identities shared by target and curator provenance must agree exactly.
+The bounded apply contract completes once PR-47 merges, but CURATION-001 stays
+partial because the real frozen source path cannot yet yield a
+loader-fidelitous curator-authored production record.
 
-Recommended next task after PR-47: PR-48 PRODUCT-001 per-process
-rate-trajectory fidelity over existing configured `process_rates.csv` rows.
-Preserve process IDs/rates in a standard table/accessor without a new rate law,
-inferred rate, solver change, biology, validation data, calibration, or
-empirical claim.
+Recommended next task after PR-47: PR-48 CURATION-001 curator-authored
+source-to-production registry-record bridge/schema workflow. Bridge a real
+frozen source proposal into the exact production loader schema only through
+explicit curator-authored fields and conversion metadata, with no guessed
+conversion, fallback/default, invented science, automatic promotion,
+simulation authorization, validation data, calibration, or empirical claim.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

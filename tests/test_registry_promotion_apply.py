@@ -542,6 +542,82 @@ def test_conflict_blocked_and_no_addable_plans_are_refused(
 
 
 @pytest.mark.parametrize(
+    ("candidate_kind", "error_pattern"),
+    [
+        ("conflict", "conflict or blocked_unsupported"),
+        ("blocked", "conflict or blocked_unsupported"),
+        ("duplicate_only", "requires at least one addable record"),
+    ],
+)
+def test_checksum_valid_non_applicable_written_bundle_remains_non_applicable(
+    tmp_path: Path,
+    candidate_kind: str,
+    error_pattern: str,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    _, target_payload = _parameter_target(registry_index)
+    existing = deepcopy(target_payload["records"][0])
+    if candidate_kind == "conflict":
+        existing["name"] = "conflicting replacement forbidden"
+        record = _curation_record("parameter_records", existing)
+    elif candidate_kind == "blocked":
+        record = _curation_record(
+            "product_maps",
+            {"record_id": "blocked_product_map", "product_map_type": "synthetic"},
+        )
+    else:
+        record = _curation_record("parameter_records", existing)
+    plan = plan_registry_promotion(
+        _curation_result(record),
+        registry_index=registry_index,
+    )
+    bundle = plan.write(tmp_path / f"{candidate_kind}_plan").output_directory
+    manifest = json.loads((bundle / "promotion_plan.json").read_text(encoding="utf-8"))
+
+    assert plan.summary()["apply_available"] is False
+    assert manifest["summary"]["apply_available"] is False
+    assert manifest["apply_available"] is False
+    with pytest.raises(RegistryPromotionApplyError, match=error_pattern):
+        apply_registry_promotion(
+            bundle,
+            confirmation_digest=plan.plan_digest,
+            new_registry_version="0.1.1",
+            registry_index=registry_index,
+        )
+
+
+def test_checksum_valid_written_plan_revalidates_source_identity_consistency(
+    tmp_path: Path,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    payload = _synthetic_parameter()
+    payload["provenance"]["source_database"] = "synthetic_fixture"
+    plan = plan_registry_promotion(
+        _curation_result(_curation_record("parameter_records", payload)),
+        registry_index=registry_index,
+    )
+    curation_metadata = deepcopy(plan.candidates[0].curation_metadata)
+    curation_metadata["source_provenance"]["source_database"] = "other_database"
+    candidate = replace(
+        plan.candidates[0],
+        curation_metadata=curation_metadata,
+    )
+    contradictory = _redigest(replace(plan, candidates=(candidate,)))
+    bundle = contradictory.write(tmp_path / "contradictory_plan").output_directory
+
+    with pytest.raises(
+        RegistryPromotionApplyError,
+        match="curation_source_identity_conflict: source_database",
+    ):
+        apply_registry_promotion(
+            bundle,
+            confirmation_digest=contradictory.plan_digest,
+            new_registry_version="0.1.1",
+            registry_index=registry_index,
+        )
+
+
+@pytest.mark.parametrize(
     "new_version",
     [
         "0.1.0",
@@ -773,6 +849,146 @@ def test_injected_commit_failure_rolls_back_byte_for_byte_without_debris(
 
     assert _snapshot(registry_index) == before
     _assert_no_transaction_debris(registry_index)
+
+
+@pytest.mark.parametrize(
+    ("interrupt_boundary", "interrupt_type"),
+    [("after_backup", KeyboardInterrupt), ("before_install", SystemExit)],
+    ids=["keyboard-interrupt-after-backup", "system-exit-before-install"],
+)
+def test_base_exception_around_backup_install_boundary_is_reconciled_from_disk(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    interrupt_boundary: str,
+    interrupt_type: type[BaseException],
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    (registry_index.parent / "unrelated.bin").write_bytes(b"preserve interruption bytes")
+    plan = plan_registry_promotion(
+        _curation_result(_curation_record("parameter_records", _synthetic_parameter())),
+        registry_index=registry_index,
+    )
+    before = _snapshot(registry_index)
+    real_replace = promotion_module._replace_registry_path
+
+    def interrupt_at_boundary(source: Path, destination: Path, *, phase: str) -> None:
+        if phase == "install" and interrupt_boundary == "before_install":
+            raise interrupt_type("injected interruption before install rename")
+        real_replace(source, destination, phase=phase)
+        if phase == "backup" and interrupt_boundary == "after_backup":
+            raise interrupt_type("injected interruption after backup rename")
+
+    monkeypatch.setattr(
+        promotion_module,
+        "_replace_registry_path",
+        interrupt_at_boundary,
+    )
+
+    with pytest.raises(interrupt_type) as captured:
+        apply_registry_promotion(
+            plan,
+            confirmation_digest=plan.plan_digest,
+            new_registry_version="0.1.1",
+        )
+
+    assert captured.value.__notes__ == [
+        "FungMod registry promotion: transaction_status=failed; "
+        "rollback_status=complete."
+    ]
+    assert _snapshot(registry_index) == before
+    assert load_registry(registry_index).version == "0.1.0"
+    _assert_no_transaction_debris(registry_index)
+
+
+def test_keyboard_interrupt_during_installed_runtime_verification_rolls_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    (registry_index.parent / "unrelated.bin").write_bytes(b"preserve runtime interrupt")
+    plan = plan_registry_promotion(
+        _curation_result(_curation_record("parameter_records", _synthetic_parameter())),
+        registry_index=registry_index,
+    )
+    before = _snapshot(registry_index)
+    real_load_registry = promotion_module.load_registry
+
+    def interrupt_installed_runtime(path: str | Path):
+        candidate = Path(path)
+        if candidate == registry_index:
+            payload = yaml.safe_load(candidate.read_text(encoding="utf-8"))
+            if payload["version"] == "0.1.1":
+                raise KeyboardInterrupt(
+                    "injected interruption during installed runtime verification"
+                )
+        return real_load_registry(path)
+
+    monkeypatch.setattr(
+        promotion_module,
+        "load_registry",
+        interrupt_installed_runtime,
+    )
+
+    with pytest.raises(KeyboardInterrupt) as captured:
+        apply_registry_promotion(
+            plan,
+            confirmation_digest=plan.plan_digest,
+            new_registry_version="0.1.1",
+        )
+
+    assert captured.value.__notes__ == [
+        "FungMod registry promotion: transaction_status=failed; "
+        "rollback_status=complete."
+    ]
+    assert _snapshot(registry_index) == before
+    assert load_registry(registry_index).version == "0.1.0"
+    _assert_no_transaction_debris(registry_index)
+
+
+def test_interruption_with_unproven_rollback_raises_truthful_apply_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    plan = plan_registry_promotion(
+        _curation_result(_curation_record("parameter_records", _synthetic_parameter())),
+        registry_index=registry_index,
+    )
+    real_replace = promotion_module._replace_registry_path
+
+    def interrupt_then_fail_rollback(
+        source: Path,
+        destination: Path,
+        *,
+        phase: str,
+    ) -> None:
+        if phase == "rollback":
+            raise OSError("injected rollback failure after interruption")
+        real_replace(source, destination, phase=phase)
+        if phase == "backup":
+            raise KeyboardInterrupt("injected interruption after backup rename")
+
+    monkeypatch.setattr(
+        promotion_module,
+        "_replace_registry_path",
+        interrupt_then_fail_rollback,
+    )
+
+    with pytest.raises(
+        RegistryPromotionApplyError,
+        match="transaction_status=failed; rollback_status=unproven; backup_path=",
+    ):
+        apply_registry_promotion(
+            plan,
+            confirmation_digest=plan.plan_digest,
+            new_registry_version="0.1.1",
+        )
+
+    assert not registry_index.parent.exists()
+    assert len(list(tmp_path.glob(".registry.promotion-backup-*"))) == 1
+    stages = list(tmp_path.glob(".registry.promotion-stage-*"))
+    assert len(stages) == 1
+    assert (stages[0] / "registry/registry_index.yml").is_file()
 
 
 def test_installed_runtime_verification_failure_rolls_back_before_backup_cleanup(

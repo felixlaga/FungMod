@@ -242,6 +242,7 @@ def test_exact_duplicate_is_a_no_op(tmp_path: Path) -> None:
     assert candidate.before_sha256 == candidate.after_sha256
     assert plan.prospective_files == ()
     assert plan.before_registry_digest == plan.prospective_registry_digest
+    assert plan.summary()["apply_available"] is False
 
 
 @pytest.mark.parametrize("candidate_value", [True, 1], ids=["bool", "int"])
@@ -285,6 +286,7 @@ def test_same_id_with_different_content_is_conflict_and_never_overwritten(
     assert candidate.reason == "record_id_already_exists_with_different_content_no_overwrite"
     assert candidate.after_sha256 is None
     assert plan.prospective_files == ()
+    assert plan.summary()["apply_available"] is False
     assert _registry_snapshot(registry_index) == before
 
 
@@ -304,6 +306,145 @@ def test_product_map_is_blocked_pending_destination_contract(tmp_path: Path) -> 
     assert candidate.registry_key is None
     assert candidate.target_path is None
     assert plan.prospective_files == ()
+    assert plan.summary()["apply_available"] is False
+
+
+def test_apply_available_allows_addable_with_exact_duplicate_only(tmp_path: Path) -> None:
+    registry_index = _copy_registry(tmp_path)
+    _, target = _read_target_records(registry_index, "parameters")
+    exact_duplicate = deepcopy(target["records"][0])
+    plan = plan_registry_promotion(
+        _curation_result(
+            _curation_record("parameter_records", _synthetic_parameter()),
+            _curation_record("parameter_records", exact_duplicate),
+        ),
+        registry_index=registry_index,
+    )
+
+    assert {item.classification for item in plan.candidates} == {
+        "addable",
+        "exact_duplicate",
+    }
+    assert plan.summary()["apply_available"] is True
+
+
+def test_apply_available_is_false_when_addable_coexists_with_conflict(
+    tmp_path: Path,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    _, target = _read_target_records(registry_index, "parameters")
+    conflict = deepcopy(target["records"][0])
+    conflict["name"] = "Conflicting record that forbids the whole apply set"
+    plan = plan_registry_promotion(
+        _curation_result(
+            _curation_record("parameter_records", _synthetic_parameter()),
+            _curation_record("parameter_records", conflict),
+        ),
+        registry_index=registry_index,
+    )
+
+    assert {item.classification for item in plan.candidates} == {
+        "addable",
+        "conflict",
+    }
+    assert plan.summary()["apply_available"] is False
+
+
+@pytest.mark.parametrize("written_bundle", [False, True])
+@pytest.mark.parametrize(
+    ("target_identity", "curation_identity", "conflicting_field"),
+    [
+        (
+            {"source_database": "other_database"},
+            {
+                "source_database": "synthetic_fixture",
+                "source_entry_ids": ["fixture-1"],
+                "source_snapshot_path": "synthetic/software/fixture.json",
+            },
+            "source_database",
+        ),
+        (
+            {"source_entry_id": "other-entry"},
+            {
+                "source_database": "synthetic_fixture",
+                "source_entry_ids": ["fixture-1"],
+                "source_snapshot_path": "synthetic/software/fixture.json",
+            },
+            "source_entry_ids",
+        ),
+        (
+            {"source_snapshot_path": "other/snapshot.json"},
+            {
+                "source_database": "synthetic_fixture",
+                "source_entry_ids": ["fixture-1"],
+                "source_snapshot_path": "synthetic/software/fixture.json",
+            },
+            "source_snapshot_path",
+        ),
+        (
+            {"source_url": "https://example.test/other"},
+            {
+                "source_database": "synthetic_fixture",
+                "source_entry_ids": ["fixture-1"],
+                "source_snapshot_path": "",
+                "source_url": "https://example.test/fixture-1",
+            },
+            "source_url",
+        ),
+    ],
+    ids=["database", "entry-ids", "snapshot", "url"],
+)
+def test_contradictory_target_and_curation_source_identity_is_blocked(
+    tmp_path: Path,
+    written_bundle: bool,
+    target_identity: dict[str, Any],
+    curation_identity: dict[str, Any],
+    conflicting_field: str,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    payload = _synthetic_parameter()
+    payload["provenance"].update(target_identity)
+    result = _curation_result(
+        _curation_record(
+            "parameter_records",
+            payload,
+            source_provenance=curation_identity,
+        )
+    )
+    curation_input: CurationResult | Path = result
+    if written_bundle:
+        curation_input = result.write(tmp_path / "curation_bundle").output_directory
+
+    plan = plan_registry_promotion(curation_input, registry_index=registry_index)
+
+    assert plan.candidates[0].classification == "blocked_unsupported"
+    assert plan.candidates[0].reason == (
+        f"curation_source_identity_conflict: {conflicting_field}"
+    )
+    assert plan.summary()["apply_available"] is False
+    assert plan.prospective_files == ()
+
+
+def test_singular_and_plural_source_entry_identity_normalize_exactly(
+    tmp_path: Path,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    payload = _synthetic_parameter()
+    payload["provenance"].update(
+        {
+            "source_database": "synthetic_fixture",
+            "source_entry_id": "fixture-1",
+            "source_snapshot_path": "synthetic/software/fixture.json",
+        }
+    )
+
+    plan = plan_registry_promotion(
+        _curation_result(_curation_record("parameter_records", payload)),
+        registry_index=registry_index,
+    )
+
+    assert plan.candidates[0].classification == "addable"
+    assert plan.summary()["apply_available"] is True
 
 
 def test_rejected_deferred_and_implicit_records_are_not_considered(tmp_path: Path) -> None:

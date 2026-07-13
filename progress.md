@@ -31,10 +31,11 @@ Status key:
 Date: 2026-07-13
 
 Status: `current` for the bounded transactional apply slice; PR-46 is complete
-after PR #61 merged as `2b6c639`. The current implementation satisfies the
-active CURATION-001 acceptance criteria, so CURATION-001 becomes `complete`
-for that declared scope once PR-47 merges. VALIDATION-DATA-001 remains
-`deferred; blocked/partial` for ingestion.
+after PR #61 merged as `2b6c639`. The transactional apply contract is complete
+once PR-47 merges, but CURATION-001 remains `partial`: the real frozen source
+path cannot yet produce a loader-fidelitous curator-authored production record
+without a separate explicit schema/conversion bridge. VALIDATION-DATA-001
+remains `deferred; blocked/partial` for ingestion.
 
 Completed in this pass:
 
@@ -50,7 +51,8 @@ Completed in this pass:
   silently reinterpreted.
 - Revalidates the exact plan/confirmation digest, candidate and prospective
   consistency, accepted curation metadata, ISO date, source provenance,
-  blockers, loader fidelity, current index SHA, full before-root digest, every
+  source-identity consistency between target and curator provenance, blockers,
+  loader fidelity, current index SHA, full before-root digest, every
   target before hash, index destinations, path/root/symlink/shared-target
   safety, no-overwrite state, and `load_registry(...)` immediately before the
   transaction.
@@ -64,8 +66,10 @@ Completed in this pass:
 - Uses an atomic exclusive sibling lock for cooperating single-writer and
   reentrant exclusion. The directory-level swap retains a byte-exact backup
   through installed version/digest/runtime verification, rolls back
-  deterministically on injected failure, verifies rollback digest/loader state,
-  and reports committed cleanup failures without implying rollback.
+  deterministically on injected failure or interruption, reconciles source,
+  backup, and stage state from validated on-disk digests, verifies rollback
+  digest/loader state, preserves recovery copies when rollback is unproven, and
+  reports committed cleanup failures without implying rollback.
 - Added `RegistryPromotionApplyResult` with old/new versions, confirmed
   `plan_digest`/`confirmation_digest`, before/planned/applied registry digests,
   exact changed files/hashes, applied and exact-duplicate IDs, transaction,
@@ -75,7 +79,9 @@ Completed in this pass:
   `simulation_authorized: false`.
 - Kept product maps blocked pending a destination contract, conflicts and
   blocked candidates non-applicable, exact duplicates no-op only, and at least
-  one addable record mandatory. No receipt is written to a hidden location.
+  one addable record mandatory. Plan summaries/manifests now report
+  `apply_available: true` only for at least one addable with no conflict or
+  blocked candidate. No receipt is written to a hidden location.
 
 Tests added or modified: `tests/test_registry_promotion_apply.py` exercises
 in-memory and written-bundle success on copied registries, parameter and fungus
@@ -84,13 +90,16 @@ compatibility, index/target/unrelated drift, conflict/blocked/no-addable plans,
 strict patch versions, unsafe destinations, untrusted manifest absolute paths,
 durable audit provenance, unchanged scientific fields and target allowed-use,
 complete staged loading, byte-exact commit rollback, rollback failure,
-committed backup/lock cleanup failure truthfulness, concurrent/reentrant lock
-refusal, debris cleanup, and public exports. The repository's real
+`KeyboardInterrupt`/`SystemExit` after backup rename, before install rename,
+and during installed-runtime verification, committed backup/lock cleanup
+failure truthfulness, concurrent/reentrant lock refusal, debris cleanup, and
+public exports. The repository's real
 `data_registry/` is never an apply target in tests.
 `tests/test_registry_promotion_plan.py` now covers schema `2.0.0`, deterministic
-audit metadata, and unchanged raw exact-duplicate semantics.
+audit metadata, source-identity contradiction blocking, candidate-derived
+applicability, and unchanged raw exact-duplicate semantics.
 `tests/test_roadmap_orchestration_status.py` keeps PR-46 completion, PR-47
-current status, scoped CURATION-001 completion, PR-48 build-first follow-up,
+current status, partial CURATION-001 status, PR-48 curation bridge follow-up,
 and deferred validation wording synchronized.
 
 What did not change: no repository `data_registry/` record or version, package
@@ -113,7 +122,8 @@ Remaining ambiguity and risk: the lock is cooperative between callers using
 this API; external filesystem writers cannot be forced to honor it, so source
 digests are rechecked immediately before swap. Directory swaps assume local
 same-filesystem rename semantics. Rollback failure is fail-closed and reports
-the exact backup path because automatic recovery cannot then be proven.
+the exact backup/stage paths and preserves the stage container because
+automatic recovery cannot then be proven.
 Product-map destination ownership remains undefined and blocked. Exact
 duplicates remain no-op and therefore do not rewrite an existing production
 record solely to attach this plan's curation audit.
@@ -123,22 +133,23 @@ adversarial tests, full-tree staging, digest rechecks, locking, installed-state
 verification, deterministic rollback, and explicit cleanup-state reporting;
 scientific risk is low because no scientific content is inferred or changed.
 
-Recommended next task after PR-47 merges: PR-48, a bounded PRODUCT-001
-per-process rate-trajectory fidelity slice. Preserve process IDs and rates from
-existing configured `process_rates.csv` rows in a standard researcher-facing
-table/accessor instead of collapsing multi-process rows by time index. Add no
-new rate law, inferred rate, solver change, biology, validation data,
-calibration, or empirical claim.
+Recommended next task after PR-47 merges: PR-48, a bounded CURATION-001
+curator-authored source-to-production registry-record bridge/schema workflow.
+Make an explicit frozen source record transformable into the exact existing
+production loader schema through curator-authored fields and conversion
+metadata only. Add no guessed conversion, fallback/default, invented science,
+automatic promotion, simulation authorization, validation data, calibration,
+or empirical claim.
 
 Verification:
 
-- Focused registry-promotion plan/apply and roadmap-status suite: 90 passed in
-  18.18s.
+- Focused registry-promotion plan/apply and roadmap-status suite: 109 passed in
+  22.71s.
 - Broad registry, curation, source-provider, researcher-API, and status suite:
-  252 passed in 35.71s.
-- Full suite from scratch with coverage: 885 passed in 182.00s; total coverage
-  84.51% against the required 80% gate, with
-  `src/fungal_model/api/registry_promotion.py` at 79%.
+  273 passed in 40.93s.
+- Full suite from scratch with coverage: 904 passed in 179.71s; total coverage
+  84.52% against the required 80% gate, with
+  `src/fungal_model/api/registry_promotion.py` at 80%.
 - Full Ruff: passed for `src` and `tests`.
 - Full Pyright: 0 errors, 0 warnings, 0 informations.
 - Unstaged and staged diff checks: passed.

@@ -50,6 +50,9 @@ schema `2.0.0`, durable curation audit provenance, strict next-patch versioning,
 full-root staging/drift checks, locking, no overwrite, and verified rollback.
 It does not ingest validation data, change scientific fields, authorize
 simulation automatically, or claim validation.
+The bounded apply contract does not complete CURATION-001: the real frozen
+source path still lacks a curator-authored bridge into the exact production
+loader schema without guessed conversions or defaults.
 A future validation ingestion PR must not ingest, digitize, or
 fabricate data unless those evidence requirements are met.
 This gate does not complete VALIDATION-DATA-001.
@@ -153,10 +156,12 @@ schema, or biology changes in this gate PR.
 
 ## Next Action
 
-After PR-47, take the bounded PR-48 PRODUCT-001 per-process rate-trajectory
-fidelity slice over existing configured process-rate rows. Continue building
-PRODUCT-001, THERMO-003, and generic BIO-003 simulator capability. Later, find
-or obtain source-backed numeric time-course
+After PR-47, take the bounded PR-48 CURATION-001 curator-authored
+source-to-production registry-record bridge/schema workflow. Require explicit
+production fields and conversion metadata with no guessed conversions,
+fallbacks, defaults, invented science, or automatic promotion. Continue
+building PRODUCT-001, THERMO-003, and generic BIO-003 simulator capability.
+Later, find or obtain source-backed numeric time-course
 observations that satisfy the required evidence fields above. Then open a
 separate ingestion PR for VALIDATION-DATA-001 with the dataset, comparison
 workflow, limitations, and tests.

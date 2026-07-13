@@ -251,7 +251,7 @@ class RegistryPromotionPlan:
             "production_registry_mutated": False,
             "scientific_validation_claimed": False,
             "simulation_authorized": False,
-            "apply_available": True,
+            "apply_available": _candidate_set_apply_available(self.candidates),
             "apply_policy": _PROMOTION_APPLY_POLICY,
             "version_policy": _PROMOTION_VERSION_POLICY,
         }
@@ -312,6 +312,17 @@ class _ApplyTransactionState:
     rollback_status: Literal["not_required", "complete", "unproven"] = "not_required"
 
 
+def _candidate_set_apply_available(
+    candidates: Sequence[RegistryPromotionCandidate],
+) -> bool:
+    classifications = {item.classification for item in candidates}
+    return (
+        "addable" in classifications
+        and "conflict" not in classifications
+        and "blocked_unsupported" not in classifications
+    )
+
+
 def plan_registry_promotion(
     curation_bundle_or_result: CurationResult | str | Path,
     registry_index: str | Path = "data_registry/registry_index.yml",
@@ -367,6 +378,24 @@ def plan_registry_promotion(
                     registry_key=registry_key,
                     classification="blocked_unsupported",
                     reason="registry_index_destination_missing",
+                )
+            )
+            continue
+
+        try:
+            _validate_source_identity_consistency(
+                item.record_id,
+                target_record=item.target_record,
+                curation_metadata=item.curation_metadata,
+            )
+        except RegistryPromotionPlanError as exc:
+            candidates.append(
+                _candidate(
+                    item,
+                    registry_key=registry_key,
+                    classification="blocked_unsupported",
+                    reason=str(exc),
+                    target=target,
                 )
             )
             continue
@@ -655,18 +684,21 @@ def _apply_registry_promotion(
             stage_body_error = exc
             raise
         finally:
-            try:
-                shutil.rmtree(stage_container)
-            except OSError as exc:
-                prior_error = (
-                    "" if stage_body_error is None else f"; prior_error={stage_body_error}"
-                )
-                raise RegistryPromotionApplyError(
-                    f"transaction_status={transaction_state.transaction_status}; "
-                    f"rollback_status={transaction_state.rollback_status}; "
-                    f"stage_cleanup_status=failed; stage_path={stage_container}; cause={exc}"
-                    f"{prior_error}"
-                ) from exc
+            if transaction_state.rollback_status != "unproven":
+                try:
+                    shutil.rmtree(stage_container)
+                except OSError as exc:
+                    prior_error = (
+                        ""
+                        if stage_body_error is None
+                        else f"; prior_error={stage_body_error}"
+                    )
+                    raise RegistryPromotionApplyError(
+                        f"transaction_status={transaction_state.transaction_status}; "
+                        f"rollback_status={transaction_state.rollback_status}; "
+                        f"stage_cleanup_status=failed; stage_path={stage_container}; "
+                        f"cause={exc}{prior_error}"
+                    ) from exc
 
     return RegistryPromotionApplyResult(
         registry_index_path=applied_index.path,
@@ -742,7 +774,7 @@ def _plan_digest_payload(
         "production_registry_mutated": False,
         "scientific_validation_claimed": False,
         "simulation_authorized": False,
-        "apply_available": True,
+        "apply_available": _candidate_set_apply_available(candidates),
         "apply_policy": _PROMOTION_APPLY_POLICY,
         "version_policy": _PROMOTION_VERSION_POLICY,
     }
@@ -878,6 +910,13 @@ def _plan_from_written_bundle(value: str | Path) -> RegistryPromotionPlan:
         raise RegistryPromotionApplyError(
             "Promotion-plan manifest summary does not match its exact plan contents."
         )
+    if not _type_exact_equal(
+        manifest.get("apply_available"),
+        plan.summary()["apply_available"],
+    ):
+        raise RegistryPromotionApplyError(
+            "Promotion-plan manifest apply_available does not match its exact candidate set."
+        )
     _validate_bundle_candidate_prospective_consistency(plan)
     return plan
 
@@ -907,7 +946,6 @@ def _validate_plan_manifest_contract(manifest: Mapping[str, Any]) -> None:
         "production_registry_mutated": False,
         "scientific_validation_claimed": False,
         "simulation_authorized": False,
-        "apply_available": True,
         "apply_policy": _PROMOTION_APPLY_POLICY,
         "version_policy": _PROMOTION_VERSION_POLICY,
     }
@@ -1213,6 +1251,11 @@ def _validate_apply_candidate_set(plan: RegistryPromotionPlan) -> None:
     for candidate in plan.candidates:
         _validate_accepted_curation(candidate.record_id, candidate.curation_metadata)
         _validate_target_record(candidate.record_id, candidate.target_record)
+        _validate_source_identity_consistency(
+            candidate.record_id,
+            target_record=candidate.target_record,
+            curation_metadata=candidate.curation_metadata,
+        )
         expected_key = _CURATION_TO_REGISTRY_KEY.get(candidate.record_type)
         if expected_key is None or candidate.record_type == "product_maps":
             raise RegistryPromotionApplyError(
@@ -1605,13 +1648,9 @@ def _commit_staged_registry(
         raise RegistryPromotionApplyError(
             "Registry root digest changed immediately before the transactional swap."
         )
-    moved_source = False
-    installed_stage = False
     try:
         _replace_registry_path(source_root, backup, phase="backup")
-        moved_source = True
         _replace_registry_path(stage_root, source_root, phase="install")
-        installed_stage = True
         installed_index = _load_registry_index(source_root / index_relative_path)
         installed_registry = load_registry(installed_index.path)
         if installed_registry.version != new_registry_version:
@@ -1627,41 +1666,31 @@ def _commit_staged_registry(
             installed_registry,
             label="Installed runtime registry",
         )
-    except Exception as transaction_error:
+    except BaseException as transaction_error:
         transaction_state.transaction_status = "failed"
-        if moved_source:
-            try:
-                if source_root.exists() and not installed_stage:
-                    possible_install = _load_registry_index(source_root / index_relative_path)
-                    installed_stage = (
-                        _registry_digest(possible_install, overrides={})
-                        == applied_registry_digest
-                    )
-                if installed_stage:
-                    _replace_registry_path(
-                        source_root,
-                        stage_root,
-                        phase="remove_failed_install",
-                    )
-                elif source_root.exists():
-                    raise RegistryPromotionApplyError(
-                        "Unexpected registry root appeared during rollback."
-                    )
-                _replace_registry_path(backup, source_root, phase="rollback")
-                restored_index = _load_registry_index(source_root / index_relative_path)
-                _validate_current_registry(restored_index)
-                restored_digest = _registry_digest(restored_index, overrides={})
-                if restored_digest != before_registry_digest:
-                    raise RegistryPromotionApplyError(
-                        "Restored registry digest does not match the pre-transaction digest."
-                    )
-                transaction_state.rollback_status = "complete"
-            except Exception as rollback_error:
-                transaction_state.rollback_status = "unproven"
-                raise RegistryPromotionApplyError(
-                    "transaction_status=failed; rollback_status=unproven; "
-                    f"backup_path={backup}; cause={transaction_error}"
-                ) from rollback_error
+        try:
+            _reconcile_failed_registry_transaction(
+                source_root=source_root,
+                backup=backup,
+                stage_root=stage_root,
+                index_relative_path=index_relative_path,
+                before_registry_digest=before_registry_digest,
+                applied_registry_digest=applied_registry_digest,
+                transaction_state=transaction_state,
+            )
+        except BaseException as rollback_error:
+            transaction_state.rollback_status = "unproven"
+            raise RegistryPromotionApplyError(
+                "transaction_status=failed; rollback_status=unproven; "
+                f"backup_path={backup}; stage_path={stage_root}; "
+                f"cause={transaction_error}"
+            ) from rollback_error
+        if not isinstance(transaction_error, Exception):
+            transaction_error.add_note(
+                "FungMod registry promotion: transaction_status=failed; "
+                f"rollback_status={transaction_state.rollback_status}."
+            )
+            raise
         raise RegistryPromotionApplyError(
             f"transaction_status=failed; rollback_status={transaction_state.rollback_status}; "
             f"cause={transaction_error}"
@@ -1677,6 +1706,66 @@ def _commit_staged_registry(
             f"backup_cleanup_status=failed; backup_path={backup}; cause={exc}"
         ) from exc
     return installed_index
+
+
+def _reconcile_failed_registry_transaction(
+    *,
+    source_root: Path,
+    backup: Path,
+    stage_root: Path,
+    index_relative_path: Path,
+    before_registry_digest: str,
+    applied_registry_digest: str,
+    transaction_state: _ApplyTransactionState,
+) -> None:
+    source_digest = _registry_copy_digest(source_root, index_relative_path)
+    backup_digest = _registry_copy_digest(backup, index_relative_path)
+    stage_digest = _registry_copy_digest(stage_root, index_relative_path)
+
+    if source_digest == before_registry_digest and backup_digest is None:
+        transaction_state.rollback_status = "not_required"
+        return
+    if backup_digest != before_registry_digest:
+        raise RegistryPromotionApplyError(
+            "Cannot prove the backup contains the exact pre-transaction registry."
+        )
+
+    if source_digest is None:
+        if stage_digest not in {None, applied_registry_digest}:
+            raise RegistryPromotionApplyError(
+                "Staged registry digest changed during transaction recovery."
+            )
+    elif source_digest == applied_registry_digest:
+        if stage_digest is not None:
+            raise RegistryPromotionApplyError(
+                "Both active and staged registry paths exist during transaction recovery."
+            )
+        _replace_registry_path(
+            source_root,
+            stage_root,
+            phase="remove_failed_install",
+        )
+    else:
+        raise RegistryPromotionApplyError(
+            "Active registry digest is neither the before nor applied transaction state."
+        )
+
+    _replace_registry_path(backup, source_root, phase="rollback")
+    restored_index = _load_registry_index(source_root / index_relative_path)
+    _validate_current_registry(restored_index)
+    restored_digest = _registry_digest(restored_index, overrides={})
+    if restored_digest != before_registry_digest:
+        raise RegistryPromotionApplyError(
+            "Restored registry digest does not match the pre-transaction digest."
+        )
+    transaction_state.rollback_status = "complete"
+
+
+def _registry_copy_digest(root: Path, index_relative_path: Path) -> str | None:
+    if not os.path.lexists(root):
+        return None
+    index = _load_registry_index(root / index_relative_path)
+    return _registry_digest(index, overrides={})
 
 
 def _replace_registry_path(source: Path, destination: Path, *, phase: str) -> None:
@@ -1862,6 +1951,11 @@ def _validate_target_record(record_id: str, record: Mapping[str, Any]) -> None:
 
 
 def _target_record_with_curation_audit(record: _AcceptedRecord) -> Mapping[str, Any]:
+    _validate_source_identity_consistency(
+        record.record_id,
+        target_record=record.target_record,
+        curation_metadata=record.curation_metadata,
+    )
     target_record = deepcopy(dict(record.target_record))
     provenance = target_record.get("provenance")
     if not isinstance(provenance, Mapping):
@@ -1890,6 +1984,87 @@ def _curation_audit_payload(curation: Mapping[str, Any]) -> dict[str, Any]:
         "source_provenance": deepcopy(curation.get("source_provenance")),
         "allowed_use_decision": curation.get("allowed_use"),
     }
+
+
+def _validate_source_identity_consistency(
+    record_id: str,
+    *,
+    target_record: Mapping[str, Any],
+    curation_metadata: Mapping[str, Any],
+) -> None:
+    target_provenance = target_record.get("provenance")
+    curation_provenance = curation_metadata.get("source_provenance")
+    if not isinstance(target_provenance, Mapping) or not isinstance(
+        curation_provenance,
+        Mapping,
+    ):
+        return
+    target_identity = _canonical_source_identity(
+        target_provenance,
+        label=f"Target record {record_id!r} provenance",
+    )
+    curation_identity = _canonical_source_identity(
+        curation_provenance,
+        label=f"Curation record {record_id!r} source provenance",
+    )
+    for field in sorted(set(target_identity) & set(curation_identity)):
+        if not _type_exact_equal(target_identity[field], curation_identity[field]):
+            raise RegistryPromotionPlanError(
+                f"curation_source_identity_conflict: {field}"
+            )
+
+
+def _canonical_source_identity(
+    provenance: Mapping[str, Any],
+    *,
+    label: str,
+) -> dict[str, str | tuple[str, ...]]:
+    identity: dict[str, str | tuple[str, ...]] = {}
+    for field in ("source_database", "source_snapshot_path", "source_url"):
+        if field not in provenance:
+            continue
+        value = provenance[field]
+        if field in {"source_snapshot_path", "source_url"} and (
+            value is None or value == ""
+        ):
+            continue
+        if not isinstance(value, str) or not value.strip():
+            raise RegistryPromotionPlanError(
+                f"{label} has invalid source identity field {field!r}."
+            )
+        identity[field] = value
+
+    plural_ids: tuple[str, ...] | None = None
+    if "source_entry_ids" in provenance:
+        raw_ids = provenance["source_entry_ids"]
+        if not _nonempty_string_sequence(raw_ids):
+            raise RegistryPromotionPlanError(
+                f"{label} has invalid source identity field 'source_entry_ids'."
+            )
+        assert isinstance(raw_ids, Sequence) and not isinstance(
+            raw_ids,
+            (str, bytes, bytearray),
+        )
+        plural_ids = tuple(sorted(raw_ids))
+
+    singular_ids: tuple[str, ...] | None = None
+    if "source_entry_id" in provenance:
+        raw_id = provenance["source_entry_id"]
+        if not isinstance(raw_id, str) or not raw_id.strip():
+            raise RegistryPromotionPlanError(
+                f"{label} has invalid source identity field 'source_entry_id'."
+            )
+        singular_ids = (raw_id,)
+
+    if plural_ids is not None and singular_ids is not None:
+        if not _type_exact_equal(plural_ids, singular_ids):
+            raise RegistryPromotionPlanError(
+                f"{label} has contradictory source_entry_id/source_entry_ids values."
+            )
+    entry_ids = plural_ids if plural_ids is not None else singular_ids
+    if entry_ids is not None:
+        identity["source_entry_ids"] = entry_ids
+    return identity
 
 
 def _curation_manifest_path(value: str | Path) -> Path:
@@ -2354,7 +2529,7 @@ def _write_plan_bundle(root: Path, plan: RegistryPromotionPlan) -> None:
         "production_registry_mutated": False,
         "scientific_validation_claimed": False,
         "simulation_authorized": False,
-        "apply_available": True,
+        "apply_available": plan.summary()["apply_available"],
         "apply_policy": _PROMOTION_APPLY_POLICY,
         "version_policy": _PROMOTION_VERSION_POLICY,
     }
@@ -2393,6 +2568,7 @@ def _promotion_report(plan: RegistryPromotionPlan) -> str:
         f"- Exact duplicate/no-op: {summary['exact_duplicate_count']}",
         f"- Conflict: {summary['conflict_count']}",
         f"- Blocked/unsupported: {summary['blocked_unsupported_count']}",
+        f"- Apply available: {str(summary['apply_available']).lower()}",
         "",
         "## Scope",
         "",

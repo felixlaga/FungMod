@@ -98,6 +98,10 @@ def test_pr47_registry_promotion_apply_contract_is_synchronized() -> None:
     assert "Pre-PR-47 written schema `1.0.0`" in readme
     assert "`plan_digest`/`confirmation_digest`" in progress
     assert "simulation_authorized: false" in progress
+    for text in (readme, status, next_steps, roadmap, progress):
+        assert "CURATION-001 remains" in text or "CURATION-001 stays" in text
+        assert "source-to-production" in text
+        assert "no guessed" in text.lower()
 
 
 def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> None:
@@ -397,8 +401,11 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-46 | CURATION-001 registry-promotion preview plan" in status
     assert "PR-47 | CURATION-001 digest-confirmed transactional apply" in status
     assert "complete after PR #61 merged as `2b6c639`" in status
-    assert "CURATION-001 completes for its active acceptance criteria" in status
-    assert "PR-48 | PRODUCT-001 per-process rate-trajectory fidelity" in status
+    assert "bounded apply contract completes once merged, while CURATION-001 remains partial" in status
+    assert (
+        "PR-48 | CURATION-001 curator-authored source-to-production "
+        "registry-record bridge/schema workflow"
+    ) in status
     assert "entropy_production_rate_timeseries.json" in next_steps
     assert "entropy_production_rate_timeseries.json" in _read(README)
     assert "no silent conversion" in status
@@ -512,6 +519,8 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "PR-46 registry-promotion planning is complete" in gate
     assert "selected PR-47 work is bounded transactional" in gate
     assert "intentional plan\nschema `2.0.0`" in gate
+    assert "does not complete CURATION-001" in gate
+    assert "PR-48 CURATION-001 curator-authored" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate
