@@ -252,7 +252,7 @@ def test_record_type_schema_validation_blocks_malformed_content(tmp_path: Path) 
     fungus = next(record for record in result.records if record.record_type == "fungi")
     assert "field 'enzyme_classes' must be nonempty sequence of nonblank text" in fungus.reasons
     assert (
-        "field 'substrates' must be nonempty participant sequence"
+        "field 'substrates' must be nonempty participant sequence with finite positive numeric stoichiometry"
         in by_id[REJECTED_PRODUCT_MAP_ID].reasons
     )
     assert "field 'converted_value' must be finite number" in by_id[PARAMETER_ID].reasons
@@ -267,6 +267,115 @@ def test_record_type_schema_validation_blocks_malformed_content(tmp_path: Path) 
             bundle,
             curator="Dr Curator",
             decisions={PARAMETER_ID: _decision("accept", "Attempted malformed acceptance")},
+        )
+
+
+def test_valid_product_map_stoichiometry_and_yield_are_review_eligible() -> None:
+    result = review_source_proposal(_proposal())
+    product_map = next(record for record in result.records if record.record_id == REJECTED_PRODUCT_MAP_ID)
+
+    assert product_map.classification == "eligible_for_review"
+    assert product_map.reasons == ()
+
+
+@pytest.mark.parametrize("participant_group", ["substrates", "products"])
+@pytest.mark.parametrize(
+    "stoichiometry",
+    ["not-a-number", "0", "-1", "nan", "inf"],
+    ids=["nonnumeric", "zero", "negative", "nan", "infinite"],
+)
+def test_product_map_blocks_invalid_participant_stoichiometry(
+    tmp_path: Path,
+    participant_group: str,
+    stoichiometry: str,
+) -> None:
+    payload = _proposal().to_dict()
+    product_map = payload["proposed_records"]["product_maps"][0]
+    product_map[participant_group][0]["stoichiometry"] = stoichiometry
+    bundle = tmp_path / f"{participant_group}_{stoichiometry.replace('-', 'minus')}"
+    _write_manifest(bundle, payload)
+
+    result = review_source_proposal(bundle)
+    blocked = next(record for record in result.records if record.record_id == REJECTED_PRODUCT_MAP_ID)
+
+    assert blocked.classification == "blocked_excluded"
+    assert (
+        f"field {participant_group!r} must be nonempty participant sequence with finite positive numeric stoichiometry"
+        in blocked.reasons
+    )
+    with pytest.raises(CurationError, match="cannot be accepted.*positive numeric stoichiometry"):
+        review_source_proposal(
+            bundle,
+            curator="Dr Curator",
+            decisions={REJECTED_PRODUCT_MAP_ID: _decision("accept", "Attempted invalid acceptance")},
+        )
+
+
+@pytest.mark.parametrize(
+    "yield_value",
+    ["not-a-number", 0.0, -1.0, float("nan"), float("inf")],
+    ids=["nonnumeric", "zero", "negative", "nan", "infinite"],
+)
+def test_product_map_blocks_invalid_stoichiometric_yield_values(
+    tmp_path: Path,
+    yield_value: object,
+) -> None:
+    payload = _proposal().to_dict()
+    yields = payload["proposed_records"]["product_maps"][0]["stoichiometric_yields"]
+    yield_key = next(iter(yields))
+    yields[yield_key] = yield_value
+    bundle = tmp_path / "invalid_yield"
+    _write_manifest(bundle, payload)
+
+    result = review_source_proposal(bundle)
+    blocked = next(record for record in result.records if record.record_id == REJECTED_PRODUCT_MAP_ID)
+
+    assert blocked.classification == "blocked_excluded"
+    assert "field 'stoichiometric_yields' must be positive finite numeric mapping" in blocked.reasons
+    with pytest.raises(CurationError, match="cannot be accepted.*positive finite numeric mapping"):
+        review_source_proposal(
+            bundle,
+            curator="Dr Curator",
+            decisions={REJECTED_PRODUCT_MAP_ID: _decision("accept", "Attempted invalid acceptance")},
+        )
+
+
+def test_product_map_yield_consistency_uses_tight_tolerance(tmp_path: Path) -> None:
+    payload = _proposal().to_dict()
+    yields = payload["proposed_records"]["product_maps"][0]["stoichiometric_yields"]
+    yield_key = next(iter(yields))
+    yields[yield_key] = 2.0 + 1e-13
+    within_tolerance = tmp_path / "within_tolerance"
+    _write_manifest(within_tolerance, payload)
+
+    valid = review_source_proposal(within_tolerance)
+    valid_map = next(record for record in valid.records if record.record_id == REJECTED_PRODUCT_MAP_ID)
+    assert valid_map.classification == "eligible_for_review"
+
+    yields[yield_key] = 3.0
+    inconsistent_bundle = tmp_path / "inconsistent"
+    _write_manifest(inconsistent_bundle, payload)
+    inconsistent = review_source_proposal(inconsistent_bundle)
+    blocked = next(record for record in inconsistent.records if record.record_id == REJECTED_PRODUCT_MAP_ID)
+    assert blocked.classification == "blocked_excluded"
+    assert any("must match product participant stoichiometry 2.0" in reason for reason in blocked.reasons)
+
+    for decision in ("reject", "defer"):
+        reviewed = review_source_proposal(
+            inconsistent_bundle,
+            curator="Dr Curator",
+            decisions={REJECTED_PRODUCT_MAP_ID: _decision(decision, "Yield requires source review")},
+        )
+        reviewed_map = next(record for record in reviewed.records if record.record_id == REJECTED_PRODUCT_MAP_ID)
+        assert reviewed_map.explicit_decision is True
+        assert reviewed_map.decision == decision
+        assert reviewed_map.classification == "blocked_excluded"
+
+    with pytest.raises(CurationError, match="cannot be accepted.*must match product participant"):
+        review_source_proposal(
+            inconsistent_bundle,
+            curator="Dr Curator",
+            decisions={REJECTED_PRODUCT_MAP_ID: _decision("accept", "Attempted inconsistent acceptance")},
         )
 
 

@@ -243,6 +243,9 @@ blockers with curator rationale. Decision allowed use is restricted to
 `review_only_not_simulation_registry` or
 `pending_registry_promotion_review`; scientific, validation, and simulation
 use cannot be declared by this API.
+Product-map participants also require parseable finite positive stoichiometry,
+and each finite positive product yield must match exactly one product name or
+id and its participant stoichiometry; no conversion is inferred.
 
 ## Run A Virtual Experiment
 

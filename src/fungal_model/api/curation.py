@@ -17,7 +17,7 @@ from typing import Any, Literal
 
 import yaml
 
-from fungal_model.sources.sabiork import PROPOSAL_STATUS, RegistryProposal
+from fungal_model.sources.sabiork import PROPOSAL_STATUS, RegistryProposal, stable_sabiork_token
 
 
 CURATION_SCHEMA_VERSION = "1.0.0"
@@ -30,6 +30,7 @@ CURATION_DECISION_ALLOWED_USES = frozenset(
         CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
     }
 )
+_STOICHIOMETRY_RELATIVE_TOLERANCE = 1e-12
 _DECISIONS = {"accept", "reject", "defer"}
 _RECORD_TYPES = (
     "fungi",
@@ -91,8 +92,8 @@ _FIELD_RULES: Mapping[str, Mapping[str, str]] = {
     "product_maps": {
         "product_map_type": "nonblank text",
         "source_entry_id": "nonblank text",
-        "substrates": "nonempty participant sequence",
-        "products": "nonempty participant sequence",
+        "substrates": "nonempty participant sequence with finite positive numeric stoichiometry",
+        "products": "nonempty participant sequence with finite positive numeric stoichiometry",
         "stoichiometric_yields": "positive finite numeric mapping",
     },
     "parameter_records": {
@@ -520,6 +521,8 @@ def _record_schema_issues(record_type: str, record: Mapping[str, Any]) -> list[s
             continue
         if not _field_matches_rule(value, rule):
             issues.append(f"field {field!r} must be {rule}")
+    if record_type == "product_maps":
+        issues.extend(_product_map_consistency_issues(record))
     return issues
 
 
@@ -528,7 +531,7 @@ def _field_matches_rule(value: Any, rule: str) -> bool:
         return _nonblank_text(value)
     if rule == "nonempty sequence of nonblank text":
         return _nonempty_string_sequence(value)
-    if rule == "nonempty participant sequence":
+    if rule == "nonempty participant sequence with finite positive numeric stoichiometry":
         return _participant_sequence(value)
     if rule == "positive finite numeric mapping":
         return _positive_numeric_mapping(value)
@@ -544,7 +547,7 @@ def _field_matches_rule(value: Any, rule: str) -> bool:
 
 
 def _participant_sequence(value: Any) -> bool:
-    required = ("entry_id", "reaction_id", "role", "compound_name", "stoichiometry")
+    required = ("entry_id", "reaction_id", "role", "compound_name")
     return (
         isinstance(value, Sequence)
         and not isinstance(value, (str, bytes))
@@ -552,9 +555,76 @@ def _participant_sequence(value: Any) -> bool:
         and all(
             isinstance(item, Mapping)
             and all(_nonblank_text(item.get(field)) for field in required)
+            and _parsed_positive_number(item.get("stoichiometry")) is not None
             for item in value
         )
     )
+
+
+def _product_map_consistency_issues(record: Mapping[str, Any]) -> list[str]:
+    products = record.get("products")
+    yields = record.get("stoichiometric_yields")
+    if not _participant_sequence(products) or not _positive_numeric_mapping(yields):
+        return []
+    assert isinstance(products, Sequence) and not isinstance(products, (str, bytes))
+    assert isinstance(yields, Mapping)
+
+    aliases_by_index: list[set[str]] = []
+    product_values: list[float] = []
+    for product in products:
+        assert isinstance(product, Mapping)
+        aliases = {stable_sabiork_token(product["compound_name"])}
+        if _nonblank_text(product.get("compound_id")):
+            aliases.add(stable_sabiork_token(product["compound_id"]))
+        aliases_by_index.append(aliases)
+        parsed = _parsed_positive_number(product["stoichiometry"])
+        assert parsed is not None
+        product_values.append(parsed)
+
+    matched_products: set[int] = set()
+    issues: list[str] = []
+    for yield_key, yield_value in yields.items():
+        canonical_key = stable_sabiork_token(yield_key)
+        matches = [index for index, aliases in enumerate(aliases_by_index) if canonical_key in aliases]
+        if len(matches) != 1:
+            issues.append(
+                f"stoichiometric_yields key {str(yield_key)!r} must match exactly one product participant"
+            )
+            continue
+        index = matches[0]
+        if index in matched_products:
+            issues.append(
+                f"multiple stoichiometric_yields entries match product participant {canonical_key!r}"
+            )
+            continue
+        matched_products.add(index)
+        if not math.isclose(
+            float(yield_value),
+            product_values[index],
+            rel_tol=_STOICHIOMETRY_RELATIVE_TOLERANCE,
+            abs_tol=0.0,
+        ):
+            issues.append(
+                f"stoichiometric_yields value for {str(yield_key)!r} must match product participant "
+                f"stoichiometry {product_values[index]!r}"
+            )
+    for index, aliases in enumerate(aliases_by_index):
+        if index not in matched_products:
+            issues.append(
+                "product participant has no matching stoichiometric_yields entry: "
+                + ", ".join(sorted(aliases))
+            )
+    return issues
+
+
+def _parsed_positive_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) and parsed > 0.0 else None
 
 
 def _positive_numeric_mapping(value: Any) -> bool:

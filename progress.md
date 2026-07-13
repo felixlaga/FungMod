@@ -43,6 +43,12 @@ Completed in this pass:
   classification with exact missing fields and typed record-specific schema
   reasons. Unknown biology, parameters, units, and review-required fields
   remain explicit and are never filled or inferred.
+- Required every proposed product-map substrate/product participant
+  stoichiometry to parse as a finite positive number. Product yields must be
+  finite positive numerics, map unambiguously to product participant names or
+  ids through the existing SABIO token normalization, and match participant
+  stoichiometry within `1e-12` relative tolerance and zero absolute tolerance.
+  No stoichiometric conversion or fallback is performed.
 - Added explicit `accept`, `reject`, and `defer` decisions requiring curator
   identity, reason, ISO curation date, closed review-only/pending-promotion
   allowed use, and limitations. Acceptance additionally requires complete
@@ -70,7 +76,10 @@ Tests added or modified: `tests/test_curation_review.py` covers normal frozen
 SABIO-RK review, all-deferred default behavior, explicit accepted/rejected
 decisions, exact blockers, provenance, value/unit/conversion preservation,
 registry immutability, deterministic transactional outputs and checksums,
-malformed/duplicate/path/decision failures, and offline socket containment.
+malformed/duplicate/path/decision failures, owned output replacement, canonical
+serialization, full path-component symlink rejection, strict product-map
+participant/yield stoichiometry and consistency, and offline socket
+containment.
 `tests/test_roadmap_orchestration_status.py` keeps PR-44/PR-45, partial
 CURATION-001, future promotion, and deferred validation wording synchronized.
 
@@ -102,9 +111,9 @@ until source-backed observations satisfy its evidence gate.
 
 Verification:
 
-- Focused curation, source-provider, and discovery suite: 56 passed.
+- Focused curation, source-provider, and discovery suite: 73 passed.
 - Broad curation, SABIO-RK source/discovery/parser/fetch, Reaction 618,
-  registry, public-API, instruction-hierarchy, and roadmap suite: 150 passed.
+  registry, public-API, instruction-hierarchy, and roadmap suite: 167 passed.
 - `RUFF_CACHE_DIR=/private/tmp/fungmod-ruff-cache .venv/bin/python -m ruff check src tests`
   - Result: all checks passed.
 - `.venv/bin/python -m pyright --pythonpath .venv/bin/python`
@@ -117,9 +126,11 @@ Verification:
   `notebooks/examples/.ipynb_checkpoints/10_virtual_experiment_product_tour-checkpoint.ipynb`
   remains in the shared workspace with a 2026-06-20 timestamp. PR-45 did not
   create, modify, delete, or stage it.
-- Final correction-tree full coverage gate excluding only that unrelated
-  workspace-hygiene assertion: 783 passed, 1 deselected; total coverage 84.93%.
-  The curation module has 88% branch-aware coverage.
+- Review-correction full coverage gate before the final product-map P1,
+  excluding only that unrelated workspace-hygiene assertion: 783 passed,
+  1 deselected; total coverage 84.93%. The curation module had 88%
+  branch-aware coverage at that checkpoint. The final product-map P1 then ran
+  the focused, broad, Ruff, Pyright, and diff gates requested above.
 - One initial broad-suite command named nonexistent
   `tests/test_active_instruction_docs.py` and collected no tests; it was
   corrected to `tests/test_active_instruction_hierarchy.py` in the green broad
