@@ -63,7 +63,7 @@ def test_status_tracker_reconciles_completed_scoped_slices_without_overclaiming(
         assert boundary in text
 
 
-def test_pr46_registry_promotion_preview_contract_is_synchronized() -> None:
+def test_pr47_registry_promotion_apply_contract_is_synchronized() -> None:
     readme = _read(README)
     status = _read(STATUS_DOC)
     next_steps = _read(NEXT_STEPS)
@@ -73,28 +73,35 @@ def test_pr46_registry_promotion_preview_contract_is_synchronized() -> None:
 
     for text in (readme, status, next_steps, roadmap, progress):
         assert "plan_registry_promotion" in text
-        assert "CURATION-001 remains partial" in text
+        assert "apply_registry_promotion" in text
 
     for text in (status, next_steps, roadmap, validation_gate, progress):
-        assert "PR-45" in text
-        assert "PR #60" in text
         assert "PR-46" in text
+        assert "PR #61" in text
+        assert "2b6c639" in text
         assert "PR-47" in text
 
     for phrase in (
-        "checksum-verifies written curation bundles",
-        "round-trip to the exact candidate mapping",
-        "exact prospective YAML",
-        "no registry mutation",
+        "plan schema `2.0.0`",
+        "exact plan digest",
+        "exact next numeric patch version",
+        "full-root",
+        "same-filesystem registry copy",
+        "verified rollback",
         "Product maps remain blocked",
-        "digest-confirmed transactional apply",
     ):
         assert phrase in next_steps
 
     assert "unsupported_pending_destination_contract" in readme
     assert "parameter_records" in readme
-    assert "version bump policy" in readme
-    assert "no `apply()` path" in progress
+    assert "strict numeric `MAJOR.MINOR.PATCH`" in readme
+    assert "Pre-PR-47 written schema `1.0.0`" in readme
+    assert "`plan_digest`/`confirmation_digest`" in progress
+    assert "simulation_authorized: false" in progress
+    for text in (readme, status, next_steps, roadmap, progress):
+        assert "CURATION-001 remains" in text or "CURATION-001 stays" in text
+        assert "source-to-production" in text
+        assert "no guessed" in text.lower()
 
 
 def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> None:
@@ -102,10 +109,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-46: registry-promotion preview plan"
+    current_next = "PR-47: digest-confirmed transactional registry apply"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-46 registry-promotion preview plan" in roadmap
+    assert "The current next PR is PR-47 digest-confirmed transactional registry apply" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
@@ -123,8 +130,9 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "completed PR-43 slice adds post-simulation" in roadmap
     assert "completed PR-44" in roadmap
     assert "completed PR-45" in roadmap
-    assert "current PR-46" in roadmap
-    assert "PR-47" in roadmap
+    assert "completed PR-46" in roadmap
+    assert "current PR-47" in roadmap
+    assert "PR-48" in roadmap
     assert "branching, cycles, disconnected chains, and malformed topology" in roadmap
     assert "35 baseline nullable-member errors across 11" in roadmap
     assert "scientific modules using explicit contracts" in roadmap
@@ -164,7 +172,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-46: registry-promotion preview plan"
+    current_next = "PR-47: digest-confirmed transactional registry apply"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -392,7 +400,12 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "complete after PR #60 merged as `5ac7864`" in status
     assert "PR-46 | CURATION-001 registry-promotion preview plan" in status
     assert "PR-47 | CURATION-001 digest-confirmed transactional apply" in status
-    assert "CURATION-001 remains partial" in status
+    assert "complete after PR #61 merged as `2b6c639`" in status
+    assert "bounded apply contract completes once merged, while CURATION-001 remains partial" in status
+    assert (
+        "PR-48 | CURATION-001 curator-authored source-to-production "
+        "registry-record bridge/schema workflow"
+    ) in status
     assert "entropy_production_rate_timeseries.json" in next_steps
     assert "entropy_production_rate_timeseries.json" in _read(README)
     assert "no silent conversion" in status
@@ -444,7 +457,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-46: registry-promotion preview plan"
+    current_next = "PR-47: digest-confirmed transactional registry apply"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -503,8 +516,11 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "process-bound entropy-production-rate diagnostics is complete after PR #58" in gate
     assert "PR-44 researcher source-provider onboarding is complete after PR #59" in gate
     assert "PR-45 CURATION-001 proposal-review and decision-bundle work is complete" in gate
-    assert "selected PR-46 work is therefore bounded" in gate
-    assert "digest-confirmed transactional apply remains PR-47" in gate
+    assert "PR-46 registry-promotion planning is complete" in gate
+    assert "selected PR-47 work is bounded transactional" in gate
+    assert "intentional plan\nschema `2.0.0`" in gate
+    assert "does not complete CURATION-001" in gate
+    assert "PR-48 CURATION-001 curator-authored" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate

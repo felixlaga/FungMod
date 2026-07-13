@@ -9,10 +9,14 @@ from fungal_model.api.curation import (
 from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid, environment_grid
 from fungal_model.api.registry_promotion import (
     ProspectiveRegistryFile,
+    RegistryPromotionAppliedFile,
+    RegistryPromotionApplyError,
+    RegistryPromotionApplyResult,
     RegistryPromotionCandidate,
     RegistryPromotionPlan,
     RegistryPromotionPlanError,
     RegistryPromotionPlanWriteResult,
+    apply_registry_promotion,
     plan_registry_promotion,
 )
 from fungal_model.api.source_provider import (
@@ -37,8 +41,12 @@ __all__ = [
     "EnvironmentCase",
     "EnvironmentGrid",
     "environment_grid",
+    "apply_registry_promotion",
     "plan_registry_promotion",
     "ProspectiveRegistryFile",
+    "RegistryPromotionAppliedFile",
+    "RegistryPromotionApplyError",
+    "RegistryPromotionApplyResult",
     "RegistryPromotionCandidate",
     "RegistryPromotionPlan",
     "RegistryPromotionPlanError",
