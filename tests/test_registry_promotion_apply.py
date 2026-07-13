@@ -1072,6 +1072,56 @@ def test_backup_cleanup_failure_reports_committed_active_registry(
     assert len(list(tmp_path.glob(".registry.promotion-backup-*"))) == 1
 
 
+@pytest.mark.parametrize(
+    "interrupt_type",
+    [KeyboardInterrupt, SystemExit],
+    ids=["keyboard-interrupt", "system-exit"],
+)
+def test_backup_cleanup_interruption_preserves_committed_state_and_backup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    interrupt_type: type[BaseException],
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    plan = plan_registry_promotion(
+        _curation_result(_curation_record("parameter_records", _synthetic_parameter())),
+        registry_index=registry_index,
+    )
+    real_rmtree = promotion_module.shutil.rmtree
+
+    def interrupt_backup_cleanup(
+        path: str | Path,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        if "promotion-backup" in Path(path).name:
+            raise interrupt_type("injected backup cleanup interruption")
+        real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(promotion_module.shutil, "rmtree", interrupt_backup_cleanup)
+
+    with pytest.raises(interrupt_type) as captured:
+        apply_registry_promotion(
+            plan,
+            confirmation_digest=plan.plan_digest,
+            new_registry_version="0.1.1",
+        )
+
+    backups = list(tmp_path.glob(".registry.promotion-backup-*"))
+    assert len(backups) == 1
+    assert captured.value.__notes__ == [
+        "FungMod registry promotion: transaction_status=committed; "
+        "rollback_status=not_required; backup_cleanup_status=interrupted; "
+        f"backup_path={backups[0]}; cause=injected backup cleanup interruption"
+    ]
+    promoted = load_registry(registry_index)
+    assert promoted.version == "0.1.1"
+    assert "apply_parameter" in promoted.parameters
+    assert not list(tmp_path.glob(".registry.promotion-stage-*"))
+    assert not (tmp_path / ".registry.fungmod-registry-promotion.lock").exists()
+    real_rmtree(backups[0])
+
+
 def test_stage_cleanup_failure_reports_committed_active_registry(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1110,6 +1160,56 @@ def test_stage_cleanup_failure_reports_committed_active_registry(
     real_rmtree(stage_containers[0])
 
 
+@pytest.mark.parametrize(
+    "interrupt_type",
+    [KeyboardInterrupt, SystemExit],
+    ids=["keyboard-interrupt", "system-exit"],
+)
+def test_stage_cleanup_interruption_preserves_committed_state_and_stage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    interrupt_type: type[BaseException],
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    plan = plan_registry_promotion(
+        _curation_result(_curation_record("parameter_records", _synthetic_parameter())),
+        registry_index=registry_index,
+    )
+    real_rmtree = promotion_module.shutil.rmtree
+
+    def interrupt_stage_cleanup(
+        path: str | Path,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        if "promotion-stage" in Path(path).name:
+            raise interrupt_type("injected stage cleanup interruption")
+        real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(promotion_module.shutil, "rmtree", interrupt_stage_cleanup)
+
+    with pytest.raises(interrupt_type) as captured:
+        apply_registry_promotion(
+            plan,
+            confirmation_digest=plan.plan_digest,
+            new_registry_version="0.1.1",
+        )
+
+    stage_containers = list(tmp_path.glob(".registry.promotion-stage-*"))
+    assert len(stage_containers) == 1
+    assert captured.value.__notes__ == [
+        "FungMod registry promotion: transaction_status=committed; "
+        "rollback_status=not_required; stage_cleanup_status=interrupted; "
+        f"stage_path={stage_containers[0]}; cause=injected stage cleanup interruption"
+    ]
+    promoted = load_registry(registry_index)
+    assert promoted.version == "0.1.1"
+    assert "apply_parameter" in promoted.parameters
+    assert not list(tmp_path.glob(".registry.promotion-backup-*"))
+    assert not (tmp_path / ".registry.fungmod-registry-promotion.lock").exists()
+    real_rmtree(stage_containers[0])
+
+
 def test_lock_cleanup_failure_reports_committed_active_registry(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1144,6 +1244,99 @@ def test_lock_cleanup_failure_reports_committed_active_registry(
 
     assert load_registry(registry_index).version == "0.1.1"
     assert "apply_parameter" in load_registry(registry_index).parameters
+    assert lock_path.is_file()
+    real_unlink(lock_path)
+
+
+@pytest.mark.parametrize(
+    "interrupt_type",
+    [KeyboardInterrupt, SystemExit],
+    ids=["keyboard-interrupt", "system-exit"],
+)
+def test_lock_cleanup_interruption_preserves_committed_state_and_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    interrupt_type: type[BaseException],
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    plan = plan_registry_promotion(
+        _curation_result(_curation_record("parameter_records", _synthetic_parameter())),
+        registry_index=registry_index,
+    )
+    lock_path = tmp_path / ".registry.fungmod-registry-promotion.lock"
+    real_unlink = Path.unlink
+
+    def interrupt_lock_unlink(path: Path, *args: Any, **kwargs: Any) -> None:
+        if path == lock_path:
+            raise interrupt_type("injected lock cleanup interruption")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", interrupt_lock_unlink)
+
+    with pytest.raises(interrupt_type) as captured:
+        apply_registry_promotion(
+            plan,
+            confirmation_digest=plan.plan_digest,
+            new_registry_version="0.1.1",
+        )
+
+    assert captured.value.__notes__ == [
+        "FungMod registry promotion: transaction_status=committed; "
+        "rollback_status=not_required; lock_cleanup_status=interrupted; "
+        f"lock_path={lock_path}; cause=injected lock cleanup interruption"
+    ]
+    promoted = load_registry(registry_index)
+    assert promoted.version == "0.1.1"
+    assert "apply_parameter" in promoted.parameters
+    assert lock_path.is_file()
+    assert not list(tmp_path.glob(".registry.promotion-backup-*"))
+    assert not list(tmp_path.glob(".registry.promotion-stage-*"))
+    real_unlink(lock_path)
+
+
+def test_lock_cleanup_interruption_before_commit_reports_uncommitted_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry_index = _copy_registry(tmp_path)
+    plan = plan_registry_promotion(
+        _curation_result(_curation_record("parameter_records", _synthetic_parameter())),
+        registry_index=registry_index,
+    )
+    before = _snapshot(registry_index)
+    lock_path = tmp_path / ".registry.fungmod-registry-promotion.lock"
+    real_unlink = Path.unlink
+
+    def fail_before_commit(*args: Any, **kwargs: Any) -> str:
+        del args, kwargs
+        raise RegistryPromotionApplyError("injected failure before commit")
+
+    def interrupt_lock_unlink(path: Path, *args: Any, **kwargs: Any) -> None:
+        if path == lock_path:
+            raise KeyboardInterrupt("injected pre-commit lock cleanup interruption")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(
+        promotion_module,
+        "_validate_version_transition",
+        fail_before_commit,
+    )
+    monkeypatch.setattr(Path, "unlink", interrupt_lock_unlink)
+
+    with pytest.raises(KeyboardInterrupt) as captured:
+        apply_registry_promotion(
+            plan,
+            confirmation_digest=plan.plan_digest,
+            new_registry_version="0.1.1",
+        )
+
+    assert captured.value.__notes__ == [
+        "FungMod registry promotion: transaction_status=not_started; "
+        "rollback_status=not_required; lock_cleanup_status=interrupted; "
+        f"lock_path={lock_path}; cause=injected pre-commit lock cleanup interruption; "
+        "prior_error=injected failure before commit"
+    ]
+    assert _snapshot(registry_index) == before
     assert lock_path.is_file()
     real_unlink(lock_path)
 

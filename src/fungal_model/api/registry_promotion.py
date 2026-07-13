@@ -687,17 +687,20 @@ def _apply_registry_promotion(
             if transaction_state.rollback_status != "unproven":
                 try:
                     shutil.rmtree(stage_container)
-                except OSError as exc:
-                    prior_error = (
-                        ""
-                        if stage_body_error is None
-                        else f"; prior_error={stage_body_error}"
+                except BaseException as exc:
+                    detail = _cleanup_failure_detail(
+                        transaction_state=transaction_state,
+                        cleanup_name="stage_cleanup",
+                        cleanup_path_name="stage_path",
+                        cleanup_path=stage_container,
+                        error=exc,
+                        prior_error=stage_body_error,
                     )
+                    if not isinstance(exc, Exception):
+                        exc.add_note(f"FungMod registry promotion: {detail}")
+                        raise
                     raise RegistryPromotionApplyError(
-                        f"transaction_status={transaction_state.transaction_status}; "
-                        f"rollback_status={transaction_state.rollback_status}; "
-                        f"stage_cleanup_status=failed; stage_path={stage_container}; "
-                        f"cause={exc}{prior_error}"
+                        detail
                     ) from exc
 
     return RegistryPromotionApplyResult(
@@ -1491,11 +1494,20 @@ def _registry_apply_lock(
     if initialization_error is not None:
         try:
             lock_path.unlink()
-        except OSError as cleanup_error:
+        except BaseException as cleanup_error:
+            detail = _cleanup_failure_detail(
+                transaction_state=transaction_state,
+                cleanup_name="lock_cleanup",
+                cleanup_path_name="lock_path",
+                cleanup_path=lock_path,
+                error=cleanup_error,
+                prior_error=initialization_error,
+            )
+            if not isinstance(cleanup_error, Exception):
+                cleanup_error.add_note(f"FungMod registry promotion: {detail}")
+                raise
             raise RegistryPromotionApplyError(
-                "transaction_status=not_started; rollback_status=not_required; "
-                f"lock_cleanup_status=failed; lock_path={lock_path}; "
-                f"cause={cleanup_error}; prior_error={initialization_error}"
+                detail
             ) from cleanup_error
         raise RegistryPromotionApplyError(
             f"Registry promotion lock initialization failed at {lock_path}: "
@@ -1510,14 +1522,40 @@ def _registry_apply_lock(
     finally:
         try:
             lock_path.unlink()
-        except OSError as exc:
-            prior_error = "" if body_error is None else f"; prior_error={body_error}"
+        except BaseException as exc:
+            detail = _cleanup_failure_detail(
+                transaction_state=transaction_state,
+                cleanup_name="lock_cleanup",
+                cleanup_path_name="lock_path",
+                cleanup_path=lock_path,
+                error=exc,
+                prior_error=body_error,
+            )
+            if not isinstance(exc, Exception):
+                exc.add_note(f"FungMod registry promotion: {detail}")
+                raise
             raise RegistryPromotionApplyError(
-                f"transaction_status={transaction_state.transaction_status}; "
-                f"rollback_status={transaction_state.rollback_status}; "
-                f"lock_cleanup_status=failed; lock_path={lock_path}; cause={exc}"
-                f"{prior_error}"
+                detail
             ) from exc
+
+
+def _cleanup_failure_detail(
+    *,
+    transaction_state: _ApplyTransactionState,
+    cleanup_name: str,
+    cleanup_path_name: str,
+    cleanup_path: Path,
+    error: BaseException,
+    prior_error: BaseException | None = None,
+) -> str:
+    cleanup_status = "failed" if isinstance(error, Exception) else "interrupted"
+    prior_detail = "" if prior_error is None else f"; prior_error={prior_error}"
+    return (
+        f"transaction_status={transaction_state.transaction_status}; "
+        f"rollback_status={transaction_state.rollback_status}; "
+        f"{cleanup_name}_status={cleanup_status}; "
+        f"{cleanup_path_name}={cleanup_path}; cause={error}{prior_detail}"
+    )
 
 
 def _validate_staged_apply(
@@ -1700,10 +1738,19 @@ def _commit_staged_registry(
     transaction_state.rollback_status = "not_required"
     try:
         shutil.rmtree(backup)
-    except OSError as exc:
+    except BaseException as exc:
+        detail = _cleanup_failure_detail(
+            transaction_state=transaction_state,
+            cleanup_name="backup_cleanup",
+            cleanup_path_name="backup_path",
+            cleanup_path=backup,
+            error=exc,
+        )
+        if not isinstance(exc, Exception):
+            exc.add_note(f"FungMod registry promotion: {detail}")
+            raise
         raise RegistryPromotionApplyError(
-            "transaction_status=committed; rollback_status=not_required; "
-            f"backup_cleanup_status=failed; backup_path={backup}; cause={exc}"
+            detail
         ) from exc
     return installed_index
 
