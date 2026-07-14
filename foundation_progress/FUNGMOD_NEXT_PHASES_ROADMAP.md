@@ -224,11 +224,14 @@ The current PR-48 `author_parameter_record(...)` slice is limited to accepted
 in-memory PARAMETER curation results and complete curator-authored production
 mappings with exact identity conversion, source digest/provenance,
 loader-round-trip, ordered frozen-URL, full-registry-context, exact role/
-compatibility, result/report envelope, and mutation checks. Its
+compatibility, closed summary/result/report envelope, structural non-downgrade,
+and mutation checks. Immutable frozen metadata page/request/URL/raw-page
+cardinality is reconciled offline. Its
 specialized checksummed curation output is promotion-plan-compatible but does
 not mutate or apply; its public checksums establish internal consistency rather
 than cryptographic authorship. Its exact storage-only policy uses one shared
-predicate across modelability and runtime resolution in every mode. Nonidentity
+predicate across modelability and runtime resolution in every mode, including
+bridge-shaped records whose removable marker or labels were stripped. Nonidentity
 conversion, written source input, non-parameter records, validation,
 calibration, and simulation authorization remain unsupported, so CURATION-001
 remains partial. The recommended next

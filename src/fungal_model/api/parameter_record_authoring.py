@@ -38,7 +38,10 @@ from fungal_model.api.curation import (
     validate_curation_report_limitations,
 )
 from fungal_model.registry.loaders import load_parameter_record_mapping, load_registry
-from fungal_model.registry.records import PARAMETER_ALLOWED_USE_STORAGE_ONLY
+from fungal_model.registry.records import (
+    PARAMETER_ALLOWED_USE_STORAGE_ONLY,
+    parameter_provenance_requires_authoring_contract,
+)
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.sources.sabiork import (
     PROPOSAL_STATUS,
@@ -109,6 +112,16 @@ _PROPOSAL_IDENTITY_FIELDS = _SOURCE_IDENTITY_FIELDS
 _SOURCE_PROVENANCE_FIELDS = frozenset((*_SOURCE_IDENTITY_FIELDS, "proposal_status", "notes"))
 _SOURCE_ALIAS_FIELDS = frozenset({"source_reaction_id", "selected_kinlaw_entry_id"})
 _RESULT_PROVENANCE_FIELDS = frozenset({"source_query", "source_snapshot_path", "proposal_limitations"})
+_SOURCE_AUTHORING_EVIDENCE_FIELDS = frozenset(
+    {
+        "source_reaction_ids",
+        "source_query",
+        "source_field",
+        "source_urls",
+        "source_snapshot_sha256",
+        "proposal_status",
+    }
+)
 _SOURCE_PARAMETER_AUDIT_FIELDS = frozenset(
     {
         "parameter_symbol",
@@ -187,6 +200,14 @@ _AUDIT_FIELDS = frozenset(
         "production_registry_mutated",
     }
 )
+_OUTER_PROVENANCE_SAFETY_FIELDS = frozenset(
+    {
+        "production_registry_mutated",
+        "registry_mutated",
+        "scientific_validation_claimed",
+        "simulation_authorized",
+    }
+)
 
 
 class ParameterRecordAuthoringError(ValueError):
@@ -234,21 +255,14 @@ class CuratorAuthoredParameterResult(CurationResult):
     authoring_digest: str
 
     def summary(self) -> dict[str, Any]:
-        return {
-            **super().summary(),
-            "proposal_limitations": list(self.proposal_limitations),
-            "workflow": PARAMETER_AUTHORING_WORKFLOW,
-            "authoring_schema_version": PARAMETER_AUTHORING_SCHEMA_VERSION,
-            "supported_record_types": ["parameter_records"],
-            "source_record_id": self.source_record_id,
-            "authored_record_id": self.authored_record_id,
-            "authoring_digest": self.authoring_digest,
-            "identity_conversion_only": True,
-            "loader_round_trip_verified": True,
-            "selector_compatibility_verified": True,
-            "promotion_plan_compatible": True,
-            "simulation_authorized": False,
-        }
+        return _parameter_authoring_summary(
+            source_query=self.source_query,
+            source_snapshot_path=self.source_snapshot_path,
+            proposal_limitations=self.proposal_limitations,
+            source_record_id=self.source_record_id,
+            authored_record_id=self.authored_record_id,
+            authoring_digest=self.authoring_digest,
+        )
 
     def verify_integrity(self) -> None:
         if len(self.records) != 1 or self.records[0].record_type != "parameter_records":
@@ -391,6 +405,26 @@ def is_curator_authored_parameter_record(record: Mapping[str, Any]) -> bool:
     return isinstance(provenance, Mapping) and PARAMETER_BRIDGE_PROVENANCE_KEY in provenance
 
 
+def parameter_candidate_requires_authoring_contract(
+    record_type: str,
+    target_record: Mapping[str, Any],
+    curation_metadata: Mapping[str, Any],
+) -> bool:
+    """Return whether intrinsic source evidence requires specialized PARAMETER validation."""
+
+    if record_type != "parameter_records":
+        return False
+    provenance = target_record.get("provenance")
+    if isinstance(provenance, Mapping) and parameter_provenance_requires_authoring_contract(
+        provenance
+    ):
+        return True
+    source_provenance = curation_metadata.get("source_provenance")
+    return isinstance(source_provenance, Mapping) and bool(
+        _SOURCE_AUTHORING_EVIDENCE_FIELDS & set(source_provenance)
+    )
+
+
 def validate_authored_parameter_record(
     target_record: Mapping[str, Any],
     curation_metadata: Mapping[str, Any],
@@ -443,20 +477,19 @@ def validate_parameter_authoring_bundle_record(
     curation_metadata: Mapping[str, Any],
     curation_report: str,
 ) -> None:
-    expected = {
-        "workflow": PARAMETER_AUTHORING_WORKFLOW,
-        "authoring_schema_version": PARAMETER_AUTHORING_SCHEMA_VERSION,
-        "supported_record_types": ["parameter_records"],
-    }
-    if any(not type_exact_equal(summary.get(key), value) for key, value in expected.items()):
-        raise ParameterRecordAuthoringError("Written bundle lacks the parameter-only authoring contract.")
     source_id = summary.get("source_record_id")
     authored_id = summary.get("authored_record_id")
     digest = summary.get("authoring_digest")
     if record_type != "parameter_records" or target_record.get("record_id") != authored_id:
         raise ParameterRecordAuthoringError("Written authoring summary does not match its parameter target.")
-    if not _text(source_id) or not isinstance(digest, str) or _SHA256.fullmatch(digest) is None:
+    if (
+        not _text(source_id)
+        or not _text(authored_id)
+        or not isinstance(digest, str)
+        or _SHA256.fullmatch(digest) is None
+    ):
         raise ParameterRecordAuthoringError("Written authoring summary lacks source identity or digest.")
+    assert isinstance(source_id, str) and isinstance(authored_id, str)
     source_query = summary.get("source_query")
     source_snapshot_path = summary.get("source_snapshot_path")
     proposal_limitations = summary.get("proposal_limitations")
@@ -464,11 +497,22 @@ def validate_parameter_authoring_bundle_record(
         proposal_limitations
     ):
         raise ParameterRecordAuthoringError("Written authoring summary lacks result provenance.")
-    assert isinstance(source_id, str)
     assert isinstance(source_query, str) and isinstance(source_snapshot_path, str)
     assert isinstance(proposal_limitations, Sequence) and not isinstance(
         proposal_limitations, (str, bytes)
     )
+    expected_summary = _parameter_authoring_summary(
+        source_query=source_query,
+        source_snapshot_path=source_snapshot_path,
+        proposal_limitations=proposal_limitations,
+        source_record_id=source_id,
+        authored_record_id=authored_id,
+        authoring_digest=digest,
+    )
+    if not type_exact_equal(summary, expected_summary):
+        raise ParameterRecordAuthoringError(
+            "Written bundle lacks the closed parameter-only authoring summary contract."
+        )
     result_provenance = _result_provenance(
         source_query=source_query,
         source_snapshot_path=source_snapshot_path,
@@ -476,6 +520,11 @@ def validate_parameter_authoring_bundle_record(
     )
     _validate_result_provenance_envelope(
         result_provenance,
+        summary=summary,
+        manifest=manifest,
+        accepted_payload=accepted_payload,
+    )
+    _validate_written_safety_envelope(
         summary=summary,
         manifest=manifest,
         accepted_payload=accepted_payload,
@@ -533,6 +582,66 @@ def _result_provenance(
         "source_snapshot_path": source_snapshot_path,
         "proposal_limitations": list(proposal_limitations),
     }
+
+
+def _parameter_authoring_summary(
+    *,
+    source_query: str,
+    source_snapshot_path: str,
+    proposal_limitations: Sequence[str],
+    source_record_id: str,
+    authored_record_id: str,
+    authoring_digest: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": CURATION_SCHEMA_VERSION,
+        "source_query": source_query,
+        "source_snapshot_path": source_snapshot_path,
+        "record_count": 1,
+        "eligible_for_review_count": 1,
+        "blocked_excluded_count": 0,
+        "accepted_count": 1,
+        "rejected_count": 0,
+        "deferred_count": 0,
+        "production_registry_mutated": False,
+        "scientific_validation_claimed": False,
+        "proposal_limitations": list(proposal_limitations),
+        "workflow": PARAMETER_AUTHORING_WORKFLOW,
+        "authoring_schema_version": PARAMETER_AUTHORING_SCHEMA_VERSION,
+        "supported_record_types": ["parameter_records"],
+        "source_record_id": source_record_id,
+        "authored_record_id": authored_record_id,
+        "authoring_digest": authoring_digest,
+        "identity_conversion_only": True,
+        "loader_round_trip_verified": True,
+        "selector_compatibility_verified": True,
+        "promotion_plan_compatible": True,
+        "simulation_authorized": False,
+    }
+
+
+def _validate_written_safety_envelope(
+    *,
+    summary: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+    accepted_payload: Mapping[str, Any],
+) -> None:
+    expected = (
+        (summary, "production_registry_mutated", False),
+        (summary, "scientific_validation_claimed", False),
+        (summary, "simulation_authorized", False),
+        (manifest, "production_registry_mutated", False),
+        (manifest, "scientific_validation_claimed", False),
+        (accepted_payload, "production_registry_promotion", False),
+    )
+    if any(
+        key not in representation
+        or not type_exact_equal(representation.get(key), value)
+        for representation, key, value in expected
+    ):
+        raise ParameterRecordAuthoringError(
+            "Written bundle safety claims disagree across authoritative representations."
+        )
 
 
 def _validate_result_provenance(
@@ -705,6 +814,13 @@ def _validate_target_schema(record: Mapping[str, Any], *, audit_required: bool) 
     if present_reserved != expected_reserved:
         raise ParameterRecordAuthoringError(
             "ParameterRecord reserved provenance keys are authoring-owned and cannot collide."
+        )
+    conflicting_safety = set(provenance) & _OUTER_PROVENANCE_SAFETY_FIELDS
+    if conflicting_safety:
+        raise ParameterRecordAuthoringError(
+            "ParameterRecord outer provenance cannot supply authoring-owned safety claims: "
+            + ", ".join(sorted(conflicting_safety))
+            + "."
         )
     value = record.get("value")
     if not isinstance(value, Mapping) or set(value) != _VALUE_FIELDS:

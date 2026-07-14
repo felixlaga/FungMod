@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 import fungal_model
+import fungal_model.api.registry_promotion as promotion_module
 import fungal_model.sources.sabiork.fetch as sabiork_fetch
 from fungal_model import (
     CurationDecision,
@@ -19,11 +20,15 @@ from fungal_model import (
     CurationResult,
     CuratorAuthoredParameterResult,
     ParameterRecordAuthoringError,
+    RegistryPromotionApplyError,
     RegistryPromotionPlanError,
+    VirtualExperimentError,
     author_parameter_record,
+    apply_registry_promotion,
     plan_registry_promotion,
     review_source_proposal,
     source_proposal,
+    virtual_experiment,
 )
 from fungal_model.api.curation import (
     CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
@@ -41,6 +46,7 @@ from fungal_model.api.parameter_record_authoring import (
     parameter_authoring_digest,
 )
 from fungal_model.sources.sabiork.fetch import HTTPResponseSnapshot
+from fungal_model.sources.sabiork import SabioRKSourceError, frozen_source_urls
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -378,6 +384,32 @@ def test_offline_two_page_sabio_urls_survive_proposal_curation_and_authoring(
         )
 
 
+def test_collapsed_two_page_frozen_metadata_is_rejected_offline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proposal, source_urls = _two_page_proposal(tmp_path, monkeypatch)
+    source = _accepted_source_curation(tmp_path / "accepted", proposal=proposal)
+    metadata_path = Path(proposal.source_snapshot_path).parent.parent / "fetch_metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["total_pages"] == 2
+    assert len(metadata["raw_pages"]) == 2
+    metadata["source_urls"] = source_urls[:1]
+    metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(SabioRKSourceError, match="total_pages, requests_made, and source_urls"):
+        frozen_source_urls(proposal.source_snapshot_path)
+
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path / "registry_copy")
+    with pytest.raises(ParameterRecordAuthoringError, match="Frozen SABIO-RK source URL evidence"):
+        author_parameter_record(
+            source,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=_canonical_parameter_target(source),
+            registry_index=registry_index,
+        )
+
+
 def test_in_memory_result_is_directly_promotion_plan_compatible(tmp_path: Path) -> None:
     _, registry_index, _, authored = _author(tmp_path)
 
@@ -419,6 +451,141 @@ def test_written_outputs_are_deterministic_and_checksum_declared(tmp_path: Path)
     assert manifest["summary"]["authoring_digest"] == authored.authoring_digest
     for name, digest in manifest["files"].items():
         assert hashlib.sha256((first.output_directory / name).read_bytes()).hexdigest() == digest
+
+
+def test_rechecksummed_summary_cannot_claim_mutation_validation_or_simulation(
+    tmp_path: Path,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    bundle = authored.write(tmp_path / "forged_summary_safety")
+    manifest = json.loads(bundle.paths["curation_manifest"].read_text(encoding="utf-8"))
+    manifest["summary"].update(
+        {
+            "simulation_authorized": True,
+            "scientific_validation_claimed": True,
+            "production_registry_mutated": True,
+            "registry_mutated": True,
+        }
+    )
+    manifest["files"] = {
+        name: hashlib.sha256((bundle.output_directory / name).read_bytes()).hexdigest()
+        for name in manifest["files"]
+    }
+    bundle.paths["curation_manifest"].write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RegistryPromotionPlanError, match="closed parameter-only authoring summary"):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
+
+
+def test_bridge_shape_cannot_be_downgraded_to_generic_promotion_or_runtime_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    bundle = authored.write(tmp_path / "downgraded_bridge_bundle")
+    accepted, manifest = _bundle_payloads(bundle)
+    target = accepted["records"][0]
+    target["provenance"].pop(PARAMETER_BRIDGE_PROVENANCE_KEY)
+    target["allowed_use"] = "exploratory_simulation"
+    target["value"]["confidence_level"] = "literature_curated"
+    generic_summary_fields = {
+        "schema_version",
+        "source_query",
+        "source_snapshot_path",
+        "record_count",
+        "eligible_for_review_count",
+        "blocked_excluded_count",
+        "accepted_count",
+        "rejected_count",
+        "deferred_count",
+        "production_registry_mutated",
+        "scientific_validation_claimed",
+    }
+    manifest["summary"] = {
+        key: value for key, value in manifest["summary"].items() if key in generic_summary_fields
+    }
+    accepted_path = bundle.paths["accepted_registry_records"]
+    accepted_path.write_text(yaml.safe_dump(accepted, sort_keys=False), encoding="utf-8")
+    manifest["files"][accepted_path.name] = hashlib.sha256(accepted_path.read_bytes()).hexdigest()
+    bundle.paths["curation_manifest"].write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    registry_before = _registry_snapshot(registry_index.parent)
+
+    with pytest.raises(RegistryPromotionPlanError, match="authoring summary|source identity"):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
+    assert _registry_snapshot(registry_index.parent) == registry_before
+
+    with monkeypatch.context() as legacy_dispatch:
+        legacy_dispatch.setattr(
+            promotion_module,
+            "parameter_candidate_requires_authoring_contract",
+            lambda *_args, **_kwargs: False,
+        )
+        legacy_plan = plan_registry_promotion(
+            bundle.output_directory,
+            registry_index=registry_index,
+        )
+    with pytest.raises(RegistryPromotionApplyError, match="generic apply is forbidden"):
+        apply_registry_promotion(
+            legacy_plan,
+            confirmation_digest=legacy_plan.plan_digest,
+            new_registry_version="0.1.1",
+            registry_index=registry_index,
+        )
+    assert _registry_snapshot(registry_index.parent) == registry_before
+
+    curation = authored.records[0].to_dict()["curation"]
+    generic_record = replace(
+        authored.records[0],
+        proposed_record=deepcopy(target),
+        source_provenance=deepcopy(curation["source_provenance"]),
+    )
+    generic_result = CurationResult(
+        source_query=authored.source_query,
+        source_snapshot_path=authored.source_snapshot_path,
+        proposal_limitations=authored.proposal_limitations,
+        records=(generic_record,),
+    )
+    with pytest.raises(RegistryPromotionPlanError, match="require CuratorAuthoredParameterResult"):
+        plan_registry_promotion(generic_result, registry_index=registry_index)
+
+    parameters_path = registry_index.parent / "parameters" / "parameter_records.yml"
+    parameter_payload = yaml.safe_load(parameters_path.read_text(encoding="utf-8"))
+    toy_target = next(
+        item for item in parameter_payload["records"] if item["record_id"] == "toy_param_k_surface_exact"
+    )
+    toy_target["provenance"] = deepcopy(target["provenance"])
+    toy_target["maturity"] = "literature_processed"
+    toy_target["allowed_use"] = "exploratory_simulation"
+    parameters_path.write_text(yaml.safe_dump(parameter_payload, sort_keys=False), encoding="utf-8")
+    process_path = registry_index.parent / "processes" / "process_compatibility.yml"
+    process_payload = yaml.safe_load(process_path.read_text(encoding="utf-8"))
+    process_payload["records"][0]["required_parameters"] = [
+        "k_surface_exact",
+        "k_ads_exact",
+        "A_surface_exact",
+    ]
+    process_payload["records"][0]["parameter_roles"] = {
+        "surface_rate_constant": "k_surface_exact",
+        "adsorption_constant": "k_ads_exact",
+        "accessible_surface_area": "A_surface_exact",
+    }
+    process_path.write_text(yaml.safe_dump(process_payload, sort_keys=False), encoding="utf-8")
+    study = virtual_experiment(
+        fungi="toy_fungus_alpha",
+        substrates="toy_cellulose_like_solid",
+        environments="toy_lab_environment",
+        registry=registry_index,
+    )
+    report = study.preflight(mode="exploratory")[0]
+    assert any("curator-authoring source evidence" in item.message for item in report.incompatible)
+    with pytest.raises(VirtualExperimentError, match="curator-authoring source evidence"):
+        study.simulate(mode="exploratory", output_dir=tmp_path / "blocked_runtime", quicklook=False)
 
 
 def test_rechecksummed_authored_bundle_mutation_is_rejected_by_authoring_digest(
@@ -891,6 +1058,33 @@ def test_authoring_rejects_reserved_provenance_key_collisions(
     target["provenance"][reserved_key] = {"attacker_supplied": True}
 
     with pytest.raises(ParameterRecordAuthoringError, match="reserved provenance"):
+        author_parameter_record(
+            source,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=target,
+            registry_index=registry_index,
+        )
+
+
+@pytest.mark.parametrize(
+    "safety_field",
+    [
+        "production_registry_mutated",
+        "registry_mutated",
+        "scientific_validation_claimed",
+        "simulation_authorized",
+    ],
+)
+def test_authoring_rejects_outer_provenance_safety_claims(
+    tmp_path: Path,
+    safety_field: str,
+) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    target["provenance"][safety_field] = False
+
+    with pytest.raises(ParameterRecordAuthoringError, match="authoring-owned safety claims"):
         author_parameter_record(
             source,
             source_record_id=SOURCE_PARAMETER_ID,

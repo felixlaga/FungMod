@@ -106,6 +106,9 @@ def test_pr48_parameter_authoring_contract_is_synchronized() -> None:
     assert "Pre-PR-47 written schema `1.0.0`" in readme
     assert "`plan_digest`/`confirmation_digest`" in progress
     assert "simulation_authorized: false" in progress
+    assert "structural non-downgrade" in status
+    assert "Checksums prove internal consistency, not curator authorship" in status
+    assert "`Km` role to runtime key `km`" in progress
     for text in (readme, status, next_steps, roadmap, progress):
         assert "CURATION-001 remains" in text or "CURATION-001 stays" in text
         assert "source-to-production" in text

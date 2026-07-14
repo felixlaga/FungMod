@@ -44,6 +44,7 @@ from fungal_model.api.parameter_record_authoring import (
     CuratorAuthoredParameterResult,
     ParameterRecordAuthoringError,
     is_curator_authored_parameter_record,
+    parameter_candidate_requires_authoring_contract,
     validate_authored_parameter_against_registry,
     validate_parameter_authoring_bundle_record,
 )
@@ -1282,6 +1283,15 @@ def _validate_apply_candidate_set(plan: RegistryPromotionPlan) -> None:
     for candidate in plan.candidates:
         _validate_accepted_curation(candidate.record_id, candidate.curation_metadata)
         _validate_target_record(candidate.record_id, candidate.target_record)
+        if parameter_candidate_requires_authoring_contract(
+            candidate.record_type,
+            candidate.target_record,
+            candidate.curation_metadata,
+        ) and not is_curator_authored_parameter_record(candidate.target_record):
+            raise RegistryPromotionApplyError(
+                f"Parameter candidate {candidate.record_id!r} has intrinsic authoring evidence "
+                "but lacks the specialized bridge audit; generic apply is forbidden."
+            )
         _validate_source_identity_consistency(
             candidate.record_id,
             target_record=candidate.target_record,
@@ -1858,7 +1868,11 @@ def _accepted_records(
             except ParameterRecordAuthoringError as exc:
                 raise RegistryPromotionPlanError(str(exc)) from exc
         elif any(
-            is_curator_authored_parameter_record(item.proposed_record)
+            parameter_candidate_requires_authoring_contract(
+                item.record_type,
+                item.proposed_record,
+                item.to_dict()["curation"],
+            )
             for item in value.accepted_records
         ):
             raise RegistryPromotionPlanError(
@@ -1977,7 +1991,15 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
     has_parameter_authoring_summary = (
         isinstance(summary, Mapping) and summary.get("workflow") == PARAMETER_AUTHORING_WORKFLOW
     )
-    if has_parameter_authoring_record or has_parameter_authoring_summary:
+    requires_parameter_authoring = any(
+        parameter_candidate_requires_authoring_contract(
+            item.record_type,
+            item.target_record,
+            item.curation_metadata,
+        )
+        for item in accepted
+    )
+    if has_parameter_authoring_record or has_parameter_authoring_summary or requires_parameter_authoring:
         if len(accepted) != 1:
             raise RegistryPromotionPlanError(
                 "A written parameter-authoring bundle must contain exactly one accepted parameter target."

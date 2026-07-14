@@ -76,11 +76,23 @@ Completed in this pass:
   payload, bridge audit, and the deterministic report limitations section, with
   exact cross-representation checks. Public SHA256 checksums prove internal
   bundle consistency, not external curator identity or cryptographic authorship.
+- Closed the full authored summary key/value schema, including every mutation,
+  validation, simulation, provenance, and limitation claim, and compare it
+  against manifest, accepted payload, bridge audit, and report representations.
+  Removing removable workflow labels cannot downgrade a parameter candidate
+  whose intrinsic target/curation provenance still has the authoring shape;
+  planning rejects it, apply independently rejects a legacy/reconstructed
+  generic plan lacking the bridge audit, and the shared runtime authorization
+  predicate blocks an externally installed relabelled record.
+- Reconciled frozen SABIO metadata as one offline structure: page/request/URL
+  cardinality and immutable raw-page order, page numbers, URLs, regular files,
+  byte sizes, and checksums must agree. Collapsed multi-page metadata fails.
 - Bound source query, source snapshot path, proposal limitations, every
   original/source/normalized/converted/target value and unit representation,
   singular and plural source aliases, acceptance evidence, and every closed
   policy field into exact-key audit schemas and the result digest. Both
-  authoring-owned provenance keys are reserved and rejected on input.
+  authoring-owned provenance keys and outer mutation/validation/simulation
+  safety claims are reserved and rejected on input.
 - Made `registry_storage_only_no_simulation_authorization` one centralized,
   mode-independent authorization predicate used by modelability and every
   simulation parameter ranking/resolution path. Exploratory, scientific, and
@@ -111,8 +123,10 @@ PR-48 current scope, remaining CURATION-001 limits, and the PR-49 follow-up.
 What did not change: no production registry record or version, package version,
 curation decision semantics, promotion apply behavior, process law, solver,
 biology, parameter value/unit/maturity in `data_registry/`, validation data,
-calibration, or empirical comparison. The SABIO source adapter only adds exact
-frozen fetch URLs to proposal provenance; it performs no network access here.
+calibration, or empirical comparison. The SABIO source adapter performs no
+network access here. Its proposal payload now adds explicit `parameter_role`
+and normalizes the SABIO `Km` role to runtime key `km`, alongside exact frozen
+URL provenance; source values and units are unchanged.
 
 Scientific behavior impact: no new scientific result. The frozen SABIO case
 proves deterministic extraction, explicit identity mapping, provenance,
@@ -120,13 +134,18 @@ loader fidelity, and copied-registry planning only. It is not current/correct
 science, validation, calibration, prediction, transferability evidence, or
 simulation authorization.
 
-Backward compatibility: additive public API and result/error types. Existing
-curation, planning, and apply inputs retain their contracts. Records carrying
-the new reserved PARAMETER bridge marker receive additional authoring-digest
-and registry-context revalidation. Deliberate safety change: an exact
+Backward compatibility: the public API and result/error types are additive,
+but behavior is not purely additive. SABIO proposal payloads gain explicit
+`parameter_role`, with `Km` normalized to runtime role key `km`; malformed
+multi-page frozen metadata is newly rejected. Parameter candidates with the
+intrinsic authoring provenance shape require the specialized contract even if
+labels are removed, and outer provenance safety claims are rejected. Existing
+generic curation, planning, and apply inputs without that shape retain their
+contracts. Deliberate safety change: an exact
 `registry_storage_only_no_simulation_authorization` parameter is now rejected
 by modelability/preflight in every mode; behavior for other explicit
-`allowed_use` values is unchanged.
+`allowed_use` values remains unchanged unless the record carries intrinsic
+bridge-derived provenance, which never independently authorizes simulation.
 
 Remaining ambiguity and risk: nonidentity conversions require a separate
 closed conversion-method registry, unit parsing, dimensional compatibility,
@@ -148,11 +167,13 @@ written source bundle. Add no scientific transformation or registry mutation.
 
 Verification:
 
-- Focused authoring, source-provider, curation, modelability, and
-  VirtualExperiment suite: 166 passed in 10.42s.
-- Focused ensemble, case-builder, chain, promotion-plan, and promotion-apply
-  suite: 128 passed in 36.51s; roadmap status: 9 passed.
-- Canonical full pytest: 986 passed in 92.68s on the final code.
+- Focused authoring, source-provider, promotion-apply, direct chain, and roadmap
+  status suite: 171 passed in 28.59s.
+- Broader authoring, source, curation, promotion, modelability, ensemble,
+  case-builder, chain, and VirtualExperiment suite: 320 passed in 49.74s before
+  the final apply-time regression; the canonical suite below includes that
+  regression and all focused coverage.
+- Canonical full pytest: 994 passed in 93.90s on the final code.
 - Focused Ruff: passed.
 - Full Ruff: passed for `src` and `tests`.
 - Full Pyright with the shared venv interpreter selected explicitly: 0 errors,

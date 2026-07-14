@@ -51,6 +51,13 @@ def test_minimal_top_level_sabiork_call_uses_frozen_snapshot_without_key() -> No
     assert parameter["provenance"]["source_url"] == REACTION_618_SOURCE_URL
     assert parameter["provenance"]["source_urls"] == [REACTION_618_SOURCE_URL]
     assert parameter["parameter_role"] == "kcat"
+    km_parameter = next(
+        item
+        for item in proposal.proposed_records()["parameter_records"]
+        if item["parameter_symbol"] == "Km_cellobiose"
+        and item["provenance"]["source_entry_ids"] == ["35622"]
+    )
+    assert km_parameter["parameter_role"] == "km"
     assert frozen_source_urls(proposal.source_snapshot_path) == (REACTION_618_SOURCE_URL,)
     assert fungal_model.source_proposal is source_proposal
     assert "source_proposal" in fungal_model.__all__

@@ -17,6 +17,19 @@ def _tuple_of_strings(values: Sequence[Any] | None) -> tuple[str, ...]:
 
 CASE_TEMPLATE_SCHEMA_VERSION = "1"
 PARAMETER_ALLOWED_USE_STORAGE_ONLY = "registry_storage_only_no_simulation_authorization"
+_PARAMETER_AUTHORING_PROVENANCE_EVIDENCE_FIELDS = frozenset(
+    {
+        "source_entry_ids",
+        "source_reaction_ids",
+        "source_query",
+        "source_field",
+        "source_urls",
+        "source_snapshot_sha256",
+        "parameter_role",
+        "curator",
+        "curation_date",
+    }
+)
 CASE_TEMPLATE_ALLOWED_STATE_ROLES = frozenset(
     {
         "substrate",
@@ -390,7 +403,21 @@ def parameter_simulation_authorization_blocker(record: ParameterRecord) -> str |
 
     if record.allowed_use == PARAMETER_ALLOWED_USE_STORAGE_ONLY:
         return "Parameter allowed_use is storage-only and does not authorize simulation in any mode."
+    if parameter_provenance_requires_authoring_contract(record.provenance):
+        return (
+            "Parameter provenance carries curator-authoring source evidence, which does not "
+            "authorize simulation even if its outer allowed_use is changed."
+        )
     return None
+
+
+def parameter_provenance_requires_authoring_contract(provenance: Mapping[str, Any]) -> bool:
+    """Identify the intrinsic provenance shape owned by PARAMETER authoring."""
+
+    return (
+        "fungmod_parameter_bridge" in provenance
+        or bool(_PARAMETER_AUTHORING_PROVENANCE_EVIDENCE_FIELDS & set(provenance))
+    )
 
 
 def parameter_is_simulation_authorized(record: ParameterRecord) -> bool:
@@ -595,6 +622,7 @@ __all__ = [
     "ParameterRecord",
     "PARAMETER_ALLOWED_USE_STORAGE_ONLY",
     "parameter_is_simulation_authorized",
+    "parameter_provenance_requires_authoring_contract",
     "parameter_simulation_authorization_blocker",
     "ProcessCompatibilityRecord",
     "RegistryRecord",

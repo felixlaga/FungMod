@@ -403,7 +403,12 @@ plan = plan_registry_promotion(
 specialized result uses the existing deterministic, checksummed curation writer,
 and either that written bundle or the in-memory result is consumable by
 `plan_registry_promotion(...)` after authoring-digest, loader, registry-context,
-and selector revalidation. Registry context binds the index plus the complete
+selector, closed-summary, and cross-representation safety-envelope revalidation.
+Removing the bridge marker or specialized summary labels cannot downgrade a
+candidate with the intrinsic source/curator authoring provenance shape into a
+generic promotion; apply independently rejects a legacy or reconstructed
+generic plan with that shape but no bridge audit. Public checksums establish internal consistency only; they
+are not signatures or proof of curator authorship. Registry context binds the index plus the complete
 registry file tree; selector audit binds resolved entity classes, exactly one
 compatibility record, and the source/curator-authored runtime parameter-role
 key. The source/acceptance evidence remains audit
@@ -414,11 +419,14 @@ finite floats and type-exactly equal, units must be identical, and
 other record types, automatic apply, scientific validation, and simulation
 authorization remain explicitly unsupported, so CURATION-001 remains partial.
 The source adapter's `frozen_source_urls(...)` helper reads only adjacent local
-fetch metadata and performs no network access. The bridge revalidates that
-frozen URL identity during authoring and planning. One fetched URL requires the
+fetch metadata and performs no network access. It reconciles `total_pages`,
+`requests_made`, ordered `source_urls`, and, for immutable bundles, raw-page
+count/order/page numbers, URLs, regular-file paths, sizes, and checksums. The
+bridge revalidates that frozen URL identity during authoring and planning. One fetched URL requires the
 same singular `source_url`; multiple ordered URLs require `source_url=None` and
 the exact nonempty `source_urls` sequence. Its exact storage-only `allowed_use`
-is enforced by one shared predicate in modelability, parameter ranking, case
+and its intrinsic bridge-derived provenance shape are enforced by one shared
+predicate in modelability, parameter ranking, case
 assembly, ensemble runtime, and chain-template resolution in every supported
 mode, so an authored or later promoted record cannot authorize
 `VirtualExperiment.simulate(...)`.
@@ -766,7 +774,11 @@ live refresh is explicit and uses immutable query-specific bundles with raw
 page checksums and a separate derived combined export. Proposed product maps,
 parameter records, and process-compatibility records are written for human
 review under a proposal bundle; they are not silently committed into the
-simulation registry. Use
+simulation registry. SABIO parameter proposals now include an explicit
+`parameter_role` aligned with runtime compatibility roles; the SABIO `Km`
+symbol role is normalized to runtime key `km`. This changes proposal payloads
+in addition to preserving exact frozen source URLs, but does not change source
+values, units, process laws, or scientific maturity. Use
 `scripts/fetch_sabiork_kinlaw_entries.py` to freeze raw SABIO-RK exports and
 `scripts/propose_sabiork_source_records.py` to create review-only proposal
 artifacts from a frozen snapshot.

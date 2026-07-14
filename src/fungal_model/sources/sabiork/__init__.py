@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
 from collections.abc import Callable, Mapping, Sequence
@@ -1831,21 +1832,127 @@ def _source_002_provenance(
 
 
 def frozen_source_urls(source_snapshot_path: str) -> tuple[str, ...]:
-    """Read source URLs from local frozen-snapshot metadata without network access."""
+    """Validate and read ordered URLs from local frozen metadata without network access."""
 
     urls: list[str] = []
     for value in source_snapshot_path.split("; "):
-        metadata = _load_metadata(_metadata_path_for_export(Path(value)))
-        raw_urls = metadata.get("source_urls")
-        if raw_urls is None:
-            continue
-        if not isinstance(raw_urls, Sequence) or isinstance(raw_urls, (str, bytes)):
-            raise SabioRKSourceError("SABIO-RK fetch metadata source_urls must be a sequence.")
-        for url in raw_urls:
-            if not isinstance(url, str) or not url.strip():
-                raise SabioRKSourceError("SABIO-RK fetch metadata source_urls must contain nonblank URLs.")
-            urls.append(url)
-    return _unique_text(urls)
+        snapshot_path = Path(value)
+        _reject_frozen_metadata_symlinks(snapshot_path, label="SABIO-RK source snapshot")
+        metadata_path = _metadata_path_for_export(snapshot_path)
+        if metadata_path is None:
+            raise SabioRKSourceError(
+                f"SABIO-RK source snapshot lacks paired fetch metadata: {snapshot_path}"
+            )
+        _reject_frozen_metadata_symlinks(metadata_path, label="SABIO-RK fetch metadata")
+        if not metadata_path.is_file():
+            raise SabioRKSourceError(
+                f"SABIO-RK fetch metadata must be a regular file: {metadata_path}"
+            )
+        metadata = _load_metadata(metadata_path)
+        urls.extend(_validated_frozen_metadata_urls(metadata, metadata_path=metadata_path))
+    return tuple(urls)
+
+
+def _validated_frozen_metadata_urls(
+    metadata: Mapping[str, Any],
+    *,
+    metadata_path: Path,
+) -> tuple[str, ...]:
+    raw_urls = metadata.get("source_urls")
+    if (
+        not isinstance(raw_urls, Sequence)
+        or isinstance(raw_urls, (str, bytes))
+        or not raw_urls
+        or any(not isinstance(url, str) or not url.strip() for url in raw_urls)
+    ):
+        raise SabioRKSourceError(
+            "SABIO-RK fetch metadata source_urls must be an ordered nonempty sequence of URLs."
+        )
+    source_urls = tuple(raw_urls)
+    if len(source_urls) != len(set(source_urls)):
+        raise SabioRKSourceError("SABIO-RK fetch metadata source_urls must not repeat URLs.")
+
+    total_pages = metadata.get("total_pages")
+    requests_made = metadata.get("requests_made")
+    page = metadata.get("page")
+    if type(total_pages) is not int or total_pages < 1:
+        raise SabioRKSourceError("SABIO-RK fetch metadata total_pages must be a positive integer.")
+    if type(requests_made) is not int or requests_made < 1:
+        raise SabioRKSourceError("SABIO-RK fetch metadata requests_made must be a positive integer.")
+    if type(page) is not int or page != 1:
+        raise SabioRKSourceError("SABIO-RK frozen fetch metadata must start at page 1.")
+    if len(source_urls) != total_pages or requests_made != total_pages:
+        raise SabioRKSourceError(
+            "SABIO-RK frozen fetch metadata total_pages, requests_made, and source_urls disagree."
+        )
+
+    raw_pages = metadata.get("raw_pages")
+    immutable = metadata.get("immutable_snapshot_bundle")
+    if raw_pages is None:
+        if immutable is True or total_pages != 1:
+            raise SabioRKSourceError(
+                "SABIO-RK multi-page or immutable fetch metadata requires ordered raw_pages."
+            )
+        return source_urls
+    if immutable is not True:
+        raise SabioRKSourceError(
+            "SABIO-RK fetch metadata with raw_pages must declare immutable_snapshot_bundle: true."
+        )
+    if (
+        not isinstance(raw_pages, Sequence)
+        or isinstance(raw_pages, (str, bytes))
+        or len(raw_pages) != total_pages
+        or any(not isinstance(item, Mapping) for item in raw_pages)
+    ):
+        raise SabioRKSourceError(
+            "SABIO-RK fetch metadata raw_pages must match total_pages exactly."
+        )
+    for expected_page, (raw_page, source_url) in enumerate(
+        zip(raw_pages, source_urls, strict=True),
+        start=1,
+    ):
+        assert isinstance(raw_page, Mapping)
+        if raw_page.get("page") != expected_page or raw_page.get("source_url") != source_url:
+            raise SabioRKSourceError(
+                "SABIO-RK fetch metadata raw page order, page numbers, and URLs disagree."
+            )
+        _validate_frozen_raw_page(raw_page, metadata_path=metadata_path)
+    return source_urls
+
+
+def _validate_frozen_raw_page(raw_page: Mapping[str, Any], *, metadata_path: Path) -> None:
+    relative = raw_page.get("path")
+    digest = raw_page.get("sha256")
+    size_bytes = raw_page.get("size_bytes")
+    if not isinstance(relative, str) or not relative.strip():
+        raise SabioRKSourceError("SABIO-RK raw page metadata requires a nonblank path.")
+    relative_path = Path(relative)
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise SabioRKSourceError("SABIO-RK raw page metadata path must stay inside its bundle.")
+    path = metadata_path.parent / relative_path
+    _reject_frozen_metadata_symlinks(path, label="SABIO-RK raw page")
+    if not path.is_file():
+        raise SabioRKSourceError(f"SABIO-RK raw page must be a regular file: {path}")
+    body = path.read_bytes()
+    if (
+        not isinstance(digest, str)
+        or len(digest) != 64
+        or hashlib.sha256(body).hexdigest() != digest
+        or type(size_bytes) is not int
+        or size_bytes != len(body)
+    ):
+        raise SabioRKSourceError(
+            "SABIO-RK raw page size or checksum disagrees with frozen fetch metadata."
+        )
+
+
+def _reject_frozen_metadata_symlinks(path: Path, *, label: str) -> None:
+    absolute = path if path.is_absolute() else Path.cwd() / path
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink():
+            raise SabioRKSourceError(f"{label} contains a symlink component: {current}")
 
 
 def _source_002_enzyme_id(record: SabioRKReactionRecord) -> str:
