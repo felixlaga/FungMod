@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -9,6 +10,7 @@ import pytest
 import yaml
 
 from fungal_model.registry import (
+    ProcessComponentBinding,
     RegistryLoadError,
     RegistryLookupError,
     RegistryValidationError,
@@ -83,6 +85,104 @@ def test_load_toy_process_compatibility_record() -> None:
     assert records[0].product_map_required
     assert "k_surface_exact" in records[0].required_parameters
     assert records[0].parameter_roles["surface_rate_constant"] == "k_surface_exact"
+    assert "component_bindings" not in records[0].to_dict()
+
+
+def test_load_ordered_chain_component_compatibility_bindings() -> None:
+    registry = load_registry(REGISTRY_INDEX)
+    chain = registry.process_compatibility[
+        "bio002_cellulase_cellulose_film_extracellular_chain"
+    ]
+    assert [binding.to_dict() for binding in chain.component_bindings] == [
+        {
+            "process_template_id": "bio002_surface_cellulose_to_cellobiose",
+            "compatibility_record_id": "bio002_cellulase_cellulose_surface_component",
+        },
+        {
+            "process_template_id": "bio002_cellobiose_to_glucose_mm",
+            "compatibility_record_id": "bio002_beta_glucosidase_cellobiose_component",
+        },
+    ]
+
+
+def test_in_memory_component_binding_mutation_fails_registry_validation() -> None:
+    registry = load_registry(REGISTRY_INDEX)
+    record_id = "bio002_cellulase_cellulose_film_extracellular_chain"
+    outer = registry.process_compatibility[record_id]
+    whitespace_binding = replace(
+        outer,
+        component_bindings=(
+            ProcessComponentBinding(
+                process_template_id=" ",
+                compatibility_record_id="component",
+            ),
+        ),
+    )
+    assert not whitespace_binding.validate().passed
+
+    registry.process_compatibility[record_id] = replace(
+        outer,
+        component_bindings=cast(Any, ({"process_template_id": "step"},)),
+    )
+    with pytest.raises(RegistryValidationError, match="Invalid component bindings"):
+        registry.get_process_compatibility()
+
+
+@pytest.mark.parametrize(
+    ("bindings", "message"),
+    [
+        (None, "must be a sequence"),
+        ([None], "must be a mapping"),
+        ([{"process_template_id": "step"}], "must contain exactly"),
+        (
+            [
+                {
+                    "process_template_id": "step",
+                    "compatibility_record_id": "compatibility",
+                    "extra": True,
+                }
+            ],
+            "must contain exactly",
+        ),
+        (
+            [
+                {
+                    "process_template_id": " ",
+                    "compatibility_record_id": "compatibility",
+                }
+            ],
+            "must be nonblank text",
+        ),
+        (
+            [
+                {
+                    "process_template_id": "step",
+                    "compatibility_record_id": None,
+                }
+            ],
+            "must be nonblank text",
+        ),
+    ],
+)
+def test_component_compatibility_binding_loader_fails_closed(
+    tmp_path: Path,
+    bindings: Any,
+    message: str,
+) -> None:
+    registry_dir = _copy_registry(tmp_path)
+    path = registry_dir / "processes" / "process_compatibility.yml"
+    payload = _yaml_mapping(path)
+    records = cast(list[dict[str, Any]], payload["records"])
+    outer = next(
+        record
+        for record in records
+        if record["record_id"] == "bio002_cellulase_cellulose_film_extracellular_chain"
+    )
+    outer["component_bindings"] = bindings
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(RegistryLoadError, match=message):
+        load_registry(registry_dir / "registry_index.yml")
 
 
 def test_load_exact_range_distribution_and_unknown_parameter_records() -> None:

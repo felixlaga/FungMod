@@ -20,6 +20,7 @@ from fungal_model.registry.records import (
     PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY,
     PARAMETER_ALLOWED_USE_SCIENTIFIC,
     PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
+    ProcessComponentBinding,
     ProcessCompatibilityRecord,
     SubstrateRecord,
     _tuple_of_strings,
@@ -174,7 +175,52 @@ def _process_compatibility_record(data: Mapping[str, Any]) -> ProcessCompatibili
         parameter_roles={str(role): str(symbol) for role, symbol in parameter_roles.items()},
         product_map_required=bool(data.get("product_map_required", False)),
         case_template_id=str(data.get("case_template_id", "") or ""),
+        component_bindings=_process_component_bindings(data),
     )
+
+
+def _process_component_bindings(
+    data: Mapping[str, Any],
+) -> tuple[ProcessComponentBinding, ...]:
+    if "component_bindings" not in data:
+        return ()
+    value = data["component_bindings"]
+    if not isinstance(value, (list, tuple)):
+        raise RegistryLoadError("process_compatibility.component_bindings must be a sequence.")
+    bindings: list[ProcessComponentBinding] = []
+    expected_fields = {"process_template_id", "compatibility_record_id"}
+    for index, item in enumerate(value):
+        if not isinstance(item, Mapping):
+            raise RegistryLoadError(
+                f"process_compatibility.component_bindings[{index}] must be a mapping."
+            )
+        if set(item) != expected_fields:
+            raise RegistryLoadError(
+                f"process_compatibility.component_bindings[{index}] must contain exactly "
+                "process_template_id and compatibility_record_id."
+            )
+        process_template_id = item["process_template_id"]
+        compatibility_record_id = item["compatibility_record_id"]
+        if not isinstance(process_template_id, str) or not process_template_id.strip():
+            raise RegistryLoadError(
+                f"process_compatibility.component_bindings[{index}].process_template_id "
+                "must be nonblank text."
+            )
+        if (
+            not isinstance(compatibility_record_id, str)
+            or not compatibility_record_id.strip()
+        ):
+            raise RegistryLoadError(
+                f"process_compatibility.component_bindings[{index}].compatibility_record_id "
+                "must be nonblank text."
+            )
+        bindings.append(
+            ProcessComponentBinding(
+                process_template_id=process_template_id,
+                compatibility_record_id=compatibility_record_id,
+            )
+        )
+    return tuple(bindings)
 
 
 _COMMON_RECORD_FIELDS = {

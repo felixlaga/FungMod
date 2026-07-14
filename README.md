@@ -449,12 +449,18 @@ bridge/curation-evidence policies fail closed before ranking.
 Explicit CASE-001 chain mappings use their exact role-to-record IDs and one
 shared resolver across preflight, ensemble/public simulation, deterministic
 assembly, direct chain assembly, and result reconstruction. Each mapped role has
-an exact symbol and selector contract. Every component process independently
-declares its exact enzyme/substrate class pair in `component_selectors`; its
-process parameters and parameter-backed catalyst/substrate initial states must
-match that owning slot. Inventory membership or a mutually consistent group of
-rewritten role contracts is insufficient. Null-ID classes must still match the
-template's declared enzyme/substrate component inventory and target pairing.
+an exact symbol and selector contract. The outer process compatibility record
+binds each ordered process-template ID to one exact component compatibility
+record. Component `state_roles` then resolve through canonical `state_species`
+enzyme-entity or substrate IDs; classes derive from those declared entities and
+the registry, and must agree with enzyme capabilities and the bound component
+compatibility. Process parameters and parameter-backed catalyst/substrate
+initial states must match that independently resolved owning slot. Role/record
+selectors are assertions only, and `component_selectors` shadow metadata is
+rejected. Inventory membership or a mutually consistent rewrite of role
+contracts, records, and selector assertions is insufficient. Null record entity
+selectors may remain only where the record contract permits them; class
+assertions must still match the bound component identity.
 Component-process parameter ownership is derived from `process_templates`;
 initial-state roles declare a
 `record_process_type` scope without claiming a kinetic owner. Missing,

@@ -116,13 +116,18 @@ Completed in this pass:
   ensemble/public runtime, deterministic assembly, direct chain assembly, and
   result reconstruction. CASE-001 consumes its exact role-to-record IDs without
   fallback and rejects mapping, symbol, nonnegative/exact-or-sampleable value,
-  selector/component-inventory, environment, authorization, mode, and process
+  selector/component-identity, environment, authorization, mode, and process
   drift.
-  Each component process independently declares an exact enzyme/substrate class
-  pair in `component_selectors`; process parameters and parameter-backed
-  catalyst/substrate initial states must match that owning slot. This rejects a
-  coherent whole-role-group rewrite even when the rewritten role contracts and
-  records agree with each other and with some other declared component.
+  The outer process compatibility binds every ordered process-template ID to a
+  unique exact component compatibility record. Structural process `state_roles`
+  resolve through canonical `state_species` enzyme-entity or substrate IDs;
+  registry entities, enzyme capabilities, and the bound compatibility determine
+  each component's class pair, process, bond, and role-symbol authority.
+  Role/record selectors are assertions only, and `component_selectors` shadow
+  metadata is rejected. Process parameters and parameter-backed catalyst/
+  substrate initial states must match that independently resolved owning slot.
+  This rejects a coherent whole-role-group rewrite even when contracts, records,
+  and selector assertions are changed together.
   Kinetic role ownership is derived from component `process_templates` and
   conflicting metadata is rejected. Initial-state roles instead use an honest
   per-role record-scope contract; they do not claim a kinetic process owner.
@@ -190,8 +195,10 @@ by modelability/preflight in every mode. Parameter simulation admission now uses
 closed exact `allowed_use` sets, so prior ad hoc, empty, negative, or near-match
 strings no longer authorize a mode. Explicit chain templates with
 `parameter_record_ids` must also provide complete `parameter_role_contracts`;
-each component process must provide exact class-level `component_selectors`,
-and the old ownership-like `parameter_role_process_types` shape is rejected.
+the outer compatibility must provide exact ordered component-compatibility
+bindings, each parameter-backed component state must declare a canonical entity
+or substrate ID, role/record selectors are assertions only, and the old
+ownership-like `parameter_role_process_types` shape is rejected.
 CASE-001 initial-state records declare exact storage/reuse process scope, while
 kinetic owners are derived only from component process templates.
 
@@ -222,7 +229,7 @@ Verification:
   the final apply-time regression; the canonical suite below includes that
   regression and all focused coverage.
 - Ninth-pass exact-template/component-slot focused suite: 147 passed in 13.72s.
-- Canonical full pytest: 1084 passed in 189.04s on the final code.
+- Canonical full pytest: 1102 passed in 192.10s on the final code.
 - Focused Ruff: passed.
 - Full Ruff: passed for `src` and `tests`.
 - Full Pyright with the shared venv interpreter selected explicitly: 0 errors,

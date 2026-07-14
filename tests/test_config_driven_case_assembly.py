@@ -845,6 +845,10 @@ def _registry_with_bio002_product_inhibition(
     else:
         raise AssertionError("Missing BIO-002 chain template")
     template_path.write_text(yaml.safe_dump(template_data, sort_keys=False), encoding="utf-8")
+    _add_bio002_component_role_mappings(
+        registry_dir,
+        {"product_inhibition_constant": "K_i_bio003_product_fixture"},
+    )
 
     if include_ki_record:
         parameter_path = registry_dir / "parameters" / "parameter_records.yml"
@@ -966,6 +970,19 @@ def _registry_with_bio002_environment_modifiers(
     else:
         raise AssertionError("Missing BIO-002 chain template")
     template_path.write_text(yaml.safe_dump(template_data, sort_keys=False), encoding="utf-8")
+    if modifier_set == "temperature_ph":
+        component_roles = {
+            "activation_energy": "E_a_bio002_chain_env_fixture",
+            "reference_temperature": "T_ref_bio002_chain_env_fixture",
+            "ph_optimum": "pH_opt_bio002_chain_env_fixture",
+            "ph_width": "pH_width_bio002_chain_env_fixture",
+        }
+    else:
+        component_roles = {
+            "oxygen_half_saturation": "K_O2_bio002_chain_env_fixture",
+            "minimum_water_activity": "a_w_min_bio002_chain_env_fixture",
+        }
+    _add_bio002_component_role_mappings(registry_dir, component_roles)
 
     parameter_path = registry_dir / "parameters" / "parameter_records.yml"
     parameter_data = _yaml_mapping(parameter_path)
@@ -1394,6 +1411,28 @@ def _add_role_mapping(record: dict[str, Any], role: str, symbol: str) -> None:
     required_parameters = cast(list[str], record["required_parameters"])
     if symbol not in required_parameters:
         required_parameters.append(symbol)
+
+
+def _add_bio002_component_role_mappings(
+    registry_dir: Path,
+    mappings: dict[str, str],
+) -> None:
+    path = registry_dir / "processes" / "process_compatibility.yml"
+    data = _yaml_mapping(path)
+    records = cast(list[dict[str, Any]], data["records"])
+    component = next(
+        (
+            record
+            for record in records
+            if record["record_id"] == "bio002_beta_glucosidase_cellobiose_component"
+        ),
+        None,
+    )
+    if component is None:
+        raise AssertionError("Missing BIO-002 homogeneous component compatibility")
+    for role, symbol in mappings.items():
+        _add_role_mapping(component, role, symbol)
+    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
 
 def _set_reaction618_enzyme_concentration_exact(parameter_records: list[dict[str, Any]]) -> None:

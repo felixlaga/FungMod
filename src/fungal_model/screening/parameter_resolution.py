@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Literal, cast
+from dataclasses import dataclass
+from typing import Any, Literal
 
 from fungal_model.registry.records import (
     CaseTemplateRecord,
     ParameterRecord,
     ParameterRecordSelectionMode,
+    ProcessComponentBinding,
     ProcessCompatibilityRecord,
     parameter_record_mode_eligibility_blocker,
 )
@@ -23,11 +25,24 @@ _SELECTOR_FIELDS = (
     "substrate_id",
     "environment_id",
 )
-_COMPONENT_SELECTOR_FIELDS = ("enzyme_class", "substrate_class")
 _BASE_CONTRACT_FIELDS = frozenset(
     {"kind", "parameter_symbol", *_SELECTOR_FIELDS}
 )
 _INITIAL_CONTRACT_FIELDS = _BASE_CONTRACT_FIELDS | {"record_process_type"}
+
+
+@dataclass(frozen=True)
+class _StateComponent:
+    entity_type: str
+    entity_id: str
+    component_class: str
+
+
+@dataclass(frozen=True)
+class _ResolvedProcessComponent:
+    compatibility: ProcessCompatibilityRecord
+    enzyme: _StateComponent
+    substrate: _StateComponent
 
 
 class ExactTemplateParameterError(ValueError):
@@ -111,7 +126,12 @@ def resolve_exact_template_parameter_records(
         )
 
     initial_roles = _initial_parameter_roles(template)
-    process_owners, declared_process_types, process_components = _process_role_owners(
+    (
+        process_owners,
+        declared_process_types,
+        process_components,
+        process_templates,
+    ) = _process_role_owners(
         template,
         record_roles=frozenset(roles),
     )
@@ -134,11 +154,13 @@ def resolve_exact_template_parameter_records(
         )
         for role in roles
     }
-    _validate_template_component_contracts(
+    role_components = _validate_template_component_contracts(
+        registry=registry,
         template=template,
         compatibility=compatibility,
         contracts=role_contracts,
         process_components=process_components,
+        process_templates=process_templates,
     )
 
     resolved: dict[str, ParameterRecord] = {}
@@ -165,7 +187,7 @@ def resolve_exact_template_parameter_records(
             expected_process_type=(
                 str(contract["record_process_type"])
                 if contract["kind"] == "initial_state"
-                else process_owners[role]
+                else role_components[role].compatibility.process_type
             ),
             mode=mode,
             environment_id=environment_id,
@@ -199,7 +221,12 @@ def _process_role_owners(
     template: CaseTemplateRecord,
     *,
     record_roles: frozenset[str],
-) -> tuple[Mapping[str, str], frozenset[str], Mapping[str, Mapping[str, Any]]]:
+) -> tuple[
+    Mapping[str, str],
+    frozenset[str],
+    Mapping[str, Mapping[str, Any]],
+    tuple[Mapping[str, Any], ...],
+]:
     raw_templates = template.process_state_metadata.get("process_templates")
     if not isinstance(raw_templates, Sequence) or isinstance(raw_templates, (str, bytes)):
         raise ExactTemplateParameterError(
@@ -207,12 +234,32 @@ def _process_role_owners(
         )
     owners: dict[str, str] = {}
     owner_components: dict[str, Mapping[str, Any]] = {}
+    process_templates: list[Mapping[str, Any]] = []
+    process_ids: set[str] = set()
     declared = {template.process_type}
     for raw_template in raw_templates:
         if not isinstance(raw_template, Mapping):
             raise ExactTemplateParameterError(
                 f"Case template {template.case_template_id!r} contains a malformed process template."
             )
+        process_id = raw_template.get("id")
+        if not isinstance(process_id, str) or not process_id.strip():
+            raise ExactTemplateParameterError(
+                f"Case template {template.case_template_id!r} contains a process template "
+                "without a non-empty id."
+            )
+        if process_id in process_ids:
+            raise ExactTemplateParameterError(
+                f"Case template {template.case_template_id!r} declares process template "
+                f"id {process_id!r} more than once."
+            )
+        if "component_selectors" in raw_template:
+            raise ExactTemplateParameterError(
+                f"Case template process {process_id!r} must derive component identity from "
+                "component compatibility and state_species; component_selectors are unsupported."
+            )
+        process_ids.add(process_id)
+        process_templates.append(raw_template)
         process_type = raw_template.get("process_type")
         if not isinstance(process_type, str) or not process_type.strip():
             raise ExactTemplateParameterError(
@@ -243,7 +290,7 @@ def _process_role_owners(
                 )
             owners[role] = process_type
             owner_components[role] = raw_template
-    return owners, frozenset(declared), owner_components
+    return owners, frozenset(declared), owner_components, tuple(process_templates)
 
 
 def _nested_parameter_roles(value: Any, *, record_roles: frozenset[str]) -> set[str]:
@@ -266,12 +313,16 @@ def _nested_parameter_roles(value: Any, *, record_roles: frozenset[str]) -> set[
 
 def _validate_template_component_contracts(
     *,
+    registry: FungModRegistry,
     template: CaseTemplateRecord,
     compatibility: ProcessCompatibilityRecord | None,
     contracts: Mapping[str, Mapping[str, Any]],
     process_components: Mapping[str, Mapping[str, Any]],
-) -> None:
-    enzyme_targets, declared_substrates = _declared_template_components(template)
+    process_templates: Sequence[Mapping[str, Any]],
+) -> Mapping[str, _ResolvedProcessComponent]:
+    enzyme_targets, declared_substrates, enzyme_entities = _declared_template_components(
+        template
+    )
     for role, contract in contracts.items():
         enzyme_class = contract["enzyme_class"]
         substrate_class = contract["substrate_class"]
@@ -298,59 +349,74 @@ def _validate_template_component_contracts(
                 role=role,
             )
 
-    for role, component in process_components.items():
-        component_selectors = _component_selectors(component, role=role)
-        _validate_declared_component_pair(
-            role=role,
-            selectors=component_selectors,
+    state_components = _state_species_components(
+        registry=registry,
+        template=template,
+        enzyme_entities=enzyme_entities,
+    )
+    compatibility_by_process = _bound_component_compatibilities(
+        registry=registry,
+        template=template,
+        compatibility=compatibility,
+        process_templates=process_templates,
+    )
+    resolved_by_process: dict[str, _ResolvedProcessComponent] = {}
+    for process in process_templates:
+        process_id = str(process["id"])
+        resolved_by_process[process_id] = _resolve_process_component(
+            registry=registry,
+            template=template,
+            outer_compatibility=compatibility,
+            component=process,
+            compatibility=compatibility_by_process[process_id],
+            state_components=state_components,
             enzyme_targets=enzyme_targets,
             declared_substrates=declared_substrates,
         )
-        _require_exact_component_selectors(
+
+    role_components: dict[str, _ResolvedProcessComponent] = {}
+    for role, component in process_components.items():
+        process_id = str(component["id"])
+        resolved = resolved_by_process[process_id]
+        _require_component_assertions(
             role=role,
-            actual=contracts[role],
-            expected=component_selectors,
-            context="owning process",
-            selectors=_COMPONENT_SELECTOR_FIELDS,
+            contract=contracts[role],
+            component=component,
+            resolved=resolved,
         )
+        role_components[role] = resolved
+
+    for process in process_templates:
+        process_id = str(process["id"])
+        resolved = resolved_by_process[process_id]
         state_roles = _required_mapping(
-            component.get("state_roles"),
-            label=f"Component process for template role {role!r} state_roles",
+            process.get("state_roles"),
+            label=f"Component process {process_id!r} state_roles",
         )
-        _require_initial_slot_selectors(
+        _require_initial_state_binding(
             template=template,
             contracts=contracts,
-            process_role=role,
             state_role=state_roles.get("catalyst") or state_roles.get("enzyme"),
-            component_selectors=component_selectors,
-            selectors=_COMPONENT_SELECTOR_FIELDS,
+            resolved=resolved,
+            selectors=("enzyme_class", "substrate_class"),
         )
-        _require_initial_slot_selectors(
+        _require_initial_state_binding(
             template=template,
             contracts=contracts,
-            process_role=role,
             state_role=state_roles.get("substrate"),
-            component_selectors=component_selectors,
+            resolved=resolved,
             selectors=("substrate_class",),
         )
-        if compatibility is not None and state_roles.get("substrate") == "substrate":
-            expected_outer = {
-                "enzyme_class": compatibility.enzyme_class,
-                "substrate_class": compatibility.substrate_class,
-            }
-            for selector, expected in expected_outer.items():
-                if component_selectors[selector] != expected:
-                    raise ExactTemplateParameterError(
-                        f"Template role {role!r} is owned by the outer-substrate component "
-                        f"and requires {selector}={expected!r}, not "
-                        f"{component_selectors[selector]!r}.",
-                        role=role,
-                    )
+    return role_components
 
 
 def _declared_template_components(
     template: CaseTemplateRecord,
-) -> tuple[Mapping[str, frozenset[str]], frozenset[str]]:
+) -> tuple[
+    Mapping[str, frozenset[str]],
+    frozenset[str],
+    Mapping[str, str],
+]:
     entities = _required_mapping(
         template.process_state_metadata.get("entities"),
         label=f"Case template {template.case_template_id!r} entities",
@@ -363,12 +429,18 @@ def _declared_template_components(
         raise ExactTemplateParameterError("Exact template entities.substrates must be a sequence.")
 
     enzyme_targets: dict[str, frozenset[str]] = {}
+    enzyme_entities: dict[str, str] = {}
     declared_substrates: set[str] = set()
     for raw_enzyme in raw_enzymes:
         enzyme = _required_mapping(raw_enzyme, label="Exact template enzyme component")
         data = _required_mapping(enzyme.get("data"), label="Exact template enzyme component data")
+        entity_id = enzyme.get("id")
         enzyme_class = data.get("enzyme_class")
         targets = data.get("target_substrate_classes")
+        if not isinstance(entity_id, str) or not entity_id.strip():
+            raise ExactTemplateParameterError(
+                "Exact template enzyme components require a non-empty entity id."
+            )
         if not isinstance(enzyme_class, str) or not enzyme_class.strip():
             raise ExactTemplateParameterError(
                 "Exact template enzyme components require a non-empty enzyme_class."
@@ -388,7 +460,12 @@ def _declared_template_components(
             raise ExactTemplateParameterError(
                 f"Exact template declares enzyme_class {enzyme_class!r} more than once."
             )
+        if entity_id in enzyme_entities:
+            raise ExactTemplateParameterError(
+                f"Exact template declares enzyme entity id {entity_id!r} more than once."
+            )
         enzyme_targets[enzyme_class] = target_classes
+        enzyme_entities[entity_id] = enzyme_class
         declared_substrates.update(target_classes)
     for raw_substrate in raw_substrates:
         substrate = _required_mapping(raw_substrate, label="Exact template substrate component")
@@ -399,82 +476,320 @@ def _declared_template_components(
                 "Exact template substrate components require a non-empty chemical_class."
             )
         declared_substrates.add(substrate_class)
-    return enzyme_targets, frozenset(declared_substrates)
+    return enzyme_targets, frozenset(declared_substrates), enzyme_entities
 
 
-def _component_selectors(
-    component: Mapping[str, Any],
+def _state_species_components(
     *,
-    role: str,
-) -> Mapping[str, str]:
-    selectors = _required_mapping(
-        component.get("component_selectors"),
-        label=f"Component process for template role {role!r} component_selectors",
+    registry: FungModRegistry,
+    template: CaseTemplateRecord,
+    enzyme_entities: Mapping[str, str],
+) -> Mapping[str, _StateComponent]:
+    raw_bindings = _required_mapping(
+        template.process_state_metadata.get("state_species"),
+        label=f"Case template {template.case_template_id!r} state_species",
     )
-    if set(selectors) != set(_COMPONENT_SELECTOR_FIELDS):
-        raise ExactTemplateParameterError(
-            f"Component process for template role {role!r} component_selectors must "
-            "declare exact enzyme_class and substrate_class keys.",
-            role=role,
+    declared_states = frozenset(template.state_roles.values())
+    resolved: dict[str, _StateComponent] = {}
+    identities: set[tuple[str, str]] = set()
+    for state_name, raw_binding in raw_bindings.items():
+        if state_name not in declared_states:
+            raise ExactTemplateParameterError(
+                f"Case template state_species references undeclared state {state_name!r}."
+            )
+        binding = _required_mapping(
+            raw_binding,
+            label=f"Case template state_species.{state_name}",
         )
-    if any(
-        not isinstance(selectors[field], str) or not selectors[field].strip()
-        for field in _COMPONENT_SELECTOR_FIELDS
+        if set(binding) != {"species", "entity_type"}:
+            raise ExactTemplateParameterError(
+                f"Case template state_species.{state_name} must contain exactly "
+                "species and entity_type."
+            )
+        species = binding["species"]
+        entity_type = binding["entity_type"]
+        if not isinstance(species, str) or not species.strip():
+            raise ExactTemplateParameterError(
+                f"Case template state_species.{state_name}.species must be nonblank text."
+            )
+        if entity_type not in {"enzyme", "substrate"}:
+            raise ExactTemplateParameterError(
+                f"Case template state_species.{state_name}.entity_type must be "
+                "'enzyme' or 'substrate'."
+            )
+        identity = (entity_type, species)
+        if identity in identities:
+            raise ExactTemplateParameterError(
+                f"Case template state_species reuses {entity_type} identity {species!r} "
+                "for multiple state slots."
+            )
+        identities.add(identity)
+        if entity_type == "enzyme":
+            enzyme_class = enzyme_entities.get(species)
+            if enzyme_class is None:
+                raise ExactTemplateParameterError(
+                    f"Case template state {state_name!r} references undeclared enzyme "
+                    f"entity {species!r}."
+                )
+            if enzyme_class not in registry.enzyme_classes:
+                raise ExactTemplateParameterError(
+                    f"Case template enzyme entity {species!r} resolves to missing registry "
+                    f"enzyme class {enzyme_class!r}."
+                )
+            component_class = enzyme_class
+        else:
+            substrate = registry.substrates.get(species)
+            if substrate is None:
+                raise ExactTemplateParameterError(
+                    f"Case template state {state_name!r} references missing registry "
+                    f"substrate {species!r}."
+                )
+            component_class = substrate.substrate_class
+        resolved[state_name] = _StateComponent(
+            entity_type=entity_type,
+            entity_id=species,
+            component_class=component_class,
+        )
+    return resolved
+
+
+def _bound_component_compatibilities(
+    *,
+    registry: FungModRegistry,
+    template: CaseTemplateRecord,
+    compatibility: ProcessCompatibilityRecord | None,
+    process_templates: Sequence[Mapping[str, Any]],
+) -> Mapping[str, ProcessCompatibilityRecord]:
+    if compatibility is None:
+        raise ExactTemplateParameterError(
+            f"Case template {template.case_template_id!r} requires one outer process "
+            "compatibility with ordered component_bindings."
+        )
+    registered = registry.process_compatibility.get(compatibility.record_id)
+    if registered != compatibility:
+        raise ExactTemplateParameterError(
+            f"Compatibility {compatibility.record_id!r} disagrees with the active registry."
+        )
+    if not isinstance(compatibility.component_bindings, tuple) or any(
+        not isinstance(binding, ProcessComponentBinding)
+        for binding in compatibility.component_bindings
     ):
         raise ExactTemplateParameterError(
-            f"Component process for template role {role!r} component_selectors values "
-            "must be non-empty strings.",
-            role=role,
+            f"Compatibility {compatibility.record_id!r} component_bindings must be an "
+            "immutable sequence of ProcessComponentBinding values."
         )
-    return cast(Mapping[str, str], selectors)
+    expected_process_ids = tuple(str(process["id"]) for process in process_templates)
+    actual_process_ids = tuple(
+        binding.process_template_id for binding in compatibility.component_bindings
+    )
+    if actual_process_ids != expected_process_ids:
+        raise ExactTemplateParameterError(
+            f"Compatibility {compatibility.record_id!r} component_bindings must cover "
+            "the exact ordered process-template IDs."
+        )
+    compatibility_ids = tuple(
+        binding.compatibility_record_id for binding in compatibility.component_bindings
+    )
+    if len(set(compatibility_ids)) != len(compatibility_ids):
+        raise ExactTemplateParameterError(
+            f"Compatibility {compatibility.record_id!r} component_bindings must use "
+            "unique component compatibility records."
+        )
+    resolved: dict[str, ProcessCompatibilityRecord] = {}
+    for process, binding in zip(process_templates, compatibility.component_bindings, strict=True):
+        component = registry.process_compatibility.get(binding.compatibility_record_id)
+        if component is None:
+            raise ExactTemplateParameterError(
+                f"Component binding for process {binding.process_template_id!r} references "
+                f"missing compatibility {binding.compatibility_record_id!r}."
+            )
+        if (
+            component.record_id == compatibility.record_id
+            or component.component_bindings
+            or component.case_template_id
+        ):
+            raise ExactTemplateParameterError(
+                f"Component compatibility {component.record_id!r} must be a non-nested "
+                "component authority without a case_template_id."
+            )
+        if component.process_type != process["process_type"]:
+            raise ExactTemplateParameterError(
+                f"Process template {binding.process_template_id!r} requires process_type "
+                f"{component.process_type!r} from its component compatibility, not "
+                f"{process['process_type']!r}."
+            )
+        resolved[binding.process_template_id] = component
+    return resolved
 
 
-def _validate_declared_component_pair(
+def _resolve_process_component(
     *,
-    role: str,
-    selectors: Mapping[str, str],
+    registry: FungModRegistry,
+    template: CaseTemplateRecord,
+    outer_compatibility: ProcessCompatibilityRecord | None,
+    component: Mapping[str, Any],
+    compatibility: ProcessCompatibilityRecord,
+    state_components: Mapping[str, _StateComponent],
     enzyme_targets: Mapping[str, frozenset[str]],
     declared_substrates: frozenset[str],
-) -> None:
-    enzyme_class = selectors["enzyme_class"]
-    substrate_class = selectors["substrate_class"]
+) -> _ResolvedProcessComponent:
+    process_id = str(component["id"])
+    state_roles = _required_mapping(
+        component.get("state_roles"),
+        label=f"Component process {process_id!r} state_roles",
+    )
+    catalyst_fields = tuple(field for field in ("catalyst", "enzyme") if field in state_roles)
+    if len(catalyst_fields) != 1:
+        raise ExactTemplateParameterError(
+            f"Component process {process_id!r} must declare exactly one catalyst or enzyme state role."
+        )
+    enzyme = _state_component_for_process_field(
+        template=template,
+        state_components=state_components,
+        process_id=process_id,
+        process_field=catalyst_fields[0],
+        state_role=state_roles[catalyst_fields[0]],
+        expected_entity_type="enzyme",
+    )
+    substrate = _state_component_for_process_field(
+        template=template,
+        state_components=state_components,
+        process_id=process_id,
+        process_field="substrate",
+        state_role=state_roles.get("substrate"),
+        expected_entity_type="substrate",
+    )
     if (
-        enzyme_class not in enzyme_targets
-        or substrate_class not in declared_substrates
-        or substrate_class not in enzyme_targets[enzyme_class]
+        compatibility.enzyme_class != enzyme.component_class
+        or compatibility.substrate_class != substrate.component_class
     ):
         raise ExactTemplateParameterError(
-            f"Template role {role!r} component selector pair enzyme_class="
-            f"{enzyme_class!r}, substrate_class={substrate_class!r} is not an exact "
-            "declared template component pair.",
-            role=role,
+            f"Process template {process_id!r} state identities require component pair "
+            f"{enzyme.component_class!r}/{substrate.component_class!r}, but compatibility "
+            f"{compatibility.record_id!r} declares {compatibility.enzyme_class!r}/"
+            f"{compatibility.substrate_class!r}."
         )
+    if (
+        enzyme.component_class not in enzyme_targets
+        or substrate.component_class not in declared_substrates
+        or substrate.component_class not in enzyme_targets[enzyme.component_class]
+    ):
+        raise ExactTemplateParameterError(
+            f"Process template {process_id!r} state identity pair is not an exact declared "
+            "template enzyme/substrate target pair."
+        )
+    capability = registry.enzyme_classes[enzyme.component_class]
+    if substrate.component_class not in capability.compatible_substrate_classes:
+        raise ExactTemplateParameterError(
+            f"Registry enzyme class {enzyme.component_class!r} does not authorize substrate "
+            f"class {substrate.component_class!r}."
+        )
+    if compatibility.process_type not in capability.compatible_processes:
+        raise ExactTemplateParameterError(
+            f"Registry enzyme class {enzyme.component_class!r} does not authorize process "
+            f"type {compatibility.process_type!r}."
+        )
+    substrate_record = registry.substrates[substrate.entity_id]
+    required_bonds = frozenset(compatibility.required_bond_classes)
+    if not required_bonds.issubset(capability.target_bond_classes) or not required_bonds.issubset(
+        substrate_record.bond_classes
+    ):
+        raise ExactTemplateParameterError(
+            f"Component compatibility {compatibility.record_id!r} bond requirements do not "
+            "resolve through the bound enzyme/substrate registry capabilities."
+        )
+    if outer_compatibility is not None and state_roles.get("substrate") == "substrate":
+        if (
+            enzyme.component_class != outer_compatibility.enzyme_class
+            or substrate.component_class != outer_compatibility.substrate_class
+        ):
+            raise ExactTemplateParameterError(
+                f"Outer process component {process_id!r} disagrees with compatibility "
+                f"{outer_compatibility.record_id!r}."
+            )
+    return _ResolvedProcessComponent(
+        compatibility=compatibility,
+        enzyme=enzyme,
+        substrate=substrate,
+    )
 
 
-def _require_exact_component_selectors(
+def _state_component_for_process_field(
+    *,
+    template: CaseTemplateRecord,
+    state_components: Mapping[str, _StateComponent],
+    process_id: str,
+    process_field: str,
+    state_role: Any,
+    expected_entity_type: str,
+) -> _StateComponent:
+    if not isinstance(state_role, str) or state_role not in template.state_roles:
+        raise ExactTemplateParameterError(
+            f"Component process {process_id!r} field {process_field!r} must reference an "
+            "exact template state role."
+        )
+    state_name = template.state_roles[state_role]
+    component = state_components.get(state_name)
+    if component is None:
+        raise ExactTemplateParameterError(
+            f"Component process {process_id!r} state {state_name!r} lacks a canonical "
+            "state_species identity."
+        )
+    if component.entity_type != expected_entity_type:
+        article = "an" if expected_entity_type == "enzyme" else "a"
+        raise ExactTemplateParameterError(
+            f"Component process {process_id!r} field {process_field!r} requires {article} "
+            f"{expected_entity_type} state identity, not {component.entity_type!r}."
+        )
+    return component
+
+
+def _require_component_assertions(
     *,
     role: str,
-    actual: Mapping[str, Any],
-    expected: Mapping[str, str],
-    context: str,
-    selectors: Sequence[str],
+    contract: Mapping[str, Any],
+    component: Mapping[str, Any],
+    resolved: _ResolvedProcessComponent,
 ) -> None:
-    for selector in selectors:
-        if actual[selector] != expected[selector]:
+    expected = {
+        "enzyme_class": resolved.enzyme.component_class,
+        "substrate_class": resolved.substrate.component_class,
+    }
+    for selector, value in expected.items():
+        if contract[selector] != value:
             raise ExactTemplateParameterError(
-                f"Template role {role!r} {selector}={actual[selector]!r} disagrees "
-                f"with its {context} component selector {expected[selector]!r}.",
+                f"Template role {role!r} assertion {selector}={contract[selector]!r} "
+                f"disagrees with bound component value {value!r}.",
                 role=role,
             )
+    symbol = contract["parameter_symbol"]
+    compatibility_symbols = tuple(resolved.compatibility.parameter_roles.values())
+    if compatibility_symbols.count(symbol) != 1:
+        raise ExactTemplateParameterError(
+            f"Template role {role!r} symbol {symbol!r} is not exactly bound by component "
+            f"compatibility {resolved.compatibility.record_id!r}.",
+            role=role,
+        )
+    parameter_roles = _required_mapping(
+        component.get("parameter_roles"),
+        label=f"Component process {component['id']!r} parameter_roles",
+    )
+    for process_field, template_role in parameter_roles.items():
+        if template_role == role:
+            if resolved.compatibility.parameter_roles.get(process_field) != symbol:
+                raise ExactTemplateParameterError(
+                    f"Template role {role!r} symbol disagrees with exact component "
+                    f"compatibility role {process_field!r}.",
+                    role=role,
+                )
 
 
-def _require_initial_slot_selectors(
+def _require_initial_state_binding(
     *,
     template: CaseTemplateRecord,
     contracts: Mapping[str, Mapping[str, Any]],
-    process_role: str,
     state_role: Any,
-    component_selectors: Mapping[str, str],
+    resolved: _ResolvedProcessComponent,
     selectors: Sequence[str],
 ) -> None:
     if not isinstance(state_role, str):
@@ -485,13 +800,35 @@ def _require_initial_slot_selectors(
     initial_role = initial_spec.get("parameter_role")
     if not isinstance(initial_role, str) or initial_role not in contracts:
         return
-    _require_exact_component_selectors(
-        role=initial_role,
-        actual=contracts[initial_role],
-        expected=component_selectors,
-        context=f"process role {process_role!r}",
-        selectors=selectors,
-    )
+    contract = contracts[initial_role]
+    expected = {
+        "enzyme_class": resolved.enzyme.component_class,
+        "substrate_class": resolved.substrate.component_class,
+    }
+    for selector in selectors:
+        if contract[selector] != expected[selector]:
+            raise ExactTemplateParameterError(
+                f"Initial-state role {initial_role!r} assertion {selector}="
+                f"{contract[selector]!r} disagrees with bound component value "
+                f"{expected[selector]!r}.",
+                role=initial_role,
+            )
+    symbol = contract["parameter_symbol"]
+    if tuple(resolved.compatibility.parameter_roles.values()).count(symbol) != 1:
+        raise ExactTemplateParameterError(
+            f"Initial-state role {initial_role!r} symbol {symbol!r} is not exactly bound "
+            f"by component compatibility {resolved.compatibility.record_id!r}.",
+            role=initial_role,
+        )
+    if contract["record_process_type"] not in {
+        template.process_type,
+        resolved.compatibility.process_type,
+    }:
+        raise ExactTemplateParameterError(
+            f"Initial-state role {initial_role!r} record_process_type must be the outer "
+            "template or its bound component process type.",
+            role=initial_role,
+        )
 
 
 def _role_contract(

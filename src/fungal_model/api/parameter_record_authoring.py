@@ -1398,12 +1398,17 @@ def _resolve_parameter_compatibility(
         )
     if loaded.environment_id is not None:
         _registry_lookup(registry.get_environment, loaded.environment_id)
+    try:
+        candidates = registry.get_process_compatibility(
+            substrate_class=effective_substrate_class,
+            process_type=loaded.process_type,
+        )
+    except RegistryLookupError:
+        candidates = ()
     matches = tuple(
         item
-        for item in registry.process_compatibility.values()
-        if item.process_type == loaded.process_type
-        and item.enzyme_class in effective_enzyme_classes
-        and item.substrate_class == effective_substrate_class
+        for item in candidates
+        if item.enzyme_class in effective_enzyme_classes
         and loaded.parameter_symbol in item.required_parameters
         and item.parameter_roles.get(parameter_role) == loaded.parameter_symbol
         and tuple(

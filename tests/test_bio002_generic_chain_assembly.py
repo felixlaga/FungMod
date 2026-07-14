@@ -120,7 +120,7 @@ def test_artificial_chain_rejects_coherent_whole_component_role_group_swap(
     _coherently_swap_generic_second_component(registry_dir)
     registry = load_registry(registry_dir / "registry_index.yml")
 
-    with pytest.raises(EnzymeChainAssemblyError, match="component selector"):
+    with pytest.raises(EnzymeChainAssemblyError, match="reuses substrate identity"):
         build_extracellular_enzyme_chain_config(
             registry=registry,
             template_id=GENERIC_TEMPLATE_ID,
@@ -325,6 +325,26 @@ def _insert_generic_chain_fixture(registry_dir: Path) -> None:
     cast(list[dict[str, Any]], parameter_data["records"])[0:0] = _generic_chain_parameters()
     parameter_path.write_text(yaml.safe_dump(parameter_data, sort_keys=False), encoding="utf-8")
 
+    enzyme_path = registry_dir / "enzymes" / "enzyme_classes.yml"
+    enzyme_data = _yaml_mapping(enzyme_path)
+    cast(list[dict[str, Any]], enzyme_data["records"])[0:0] = _generic_enzyme_classes()
+    enzyme_path.write_text(yaml.safe_dump(enzyme_data, sort_keys=False), encoding="utf-8")
+
+    substrate_path = registry_dir / "substrates" / "substrates.yml"
+    substrate_data = _yaml_mapping(substrate_path)
+    cast(list[dict[str, Any]], substrate_data["records"])[0:0] = _generic_substrates()
+    substrate_path.write_text(yaml.safe_dump(substrate_data, sort_keys=False), encoding="utf-8")
+
+    compatibility_path = registry_dir / "processes" / "process_compatibility.yml"
+    compatibility_data = _yaml_mapping(compatibility_path)
+    cast(list[dict[str, Any]], compatibility_data["records"])[0:0] = (
+        _generic_process_compatibilities()
+    )
+    compatibility_path.write_text(
+        yaml.safe_dump(compatibility_data, sort_keys=False),
+        encoding="utf-8",
+    )
+
 
 def _generic_chain_template() -> dict[str, Any]:
     return {
@@ -392,6 +412,32 @@ def _generic_chain_template() -> dict[str, Any]:
             "config_maturity": "framework_benchmark",
             "public_path": False,
             "entities": _generic_chain_entities(),
+            "state_species": {
+                "polymer_x_pool": {
+                    "species": "polymer_x_fixture",
+                    "entity_type": "substrate",
+                },
+                "oligomer_y_pool": {
+                    "species": "oligomer_y_fixture",
+                    "entity_type": "substrate",
+                },
+                "fragment_q_pool": {
+                    "species": "fragment_q_fixture",
+                    "entity_type": "substrate",
+                },
+                "catalyst_alpha_pool": {
+                    "species": "catalyst_alpha_fixture",
+                    "entity_type": "enzyme",
+                },
+                "catalyst_beta_pool": {
+                    "species": "catalyst_beta_fixture",
+                    "entity_type": "enzyme",
+                },
+                "catalyst_gamma_pool": {
+                    "species": "catalyst_gamma_fixture",
+                    "entity_type": "enzyme",
+                },
+            },
             "parameter_record_ids": {
                 "x_initial": "fixture_x_initial_concentration",
                 "alpha_initial": "fixture_alpha_initial_concentration",
@@ -437,10 +483,6 @@ def _generic_chain_template() -> dict[str, Any]:
                 {
                     "id": "x_surface_to_y_fixture",
                     "process_type": "surface_catalysis",
-                    "component_selectors": {
-                        "enzyme_class": "catalyst_alpha_fixture",
-                        "substrate_class": "polymer_x_fixture",
-                    },
                     "state_roles": {
                         "substrate": "substrate",
                         "catalyst": "surface_catalyst",
@@ -462,10 +504,6 @@ def _generic_chain_template() -> dict[str, Any]:
                 {
                     "id": "y_to_q_homogeneous_fixture",
                     "process_type": "homogeneous_michaelis_menten",
-                    "component_selectors": {
-                        "enzyme_class": "catalyst_beta_fixture",
-                        "substrate_class": "oligomer_y_fixture",
-                    },
                     "state_roles": {
                         "substrate": "intermediate_1",
                         "product": "intermediate_2",
@@ -479,10 +517,6 @@ def _generic_chain_template() -> dict[str, Any]:
                 {
                     "id": "q_to_z_homogeneous_fixture",
                     "process_type": "homogeneous_michaelis_menten",
-                    "component_selectors": {
-                        "enzyme_class": "catalyst_gamma_fixture",
-                        "substrate_class": "fragment_q_fixture",
-                    },
                     "state_roles": {
                         "substrate": "intermediate_2",
                         "product": "product",
@@ -689,6 +723,201 @@ def _generic_chain_entities() -> dict[str, Any]:
     }
 
 
+def _generic_enzyme_classes() -> list[dict[str, Any]]:
+    return [
+        _generic_enzyme_class(
+            record_id="catalyst_alpha_fixture",
+            substrate_class="polymer_x_fixture",
+            bond_class="fixture_linkage_x",
+            process_type="surface_catalysis",
+        ),
+        _generic_enzyme_class(
+            record_id="catalyst_beta_fixture",
+            substrate_class="oligomer_y_fixture",
+            bond_class="fixture_linkage_y",
+            process_type="homogeneous_michaelis_menten",
+        ),
+        _generic_enzyme_class(
+            record_id="catalyst_gamma_fixture",
+            substrate_class="fragment_q_fixture",
+            bond_class="fixture_linkage_q",
+            process_type="homogeneous_michaelis_menten",
+        ),
+    ]
+
+
+def _generic_enzyme_class(
+    *,
+    record_id: str,
+    substrate_class: str,
+    bond_class: str,
+    process_type: str,
+) -> dict[str, Any]:
+    return {
+        "record_id": record_id,
+        "name": f"Artificial enzyme class {record_id}",
+        "maturity": "toy_development",
+        "provenance": {
+            "source": "BIO-002 genericity test fixture",
+            "confidence_level": "testing",
+            "notes": "Artificial capability metadata for software tests only.",
+        },
+        "target_bond_classes": [bond_class],
+        "compatible_substrate_classes": [substrate_class],
+        "compatible_processes": [process_type],
+        "notes": "Artificial enzyme capability; not scientific evidence.",
+    }
+
+
+def _generic_substrates() -> list[dict[str, Any]]:
+    return [
+        _generic_substrate(
+            record_id="polymer_x_fixture",
+            bond_class="fixture_linkage_x",
+            product="oligomer_y_fixture",
+        ),
+        _generic_substrate(
+            record_id="oligomer_y_fixture",
+            bond_class="fixture_linkage_y",
+            product="fragment_q_fixture",
+        ),
+        _generic_substrate(
+            record_id="fragment_q_fixture",
+            bond_class="fixture_linkage_q",
+            product="monomer_z_fixture",
+        ),
+    ]
+
+
+def _generic_substrate(
+    *,
+    record_id: str,
+    bond_class: str,
+    product: str,
+) -> dict[str, Any]:
+    return {
+        "record_id": record_id,
+        "name": f"Artificial substrate {record_id}",
+        "maturity": "toy_development",
+        "provenance": {
+            "source": "BIO-002 genericity test fixture",
+            "confidence_level": "testing",
+            "notes": "Artificial substrate identity for software tests only.",
+        },
+        "substrate_class": record_id,
+        "physical_state": "artificial_fixture",
+        "bond_classes": [bond_class],
+        "products": [product],
+        "properties": {},
+        "notes": "Artificial substrate record; not scientific evidence.",
+    }
+
+
+def _generic_process_compatibilities() -> list[dict[str, Any]]:
+    specs = _generic_parameter_specs()
+    symbols = {role: spec["symbol"] for role, spec in specs.items()}
+    return [
+        _generic_compatibility(
+            record_id="fixture_three_step_chain_compatibility",
+            enzyme_class="catalyst_alpha_fixture",
+            substrate_class="polymer_x_fixture",
+            bond_class="fixture_linkage_x",
+            process_type="extracellular_enzyme_chain",
+            parameter_roles=symbols,
+            case_template_id=GENERIC_TEMPLATE_ID,
+            component_bindings=[
+                {
+                    "process_template_id": "x_surface_to_y_fixture",
+                    "compatibility_record_id": "fixture_x_surface_component",
+                },
+                {
+                    "process_template_id": "y_to_q_homogeneous_fixture",
+                    "compatibility_record_id": "fixture_y_to_q_component",
+                },
+                {
+                    "process_template_id": "q_to_z_homogeneous_fixture",
+                    "compatibility_record_id": "fixture_q_to_z_component",
+                },
+            ],
+        ),
+        _generic_compatibility(
+            record_id="fixture_x_surface_component",
+            enzyme_class="catalyst_alpha_fixture",
+            substrate_class="polymer_x_fixture",
+            bond_class="fixture_linkage_x",
+            process_type="surface_catalysis",
+            parameter_roles={
+                "substrate_initial_amount": symbols["x_initial"],
+                "enzyme_initial_concentration": symbols["alpha_initial"],
+                "surface_rate_constant": symbols["surface_rate_constant"],
+                "adsorption_constant": symbols["adsorption_constant"],
+                "accessible_surface_area": symbols["accessible_surface_area"],
+            },
+        ),
+        _generic_compatibility(
+            record_id="fixture_y_to_q_component",
+            enzyme_class="catalyst_beta_fixture",
+            substrate_class="oligomer_y_fixture",
+            bond_class="fixture_linkage_y",
+            process_type="homogeneous_michaelis_menten",
+            parameter_roles={
+                "enzyme_initial_concentration": symbols["beta_initial"],
+                "km": symbols["km_y_to_q"],
+                "kcat": symbols["kcat_y_to_q"],
+            },
+        ),
+        _generic_compatibility(
+            record_id="fixture_q_to_z_component",
+            enzyme_class="catalyst_gamma_fixture",
+            substrate_class="fragment_q_fixture",
+            bond_class="fixture_linkage_q",
+            process_type="homogeneous_michaelis_menten",
+            parameter_roles={
+                "enzyme_initial_concentration": symbols["gamma_initial"],
+                "km": symbols["km_q_to_z"],
+                "kcat": symbols["kcat_q_to_z"],
+                "inhibition_constant": symbols["terminal_inhibition_constant"],
+            },
+        ),
+    ]
+
+
+def _generic_compatibility(
+    *,
+    record_id: str,
+    enzyme_class: str,
+    substrate_class: str,
+    bond_class: str,
+    process_type: str,
+    parameter_roles: dict[str, str],
+    case_template_id: str | None = None,
+    component_bindings: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    record = {
+        "record_id": record_id,
+        "name": f"Artificial process compatibility {record_id}",
+        "maturity": "toy_development",
+        "provenance": {
+            "source": "BIO-002 genericity test fixture",
+            "confidence_level": "testing",
+            "notes": "Artificial component compatibility for software tests only.",
+        },
+        "enzyme_class": enzyme_class,
+        "substrate_class": substrate_class,
+        "required_bond_classes": [bond_class],
+        "process_type": process_type,
+        "required_parameters": list(parameter_roles.values()),
+        "parameter_roles": parameter_roles,
+        "product_map_required": True,
+        "notes": "Artificial compatibility record; not scientific evidence.",
+    }
+    if case_template_id is not None:
+        record["case_template_id"] = case_template_id
+    if component_bindings is not None:
+        record["component_bindings"] = component_bindings
+    return record
+
+
 def _generic_chain_parameters() -> list[dict[str, Any]]:
     return [
         _parameter(**spec)
@@ -835,8 +1064,28 @@ def _coherently_swap_generic_second_component(registry_dir: Path) -> None:
     )
     for role in role_record_ids:
         contracts[role].update(selectors)
+    metadata = cast(dict[str, Any], template["process_state_metadata"])
+    state_species = cast(dict[str, dict[str, Any]], metadata["state_species"])
+    state_species["catalyst_beta_pool"]["species"] = "catalyst_alpha_fixture"
+    state_species["oligomer_y_pool"]["species"] = "polymer_x_fixture"
     template_path.write_text(
         yaml.safe_dump(template_data, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    compatibility_path = registry_dir / "processes" / "process_compatibility.yml"
+    compatibility_data = _yaml_mapping(compatibility_path)
+    compatibility_records = cast(list[dict[str, Any]], compatibility_data["records"])
+    component = next(
+        record
+        for record in compatibility_records
+        if record["record_id"] == "fixture_y_to_q_component"
+    )
+    component["enzyme_class"] = "catalyst_alpha_fixture"
+    component["substrate_class"] = "polymer_x_fixture"
+    component["process_type"] = "surface_catalysis"
+    compatibility_path.write_text(
+        yaml.safe_dump(compatibility_data, sort_keys=False),
         encoding="utf-8",
     )
 

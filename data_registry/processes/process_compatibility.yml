@@ -93,11 +93,68 @@ records:
       kcat: kcat_cellobiose
     product_map_required: true
     case_template_id: bio002_extracellular_enzyme_chain_template
+    component_bindings:
+      - process_template_id: bio002_surface_cellulose_to_cellobiose
+        compatibility_record_id: bio002_cellulase_cellulose_surface_component
+      - process_template_id: bio002_cellobiose_to_glucose_mm
+        compatibility_record_id: bio002_beta_glucosidase_cellobiose_component
     notes: >
       CASE-001/BIO-002 compatibility only. It exposes the existing two-step
       enzyme-chain template through registry case selection; it does not add
       whole-fungus growth, secretion, uptake, biomass, PET, lignin, full
       lignocellulose, organism-specific physiology, or empirical validation.
+
+  - record_id: bio002_cellulase_cellulose_surface_component
+    name: BIO-002 cellulase cellulose-equivalent surface component
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+      confidence_level: exploratory_assumption
+      bio_milestone: BIO-002
+      notes: Exact component compatibility authority for the BIO-002 chain surface step.
+    enzyme_class: cellulase_generic
+    substrate_class: cellulose_film_generic
+    required_bond_classes:
+      - beta_1_4_glycosidic
+    process_type: surface_catalysis
+    required_parameters:
+      - bio002_initial_solid_cellulose_equivalent_concentration
+      - bio002_cellulase_initial_concentration
+      - bio002_cellulose_to_cellobiose_surface_rate
+      - bio002_cellulase_adsorption_constant
+      - bio002_cellulose_accessible_surface_area
+    parameter_roles:
+      substrate_initial_amount: bio002_initial_solid_cellulose_equivalent_concentration
+      enzyme_initial_concentration: bio002_cellulase_initial_concentration
+      surface_rate_constant: bio002_cellulose_to_cellobiose_surface_rate
+      adsorption_constant: bio002_cellulase_adsorption_constant
+      accessible_surface_area: bio002_cellulose_accessible_surface_area
+    product_map_required: true
+    notes: Component binding metadata only; it adds no parameter value or scientific validation.
+
+  - record_id: bio002_beta_glucosidase_cellobiose_component
+    name: BIO-002 beta-glucosidase cellobiose homogeneous component
+    maturity: literature_metadata
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+      notes: Exact component compatibility authority for the BIO-002 chain homogeneous step.
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    required_bond_classes:
+      - beta_1_4_glycosidic
+    process_type: homogeneous_michaelis_menten
+    required_parameters:
+      - bio002_beta_glucosidase_initial_concentration
+      - Km_cellobiose
+      - kcat_cellobiose
+    parameter_roles:
+      enzyme_initial_concentration: bio002_beta_glucosidase_initial_concentration
+      km: Km_cellobiose
+      kcat: kcat_cellobiose
+    product_map_required: true
+    notes: Component binding metadata only; it adds no parameter value or scientific validation.
 
   - record_id: beta_glucosidase_cellobiose_homogeneous_mm
     name: beta-glucosidase on cellobiose homogeneous Michaelis-Menten

@@ -398,6 +398,19 @@ records:
               catalytic_parameters: []
               adsorption_parameters: []
               parameters: []
+      state_species:
+        solid_cellulose_equivalent_concentration:
+          species: cellulose_film_generic
+          entity_type: substrate
+        cellobiose_concentration:
+          species: cellobiose
+          entity_type: substrate
+        cellulase_concentration:
+          species: cellulase_generic
+          entity_type: enzyme
+        beta_glucosidase_concentration:
+          species: beta_glucosidase
+          entity_type: enzyme
       parameter_record_ids:
         solid_substrate_initial_concentration: bio002_initial_solid_cellulose_equivalent_concentration
         cellulase_initial_concentration: bio002_cellulase_initial_concentration
@@ -495,9 +508,6 @@ records:
       process_templates:
         - id: bio002_surface_cellulose_to_cellobiose
           process_type: surface_catalysis
-          component_selectors:
-            enzyme_class: cellulase_generic
-            substrate_class: cellulose_film_generic
           state_roles:
             substrate: substrate
             catalyst: surface_catalyst
@@ -517,9 +527,6 @@ records:
             - Accessible surface area is constant during each run; surface renewal and morphology are not modeled.
         - id: bio002_cellobiose_to_glucose_mm
           process_type: homogeneous_michaelis_menten
-          component_selectors:
-            enzyme_class: beta_glucosidase
-            substrate_class: cellobiose
           state_roles:
             substrate: intermediate
             product: product

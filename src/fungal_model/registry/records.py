@@ -245,6 +245,20 @@ class EnvironmentRecord(RegistryRecord):
 
 
 @dataclass(frozen=True)
+class ProcessComponentBinding:
+    """Ordered binding from one template process to one component compatibility."""
+
+    process_template_id: str
+    compatibility_record_id: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "process_template_id": self.process_template_id,
+            "compatibility_record_id": self.compatibility_record_id,
+        }
+
+
+@dataclass(frozen=True)
 class ProcessCompatibilityRecord(RegistryRecord):
     """Record describing when a process type is categorically compatible."""
 
@@ -256,6 +270,7 @@ class ProcessCompatibilityRecord(RegistryRecord):
     parameter_roles: Mapping[str, str] = field(default_factory=dict)
     product_map_required: bool = False
     case_template_id: str = ""
+    component_bindings: tuple[ProcessComponentBinding, ...] = ()
 
     def validate(self) -> ValidationResult:
         issues = self._common_issues()
@@ -277,6 +292,62 @@ class ProcessCompatibilityRecord(RegistryRecord):
                     "details": {"unknown_symbols": unknown_role_parameters},
                 }
             )
+        bindings = self.component_bindings
+        if not isinstance(bindings, tuple):
+            issues.append(
+                {
+                    "field": "component_bindings",
+                    "message": "Component bindings must be an immutable sequence.",
+                }
+            )
+            bindings = ()
+        process_ids: list[str] = []
+        compatibility_ids: list[str] = []
+        for index, binding in enumerate(bindings):
+            if not isinstance(binding, ProcessComponentBinding):
+                issues.append(
+                    {
+                        "field": f"component_bindings.{index}",
+                        "message": "Component bindings must use ProcessComponentBinding values.",
+                    }
+                )
+                continue
+            process_ids.append(binding.process_template_id)
+            compatibility_ids.append(binding.compatibility_record_id)
+            if (
+                not isinstance(binding.process_template_id, str)
+                or not binding.process_template_id.strip()
+            ):
+                issues.append(
+                    {
+                        "field": f"component_bindings.{index}.process_template_id",
+                        "message": "Component binding process_template_id is required.",
+                    }
+                )
+            if (
+                not isinstance(binding.compatibility_record_id, str)
+                or not binding.compatibility_record_id.strip()
+            ):
+                issues.append(
+                    {
+                        "field": f"component_bindings.{index}.compatibility_record_id",
+                        "message": "Component binding compatibility_record_id is required.",
+                    }
+                )
+        if len(set(process_ids)) != len(process_ids):
+            issues.append(
+                {
+                    "field": "component_bindings",
+                    "message": "Component binding process_template_id values must be unique.",
+                }
+            )
+        if len(set(compatibility_ids)) != len(compatibility_ids):
+            issues.append(
+                {
+                    "field": "component_bindings",
+                    "message": "Component binding compatibility_record_id values must be unique.",
+                }
+            )
         return _validation_result(self.record_id, issues)
 
     def to_dict(self) -> dict[str, Any]:
@@ -293,6 +364,10 @@ class ProcessCompatibilityRecord(RegistryRecord):
                 "case_template_id": self.case_template_id,
             }
         )
+        if self.component_bindings:
+            data["component_bindings"] = [
+                binding.to_dict() for binding in self.component_bindings
+            ]
         return data
 
 

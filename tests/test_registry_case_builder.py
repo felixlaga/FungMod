@@ -203,9 +203,13 @@ def test_real_case001_preflight_and_deterministic_build_use_explicit_template_re
         ("missing_role_contract", "exactly the same role keys"),
         ("ambiguous_role_process", "multiple component process types"),
         ("legacy_role_process_metadata", "deprecated parameter_role_process_types"),
-        ("missing_component_selectors", "component_selectors must be a mapping"),
-        ("extra_component_selector", "exact enzyme_class and substrate_class"),
-        ("invalid_component_selector_pair", "component selector pair"),
+        ("missing_component_bindings", "exact ordered process-template IDs"),
+        ("reordered_component_bindings", "exact ordered process-template IDs"),
+        ("duplicate_component_binding", "unique component compatibility"),
+        ("missing_state_species", "state_species must be a mapping"),
+        ("duplicate_state_species", "reuses enzyme identity"),
+        ("wrong_state_entity_type", "requires an enzyme state identity"),
+        ("shadow_component_selectors", "component_selectors are unsupported"),
         ("invented_initial_scope", "outer template process_type"),
         ("invented_null_id_class", "selector enzyme_class"),
         ("wrong_declared_component_class", "selector enzyme_class"),
@@ -231,6 +235,7 @@ def test_case001_explicit_template_mapping_fails_closed(
     surface_role = "surface_rate_constant"
     surface_id = "bio002_cellulose_to_cellobiose_surface_rate"
     kcat_id = "sabiork_reaction_618_kcat_cellobiose"
+    outer_compatibility_id = "bio002_cellulase_cellulose_film_extracellular_chain"
 
     if malformation == "not_a_mapping":
         metadata["parameter_record_ids"] = []
@@ -260,17 +265,56 @@ def test_case001_explicit_template_mapping_fails_closed(
         metadata["parameter_role_process_types"] = {
             surface_role: "invented_surface_mechanism"
         }
-    elif malformation == "missing_component_selectors":
+    elif malformation == "missing_component_bindings":
+        outer = registry.process_compatibility[outer_compatibility_id]
+        registry.process_compatibility[outer_compatibility_id] = replace(
+            outer,
+            component_bindings=(),
+        )
+    elif malformation == "reordered_component_bindings":
+        outer = registry.process_compatibility[outer_compatibility_id]
+        registry.process_compatibility[outer_compatibility_id] = replace(
+            outer,
+            component_bindings=tuple(reversed(outer.component_bindings)),
+        )
+    elif malformation == "duplicate_component_binding":
+        outer = registry.process_compatibility[outer_compatibility_id]
+        registry.process_compatibility[outer_compatibility_id] = replace(
+            outer,
+            component_bindings=(
+                outer.component_bindings[0],
+                replace(
+                    outer.component_bindings[1],
+                    compatibility_record_id=(
+                        outer.component_bindings[0].compatibility_record_id
+                    ),
+                ),
+            ),
+        )
+    elif malformation == "missing_state_species":
+        metadata.pop("state_species")
+    elif malformation == "duplicate_state_species":
+        state_species = deepcopy(dict(metadata["state_species"]))
+        state_species["beta_glucosidase_concentration"] = {
+            "species": "cellulase_generic",
+            "entity_type": "enzyme",
+        }
+        metadata["state_species"] = state_species
+    elif malformation == "wrong_state_entity_type":
+        state_species = deepcopy(dict(metadata["state_species"]))
+        state_species["solid_cellulose_equivalent_concentration"], state_species[
+            "cellulase_concentration"
+        ] = (
+            state_species["cellulase_concentration"],
+            state_species["solid_cellulose_equivalent_concentration"],
+        )
+        metadata["state_species"] = state_species
+    elif malformation == "shadow_component_selectors":
         process_templates = deepcopy(list(metadata["process_templates"]))
-        process_templates[0].pop("component_selectors")
-        metadata["process_templates"] = process_templates
-    elif malformation == "extra_component_selector":
-        process_templates = deepcopy(list(metadata["process_templates"]))
-        process_templates[0]["component_selectors"]["fungus_id"] = None
-        metadata["process_templates"] = process_templates
-    elif malformation == "invalid_component_selector_pair":
-        process_templates = deepcopy(list(metadata["process_templates"]))
-        process_templates[0]["component_selectors"]["enzyme_class"] = "beta_glucosidase"
+        process_templates[0]["component_selectors"] = {
+            "enzyme_class": "cellulase_generic",
+            "substrate_class": "cellulose_film_generic",
+        }
         metadata["process_templates"] = process_templates
     elif malformation == "invented_initial_scope":
         role_contracts = deepcopy(dict(metadata["parameter_role_contracts"]))

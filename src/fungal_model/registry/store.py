@@ -12,6 +12,7 @@ from fungal_model.registry.records import (
     EnvironmentRecord,
     FungusRecord,
     ParameterRecord,
+    ProcessComponentBinding,
     ProcessCompatibilityRecord,
     SubstrateRecord,
 )
@@ -93,10 +94,25 @@ class FungModRegistry:
         substrate_class: str | None = None,
         process_type: str | None = None,
     ) -> tuple[ProcessCompatibilityRecord, ...]:
+        component_record_ids: set[str] = set()
+        for outer_record in self.process_compatibility.values():
+            if not isinstance(outer_record.component_bindings, tuple) or any(
+                not isinstance(binding, ProcessComponentBinding)
+                for binding in outer_record.component_bindings
+            ):
+                raise RegistryValidationError(
+                    f"Invalid component bindings on process compatibility "
+                    f"{outer_record.record_id!r}."
+                )
+            component_record_ids.update(
+                binding.compatibility_record_id
+                for binding in outer_record.component_bindings
+            )
         records = tuple(
             record
             for record in self.process_compatibility.values()
-            if (enzyme_class is None or record.enzyme_class == enzyme_class)
+            if record.record_id not in component_record_ids
+            and (enzyme_class is None or record.enzyme_class == enzyme_class)
             and (substrate_class is None or record.substrate_class == substrate_class)
             and (process_type is None or record.process_type == process_type)
         )
