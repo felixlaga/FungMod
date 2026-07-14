@@ -759,6 +759,7 @@ def _write_bundle(root: Path, result: CurationResult) -> None:
         "schema_version": CURATION_SCHEMA_VERSION,
         "source_query": result.source_query,
         "source_snapshot_path": result.source_snapshot_path,
+        "proposal_limitations": list(result.proposal_limitations),
         "summary": result.summary(),
         "files": checksums,
         "allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
@@ -795,6 +796,7 @@ def _records_payload(
         "allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
         "source_query": result.source_query,
         "source_snapshot_path": result.source_snapshot_path,
+        "proposal_limitations": list(result.proposal_limitations),
         "production_registry_promotion": False,
         "records": [record.to_dict() for record in records],
     }
@@ -872,6 +874,23 @@ def _report_markdown(result: CurationResult) -> str:
     lines.extend(["", "## Proposal Limitations", ""])
     lines.extend(f"- {limitation}" for limitation in result.proposal_limitations)
     return "\n".join(lines) + "\n"
+
+
+def validate_curation_report_limitations(
+    report_text: str,
+    proposal_limitations: Sequence[str],
+) -> None:
+    """Require the deterministic report's final limitations section to match exactly."""
+
+    if not isinstance(report_text, str) or not _nonempty_string_sequence(proposal_limitations):
+        raise CurationError("Curation report and proposal limitations must be explicit text.")
+    expected = "## Proposal Limitations\n\n" + "\n".join(
+        f"- {limitation}" for limitation in proposal_limitations
+    ) + "\n"
+    if not report_text.endswith(expected):
+        raise CurationError(
+            "Curation report proposal limitations disagree with the machine-readable bundle envelope."
+        )
 
 
 def _replace_directory(staging: Path, destination: Path) -> None:
@@ -1002,4 +1021,5 @@ __all__ = [
     "CurationResult",
     "CurationWriteResult",
     "review_source_proposal",
+    "validate_curation_report_limitations",
 ]

@@ -385,6 +385,20 @@ class ParameterRecord(RegistryRecord):
         return data
 
 
+def parameter_simulation_authorization_blocker(record: ParameterRecord) -> str | None:
+    """Return the mode-independent simulation blocker for a parameter record."""
+
+    if record.allowed_use == PARAMETER_ALLOWED_USE_STORAGE_ONLY:
+        return "Parameter allowed_use is storage-only and does not authorize simulation in any mode."
+    return None
+
+
+def parameter_is_simulation_authorized(record: ParameterRecord) -> bool:
+    """Return whether the record passes the mode-independent authorization policy."""
+
+    return parameter_simulation_authorization_blocker(record) is None
+
+
 def _validation_result(record_id: str, issues: list[dict[str, Any]]) -> ValidationResult:
     return ValidationResult(
         name="registry_record",
@@ -580,6 +594,8 @@ __all__ = [
     "FungusRecord",
     "ParameterRecord",
     "PARAMETER_ALLOWED_USE_STORAGE_ONLY",
+    "parameter_is_simulation_authorized",
+    "parameter_simulation_authorization_blocker",
     "ProcessCompatibilityRecord",
     "RegistryRecord",
     "SubstrateRecord",

@@ -300,6 +300,9 @@ and allowed-use decision. Apply writes those exact prospective bytes; it does
 not transform scientific values, units, maturity, target `allowed_use`,
 mechanisms, or IDs. Pre-PR-47 written schema `1.0.0` remains preview-only and
 is explicitly rejected at apply because it lacks that durable audit contract.
+Bundle checksums establish deterministic internal consistency and tamper
+detection relative to the manifest; they are not signatures and do not prove
+external curator identity or authorship.
 When the target record's outer provenance also carries a source database,
 entry ID or IDs, snapshot path, or source URL, that normalized source identity
 must agree type- and value-exactly with the curator source provenance before
@@ -356,6 +359,7 @@ authored = author_parameter_record(
             "source_url": source_identity["source_url"],
             "source_urls": source_identity["source_urls"],
             "source_snapshot_sha256": source_identity["source_snapshot_sha256"],
+            "parameter_role": accepted.proposed_record["parameter_role"],
             "curator": "Researcher Name",
             "curation_date": "2026-07-14",
             "source_reaction_id": "618",
@@ -399,7 +403,10 @@ plan = plan_registry_promotion(
 specialized result uses the existing deterministic, checksummed curation writer,
 and either that written bundle or the in-memory result is consumable by
 `plan_registry_promotion(...)` after authoring-digest, loader, registry-context,
-and selector revalidation. The source/acceptance evidence remains audit
+and selector revalidation. Registry context binds the index plus the complete
+registry file tree; selector audit binds resolved entity classes, exactly one
+compatibility record, and the source/curator-authored runtime parameter-role
+key. The source/acceptance evidence remains audit
 metadata; only the complete curator-authored `ParameterRecord` is the
 loader/promotion target. Original, converted, and target numeric values must be
 finite floats and type-exactly equal, units must be identical, and
@@ -408,10 +415,13 @@ other record types, automatic apply, scientific validation, and simulation
 authorization remain explicitly unsupported, so CURATION-001 remains partial.
 The source adapter's `frozen_source_urls(...)` helper reads only adjacent local
 fetch metadata and performs no network access. The bridge revalidates that
-frozen URL identity during authoring and planning. Its exact storage-only
-`allowed_use` is enforced by centralized modelability/preflight checks in every
-mode, including exploratory mode, so an authored or later promoted record
-cannot authorize `VirtualExperiment.simulate(...)`.
+frozen URL identity during authoring and planning. One fetched URL requires the
+same singular `source_url`; multiple ordered URLs require `source_url=None` and
+the exact nonempty `source_urls` sequence. Its exact storage-only `allowed_use`
+is enforced by one shared predicate in modelability, parameter ranking, case
+assembly, ensemble runtime, and chain-template resolution in every supported
+mode, so an authored or later promoted record cannot authorize
+`VirtualExperiment.simulate(...)`.
 
 ## Run A Virtual Experiment
 

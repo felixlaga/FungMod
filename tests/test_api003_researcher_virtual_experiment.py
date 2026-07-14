@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import shutil
 import socket
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
 
@@ -261,6 +262,46 @@ def test_storage_only_parameter_blocks_virtual_experiment_simulation(
             output_dir=tmp_path / f"storage_only_{mode}",
             quicklook=False,
         )
+
+
+def test_preflight_and_exploratory_runtime_choose_the_same_authorized_exact_record(
+    tmp_path: Path,
+) -> None:
+    registry = _modelable_toy_registry(tmp_path)
+    parameters_path = registry / "parameters" / "parameter_records.yml"
+    payload = _yaml_mapping(parameters_path)
+    records = cast(list[dict[str, Any]], payload["records"])
+    storage_only = next(
+        item for item in records if item["record_id"] == "toy_param_k_surface_exact"
+    )
+    authorized = deepcopy(storage_only)
+    authorized["record_id"] = "toy_param_k_surface_exact_authorized"
+    authorized["name"] = "Authorized exact surface rate selection fixture"
+    storage_only["maturity"] = "literature_processed"
+    storage_only["allowed_use"] = PARAMETER_ALLOWED_USE_STORAGE_ONLY
+    records.append(authorized)
+    parameters_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    study = virtual_experiment(
+        fungi="toy_fungus_alpha",
+        substrates="toy_cellulose_like_solid",
+        environments="toy_lab_environment",
+        registry=registry / "registry_index.yml",
+    )
+
+    report = study.preflight(mode="exploratory")[0]
+    selected = next(item for item in report.known if item.item_id == "k_surface_exact")
+    assert selected.details["record_id"] == authorized["record_id"]
+
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=4,
+        output_dir=tmp_path / "authorized_selection",
+        quicklook=False,
+    )
+    sampled = next(row for row in result.sampled_parameters() if row["symbol"] == "k_surface_exact")
+    assert sampled["source_record_id"] == authorized["record_id"]
+    assert sampled["source_record_id"] != storage_only["record_id"]
 
 
 def test_result_table_accessors_return_standard_tables(tmp_path: Path) -> None:

@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 import fungal_model
+import fungal_model.sources.sabiork.fetch as sabiork_fetch
 from fungal_model import (
     CurationDecision,
     CurationError,
@@ -39,10 +40,20 @@ from fungal_model.api.parameter_record_authoring import (
     PARAMETER_IDENTITY_CONVERSION_METHOD,
     parameter_authoring_digest,
 )
+from fungal_model.sources.sabiork.fetch import HTTPResponseSnapshot
 
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = ROOT / "data" / "source_snapshots" / "sabiork"
+REACTION_618_EXPORT = (
+    ROOT
+    / "data"
+    / "kinetic_records"
+    / "sabiork"
+    / "case_001_reaction_618_beta_glucosidase"
+    / "raw"
+    / "kinlaw_entries_reaction_618.json"
+)
 DATA_REGISTRY = ROOT / "data_registry"
 SOURCE_PARAMETER_ID = "proposed_sabiork_parameter_618_35622_kcat_cellobiose"
 CANONICAL_PARAMETER_ID = "sabiork_reaction_618_kcat_cellobiose"
@@ -63,6 +74,39 @@ def _proposal():
     )
 
 
+def _two_page_proposal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    first_page = json.loads(REACTION_618_EXPORT.read_text(encoding="utf-8"))
+    first_page["meta"]["page"] = 1
+    first_page["meta"]["total_pages"] = 2
+    second_page = {
+        "meta": {**first_page["meta"], "page": 2},
+        "data": [],
+    }
+    requested_urls: list[str] = []
+
+    def fake_transport(url: str, *, timeout_seconds: float) -> HTTPResponseSnapshot:
+        assert timeout_seconds == 30.0
+        requested_urls.append(url)
+        payload = second_page if "page=2" in url else first_page
+        return HTTPResponseSnapshot(
+            body=json.dumps(payload),
+            http_status=200,
+            url=url,
+        )
+
+    monkeypatch.setattr(sabiork_fetch, "MIN_REQUEST_INTERVAL_SECONDS", 0.0)
+    proposal = source_proposal(
+        provider="sabiork",
+        reaction_id="618",
+        entry_id="35622",
+        refresh=True,
+        cache_dir=tmp_path / "two_page_snapshots",
+        transport=fake_transport,
+    )
+    assert len(requested_urls) == 2
+    return proposal, requested_urls
+
+
 def _write_proposal_manifest(path: Path, payload: MappingLike) -> Path:
     path.mkdir(parents=True)
     manifest = path / "proposal_manifest.json"
@@ -73,8 +117,8 @@ def _write_proposal_manifest(path: Path, payload: MappingLike) -> Path:
 MappingLike = dict[str, Any]
 
 
-def _accepted_source_curation(tmp_path: Path) -> CurationResult:
-    payload = _proposal().to_dict()
+def _accepted_source_curation(tmp_path: Path, *, proposal: Any | None = None) -> CurationResult:
+    payload = (proposal or _proposal()).to_dict()
     parameter = next(
         item
         for item in payload["proposed_records"]["parameter_records"]
@@ -125,6 +169,7 @@ def _canonical_parameter_target(source: CurationResult) -> dict[str, Any]:
             "source_url": provenance["source_url"],
             "source_urls": deepcopy(provenance["source_urls"]),
             "source_snapshot_sha256": provenance["source_snapshot_sha256"],
+            "parameter_role": accepted.proposed_record["parameter_role"],
             "curator": CURATOR,
             "curation_date": CURATION_DATE,
             "source_reaction_id": "618",
@@ -240,6 +285,7 @@ def test_real_frozen_sabio_identity_path_is_addable_only_on_a_copied_registry(
     assert bridge["source_proposal_record_id"] == SOURCE_PARAMETER_ID
     assert bridge["source_parameter"] == {
         "parameter_symbol": "kcat_cellobiose",
+        "parameter_role": "kcat",
         "proposal_status": "proposed_review_required",
         "proposal_allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
         "original_value": 0.13,
@@ -267,9 +313,69 @@ def test_real_frozen_sabio_identity_path_is_addable_only_on_a_copied_registry(
         "source_snapshot_path": source.source_snapshot_path,
         "proposal_limitations": list(source.proposal_limitations),
     }
+    assert bridge["selector_resolution"] == {
+        "fungus_id": "sabiork_beta_glucosidase_source",
+        "effective_enzyme_classes": ["beta_glucosidase"],
+        "substrate_id": "cellobiose",
+        "effective_substrate_class": "cellobiose",
+        "environment_id": "sabiork_reaction_618_selected_conditions",
+        "process_type": "homogeneous_michaelis_menten",
+        "parameter_symbol": "kcat_cellobiose",
+        "parameter_role": "kcat",
+        "process_compatibility_id": "beta_glucosidase_cellobiose_homogeneous_mm",
+    }
+    assert len(bridge["registry_context"]["registry_content_sha256"]) == 64
     assert candidate.target_record["provenance"]["fungmod_curation"]["curator"] == CURATOR
     assert _registry_snapshot(registry_index.parent) == copied_before
     assert _registry_snapshot() == production_before
+
+
+def test_offline_two_page_sabio_urls_survive_proposal_curation_and_authoring(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proposal, source_urls = _two_page_proposal(tmp_path, monkeypatch)
+    proposed = next(
+        item
+        for item in proposal.proposed_records()["parameter_records"]
+        if item["record_id"] == SOURCE_PARAMETER_ID
+    )
+    assert proposed["provenance"]["source_url"] is None
+    assert proposed["provenance"]["source_urls"] == source_urls
+
+    source = _accepted_source_curation(tmp_path, proposal=proposal)
+    accepted = source.accepted_records[0]
+    assert accepted.source_provenance["source_url"] is None
+    assert accepted.source_provenance["source_urls"] == source_urls
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    authored = author_parameter_record(
+        source,
+        source_record_id=SOURCE_PARAMETER_ID,
+        parameter_record=_canonical_parameter_target(source),
+        registry_index=registry_index,
+    )
+    authored_provenance = authored.records[0].proposed_record["provenance"]
+    assert authored_provenance["source_url"] is None
+    assert authored_provenance["source_urls"] == source_urls
+
+    tampered_proposed = deepcopy(dict(accepted.proposed_record))
+    tampered_proposed["provenance"]["source_urls"] = list(reversed(source_urls))
+    tampered_record = replace(
+        accepted,
+        proposed_record=tampered_proposed,
+        source_provenance={
+            **accepted.source_provenance,
+            "source_urls": list(reversed(source_urls)),
+        },
+    )
+    tampered = replace(source, records=(tampered_record,))
+    with pytest.raises(ParameterRecordAuthoringError, match="frozen SABIO-RK fetch metadata"):
+        author_parameter_record(
+            tampered,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=_canonical_parameter_target(source),
+            registry_index=registry_index,
+        )
 
 
 def test_in_memory_result_is_directly_promotion_plan_compatible(tmp_path: Path) -> None:
@@ -381,6 +487,25 @@ def test_redigested_written_result_envelope_mutation_is_rejected_by_planning(
     _redigest_bundle(bundle, accepted, manifest)
 
     with pytest.raises(RegistryPromotionPlanError, match="result provenance|curation|audit"):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
+
+
+def test_refreshed_checksums_cannot_hide_report_limitations_disagreement(
+    tmp_path: Path,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    bundle = authored.write(tmp_path / "forged_limitations_with_refreshed_checksums")
+    accepted, manifest = _bundle_payloads(bundle)
+    forged = ["Forged limitation that is absent from the deterministic report."]
+    manifest["proposal_limitations"] = forged
+    manifest["summary"]["proposal_limitations"] = forged
+    accepted["proposal_limitations"] = forged
+    accepted["records"][0]["provenance"][PARAMETER_BRIDGE_PROVENANCE_KEY][
+        "result_provenance"
+    ]["proposal_limitations"] = forged
+    _redigest_bundle(bundle, accepted, manifest)
+
+    with pytest.raises(RegistryPromotionPlanError, match="report proposal limitations disagree"):
         plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
 
 
@@ -891,7 +1016,7 @@ def test_selector_combination_and_parameter_role_must_be_compatible(tmp_path: Pa
         )
 
 
-def test_required_parameter_without_explicit_role_is_not_compatible(tmp_path: Path) -> None:
+def test_parameter_symbol_under_a_different_role_key_is_not_compatible(tmp_path: Path) -> None:
     source = _accepted_source_curation(tmp_path)
     registry_index = _copy_registry_without_canonical_parameter(tmp_path)
     process_path = registry_index.parent / "processes" / "process_compatibility.yml"
@@ -901,7 +1026,7 @@ def test_required_parameter_without_explicit_role_is_not_compatible(tmp_path: Pa
         for item in payload["records"]
         if item["record_id"] == "beta_glucosidase_cellobiose_homogeneous_mm"
     )
-    del compatibility["parameter_roles"]["kcat"]
+    compatibility["parameter_roles"]["turnover"] = compatibility["parameter_roles"].pop("kcat")
     process_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(ParameterRecordAuthoringError, match="exactly one effective process compatibility"):
@@ -975,10 +1100,62 @@ def test_planning_rejects_effective_compatibility_registry_drift(tmp_path: Path)
     process_payload["records"].append(duplicate)
     process_path.write_text(yaml.safe_dump(process_payload, sort_keys=False), encoding="utf-8")
 
-    with pytest.raises(RegistryPromotionPlanError, match="exactly one effective process compatibility"):
+    with pytest.raises(RegistryPromotionPlanError, match="registry context"):
         plan_registry_promotion(authored, registry_index=registry_index)
-    with pytest.raises(RegistryPromotionPlanError, match="exactly one effective process compatibility"):
+    with pytest.raises(RegistryPromotionPlanError, match="registry context"):
         plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
+
+
+@pytest.mark.parametrize("drift", ["coherent_entity_reclassification", "parameter_role_rename"])
+def test_full_registry_and_exact_role_context_rejects_planning_drift(
+    tmp_path: Path,
+    drift: str,
+) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    target["enzyme_class"] = None
+    target["substrate_class"] = None
+    authored = author_parameter_record(
+        source,
+        source_record_id=SOURCE_PARAMETER_ID,
+        parameter_record=target,
+        registry_index=registry_index,
+    )
+    bundle = authored.write(tmp_path / f"before_{drift}")
+    audit = authored.records[0].proposed_record["provenance"][PARAMETER_BRIDGE_PROVENANCE_KEY]
+    assert audit["selector_resolution"]["effective_enzyme_classes"] == ["beta_glucosidase"]
+    assert audit["selector_resolution"]["parameter_role"] == "kcat"
+    assert (
+        audit["selector_resolution"]["process_compatibility_id"]
+        == "beta_glucosidase_cellobiose_homogeneous_mm"
+    )
+
+    process_path = registry_index.parent / "processes" / "process_compatibility.yml"
+    process_payload = yaml.safe_load(process_path.read_text(encoding="utf-8"))
+    compatibility = next(
+        item
+        for item in process_payload["records"]
+        if item["record_id"] == "beta_glucosidase_cellobiose_homogeneous_mm"
+    )
+    if drift == "coherent_entity_reclassification":
+        fungi_path = registry_index.parent / "fungi" / "fungi.yml"
+        fungi_payload = yaml.safe_load(fungi_path.read_text(encoding="utf-8"))
+        fungus = next(
+            item
+            for item in fungi_payload["records"]
+            if item["record_id"] == "sabiork_beta_glucosidase_source"
+        )
+        fungus["enzyme_classes"] = ["toy_cellulase"]
+        compatibility["enzyme_class"] = "toy_cellulase"
+        fungi_path.write_text(yaml.safe_dump(fungi_payload, sort_keys=False), encoding="utf-8")
+    else:
+        compatibility["parameter_roles"]["turnover"] = compatibility["parameter_roles"].pop("kcat")
+    process_path.write_text(yaml.safe_dump(process_payload, sort_keys=False), encoding="utf-8")
+
+    for planning_input in (authored, bundle.output_directory):
+        with pytest.raises(RegistryPromotionPlanError, match="registry context"):
+            plan_registry_promotion(planning_input, registry_index=registry_index)
 
 
 def test_deferred_rejected_blocked_and_unsupported_sources_are_rejected(tmp_path: Path) -> None:

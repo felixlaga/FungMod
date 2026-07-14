@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
 from fungal_model.registry.records import (
-    PARAMETER_ALLOWED_USE_STORAGE_ONLY,
     ParameterRecord,
     ProcessCompatibilityRecord,
+    parameter_is_simulation_authorized,
+    parameter_simulation_authorization_blocker,
 )
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 
@@ -352,12 +353,13 @@ def _classify_parameter(
             )
         )
         return
-    if record.allowed_use == PARAMETER_ALLOWED_USE_STORAGE_ONLY:
+    authorization_blocker = parameter_simulation_authorization_blocker(record)
+    if authorization_blocker is not None:
         incompatible.append(
             _item(
                 "parameter",
                 record.parameter_symbol,
-                "Parameter allowed_use is storage-only and does not authorize simulation in any mode.",
+                authorization_blocker,
                 {
                     "record_id": record.record_id,
                     "maturity": record.maturity,
@@ -502,6 +504,7 @@ def _matches(record_value: str | None, requested: str) -> bool:
 
 
 def _parameter_specificity(record: ParameterRecord, *, mode: ModelabilityMode) -> tuple[int, ...]:
+    authorization_score = int(parameter_is_simulation_authorized(record))
     selector_score = sum(
         value is not None
         for value in (
@@ -516,9 +519,9 @@ def _parameter_specificity(record: ParameterRecord, *, mode: ModelabilityMode) -
     if mode == "exploratory":
         value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
         exploratory_score = 1 if _is_exploratory_parameter_record(record) else 0
-        return selector_score, value_score, exploratory_score, maturity_score
+        return authorization_score, selector_score, value_score, exploratory_score, maturity_score
     value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
-    return selector_score, value_score, maturity_score
+    return authorization_score, selector_score, value_score, maturity_score
 
 
 def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:

@@ -223,12 +223,15 @@ apply contract completed after PR #62 merged as `b1ebb860`.
 The current PR-48 `author_parameter_record(...)` slice is limited to accepted
 in-memory PARAMETER curation results and complete curator-authored production
 mappings with exact identity conversion, source digest/provenance,
-loader-round-trip, selector, registry-context, and mutation checks. Its
+loader-round-trip, ordered frozen-URL, full-registry-context, exact role/
+compatibility, result/report envelope, and mutation checks. Its
 specialized checksummed curation output is promotion-plan-compatible but does
-not mutate or apply. Its exact storage-only policy blocks modelability and
-simulation in every mode. Nonidentity conversion, written source input,
-non-parameter records, validation, calibration, and simulation authorization
-remain unsupported, so CURATION-001 remains partial. The recommended next
+not mutate or apply; its public checksums establish internal consistency rather
+than cryptographic authorship. Its exact storage-only policy uses one shared
+predicate across modelability and runtime resolution in every mode. Nonidentity
+conversion, written source input, non-parameter records, validation,
+calibration, and simulation authorization remain unsupported, so CURATION-001
+remains partial. The recommended next
 slice is PR-49 reusable public checksum-validated curation-bundle loading,
 centralizing existing manifest/checksum/path parsing before any future written
 authoring input.

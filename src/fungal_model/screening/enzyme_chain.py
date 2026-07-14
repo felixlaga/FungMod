@@ -15,7 +15,11 @@ import yaml
 
 from fungal_model.api.metrics import threshold_crossing_time
 from fungal_model.io.model_config import ModelConfig
-from fungal_model.registry.records import CaseTemplateRecord, ParameterRecord
+from fungal_model.registry.records import (
+    CaseTemplateRecord,
+    ParameterRecord,
+    parameter_simulation_authorization_blocker,
+)
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.results import SimulationResult
 from fungal_model.screening.template_environment_modifiers import (
@@ -314,6 +318,11 @@ def _parameter_records(
             record = registry.parameters[str(record_id)]
         except KeyError as exc:
             raise EnzymeChainAssemblyError(f"Unknown parameter record for role {role_text!r}: {record_id}") from exc
+        blocker = parameter_simulation_authorization_blocker(record)
+        if blocker is not None:
+            raise EnzymeChainAssemblyError(
+                f"Template parameter role {role_text!r} is unauthorized: {blocker}"
+            )
         if not record.value.is_exact:
             raise EnzymeChainAssemblyError(
                 f"Template parameter role {role_text!r} requires an exact parameter record for deterministic assembly; "

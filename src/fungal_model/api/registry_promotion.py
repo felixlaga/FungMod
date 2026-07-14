@@ -25,6 +25,8 @@ from fungal_model.api._integrity import (
     first_symlink_component,
     round_trip_differences as _round_trip_differences,
     sha256_bytes as _sha256_bytes,
+    tree_file_hashes,
+    TreeIntegrityError,
     type_exact_equal as _type_exact_equal,
 )
 from fungal_model.api.curation import (
@@ -1989,6 +1991,10 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
                 record_type=item.record_type,
                 target_record=item.target_record,
                 curation_metadata=item.curation_metadata,
+                curation_report=_read_utf8_text(
+                    declared["curation_report.md"],
+                    label="Curation report",
+                ),
             )
         except ParameterRecordAuthoringError as exc:
             raise RegistryPromotionPlanError(str(exc)) from exc
@@ -2508,48 +2514,15 @@ def _registry_digest(index: _RegistryIndex, *, overrides: Mapping[str, str]) -> 
 
 
 def _registry_tree_hashes(root: Path) -> dict[str, str]:
-    hashes: dict[str, str] = {}
-    for current_root, raw_directories, raw_files in os.walk(
-        root,
-        topdown=True,
-        onerror=_raise_registry_walk_error,
-        followlinks=False,
-    ):
-        current = Path(current_root)
-        for name in sorted(raw_directories):
-            path = current / name
-            if path.is_symlink():
-                raise RegistryPromotionPlanError(
-                    f"Registry root contains an unsafe symlink: {path}"
-                )
-            if not path.is_dir():
-                raise RegistryPromotionPlanError(
-                    f"Registry root contains an unsafe special entry: {path}"
-                )
-        for name in sorted(raw_files):
-            path = current / name
-            if path.is_symlink():
-                raise RegistryPromotionPlanError(
-                    f"Registry root contains an unsafe symlink: {path}"
-                )
-            if not path.is_file():
-                raise RegistryPromotionPlanError(
-                    f"Registry root contains an unsafe special entry: {path}"
-                )
-            relative = path.relative_to(root).as_posix()
-            hashes[relative] = _sha256_bytes(path.read_bytes())
-    return dict(sorted(hashes.items()))
+    try:
+        return tree_file_hashes(root, label="Registry root")
+    except TreeIntegrityError as exc:
+        raise RegistryPromotionPlanError(str(exc)) from exc
 
 
 def _raise_bundle_walk_error(error: OSError) -> None:
     raise RegistryPromotionApplyError(
         f"Cannot inspect promotion-plan bundle safely: {error}"
-    ) from error
-
-
-def _raise_registry_walk_error(error: OSError) -> None:
-    raise RegistryPromotionPlanError(
-        f"Cannot inspect registry root safely: {error}"
     ) from error
 
 
@@ -2762,6 +2735,13 @@ def _read_yaml_mapping(path: Path, *, label: str) -> Mapping[str, Any]:
     if not isinstance(payload, Mapping):
         raise RegistryPromotionPlanError(f"{label} {path} must contain a YAML mapping.")
     return payload
+
+
+def _read_utf8_text(path: Path, *, label: str) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise RegistryPromotionPlanError(f"Malformed {label.lower()} {path}: {exc}") from exc
 
 
 def _reject_symlink_components(path: Path, *, label: str) -> None:

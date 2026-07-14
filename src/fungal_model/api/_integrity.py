@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -13,6 +15,10 @@ PARAMETER_BRIDGE_PROVENANCE_KEY = "fungmod_parameter_bridge"
 RESERVED_PROVENANCE_KEYS = frozenset(
     {CURATION_AUDIT_PROVENANCE_KEY, PARAMETER_BRIDGE_PROVENANCE_KEY}
 )
+
+
+class TreeIntegrityError(ValueError):
+    """Raised when a content tree cannot be hashed without following unsafe entries."""
 
 
 def canonicalize(value: Any) -> Any:
@@ -85,6 +91,49 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
+def tree_file_hashes(root: Path, *, label: str) -> dict[str, str]:
+    """Hash every regular file below ``root`` without following symlinks."""
+
+    hashes: dict[str, str] = {}
+
+    def raise_walk_error(error: OSError) -> None:
+        raise TreeIntegrityError(f"Cannot inspect {label.lower()} safely: {error}") from error
+
+    for current_root, raw_directories, raw_files in os.walk(
+        root,
+        topdown=True,
+        onerror=raise_walk_error,
+        followlinks=False,
+    ):
+        current = Path(current_root)
+        for name in sorted(raw_directories):
+            path = current / name
+            if path.is_symlink():
+                raise TreeIntegrityError(f"{label} contains an unsafe symlink: {path}")
+            if not path.is_dir():
+                raise TreeIntegrityError(f"{label} contains an unsafe special entry: {path}")
+        for name in sorted(raw_files):
+            path = current / name
+            if path.is_symlink():
+                raise TreeIntegrityError(f"{label} contains an unsafe symlink: {path}")
+            if not path.is_file():
+                raise TreeIntegrityError(f"{label} contains an unsafe special entry: {path}")
+            hashes[path.relative_to(root).as_posix()] = sha256_bytes(path.read_bytes())
+    return dict(sorted(hashes.items()))
+
+
+def tree_content_digest(root: Path, *, label: str) -> str:
+    """Bind a regular-file tree's relative paths and bytes into one SHA-256 digest."""
+
+    encoded = json.dumps(
+        tree_file_hashes(root, label=label),
+        sort_keys=True,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return sha256_bytes(encoded)
+
+
 def first_symlink_component(path: Path) -> Path | None:
     absolute = path if path.is_absolute() else Path.cwd() / path
     current = Path(absolute.anchor)
@@ -103,9 +152,12 @@ __all__ = [
     "CURATION_AUDIT_PROVENANCE_KEY",
     "PARAMETER_BRIDGE_PROVENANCE_KEY",
     "RESERVED_PROVENANCE_KEYS",
+    "TreeIntegrityError",
     "canonicalize",
     "first_symlink_component",
     "round_trip_differences",
     "sha256_bytes",
+    "tree_content_digest",
+    "tree_file_hashes",
     "type_exact_equal",
 ]

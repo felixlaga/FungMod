@@ -48,7 +48,8 @@ Completed in this pass:
   `ValueSpec` forms, and nonidentity methods fail closed.
 - Required complete accepted-curation evidence and exact source identity:
   proposal record id, database, entry/reaction ids, query, source field,
-  snapshot path, exact `source_url`/`source_urls` from frozen fetch metadata,
+  snapshot path, exact one-URL or ordered multi-page `source_url`/`source_urls`
+  cardinality from frozen fetch metadata,
   frozen snapshot SHA256, curator, date, reason, limitations, and
   pending-promotion decision policy. Snapshot bytes and frozen URL evidence are
   revalidated before authoring and planning.
@@ -60,8 +61,10 @@ Completed in this pass:
   are rejected by exact production-loader round-trip comparison.
 - Resolved effective enzyme/substrate classes from every non-null entity id,
   rejected class/entity disagreements, and required exactly one process
-  compatibility record matching the effective combination and parameter role.
-  The authored result records the registry index identity and digest, isolates
+  compatibility record matching the effective combination and the explicit
+  source/curator runtime parameter-role key. The authored result records the
+  registry index identity, a complete registry-tree digest, resolved classes,
+  compatibility record id, and role key; it isolates
   itself from later input mutation, and revalidates its authoring digest,
   selectors, and planning registry when passed to `plan_registry_promotion(...)`.
 - Preserved the dual representation: accepted source/curation evidence is
@@ -69,21 +72,25 @@ Completed in this pass:
   curator-authored `ParameterRecord` is the loader and promotion target. The
   specialized result reuses `CurationResult.write()` for deterministic,
   checksummed output already consumable by promotion planning.
+- Persisted result-level proposal limitations in manifest, summary, accepted
+  payload, bridge audit, and the deterministic report limitations section, with
+  exact cross-representation checks. Public SHA256 checksums prove internal
+  bundle consistency, not external curator identity or cryptographic authorship.
 - Bound source query, source snapshot path, proposal limitations, every
   original/source/normalized/converted/target value and unit representation,
   singular and plural source aliases, acceptance evidence, and every closed
   policy field into exact-key audit schemas and the result digest. Both
   authoring-owned provenance keys are reserved and rejected on input.
-- Made `registry_storage_only_no_simulation_authorization` a centralized,
-  mode-independent modelability blocker. Exploratory, scientific, and toy
-  preflight paths cannot use such a parameter, and
-  `VirtualExperiment.simulate(...)` fails before execution. Other explicit
-  `allowed_use` behavior remains unchanged.
+- Made `registry_storage_only_no_simulation_authorization` one centralized,
+  mode-independent authorization predicate used by modelability and every
+  simulation parameter ranking/resolution path. Exploratory, scientific, and
+  toy preflight paths cannot use such a parameter; ensemble and chain runtime
+  refuse it, and authorized alternatives are ranked consistently. Other
+  explicit `allowed_use` behavior remains unchanged.
 - Kept written source curation input out of scope. Shared canonicalization,
-  type-exact comparison, round-trip difference, SHA256, and symlink helpers
-  live in one internal integrity module and are reused by registry promotion;
-  the production parameter factory is exposed through one focused loader
-  helper. No parallel curation-bundle parser was added.
+  type-exact comparison, round-trip difference, SHA256, full-tree hashing, and
+  symlink helpers live in one internal integrity module and are reused by
+  registry promotion. No parallel curation-bundle parser was added.
 - The frozen SABIO-RK test completes explicit identity curation in a test-owned
   proposal copy, re-authors canonical EntryID 35622 kcat using the existing
   canonical record id, removes that target only from a copied temporary
@@ -141,11 +148,11 @@ written source bundle. Add no scientific transformation or registry mutation.
 
 Verification:
 
-- Focused PARAMETER-authoring suite: 63 passed.
-- Focused authoring, source-provider, curation, promotion-planning,
-  modelability, VirtualExperiment, and roadmap-status suite: 214 passed in
-  14.10s.
-- Canonical full pytest: 981 passed in 91.95s on the final code.
+- Focused authoring, source-provider, curation, modelability, and
+  VirtualExperiment suite: 166 passed in 10.42s.
+- Focused ensemble, case-builder, chain, promotion-plan, and promotion-apply
+  suite: 128 passed in 36.51s; roadmap status: 9 passed.
+- Canonical full pytest: 986 passed in 92.68s on the final code.
 - Focused Ruff: passed.
 - Full Ruff: passed for `src` and `tests`.
 - Full Pyright with the shared venv interpreter selected explicitly: 0 errors,

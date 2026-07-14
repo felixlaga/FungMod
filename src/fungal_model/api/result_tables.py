@@ -24,7 +24,11 @@ from fungal_model.api.output_schema import (
     output_schema_document,
     table_fieldnames,
 )
-from fungal_model.registry.records import ParameterRecord, RegistryRecord
+from fungal_model.registry.records import (
+    ParameterRecord,
+    RegistryRecord,
+    parameter_is_simulation_authorized,
+)
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.screening import (
     EnsembleSample,
@@ -2344,7 +2348,7 @@ def _role_parameter_records(
             environment_id=case.environment_id,
             mode=mode,
         )
-        if record is not None:
+        if record is not None and parameter_is_simulation_authorized(record):
             records[role] = record
     return records
 
@@ -2373,7 +2377,7 @@ def _chain_template_role_records(
         if record_id is None:
             continue
         record = registry.parameters.get(str(record_id))
-        if record is not None:
+        if record is not None and parameter_is_simulation_authorized(record):
             records[role] = record
     return records
 
@@ -2394,6 +2398,7 @@ def _best_case_parameter_record(
         record
         for record in registry.parameters.values()
         if record.parameter_symbol == parameter_symbol
+        and parameter_is_simulation_authorized(record)
         and record.process_type == process_type
         and _matches(record.enzyme_class, enzyme_class)
         and _matches(record.substrate_class, substrate_class)
@@ -2414,7 +2419,7 @@ def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
 
 
-def _parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int]:
+def _parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int, int]:
     selector_score = sum(
         value is not None
         for value in (
@@ -2427,10 +2432,10 @@ def _parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int]:
     )
     value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
     exploratory_score = 1 if _is_exploratory_record(record) else 0
-    return selector_score, value_score, exploratory_score
+    return int(parameter_is_simulation_authorized(record)), selector_score, value_score, exploratory_score
 
 
-def _scientific_parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int]:
+def _scientific_parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int, int]:
     selector_score = sum(
         value is not None
         for value in (
@@ -2443,7 +2448,7 @@ def _scientific_parameter_record_priority(record: ParameterRecord) -> tuple[int,
     )
     value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
     maturity_score = 1 if record.maturity == "calibrated" else 0
-    return selector_score, value_score, maturity_score
+    return int(parameter_is_simulation_authorized(record)), selector_score, value_score, maturity_score
 
 
 def _trajectory_state_names(row: Mapping[str, str]) -> tuple[str, ...]:

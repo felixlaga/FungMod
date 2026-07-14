@@ -1617,6 +1617,7 @@ def _source_002_proposed_parameter_records(proposal: RegistryProposal) -> list[d
                         "source_field": parameter.source_field,
                     },
                     "parameter_symbol": parameter.proposed_symbol,
+                    "parameter_role": _parameter_role(record, parameter.proposed_symbol),
                     "process_type": proposal.process_type,
                     "enzyme_class": _source_002_enzyme_id(record),
                     "substrate_class": stable_sabiork_token(_primary_substrate_name(record.participants)),
@@ -1868,7 +1869,7 @@ def _parameter_roles(record: SabioRKReactionRecord) -> dict[str, str]:
         symbol = parameter.proposed_symbol
         lowered = symbol.lower()
         if lowered.startswith("km_"):
-            roles.setdefault("Km", symbol)
+            roles.setdefault("km", symbol)
         elif lowered.startswith("kcat_"):
             roles.setdefault("kcat", symbol)
         elif lowered == "enzyme_concentration":
@@ -1876,6 +1877,11 @@ def _parameter_roles(record: SabioRKReactionRecord) -> dict[str, str]:
         else:
             roles.setdefault(symbol, symbol)
     return roles
+
+
+def _parameter_role(record: SabioRKReactionRecord, symbol: str) -> str:
+    roles = [role for role, mapped_symbol in _parameter_roles(record).items() if mapped_symbol == symbol]
+    return roles[0] if len(roles) == 1 else ""
 
 
 def _case_template_safe(record: SabioRKReactionRecord, *, proposal: RegistryProposal) -> bool:

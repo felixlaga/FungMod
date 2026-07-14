@@ -15,7 +15,12 @@ import yaml
 
 from fungal_model.core.value_spec import ValueSpec
 from fungal_model.io.model_config import ModelConfig
-from fungal_model.registry.records import ParameterRecord, ProcessCompatibilityRecord
+from fungal_model.registry.records import (
+    ParameterRecord,
+    ProcessCompatibilityRecord,
+    parameter_is_simulation_authorized,
+    parameter_simulation_authorization_blocker,
+)
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.results import SimulationResult
 from fungal_model.screening.case_builder import (
@@ -429,6 +434,11 @@ def _resolve_role_records(
             raise RegistryScreenSimulationError(
                 f"No registry parameter record found for role {role!r} and symbol {symbol!r}."
             )
+        blocker = parameter_simulation_authorization_blocker(record)
+        if blocker is not None:
+            raise RegistryScreenSimulationError(
+                f"Exploratory mode rejected parameter role {role!r} and symbol {symbol!r}: {blocker}"
+            )
         validation = record.value.validate(nonnegative=True)
         if not validation.passed:
             raise RegistryScreenSimulationError(
@@ -567,6 +577,11 @@ def _chain_template_role_records(
                 f"{process_label} role {role!r} expected symbol {expected_symbol!r}, "
                 f"but template record {record_id!r} uses {record.parameter_symbol!r}."
             )
+        blocker = parameter_simulation_authorization_blocker(record)
+        if blocker is not None:
+            raise RegistryScreenSimulationError(
+                f"Parameter role {role!r} and symbol {record.parameter_symbol!r} is unauthorized: {blocker}"
+            )
         validation = record.value.validate(nonnegative=True)
         if not validation.passed:
             raise RegistryScreenSimulationError(
@@ -649,7 +664,7 @@ def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
 
 
-def _exploratory_parameter_specificity(record: ParameterRecord) -> tuple[int, int, int]:
+def _exploratory_parameter_specificity(record: ParameterRecord) -> tuple[int, int, int, int]:
     selector_score = sum(
         value is not None
         for value in (
@@ -662,10 +677,10 @@ def _exploratory_parameter_specificity(record: ParameterRecord) -> tuple[int, in
     )
     value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
     exploratory_score = 1 if record.maturity == "exploratory_prior" or record.provenance.get("exploratory_prior") else 0
-    return selector_score, value_score, exploratory_score
+    return int(parameter_is_simulation_authorized(record)), selector_score, value_score, exploratory_score
 
 
-def _scientific_parameter_specificity(record: ParameterRecord) -> tuple[int, int, int]:
+def _scientific_parameter_specificity(record: ParameterRecord) -> tuple[int, int, int, int]:
     selector_score = sum(
         value is not None
         for value in (
@@ -678,7 +693,7 @@ def _scientific_parameter_specificity(record: ParameterRecord) -> tuple[int, int
     )
     value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
     maturity_score = 1 if record.maturity == "calibrated" else 0
-    return selector_score, value_score, maturity_score
+    return int(parameter_is_simulation_authorized(record)), selector_score, value_score, maturity_score
 
 
 def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:
@@ -686,6 +701,9 @@ def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:
 
 
 def _scientific_parameter_record_blocker(record: ParameterRecord) -> str | None:
+    authorization_blocker = parameter_simulation_authorization_blocker(record)
+    if authorization_blocker is not None:
+        return authorization_blocker
     maturity = record.maturity.casefold()
     if maturity.startswith("toy") or maturity.startswith("synthetic"):
         return "toy or synthetic parameter records are not scientific inputs"

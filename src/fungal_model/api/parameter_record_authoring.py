@@ -17,28 +17,31 @@ import yaml
 from fungal_model.api._integrity import (
     PARAMETER_BRIDGE_PROVENANCE_KEY,
     RESERVED_PROVENANCE_KEYS,
+    TreeIntegrityError,
     canonicalize,
     first_symlink_component,
     round_trip_differences,
     sha256_bytes,
+    tree_content_digest,
     type_exact_equal,
 )
 from fungal_model.api.curation import (
     CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
     CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
     CURATION_SCHEMA_VERSION,
+    CurationError,
     CurationRecord,
     CurationResult,
     CurationWriteResult,
     curation_date_is_iso,
     curation_source_provenance_missing,
+    validate_curation_report_limitations,
 )
 from fungal_model.registry.loaders import load_parameter_record_mapping, load_registry
 from fungal_model.registry.records import PARAMETER_ALLOWED_USE_STORAGE_ONLY
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.sources.sabiork import (
     PROPOSAL_STATUS,
-    SabioRKSourceError,
     frozen_source_urls,
 )
 
@@ -109,6 +112,7 @@ _RESULT_PROVENANCE_FIELDS = frozenset({"source_query", "source_snapshot_path", "
 _SOURCE_PARAMETER_AUDIT_FIELDS = frozenset(
     {
         "parameter_symbol",
+        "parameter_role",
         "proposal_status",
         "proposal_allowed_use",
         "original_value",
@@ -146,7 +150,22 @@ _TARGET_POLICY_AUDIT_FIELDS = frozenset(
         "confidence_level",
     }
 )
-_REGISTRY_CONTEXT_FIELDS = frozenset({"registry_id", "registry_version", "registry_index_sha256"})
+_REGISTRY_CONTEXT_FIELDS = frozenset(
+    {"registry_id", "registry_version", "registry_index_sha256", "registry_content_sha256"}
+)
+_SELECTOR_RESOLUTION_FIELDS = frozenset(
+    {
+        "fungus_id",
+        "effective_enzyme_classes",
+        "substrate_id",
+        "effective_substrate_class",
+        "environment_id",
+        "process_type",
+        "parameter_symbol",
+        "parameter_role",
+        "process_compatibility_id",
+    }
+)
 _AUDIT_FIELDS = frozenset(
     {
         "schema_version",
@@ -162,6 +181,7 @@ _AUDIT_FIELDS = frozenset(
         "result_provenance",
         "target_policy",
         "registry_context",
+        "selector_resolution",
         "scientific_validation_claimed",
         "simulation_authorized",
         "production_registry_mutated",
@@ -177,6 +197,32 @@ class ParameterRecordAuthoringError(ValueError):
 class _RegistryContext:
     registry: FungModRegistry
     evidence: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class _ResolvedParameterCompatibility:
+    fungus_id: str | None
+    effective_enzyme_classes: tuple[str, ...]
+    substrate_id: str | None
+    effective_substrate_class: str
+    environment_id: str | None
+    process_type: str
+    parameter_symbol: str
+    parameter_role: str
+    process_compatibility_id: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "fungus_id": self.fungus_id,
+            "effective_enzyme_classes": list(self.effective_enzyme_classes),
+            "substrate_id": self.substrate_id,
+            "effective_substrate_class": self.effective_substrate_class,
+            "environment_id": self.environment_id,
+            "process_type": self.process_type,
+            "parameter_symbol": self.parameter_symbol,
+            "parameter_role": self.parameter_role,
+            "process_compatibility_id": self.process_compatibility_id,
+        }
 
 
 @dataclass(frozen=True)
@@ -251,7 +297,7 @@ def author_parameter_record(
     _validate_target_schema(target, audit_required=False)
     _validate_target_correspondence(source, target)
     context = _load_registry_context(registry_index)
-    _validate_selectors(target, context.registry)
+    selector_resolution = _resolve_parameter_compatibility(target, context.registry)
 
     provenance = deepcopy(dict(target["provenance"]))
     provenance[PARAMETER_BRIDGE_PROVENANCE_KEY] = _audit_payload(
@@ -259,6 +305,7 @@ def author_parameter_record(
         target=target,
         authored_record_id=str(target["record_id"]),
         registry_evidence=context.evidence,
+        selector_resolution=selector_resolution,
         result_provenance=result_provenance,
     )
     target["provenance"] = provenance
@@ -394,6 +441,7 @@ def validate_parameter_authoring_bundle_record(
     record_type: str,
     target_record: Mapping[str, Any],
     curation_metadata: Mapping[str, Any],
+    curation_report: str,
 ) -> None:
     expected = {
         "workflow": PARAMETER_AUTHORING_WORKFLOW,
@@ -416,19 +464,26 @@ def validate_parameter_authoring_bundle_record(
         proposal_limitations
     ):
         raise ParameterRecordAuthoringError("Written authoring summary lacks result provenance.")
-    if any(
-        not type_exact_equal(container.get(field), summary.get(field))
-        for container in (manifest, accepted_payload)
-        for field in ("source_query", "source_snapshot_path")
-    ):
-        raise ParameterRecordAuthoringError(
-            "Written bundle result provenance disagrees across manifest, summary, and accepted records."
-        )
     assert isinstance(source_id, str)
     assert isinstance(source_query, str) and isinstance(source_snapshot_path, str)
     assert isinstance(proposal_limitations, Sequence) and not isinstance(
         proposal_limitations, (str, bytes)
     )
+    result_provenance = _result_provenance(
+        source_query=source_query,
+        source_snapshot_path=source_snapshot_path,
+        proposal_limitations=proposal_limitations,
+    )
+    _validate_result_provenance_envelope(
+        result_provenance,
+        summary=summary,
+        manifest=manifest,
+        accepted_payload=accepted_payload,
+    )
+    try:
+        validate_curation_report_limitations(curation_report, proposal_limitations)
+    except CurationError as exc:
+        raise ParameterRecordAuthoringError(str(exc)) from exc
     validate_authored_parameter_record(
         target_record,
         curation_metadata,
@@ -454,7 +509,11 @@ def validate_authored_parameter_against_registry(
         raise ParameterRecordAuthoringError(
             "Authored parameter registry context does not match the planning registry."
         )
-    _validate_selectors(target_record, context.registry)
+    current_resolution = _resolve_parameter_compatibility(target_record, context.registry).to_dict()
+    if not type_exact_equal(audit.get("selector_resolution"), current_resolution):
+        raise ParameterRecordAuthoringError(
+            "Authored parameter selector resolution does not match the planning registry."
+        )
 
 
 def _result_provenance(
@@ -488,6 +547,21 @@ def _validate_result_provenance(
         raise ParameterRecordAuthoringError(
             "Authored result provenance disagrees with accepted curation evidence."
         )
+
+
+def _validate_result_provenance_envelope(
+    expected: Mapping[str, Any],
+    **representations: Mapping[str, Any],
+) -> None:
+    for label, representation in representations.items():
+        actual = {field: representation.get(field) for field in _RESULT_PROVENANCE_FIELDS}
+        if any(field not in representation for field in _RESULT_PROVENANCE_FIELDS) or not type_exact_equal(
+            actual, expected
+        ):
+            raise ParameterRecordAuthoringError(
+                "Written bundle result provenance disagrees across its "
+                f"authoritative representations ({label})."
+            )
 
 
 def _accepted_source(result: CurationResult, record_id: str) -> CurationRecord:
@@ -583,8 +657,10 @@ def _validate_source_record(
         _finite_float(source.get(field), field=f"source.{field}")
     if not all(_text(source.get(field)) for field in text_fields):
         raise ParameterRecordAuthoringError("Source original and normalized units must be explicit text.")
-    if not _text(source.get("parameter_symbol")):
-        raise ParameterRecordAuthoringError("Source parameter_symbol must be explicit text.")
+    if not _text(source.get("parameter_symbol")) or not _text(source.get("parameter_role")):
+        raise ParameterRecordAuthoringError(
+            "Source parameter_symbol and parameter_role must be explicit text."
+        )
     pairs = (
         ("original_value", "source_value"),
         ("converted_value", "source_value"),
@@ -661,6 +737,10 @@ def _validate_target_correspondence(source: CurationRecord, target: Mapping[str,
         raise ParameterRecordAuthoringError("Target units must match converted_units exactly.")
     if not type_exact_equal(target.get("parameter_symbol"), source_record.get("parameter_symbol")):
         raise ParameterRecordAuthoringError("Target parameter_symbol must match the selected source record.")
+    if not type_exact_equal(provenance.get("parameter_role"), source_record.get("parameter_role")):
+        raise ParameterRecordAuthoringError(
+            "Target provenance parameter_role must match the selected source role contract."
+        )
     if any(
         field not in provenance
         or not type_exact_equal(provenance[field], source.source_provenance[field])
@@ -724,6 +804,7 @@ def _audit_payload(
     target: Mapping[str, Any],
     authored_record_id: str,
     registry_evidence: Mapping[str, str],
+    selector_resolution: _ResolvedParameterCompatibility,
     result_provenance: Mapping[str, Any],
 ) -> dict[str, Any]:
     proposed = source.proposed_record
@@ -739,6 +820,7 @@ def _audit_payload(
         "conversion_policy": "identity_only_nonidentity_deferred",
         "source_parameter": {
             "parameter_symbol": proposed["parameter_symbol"],
+            "parameter_role": proposed["parameter_role"],
             "proposal_status": proposed["proposal_status"],
             "proposal_allowed_use": proposed["allowed_use"],
             "original_value": proposed["original_value"],
@@ -759,6 +841,7 @@ def _audit_payload(
         "result_provenance": deepcopy(dict(result_provenance)),
         "target_policy": _target_policy(target),
         "registry_context": deepcopy(dict(registry_evidence)),
+        "selector_resolution": selector_resolution.to_dict(),
         "scientific_validation_claimed": False,
         "simulation_authorized": False,
         "production_registry_mutated": False,
@@ -811,6 +894,7 @@ def _validate_audit(
         _finite_float(source_parameter.get(field), field=f"audit.source_parameter.{field}")
     parameter_expected = {
         "parameter_symbol": target.get("parameter_symbol"),
+        "parameter_role": target["provenance"].get("parameter_role"),
         "proposal_status": PROPOSAL_STATUS,
         "proposal_allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
         "target_value": value.get("value"),
@@ -896,6 +980,41 @@ def _validate_audit(
         context["registry_index_sha256"]
     ) is None:
         raise ParameterRecordAuthoringError("Parameter bridge registry digest is invalid.")
+    if not isinstance(context.get("registry_content_sha256"), str) or _SHA256.fullmatch(
+        context["registry_content_sha256"]
+    ) is None:
+        raise ParameterRecordAuthoringError("Parameter bridge full registry digest is invalid.")
+    resolution = audit.get("selector_resolution")
+    if (
+        not isinstance(resolution, Mapping)
+        or set(resolution) != _SELECTOR_RESOLUTION_FIELDS
+        or not _text_sequence(resolution.get("effective_enzyme_classes"))
+        or not all(
+            _text(resolution.get(field))
+            for field in (
+                "effective_substrate_class",
+                "process_type",
+                "parameter_symbol",
+                "parameter_role",
+                "process_compatibility_id",
+            )
+        )
+        or any(
+            resolution.get(field) is not None and not _text(resolution.get(field))
+            for field in ("fungus_id", "substrate_id", "environment_id")
+        )
+        or not type_exact_equal(resolution.get("fungus_id"), target.get("fungus_id"))
+        or not type_exact_equal(resolution.get("substrate_id"), target.get("substrate_id"))
+        or not type_exact_equal(resolution.get("environment_id"), target.get("environment_id"))
+        or not type_exact_equal(resolution.get("process_type"), target.get("process_type"))
+        or not type_exact_equal(resolution.get("parameter_symbol"), target.get("parameter_symbol"))
+        or not type_exact_equal(
+            resolution.get("parameter_role"), target_provenance.get("parameter_role")
+        )
+    ):
+        raise ParameterRecordAuthoringError(
+            "Parameter bridge selector and compatibility resolution is inconsistent."
+        )
 
 
 def _validate_source_provenance(provenance: Mapping[str, Any]) -> None:
@@ -910,19 +1029,27 @@ def _validate_source_provenance(provenance: Mapping[str, Any]) -> None:
         elif field == "source_snapshot_sha256":
             valid = isinstance(value, str) and _SHA256.fullmatch(value) is not None
         elif field == "source_url":
-            valid = _text(value)
+            valid = value is None or _text(value)
         else:
             valid = _text(value)
         if not valid:
             raise ParameterRecordAuthoringError(f"Source provenance requires {field}.")
-    if not type_exact_equal(provenance["source_urls"], [provenance["source_url"]]):
+    source_urls = provenance["source_urls"]
+    assert isinstance(source_urls, Sequence) and not isinstance(source_urls, (str, bytes))
+    source_url = provenance["source_url"]
+    valid_url_cardinality = (
+        len(source_urls) == 1
+        and type_exact_equal(source_url, source_urls[0])
+    ) or (len(source_urls) > 1 and source_url is None)
+    if not valid_url_cardinality:
         raise ParameterRecordAuthoringError(
-            "Source provenance requires one exact source_url/source_urls identity."
+            "Source provenance URL cardinality requires one URL in both forms or multiple "
+            "ordered source_urls with source_url null."
         )
     if provenance["source_database"] == "SABIO-RK":
         try:
             frozen_urls = list(frozen_source_urls(str(provenance["source_snapshot_path"])))
-        except (OSError, SabioRKSourceError) as exc:
+        except (OSError, ValueError) as exc:
             raise ParameterRecordAuthoringError(
                 f"Frozen SABIO-RK source URL evidence is unreadable: {exc}"
             ) from exc
@@ -977,25 +1104,40 @@ def _load_registry_context(registry_index: str | Path) -> _RegistryContext:
         registry = load_registry(resolved)
     except (OSError, TypeError, ValueError) as exc:
         raise ParameterRecordAuthoringError(f"Registry failed production loading: {exc}") from exc
+    try:
+        content_digest = tree_content_digest(resolved.parent, label="Registry root")
+    except (OSError, TreeIntegrityError) as exc:
+        raise ParameterRecordAuthoringError(f"Registry content cannot be hashed safely: {exc}") from exc
     return _RegistryContext(
         registry=registry,
         evidence={
             "registry_id": registry_id,
             "registry_version": version,
             "registry_index_sha256": sha256_bytes(resolved.read_bytes()),
+            "registry_content_sha256": content_digest,
         },
     )
 
 
-def _validate_selectors(record: Mapping[str, Any], registry: FungModRegistry) -> None:
+def _resolve_parameter_compatibility(
+    record: Mapping[str, Any],
+    registry: FungModRegistry,
+) -> _ResolvedParameterCompatibility:
     loaded = load_parameter_record_mapping(record)
-    effective_enzyme_classes: set[str] | None = None
+    provenance = record.get("provenance")
+    parameter_role = provenance.get("parameter_role") if isinstance(provenance, Mapping) else None
+    if not _text(parameter_role):
+        raise ParameterRecordAuthoringError(
+            "Curator-authored provenance requires one explicit parameter_role."
+        )
+    assert isinstance(parameter_role, str)
+    effective_enzyme_classes: set[str] = set()
     if loaded.enzyme_class is not None:
         if loaded.enzyme_class not in registry.enzyme_classes:
             raise ParameterRecordAuthoringError(
                 f"Unknown authored enzyme_class {loaded.enzyme_class!r}."
             )
-        effective_enzyme_classes = {loaded.enzyme_class}
+        effective_enzyme_classes.add(loaded.enzyme_class)
     if loaded.substrate_class is not None and not any(
         item.substrate_class == loaded.substrate_class for item in registry.substrates.values()
     ):
@@ -1011,28 +1153,53 @@ def _validate_selectors(record: Mapping[str, Any], registry: FungModRegistry) ->
             if loaded.enzyme_class is not None
             else set(fungus.enzyme_classes)
         )
+    if not effective_enzyme_classes:
+        raise ParameterRecordAuthoringError(
+            "Authored selectors must resolve at least one effective enzyme class."
+        )
     effective_substrate_class = loaded.substrate_class
     if loaded.substrate_id is not None:
         substrate = _registry_lookup(registry.get_substrate, loaded.substrate_id)
         if loaded.substrate_class is not None and substrate.substrate_class != loaded.substrate_class:
             raise ParameterRecordAuthoringError("Authored substrate_id and substrate_class are incompatible.")
         effective_substrate_class = substrate.substrate_class
+    if effective_substrate_class is None:
+        raise ParameterRecordAuthoringError(
+            "Authored selectors must resolve one effective substrate class."
+        )
     if loaded.environment_id is not None:
         _registry_lookup(registry.get_environment, loaded.environment_id)
     matches = tuple(
         item
         for item in registry.process_compatibility.values()
         if item.process_type == loaded.process_type
-        and (effective_enzyme_classes is None or item.enzyme_class in effective_enzyme_classes)
-        and (effective_substrate_class is None or item.substrate_class == effective_substrate_class)
+        and item.enzyme_class in effective_enzyme_classes
+        and item.substrate_class == effective_substrate_class
         and loaded.parameter_symbol in item.required_parameters
-        and loaded.parameter_symbol in item.parameter_roles.values()
+        and item.parameter_roles.get(parameter_role) == loaded.parameter_symbol
+        and tuple(
+            role
+            for role, symbol in item.parameter_roles.items()
+            if symbol == loaded.parameter_symbol
+        )
+        == (parameter_role,)
     )
     if len(matches) != 1:
         raise ParameterRecordAuthoringError(
             "Authored selectors and parameter role require exactly one effective process "
             f"compatibility record; found {len(matches)}."
         )
+    return _ResolvedParameterCompatibility(
+        fungus_id=loaded.fungus_id,
+        effective_enzyme_classes=tuple(sorted(effective_enzyme_classes)),
+        substrate_id=loaded.substrate_id,
+        effective_substrate_class=effective_substrate_class,
+        environment_id=loaded.environment_id,
+        process_type=loaded.process_type,
+        parameter_symbol=loaded.parameter_symbol,
+        parameter_role=parameter_role,
+        process_compatibility_id=matches[0].record_id,
+    )
 
 
 def _registry_lookup(function: Any, record_id: str) -> Any:
