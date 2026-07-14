@@ -19,9 +19,7 @@ from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
     parameter_record_is_mode_eligible,
-    parameter_record_mode_eligibility_blocker,
     parameter_record_selection_key,
-    parameter_simulation_authorization_blocker,
 )
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.results import SimulationResult
@@ -32,6 +30,10 @@ from fungal_model.screening.case_builder import (
     select_registry_case_compatibility,
 )
 from fungal_model.screening.modelability import ModelabilityReport, assess_modelability
+from fungal_model.screening.parameter_resolution import (
+    ExactTemplateParameterError,
+    resolve_exact_template_parameter_records,
+)
 from fungal_model.workflows import run_configured_model
 
 ScreenSimulationMode = Literal["exploratory", "scientific"]
@@ -400,16 +402,18 @@ def _resolve_role_records(
     required_roles: tuple[str, ...],
     process_label: str,
 ) -> Mapping[str, ParameterRecord]:
-    chain_records = _chain_template_role_records(
+    explicit_records = _exact_template_role_records(
         registry=registry,
         compatibility=compatibility,
         required_roles=required_roles,
         process_label=process_label,
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
         environment_id=environment_id,
-        scientific=False,
+        mode="exploratory",
     )
-    if chain_records is not None:
-        return chain_records
+    if explicit_records is not None:
+        return explicit_records
     missing_roles = tuple(
         role for role in required_roles if role not in compatibility.parameter_roles
     )
@@ -436,11 +440,6 @@ def _resolve_role_records(
             raise RegistryScreenSimulationError(
                 f"No registry parameter record found for role {role!r} and symbol {symbol!r}."
             )
-        blocker = parameter_simulation_authorization_blocker(record)
-        if blocker is not None:
-            raise RegistryScreenSimulationError(
-                f"Exploratory mode rejected parameter role {role!r} and symbol {symbol!r}: {blocker}"
-            )
         validation = record.value.validate(nonnegative=True)
         if not validation.passed:
             raise RegistryScreenSimulationError(
@@ -466,16 +465,18 @@ def _resolve_scientific_role_records(
     required_roles: tuple[str, ...],
     process_label: str,
 ) -> Mapping[str, ParameterRecord]:
-    chain_records = _chain_template_role_records(
+    explicit_records = _exact_template_role_records(
         registry=registry,
         compatibility=compatibility,
         required_roles=required_roles,
         process_label=process_label,
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
         environment_id=environment_id,
-        scientific=True,
+        mode="scientific",
     )
-    if chain_records is not None:
-        return chain_records
+    if explicit_records is not None:
+        return explicit_records
     missing_roles = tuple(
         role for role in required_roles if role not in compatibility.parameter_roles
     )
@@ -514,30 +515,23 @@ def _resolve_scientific_role_records(
                 f"Scientific mode requires exact parameters; role {role!r} uses "
                 f"symbol {symbol!r} with ValueSpec kind {record.value.kind!r}."
             )
-        blocker = _scientific_parameter_record_blocker(record)
-        if blocker is not None:
-            raise RegistryScreenSimulationError(
-                f"Scientific mode rejected parameter role {role!r} and symbol {symbol!r}: {blocker}"
-            )
         records[role] = record
     return records
 
 
-def _chain_template_role_records(
+def _exact_template_role_records(
     *,
     registry: FungModRegistry,
     compatibility: ProcessCompatibilityRecord,
     required_roles: tuple[str, ...],
     process_label: str,
+    fungus_id: str,
+    substrate_id: str,
     environment_id: str,
-    scientific: bool,
+    mode: ScreenSimulationMode,
 ) -> Mapping[str, ParameterRecord] | None:
-    if compatibility.process_type != "extracellular_enzyme_chain":
-        return None
     if not compatibility.case_template_id:
-        raise RegistryScreenSimulationError(
-            f"{process_label} compatibility {compatibility.record_id!r} lacks case_template_id."
-        )
+        return None
     try:
         template = registry.get_case_template(compatibility.case_template_id)
     except RegistryLookupError as exc:
@@ -545,77 +539,22 @@ def _chain_template_role_records(
             f"{process_label} compatibility {compatibility.record_id!r} references missing "
             f"case template {compatibility.case_template_id!r}."
         ) from exc
-    parameter_ids = template.process_state_metadata.get("parameter_record_ids")
-    if not isinstance(parameter_ids, dict):
-        raise RegistryScreenSimulationError(
-            f"{process_label} template {template.case_template_id!r} lacks parameter_record_ids."
+    try:
+        return resolve_exact_template_parameter_records(
+            registry=registry,
+            template=template,
+            compatibility=compatibility,
+            required_roles=required_roles,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            mode=mode,
+            value_requirement="exact" if mode == "scientific" else "sampleable",
         )
-    missing_roles = tuple(
-        role for role in required_roles if role not in compatibility.parameter_roles or role not in parameter_ids
-    )
-    if missing_roles:
+    except ExactTemplateParameterError as exc:
         raise RegistryScreenSimulationError(
-            f"{process_label} compatibility/template metadata is missing parameter role mappings "
-            f"for: {', '.join(missing_roles)}."
-        )
-    roles_to_resolve = tuple(dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys())))
-    records: dict[str, ParameterRecord] = {}
-    for role in roles_to_resolve:
-        record_id = str(parameter_ids[role])
-        record = registry.parameters.get(record_id)
-        if record is None:
-            raise RegistryScreenSimulationError(
-                f"{process_label} template {template.case_template_id!r} references missing "
-                f"parameter record {record_id!r} for role {role!r}."
-            )
-        if not _matches(record.environment_id, environment_id):
-            raise RegistryScreenSimulationError(
-                f"{process_label} template {template.case_template_id!r} parameter record "
-                f"{record_id!r} is scoped to environment {record.environment_id!r}, not {environment_id!r}."
-            )
-        expected_symbol = compatibility.parameter_roles[role]
-        if record.parameter_symbol != expected_symbol:
-            raise RegistryScreenSimulationError(
-                f"{process_label} role {role!r} expected symbol {expected_symbol!r}, "
-                f"but template record {record_id!r} uses {record.parameter_symbol!r}."
-            )
-        blocker = parameter_simulation_authorization_blocker(record)
-        if blocker is not None:
-            raise RegistryScreenSimulationError(
-                f"Parameter role {role!r} and symbol {record.parameter_symbol!r} is unauthorized: {blocker}"
-            )
-        mode = "scientific" if scientific else "exploratory"
-        eligibility_blocker = parameter_record_mode_eligibility_blocker(record, mode=mode)
-        if eligibility_blocker is not None:
-            raise RegistryScreenSimulationError(
-                f"{mode.capitalize()} mode rejected parameter role {role!r} and symbol "
-                f"{record.parameter_symbol!r}: {eligibility_blocker}"
-            )
-        validation = record.value.validate(nonnegative=True)
-        if not validation.passed:
-            raise RegistryScreenSimulationError(
-                f"Parameter {record.parameter_symbol!r} for role {role!r} failed ValueSpec validation: "
-                f"{validation.to_dict()}"
-            )
-        if scientific:
-            if not record.value.is_exact:
-                raise RegistryScreenSimulationError(
-                    f"Scientific mode requires exact parameters; role {role!r} uses "
-                    f"symbol {record.parameter_symbol!r} with ValueSpec kind {record.value.kind!r}."
-                )
-            blocker = _scientific_parameter_record_blocker(record)
-            if blocker is not None:
-                raise RegistryScreenSimulationError(
-                    f"Scientific mode rejected parameter role {role!r} and symbol "
-                    f"{record.parameter_symbol!r}: {blocker}"
-                )
-        elif not record.value.is_exact and not record.value.is_uncertain:
-            raise RegistryScreenSimulationError(
-                f"Parameter role {role!r} uses ValueSpec kind {record.value.kind!r}, "
-                "which cannot be sampled for exploratory simulation."
-            )
-        records[role] = record
-    return records
+            f"{process_label} exact parameter mapping is invalid: {exc}"
+        ) from exc
 
 
 def _best_exploratory_parameter_record(
@@ -678,13 +617,6 @@ def _best_scientific_parameter_record(
 
 def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
-
-
-def _scientific_parameter_record_blocker(record: ParameterRecord) -> str | None:
-    authorization_blocker = parameter_simulation_authorization_blocker(record)
-    if authorization_blocker is not None:
-        return authorization_blocker
-    return parameter_record_mode_eligibility_blocker(record, mode="scientific")
 
 
 def _sample_role_records(

@@ -12,6 +12,10 @@ import yaml
 
 from fungal_model import ConfiguredModelExecutionError, VirtualExperiment
 from fungal_model.registry import load_registry
+from fungal_model.registry.records import (
+    PARAMETER_ALLOWED_USE_SCIENTIFIC,
+    PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
+)
 from fungal_model.screening import (
     EnzymeChainAssemblyError,
     RegistryCaseBuildError,
@@ -157,14 +161,17 @@ def test_registry_product_inhibition_requires_explicit_ki_record(tmp_path: Path)
     registry_dir = _registry_with_bio002_product_inhibition(tmp_path, include_ki_record=False)
     registry = load_registry(registry_dir / "registry_index.yml")
 
-    with pytest.raises(EnzymeChainAssemblyError, match="Unknown parameter record"):
+    with pytest.raises(EnzymeChainAssemblyError, match="missing parameter record"):
         build_extracellular_enzyme_chain_config(registry=registry)
 
 
 def test_registry_product_inhibition_rejects_non_positive_ki_without_fallback(tmp_path: Path) -> None:
     registry_dir = _registry_with_bio002_product_inhibition(tmp_path, ki_value=0.0)
     registry = load_registry(registry_dir / "registry_index.yml")
-    config = build_extracellular_enzyme_chain_config(registry=registry, output_directory=tmp_path / "bad_ki")
+    config = build_extracellular_enzyme_chain_config(
+        registry=registry,
+        output_directory=tmp_path / "bad_ki",
+    )
     config_path = tmp_path / "bad_ki.yml"
     config_path.write_text(yaml.safe_dump(config.to_dict(), sort_keys=False), encoding="utf-8")
 
@@ -367,7 +374,7 @@ def test_registry_chain_environment_modifier_requires_role_field(tmp_path: Path)
     )
     registry = load_registry(registry_dir / "registry_index.yml")
 
-    with pytest.raises(EnzymeChainAssemblyError, match="requires width_role"):
+    with pytest.raises(EnzymeChainAssemblyError, match="not owned by exactly one component process"):
         build_extracellular_enzyme_chain_config(
             registry=registry,
             environment_id=REACTION_ENVIRONMENT_ID,
@@ -383,7 +390,7 @@ def test_registry_chain_environment_modifier_requires_resolved_role(tmp_path: Pa
     )
     registry = load_registry(registry_dir / "registry_index.yml")
 
-    with pytest.raises(EnzymeChainAssemblyError, match="width_role 'missing_ph_width_role'"):
+    with pytest.raises(EnzymeChainAssemblyError, match="not owned by exactly one component process"):
         build_extracellular_enzyme_chain_config(
             registry=registry,
             environment_id=REACTION_ENVIRONMENT_ID,
@@ -821,6 +828,9 @@ def _registry_with_bio002_product_inhibition(
         if record["record_id"] == "bio002_extracellular_enzyme_chain_template":
             metadata = record["process_state_metadata"]
             metadata["parameter_record_ids"]["product_inhibition_constant"] = "bio003_fixture_product_inhibition_constant"
+            metadata["parameter_role_contracts"]["product_inhibition_constant"] = (
+                _bio002_homogeneous_role_contract("K_i_bio003_product_fixture")
+            )
             metadata["process_templates"][1]["modifiers"] = [
                 {
                     "type": "product_inhibition",
@@ -853,11 +863,11 @@ def _registry_with_bio002_product_inhibition(
                 },
                 "parameter_symbol": "K_i_bio003_product_fixture",
                 "process_type": "homogeneous_michaelis_menten",
-                "enzyme_class": None,
-                "substrate_class": None,
-                "fungus_id": None,
-                "substrate_id": None,
-                "environment_id": None,
+                "enzyme_class": "beta_glucosidase",
+                "substrate_class": "cellobiose",
+                "fungus_id": REACTION_FUNGUS_ID,
+                "substrate_id": REACTION_SUBSTRATE_ID,
+                "environment_id": REACTION_ENVIRONMENT_ID,
                 "value": {
                     "kind": "exact",
                     "value": ki_value,
@@ -868,7 +878,7 @@ def _registry_with_bio002_product_inhibition(
                 },
                 "range_scope": "software_test_fixture",
                 "range_interpretation": "configured mechanics only",
-                "allowed_use": "software_testing_only_not_scientific_validation",
+                "allowed_use": PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
                 "notes": "Fixture K_i for proving explicit registry-backed product-inhibition assembly.",
             },
         )
@@ -902,6 +912,14 @@ def _registry_with_bio002_environment_modifiers(
                         "ph_width": "bio002_chain_ph_width_fixture",
                     }
                 )
+                metadata["parameter_role_contracts"].update(
+                    {
+                        "activation_energy": _bio002_homogeneous_role_contract("E_a_bio002_chain_env_fixture"),
+                        "reference_temperature": _bio002_homogeneous_role_contract("T_ref_bio002_chain_env_fixture"),
+                        "ph_optimum": _bio002_homogeneous_role_contract("pH_opt_bio002_chain_env_fixture"),
+                        "ph_width": _bio002_homogeneous_role_contract("pH_width_bio002_chain_env_fixture"),
+                    }
+                )
                 ph_modifier = {
                     "type": "ph_gaussian",
                     "optimum_role": "ph_optimum",
@@ -921,6 +939,12 @@ def _registry_with_bio002_environment_modifiers(
                     {
                         "oxygen_half_saturation": "bio002_chain_oxygen_half_saturation_fixture",
                         "minimum_water_activity": "bio002_chain_minimum_water_activity_fixture",
+                    }
+                )
+                metadata["parameter_role_contracts"].update(
+                    {
+                        "oxygen_half_saturation": _bio002_homogeneous_role_contract("K_O2_bio002_chain_env_fixture"),
+                        "minimum_water_activity": _bio002_homogeneous_role_contract("a_w_min_bio002_chain_env_fixture"),
                     }
                 )
                 oxygen_modifier = {
@@ -1064,12 +1088,12 @@ def _chain_environment_modifier_parameter_record(
             "notes": notes,
         },
         "parameter_symbol": symbol,
-        "process_type": "extracellular_enzyme_chain",
-        "enzyme_class": None,
-        "substrate_class": None,
-        "fungus_id": None,
-        "substrate_id": None,
-        "environment_id": None,
+        "process_type": "homogeneous_michaelis_menten",
+        "enzyme_class": "beta_glucosidase",
+        "substrate_class": "cellobiose",
+        "fungus_id": REACTION_FUNGUS_ID,
+        "substrate_id": REACTION_SUBSTRATE_ID,
+        "environment_id": REACTION_ENVIRONMENT_ID,
         "value": {
             "kind": "exact",
             "value": value,
@@ -1080,8 +1104,20 @@ def _chain_environment_modifier_parameter_record(
         },
         "range_scope": "software_test_fixture",
         "range_interpretation": "configured mechanics only",
-        "allowed_use": "scientific_builder_software_testing_only_not_scientific_validation",
+        "allowed_use": PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
         "notes": notes,
+    }
+
+
+def _bio002_homogeneous_role_contract(symbol: str) -> dict[str, Any]:
+    return {
+        "kind": "process_parameter",
+        "parameter_symbol": symbol,
+        "enzyme_class": "beta_glucosidase",
+        "substrate_class": "cellobiose",
+        "fungus_id": REACTION_FUNGUS_ID,
+        "substrate_id": REACTION_SUBSTRATE_ID,
+        "environment_id": REACTION_ENVIRONMENT_ID,
     }
 
 
@@ -1171,7 +1207,7 @@ def _registry_with_reaction618_process_modifier(
                 },
                 "range_scope": "software_test_fixture",
                 "range_interpretation": "configured mechanics only",
-                "allowed_use": "scientific_builder_software_testing_only_not_scientific_validation",
+                "allowed_use": PARAMETER_ALLOWED_USE_SCIENTIFIC,
                 "notes": "Fixture K_i for proving explicit one-process registry-backed product-inhibition assembly.",
             },
         )
@@ -1415,7 +1451,7 @@ def _environment_modifier_parameter_record(
         },
         "range_scope": "software_test_fixture",
         "range_interpretation": "configured mechanics only",
-        "allowed_use": "scientific_builder_software_testing_only_not_scientific_validation",
+        "allowed_use": PARAMETER_ALLOWED_USE_SCIENTIFIC,
         "notes": notes,
     }
 

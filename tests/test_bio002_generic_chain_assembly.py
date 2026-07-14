@@ -391,6 +391,7 @@ def _generic_chain_template() -> dict[str, Any]:
                 "kcat_q_to_z": "fixture_q_to_z_kcat",
                 "terminal_inhibition_constant": "fixture_z_inhibition_constant",
             },
+            "parameter_role_contracts": _generic_parameter_role_contracts(),
             "product_maps": [
                 {
                     "id": "x_to_y_fixture_map",
@@ -663,22 +664,80 @@ def _generic_chain_entities() -> dict[str, Any]:
 
 def _generic_chain_parameters() -> list[dict[str, Any]]:
     return [
-        _parameter("fixture_x_initial_concentration", "X_initial", "extracellular_enzyme_chain", 6.0, "mM"),
-        _parameter("fixture_alpha_initial_concentration", "E_alpha_initial", "extracellular_enzyme_chain", 1.0, "mM"),
-        _parameter("fixture_beta_initial_concentration", "E_beta_initial", "extracellular_enzyme_chain", 0.5, "mM"),
-        _parameter("fixture_gamma_initial_concentration", "E_gamma_initial", "extracellular_enzyme_chain", 0.4, "mM"),
-        _parameter("fixture_x_to_y_surface_rate", "k_surface_x_to_y", "surface_catalysis", 0.01, "mM / meter ** 2 / second"),
-        _parameter("fixture_alpha_adsorption_constant", "K_ads_alpha", "surface_catalysis", 1.0, "1 / mM"),
-        _parameter("fixture_x_accessible_surface_area", "A_x_accessible", "surface_catalysis", 1.0, "meter ** 2"),
-        _parameter("fixture_y_to_q_km", "Km_y_to_q", "homogeneous_michaelis_menten", 0.8, "mM"),
-        _parameter("fixture_y_to_q_kcat", "kcat_y_to_q", "homogeneous_michaelis_menten", 0.04, "1 / second"),
-        _parameter("fixture_q_to_z_km", "Km_q_to_z", "homogeneous_michaelis_menten", 0.6, "mM"),
-        _parameter("fixture_q_to_z_kcat", "kcat_q_to_z", "homogeneous_michaelis_menten", 0.03, "1 / second"),
-        _parameter("fixture_z_inhibition_constant", "K_i_z_fixture", "homogeneous_michaelis_menten", 8.0, "mM"),
+        _parameter(**spec)
+        for spec in _generic_parameter_specs().values()
     ]
 
 
-def _parameter(record_id: str, symbol: str, process_type: str, value: float, units: str) -> dict[str, Any]:
+def _generic_parameter_role_contracts() -> dict[str, dict[str, Any]]:
+    contracts: dict[str, dict[str, Any]] = {}
+    for role, spec in _generic_parameter_specs().items():
+        contract = {
+            "kind": spec["kind"],
+            "parameter_symbol": spec["symbol"],
+            "enzyme_class": spec["enzyme_class"],
+            "substrate_class": spec["substrate_class"],
+            "fungus_id": None,
+            "substrate_id": None,
+            "environment_id": None,
+        }
+        if spec["kind"] == "initial_state":
+            contract["record_process_type"] = spec["process_type"]
+        contracts[role] = contract
+    return contracts
+
+
+def _generic_parameter_specs() -> dict[str, dict[str, Any]]:
+    return {
+        "x_initial": _parameter_spec("fixture_x_initial_concentration", "X_initial", "extracellular_enzyme_chain", 6.0, "mM", None, "polymer_x_fixture", "initial_state"),
+        "alpha_initial": _parameter_spec("fixture_alpha_initial_concentration", "E_alpha_initial", "extracellular_enzyme_chain", 1.0, "mM", "catalyst_alpha_fixture", "polymer_x_fixture", "initial_state"),
+        "beta_initial": _parameter_spec("fixture_beta_initial_concentration", "E_beta_initial", "extracellular_enzyme_chain", 0.5, "mM", "catalyst_beta_fixture", "oligomer_y_fixture", "initial_state"),
+        "gamma_initial": _parameter_spec("fixture_gamma_initial_concentration", "E_gamma_initial", "extracellular_enzyme_chain", 0.4, "mM", "catalyst_gamma_fixture", "fragment_q_fixture", "initial_state"),
+        "surface_rate_constant": _parameter_spec("fixture_x_to_y_surface_rate", "k_surface_x_to_y", "surface_catalysis", 0.01, "mM / meter ** 2 / second", "catalyst_alpha_fixture", "polymer_x_fixture", "process_parameter"),
+        "adsorption_constant": _parameter_spec("fixture_alpha_adsorption_constant", "K_ads_alpha", "surface_catalysis", 1.0, "1 / mM", "catalyst_alpha_fixture", "polymer_x_fixture", "process_parameter"),
+        "accessible_surface_area": _parameter_spec("fixture_x_accessible_surface_area", "A_x_accessible", "surface_catalysis", 1.0, "meter ** 2", "catalyst_alpha_fixture", "polymer_x_fixture", "process_parameter"),
+        "km_y_to_q": _parameter_spec("fixture_y_to_q_km", "Km_y_to_q", "homogeneous_michaelis_menten", 0.8, "mM", "catalyst_beta_fixture", "oligomer_y_fixture", "process_parameter"),
+        "kcat_y_to_q": _parameter_spec("fixture_y_to_q_kcat", "kcat_y_to_q", "homogeneous_michaelis_menten", 0.04, "1 / second", "catalyst_beta_fixture", "oligomer_y_fixture", "process_parameter"),
+        "km_q_to_z": _parameter_spec("fixture_q_to_z_km", "Km_q_to_z", "homogeneous_michaelis_menten", 0.6, "mM", "catalyst_gamma_fixture", "fragment_q_fixture", "process_parameter"),
+        "kcat_q_to_z": _parameter_spec("fixture_q_to_z_kcat", "kcat_q_to_z", "homogeneous_michaelis_menten", 0.03, "1 / second", "catalyst_gamma_fixture", "fragment_q_fixture", "process_parameter"),
+        "terminal_inhibition_constant": _parameter_spec("fixture_z_inhibition_constant", "K_i_z_fixture", "homogeneous_michaelis_menten", 8.0, "mM", "catalyst_gamma_fixture", "fragment_q_fixture", "process_parameter"),
+    }
+
+
+def _parameter_spec(
+    record_id: str,
+    symbol: str,
+    process_type: str,
+    value: float,
+    units: str,
+    enzyme_class: str | None,
+    substrate_class: str,
+    kind: str,
+) -> dict[str, Any]:
+    return {
+        "record_id": record_id,
+        "symbol": symbol,
+        "process_type": process_type,
+        "value": value,
+        "units": units,
+        "enzyme_class": enzyme_class,
+        "substrate_class": substrate_class,
+        "kind": kind,
+    }
+
+
+def _parameter(
+    *,
+    record_id: str,
+    symbol: str,
+    process_type: str,
+    value: float,
+    units: str,
+    enzyme_class: str | None,
+    substrate_class: str,
+    kind: str,
+) -> dict[str, Any]:
+    del kind
     return {
         "record_id": record_id,
         "name": f"Fixture parameter {symbol}",
@@ -690,8 +749,8 @@ def _parameter(record_id: str, symbol: str, process_type: str, value: float, uni
         },
         "parameter_symbol": symbol,
         "process_type": process_type,
-        "enzyme_class": None,
-        "substrate_class": None,
+        "enzyme_class": enzyme_class,
+        "substrate_class": substrate_class,
         "fungus_id": None,
         "substrate_id": None,
         "environment_id": None,

@@ -8,6 +8,8 @@ from typing import Any, cast
 
 import yaml
 
+from fungal_model.registry.records import PARAMETER_ALLOWED_USE_EXPLORATORY
+
 
 def prepare_reversible_product_inhibition_example_registry(
     destination: str | Path,
@@ -55,6 +57,15 @@ def _add_chain_template_modifier(template_path: Path) -> None:
         metadata["parameter_record_ids"]["product_inhibition_constant"] = (
             "bio003_example_product_inhibition_constant"
         )
+        metadata["parameter_role_contracts"]["product_inhibition_constant"] = {
+            "kind": "process_parameter",
+            "parameter_symbol": "K_i_bio003_product_example",
+            "enzyme_class": "beta_glucosidase",
+            "substrate_class": "cellobiose",
+            "fungus_id": "sabiork_beta_glucosidase_source",
+            "substrate_id": "cellobiose",
+            "environment_id": "sabiork_reaction_618_selected_conditions",
+        }
         metadata["process_templates"][1]["modifiers"] = [
             {
                 "type": "product_inhibition",
@@ -91,11 +102,11 @@ def _add_example_inhibition_parameter(parameter_path: Path, *, inhibition_consta
             },
             "parameter_symbol": "K_i_bio003_product_example",
             "process_type": "homogeneous_michaelis_menten",
-            "enzyme_class": None,
-            "substrate_class": None,
-            "fungus_id": None,
-            "substrate_id": None,
-            "environment_id": None,
+            "enzyme_class": "beta_glucosidase",
+            "substrate_class": "cellobiose",
+            "fungus_id": "sabiork_beta_glucosidase_source",
+            "substrate_id": "cellobiose",
+            "environment_id": "sabiork_reaction_618_selected_conditions",
             "value": {
                 "kind": "exact",
                 "value": inhibition_constant_mM,
@@ -106,7 +117,7 @@ def _add_example_inhibition_parameter(parameter_path: Path, *, inhibition_consta
             },
             "range_scope": "researcher_facing_example_fixture",
             "range_interpretation": "configured mechanics only",
-            "allowed_use": "exploratory_example_only_not_scientific_validation",
+            "allowed_use": PARAMETER_ALLOWED_USE_EXPLORATORY,
             "notes": (
                 "Fixture K_i for demonstrating explicit registry-backed product-inhibition "
                 "assembly and output inspection."

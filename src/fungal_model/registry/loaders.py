@@ -15,6 +15,11 @@ from fungal_model.registry.records import (
     EnvironmentRecord,
     FungusRecord,
     ParameterRecord,
+    PARAMETER_ALLOWED_USE_EXPLORATORY,
+    PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING,
+    PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY,
+    PARAMETER_ALLOWED_USE_SCIENTIFIC,
+    PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
     ProcessCompatibilityRecord,
     SubstrateRecord,
     _tuple_of_strings,
@@ -405,20 +410,21 @@ def _allowed_use(
     maturity: str,
     value: Mapping[str, Any],
 ) -> str:
-    explicit = data.get("allowed_use") or provenance.get("allowed_use")
-    if explicit is not None:
-        return str(explicit)
+    if "allowed_use" in data:
+        return str(data.get("allowed_use") or "")
+    if "allowed_use" in provenance:
+        return str(provenance.get("allowed_use") or "")
     value_kind = str(value.get("kind", ""))
     if maturity.startswith("toy"):
-        return "software_tests_only_not_scientific"
+        return PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY
     if maturity == "exploratory_prior" or provenance.get("exploratory_prior"):
-        return "exploratory_simulation_only_not_literature_curated"
+        return PARAMETER_ALLOWED_USE_EXPLORATORY
     if maturity == "literature_range" or value_kind in {"range", "distribution"}:
-        return "exploratory_screening_only_not_calibrated_uncertainty_not_environment_response"
+        return PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING
     if value_kind == "unknown":
-        return "preflight_and_gap_analysis_only_requires_measurement_or_curation"
+        return PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY
     if maturity == "literature_processed" and value_kind == "exact":
-        return "scientific_or_exploratory_when_all_other_inputs_are_valid"
+        return PARAMETER_ALLOWED_USE_SCIENTIFIC
     return "requires_record_specific_review"
 
 

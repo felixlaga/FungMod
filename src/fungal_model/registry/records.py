@@ -18,7 +18,39 @@ def _tuple_of_strings(values: Sequence[Any] | None) -> tuple[str, ...]:
 
 CASE_TEMPLATE_SCHEMA_VERSION = "1"
 PARAMETER_ALLOWED_USE_STORAGE_ONLY = "registry_storage_only_no_simulation_authorization"
+PARAMETER_ALLOWED_USE_SCIENTIFIC = (
+    "scientific_or_exploratory_when_all_other_inputs_are_valid"
+)
+PARAMETER_ALLOWED_USE_EXPLORATORY = (
+    "exploratory_simulation_only_not_literature_curated"
+)
+PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING = (
+    "exploratory_screening_only_not_calibrated_uncertainty_not_environment_response"
+)
+PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY = "software_tests_only_not_scientific"
+PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY = (
+    "preflight_and_gap_analysis_only_requires_measurement_or_curation"
+)
 ParameterRecordSelectionMode = Literal["exploratory", "scientific", "toy"]
+_PARAMETER_ALLOWED_USE_BY_MODE: Mapping[ParameterRecordSelectionMode, frozenset[str]] = {
+    "scientific": frozenset({PARAMETER_ALLOWED_USE_SCIENTIFIC}),
+    "exploratory": frozenset(
+        {
+            PARAMETER_ALLOWED_USE_SCIENTIFIC,
+            PARAMETER_ALLOWED_USE_EXPLORATORY,
+            PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING,
+            PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
+        }
+    ),
+    "toy": frozenset(
+        {
+            PARAMETER_ALLOWED_USE_SCIENTIFIC,
+            PARAMETER_ALLOWED_USE_EXPLORATORY,
+            PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING,
+            PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
+        }
+    ),
+}
 CASE_TEMPLATE_ALLOWED_STATE_ROLES = frozenset(
     {
         "substrate",
@@ -419,19 +451,25 @@ def parameter_record_mode_eligibility_blocker(
     *,
     mode: ParameterRecordSelectionMode,
 ) -> str | None:
-    """Return the shared mode-specific eligibility blocker for a parameter."""
+    """Return the shared authorization and mode-eligibility blocker."""
 
+    if mode not in _PARAMETER_ALLOWED_USE_BY_MODE:
+        raise ValueError(f"Unsupported parameter selection mode: {mode!r}")
+    authorization_blocker = parameter_simulation_authorization_blocker(record)
+    if authorization_blocker is not None:
+        return authorization_blocker
+    if record.allowed_use not in _PARAMETER_ALLOWED_USE_BY_MODE[mode]:
+        return (
+            f"Parameter allowed_use {record.allowed_use!r} does not exactly authorize "
+            f"{mode} simulation."
+        )
     if mode in {"exploratory", "toy"}:
         return None
-    if mode != "scientific":
-        raise ValueError(f"Unsupported parameter selection mode: {mode!r}")
     if parameter_record_is_exploratory(record):
         return "Scientific mode rejects exploratory-prior parameter records."
     maturity = record.maturity.casefold()
     if maturity.startswith("toy") or maturity.startswith("synthetic"):
         return "Scientific mode rejects toy or synthetic parameter records."
-    if "scientific" not in record.allowed_use.casefold():
-        return "Scientific mode requires parameter allowed_use to permit scientific use."
     return None
 
 
@@ -452,7 +490,6 @@ def parameter_record_selection_key(
 ) -> tuple[int, ...]:
     """Return the shared mode-aware ranking key for parameter candidates."""
 
-    authorization_score = int(parameter_is_simulation_authorized(record))
     selector_score = sum(
         value is not None
         for value in (
@@ -470,7 +507,6 @@ def parameter_record_selection_key(
             parameter_record_is_exploratory(record)
         )
         return (
-            authorization_score,
             selector_score,
             value_score,
             exploratory_score,
@@ -478,7 +514,7 @@ def parameter_record_selection_key(
         )
     if mode in {"scientific", "toy"}:
         value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
-        return authorization_score, selector_score, value_score, maturity_score
+        return selector_score, value_score, maturity_score
     raise ValueError(f"Unsupported parameter selection mode: {mode!r}")
 
 
@@ -677,6 +713,11 @@ __all__ = [
     "FungusRecord",
     "ParameterRecord",
     "ParameterRecordSelectionMode",
+    "PARAMETER_ALLOWED_USE_EXPLORATORY",
+    "PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING",
+    "PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY",
+    "PARAMETER_ALLOWED_USE_SCIENTIFIC",
+    "PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY",
     "PARAMETER_ALLOWED_USE_STORAGE_ONLY",
     "parameter_is_simulation_authorized",
     "parameter_record_is_exploratory",

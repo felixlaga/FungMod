@@ -433,16 +433,29 @@ bridge revalidates that frozen URL identity during authoring and planning. One f
 same singular `source_url`; multiple ordered URLs require `source_url=None` and
 the exact nonempty `source_urls` sequence. Its exact storage-only `allowed_use`
 and its intrinsic bridge-derived provenance shape are enforced by one shared
-predicate in modelability, parameter ranking, case
+admission predicate in modelability, parameter ranking, case
 assembly, ensemble runtime, and chain-template resolution in every supported
 mode, so an authored or later promoted record cannot authorize
 `VirtualExperiment.simulate(...)`. Dynamic parameter searches in modelability,
 ensemble runtime, deterministic case assembly, and result-table reconstruction
 first apply one mode-aware eligibility predicate and then one complete ranking
-key, including the calibrated-maturity tie-break. Explicit CASE-001 chain
-mappings use their exact role-to-record IDs and reject missing, unauthorized,
-mode-ineligible, selector-incompatible, or role/process-incompatible records
-without dynamic fallback.
+key, including the calibrated-maturity tie-break. Admission uses exact closed
+`allowed_use` values: scientific mode accepts only
+`scientific_or_exploratory_when_all_other_inputs_are_valid`; exploratory and toy
+modes additionally accept the named exploratory/screening and software-test
+policies. Empty, unknown, negative, near-match, storage-only, and
+bridge/curation-evidence policies fail closed before ranking.
+
+Explicit CASE-001 chain mappings use their exact role-to-record IDs and one
+shared resolver across preflight, ensemble/public simulation, deterministic
+assembly, direct chain assembly, and result reconstruction. Each mapped role has
+an exact symbol and selector contract. Null-ID classes must still match the
+template's declared enzyme/substrate component inventory and target pairing.
+Component-process parameter ownership is derived from `process_templates`;
+initial-state roles declare a
+`record_process_type` scope without claiming a kinetic owner. Missing,
+unauthorized, mode-ineligible, selector-incompatible, component-incompatible,
+or process-incompatible records are rejected without dynamic fallback.
 
 ## Run A Virtual Experiment
 

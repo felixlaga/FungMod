@@ -425,6 +425,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "current; bounded PARAMETER identity bridge completes once merged" in status
     assert "PR-49 | CURATION-001 reusable public curation-bundle loader" in status
     assert "exact storage-only policy blocks simulation in every mode" in status
+    assert "closed exact per-mode `allowed_use` permissions" in status
+    assert "initial-state roles declare record scope rather than kinetic ownership" in status
     assert "entropy_production_rate_timeseries.json" in next_steps
     assert "entropy_production_rate_timeseries.json" in _read(README)
     assert "no silent conversion" in status

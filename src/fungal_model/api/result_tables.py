@@ -27,7 +27,6 @@ from fungal_model.api.output_schema import (
 from fungal_model.registry.records import (
     ParameterRecord,
     RegistryRecord,
-    parameter_is_simulation_authorized,
     parameter_record_is_exploratory,
     parameter_record_is_mode_eligible,
     parameter_record_selection_key,
@@ -43,6 +42,10 @@ from fungal_model.screening.case_builder import (
     RegistryCaseBuildError,
     get_registry_process_assembler,
     select_registry_case_compatibility,
+)
+from fungal_model.screening.parameter_resolution import (
+    ExactTemplateParameterError,
+    resolve_exact_template_parameter_records,
 )
 
 
@@ -2327,14 +2330,17 @@ def _role_parameter_records(
     assembler = get_registry_process_assembler(compatibility.process_type)
     if assembler is None:
         return {}
-    chain_records = _chain_template_role_records(
+    explicit_records = _exact_template_role_records(
         registry=registry,
         compatibility=compatibility,
         required_roles=assembler.required_parameter_roles,
+        fungus_id=case.fungus_id,
+        substrate_id=case.substrate_id,
+        environment_id=case.environment_id,
         mode=mode,
     )
-    if chain_records is not None:
-        return dict(chain_records)
+    if explicit_records is not None:
+        return dict(explicit_records)
     records: dict[str, ParameterRecord] = {}
     roles = tuple(dict.fromkeys((*assembler.required_parameter_roles, *compatibility.parameter_roles.keys())))
     for role in roles:
@@ -2352,44 +2358,47 @@ def _role_parameter_records(
             environment_id=case.environment_id,
             mode=mode,
         )
-        if record is not None and parameter_is_simulation_authorized(record):
+        if record is not None:
             records[role] = record
     return records
 
 
-def _chain_template_role_records(
+def _exact_template_role_records(
     *,
     registry: FungModRegistry,
     compatibility: Any,
     required_roles: tuple[str, ...],
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
     mode: str,
 ) -> Mapping[str, ParameterRecord] | None:
-    if compatibility.process_type != "extracellular_enzyme_chain":
-        return None
     if not compatibility.case_template_id:
-        return {}
+        return None
     try:
         template = registry.get_case_template(compatibility.case_template_id)
-    except RegistryLookupError:
-        return {}
-    parameter_ids = template.process_state_metadata.get("parameter_record_ids")
-    if not isinstance(parameter_ids, dict):
-        return {}
-    roles = tuple(dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys())))
-    records: dict[str, ParameterRecord] = {}
-    for role in roles:
-        record_id = parameter_ids.get(role)
-        if record_id is None:
-            continue
-        record = registry.parameters.get(str(record_id))
-        selection_mode = "scientific" if mode == "scientific" else "exploratory"
-        if (
-            record is not None
-            and parameter_is_simulation_authorized(record)
-            and parameter_record_is_mode_eligible(record, mode=selection_mode)
-        ):
-            records[role] = record
-    return records
+    except RegistryLookupError as exc:
+        raise RegistryCaseBuildError(
+            f"Compatibility {compatibility.record_id!r} references missing case template "
+            f"{compatibility.case_template_id!r}."
+        ) from exc
+    selection_mode = "scientific" if mode == "scientific" else "exploratory"
+    try:
+        return resolve_exact_template_parameter_records(
+            registry=registry,
+            template=template,
+            compatibility=compatibility,
+            required_roles=required_roles,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            mode=selection_mode,
+            value_requirement="exact" if selection_mode == "scientific" else "sampleable",
+        )
+    except ExactTemplateParameterError as exc:
+        raise RegistryCaseBuildError(
+            f"Result reconstruction rejected the exact template parameter mapping: {exc}"
+        ) from exc
 
 
 def _best_case_parameter_record(
@@ -2408,7 +2417,6 @@ def _best_case_parameter_record(
         record
         for record in registry.parameters.values()
         if record.parameter_symbol == parameter_symbol
-        and parameter_is_simulation_authorized(record)
         and record.process_type == process_type
         and _matches(record.enzyme_class, enzyme_class)
         and _matches(record.substrate_class, substrate_class)

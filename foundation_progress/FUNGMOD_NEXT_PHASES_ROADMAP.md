@@ -229,9 +229,13 @@ and mutation checks. Immutable frozen metadata page/request/URL/raw-page
 cardinality and unique exact page-path identity are reconciled offline. Its
 specialized checksummed curation output is promotion-plan-compatible but does
 not mutate or apply; its public checksums establish internal consistency rather
-than cryptographic authorship. Its exact storage-only policy uses one shared
-predicate across modelability and runtime resolution in every mode, including
-bridge-shaped records whose removable marker or labels were stripped. Nonidentity
+than cryptographic authorship. One shared admission predicate blocks its exact
+storage-only policy and intrinsic bridge evidence in every mode, and applies
+closed exact per-mode `allowed_use` permissions before ranking. One shared exact
+template-role resolver aligns preflight, public/runtime simulation,
+deterministic/direct assembly, and result reconstruction; kinetic role owners
+derive from component process templates, while initial-state roles declare
+record scope without claiming kinetic ownership. Nonidentity
 conversion, written source input, non-parameter records, validation,
 calibration, and simulation authorization remain unsupported, so CURATION-001
 remains partial. The recommended next

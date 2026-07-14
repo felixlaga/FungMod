@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -16,10 +16,13 @@ from fungal_model.registry.records import (
     parameter_record_is_mode_eligible,
     parameter_record_mode_eligibility_blocker,
     parameter_record_selection_key,
-    parameter_simulation_authorization_blocker,
 )
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.screening.modelability import ModelabilityReport, assess_modelability
+from fungal_model.screening.parameter_resolution import (
+    ExactTemplateParameterError,
+    resolve_exact_template_parameter_records,
+)
 from fungal_model.screening.template_environment_modifiers import (
     ENVIRONMENT_MODIFIER_TYPES,
     build_template_environment_entity,
@@ -272,17 +275,20 @@ def _exact_role_parameters(
         compatibility=compatibility,
         required_roles=required_roles,
     )
-    explicit = _explicit_template_parameter_records(
-        registry=registry,
-        compatibility=compatibility,
-        case_template=case_template,
-        roles=roles_to_resolve,
-        fungus_id=fungus_id,
-        substrate_id=substrate_id,
-        environment_id=environment_id,
-        process_label=process_label,
-        mode=mode,
-    )
+    try:
+        explicit = resolve_exact_template_parameter_records(
+            registry=registry,
+            template=case_template,
+            compatibility=compatibility,
+            required_roles=roles_to_resolve,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            mode=mode,
+            value_requirement="exact",
+        )
+    except ExactTemplateParameterError as exc:
+        raise RegistryCaseBuildError(f"{process_label} exact parameter mapping is invalid: {exc}") from exc
     if explicit is not None:
         return explicit
 
@@ -312,186 +318,6 @@ def _exact_role_parameters(
     return resolved
 
 
-def _explicit_template_parameter_records(
-    *,
-    registry: FungModRegistry,
-    compatibility: ProcessCompatibilityRecord,
-    case_template: CaseTemplateRecord,
-    roles: tuple[str, ...],
-    fungus_id: str,
-    substrate_id: str,
-    environment_id: str,
-    process_label: str,
-    mode: RegistryCaseConfigMode,
-) -> Mapping[str, ParameterRecord] | None:
-    metadata = case_template.process_state_metadata
-    if "parameter_record_ids" not in metadata:
-        return None
-    record_ids = metadata.get("parameter_record_ids")
-    if not isinstance(record_ids, Mapping):
-        raise RegistryCaseBuildError(
-            f"{process_label} template {case_template.case_template_id!r} "
-            "parameter_record_ids must be a mapping."
-        )
-    missing_roles = tuple(role for role in roles if role not in record_ids)
-    if missing_roles:
-        raise RegistryCaseBuildError(
-            f"{process_label} template {case_template.case_template_id!r} is missing explicit "
-            f"parameter record IDs for: {', '.join(missing_roles)}."
-        )
-    role_process_types = _template_parameter_role_process_types(
-        case_template,
-        required_roles=roles,
-    )
-    resolved: dict[str, ParameterRecord] = {}
-    for role in roles:
-        record_id = record_ids[role]
-        if not isinstance(record_id, str) or not record_id.strip():
-            raise RegistryCaseBuildError(
-                f"{process_label} template role {role!r} requires a non-empty parameter record ID."
-            )
-        record = registry.parameters.get(record_id)
-        if record is None:
-            raise RegistryCaseBuildError(
-                f"{process_label} template role {role!r} references missing parameter "
-                f"record {record_id!r}."
-            )
-        expected_symbol = compatibility.parameter_roles[role]
-        expected_process_type = role_process_types[role]
-        if record.process_type != expected_process_type:
-            raise RegistryCaseBuildError(
-                f"{process_label} template role {role!r} requires process_type "
-                f"{expected_process_type!r}, but record {record_id!r} uses {record.process_type!r}."
-            )
-        _validate_explicit_parameter_selectors(
-            registry=registry,
-            compatibility=compatibility,
-            record=record,
-            fungus_id=fungus_id,
-            substrate_id=substrate_id,
-            process_label=process_label,
-        )
-        if not _matches(record.environment_id, environment_id):
-            raise RegistryCaseBuildError(
-                f"{process_label} template parameter record {record_id!r} is scoped to "
-                f"environment {record.environment_id!r}, not {environment_id!r}."
-            )
-        _validate_deterministic_parameter_record(
-            record,
-            role=role,
-            expected_symbol=expected_symbol,
-            mode=mode,
-        )
-        resolved[role] = record
-    return resolved
-
-
-def _template_parameter_role_process_types(
-    case_template: CaseTemplateRecord,
-    *,
-    required_roles: tuple[str, ...],
-) -> Mapping[str, str]:
-    configured = case_template.process_state_metadata.get("parameter_role_process_types")
-    if not isinstance(configured, Mapping):
-        raise RegistryCaseBuildError(
-            f"Case template {case_template.case_template_id!r} must define "
-            "parameter_role_process_types as a mapping for explicit parameter records."
-        )
-    role_process_types: dict[str, str] = {}
-    for role in required_roles:
-        process_type = configured.get(role)
-        if not isinstance(process_type, str) or not process_type.strip():
-            raise RegistryCaseBuildError(
-                f"Case template {case_template.case_template_id!r} must define one process_type "
-                f"for explicit parameter role {role!r}."
-            )
-        role_process_types[role] = process_type
-
-    process_templates = case_template.process_state_metadata.get("process_templates", ())
-    if not isinstance(process_templates, Sequence) or isinstance(process_templates, (str, bytes)):
-        raise RegistryCaseBuildError(
-            f"Case template {case_template.case_template_id!r} process_templates must be a sequence."
-        )
-    declared_by_process: dict[str, str] = {}
-    for process_template in process_templates:
-        if not isinstance(process_template, Mapping):
-            raise RegistryCaseBuildError(
-                f"Case template {case_template.case_template_id!r} contains a malformed process template."
-            )
-        process_type = process_template.get("process_type")
-        parameter_roles = process_template.get("parameter_roles")
-        if not isinstance(process_type, str) or not isinstance(parameter_roles, Mapping):
-            raise RegistryCaseBuildError(
-                f"Case template {case_template.case_template_id!r} contains a process template "
-                "without process_type and parameter_roles mappings."
-            )
-        for role in parameter_roles.values():
-            if isinstance(role, str) and role:
-                previous = declared_by_process.setdefault(role, process_type)
-                if previous != process_type:
-                    raise RegistryCaseBuildError(
-                        f"Case template {case_template.case_template_id!r} assigns explicit "
-                        f"parameter role {role!r} to multiple process types."
-                    )
-    for role, process_type in declared_by_process.items():
-        if role in role_process_types and role_process_types[role] != process_type:
-            raise RegistryCaseBuildError(
-                f"Case template {case_template.case_template_id!r} assigns explicit parameter "
-                f"role {role!r} to conflicting process types."
-            )
-    return role_process_types
-
-
-def _validate_explicit_parameter_selectors(
-    *,
-    registry: FungModRegistry,
-    compatibility: ProcessCompatibilityRecord,
-    record: ParameterRecord,
-    fungus_id: str,
-    substrate_id: str,
-    process_label: str,
-) -> None:
-    if record.enzyme_class == compatibility.enzyme_class:
-        if not _matches(record.fungus_id, fungus_id):
-            raise RegistryCaseBuildError(
-                f"{process_label} template parameter record {record.record_id!r} is scoped to "
-                f"fungus {record.fungus_id!r}, not requested fungus {fungus_id!r}."
-            )
-    elif record.fungus_id is not None:
-        try:
-            component_fungus = registry.get_fungus(record.fungus_id)
-        except RegistryLookupError as exc:
-            raise RegistryCaseBuildError(
-                f"{process_label} template parameter record {record.record_id!r} references "
-                f"unknown component fungus {record.fungus_id!r}."
-            ) from exc
-        if record.enzyme_class not in component_fungus.enzyme_classes:
-            raise RegistryCaseBuildError(
-                f"{process_label} template parameter record {record.record_id!r} fungus selector "
-                f"{record.fungus_id!r} does not provide enzyme class {record.enzyme_class!r}."
-            )
-
-    if record.substrate_class == compatibility.substrate_class:
-        if not _matches(record.substrate_id, substrate_id):
-            raise RegistryCaseBuildError(
-                f"{process_label} template parameter record {record.record_id!r} is scoped to "
-                f"substrate {record.substrate_id!r}, not requested substrate {substrate_id!r}."
-            )
-    elif record.substrate_id is not None:
-        try:
-            component_substrate = registry.get_substrate(record.substrate_id)
-        except RegistryLookupError as exc:
-            raise RegistryCaseBuildError(
-                f"{process_label} template parameter record {record.record_id!r} references "
-                f"unknown component substrate {record.substrate_id!r}."
-            ) from exc
-        if record.substrate_class != component_substrate.substrate_class:
-            raise RegistryCaseBuildError(
-                f"{process_label} template parameter record {record.record_id!r} substrate "
-                f"selector {record.substrate_id!r} does not have class {record.substrate_class!r}."
-            )
-
-
 def _validate_deterministic_parameter_record(
     record: ParameterRecord,
     *,
@@ -509,11 +335,6 @@ def _validate_deterministic_parameter_record(
         raise RegistryCaseBuildError(
             f"Parameter role {role!r} and symbol {expected_symbol!r} is mode-ineligible: "
             f"{eligibility_blocker}"
-        )
-    blocker = parameter_simulation_authorization_blocker(record)
-    if blocker is not None:
-        raise RegistryCaseBuildError(
-            f"Parameter role {role!r} and symbol {expected_symbol!r} is unauthorized: {blocker}"
         )
     if not record.value.is_exact:
         raise RegistryCaseBuildError(

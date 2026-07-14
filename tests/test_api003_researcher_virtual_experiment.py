@@ -15,7 +15,10 @@ from fungal_model import VirtualExperiment, environment_grid, virtual_experiment
 from fungal_model.api import VirtualExperimentError
 from fungal_model.api.report import write_virtual_experiment_report
 from fungal_model.registry import AmbiguousResolutionError, ResolutionError, load_registry
-from fungal_model.registry.records import PARAMETER_ALLOWED_USE_STORAGE_ONLY
+from fungal_model.registry.records import (
+    PARAMETER_ALLOWED_USE_SCIENTIFIC,
+    PARAMETER_ALLOWED_USE_STORAGE_ONLY,
+)
 from fungal_model.screening import assess_modelability, build_model_config_from_registry_case
 
 
@@ -229,8 +232,8 @@ def test_scientific_mode_rejects_toy_scientific_inputs(tmp_path: Path) -> None:
     report = study.preflight(mode="scientific")[0]
 
     assert report.status == "underparameterized"
-    assert any("toy or synthetic" in item.message for item in report.incompatible)
-    with pytest.raises(VirtualExperimentError, match="toy or synthetic"):
+    assert any("does not exactly authorize scientific" in item.message for item in report.incompatible)
+    with pytest.raises(VirtualExperimentError, match="does not exactly authorize scientific"):
         study.simulate(mode="scientific", output_dir=tmp_path / "toy_blocked", quicklook=False)
 
 
@@ -323,7 +326,7 @@ def test_maturity_tie_selection_agrees_across_preflight_runtime_and_outputs(
     for record in records:
         if record["record_id"] in required_ids:
             record["maturity"] = "calibrated"
-            record["allowed_use"] = "scientific_simulation_test_fixture"
+            record["allowed_use"] = PARAMETER_ALLOWED_USE_SCIENTIFIC
     lower_maturity = next(
         record for record in records if record["record_id"] == "toy_param_k_surface_exact"
     )
