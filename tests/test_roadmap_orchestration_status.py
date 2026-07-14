@@ -107,6 +107,8 @@ def test_pr48_parameter_authoring_contract_is_synchronized() -> None:
     assert "`plan_digest`/`confirmation_digest`" in progress
     assert "simulation_authorized: false" in progress
     assert "structural non-downgrade" in status
+    assert "complete independent apply revalidation" in status
+    assert "ordinary curator/date/role metadata" in status
     assert "Checksums prove internal consistency, not curator authorship" in status
     assert "`Km` role to runtime key `km`" in progress
     for text in (readme, status, next_steps, roadmap, progress):

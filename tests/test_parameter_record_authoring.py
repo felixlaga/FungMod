@@ -33,6 +33,7 @@ from fungal_model import (
 from fungal_model.api.curation import (
     CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
     CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
+    CurationRecord,
 )
 from fungal_model.api.parameter_record_authoring import (
     PARAMETER_AUTHORING_ALLOWED_USE,
@@ -47,6 +48,9 @@ from fungal_model.api.parameter_record_authoring import (
 )
 from fungal_model.sources.sabiork.fetch import HTTPResponseSnapshot
 from fungal_model.sources.sabiork import SabioRKSourceError, frozen_source_urls
+from fungal_model.provenance import classify_parameter_provenance
+from fungal_model.registry.loaders import load_parameter_record_mapping, load_registry
+from fungal_model.registry.records import parameter_simulation_authorization_blocker
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -289,6 +293,7 @@ def test_real_frozen_sabio_identity_path_is_addable_only_on_a_copied_registry(
     assert candidate.target_record["allowed_use"] == PARAMETER_AUTHORING_ALLOWED_USE
     bridge = candidate.target_record["provenance"][PARAMETER_BRIDGE_PROVENANCE_KEY]
     assert bridge["source_proposal_record_id"] == SOURCE_PARAMETER_ID
+    assert bridge["authoring_digest"] == authored.authoring_digest
     assert bridge["source_parameter"] == {
         "parameter_symbol": "kcat_cellobiose",
         "parameter_role": "kcat",
@@ -410,6 +415,27 @@ def test_collapsed_two_page_frozen_metadata_is_rejected_offline(
         )
 
 
+def test_two_page_frozen_metadata_rejects_raw_page_path_aliasing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proposal, _ = _two_page_proposal(tmp_path, monkeypatch)
+    metadata_path = Path(proposal.source_snapshot_path).parent.parent / "fetch_metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    first = metadata["raw_pages"][0]
+    second = metadata["raw_pages"][1]
+    second["path"] = first["path"]
+    second["sha256"] = first["sha256"]
+    second["size_bytes"] = first["size_bytes"]
+    metadata_path.write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SabioRKSourceError, match="uniquely match raw/page_NNNN"):
+        frozen_source_urls(proposal.source_snapshot_path)
+
+
 def test_in_memory_result_is_directly_promotion_plan_compatible(tmp_path: Path) -> None:
     _, registry_index, _, authored = _author(tmp_path)
 
@@ -480,9 +506,79 @@ def test_rechecksummed_summary_cannot_claim_mutation_validation_or_simulation(
         plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
 
 
+@pytest.mark.parametrize(
+    "malformation",
+    [
+        "manifest_extra_safety_claim",
+        "accepted_extra_safety_claim",
+        "curation_extra_safety_claim",
+        "rewritten_report_scope",
+        "combined",
+    ],
+)
+def test_rechecksummed_written_bundle_rejects_extra_claims_and_report_rewrites(
+    tmp_path: Path,
+    malformation: str,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    bundle = authored.write(tmp_path / f"closed_envelope_{malformation}")
+    accepted, manifest = _bundle_payloads(bundle)
+    if malformation in {"manifest_extra_safety_claim", "combined"}:
+        manifest["simulation_authorized"] = True
+    if malformation in {"accepted_extra_safety_claim", "combined"}:
+        accepted["scientific_validation_claimed"] = True
+    if malformation in {"curation_extra_safety_claim", "combined"}:
+        accepted["records"][0]["curation"]["simulation_authorized"] = True
+    if malformation in {"rewritten_report_scope", "combined"}:
+        report_path = bundle.paths["curation_report"]
+        report = report_path.read_text(encoding="utf-8").replace(
+            "It is not production registry promotion, scientific validation, or permission for simulation.",
+            "It is scientific validation and permission for simulation.",
+        )
+        report_path.write_text(report, encoding="utf-8")
+    _redigest_bundle(bundle, accepted, manifest)
+
+    with pytest.raises(
+        RegistryPromotionPlanError,
+        match="shared curation builders|closed bridge schema|deterministic machine-readable record",
+    ):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
+
+
+def test_partial_bridge_marker_is_rejected_at_plan_and_reconstructed_apply(
+    tmp_path: Path,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    bundle = authored.write(tmp_path / "partial_bridge_marker")
+    accepted, manifest = _bundle_payloads(bundle)
+    accepted["records"][0]["provenance"][PARAMETER_BRIDGE_PROVENANCE_KEY] = {}
+    _redigest_bundle(bundle, accepted, manifest)
+
+    before = _registry_snapshot(registry_index.parent)
+    with pytest.raises(RegistryPromotionPlanError, match="bridge audit|identity or digest"):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
+    assert _registry_snapshot(registry_index.parent) == before
+
+    valid_plan = plan_registry_promotion(authored, registry_index=registry_index)
+    malformed_target = deepcopy(valid_plan.addable_records[0].target_record)
+    malformed_target["provenance"][PARAMETER_BRIDGE_PROVENANCE_KEY] = {}
+    reconstructed = _reconstructed_plan_with_target(
+        valid_plan,
+        registry_index,
+        malformed_target,
+    )
+    with pytest.raises(RegistryPromotionApplyError, match="specialized bridge validation"):
+        apply_registry_promotion(
+            reconstructed,
+            confirmation_digest=reconstructed.plan_digest,
+            new_registry_version="0.1.1",
+            registry_index=registry_index,
+        )
+    assert _registry_snapshot(registry_index.parent) == before
+
+
 def test_bridge_shape_cannot_be_downgraded_to_generic_promotion_or_runtime_authority(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, registry_index, _, authored = _author(tmp_path)
     bundle = authored.write(tmp_path / "downgraded_bridge_bundle")
@@ -520,17 +616,13 @@ def test_bridge_shape_cannot_be_downgraded_to_generic_promotion_or_runtime_autho
         plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
     assert _registry_snapshot(registry_index.parent) == registry_before
 
-    with monkeypatch.context() as legacy_dispatch:
-        legacy_dispatch.setattr(
-            promotion_module,
-            "parameter_candidate_requires_authoring_contract",
-            lambda *_args, **_kwargs: False,
-        )
-        legacy_plan = plan_registry_promotion(
-            bundle.output_directory,
-            registry_index=registry_index,
-        )
-    with pytest.raises(RegistryPromotionApplyError, match="generic apply is forbidden"):
+    valid_plan = plan_registry_promotion(authored, registry_index=registry_index)
+    legacy_target = deepcopy(valid_plan.addable_records[0].target_record)
+    legacy_target["provenance"].pop(PARAMETER_BRIDGE_PROVENANCE_KEY)
+    legacy_target["allowed_use"] = "exploratory_simulation"
+    legacy_target["value"]["confidence_level"] = "literature_curated"
+    legacy_plan = _reconstructed_plan_with_target(valid_plan, registry_index, legacy_target)
+    with pytest.raises(RegistryPromotionApplyError, match="specialized bridge validation"):
         apply_registry_promotion(
             legacy_plan,
             confirmation_digest=legacy_plan.plan_digest,
@@ -586,6 +678,213 @@ def test_bridge_shape_cannot_be_downgraded_to_generic_promotion_or_runtime_autho
     assert any("curator-authoring source evidence" in item.message for item in report.incompatible)
     with pytest.raises(VirtualExperimentError, match="curator-authoring source evidence"):
         study.simulate(mode="exploratory", output_dir=tmp_path / "blocked_runtime", quicklook=False)
+
+
+def test_nested_curation_source_evidence_cannot_bypass_plan_apply_or_runtime(
+    tmp_path: Path,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    valid_plan = plan_registry_promotion(authored, registry_index=registry_index)
+    target = deepcopy(valid_plan.addable_records[0].target_record)
+    curation = deepcopy(valid_plan.addable_records[0].curation_metadata)
+    target["provenance"].pop(PARAMETER_BRIDGE_PROVENANCE_KEY)
+    target["provenance"]["fungmod_curation"] = {
+        "source_provenance": deepcopy(curation["source_provenance"]),
+    }
+    target["allowed_use"] = "exploratory_simulation"
+    target["value"]["confidence_level"] = "literature_curated"
+    assert classify_parameter_provenance(target["provenance"]) == "parameter_bridge"
+
+    generic_record = replace(
+        authored.records[0],
+        proposed_record=deepcopy(target),
+        source_provenance=deepcopy(curation["source_provenance"]),
+    )
+    generic_result = CurationResult(
+        source_query=authored.source_query,
+        source_snapshot_path=authored.source_snapshot_path,
+        proposal_limitations=authored.proposal_limitations,
+        records=(generic_record,),
+    )
+    before = _registry_snapshot(registry_index.parent)
+    with pytest.raises(RegistryPromotionPlanError, match="require CuratorAuthoredParameterResult"):
+        plan_registry_promotion(generic_result, registry_index=registry_index)
+
+    reconstructed = _reconstructed_plan_with_target(valid_plan, registry_index, target)
+    with pytest.raises(RegistryPromotionApplyError, match="specialized bridge validation"):
+        apply_registry_promotion(
+            reconstructed,
+            confirmation_digest=reconstructed.plan_digest,
+            new_registry_version="0.1.1",
+            registry_index=registry_index,
+        )
+    assert _registry_snapshot(registry_index.parent) == before
+
+    parameters_path = registry_index.parent / "parameters" / "parameter_records.yml"
+    parameter_payload = yaml.safe_load(parameters_path.read_text(encoding="utf-8"))
+    toy_target = next(
+        item for item in parameter_payload["records"] if item["record_id"] == "toy_param_k_surface_exact"
+    )
+    toy_target["provenance"] = deepcopy(target["provenance"])
+    toy_target["allowed_use"] = "exploratory_simulation"
+    parameters_path.write_text(yaml.safe_dump(parameter_payload, sort_keys=False), encoding="utf-8")
+    runtime = load_registry(registry_index)
+    blocker = parameter_simulation_authorization_blocker(
+        runtime.parameters["toy_param_k_surface_exact"]
+    )
+    assert blocker is not None and "curator-authoring source evidence" in blocker
+
+    process_path = registry_index.parent / "processes" / "process_compatibility.yml"
+    process_payload = yaml.safe_load(process_path.read_text(encoding="utf-8"))
+    process_payload["records"][0]["required_parameters"] = [
+        "k_surface_exact",
+        "k_ads_exact",
+        "A_surface_exact",
+    ]
+    process_payload["records"][0]["parameter_roles"] = {
+        "surface_rate_constant": "k_surface_exact",
+        "adsorption_constant": "k_ads_exact",
+        "accessible_surface_area": "A_surface_exact",
+    }
+    process_path.write_text(yaml.safe_dump(process_payload, sort_keys=False), encoding="utf-8")
+    study = virtual_experiment(
+        fungi="toy_fungus_alpha",
+        substrates="toy_cellulose_like_solid",
+        environments="toy_lab_environment",
+        registry=registry_index,
+    )
+    assert any(
+        "curator-authoring source evidence" in item.message
+        for item in study.preflight(mode="exploratory")[0].incompatible
+    )
+    with pytest.raises(VirtualExperimentError, match="curator-authoring source evidence"):
+        study.simulate(mode="exploratory", output_dir=tmp_path / "nested_runtime", quicklook=False)
+
+
+@pytest.mark.parametrize(
+    "outer_metadata",
+    [
+        {"curator": "Generic Test Curator"},
+        {"curation_date": "2026-07-14"},
+        {"parameter_role": "surface_rate_constant"},
+        {
+            "curator": "Generic Test Curator",
+            "curation_date": "2026-07-14",
+            "parameter_role": "surface_rate_constant",
+        },
+    ],
+    ids=["curator", "date", "role", "combined"],
+)
+def test_ordinary_curator_metadata_remains_generic_for_planning_and_runtime(
+    tmp_path: Path,
+    outer_metadata: dict[str, str],
+) -> None:
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    runtime = load_registry(registry_index)
+    target = runtime.parameters["toy_param_k_surface_exact"].to_dict()
+    target["record_id"] = "ordinary_curator_metadata_parameter"
+    target["provenance"] = {
+        "source": "Synthetic generic provenance classifier fixture.",
+        "confidence_level": "testing",
+        "notes": "Not scientific data.",
+        **outer_metadata,
+    }
+    assert classify_parameter_provenance(target["provenance"]) == "generic"
+    loaded = load_parameter_record_mapping(target)
+    assert parameter_simulation_authorization_blocker(loaded) is None
+
+    curation_record = CurationRecord(
+        record_type="parameter_records",
+        record_id=target["record_id"],
+        proposed_record=deepcopy(target),
+        classification="eligible_for_review",
+        missing_fields=(),
+        reasons=(),
+        decision="accept",
+        explicit_decision=True,
+        curator="Generic Promotion Test Curator",
+        decision_reason="Accepted as a synthetic generic promotion fixture.",
+        curation_date="2026-07-14",
+        allowed_use=CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
+        limitations=("Synthetic software fixture; no scientific claim.",),
+        source_provenance={
+            "source_database": "synthetic_fixture",
+            "source_entry_ids": ["ordinary-curator-metadata"],
+            "source_snapshot_path": "synthetic/ordinary-curator-metadata.json",
+        },
+    )
+    result = CurationResult(
+        source_query="synthetic ordinary curator metadata",
+        source_snapshot_path="synthetic/ordinary-curator-metadata.json",
+        proposal_limitations=("Synthetic software fixture; no scientific claim.",),
+        records=(curation_record,),
+    )
+    plan = plan_registry_promotion(result, registry_index=registry_index)
+    assert plan.summary()["addable_count"] == 1
+    if len(outer_metadata) == 3:
+        malformed_input = deepcopy(target)
+        malformed_input["provenance"]["fungmod_curation"] = {}
+        malformed_result = replace(
+            result,
+            records=(replace(curation_record, proposed_record=malformed_input),),
+        )
+        blocked_plan = plan_registry_promotion(malformed_result, registry_index=registry_index)
+        assert blocked_plan.summary()["apply_available"] is False
+        assert "curation_audit_provenance_key_already_exists" in blocked_plan.blocked_records[0].reason
+
+        malformed_target = deepcopy(plan.addable_records[0].target_record)
+        malformed_target["provenance"]["fungmod_curation"] = {}
+        assert classify_parameter_provenance(
+            malformed_target["provenance"]
+        ) == "curation_audited"
+        malformed_loaded = load_parameter_record_mapping(malformed_target)
+        assert parameter_simulation_authorization_blocker(malformed_loaded) is not None
+        before = _registry_snapshot(registry_index.parent)
+        reconstructed = _reconstructed_plan_with_target(
+            plan,
+            registry_index,
+            malformed_target,
+        )
+        with pytest.raises(RegistryPromotionApplyError, match="durable curation audit"):
+            apply_registry_promotion(
+                reconstructed,
+                confirmation_digest=reconstructed.plan_digest,
+                new_registry_version="0.1.1",
+                registry_index=registry_index,
+            )
+        assert _registry_snapshot(registry_index.parent) == before
+
+    parameters_path = registry_index.parent / "parameters" / "parameter_records.yml"
+    parameter_payload = yaml.safe_load(parameters_path.read_text(encoding="utf-8"))
+    runtime_target = next(
+        item for item in parameter_payload["records"] if item["record_id"] == "toy_param_k_surface_exact"
+    )
+    runtime_target["provenance"].update(outer_metadata)
+    parameters_path.write_text(yaml.safe_dump(parameter_payload, sort_keys=False), encoding="utf-8")
+    process_path = registry_index.parent / "processes" / "process_compatibility.yml"
+    process_payload = yaml.safe_load(process_path.read_text(encoding="utf-8"))
+    process_payload["records"][0]["required_parameters"] = [
+        "k_surface_exact",
+        "k_ads_exact",
+        "A_surface_exact",
+    ]
+    process_payload["records"][0]["parameter_roles"] = {
+        "surface_rate_constant": "k_surface_exact",
+        "adsorption_constant": "k_ads_exact",
+        "accessible_surface_area": "A_surface_exact",
+    }
+    process_path.write_text(yaml.safe_dump(process_payload, sort_keys=False), encoding="utf-8")
+    study = virtual_experiment(
+        fungi="toy_fungus_alpha",
+        substrates="toy_cellulose_like_solid",
+        environments="toy_lab_environment",
+        registry=registry_index,
+    )
+    study.simulate(
+        mode="exploratory",
+        output_dir=tmp_path / "ordinary_metadata_runtime",
+        quicklook=False,
+    )
 
 
 def test_rechecksummed_authored_bundle_mutation_is_rejected_by_authoring_digest(
@@ -672,7 +971,7 @@ def test_refreshed_checksums_cannot_hide_report_limitations_disagreement(
     ]["proposal_limitations"] = forged
     _redigest_bundle(bundle, accepted, manifest)
 
-    with pytest.raises(RegistryPromotionPlanError, match="report proposal limitations disagree"):
+    with pytest.raises(RegistryPromotionPlanError, match="deterministic machine-readable record"):
         plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
 
 
@@ -1475,12 +1774,10 @@ def _redigest_bundle(
     accepted: dict[str, Any],
     manifest: dict[str, Any],
 ) -> None:
-    accepted_path = bundle.paths["accepted_registry_records"]
-    accepted_path.write_text(yaml.safe_dump(accepted, sort_keys=False), encoding="utf-8")
     record = deepcopy(accepted["records"][0])
     curation = record.pop("curation")
     summary = manifest["summary"]
-    summary["authoring_digest"] = parameter_authoring_digest(
+    digest = parameter_authoring_digest(
         record,
         curation,
         source_record_id=summary["source_record_id"],
@@ -1488,8 +1785,55 @@ def _redigest_bundle(
         source_snapshot_path=summary["source_snapshot_path"],
         proposal_limitations=tuple(summary["proposal_limitations"]),
     )
-    manifest["files"][accepted_path.name] = hashlib.sha256(accepted_path.read_bytes()).hexdigest()
+    summary["authoring_digest"] = digest
+    accepted["records"][0]["provenance"][PARAMETER_BRIDGE_PROVENANCE_KEY][
+        "authoring_digest"
+    ] = digest
+    accepted_path = bundle.paths["accepted_registry_records"]
+    accepted_path.write_text(yaml.safe_dump(accepted, sort_keys=False), encoding="utf-8")
+    manifest["files"] = {
+        name: hashlib.sha256((bundle.output_directory / name).read_bytes()).hexdigest()
+        for name in manifest["files"]
+    }
     bundle.paths["curation_manifest"].write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _reconstructed_plan_with_target(plan: Any, registry_index: Path, target: dict[str, Any]):
+    index = promotion_module._load_registry_index(registry_index)
+    registry_target = index.targets["parameters"]
+    content = promotion_module._merged_target_content(registry_target, (target,))
+    after_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    candidate = replace(
+        plan.addable_records[0],
+        target_record=deepcopy(target),
+        after_sha256=after_sha256,
+    )
+    prospective = replace(
+        plan.prospective_files[0],
+        content=content,
+        after_sha256=after_sha256,
+    )
+    prospective_digest = promotion_module._registry_digest(
+        index,
+        overrides={registry_target.relative_path: content},
+    )
+    reconstructed = replace(
+        plan,
+        candidates=(candidate,),
+        prospective_files=(prospective,),
+        prospective_registry_digest=prospective_digest,
+    )
+    payload = promotion_module._plan_digest_payload(
+        input_kind=reconstructed.input_kind,
+        registry_index_path=reconstructed.registry_index_path,
+        registry_root=reconstructed.registry_root,
+        registry_index_sha256=reconstructed.registry_index_sha256,
+        before_registry_digest=reconstructed.before_registry_digest,
+        prospective_registry_digest=reconstructed.prospective_registry_digest,
+        candidates=reconstructed.candidates,
+        prospective_files=reconstructed.prospective_files,
+    )
+    return replace(reconstructed, plan_digest=promotion_module._sha256_json(payload))

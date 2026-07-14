@@ -403,11 +403,17 @@ plan = plan_registry_promotion(
 specialized result uses the existing deterministic, checksummed curation writer,
 and either that written bundle or the in-memory result is consumable by
 `plan_registry_promotion(...)` after authoring-digest, loader, registry-context,
-selector, closed-summary, and cross-representation safety-envelope revalidation.
+selector, closed-summary, exact manifest/accepted-payload/report, and
+cross-representation safety-envelope revalidation.
 Removing the bridge marker or specialized summary labels cannot downgrade a
 candidate with the intrinsic source/curator authoring provenance shape into a
 generic promotion; apply independently rejects a legacy or reconstructed
-generic plan with that shape but no bridge audit. Public checksums establish internal consistency only; they
+generic plan unless the complete bridge audit, schema, digest, identity, and
+closed safety policies revalidate. The shared classifier treats either reserved
+`fungmod_parameter_bridge`/`fungmod_curation` namespace, including malformed
+forms and distinctive nested source evidence, as non-simulation provenance;
+ordinary outer `curator`, `curation_date`, or `parameter_role` fields alone do
+not trigger the bridge contract. Public checksums establish internal consistency only; they
 are not signatures or proof of curator authorship. Registry context binds the index plus the complete
 registry file tree; selector audit binds resolved entity classes, exactly one
 compatibility record, and the source/curator-authored runtime parameter-role
@@ -421,7 +427,8 @@ authorization remain explicitly unsupported, so CURATION-001 remains partial.
 The source adapter's `frozen_source_urls(...)` helper reads only adjacent local
 fetch metadata and performs no network access. It reconciles `total_pages`,
 `requests_made`, ordered `source_urls`, and, for immutable bundles, raw-page
-count/order/page numbers, URLs, regular-file paths, sizes, and checksums. The
+count/order/page numbers, URLs, unique exact `raw/page_NNNN.json` paths, sizes,
+and checksums. The
 bridge revalidates that frozen URL identity during authoring and planning. One fetched URL requires the
 same singular `source_url`; multiple ordered URLs require `source_url=None` and
 the exact nonempty `source_urls` sequence. Its exact storage-only `allowed_use`

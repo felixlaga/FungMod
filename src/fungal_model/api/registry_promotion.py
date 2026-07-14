@@ -43,11 +43,11 @@ from fungal_model.api.parameter_record_authoring import (
     PARAMETER_AUTHORING_WORKFLOW,
     CuratorAuthoredParameterResult,
     ParameterRecordAuthoringError,
-    is_curator_authored_parameter_record,
-    parameter_candidate_requires_authoring_contract,
     validate_authored_parameter_against_registry,
     validate_parameter_authoring_bundle_record,
+    validate_parameter_authoring_plan_record,
 )
+from fungal_model.provenance import classify_parameter_provenance
 from fungal_model.registry.loaders import load_registry
 from fungal_model.registry.store import FungModRegistry
 
@@ -367,7 +367,11 @@ def plan_registry_promotion(
             )
         seen_ids.add(item.record_id)
 
-        if is_curator_authored_parameter_record(item.target_record):
+        provenance = item.target_record.get("provenance")
+        if item.record_type == "parameter_records" and classify_parameter_provenance(
+            provenance if isinstance(provenance, Mapping) else None,
+            curation_metadata=item.curation_metadata,
+        ) == "parameter_bridge":
             try:
                 validate_authored_parameter_against_registry(
                     item.target_record,
@@ -1283,15 +1287,26 @@ def _validate_apply_candidate_set(plan: RegistryPromotionPlan) -> None:
     for candidate in plan.candidates:
         _validate_accepted_curation(candidate.record_id, candidate.curation_metadata)
         _validate_target_record(candidate.record_id, candidate.target_record)
-        if parameter_candidate_requires_authoring_contract(
-            candidate.record_type,
-            candidate.target_record,
-            candidate.curation_metadata,
-        ) and not is_curator_authored_parameter_record(candidate.target_record):
-            raise RegistryPromotionApplyError(
-                f"Parameter candidate {candidate.record_id!r} has intrinsic authoring evidence "
-                "but lacks the specialized bridge audit; generic apply is forbidden."
+        provenance = candidate.target_record.get("provenance")
+        provenance_class = (
+            classify_parameter_provenance(
+                provenance if isinstance(provenance, Mapping) else None,
+                curation_metadata=candidate.curation_metadata,
             )
+            if candidate.record_type == "parameter_records"
+            else "generic"
+        )
+        if provenance_class == "parameter_bridge":
+            try:
+                validate_parameter_authoring_plan_record(
+                    candidate.target_record,
+                    candidate.curation_metadata,
+                )
+            except ParameterRecordAuthoringError as exc:
+                raise RegistryPromotionApplyError(
+                    f"Parameter candidate {candidate.record_id!r} failed complete specialized "
+                    f"bridge validation during apply: {exc}"
+                ) from exc
         _validate_source_identity_consistency(
             candidate.record_id,
             target_record=candidate.target_record,
@@ -1317,6 +1332,8 @@ def _validate_apply_candidate_set(plan: RegistryPromotionPlan) -> None:
                 raise RegistryPromotionApplyError(
                     f"Exact duplicate {candidate.record_id!r} has an unsupported reason."
                 )
+            if provenance_class != "generic":
+                _validate_exact_curation_audit(candidate)
         else:
             raise RegistryPromotionApplyError(
                 f"Promotion apply refuses candidate classification {candidate.classification!r}."
@@ -1328,13 +1345,13 @@ def _validate_exact_curation_audit(candidate: RegistryPromotionCandidate) -> Non
     provenance = candidate.target_record.get("provenance")
     if not isinstance(provenance, Mapping):
         raise RegistryPromotionApplyError(
-            f"Addable candidate {candidate.record_id!r} lacks mapping provenance."
+            f"Promotion candidate {candidate.record_id!r} lacks mapping provenance."
         )
     audit = provenance.get(_CURATION_AUDIT_PROVENANCE_KEY)
     expected = _curation_audit_payload(candidate.curation_metadata)
     if not _type_exact_equal(audit, expected):
         raise RegistryPromotionApplyError(
-            f"Addable candidate {candidate.record_id!r} lacks exact durable curation audit metadata."
+            f"Promotion candidate {candidate.record_id!r} lacks exact durable curation audit metadata."
         )
 
 
@@ -1412,6 +1429,21 @@ def _revalidate_plan_against_current_registry(
             raise RegistryPromotionApplyError(
                 f"Promotion candidate {candidate.record_id!r} target hash is stale."
             )
+        provenance = candidate.target_record.get("provenance")
+        if candidate.record_type == "parameter_records" and classify_parameter_provenance(
+            provenance if isinstance(provenance, Mapping) else None,
+            curation_metadata=candidate.curation_metadata,
+        ) == "parameter_bridge":
+            try:
+                validate_authored_parameter_against_registry(
+                    candidate.target_record,
+                    registry_index=index.path,
+                )
+            except ParameterRecordAuthoringError as exc:
+                raise RegistryPromotionApplyError(
+                    f"Authored parameter record {candidate.record_id!r} failed current-registry "
+                    f"revalidation during apply: {exc}"
+                ) from exc
         existing = _record_by_id(target, candidate.record_id)
         if candidate.classification == "addable":
             if existing is not None:
@@ -1868,11 +1900,14 @@ def _accepted_records(
             except ParameterRecordAuthoringError as exc:
                 raise RegistryPromotionPlanError(str(exc)) from exc
         elif any(
-            parameter_candidate_requires_authoring_contract(
-                item.record_type,
-                item.proposed_record,
-                item.to_dict()["curation"],
+            item.record_type == "parameter_records"
+            and classify_parameter_provenance(
+                item.proposed_record.get("provenance")
+                if isinstance(item.proposed_record.get("provenance"), Mapping)
+                else None,
+                curation_metadata=item.to_dict()["curation"],
             )
+            == "parameter_bridge"
             for item in value.accepted_records
         ):
             raise RegistryPromotionPlanError(
@@ -1985,21 +2020,21 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
     summary = manifest.get("summary")
     if not isinstance(summary, Mapping) or summary.get("accepted_count") != len(accepted):
         raise RegistryPromotionPlanError("Curation manifest accepted_count does not match accepted artifacts.")
-    has_parameter_authoring_record = any(
-        is_curator_authored_parameter_record(item.target_record) for item in accepted
-    )
     has_parameter_authoring_summary = (
         isinstance(summary, Mapping) and summary.get("workflow") == PARAMETER_AUTHORING_WORKFLOW
     )
     requires_parameter_authoring = any(
-        parameter_candidate_requires_authoring_contract(
-            item.record_type,
-            item.target_record,
-            item.curation_metadata,
+        item.record_type == "parameter_records"
+        and classify_parameter_provenance(
+            item.target_record.get("provenance")
+            if isinstance(item.target_record.get("provenance"), Mapping)
+            else None,
+            curation_metadata=item.curation_metadata,
         )
+        == "parameter_bridge"
         for item in accepted
     )
-    if has_parameter_authoring_record or has_parameter_authoring_summary or requires_parameter_authoring:
+    if has_parameter_authoring_summary or requires_parameter_authoring:
         if len(accepted) != 1:
             raise RegistryPromotionPlanError(
                 "A written parameter-authoring bundle must contain exactly one accepted parameter target."

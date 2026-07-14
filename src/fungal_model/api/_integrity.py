@@ -9,11 +9,10 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-
-CURATION_AUDIT_PROVENANCE_KEY = "fungmod_curation"
-PARAMETER_BRIDGE_PROVENANCE_KEY = "fungmod_parameter_bridge"
-RESERVED_PROVENANCE_KEYS = frozenset(
-    {CURATION_AUDIT_PROVENANCE_KEY, PARAMETER_BRIDGE_PROVENANCE_KEY}
+from fungal_model.provenance import (
+    CURATION_AUDIT_PROVENANCE_KEY,
+    PARAMETER_BRIDGE_PROVENANCE_KEY,
+    RESERVED_PROVENANCE_KEYS,
 )
 
 

@@ -73,8 +73,8 @@ Completed in this pass:
   specialized result reuses `CurationResult.write()` for deterministic,
   checksummed output already consumable by promotion planning.
 - Persisted result-level proposal limitations in manifest, summary, accepted
-  payload, bridge audit, and the deterministic report limitations section, with
-  exact cross-representation checks. Public SHA256 checksums prove internal
+  payload, bridge audit, and the deterministic full report, with exact
+  cross-representation key/value checks. Public SHA256 checksums prove internal
   bundle consistency, not external curator identity or cryptographic authorship.
 - Closed the full authored summary key/value schema, including every mutation,
   validation, simulation, provenance, and limitation claim, and compare it
@@ -86,7 +86,8 @@ Completed in this pass:
   predicate blocks an externally installed relabelled record.
 - Reconciled frozen SABIO metadata as one offline structure: page/request/URL
   cardinality and immutable raw-page order, page numbers, URLs, regular files,
-  byte sizes, and checksums must agree. Collapsed multi-page metadata fails.
+  unique exact `raw/page_NNNN.json` identities, byte sizes, and checksums must
+  agree. Collapsed or path-aliased multi-page metadata fails.
 - Bound source query, source snapshot path, proposal limitations, every
   original/source/normalized/converted/target value and unit representation,
   singular and plural source aliases, acceptance evidence, and every closed
@@ -99,10 +100,18 @@ Completed in this pass:
   toy preflight paths cannot use such a parameter; ensemble and chain runtime
   refuse it, and authorized alternatives are ranked consistently. Other
   explicit `allowed_use` behavior remains unchanged.
+- Centralized one parameter-provenance classifier across planning, apply, and
+  runtime. A reserved `fungmod_parameter_bridge` namespace always requires full
+  independent bridge schema/digest/policy validation at apply; the reserved
+  `fungmod_curation` namespace and distinctive nested source evidence remain
+  mode-independently non-simulatable even when malformed. Ordinary outer
+  `curator`, `curation_date`, and `parameter_role` metadata alone remain generic.
 - Kept written source curation input out of scope. Shared canonicalization,
   type-exact comparison, round-trip difference, SHA256, full-tree hashing, and
   symlink helpers live in one internal integrity module and are reused by
-  registry promotion. No parallel curation-bundle parser was added.
+  registry promotion; provenance classification lives in one neutral shared
+  module used by plan, apply, and runtime. No parallel curation-bundle parser
+  was added.
 - The frozen SABIO-RK test completes explicit identity curation in a test-owned
   proposal copy, re-authors canonical EntryID 35622 kcat using the existing
   canonical record id, removes that target only from a copied temporary
@@ -115,13 +124,15 @@ checksums, rechecksummed authored-bundle tampering, post-result mutation,
 unsupported written input, source acceptance/blocker/type failures, exact
 identity conversion, bool/int/string/nonfinite values, blank fields, source
 identity and snapshot digest conflicts, conservative policies, complete
-`ValueSpec` and loader fidelity, selector compatibility, unsafe output paths,
+`ValueSpec` and loader fidelity, selector compatibility, malformed and nested
+bridge evidence at plan/apply/runtime, exact written-envelope/report closure,
+ordinary curator-metadata compatibility, aliased raw pages, unsafe output paths,
 planning-registry revalidation, and public exports.
 `tests/test_roadmap_orchestration_status.py` synchronizes PR-47 completion,
 PR-48 current scope, remaining CURATION-001 limits, and the PR-49 follow-up.
 
 What did not change: no production registry record or version, package version,
-curation decision semantics, promotion apply behavior, process law, solver,
+curation decision semantics, valid generic promotion transaction behavior, process law, solver,
 biology, parameter value/unit/maturity in `data_registry/`, validation data,
 calibration, or empirical comparison. The SABIO source adapter performs no
 network access here. Its proposal payload now adds explicit `parameter_role`
@@ -141,7 +152,9 @@ multi-page frozen metadata is newly rejected. Parameter candidates with the
 intrinsic authoring provenance shape require the specialized contract even if
 labels are removed, and outer provenance safety claims are rejected. Existing
 generic curation, planning, and apply inputs without that shape retain their
-contracts. Deliberate safety change: an exact
+contracts. Deliberate safety change: parameters retaining either reserved
+authoring/curation provenance namespace are mode-independently non-simulatable;
+ordinary outer curator/date/role metadata alone remains generic. An exact
 `registry_storage_only_no_simulation_authorization` parameter is now rejected
 by modelability/preflight in every mode; behavior for other explicit
 `allowed_use` values remains unchanged unless the record carries intrinsic

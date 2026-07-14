@@ -1907,6 +1907,7 @@ def _validated_frozen_metadata_urls(
         raise SabioRKSourceError(
             "SABIO-RK fetch metadata raw_pages must match total_pages exactly."
         )
+    raw_page_paths: set[str] = set()
     for expected_page, (raw_page, source_url) in enumerate(
         zip(raw_pages, source_urls, strict=True),
         start=1,
@@ -1916,11 +1917,21 @@ def _validated_frozen_metadata_urls(
             raise SabioRKSourceError(
                 "SABIO-RK fetch metadata raw page order, page numbers, and URLs disagree."
             )
-        _validate_frozen_raw_page(raw_page, metadata_path=metadata_path)
+        relative_path = _validate_frozen_raw_page(raw_page, metadata_path=metadata_path)
+        expected_path = f"raw/page_{expected_page:04d}.json"
+        if (
+            raw_page.get("path") != expected_path
+            or relative_path != expected_path
+            or relative_path in raw_page_paths
+        ):
+            raise SabioRKSourceError(
+                "SABIO-RK raw page paths must uniquely match raw/page_NNNN.json page identity."
+            )
+        raw_page_paths.add(relative_path)
     return source_urls
 
 
-def _validate_frozen_raw_page(raw_page: Mapping[str, Any], *, metadata_path: Path) -> None:
+def _validate_frozen_raw_page(raw_page: Mapping[str, Any], *, metadata_path: Path) -> str:
     relative = raw_page.get("path")
     digest = raw_page.get("sha256")
     size_bytes = raw_page.get("size_bytes")
@@ -1929,6 +1940,7 @@ def _validate_frozen_raw_page(raw_page: Mapping[str, Any], *, metadata_path: Pat
     relative_path = Path(relative)
     if relative_path.is_absolute() or ".." in relative_path.parts:
         raise SabioRKSourceError("SABIO-RK raw page metadata path must stay inside its bundle.")
+    normalized_relative = relative_path.as_posix()
     path = metadata_path.parent / relative_path
     _reject_frozen_metadata_symlinks(path, label="SABIO-RK raw page")
     if not path.is_file():
@@ -1944,6 +1956,7 @@ def _validate_frozen_raw_page(raw_page: Mapping[str, Any], *, metadata_path: Pat
         raise SabioRKSourceError(
             "SABIO-RK raw page size or checksum disagrees with frozen fetch metadata."
         )
+    return normalized_relative
 
 
 def _reject_frozen_metadata_symlinks(path: Path, *, label: str) -> None:

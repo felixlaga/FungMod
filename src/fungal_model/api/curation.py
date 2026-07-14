@@ -744,32 +744,50 @@ def _write_bundle(root: Path, result: CurationResult) -> None:
     paths = _artifact_paths(root)
     _write_csv(paths["eligible_records"], result.eligible_records)
     _write_csv(paths["excluded_records"], result.excluded_records)
-    _write_yaml(paths["proposed_registry_records"], _records_payload("proposed", result.records, result))
-    _write_yaml(paths["accepted_registry_records"], _records_payload("accepted", result.accepted_records, result))
-    _write_yaml(paths["rejected_registry_records"], _records_payload("rejected", result.rejected_records, result))
-    paths["curation_report"].write_text(_report_markdown(result), encoding="utf-8")
+    _write_yaml(
+        paths["proposed_registry_records"],
+        curation_records_payload("proposed", result.records, result),
+    )
+    _write_yaml(
+        paths["accepted_registry_records"],
+        curation_records_payload("accepted", result.accepted_records, result),
+    )
+    _write_yaml(
+        paths["rejected_registry_records"],
+        curation_records_payload("rejected", result.rejected_records, result),
+    )
+    paths["curation_report"].write_text(render_curation_report(result), encoding="utf-8")
 
     checksums = {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for key, path in paths.items()
         if key != "curation_manifest"
     }
-    manifest = {
+    manifest = curation_manifest_payload(result, checksums)
+    paths["curation_manifest"].write_text(
+        json.dumps(_canonicalize(manifest), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def curation_manifest_payload(
+    result: CurationResult,
+    checksums: Mapping[str, str],
+) -> Mapping[str, Any]:
+    """Build the exact deterministic manifest written for a curation result."""
+
+    return {
         "kind": CURATION_MANIFEST_KIND,
         "schema_version": CURATION_SCHEMA_VERSION,
         "source_query": result.source_query,
         "source_snapshot_path": result.source_snapshot_path,
         "proposal_limitations": list(result.proposal_limitations),
         "summary": result.summary(),
-        "files": checksums,
+        "files": dict(checksums),
         "allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
         "production_registry_mutated": False,
         "scientific_validation_claimed": False,
     }
-    paths["curation_manifest"].write_text(
-        json.dumps(_canonicalize(manifest), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _artifact_paths(root: Path) -> dict[str, Path]:
@@ -784,11 +802,13 @@ def _artifact_paths(root: Path) -> dict[str, Path]:
     }
 
 
-def _records_payload(
+def curation_records_payload(
     bundle_status: str,
     records: Sequence[CurationRecord],
     result: CurationResult,
 ) -> Mapping[str, Any]:
+    """Build one exact deterministic decision-record payload."""
+
     return {
         "kind": "fungmod_curation_decision_records",
         "schema_version": CURATION_SCHEMA_VERSION,
@@ -831,7 +851,9 @@ def _write_csv(path: Path, records: Sequence[CurationRecord]) -> None:
             )
 
 
-def _report_markdown(result: CurationResult) -> str:
+def render_curation_report(result: CurationResult) -> str:
+    """Render the deterministic human-readable report for a curation result."""
+
     summary = result.summary()
     lines = [
         "# CURATION-001 Proposal Review",
@@ -1020,6 +1042,9 @@ __all__ = [
     "CurationRecord",
     "CurationResult",
     "CurationWriteResult",
+    "curation_manifest_payload",
+    "curation_records_payload",
+    "render_curation_report",
     "review_source_proposal",
     "validate_curation_report_limitations",
 ]

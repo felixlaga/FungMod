@@ -224,9 +224,9 @@ The current PR-48 `author_parameter_record(...)` slice is limited to accepted
 in-memory PARAMETER curation results and complete curator-authored production
 mappings with exact identity conversion, source digest/provenance,
 loader-round-trip, ordered frozen-URL, full-registry-context, exact role/
-compatibility, closed summary/result/report envelope, structural non-downgrade,
+compatibility, closed summary/result/full-report envelope, structural non-downgrade,
 and mutation checks. Immutable frozen metadata page/request/URL/raw-page
-cardinality is reconciled offline. Its
+cardinality and unique exact page-path identity are reconciled offline. Its
 specialized checksummed curation output is promotion-plan-compatible but does
 not mutate or apply; its public checksums establish internal consistency rather
 than cryptographic authorship. Its exact storage-only policy uses one shared
