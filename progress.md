@@ -162,9 +162,12 @@ Completed in this pass:
   anchored implemented direct process parameters to process-type-owned
   canonical fields. Explicit templates reject missing direct roles, coherent
   semantic-key renames, and duplicate role reuse before modelability or
-  assembly, while optional nested modifiers and dynamic fallback retain their
-  existing contracts. Malformed list-valued compatibility roles and component
-  binding IDs now produce `RegistryValidationError` instead of raw `TypeError`.
+  assembly. Every initial-state `parameter_role` and `units_from_role` must also
+  retain an explicit parameter record, so coherent outer-compatibility and
+  template truncation fails during preflight instead of later assembly. Optional
+  nested modifiers and dynamic fallback retain their existing contracts.
+  Malformed list-valued compatibility roles and component binding IDs now
+  produce `RegistryValidationError` instead of raw `TypeError`.
 - Centralized one parameter-provenance classifier across planning, apply, and
   runtime. A reserved `fungmod_parameter_bridge` namespace always requires full
   independent bridge schema/digest/policy validation at apply; the reserved
@@ -265,11 +268,11 @@ Verification:
   case-builder, chain, and VirtualExperiment suite: 320 passed in 49.74s before
   the final apply-time regression; the canonical suite below includes that
   regression and all focused coverage.
-- Twelfth-pass authoring/resolver/registry/status regression suite: 229 passed
-  in 118.09s; the complete explicit CASE-001 malformation matrix passed 35
+- Final-review authoring/resolver/registry/status regression suite: 230 passed
+  in 126.33s; the complete explicit CASE-001 malformation matrix passed 35
   tests in 10.37s after its expected diagnostics were aligned with the stronger
   exact process-role and consumed-substrate checks.
-- Canonical full pytest: 1143 passed in 207.84s on the final code.
+- Canonical full pytest: 1144 passed in 249.30s on the final code.
 - Focused Ruff: passed.
 - Full Ruff: passed for `src` and `tests`.
 - Full Pyright with the shared venv interpreter selected explicitly: 0 errors,

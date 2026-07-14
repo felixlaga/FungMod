@@ -171,6 +171,14 @@ def resolve_exact_template_parameter_records(
         )
 
     initial_roles = _initial_parameter_roles(template)
+    missing_initial_roles = tuple(sorted(initial_roles.difference(record_ids)))
+    if missing_initial_roles:
+        raise ExactTemplateParameterError(
+            f"Case template {template.case_template_id!r} initial_state_mapping "
+            "parameter_role/units_from_role values lack explicit parameter records: "
+            f"{', '.join(missing_initial_roles)}.",
+            role=missing_initial_roles[0],
+        )
     (
         process_owners,
         declared_process_types,

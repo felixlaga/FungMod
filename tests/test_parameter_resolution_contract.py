@@ -287,6 +287,10 @@ def test_shared_exact_resolver_requires_nested_modifier_semantic_role_key(
         ("direct_role_alias", "reuses explicit parameter roles"),
         ("direct_role_rename", "exact canonical"),
         (
+            "initial_role_truncation",
+            "cellulase_initial_concentration",
+        ),
+        (
             "initial_state_role",
             "exact component compatibility role 'enzyme_initial_concentration'",
         ),
@@ -879,6 +883,9 @@ def _apply_contract_drift_in_memory(
     if drift in {"direct_role_truncation", "direct_role_alias", "direct_role_rename"}:
         _mutate_direct_kcat_contract(registry, mutation=drift)
         return
+    if drift == "initial_role_truncation":
+        _truncate_initial_role(registry)
+        return
     _rename_component_role(
         registry,
         component_id="bio002_beta_glucosidase_cellobiose_component",
@@ -916,6 +923,9 @@ def _apply_contract_drift_in_files(registry_dir: Path, *, drift: str) -> None:
         return
     if drift in {"direct_role_truncation", "direct_role_alias", "direct_role_rename"}:
         _mutate_direct_kcat_contract_in_files(registry_dir, mutation=drift)
+        return
+    if drift == "initial_role_truncation":
+        _truncate_initial_role_in_files(registry_dir)
         return
     path = registry_dir / "processes" / "process_compatibility.yml"
     payload = _yaml_mapping(path)
@@ -1021,6 +1031,62 @@ def _replace_outer_substrate_with_same_class_alternate_in_files(
     }
     template_path.write_text(
         yaml.safe_dump(template_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def _truncate_initial_role(registry: FungModRegistry) -> None:
+    role = "cellulase_initial_concentration"
+    template = registry.case_templates[CHAIN_TEMPLATE_ID]
+    metadata = deepcopy(dict(template.process_state_metadata))
+    cast(dict[str, Any], metadata["parameter_record_ids"]).pop(role)
+    cast(dict[str, Any], metadata["parameter_role_contracts"]).pop(role)
+    registry.case_templates[CHAIN_TEMPLATE_ID] = replace(
+        template,
+        process_state_metadata=metadata,
+    )
+
+    outer = registry.process_compatibility[CHAIN_COMPATIBILITY_ID]
+    roles = dict(outer.parameter_roles)
+    symbol = roles.pop(role)
+    registry.process_compatibility[CHAIN_COMPATIBILITY_ID] = replace(
+        outer,
+        parameter_roles=roles,
+        required_parameters=tuple(
+            value for value in outer.required_parameters if value != symbol
+        ),
+    )
+
+
+def _truncate_initial_role_in_files(registry_dir: Path) -> None:
+    role = "cellulase_initial_concentration"
+    template_path = registry_dir / "case_templates" / "case_templates.yml"
+    template_payload = _yaml_mapping(template_path)
+    template = next(
+        record
+        for record in cast(list[dict[str, Any]], template_payload["records"])
+        if record["record_id"] == CHAIN_TEMPLATE_ID
+    )
+    metadata = cast(dict[str, Any], template["process_state_metadata"])
+    cast(dict[str, Any], metadata["parameter_record_ids"]).pop(role)
+    cast(dict[str, Any], metadata["parameter_role_contracts"]).pop(role)
+    template_path.write_text(
+        yaml.safe_dump(template_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    process_path = registry_dir / "processes" / "process_compatibility.yml"
+    process_payload = _yaml_mapping(process_path)
+    outer = next(
+        record
+        for record in cast(list[dict[str, Any]], process_payload["records"])
+        if record["record_id"] == CHAIN_COMPATIBILITY_ID
+    )
+    roles = cast(dict[str, str], outer["parameter_roles"])
+    symbol = roles.pop(role)
+    cast(list[str], outer["required_parameters"]).remove(symbol)
+    process_path.write_text(
+        yaml.safe_dump(process_payload, sort_keys=False),
         encoding="utf-8",
     )
 
