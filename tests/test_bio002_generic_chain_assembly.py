@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable, cast
 
@@ -9,10 +10,15 @@ import numpy as np
 import pytest
 import yaml
 
-from fungal_model.registry import load_registry
+from fungal_model import VirtualExperiment
+from fungal_model.api import VirtualExperimentError
+from fungal_model.registry import RegistryValidationError, load_registry
 from fungal_model.screening import (
     EnzymeChainAssemblyError,
+    RegistryCaseBuildError,
+    assess_modelability,
     build_extracellular_enzyme_chain_config,
+    build_model_config_from_registry_case,
     write_enzyme_chain_standard_tables,
 )
 from fungal_model.workflows import run_configured_model
@@ -20,6 +26,9 @@ from fungal_model.workflows import run_configured_model
 
 ROOT = Path(__file__).resolve().parents[1]
 GENERIC_TEMPLATE_ID = "bio002_polymer_x_oligomer_y_monomer_z_template"
+GENERIC_FUNGUS_ID = "fixture_chain_enzyme_source"
+GENERIC_SUBSTRATE_ID = "polymer_x_fixture"
+GENERIC_ENVIRONMENT_ID = "toy_lab_environment"
 
 
 def test_artificial_three_step_chain_assembles_runs_and_writes_tables(tmp_path: Path) -> None:
@@ -118,12 +127,104 @@ def test_artificial_chain_rejects_coherent_whole_component_role_group_swap(
     registry_dir = _copy_registry(tmp_path)
     _insert_generic_chain_fixture(registry_dir)
     _coherently_swap_generic_second_component(registry_dir)
-    registry = load_registry(registry_dir / "registry_index.yml")
+    with pytest.raises(RegistryValidationError, match="process_type does not match"):
+        load_registry(registry_dir / "registry_index.yml")
 
-    with pytest.raises(EnzymeChainAssemblyError, match="reuses substrate identity"):
+
+@pytest.mark.parametrize(
+    ("component_id", "old_role", "new_role", "message"),
+    [
+        (
+            "fixture_y_to_q_component",
+            "enzyme_initial_concentration",
+            "unrelated_initial_role",
+            "exact component compatibility role 'enzyme_initial_concentration'",
+        ),
+        (
+            "fixture_q_to_z_component",
+            "inhibition_constant",
+            "unrelated_modifier_role",
+            "exact component compatibility role 'inhibition_constant'",
+        ),
+    ],
+)
+def test_artificial_three_step_semantic_role_rewrite_is_rejected_by_every_path(
+    tmp_path: Path,
+    component_id: str,
+    old_role: str,
+    new_role: str,
+    message: str,
+) -> None:
+    valid_dir = _copy_registry(tmp_path / "valid")
+    _insert_generic_chain_fixture(valid_dir)
+    valid_study = VirtualExperiment.from_registry(
+        fungi=GENERIC_FUNGUS_ID,
+        substrates=GENERIC_SUBSTRATE_ID,
+        environments=GENERIC_ENVIRONMENT_ID,
+        registry=valid_dir / "registry_index.yml",
+    )
+    assert valid_study.preflight(mode="exploratory")[0].status == "modelable"
+    valid_result = valid_study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=19,
+        output_dir=tmp_path / "valid_result",
+        quicklook=False,
+    )
+    _rename_component_role_in_memory(
+        valid_study.registry,
+        component_id=component_id,
+        old_role=old_role,
+        new_role=new_role,
+    )
+    with pytest.raises(RegistryCaseBuildError, match=message):
+        valid_result.write_tables(tmp_path / "rewritten_tables")
+
+    drifted_dir = _copy_registry(tmp_path / "drifted")
+    _insert_generic_chain_fixture(drifted_dir)
+    _rename_component_role_in_file(
+        drifted_dir,
+        component_id=component_id,
+        old_role=old_role,
+        new_role=new_role,
+    )
+    registry = load_registry(drifted_dir / "registry_index.yml")
+    report = assess_modelability(
+        fungus_id=GENERIC_FUNGUS_ID,
+        substrate_id=GENERIC_SUBSTRATE_ID,
+        environment_id=GENERIC_ENVIRONMENT_ID,
+        registry=registry,
+        mode="exploratory",
+    )
+    assert report.status == "underparameterized"
+    assert any(message in item.message for item in report.incompatible)
+
+    study = VirtualExperiment.from_registry(
+        fungi=GENERIC_FUNGUS_ID,
+        substrates=GENERIC_SUBSTRATE_ID,
+        environments=GENERIC_ENVIRONMENT_ID,
+        registry=drifted_dir / "registry_index.yml",
+    )
+    with pytest.raises(VirtualExperimentError, match=message):
+        study.simulate(
+            mode="exploratory",
+            n_samples=1,
+            output_dir=tmp_path / "blocked_runtime",
+            quicklook=False,
+        )
+    with pytest.raises(RegistryCaseBuildError, match="modelability status"):
+        build_model_config_from_registry_case(
+            fungus_id=GENERIC_FUNGUS_ID,
+            substrate_id=GENERIC_SUBSTRATE_ID,
+            environment_id=GENERIC_ENVIRONMENT_ID,
+            registry=registry,
+            mode="toy",
+        )
+    with pytest.raises(EnzymeChainAssemblyError, match=message):
         build_extracellular_enzyme_chain_config(
             registry=registry,
             template_id=GENERIC_TEMPLATE_ID,
+            environment_id=GENERIC_ENVIRONMENT_ID,
         )
 
 
@@ -133,6 +234,27 @@ def test_linear_chain_requires_at_least_two_processes(tmp_path: Path) -> None:
         lambda template: template["process_state_metadata"].update(
             {"process_templates": template["process_state_metadata"]["process_templates"][:1]}
         ),
+    )
+    process_path = registry_dir / "processes" / "process_compatibility.yml"
+    process_payload = _yaml_mapping(process_path)
+    outer = next(
+        record
+        for record in cast(list[dict[str, Any]], process_payload["records"])
+        if record["record_id"] == "fixture_three_step_chain_compatibility"
+    )
+    outer["component_bindings"] = outer["component_bindings"][:1]
+    for component_id in (
+        "fixture_y_to_q_component",
+        "fixture_q_to_z_component",
+    ):
+        process_payload["records"] = [
+            record
+            for record in cast(list[dict[str, Any]], process_payload["records"])
+            if record["record_id"] != component_id
+        ]
+    process_path.write_text(
+        yaml.safe_dump(process_payload, sort_keys=False),
+        encoding="utf-8",
     )
     registry = load_registry(registry_dir / "registry_index.yml")
 
@@ -335,6 +457,26 @@ def _insert_generic_chain_fixture(registry_dir: Path) -> None:
     cast(list[dict[str, Any]], substrate_data["records"])[0:0] = _generic_substrates()
     substrate_path.write_text(yaml.safe_dump(substrate_data, sort_keys=False), encoding="utf-8")
 
+    fungus_path = registry_dir / "fungi" / "fungi.yml"
+    fungus_data = _yaml_mapping(fungus_path)
+    cast(list[dict[str, Any]], fungus_data["records"]).insert(
+        0,
+        {
+            "record_id": GENERIC_FUNGUS_ID,
+            "name": "Artificial three-step chain enzyme source",
+            "maturity": "toy_development",
+            "provenance": {
+                "source": "BIO-002 genericity test fixture",
+                "confidence_level": "testing",
+                "notes": "Artificial source identity for software tests only.",
+            },
+            "enzyme_classes": ["catalyst_alpha_fixture"],
+            "assimilable_products": ["monomer_z_fixture"],
+            "notes": "Artificial enzyme-source fixture; not biological evidence.",
+        },
+    )
+    fungus_path.write_text(yaml.safe_dump(fungus_data, sort_keys=False), encoding="utf-8")
+
     compatibility_path = registry_dir / "processes" / "process_compatibility.yml"
     compatibility_data = _yaml_mapping(compatibility_path)
     cast(list[dict[str, Any]], compatibility_data["records"])[0:0] = (
@@ -362,6 +504,7 @@ def _generic_chain_template() -> dict[str, Any]:
         "process_type": "extracellular_enzyme_chain",
         "state_roles": {
             "substrate": "polymer_x_pool",
+            "intermediate": "oligomer_y_pool",
             "intermediate_1": "oligomer_y_pool",
             "intermediate_2": "fragment_q_pool",
             "product": "monomer_z_pool",
@@ -371,6 +514,7 @@ def _generic_chain_template() -> dict[str, Any]:
         },
         "initial_state_mapping": {
             "substrate": {"parameter_role": "x_initial", "units_from_role": "x_initial"},
+            "intermediate": {"value": 0.0, "units": "mM"},
             "intermediate_1": {"value": 0.0, "units": "mM"},
             "intermediate_2": {"value": 0.0, "units": "mM"},
             "product": {"value": 0.0, "units": "mM"},
@@ -730,6 +874,7 @@ def _generic_enzyme_classes() -> list[dict[str, Any]]:
             substrate_class="polymer_x_fixture",
             bond_class="fixture_linkage_x",
             process_type="surface_catalysis",
+            additional_process_types=("extracellular_enzyme_chain",),
         ),
         _generic_enzyme_class(
             record_id="catalyst_beta_fixture",
@@ -752,6 +897,7 @@ def _generic_enzyme_class(
     substrate_class: str,
     bond_class: str,
     process_type: str,
+    additional_process_types: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     return {
         "record_id": record_id,
@@ -764,7 +910,7 @@ def _generic_enzyme_class(
         },
         "target_bond_classes": [bond_class],
         "compatible_substrate_classes": [substrate_class],
-        "compatible_processes": [process_type],
+        "compatible_processes": [process_type, *additional_process_types],
         "notes": "Artificial enzyme capability; not scientific evidence.",
     }
 
@@ -841,6 +987,21 @@ def _generic_process_compatibilities() -> list[dict[str, Any]]:
             ],
         ),
         _generic_compatibility(
+            record_id="fixture_x_surface_standalone_compatibility",
+            enzyme_class="catalyst_alpha_fixture",
+            substrate_class="polymer_x_fixture",
+            bond_class="fixture_linkage_x",
+            process_type="surface_catalysis",
+            parameter_roles={
+                "substrate_initial_amount": symbols["x_initial"],
+                "enzyme_initial_concentration": symbols["alpha_initial"],
+                "surface_rate_constant": symbols["surface_rate_constant"],
+                "adsorption_constant": symbols["adsorption_constant"],
+                "accessible_surface_area": symbols["accessible_surface_area"],
+            },
+            component_only=False,
+        ),
+        _generic_compatibility(
             record_id="fixture_x_surface_component",
             enzyme_class="catalyst_alpha_fixture",
             substrate_class="polymer_x_fixture",
@@ -892,6 +1053,7 @@ def _generic_compatibility(
     parameter_roles: dict[str, str],
     case_template_id: str | None = None,
     component_bindings: list[dict[str, str]] | None = None,
+    component_only: bool = True,
 ) -> dict[str, Any]:
     record = {
         "record_id": record_id,
@@ -913,6 +1075,8 @@ def _generic_compatibility(
     }
     if case_template_id is not None:
         record["case_template_id"] = case_template_id
+    elif component_only:
+        record["compatibility_scope"] = "component_only"
     if component_bindings is not None:
         record["component_bindings"] = component_bindings
     return record
@@ -1088,6 +1252,41 @@ def _coherently_swap_generic_second_component(registry_dir: Path) -> None:
         yaml.safe_dump(compatibility_data, sort_keys=False),
         encoding="utf-8",
     )
+
+
+def _rename_component_role_in_memory(
+    registry: Any,
+    *,
+    component_id: str,
+    old_role: str,
+    new_role: str,
+) -> None:
+    component = registry.process_compatibility[component_id]
+    roles = dict(component.parameter_roles)
+    roles[new_role] = roles.pop(old_role)
+    registry.process_compatibility[component_id] = replace(
+        component,
+        parameter_roles=roles,
+    )
+
+
+def _rename_component_role_in_file(
+    registry_dir: Path,
+    *,
+    component_id: str,
+    old_role: str,
+    new_role: str,
+) -> None:
+    path = registry_dir / "processes" / "process_compatibility.yml"
+    payload = _yaml_mapping(path)
+    component = next(
+        record
+        for record in cast(list[dict[str, Any]], payload["records"])
+        if record["record_id"] == component_id
+    )
+    roles = cast(dict[str, str], component["parameter_roles"])
+    roles[new_role] = roles.pop(old_role)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
 def _yaml_mapping(path: Path) -> dict[str, Any]:

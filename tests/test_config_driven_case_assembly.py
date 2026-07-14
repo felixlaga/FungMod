@@ -847,7 +847,7 @@ def _registry_with_bio002_product_inhibition(
     template_path.write_text(yaml.safe_dump(template_data, sort_keys=False), encoding="utf-8")
     _add_bio002_component_role_mappings(
         registry_dir,
-        {"product_inhibition_constant": "K_i_bio003_product_fixture"},
+        {"inhibition_constant": "K_i_bio003_product_fixture"},
     )
 
     if include_ki_record:

@@ -13,7 +13,11 @@ from fungal_model.registry.records import (
     parameter_record_mode_eligibility_blocker,
     parameter_record_selection_key,
 )
-from fungal_model.registry.store import FungModRegistry, RegistryLookupError
+from fungal_model.registry.store import (
+    FungModRegistry,
+    RegistryLookupError,
+    RegistryValidationError,
+)
 from fungal_model.screening.parameter_resolution import (
     ExactTemplateParameterError,
     resolve_exact_template_parameter_records,
@@ -180,6 +184,16 @@ def assess_modelability(
                     substrate_class=substrate.substrate_class,
                     process_type=process_type,
                 )
+            except RegistryValidationError as exc:
+                incompatible.append(
+                    _item(
+                        "process_compatibility",
+                        "component_authority_graph",
+                        f"Registry process compatibility authority graph is invalid: {exc}",
+                        {},
+                    )
+                )
+                continue
             except RegistryLookupError:
                 incompatible.append(
                     _item(

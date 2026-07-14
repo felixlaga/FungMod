@@ -235,9 +235,12 @@ closed exact per-mode `allowed_use` permissions before ranking. One shared exact
 template-role resolver aligns preflight, public/runtime simulation,
 deterministic/direct assembly, and result reconstruction; kinetic role owners
 derive from component process templates. Exact ordered outer-compatibility
-bindings plus structural state/entity IDs and registry capabilities independently
-resolve each component slot; role/record selectors are assertions only. Each
-process must bind its roles and parameter-backed states to that slot.
+bindings plus intrinsic component-only scope, structural state/entity IDs, and
+registry capabilities independently resolve each component slot through one
+load/query-validated registry authority graph; role/record selectors are
+assertions only. Configured substrate entity IDs must resolve exactly through
+registry-backed `state_species`, and each process must bind its roles and
+parameter-backed states to that slot through exact semantic compatibility keys.
 Initial-state roles declare record scope without claiming
 kinetic ownership. Nonidentity
 conversion, written source input, non-parameter records, validation,

@@ -341,6 +341,35 @@ def test_real_frozen_sabio_identity_path_is_addable_only_on_a_copied_registry(
     assert _registry_snapshot() == production_before
 
 
+def test_removed_outer_bindings_cannot_reclassify_component_for_authoring(
+    tmp_path: Path,
+) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    path = registry_index.parent / "processes" / "process_compatibility.yml"
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    outer = next(
+        record
+        for record in cast(list[dict[str, Any]], payload["records"])
+        if record["record_id"]
+        == "bio002_cellulase_cellulose_film_extracellular_chain"
+    )
+    outer.pop("component_bindings")
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(
+        ParameterRecordAuthoringError,
+        match="exactly one owner binding; found 0",
+    ):
+        author_parameter_record(
+            source,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=_canonical_parameter_target(source),
+            registry_index=registry_index,
+        )
+
+
 def test_offline_two_page_sabio_urls_survive_proposal_curation_and_authoring(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1633,9 +1662,9 @@ def test_planning_rejects_effective_compatibility_registry_drift(tmp_path: Path)
     process_payload["records"].append(duplicate)
     process_path.write_text(yaml.safe_dump(process_payload, sort_keys=False), encoding="utf-8")
 
-    with pytest.raises(RegistryPromotionPlanError, match="registry context"):
+    with pytest.raises(RegistryPromotionPlanError, match="invalid before planning"):
         plan_registry_promotion(authored, registry_index=registry_index)
-    with pytest.raises(RegistryPromotionPlanError, match="registry context"):
+    with pytest.raises(RegistryPromotionPlanError, match="invalid before planning"):
         plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
 
 

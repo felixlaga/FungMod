@@ -10,11 +10,10 @@ from fungal_model.registry.records import (
     CaseTemplateRecord,
     ParameterRecord,
     ParameterRecordSelectionMode,
-    ProcessComponentBinding,
     ProcessCompatibilityRecord,
     parameter_record_mode_eligibility_blocker,
 )
-from fungal_model.registry.store import FungModRegistry
+from fungal_model.registry.store import FungModRegistry, RegistryValidationError
 
 ParameterValueRequirement = Literal["exact", "sampleable"]
 
@@ -29,6 +28,34 @@ _BASE_CONTRACT_FIELDS = frozenset(
     {"kind", "parameter_symbol", *_SELECTOR_FIELDS}
 )
 _INITIAL_CONTRACT_FIELDS = _BASE_CONTRACT_FIELDS | {"record_process_type"}
+_INITIAL_STATE_COMPATIBILITY_ROLE_BY_PROCESS_FIELD = {
+    "catalyst": "enzyme_initial_concentration",
+    "enzyme": "enzyme_initial_concentration",
+    "substrate": "substrate_initial_amount",
+}
+_MODIFIER_COMPATIBILITY_ROLE_BY_FIELD = {
+    "product_inhibition": {
+        "inhibition_constant_role": "inhibition_constant",
+    },
+    "temperature_arrhenius_reference": {
+        "activation_energy_role": "activation_energy",
+        "reference_temperature_role": "reference_temperature",
+        "minimum_temperature_role": "minimum_temperature",
+        "maximum_temperature_role": "maximum_temperature",
+    },
+    "ph_gaussian": {
+        "optimum_role": "ph_optimum",
+        "width_role": "ph_width",
+        "minimum_ph_role": "minimum_ph",
+        "maximum_ph_role": "maximum_ph",
+    },
+    "oxygen_monod": {
+        "half_saturation_role": "oxygen_half_saturation",
+    },
+    "water_activity_threshold": {
+        "minimum_water_activity_role": "minimum_water_activity",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -112,12 +139,19 @@ def resolve_exact_template_parameter_records(
         raise ExactTemplateParameterError(
             f"Case template {template.case_template_id!r} parameter_record_ids cannot be empty."
         )
+    effective_required_roles = (
+        tuple(compatibility.parameter_roles)
+        if compatibility is not None
+        else tuple(required_roles)
+    )
     if set(contracts) != set(record_ids):
         raise ExactTemplateParameterError(
             f"Case template {template.case_template_id!r} parameter_role_contracts must "
             "have exactly the same role keys as parameter_record_ids."
         )
-    missing_roles = tuple(role for role in required_roles if role not in record_ids)
+    missing_roles = tuple(
+        role for role in effective_required_roles if role not in record_ids
+    )
     if missing_roles:
         raise ExactTemplateParameterError(
             f"Case template {template.case_template_id!r} is missing explicit parameter "
@@ -130,6 +164,7 @@ def resolve_exact_template_parameter_records(
         process_owners,
         declared_process_types,
         process_components,
+        process_role_keys,
         process_templates,
     ) = _process_role_owners(
         template,
@@ -139,7 +174,7 @@ def resolve_exact_template_parameter_records(
         template=template,
         compatibility=compatibility,
         record_roles=frozenset(roles),
-        required_roles=required_roles,
+        required_roles=effective_required_roles,
         contracts=contracts,
     )
 
@@ -160,6 +195,7 @@ def resolve_exact_template_parameter_records(
         compatibility=compatibility,
         contracts=role_contracts,
         process_components=process_components,
+        process_role_keys=process_role_keys,
         process_templates=process_templates,
     )
 
@@ -225,6 +261,7 @@ def _process_role_owners(
     Mapping[str, str],
     frozenset[str],
     Mapping[str, Mapping[str, Any]],
+    Mapping[str, str],
     tuple[Mapping[str, Any], ...],
 ]:
     raw_templates = template.process_state_metadata.get("process_templates")
@@ -234,6 +271,7 @@ def _process_role_owners(
         )
     owners: dict[str, str] = {}
     owner_components: dict[str, Mapping[str, Any]] = {}
+    role_keys: dict[str, str] = {}
     process_templates: list[Mapping[str, Any]] = []
     process_ids: set[str] = set()
     declared = {template.process_type}
@@ -274,28 +312,52 @@ def _process_role_owners(
                 "must define parameter_roles as a mapping."
             )
         referenced_roles = {
-            value
-            for value in parameter_roles.values()
+            value: str(process_field)
+            for process_field, value in parameter_roles.items()
             if isinstance(value, str) and value in record_roles
         }
-        referenced_roles.update(
-            _nested_parameter_roles(raw_template.get("modifiers"), record_roles=record_roles)
-        )
-        for role in referenced_roles:
-            if role in owner_components:
+        for role, semantic_key in _nested_parameter_role_keys(
+            raw_template.get("modifiers"),
+            record_roles=record_roles,
+        ).items():
+            existing_key = referenced_roles.get(role)
+            if existing_key is not None and existing_key != semantic_key:
                 raise ExactTemplateParameterError(
                     f"Case template {template.case_template_id!r} assigns parameter role "
-                    f"{role!r} to multiple component process types or components.",
+                    f"{role!r} to conflicting component semantic keys.",
+                    role=role,
+                )
+            referenced_roles[role] = semantic_key
+        for role, semantic_key in referenced_roles.items():
+            if role in owner_components:
+                same_component = owner_components[role] is raw_template
+                if same_component and role_keys[role] == semantic_key:
+                    continue
+                raise ExactTemplateParameterError(
+                    f"Case template {template.case_template_id!r} assigns parameter role "
+                    f"{role!r} to multiple component process types, components, or semantic keys.",
                     role=role,
                 )
             owners[role] = process_type
             owner_components[role] = raw_template
-    return owners, frozenset(declared), owner_components, tuple(process_templates)
+            role_keys[role] = semantic_key
+    return (
+        owners,
+        frozenset(declared),
+        owner_components,
+        role_keys,
+        tuple(process_templates),
+    )
 
 
-def _nested_parameter_roles(value: Any, *, record_roles: frozenset[str]) -> set[str]:
-    roles: set[str] = set()
+def _nested_parameter_role_keys(
+    value: Any,
+    *,
+    record_roles: frozenset[str],
+) -> Mapping[str, str]:
+    roles: dict[str, str] = {}
     if isinstance(value, Mapping):
+        modifier_type = value.get("type")
         for key, nested in value.items():
             if (
                 isinstance(key, str)
@@ -303,12 +365,66 @@ def _nested_parameter_roles(value: Any, *, record_roles: frozenset[str]) -> set[
                 and isinstance(nested, str)
                 and nested in record_roles
             ):
-                roles.add(nested)
-            roles.update(_nested_parameter_roles(nested, record_roles=record_roles))
+                semantic_key = _modifier_compatibility_role(
+                    modifier_type=modifier_type,
+                    field=key,
+                    role=nested,
+                )
+                if not semantic_key:
+                    raise ExactTemplateParameterError(
+                        f"Nested parameter role {nested!r} has an empty semantic key.",
+                        role=nested,
+                    )
+                existing = roles.get(nested)
+                if existing is not None and existing != semantic_key:
+                    raise ExactTemplateParameterError(
+                        f"Nested parameter role {nested!r} has conflicting semantic keys.",
+                        role=nested,
+                    )
+                roles[nested] = semantic_key
+            for role, semantic_key in _nested_parameter_role_keys(
+                nested,
+                record_roles=record_roles,
+            ).items():
+                existing = roles.get(role)
+                if existing is not None and existing != semantic_key:
+                    raise ExactTemplateParameterError(
+                        f"Nested parameter role {role!r} has conflicting semantic keys.",
+                        role=role,
+                    )
+                roles[role] = semantic_key
     elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
         for nested in value:
-            roles.update(_nested_parameter_roles(nested, record_roles=record_roles))
+            for role, semantic_key in _nested_parameter_role_keys(
+                nested,
+                record_roles=record_roles,
+            ).items():
+                existing = roles.get(role)
+                if existing is not None and existing != semantic_key:
+                    raise ExactTemplateParameterError(
+                        f"Nested parameter role {role!r} has conflicting semantic keys.",
+                        role=role,
+                    )
+                roles[role] = semantic_key
     return roles
+
+
+def _modifier_compatibility_role(
+    *,
+    modifier_type: Any,
+    field: str,
+    role: str,
+) -> str:
+    if isinstance(modifier_type, str) and modifier_type:
+        fields = _MODIFIER_COMPATIBILITY_ROLE_BY_FIELD.get(modifier_type)
+        if fields is None or field not in fields:
+            raise ExactTemplateParameterError(
+                f"Modifier type {modifier_type!r} has no exact semantic role for "
+                f"field {field!r}.",
+                role=role,
+            )
+        return fields[field]
+    return field.removesuffix("_role")
 
 
 def _validate_template_component_contracts(
@@ -318,11 +434,15 @@ def _validate_template_component_contracts(
     compatibility: ProcessCompatibilityRecord | None,
     contracts: Mapping[str, Mapping[str, Any]],
     process_components: Mapping[str, Mapping[str, Any]],
+    process_role_keys: Mapping[str, str],
     process_templates: Sequence[Mapping[str, Any]],
 ) -> Mapping[str, _ResolvedProcessComponent]:
-    enzyme_targets, declared_substrates, enzyme_entities = _declared_template_components(
-        template
-    )
+    (
+        enzyme_targets,
+        declared_substrates,
+        enzyme_entities,
+        substrate_entities,
+    ) = _declared_template_components(template)
     for role, contract in contracts.items():
         enzyme_class = contract["enzyme_class"]
         substrate_class = contract["substrate_class"]
@@ -353,12 +473,12 @@ def _validate_template_component_contracts(
         registry=registry,
         template=template,
         enzyme_entities=enzyme_entities,
+        substrate_entities=substrate_entities,
     )
     compatibility_by_process = _bound_component_compatibilities(
         registry=registry,
         template=template,
         compatibility=compatibility,
-        process_templates=process_templates,
     )
     resolved_by_process: dict[str, _ResolvedProcessComponent] = {}
     for process in process_templates:
@@ -381,8 +501,8 @@ def _validate_template_component_contracts(
         _require_component_assertions(
             role=role,
             contract=contracts[role],
-            component=component,
             resolved=resolved,
+            expected_compatibility_role=process_role_keys[role],
         )
         role_components[role] = resolved
 
@@ -393,10 +513,15 @@ def _validate_template_component_contracts(
             process.get("state_roles"),
             label=f"Component process {process_id!r} state_roles",
         )
+        catalyst_field = next(
+            (field for field in ("catalyst", "enzyme") if field in state_roles),
+            None,
+        )
         _require_initial_state_binding(
             template=template,
             contracts=contracts,
-            state_role=state_roles.get("catalyst") or state_roles.get("enzyme"),
+            state_role=state_roles.get(catalyst_field) if catalyst_field else None,
+            process_field=catalyst_field,
             resolved=resolved,
             selectors=("enzyme_class", "substrate_class"),
         )
@@ -404,6 +529,7 @@ def _validate_template_component_contracts(
             template=template,
             contracts=contracts,
             state_role=state_roles.get("substrate"),
+            process_field="substrate",
             resolved=resolved,
             selectors=("substrate_class",),
         )
@@ -415,6 +541,7 @@ def _declared_template_components(
 ) -> tuple[
     Mapping[str, frozenset[str]],
     frozenset[str],
+    Mapping[str, str],
     Mapping[str, str],
 ]:
     entities = _required_mapping(
@@ -430,6 +557,7 @@ def _declared_template_components(
 
     enzyme_targets: dict[str, frozenset[str]] = {}
     enzyme_entities: dict[str, str] = {}
+    substrate_entities: dict[str, str] = {}
     declared_substrates: set[str] = set()
     for raw_enzyme in raw_enzymes:
         enzyme = _required_mapping(raw_enzyme, label="Exact template enzyme component")
@@ -470,13 +598,28 @@ def _declared_template_components(
     for raw_substrate in raw_substrates:
         substrate = _required_mapping(raw_substrate, label="Exact template substrate component")
         data = _required_mapping(substrate.get("data"), label="Exact template substrate component data")
+        entity_id = substrate.get("id")
         substrate_class = data.get("chemical_class")
+        if not isinstance(entity_id, str) or not entity_id.strip():
+            raise ExactTemplateParameterError(
+                "Exact template substrate components require a non-empty entity id."
+            )
         if not isinstance(substrate_class, str) or not substrate_class.strip():
             raise ExactTemplateParameterError(
                 "Exact template substrate components require a non-empty chemical_class."
             )
+        if entity_id in substrate_entities:
+            raise ExactTemplateParameterError(
+                f"Exact template declares substrate entity id {entity_id!r} more than once."
+            )
+        substrate_entities[entity_id] = substrate_class
         declared_substrates.add(substrate_class)
-    return enzyme_targets, frozenset(declared_substrates), enzyme_entities
+    return (
+        enzyme_targets,
+        frozenset(declared_substrates),
+        enzyme_entities,
+        substrate_entities,
+    )
 
 
 def _state_species_components(
@@ -484,6 +627,7 @@ def _state_species_components(
     registry: FungModRegistry,
     template: CaseTemplateRecord,
     enzyme_entities: Mapping[str, str],
+    substrate_entities: Mapping[str, str],
 ) -> Mapping[str, _StateComponent]:
     raw_bindings = _required_mapping(
         template.process_state_metadata.get("state_species"),
@@ -492,6 +636,19 @@ def _state_species_components(
     declared_states = frozenset(template.state_roles.values())
     resolved: dict[str, _StateComponent] = {}
     identities: set[tuple[str, str]] = set()
+    bound_substrate_entities: set[str] = set()
+    for entity_id, substrate_class in substrate_entities.items():
+        substrate = registry.substrates.get(entity_id)
+        if substrate is None:
+            raise ExactTemplateParameterError(
+                f"Case template declares missing registry substrate entity {entity_id!r}."
+            )
+        if substrate.substrate_class != substrate_class:
+            raise ExactTemplateParameterError(
+                f"Case template substrate entity {entity_id!r} chemical_class "
+                f"{substrate_class!r} disagrees with registry class "
+                f"{substrate.substrate_class!r}."
+            )
     for state_name, raw_binding in raw_bindings.items():
         if state_name not in declared_states:
             raise ExactTemplateParameterError(
@@ -545,10 +702,26 @@ def _state_species_components(
                     f"substrate {species!r}."
                 )
             component_class = substrate.substrate_class
+            declared_class = substrate_entities.get(species)
+            if declared_class is not None:
+                if declared_class != component_class:
+                    raise ExactTemplateParameterError(
+                        f"Case template state {state_name!r} substrate identity {species!r} "
+                        "disagrees with its configured entity class."
+                    )
+                bound_substrate_entities.add(species)
         resolved[state_name] = _StateComponent(
             entity_type=entity_type,
             entity_id=species,
             component_class=component_class,
+        )
+    missing_substrate_entities = tuple(
+        sorted(set(substrate_entities) - bound_substrate_entities)
+    )
+    if missing_substrate_entities:
+        raise ExactTemplateParameterError(
+            "Configured substrate entity IDs must each appear exactly in canonical "
+            f"state_species; missing {missing_substrate_entities}."
         )
     return resolved
 
@@ -558,7 +731,6 @@ def _bound_component_compatibilities(
     registry: FungModRegistry,
     template: CaseTemplateRecord,
     compatibility: ProcessCompatibilityRecord | None,
-    process_templates: Sequence[Mapping[str, Any]],
 ) -> Mapping[str, ProcessCompatibilityRecord]:
     if compatibility is None:
         raise ExactTemplateParameterError(
@@ -570,56 +742,15 @@ def _bound_component_compatibilities(
         raise ExactTemplateParameterError(
             f"Compatibility {compatibility.record_id!r} disagrees with the active registry."
         )
-    if not isinstance(compatibility.component_bindings, tuple) or any(
-        not isinstance(binding, ProcessComponentBinding)
-        for binding in compatibility.component_bindings
-    ):
-        raise ExactTemplateParameterError(
-            f"Compatibility {compatibility.record_id!r} component_bindings must be an "
-            "immutable sequence of ProcessComponentBinding values."
+    try:
+        return registry.get_process_component_authorities(
+            compatibility.record_id,
+            template=template,
         )
-    expected_process_ids = tuple(str(process["id"]) for process in process_templates)
-    actual_process_ids = tuple(
-        binding.process_template_id for binding in compatibility.component_bindings
-    )
-    if actual_process_ids != expected_process_ids:
+    except (RegistryValidationError, KeyError) as exc:
         raise ExactTemplateParameterError(
-            f"Compatibility {compatibility.record_id!r} component_bindings must cover "
-            "the exact ordered process-template IDs."
-        )
-    compatibility_ids = tuple(
-        binding.compatibility_record_id for binding in compatibility.component_bindings
-    )
-    if len(set(compatibility_ids)) != len(compatibility_ids):
-        raise ExactTemplateParameterError(
-            f"Compatibility {compatibility.record_id!r} component_bindings must use "
-            "unique component compatibility records."
-        )
-    resolved: dict[str, ProcessCompatibilityRecord] = {}
-    for process, binding in zip(process_templates, compatibility.component_bindings, strict=True):
-        component = registry.process_compatibility.get(binding.compatibility_record_id)
-        if component is None:
-            raise ExactTemplateParameterError(
-                f"Component binding for process {binding.process_template_id!r} references "
-                f"missing compatibility {binding.compatibility_record_id!r}."
-            )
-        if (
-            component.record_id == compatibility.record_id
-            or component.component_bindings
-            or component.case_template_id
-        ):
-            raise ExactTemplateParameterError(
-                f"Component compatibility {component.record_id!r} must be a non-nested "
-                "component authority without a case_template_id."
-            )
-        if component.process_type != process["process_type"]:
-            raise ExactTemplateParameterError(
-                f"Process template {binding.process_template_id!r} requires process_type "
-                f"{component.process_type!r} from its component compatibility, not "
-                f"{process['process_type']!r}."
-            )
-        resolved[binding.process_template_id] = component
-    return resolved
+            f"Compatibility {compatibility.record_id!r} component authority graph is invalid: {exc}"
+        ) from exc
 
 
 def _resolve_process_component(
@@ -748,8 +879,8 @@ def _require_component_assertions(
     *,
     role: str,
     contract: Mapping[str, Any],
-    component: Mapping[str, Any],
     resolved: _ResolvedProcessComponent,
+    expected_compatibility_role: str,
 ) -> None:
     expected = {
         "enzyme_class": resolved.enzyme.component_class,
@@ -764,24 +895,17 @@ def _require_component_assertions(
             )
     symbol = contract["parameter_symbol"]
     compatibility_symbols = tuple(resolved.compatibility.parameter_roles.values())
-    if compatibility_symbols.count(symbol) != 1:
+    if (
+        resolved.compatibility.parameter_roles.get(expected_compatibility_role)
+        != symbol
+        or compatibility_symbols.count(symbol) != 1
+    ):
         raise ExactTemplateParameterError(
-            f"Template role {role!r} symbol {symbol!r} is not exactly bound by component "
-            f"compatibility {resolved.compatibility.record_id!r}.",
+            f"Template role {role!r} symbol {symbol!r} must be bound by exact component "
+            f"compatibility role {expected_compatibility_role!r} on "
+            f"{resolved.compatibility.record_id!r}.",
             role=role,
         )
-    parameter_roles = _required_mapping(
-        component.get("parameter_roles"),
-        label=f"Component process {component['id']!r} parameter_roles",
-    )
-    for process_field, template_role in parameter_roles.items():
-        if template_role == role:
-            if resolved.compatibility.parameter_roles.get(process_field) != symbol:
-                raise ExactTemplateParameterError(
-                    f"Template role {role!r} symbol disagrees with exact component "
-                    f"compatibility role {process_field!r}.",
-                    role=role,
-                )
 
 
 def _require_initial_state_binding(
@@ -789,6 +913,7 @@ def _require_initial_state_binding(
     template: CaseTemplateRecord,
     contracts: Mapping[str, Mapping[str, Any]],
     state_role: Any,
+    process_field: str | None,
     resolved: _ResolvedProcessComponent,
     selectors: Sequence[str],
 ) -> None:
@@ -814,10 +939,26 @@ def _require_initial_state_binding(
                 role=initial_role,
             )
     symbol = contract["parameter_symbol"]
-    if tuple(resolved.compatibility.parameter_roles.values()).count(symbol) != 1:
+    expected_compatibility_role = (
+        _INITIAL_STATE_COMPATIBILITY_ROLE_BY_PROCESS_FIELD.get(process_field)
+        if process_field is not None
+        else None
+    )
+    if expected_compatibility_role is None:
         raise ExactTemplateParameterError(
-            f"Initial-state role {initial_role!r} symbol {symbol!r} is not exactly bound "
-            f"by component compatibility {resolved.compatibility.record_id!r}.",
+            f"Initial-state role {initial_role!r} has no semantic component role for "
+            f"process field {process_field!r}.",
+            role=initial_role,
+        )
+    if (
+        resolved.compatibility.parameter_roles.get(expected_compatibility_role)
+        != symbol
+        or tuple(resolved.compatibility.parameter_roles.values()).count(symbol) != 1
+    ):
+        raise ExactTemplateParameterError(
+            f"Initial-state role {initial_role!r} symbol {symbol!r} must be bound by exact "
+            f"component compatibility role {expected_compatibility_role!r} on "
+            f"{resolved.compatibility.record_id!r}.",
             role=initial_role,
         )
     if contract["record_process_type"] not in {

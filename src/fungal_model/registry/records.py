@@ -17,6 +17,20 @@ def _tuple_of_strings(values: Sequence[Any] | None) -> tuple[str, ...]:
 
 
 CASE_TEMPLATE_SCHEMA_VERSION = "1"
+PROCESS_COMPATIBILITY_SCOPE_STANDALONE = "standalone"
+PROCESS_COMPATIBILITY_SCOPE_COMPONENT = "component_only"
+PROCESS_COMPATIBILITY_SCOPES = frozenset(
+    {
+        PROCESS_COMPATIBILITY_SCOPE_STANDALONE,
+        PROCESS_COMPATIBILITY_SCOPE_COMPONENT,
+    }
+)
+
+
+def _is_canonical_nonblank_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value) and value == value.strip()
+
+
 PARAMETER_ALLOWED_USE_STORAGE_ONLY = "registry_storage_only_no_simulation_authorization"
 PARAMETER_ALLOWED_USE_SCIENTIFIC = (
     "scientific_or_exploratory_when_all_other_inputs_are_valid"
@@ -271,18 +285,76 @@ class ProcessCompatibilityRecord(RegistryRecord):
     product_map_required: bool = False
     case_template_id: str = ""
     component_bindings: tuple[ProcessComponentBinding, ...] = ()
+    compatibility_scope: str = PROCESS_COMPATIBILITY_SCOPE_STANDALONE
 
     def validate(self) -> ValidationResult:
         issues = self._common_issues()
         for field_name in ("enzyme_class", "substrate_class", "process_type"):
-            if not getattr(self, field_name):
+            value = getattr(self, field_name)
+            if not _is_canonical_nonblank_text(value):
                 issues.append({"field": field_name, "message": f"{field_name} is required."})
-        if not self.required_bond_classes:
+        if (
+            not isinstance(self.compatibility_scope, str)
+            or self.compatibility_scope not in PROCESS_COMPATIBILITY_SCOPES
+        ):
+            issues.append(
+                {
+                    "field": "compatibility_scope",
+                    "message": "Compatibility scope must be 'standalone' or 'component_only'.",
+                }
+            )
+        if (
+            not isinstance(self.required_bond_classes, tuple)
+            or not self.required_bond_classes
+            or any(
+                not _is_canonical_nonblank_text(value)
+                for value in self.required_bond_classes
+            )
+        ):
             issues.append({"field": "required_bond_classes", "message": "Required bond classes are required."})
+        required_parameters = self.required_parameters
+        if not isinstance(required_parameters, tuple) or any(
+            not _is_canonical_nonblank_text(value)
+            for value in required_parameters
+        ):
+            issues.append(
+                {
+                    "field": "required_parameters",
+                    "message": "Required parameters must be an immutable sequence of nonblank symbols.",
+                }
+            )
+            required_parameters = ()
+        if len(set(required_parameters)) != len(required_parameters):
+            issues.append(
+                {
+                    "field": "required_parameters",
+                    "message": "Required parameter symbols must be unique.",
+                }
+            )
+        parameter_roles = self.parameter_roles
+        if not isinstance(parameter_roles, Mapping):
+            issues.append(
+                {
+                    "field": "parameter_roles",
+                    "message": "Parameter roles must be a mapping.",
+                }
+            )
+            parameter_roles = {}
+        if any(
+            not _is_canonical_nonblank_text(role)
+            or not _is_canonical_nonblank_text(symbol)
+            for role, symbol in parameter_roles.items()
+        ):
+            issues.append(
+                {
+                    "field": "parameter_roles",
+                    "message": "Parameter role keys and symbols must be nonblank text.",
+                }
+            )
         unknown_role_parameters = tuple(
             symbol
-            for symbol in self.parameter_roles.values()
-            if symbol not in self.required_parameters
+            for symbol in parameter_roles.values()
+            if symbol not in required_parameters
         )
         if unknown_role_parameters:
             issues.append(
@@ -290,6 +362,24 @@ class ProcessCompatibilityRecord(RegistryRecord):
                     "field": "parameter_roles",
                     "message": "Parameter role mappings must reference required parameters.",
                     "details": {"unknown_symbols": unknown_role_parameters},
+                }
+            )
+        role_symbols = tuple(parameter_roles.values())
+        if len(set(role_symbols)) != len(role_symbols):
+            issues.append(
+                {
+                    "field": "parameter_roles",
+                    "message": "Parameter role symbols must be unique.",
+                }
+            )
+        if not isinstance(self.case_template_id, str) or (
+            self.case_template_id
+            and not _is_canonical_nonblank_text(self.case_template_id)
+        ):
+            issues.append(
+                {
+                    "field": "case_template_id",
+                    "message": "Case template id must be empty or nonblank text.",
                 }
             )
         bindings = self.component_bindings
@@ -314,24 +404,24 @@ class ProcessCompatibilityRecord(RegistryRecord):
                 continue
             process_ids.append(binding.process_template_id)
             compatibility_ids.append(binding.compatibility_record_id)
-            if (
-                not isinstance(binding.process_template_id, str)
-                or not binding.process_template_id.strip()
-            ):
+            if not _is_canonical_nonblank_text(binding.process_template_id):
                 issues.append(
                     {
                         "field": f"component_bindings.{index}.process_template_id",
-                        "message": "Component binding process_template_id is required.",
+                        "message": (
+                            "Component binding process_template_id must be canonical "
+                            "nonblank text without surrounding whitespace."
+                        ),
                     }
                 )
-            if (
-                not isinstance(binding.compatibility_record_id, str)
-                or not binding.compatibility_record_id.strip()
-            ):
+            if not _is_canonical_nonblank_text(binding.compatibility_record_id):
                 issues.append(
                     {
                         "field": f"component_bindings.{index}.compatibility_record_id",
-                        "message": "Component binding compatibility_record_id is required.",
+                        "message": (
+                            "Component binding compatibility_record_id must be canonical "
+                            "nonblank text without surrounding whitespace."
+                        ),
                     }
                 )
         if len(set(process_ids)) != len(process_ids):
@@ -368,6 +458,8 @@ class ProcessCompatibilityRecord(RegistryRecord):
             data["component_bindings"] = [
                 binding.to_dict() for binding in self.component_bindings
             ]
+        if self.compatibility_scope == PROCESS_COMPATIBILITY_SCOPE_COMPONENT:
+            data["compatibility_scope"] = self.compatibility_scope
         return data
 
 

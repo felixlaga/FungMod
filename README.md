@@ -139,7 +139,12 @@ basic kinetics layer:
   chains of two or more implemented process steps, whose stoichiometry,
   conserved quantities, entities, modifiers, and output labels come from
   template data rather than mechanism-code biological names; branching and
-  cycles fail explicitly as unsupported;
+  cycles fail explicitly as unsupported. Component process compatibilities use
+  an intrinsic `component_only` scope and a registry-validated ownership graph,
+  so removing or corrupting an outer binding cannot expose a component as a
+  standalone compatibility. Exact templates also cross-bind configured
+  substrate entity IDs to registry-backed `state_species` identities and bind
+  initial-state and modifier symbols through exact semantic compatibility keys;
 - a scoped CASE-001 researcher-facing path that runs the existing BIO-002
   cellulose-equivalent enzyme-chain virtual experiment from names and aliases
   through the top-level `virtual_experiment(...)` API.

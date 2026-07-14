@@ -106,6 +106,7 @@ records:
 
   - record_id: bio002_cellulase_cellulose_surface_component
     name: BIO-002 cellulase cellulose-equivalent surface component
+    compatibility_scope: component_only
     maturity: exploratory_metadata
     provenance:
       source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
@@ -134,6 +135,7 @@ records:
 
   - record_id: bio002_beta_glucosidase_cellobiose_component
     name: BIO-002 beta-glucosidase cellobiose homogeneous component
+    compatibility_scope: component_only
     maturity: literature_metadata
     provenance:
       source_database: SABIO-RK

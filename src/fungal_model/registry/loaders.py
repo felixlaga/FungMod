@@ -20,6 +20,8 @@ from fungal_model.registry.records import (
     PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY,
     PARAMETER_ALLOWED_USE_SCIENTIFIC,
     PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
+    PROCESS_COMPATIBILITY_SCOPES,
+    PROCESS_COMPATIBILITY_SCOPE_STANDALONE,
     ProcessComponentBinding,
     ProcessCompatibilityRecord,
     SubstrateRecord,
@@ -176,7 +178,21 @@ def _process_compatibility_record(data: Mapping[str, Any]) -> ProcessCompatibili
         product_map_required=bool(data.get("product_map_required", False)),
         case_template_id=str(data.get("case_template_id", "") or ""),
         component_bindings=_process_component_bindings(data),
+        compatibility_scope=_process_compatibility_scope(data),
     )
+
+
+def _process_compatibility_scope(data: Mapping[str, Any]) -> str:
+    value = data.get(
+        "compatibility_scope",
+        PROCESS_COMPATIBILITY_SCOPE_STANDALONE,
+    )
+    if not isinstance(value, str) or value not in PROCESS_COMPATIBILITY_SCOPES:
+        raise RegistryLoadError(
+            "process_compatibility.compatibility_scope must be 'standalone' "
+            "or 'component_only'."
+        )
+    return value
 
 
 def _process_component_bindings(

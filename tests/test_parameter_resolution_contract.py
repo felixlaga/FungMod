@@ -11,7 +11,10 @@ import yaml
 
 from fungal_model import VirtualExperiment
 from fungal_model.api import VirtualExperimentError
-from fungal_model.registry import FungModRegistry, load_registry
+from fungal_model.examples.product_inhibition import (
+    prepare_reversible_product_inhibition_example_registry,
+)
+from fungal_model.registry import FungModRegistry, RegistryValidationError, load_registry
 from fungal_model.registry.records import (
     CaseTemplateRecord,
     PARAMETER_ALLOWED_USE_EXPLORATORY,
@@ -42,6 +45,7 @@ KM_RECORD_ID = "sabiork_reaction_618_Km_cellobiose"
 KCAT_RECORD_ID = "sabiork_reaction_618_kcat_cellobiose"
 BETA_INITIAL_RECORD_ID = "bio002_beta_glucosidase_initial_concentration"
 FUNGUS_ID = "generic_cellulase_source"
+CHAIN_FIXTURE_FUNGUS_ID = "exact_chain_test_source"
 SUBSTRATE_ID = "cellulose_film_generic"
 ENVIRONMENT_ID = "sabiork_reaction_618_selected_conditions"
 
@@ -161,12 +165,185 @@ def test_shared_exact_resolver_rejects_cross_component_role_swap() -> None:
         )
 
 
+def test_shared_exact_resolver_cross_binds_configured_substrate_entity_id() -> None:
+    registry = load_registry(REGISTRY_INDEX)
+    template = registry.case_templates[CHAIN_TEMPLATE_ID]
+    metadata = deepcopy(dict(template.process_state_metadata))
+    entities = deepcopy(dict(metadata["entities"]))
+    substrates = deepcopy(list(entities["substrates"]))
+    substrates[0]["id"] = "rewritten_configured_substrate"
+    entities["substrates"] = substrates
+    metadata["entities"] = entities
+    template = replace(template, process_state_metadata=metadata)
+    compatibility = registry.process_compatibility[CHAIN_COMPATIBILITY_ID]
+
+    with pytest.raises(
+        ExactTemplateParameterError,
+        match="declares missing registry substrate entity",
+    ):
+        resolve_exact_template_parameter_records(
+            registry=registry,
+            template=template,
+            compatibility=compatibility,
+            required_roles=tuple(compatibility.parameter_roles),
+            fungus_id=FUNGUS_ID,
+            substrate_id=SUBSTRATE_ID,
+            environment_id=ENVIRONMENT_ID,
+            mode="exploratory",
+            value_requirement="sampleable",
+        )
+
+
+def test_shared_exact_resolver_requires_initial_state_semantic_role_key() -> None:
+    registry = load_registry(REGISTRY_INDEX)
+    _rename_component_role(
+        registry,
+        component_id="bio002_beta_glucosidase_cellobiose_component",
+        old_role="enzyme_initial_concentration",
+        new_role="unrelated_initial_role",
+    )
+    template = registry.case_templates[CHAIN_TEMPLATE_ID]
+    compatibility = registry.process_compatibility[CHAIN_COMPATIBILITY_ID]
+
+    with pytest.raises(
+        ExactTemplateParameterError,
+        match="exact component compatibility role 'enzyme_initial_concentration'",
+    ):
+        resolve_exact_template_parameter_records(
+            registry=registry,
+            template=template,
+            compatibility=compatibility,
+            required_roles=tuple(compatibility.parameter_roles),
+            fungus_id=FUNGUS_ID,
+            substrate_id=SUBSTRATE_ID,
+            environment_id=ENVIRONMENT_ID,
+            mode="exploratory",
+            value_requirement="sampleable",
+        )
+
+
+def test_shared_exact_resolver_requires_nested_modifier_semantic_role_key(
+    tmp_path: Path,
+) -> None:
+    registry_index = prepare_reversible_product_inhibition_example_registry(
+        tmp_path / "product_inhibition_registry",
+        source_registry=REGISTRY_INDEX,
+    )
+    registry = load_registry(registry_index)
+    _rename_component_role(
+        registry,
+        component_id="bio002_beta_glucosidase_cellobiose_component",
+        old_role="inhibition_constant",
+        new_role="unrelated_modifier_role",
+    )
+    template = registry.case_templates[CHAIN_TEMPLATE_ID]
+    compatibility = registry.process_compatibility[CHAIN_COMPATIBILITY_ID]
+
+    with pytest.raises(
+        ExactTemplateParameterError,
+        match="exact component compatibility role 'inhibition_constant'",
+    ):
+        resolve_exact_template_parameter_records(
+            registry=registry,
+            template=template,
+            compatibility=compatibility,
+            required_roles=tuple(compatibility.parameter_roles),
+            fungus_id=FUNGUS_ID,
+            substrate_id=SUBSTRATE_ID,
+            environment_id=ENVIRONMENT_ID,
+            mode="exploratory",
+            value_requirement="sampleable",
+        )
+
+
+@pytest.mark.parametrize(
+    ("drift", "message"),
+    [
+        ("substrate_entity_id", "missing registry substrate entity"),
+        (
+            "initial_state_role",
+            "exact component compatibility role 'enzyme_initial_concentration'",
+        ),
+        (
+            "nested_modifier_role",
+            "exact component compatibility role 'inhibition_constant'",
+        ),
+    ],
+)
+def test_identity_and_semantic_role_drift_is_rejected_by_every_public_path(
+    tmp_path: Path,
+    drift: str,
+    message: str,
+) -> None:
+    valid_index = _prepare_contract_registry(tmp_path / "valid", drift=drift)
+    valid_study = VirtualExperiment.from_registry(
+        fungi=CHAIN_FIXTURE_FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=valid_index,
+    )
+    assert valid_study.preflight(mode="exploratory")[0].status in {
+        "modelable",
+        "exploratory",
+    }
+    valid_result = valid_study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=23,
+        output_dir=tmp_path / "valid_result",
+        quicklook=False,
+    )
+    _apply_contract_drift_in_memory(valid_study.registry, drift=drift)
+    with pytest.raises(RegistryCaseBuildError, match=message):
+        valid_result.write_tables(tmp_path / "rewritten_tables")
+
+    drifted_index = _prepare_contract_registry(tmp_path / "drifted", drift=drift)
+    _apply_contract_drift_in_files(drifted_index.parent, drift=drift)
+    registry = load_registry(drifted_index)
+    report = assess_modelability(
+        fungus_id=CHAIN_FIXTURE_FUNGUS_ID,
+        substrate_id=SUBSTRATE_ID,
+        environment_id=ENVIRONMENT_ID,
+        registry=registry,
+        mode="exploratory",
+    )
+    assert report.status == "underparameterized"
+    assert any(message in item.message for item in report.incompatible)
+
+    study = VirtualExperiment.from_registry(
+        fungi=CHAIN_FIXTURE_FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=drifted_index,
+    )
+    with pytest.raises(VirtualExperimentError, match=message):
+        study.simulate(
+            mode="exploratory",
+            n_samples=1,
+            output_dir=tmp_path / "blocked_runtime",
+            quicklook=False,
+        )
+    with pytest.raises(RegistryCaseBuildError, match="modelability status"):
+        build_model_config_from_registry_case(
+            fungus_id=CHAIN_FIXTURE_FUNGUS_ID,
+            substrate_id=SUBSTRATE_ID,
+            environment_id=ENVIRONMENT_ID,
+            registry=registry,
+            mode="toy",
+        )
+    with pytest.raises(EnzymeChainAssemblyError, match=message):
+        build_extracellular_enzyme_chain_config(
+            registry=registry,
+            environment_id=ENVIRONMENT_ID,
+        )
+
+
 def test_shared_exact_resolver_rejects_coherent_whole_component_role_group_swap() -> None:
     registry = load_registry(REGISTRY_INDEX)
     template = _coherently_swap_second_component(registry)
     compatibility = registry.process_compatibility[CHAIN_COMPATIBILITY_ID]
 
-    with pytest.raises(ExactTemplateParameterError, match="requires process_type"):
+    with pytest.raises(ExactTemplateParameterError, match="process_type does not match"):
         resolve_exact_template_parameter_records(
             registry=registry,
             template=template,
@@ -184,9 +361,9 @@ def test_shared_exact_resolver_rejects_coherent_whole_component_role_group_swap(
     ("drift", "message"),
     [
         ("shadow_selectors", "component_selectors are unsupported"),
-        ("component_binding", "unique component compatibility"),
-        ("standalone_component_binding", "without a case_template_id"),
-        ("component_compatibility", "requires process_type"),
+        ("component_binding", "compatibility_record_id values must be unique"),
+        ("standalone_component_binding", "intrinsic component-only compatibility"),
+        ("component_compatibility", "process_type does not match"),
         ("enzyme_capability", "does not authorize process type"),
         ("state_species", "state identities require component pair"),
     ],
@@ -444,16 +621,10 @@ def test_coherent_whole_component_role_group_swap_is_rejected_by_every_public_pa
     valid_study.registry.case_templates[CHAIN_TEMPLATE_ID] = _coherently_swap_second_component(
         valid_study.registry
     )
-    with pytest.raises(RegistryCaseBuildError, match="requires process_type"):
+    with pytest.raises(RegistryValidationError, match="process_type does not match"):
         valid_result.write_tables(tmp_path / "rewritten_tables")
 
-    drifted_dir = _copy_registry(tmp_path / "drifted")
-    _coherently_swap_second_component_files(drifted_dir)
-    _remove_process_compatibility(
-        drifted_dir,
-        record_id="bio001_cellulase_cellulose_film_surface_catalysis",
-    )
-    registry = load_registry(drifted_dir / "registry_index.yml")
+    registry = valid_study.registry
     report = assess_modelability(
         fungus_id=FUNGUS_ID,
         substrate_id=SUBSTRATE_ID,
@@ -461,16 +632,16 @@ def test_coherent_whole_component_role_group_swap_is_rejected_by_every_public_pa
         registry=registry,
         mode="exploratory",
     )
-    assert report.status == "underparameterized"
-    assert any("requires process_type" in item.message for item in report.incompatible)
+    assert report.status == "unsupported"
+    assert any("process_type does not match" in item.message for item in report.incompatible)
 
     study = VirtualExperiment.from_registry(
         fungi=FUNGUS_ID,
         substrates=SUBSTRATE_ID,
         environments=ENVIRONMENT_ID,
-        registry=drifted_dir / "registry_index.yml",
+        registry=registry,
     )
-    with pytest.raises(VirtualExperimentError, match="requires process_type"):
+    with pytest.raises(VirtualExperimentError, match="process_type does not match"):
         study.simulate(
             mode="exploratory",
             n_samples=1,
@@ -485,7 +656,7 @@ def test_coherent_whole_component_role_group_swap_is_rejected_by_every_public_pa
             registry=registry,
             mode="toy",
         )
-    with pytest.raises(EnzymeChainAssemblyError, match="requires process_type"):
+    with pytest.raises(EnzymeChainAssemblyError, match="process_type does not match"):
         build_extracellular_enzyme_chain_config(
             registry=registry,
             environment_id=ENVIRONMENT_ID,
@@ -497,6 +668,224 @@ def _copy_registry(tmp_path: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ROOT / "data_registry", destination)
     return destination
+
+
+def _prepare_contract_registry(tmp_path: Path, *, drift: str) -> Path:
+    if drift == "nested_modifier_role":
+        registry_index = prepare_reversible_product_inhibition_example_registry(
+            tmp_path / "data_registry",
+            source_registry=REGISTRY_INDEX,
+        )
+        registry_dir = registry_index.parent
+    else:
+        registry_dir = _copy_registry(tmp_path)
+        registry_index = registry_dir / "registry_index.yml"
+    _add_chain_only_public_fixture(registry_dir)
+    return registry_index
+
+
+def _add_chain_only_public_fixture(registry_dir: Path) -> None:
+    enzyme_path = registry_dir / "enzymes" / "enzyme_classes.yml"
+    enzyme_payload = _yaml_mapping(enzyme_path)
+    cast(list[dict[str, Any]], enzyme_payload["records"]).insert(
+        0,
+        {
+            "record_id": "exact_chain_test_class",
+            "name": "Exact chain test class",
+            "maturity": "toy_development",
+            "provenance": {
+                "source": "Parameter-resolution contract test fixture",
+                "confidence_level": "testing",
+                "notes": "Copied-registry chain-selection fixture only.",
+            },
+            "target_bond_classes": ["beta_1_4_glycosidic"],
+            "compatible_substrate_classes": ["cellulose_film_generic"],
+            "compatible_processes": [
+                "surface_catalysis",
+                "extracellular_enzyme_chain",
+            ],
+            "notes": "Software-test selector only; not biological evidence.",
+        },
+    )
+    enzyme_path.write_text(
+        yaml.safe_dump(enzyme_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    fungus_path = registry_dir / "fungi" / "fungi.yml"
+    fungus_payload = _yaml_mapping(fungus_path)
+    cast(list[dict[str, Any]], fungus_payload["records"]).insert(
+        0,
+        {
+            "record_id": CHAIN_FIXTURE_FUNGUS_ID,
+            "name": "Exact chain test source",
+            "maturity": "toy_development",
+            "provenance": {
+                "source": "Parameter-resolution contract test fixture",
+                "confidence_level": "testing",
+                "notes": "Copied-registry chain-selection fixture only.",
+            },
+            "enzyme_classes": ["exact_chain_test_class"],
+            "assimilable_products": [],
+            "notes": "Software-test selector only; not a biological source claim.",
+        },
+    )
+    fungus_path.write_text(
+        yaml.safe_dump(fungus_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    template_path = registry_dir / "case_templates" / "case_templates.yml"
+    template_payload = _yaml_mapping(template_path)
+    template = next(
+        record
+        for record in cast(list[dict[str, Any]], template_payload["records"])
+        if record["record_id"] == CHAIN_TEMPLATE_ID
+    )
+    metadata = cast(dict[str, Any], template["process_state_metadata"])
+    enzyme_entities = cast(list[dict[str, Any]], metadata["entities"]["enzymes"])
+    cellulase_entity = next(
+        entity for entity in enzyme_entities if entity["id"] == "cellulase_generic"
+    )
+    cellulase_entity["id"] = "exact_chain_test_class"
+    cellulase_entity["data"]["enzyme_class"] = "exact_chain_test_class"
+    substrate_entities = cast(
+        list[dict[str, Any]],
+        metadata["entities"]["substrates"],
+    )
+    substrate_entities[0]["data"]["required_enzyme_classes"] = [
+        "exact_chain_test_class"
+    ]
+    metadata["state_species"]["cellulase_concentration"]["species"] = (
+        "exact_chain_test_class"
+    )
+    contracts = cast(
+        dict[str, dict[str, Any]],
+        metadata["parameter_role_contracts"],
+    )
+    first_component_roles = {
+        role
+        for role, contract in contracts.items()
+        if contract.get("enzyme_class") == "cellulase_generic"
+    }
+    for role in first_component_roles:
+        contracts[role]["enzyme_class"] = "exact_chain_test_class"
+        contracts[role]["fungus_id"] = CHAIN_FIXTURE_FUNGUS_ID
+    template_path.write_text(
+        yaml.safe_dump(template_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    parameter_path = registry_dir / "parameters" / "parameter_records.yml"
+    parameter_payload = _yaml_mapping(parameter_path)
+    first_component_record_ids = {
+        metadata["parameter_record_ids"][role] for role in first_component_roles
+    }
+    for record in cast(list[dict[str, Any]], parameter_payload["records"]):
+        if record["record_id"] in first_component_record_ids:
+            record["enzyme_class"] = "exact_chain_test_class"
+            record["fungus_id"] = CHAIN_FIXTURE_FUNGUS_ID
+    parameter_path.write_text(
+        yaml.safe_dump(parameter_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    process_path = registry_dir / "processes" / "process_compatibility.yml"
+    process_payload = _yaml_mapping(process_path)
+    outer = next(
+        record
+        for record in cast(list[dict[str, Any]], process_payload["records"])
+        if record["record_id"] == CHAIN_COMPATIBILITY_ID
+    )
+    outer["enzyme_class"] = "exact_chain_test_class"
+    component = next(
+        record
+        for record in cast(list[dict[str, Any]], process_payload["records"])
+        if record["record_id"]
+        == "bio002_cellulase_cellulose_surface_component"
+    )
+    component["enzyme_class"] = "exact_chain_test_class"
+    standalone = deepcopy(component)
+    standalone["record_id"] = "exact_chain_test_surface_compatibility"
+    standalone["name"] = "Exact chain test standalone surface compatibility"
+    standalone.pop("compatibility_scope")
+    cast(list[dict[str, Any]], process_payload["records"]).append(standalone)
+    process_path.write_text(
+        yaml.safe_dump(process_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def _apply_contract_drift_in_memory(
+    registry: FungModRegistry,
+    *,
+    drift: str,
+) -> None:
+    if drift == "substrate_entity_id":
+        template = registry.case_templates[CHAIN_TEMPLATE_ID]
+        metadata = deepcopy(dict(template.process_state_metadata))
+        entities = deepcopy(dict(metadata["entities"]))
+        substrates = deepcopy(list(entities["substrates"]))
+        substrates[0]["id"] = "rewritten_configured_substrate"
+        entities["substrates"] = substrates
+        metadata["entities"] = entities
+        registry.case_templates[CHAIN_TEMPLATE_ID] = replace(
+            template,
+            process_state_metadata=metadata,
+        )
+        return
+    _rename_component_role(
+        registry,
+        component_id="bio002_beta_glucosidase_cellobiose_component",
+        old_role=(
+            "enzyme_initial_concentration"
+            if drift == "initial_state_role"
+            else "inhibition_constant"
+        ),
+        new_role=(
+            "unrelated_initial_role"
+            if drift == "initial_state_role"
+            else "unrelated_modifier_role"
+        ),
+    )
+
+
+def _apply_contract_drift_in_files(registry_dir: Path, *, drift: str) -> None:
+    if drift == "substrate_entity_id":
+        path = registry_dir / "case_templates" / "case_templates.yml"
+        payload = _yaml_mapping(path)
+        template = next(
+            record
+            for record in cast(list[dict[str, Any]], payload["records"])
+            if record["record_id"] == CHAIN_TEMPLATE_ID
+        )
+        substrates = cast(
+            list[dict[str, Any]],
+            template["process_state_metadata"]["entities"]["substrates"],
+        )
+        substrates[0]["id"] = "rewritten_configured_substrate"
+        path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+        return
+    path = registry_dir / "processes" / "process_compatibility.yml"
+    payload = _yaml_mapping(path)
+    component = next(
+        record
+        for record in cast(list[dict[str, Any]], payload["records"])
+        if record["record_id"] == "bio002_beta_glucosidase_cellobiose_component"
+    )
+    roles = cast(dict[str, str], component["parameter_roles"])
+    old_role = (
+        "enzyme_initial_concentration"
+        if drift == "initial_state_role"
+        else "inhibition_constant"
+    )
+    new_role = (
+        "unrelated_initial_role"
+        if drift == "initial_state_role"
+        else "unrelated_modifier_role"
+    )
+    roles[new_role] = roles.pop(old_role)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
 def _coherently_swap_second_component(
@@ -525,59 +914,6 @@ def _coherently_swap_second_component(
     return replace(template, process_state_metadata=metadata)
 
 
-def _coherently_swap_second_component_files(registry_dir: Path) -> None:
-    selectors = {
-        "enzyme_class": "cellulase_generic",
-        "substrate_class": "cellulose_film_generic",
-        "fungus_id": None,
-        "substrate_id": "cellulose_film_generic",
-    }
-    parameter_path = registry_dir / "parameters" / "parameter_records.yml"
-    parameter_payload = _yaml_mapping(parameter_path)
-    for record in cast(list[dict[str, Any]], parameter_payload["records"]):
-        if record["record_id"] in {BETA_INITIAL_RECORD_ID, KM_RECORD_ID, KCAT_RECORD_ID}:
-            record.update(selectors)
-    parameter_path.write_text(
-        yaml.safe_dump(parameter_payload, sort_keys=False),
-        encoding="utf-8",
-    )
-
-    template_path = registry_dir / "case_templates" / "case_templates.yml"
-    template_payload = _yaml_mapping(template_path)
-    templates = cast(list[dict[str, Any]], template_payload["records"])
-    template = next(
-        record for record in templates if record["record_id"] == CHAIN_TEMPLATE_ID
-    )
-    contracts = cast(
-        dict[str, dict[str, Any]],
-        template["process_state_metadata"]["parameter_role_contracts"],
-    )
-    for role in ("beta_glucosidase_initial_concentration", "km", "kcat"):
-        contracts[role].update(selectors)
-    metadata = cast(dict[str, Any], template["process_state_metadata"])
-    _swap_component_state_species(metadata)
-    template_path.write_text(
-        yaml.safe_dump(template_payload, sort_keys=False),
-        encoding="utf-8",
-    )
-
-    compatibility_path = registry_dir / "processes" / "process_compatibility.yml"
-    compatibility_payload = _yaml_mapping(compatibility_path)
-    records = cast(list[dict[str, Any]], compatibility_payload["records"])
-    component = next(
-        record
-        for record in records
-        if record["record_id"] == "bio002_beta_glucosidase_cellobiose_component"
-    )
-    component["enzyme_class"] = "cellulase_generic"
-    component["substrate_class"] = "cellulose_film_generic"
-    component["process_type"] = "surface_catalysis"
-    compatibility_path.write_text(
-        yaml.safe_dump(compatibility_payload, sort_keys=False),
-        encoding="utf-8",
-    )
-
-
 def _reuse_outer_component_binding(registry: FungModRegistry) -> None:
     outer = registry.process_compatibility[CHAIN_COMPATIBILITY_ID]
     registry.process_compatibility[CHAIN_COMPATIBILITY_ID] = replace(
@@ -589,6 +925,23 @@ def _reuse_outer_component_binding(registry: FungModRegistry) -> None:
                 compatibility_record_id=outer.component_bindings[0].compatibility_record_id,
             ),
         ),
+    )
+
+
+def _rename_component_role(
+    registry: FungModRegistry,
+    *,
+    component_id: str,
+    old_role: str,
+    new_role: str,
+) -> None:
+    component = registry.process_compatibility[component_id]
+    roles = dict(component.parameter_roles)
+    symbol = roles.pop(old_role)
+    roles[new_role] = symbol
+    registry.process_compatibility[component_id] = replace(
+        component,
+        parameter_roles=roles,
     )
 
 
