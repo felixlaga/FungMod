@@ -118,6 +118,11 @@ Completed in this pass:
   fallback and rejects mapping, symbol, nonnegative/exact-or-sampleable value,
   selector/component-inventory, environment, authorization, mode, and process
   drift.
+  Each component process independently declares an exact enzyme/substrate class
+  pair in `component_selectors`; process parameters and parameter-backed
+  catalyst/substrate initial states must match that owning slot. This rejects a
+  coherent whole-role-group rewrite even when the rewritten role contracts and
+  records agree with each other and with some other declared component.
   Kinetic role ownership is derived from component `process_templates` and
   conflicting metadata is rejected. Initial-state roles instead use an honest
   per-role record-scope contract; they do not claim a kinetic process owner.
@@ -185,7 +190,8 @@ by modelability/preflight in every mode. Parameter simulation admission now uses
 closed exact `allowed_use` sets, so prior ad hoc, empty, negative, or near-match
 strings no longer authorize a mode. Explicit chain templates with
 `parameter_record_ids` must also provide complete `parameter_role_contracts`;
-the old ownership-like `parameter_role_process_types` shape is rejected.
+each component process must provide exact class-level `component_selectors`,
+and the old ownership-like `parameter_role_process_types` shape is rejected.
 CASE-001 initial-state records declare exact storage/reuse process scope, while
 kinetic owners are derived only from component process templates.
 
@@ -215,7 +221,8 @@ Verification:
   case-builder, chain, and VirtualExperiment suite: 320 passed in 49.74s before
   the final apply-time regression; the canonical suite below includes that
   regression and all focused coverage.
-- Canonical full pytest: 994 passed in 93.90s on the final code.
+- Ninth-pass exact-template/component-slot focused suite: 147 passed in 13.72s.
+- Canonical full pytest: 1084 passed in 189.04s on the final code.
 - Focused Ruff: passed.
 - Full Ruff: passed for `src` and `tests`.
 - Full Pyright with the shared venv interpreter selected explicitly: 0 errors,

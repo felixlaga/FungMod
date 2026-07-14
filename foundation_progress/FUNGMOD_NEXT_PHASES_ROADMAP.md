@@ -234,8 +234,10 @@ storage-only policy and intrinsic bridge evidence in every mode, and applies
 closed exact per-mode `allowed_use` permissions before ranking. One shared exact
 template-role resolver aligns preflight, public/runtime simulation,
 deterministic/direct assembly, and result reconstruction; kinetic role owners
-derive from component process templates, while initial-state roles declare
-record scope without claiming kinetic ownership. Nonidentity
+derive from component process templates, and each process independently binds
+its roles and parameter-backed states to one exact declared enzyme/substrate
+component slot. Initial-state roles declare record scope without claiming
+kinetic ownership. Nonidentity
 conversion, written source input, non-parameter records, validation,
 calibration, and simulation authorization remain unsupported, so CURATION-001
 remains partial. The recommended next

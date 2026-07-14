@@ -112,6 +112,21 @@ def test_artificial_three_step_chain_assembles_runs_and_writes_tables(tmp_path: 
     assert {row["metric"] for row in thresholds} == {"x_pool_depleted_fraction"}
 
 
+def test_artificial_chain_rejects_coherent_whole_component_role_group_swap(
+    tmp_path: Path,
+) -> None:
+    registry_dir = _copy_registry(tmp_path)
+    _insert_generic_chain_fixture(registry_dir)
+    _coherently_swap_generic_second_component(registry_dir)
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="component selector"):
+        build_extracellular_enzyme_chain_config(
+            registry=registry,
+            template_id=GENERIC_TEMPLATE_ID,
+        )
+
+
 def test_linear_chain_requires_at_least_two_processes(tmp_path: Path) -> None:
     registry_dir = _registry_with_modified_chain(
         tmp_path,
@@ -422,6 +437,10 @@ def _generic_chain_template() -> dict[str, Any]:
                 {
                     "id": "x_surface_to_y_fixture",
                     "process_type": "surface_catalysis",
+                    "component_selectors": {
+                        "enzyme_class": "catalyst_alpha_fixture",
+                        "substrate_class": "polymer_x_fixture",
+                    },
                     "state_roles": {
                         "substrate": "substrate",
                         "catalyst": "surface_catalyst",
@@ -443,6 +462,10 @@ def _generic_chain_template() -> dict[str, Any]:
                 {
                     "id": "y_to_q_homogeneous_fixture",
                     "process_type": "homogeneous_michaelis_menten",
+                    "component_selectors": {
+                        "enzyme_class": "catalyst_beta_fixture",
+                        "substrate_class": "oligomer_y_fixture",
+                    },
                     "state_roles": {
                         "substrate": "intermediate_1",
                         "product": "intermediate_2",
@@ -456,6 +479,10 @@ def _generic_chain_template() -> dict[str, Any]:
                 {
                     "id": "q_to_z_homogeneous_fixture",
                     "process_type": "homogeneous_michaelis_menten",
+                    "component_selectors": {
+                        "enzyme_class": "catalyst_gamma_fixture",
+                        "substrate_class": "fragment_q_fixture",
+                    },
                     "state_roles": {
                         "substrate": "intermediate_2",
                         "product": "product",
@@ -770,6 +797,48 @@ def _copy_registry(tmp_path: Path) -> Path:
     destination = tmp_path / "data_registry"
     shutil.copytree(ROOT / "data_registry", destination)
     return destination
+
+
+def _coherently_swap_generic_second_component(registry_dir: Path) -> None:
+    selectors = {
+        "enzyme_class": "catalyst_alpha_fixture",
+        "substrate_class": "polymer_x_fixture",
+        "fungus_id": None,
+        "substrate_id": None,
+    }
+    role_record_ids = {
+        "beta_initial": "fixture_beta_initial_concentration",
+        "km_y_to_q": "fixture_y_to_q_km",
+        "kcat_y_to_q": "fixture_y_to_q_kcat",
+    }
+
+    parameter_path = registry_dir / "parameters" / "parameter_records.yml"
+    parameter_data = _yaml_mapping(parameter_path)
+    records = cast(list[dict[str, Any]], parameter_data["records"])
+    for record in records:
+        if record["record_id"] in role_record_ids.values():
+            record.update(selectors)
+    parameter_path.write_text(
+        yaml.safe_dump(parameter_data, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    template_path = registry_dir / "case_templates" / "case_templates.yml"
+    template_data = _yaml_mapping(template_path)
+    templates = cast(list[dict[str, Any]], template_data["records"])
+    template = next(
+        record for record in templates if record["record_id"] == GENERIC_TEMPLATE_ID
+    )
+    contracts = cast(
+        dict[str, dict[str, Any]],
+        template["process_state_metadata"]["parameter_role_contracts"],
+    )
+    for role in role_record_ids:
+        contracts[role].update(selectors)
+    template_path.write_text(
+        yaml.safe_dump(template_data, sort_keys=False),
+        encoding="utf-8",
+    )
 
 
 def _yaml_mapping(path: Path) -> dict[str, Any]:

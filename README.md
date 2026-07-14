@@ -449,7 +449,11 @@ bridge/curation-evidence policies fail closed before ranking.
 Explicit CASE-001 chain mappings use their exact role-to-record IDs and one
 shared resolver across preflight, ensemble/public simulation, deterministic
 assembly, direct chain assembly, and result reconstruction. Each mapped role has
-an exact symbol and selector contract. Null-ID classes must still match the
+an exact symbol and selector contract. Every component process independently
+declares its exact enzyme/substrate class pair in `component_selectors`; its
+process parameters and parameter-backed catalyst/substrate initial states must
+match that owning slot. Inventory membership or a mutually consistent group of
+rewritten role contracts is insufficient. Null-ID classes must still match the
 template's declared enzyme/substrate component inventory and target pairing.
 Component-process parameter ownership is derived from `process_templates`;
 initial-state roles declare a

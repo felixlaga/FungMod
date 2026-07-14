@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from fungal_model.registry.records import (
     CaseTemplateRecord,
@@ -23,6 +23,7 @@ _SELECTOR_FIELDS = (
     "substrate_id",
     "environment_id",
 )
+_COMPONENT_SELECTOR_FIELDS = ("enzyme_class", "substrate_class")
 _BASE_CONTRACT_FIELDS = frozenset(
     {"kind", "parameter_symbol", *_SELECTOR_FIELDS}
 )
@@ -298,24 +299,39 @@ def _validate_template_component_contracts(
             )
 
     for role, component in process_components.items():
+        component_selectors = _component_selectors(component, role=role)
+        _validate_declared_component_pair(
+            role=role,
+            selectors=component_selectors,
+            enzyme_targets=enzyme_targets,
+            declared_substrates=declared_substrates,
+        )
+        _require_exact_component_selectors(
+            role=role,
+            actual=contracts[role],
+            expected=component_selectors,
+            context="owning process",
+            selectors=_COMPONENT_SELECTOR_FIELDS,
+        )
         state_roles = _required_mapping(
             component.get("state_roles"),
             label=f"Component process for template role {role!r} state_roles",
         )
-        contract = contracts[role]
-        _require_initial_component_match(
+        _require_initial_slot_selectors(
             template=template,
             contracts=contracts,
-            role=role,
+            process_role=role,
             state_role=state_roles.get("catalyst") or state_roles.get("enzyme"),
-            selector="enzyme_class",
+            component_selectors=component_selectors,
+            selectors=_COMPONENT_SELECTOR_FIELDS,
         )
-        _require_initial_component_match(
+        _require_initial_slot_selectors(
             template=template,
             contracts=contracts,
-            role=role,
+            process_role=role,
             state_role=state_roles.get("substrate"),
-            selector="substrate_class",
+            component_selectors=component_selectors,
+            selectors=("substrate_class",),
         )
         if compatibility is not None and state_roles.get("substrate") == "substrate":
             expected_outer = {
@@ -323,10 +339,11 @@ def _validate_template_component_contracts(
                 "substrate_class": compatibility.substrate_class,
             }
             for selector, expected in expected_outer.items():
-                if contract[selector] != expected:
+                if component_selectors[selector] != expected:
                     raise ExactTemplateParameterError(
                         f"Template role {role!r} is owned by the outer-substrate component "
-                        f"and requires {selector}={expected!r}, not {contract[selector]!r}.",
+                        f"and requires {selector}={expected!r}, not "
+                        f"{component_selectors[selector]!r}.",
                         role=role,
                     )
 
@@ -385,13 +402,80 @@ def _declared_template_components(
     return enzyme_targets, frozenset(declared_substrates)
 
 
-def _require_initial_component_match(
+def _component_selectors(
+    component: Mapping[str, Any],
+    *,
+    role: str,
+) -> Mapping[str, str]:
+    selectors = _required_mapping(
+        component.get("component_selectors"),
+        label=f"Component process for template role {role!r} component_selectors",
+    )
+    if set(selectors) != set(_COMPONENT_SELECTOR_FIELDS):
+        raise ExactTemplateParameterError(
+            f"Component process for template role {role!r} component_selectors must "
+            "declare exact enzyme_class and substrate_class keys.",
+            role=role,
+        )
+    if any(
+        not isinstance(selectors[field], str) or not selectors[field].strip()
+        for field in _COMPONENT_SELECTOR_FIELDS
+    ):
+        raise ExactTemplateParameterError(
+            f"Component process for template role {role!r} component_selectors values "
+            "must be non-empty strings.",
+            role=role,
+        )
+    return cast(Mapping[str, str], selectors)
+
+
+def _validate_declared_component_pair(
+    *,
+    role: str,
+    selectors: Mapping[str, str],
+    enzyme_targets: Mapping[str, frozenset[str]],
+    declared_substrates: frozenset[str],
+) -> None:
+    enzyme_class = selectors["enzyme_class"]
+    substrate_class = selectors["substrate_class"]
+    if (
+        enzyme_class not in enzyme_targets
+        or substrate_class not in declared_substrates
+        or substrate_class not in enzyme_targets[enzyme_class]
+    ):
+        raise ExactTemplateParameterError(
+            f"Template role {role!r} component selector pair enzyme_class="
+            f"{enzyme_class!r}, substrate_class={substrate_class!r} is not an exact "
+            "declared template component pair.",
+            role=role,
+        )
+
+
+def _require_exact_component_selectors(
+    *,
+    role: str,
+    actual: Mapping[str, Any],
+    expected: Mapping[str, str],
+    context: str,
+    selectors: Sequence[str],
+) -> None:
+    for selector in selectors:
+        if actual[selector] != expected[selector]:
+            raise ExactTemplateParameterError(
+                f"Template role {role!r} {selector}={actual[selector]!r} disagrees "
+                f"with its {context} component selector {expected[selector]!r}.",
+                role=role,
+            )
+
+
+def _require_initial_slot_selectors(
     *,
     template: CaseTemplateRecord,
     contracts: Mapping[str, Mapping[str, Any]],
-    role: str,
+    process_role: str,
     state_role: Any,
-    selector: str,
+    component_selectors: Mapping[str, str],
+    selectors: Sequence[str],
 ) -> None:
     if not isinstance(state_role, str):
         return
@@ -401,14 +485,13 @@ def _require_initial_component_match(
     initial_role = initial_spec.get("parameter_role")
     if not isinstance(initial_role, str) or initial_role not in contracts:
         return
-    expected = contracts[initial_role][selector]
-    actual = contracts[role][selector]
-    if expected is not None and actual != expected:
-        raise ExactTemplateParameterError(
-            f"Template process role {role!r} {selector}={actual!r} disagrees with "
-            f"its exact {state_role!r} component role {initial_role!r} value {expected!r}.",
-            role=role,
-        )
+    _require_exact_component_selectors(
+        role=initial_role,
+        actual=contracts[initial_role],
+        expected=component_selectors,
+        context=f"process role {process_role!r}",
+        selectors=selectors,
+    )
 
 
 def _role_contract(

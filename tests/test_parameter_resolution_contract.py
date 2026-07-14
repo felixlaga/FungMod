@@ -11,8 +11,9 @@ import yaml
 
 from fungal_model import VirtualExperiment
 from fungal_model.api import VirtualExperimentError
-from fungal_model.registry import load_registry
+from fungal_model.registry import FungModRegistry, load_registry
 from fungal_model.registry.records import (
+    CaseTemplateRecord,
     PARAMETER_ALLOWED_USE_EXPLORATORY,
     PARAMETER_ALLOWED_USE_SCIENTIFIC,
     PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
@@ -37,7 +38,9 @@ REGISTRY_INDEX = ROOT / "data_registry" / "registry_index.yml"
 CHAIN_TEMPLATE_ID = "bio002_extracellular_enzyme_chain_template"
 CHAIN_COMPATIBILITY_ID = "bio002_cellulase_cellulose_film_extracellular_chain"
 SURFACE_RECORD_ID = "bio002_cellulose_to_cellobiose_surface_rate"
+KM_RECORD_ID = "sabiork_reaction_618_Km_cellobiose"
 KCAT_RECORD_ID = "sabiork_reaction_618_kcat_cellobiose"
+BETA_INITIAL_RECORD_ID = "bio002_beta_glucosidase_initial_concentration"
 FUNGUS_ID = "generic_cellulase_source"
 SUBSTRATE_ID = "cellulose_film_generic"
 ENVIRONMENT_ID = "sabiork_reaction_618_selected_conditions"
@@ -158,6 +161,25 @@ def test_shared_exact_resolver_rejects_cross_component_role_swap() -> None:
         )
 
 
+def test_shared_exact_resolver_rejects_coherent_whole_component_role_group_swap() -> None:
+    registry = load_registry(REGISTRY_INDEX)
+    template = _coherently_swap_second_component(registry)
+    compatibility = registry.process_compatibility[CHAIN_COMPATIBILITY_ID]
+
+    with pytest.raises(ExactTemplateParameterError, match="component selector"):
+        resolve_exact_template_parameter_records(
+            registry=registry,
+            template=template,
+            compatibility=compatibility,
+            required_roles=tuple(compatibility.parameter_roles),
+            fungus_id=FUNGUS_ID,
+            substrate_id=SUBSTRATE_ID,
+            environment_id=ENVIRONMENT_ID,
+            mode="exploratory",
+            value_requirement="sampleable",
+        )
+
+
 @pytest.mark.parametrize(
     ("role", "record_id", "changes", "message"),
     [
@@ -181,7 +203,7 @@ def test_shared_exact_resolver_rejects_cross_component_role_swap() -> None:
                 "substrate_class": "cellobiose",
                 "substrate_id": "cellobiose",
             },
-            "disagrees with its exact 'surface_catalyst' component",
+            "owning process component selector",
         ),
     ],
 )
@@ -347,11 +369,138 @@ def test_exact_template_drift_is_rejected_by_every_chain_path_and_reporting(
         )
 
 
+def test_coherent_whole_component_role_group_swap_is_rejected_by_every_public_path(
+    tmp_path: Path,
+) -> None:
+    valid_registry_dir = _copy_registry(tmp_path / "valid")
+    valid_study = VirtualExperiment.from_registry(
+        fungi=FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=valid_registry_dir / "registry_index.yml",
+    )
+    valid_result = valid_study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=11,
+        output_dir=tmp_path / "valid_result",
+        quicklook=False,
+    )
+    valid_study.registry.case_templates[CHAIN_TEMPLATE_ID] = _coherently_swap_second_component(
+        valid_study.registry
+    )
+    with pytest.raises(RegistryCaseBuildError, match="component selector"):
+        valid_result.write_tables(tmp_path / "rewritten_tables")
+
+    drifted_dir = _copy_registry(tmp_path / "drifted")
+    _coherently_swap_second_component_files(drifted_dir)
+    _remove_process_compatibility(
+        drifted_dir,
+        record_id="bio001_cellulase_cellulose_film_surface_catalysis",
+    )
+    registry = load_registry(drifted_dir / "registry_index.yml")
+    report = assess_modelability(
+        fungus_id=FUNGUS_ID,
+        substrate_id=SUBSTRATE_ID,
+        environment_id=ENVIRONMENT_ID,
+        registry=registry,
+        mode="exploratory",
+    )
+    assert report.status == "underparameterized"
+    assert any("component selector" in item.message for item in report.incompatible)
+
+    study = VirtualExperiment.from_registry(
+        fungi=FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=ENVIRONMENT_ID,
+        registry=drifted_dir / "registry_index.yml",
+    )
+    with pytest.raises(VirtualExperimentError, match="component selector"):
+        study.simulate(
+            mode="exploratory",
+            n_samples=1,
+            output_dir=tmp_path / "blocked_runtime",
+            quicklook=False,
+        )
+    with pytest.raises(RegistryCaseBuildError, match="modelability status"):
+        build_model_config_from_registry_case(
+            fungus_id=FUNGUS_ID,
+            substrate_id=SUBSTRATE_ID,
+            environment_id=ENVIRONMENT_ID,
+            registry=registry,
+            mode="toy",
+        )
+    with pytest.raises(EnzymeChainAssemblyError, match="component selector"):
+        build_extracellular_enzyme_chain_config(
+            registry=registry,
+            environment_id=ENVIRONMENT_ID,
+        )
+
+
 def _copy_registry(tmp_path: Path) -> Path:
     destination = tmp_path / "data_registry"
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ROOT / "data_registry", destination)
     return destination
+
+
+def _coherently_swap_second_component(
+    registry: FungModRegistry,
+) -> CaseTemplateRecord:
+    selectors = {
+        "enzyme_class": "cellulase_generic",
+        "substrate_class": "cellulose_film_generic",
+        "fungus_id": None,
+        "substrate_id": "cellulose_film_generic",
+    }
+    for record_id in (BETA_INITIAL_RECORD_ID, KM_RECORD_ID, KCAT_RECORD_ID):
+        registry.parameters[record_id] = replace(
+            registry.parameters[record_id],
+            **selectors,
+        )
+
+    template = registry.case_templates[CHAIN_TEMPLATE_ID]
+    metadata = deepcopy(dict(template.process_state_metadata))
+    contracts = deepcopy(dict(metadata["parameter_role_contracts"]))
+    for role in ("beta_glucosidase_initial_concentration", "km", "kcat"):
+        contracts[role] = {**contracts[role], **selectors}
+    metadata["parameter_role_contracts"] = contracts
+    return replace(template, process_state_metadata=metadata)
+
+
+def _coherently_swap_second_component_files(registry_dir: Path) -> None:
+    selectors = {
+        "enzyme_class": "cellulase_generic",
+        "substrate_class": "cellulose_film_generic",
+        "fungus_id": None,
+        "substrate_id": "cellulose_film_generic",
+    }
+    parameter_path = registry_dir / "parameters" / "parameter_records.yml"
+    parameter_payload = _yaml_mapping(parameter_path)
+    for record in cast(list[dict[str, Any]], parameter_payload["records"]):
+        if record["record_id"] in {BETA_INITIAL_RECORD_ID, KM_RECORD_ID, KCAT_RECORD_ID}:
+            record.update(selectors)
+    parameter_path.write_text(
+        yaml.safe_dump(parameter_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    template_path = registry_dir / "case_templates" / "case_templates.yml"
+    template_payload = _yaml_mapping(template_path)
+    templates = cast(list[dict[str, Any]], template_payload["records"])
+    template = next(
+        record for record in templates if record["record_id"] == CHAIN_TEMPLATE_ID
+    )
+    contracts = cast(
+        dict[str, dict[str, Any]],
+        template["process_state_metadata"]["parameter_role_contracts"],
+    )
+    for role in ("beta_glucosidase_initial_concentration", "km", "kcat"):
+        contracts[role].update(selectors)
+    template_path.write_text(
+        yaml.safe_dump(template_payload, sort_keys=False),
+        encoding="utf-8",
+    )
 
 
 def _replace_parameter_field(
