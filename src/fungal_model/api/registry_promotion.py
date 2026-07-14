@@ -1972,7 +1972,11 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
     if accepted_payload.get("production_registry_promotion") is not False:
         raise RegistryPromotionPlanError("Accepted curation artifact must not claim registry promotion.")
 
-    record_types = _accepted_record_types_from_csv(eligible_path)
+    eligible_csv_payload = _read_curation_csv_payload(
+        eligible_path,
+        label="Eligible curation records",
+    )
+    record_types = _accepted_record_types_from_csv_payload(eligible_csv_payload)
     raw_records = accepted_payload.get("records")
     if not isinstance(raw_records, list):
         raise RegistryPromotionPlanError("Accepted curation artifact requires a records list.")
@@ -2044,7 +2048,20 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
             validate_parameter_authoring_bundle_record(
                 summary=summary,
                 manifest=manifest,
+                proposed_payload=_read_yaml_mapping(
+                    declared["proposed_registry_records.yml"],
+                    label="Proposed curation records",
+                ),
                 accepted_payload=accepted_payload,
+                rejected_payload=_read_yaml_mapping(
+                    declared["rejected_registry_records.yml"],
+                    label="Rejected curation records",
+                ),
+                eligible_records_csv_payload=eligible_csv_payload,
+                excluded_records_csv_payload=_read_curation_csv_payload(
+                    declared["excluded_records.csv"],
+                    label="Excluded curation records",
+                ),
                 record_type=item.record_type,
                 target_record=item.target_record,
                 curation_metadata=item.curation_metadata,
@@ -2306,14 +2323,25 @@ def _verify_declared_curation_artifacts(
     return declared
 
 
-def _accepted_record_types_from_csv(path: Path) -> dict[str, str]:
+def _read_curation_csv_payload(path: Path, *, label: str) -> Mapping[str, Any]:
     try:
         with path.open(newline="", encoding="utf-8") as handle:
-            rows = tuple(csv.DictReader(handle))
+            reader = csv.DictReader(handle)
+            rows = [dict(row) for row in reader]
+            fieldnames = list(reader.fieldnames or ())
     except (OSError, UnicodeError, csv.Error) as exc:
-        raise RegistryPromotionPlanError(f"Malformed eligible-record CSV {path}: {exc}") from exc
+        raise RegistryPromotionPlanError(f"Malformed {label.lower()} CSV {path}: {exc}") from exc
+    return {"fieldnames": fieldnames, "rows": rows}
+
+
+def _accepted_record_types_from_csv_payload(payload: Mapping[str, Any]) -> dict[str, str]:
+    rows = payload.get("rows")
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
+        raise RegistryPromotionPlanError("Eligible-record CSV requires structured rows.")
     accepted: dict[str, str] = {}
     for row in rows:
+        if not isinstance(row, Mapping):
+            raise RegistryPromotionPlanError("Eligible-record CSV rows must be mappings.")
         if row.get("decision") != "accept" or row.get("explicit_decision") != "true":
             continue
         if row.get("classification") != "eligible_for_review":

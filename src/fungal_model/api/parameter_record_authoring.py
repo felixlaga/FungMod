@@ -34,6 +34,7 @@ from fungal_model.api.curation import (
     CurationWriteResult,
     curation_date_is_iso,
     curation_manifest_payload,
+    curation_records_csv_payload,
     curation_records_payload,
     curation_source_provenance_missing,
     render_curation_report,
@@ -530,7 +531,11 @@ def validate_parameter_authoring_bundle_record(
     *,
     summary: Mapping[str, Any],
     manifest: Mapping[str, Any],
+    proposed_payload: Mapping[str, Any],
     accepted_payload: Mapping[str, Any],
+    rejected_payload: Mapping[str, Any],
+    eligible_records_csv_payload: Mapping[str, Any],
+    excluded_records_csv_payload: Mapping[str, Any],
     record_type: str,
     target_record: Mapping[str, Any],
     curation_metadata: Mapping[str, Any],
@@ -596,20 +601,36 @@ def validate_parameter_authoring_bundle_record(
         authored_record_id=authored_id,
         authoring_digest=digest,
     )
-    if not type_exact_equal(
-        manifest,
-        curation_manifest_payload(reconstructed, files),
-    ) or not type_exact_equal(
-        accepted_payload,
-        curation_records_payload("accepted", reconstructed.accepted_records, reconstructed),
-    ):
-        raise ParameterRecordAuthoringError(
-            "Written bundle manifest and accepted payload disagree with the shared curation builders."
-        )
-    if not type_exact_equal(curation_report, render_curation_report(reconstructed)):
-        raise ParameterRecordAuthoringError(
-            "Written bundle curation report disagrees with the deterministic machine-readable record."
-        )
+    expected_artifacts: Mapping[str, Any] = {
+        "curation_manifest.json": curation_manifest_payload(reconstructed, files),
+        "proposed_registry_records.yml": curation_records_payload(
+            "proposed", reconstructed.records, reconstructed
+        ),
+        "accepted_registry_records.yml": curation_records_payload(
+            "accepted", reconstructed.accepted_records, reconstructed
+        ),
+        "rejected_registry_records.yml": curation_records_payload(
+            "rejected", reconstructed.rejected_records, reconstructed
+        ),
+        "eligible_records.csv": curation_records_csv_payload(reconstructed.eligible_records),
+        "excluded_records.csv": curation_records_csv_payload(reconstructed.excluded_records),
+        "curation_report.md": render_curation_report(reconstructed),
+    }
+    actual_artifacts: Mapping[str, Any] = {
+        "curation_manifest.json": manifest,
+        "proposed_registry_records.yml": proposed_payload,
+        "accepted_registry_records.yml": accepted_payload,
+        "rejected_registry_records.yml": rejected_payload,
+        "eligible_records.csv": eligible_records_csv_payload,
+        "excluded_records.csv": excluded_records_csv_payload,
+        "curation_report.md": curation_report,
+    }
+    for name, expected in expected_artifacts.items():
+        if not type_exact_equal(actual_artifacts[name], expected):
+            raise ParameterRecordAuthoringError(
+                f"Written bundle artifact {name!r} disagrees with the shared curation "
+                "builders and deterministic machine-readable record."
+            )
 
 
 def validate_authored_parameter_against_registry(

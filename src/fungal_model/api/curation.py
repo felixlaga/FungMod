@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
 import json
 import math
 import shutil
@@ -827,28 +828,44 @@ def _write_yaml(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def _write_csv(path: Path, records: Sequence[CurationRecord]) -> None:
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=_CSV_FIELDS)
-        writer.writeheader()
-        for record in records:
-            provenance = record.source_provenance
-            writer.writerow(
-                {
-                    "record_type": record.record_type,
-                    "record_id": record.record_id,
-                    "classification": record.classification,
-                    "decision": record.decision,
-                    "explicit_decision": str(record.explicit_decision).lower(),
-                    "missing_fields": "; ".join(record.missing_fields),
-                    "reasons": "; ".join(record.reasons),
-                    "source_database": provenance.get("source_database", ""),
-                    "source_entry_ids": "; ".join(
-                        sorted(str(value) for value in provenance.get("source_entry_ids", []))
-                    ),
-                    "source_snapshot_path": provenance.get("source_snapshot_path", ""),
-                    "allowed_use": record.allowed_use,
-                }
-            )
+    path.write_text(render_curation_records_csv(records), encoding="utf-8")
+
+
+def render_curation_records_csv(records: Sequence[CurationRecord]) -> str:
+    """Render one deterministic eligible/excluded decision table."""
+
+    payload = curation_records_csv_payload(records)
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=payload["fieldnames"])
+    writer.writeheader()
+    writer.writerows(payload["rows"])
+    return output.getvalue()
+
+
+def curation_records_csv_payload(records: Sequence[CurationRecord]) -> Mapping[str, Any]:
+    """Build the exact header and rows for one curation decision table."""
+
+    rows = []
+    for record in records:
+        provenance = record.source_provenance
+        rows.append(
+            {
+                "record_type": record.record_type,
+                "record_id": record.record_id,
+                "classification": record.classification,
+                "decision": record.decision,
+                "explicit_decision": str(record.explicit_decision).lower(),
+                "missing_fields": "; ".join(record.missing_fields),
+                "reasons": "; ".join(record.reasons),
+                "source_database": provenance.get("source_database", ""),
+                "source_entry_ids": "; ".join(
+                    sorted(str(value) for value in provenance.get("source_entry_ids", []))
+                ),
+                "source_snapshot_path": provenance.get("source_snapshot_path", ""),
+                "allowed_use": record.allowed_use,
+            }
+        )
+    return {"fieldnames": list(_CSV_FIELDS), "rows": rows}
 
 
 def render_curation_report(result: CurationResult) -> str:
@@ -1043,7 +1060,9 @@ __all__ = [
     "CurationResult",
     "CurationWriteResult",
     "curation_manifest_payload",
+    "curation_records_csv_payload",
     "curation_records_payload",
+    "render_curation_records_csv",
     "render_curation_report",
     "review_source_proposal",
     "validate_curation_report_limitations",

@@ -13,7 +13,7 @@ from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
     SubstrateRecord,
-    parameter_is_simulation_authorized,
+    parameter_record_selection_key,
     parameter_simulation_authorization_blocker,
 )
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
@@ -1459,27 +1459,14 @@ def _best_parameter_record(
     ]
     if not candidates:
         return None
-    return max(candidates, key=_parameter_specificity)
+    return max(
+        candidates,
+        key=lambda record: parameter_record_selection_key(record, mode="scientific"),
+    )
 
 
 def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
-
-
-def _parameter_specificity(record: ParameterRecord) -> tuple[int, int, int, int]:
-    selector_score = sum(
-        value is not None
-        for value in (
-            record.enzyme_class,
-            record.substrate_class,
-            record.fungus_id,
-            record.substrate_id,
-            record.environment_id,
-        )
-    )
-    value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
-    maturity_score = 1 if record.maturity == "calibrated" else 0
-    return int(parameter_is_simulation_authorized(record)), selector_score, value_score, maturity_score
 
 
 def _validate_mode(mode: str) -> None:

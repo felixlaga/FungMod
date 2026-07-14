@@ -403,8 +403,8 @@ plan = plan_registry_promotion(
 specialized result uses the existing deterministic, checksummed curation writer,
 and either that written bundle or the in-memory result is consumable by
 `plan_registry_promotion(...)` after authoring-digest, loader, registry-context,
-selector, closed-summary, exact manifest/accepted-payload/report, and
-cross-representation safety-envelope revalidation.
+selector, closed-summary, and exact reconstruction of the manifest, all three
+decision YAML payloads, both decision CSV tables, and full report.
 Removing the bridge marker or specialized summary labels cannot downgrade a
 candidate with the intrinsic source/curator authoring provenance shape into a
 generic promotion; apply independently rejects a legacy or reconstructed
@@ -436,7 +436,10 @@ and its intrinsic bridge-derived provenance shape are enforced by one shared
 predicate in modelability, parameter ranking, case
 assembly, ensemble runtime, and chain-template resolution in every supported
 mode, so an authored or later promoted record cannot authorize
-`VirtualExperiment.simulate(...)`.
+`VirtualExperiment.simulate(...)`. Dynamic parameter searches in modelability,
+ensemble runtime, deterministic case assembly, and result-table reconstruction
+also use one complete mode-aware ranking key, including the calibrated-maturity
+tie-break, so identical candidate sets cannot select different records.
 
 ## Run A Virtual Experiment
 

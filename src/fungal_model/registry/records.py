@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from fungal_model.core.validators import ValidationResult
 from fungal_model.core.value_spec import ValueSpec
@@ -405,6 +405,44 @@ def parameter_is_simulation_authorized(record: ParameterRecord) -> bool:
     return parameter_simulation_authorization_blocker(record) is None
 
 
+def parameter_record_selection_key(
+    record: ParameterRecord,
+    *,
+    mode: Literal["exploratory", "scientific", "toy"],
+) -> tuple[int, ...]:
+    """Return the shared mode-aware ranking key for parameter candidates."""
+
+    authorization_score = int(parameter_is_simulation_authorized(record))
+    selector_score = sum(
+        value is not None
+        for value in (
+            record.enzyme_class,
+            record.substrate_class,
+            record.fungus_id,
+            record.substrate_id,
+            record.environment_id,
+        )
+    )
+    maturity_score = 1 if record.maturity == "calibrated" else 0
+    if mode == "exploratory":
+        value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
+        exploratory_score = int(
+            record.maturity == "exploratory_prior"
+            or bool(record.provenance.get("exploratory_prior"))
+        )
+        return (
+            authorization_score,
+            selector_score,
+            value_score,
+            exploratory_score,
+            maturity_score,
+        )
+    if mode in {"scientific", "toy"}:
+        value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
+        return authorization_score, selector_score, value_score, maturity_score
+    raise ValueError(f"Unsupported parameter selection mode: {mode!r}")
+
+
 def _validation_result(record_id: str, issues: list[dict[str, Any]]) -> ValidationResult:
     return ValidationResult(
         name="registry_record",
@@ -601,6 +639,7 @@ __all__ = [
     "ParameterRecord",
     "PARAMETER_ALLOWED_USE_STORAGE_ONLY",
     "parameter_is_simulation_authorized",
+    "parameter_record_selection_key",
     "parameter_simulation_authorization_blocker",
     "ProcessCompatibilityRecord",
     "RegistryRecord",

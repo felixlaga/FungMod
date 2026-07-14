@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import csv
+import json
 import shutil
 import socket
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pytest
 import yaml
@@ -13,8 +14,9 @@ import yaml
 from fungal_model import VirtualExperiment, environment_grid, virtual_experiment
 from fungal_model.api import VirtualExperimentError
 from fungal_model.api.report import write_virtual_experiment_report
-from fungal_model.registry import AmbiguousResolutionError, ResolutionError
+from fungal_model.registry import AmbiguousResolutionError, ResolutionError, load_registry
 from fungal_model.registry.records import PARAMETER_ALLOWED_USE_STORAGE_ONLY
+from fungal_model.screening import build_model_config_from_registry_case
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -302,6 +304,77 @@ def test_preflight_and_exploratory_runtime_choose_the_same_authorized_exact_reco
     sampled = next(row for row in result.sampled_parameters() if row["symbol"] == "k_surface_exact")
     assert sampled["source_record_id"] == authorized["record_id"]
     assert sampled["source_record_id"] != storage_only["record_id"]
+
+
+@pytest.mark.parametrize("mode", ["exploratory", "scientific"])
+def test_maturity_tie_selection_agrees_across_preflight_runtime_and_outputs(
+    tmp_path: Path,
+    mode: Literal["exploratory", "scientific"],
+) -> None:
+    registry = _modelable_toy_registry(tmp_path)
+    parameters_path = registry / "parameters" / "parameter_records.yml"
+    payload = _yaml_mapping(parameters_path)
+    records = cast(list[dict[str, Any]], payload["records"])
+    required_ids = {
+        "toy_param_k_surface_exact",
+        "toy_param_k_ads_exact",
+        "toy_param_A_surface_exact",
+    }
+    for record in records:
+        if record["record_id"] in required_ids:
+            record["maturity"] = "calibrated"
+            record["allowed_use"] = "scientific_simulation_test_fixture"
+    lower_maturity = next(
+        record for record in records if record["record_id"] == "toy_param_k_surface_exact"
+    )
+    preferred = deepcopy(lower_maturity)
+    lower_maturity["maturity"] = "literature_processed"
+    preferred["record_id"] = "calibrated_selection_tie"
+    preferred["name"] = "Calibrated-maturity ranking tie test fixture"
+    records.append(preferred)
+    parameters_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    study = virtual_experiment(
+        fungi="toy_fungus_alpha",
+        substrates="toy_cellulose_like_solid",
+        environments="toy_lab_environment",
+        registry=registry / "registry_index.yml",
+    )
+
+    preflight = study.preflight(mode=mode)[0]
+    selected = next(item for item in preflight.known if item.item_id == "k_surface_exact")
+    assert selected.details["record_id"] == preferred["record_id"]
+
+    result = study.simulate(
+        mode=mode,
+        n_samples=1,
+        seed=4,
+        output_dir=tmp_path / f"maturity_tie_{mode}",
+        quicklook=False,
+    )
+    sampled = next(row for row in result.sampled_parameters() if row["symbol"] == "k_surface_exact")
+    assert sampled["source_record_id"] == preferred["record_id"]
+    mechanism = next(
+        row for row in result.mechanism_summary() if row["mechanism_kind"] == "process_law"
+    )
+    mechanism_provenance = json.loads(mechanism["provenance"])
+    assert mechanism_provenance["role_record_ids"]["surface_rate_constant"] == preferred["record_id"]
+    report = result.write_report().read_text(encoding="utf-8")
+    assert "## Active mechanisms and modifiers" in report
+    assert f"maturity `{mechanism['maturity']}`" in report
+    if mode == "exploratory":
+        config = build_model_config_from_registry_case(
+            fungus_id="toy_fungus_alpha",
+            substrate_id="toy_cellulose_like_solid",
+            environment_id="toy_lab_environment",
+            registry=load_registry(registry / "registry_index.yml"),
+            mode="toy",
+        )
+        configured = next(
+            parameter
+            for parameter in config.parameters[0].parameters
+            if parameter["symbol"] == "k_surface_exact"
+        )
+        assert configured["name"] == preferred["name"]
 
 
 def test_result_table_accessors_return_standard_tables(tmp_path: Path) -> None:

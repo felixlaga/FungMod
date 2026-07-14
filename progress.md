@@ -72,10 +72,12 @@ Completed in this pass:
   curator-authored `ParameterRecord` is the loader and promotion target. The
   specialized result reuses `CurationResult.write()` for deterministic,
   checksummed output already consumable by promotion planning.
-- Persisted result-level proposal limitations in manifest, summary, accepted
-  payload, bridge audit, and the deterministic full report, with exact
-  cross-representation key/value checks. Public SHA256 checksums prove internal
-  bundle consistency, not external curator identity or cryptographic authorship.
+- Persisted result-level proposal limitations in manifest, summary, all three
+  decision YAML payloads, both decision CSV tables, bridge audit, and the
+  deterministic full report. Specialized planning reconstructs every semantic
+  artifact from the authored result and requires exact headers, keys, and
+  values. Public SHA256 checksums prove internal bundle consistency, not
+  external curator identity or cryptographic authorship.
 - Closed the full authored summary key/value schema, including every mutation,
   validation, simulation, provenance, and limitation claim, and compare it
   against manifest, accepted payload, bridge audit, and report representations.
@@ -100,6 +102,11 @@ Completed in this pass:
   toy preflight paths cannot use such a parameter; ensemble and chain runtime
   refuse it, and authorized alternatives are ranked consistently. Other
   explicit `allowed_use` behavior remains unchanged.
+- Centralized the complete mode-aware dynamic parameter ranking key across
+  modelability, ensemble sampling/runtime, deterministic case assembly, and
+  result-table/mechanism reconstruction. Exploratory and scientific value-kind
+  preferences remain mode-specific, while selector, authorization, exploratory
+  prior, and calibrated-maturity tie-breaks now agree for identical candidates.
 - Centralized one parameter-provenance classifier across planning, apply, and
   runtime. A reserved `fungmod_parameter_bridge` namespace always requires full
   independent bridge schema/digest/policy validation at apply; the reserved

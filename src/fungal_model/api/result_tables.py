@@ -28,6 +28,7 @@ from fungal_model.registry.records import (
     ParameterRecord,
     RegistryRecord,
     parameter_is_simulation_authorized,
+    parameter_record_selection_key,
 )
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.screening import (
@@ -2410,45 +2411,15 @@ def _best_case_parameter_record(
         candidates = [record for record in candidates if not _is_exploratory_record(record)]
     if not candidates:
         return None
+    selection_mode = "scientific" if mode == "scientific" else "exploratory"
     return max(
-        candidates, key=_scientific_parameter_record_priority if mode == "scientific" else _parameter_record_priority
+        candidates,
+        key=lambda record: parameter_record_selection_key(record, mode=selection_mode),
     )
 
 
 def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
-
-
-def _parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int, int]:
-    selector_score = sum(
-        value is not None
-        for value in (
-            record.enzyme_class,
-            record.substrate_class,
-            record.fungus_id,
-            record.substrate_id,
-            record.environment_id,
-        )
-    )
-    value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
-    exploratory_score = 1 if _is_exploratory_record(record) else 0
-    return int(parameter_is_simulation_authorized(record)), selector_score, value_score, exploratory_score
-
-
-def _scientific_parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int, int]:
-    selector_score = sum(
-        value is not None
-        for value in (
-            record.enzyme_class,
-            record.substrate_class,
-            record.fungus_id,
-            record.substrate_id,
-            record.environment_id,
-        )
-    )
-    value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
-    maturity_score = 1 if record.maturity == "calibrated" else 0
-    return int(parameter_is_simulation_authorized(record)), selector_score, value_score, maturity_score
 
 
 def _trajectory_state_names(row: Mapping[str, str]) -> tuple[str, ...]:

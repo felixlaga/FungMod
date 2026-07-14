@@ -545,6 +545,46 @@ def test_rechecksummed_written_bundle_rejects_extra_claims_and_report_rewrites(
         plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
 
 
+@pytest.mark.parametrize(
+    "artifact",
+    [
+        "proposed",
+        "accepted",
+        "rejected",
+        "eligible_decisions",
+        "excluded_decisions",
+        "manifest",
+        "report",
+        "combined",
+    ],
+)
+def test_rechecksummed_authored_bundle_closes_every_semantic_artifact(
+    tmp_path: Path,
+    artifact: str,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    bundle = authored.write(tmp_path / f"semantic_artifact_{artifact}")
+    targets = (
+        (
+            "proposed",
+            "accepted",
+            "rejected",
+            "eligible_decisions",
+            "excluded_decisions",
+            "manifest",
+            "report",
+        )
+        if artifact == "combined"
+        else (artifact,)
+    )
+    for target in targets:
+        _mutate_semantic_bundle_artifact(bundle, target)
+    _refresh_bundle_checksums(bundle)
+
+    with pytest.raises(RegistryPromotionPlanError, match="shared curation builder"):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
+
+
 def test_partial_bridge_marker_is_rejected_at_plan_and_reconstructed_apply(
     tmp_path: Path,
 ) -> None:
@@ -1799,6 +1839,57 @@ def _redigest_bundle(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _mutate_semantic_bundle_artifact(bundle: Any, artifact: str) -> None:
+    yaml_paths = {
+        "proposed": bundle.paths["proposed_registry_records"],
+        "accepted": bundle.paths["accepted_registry_records"],
+        "rejected": bundle.paths["rejected_registry_records"],
+    }
+    if artifact in yaml_paths:
+        path = yaml_paths[artifact]
+        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+        assert isinstance(payload, dict)
+        payload["simulation_authorized"] = True
+        path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+        return
+    if artifact in {"eligible_decisions", "excluded_decisions"}:
+        key = "eligible_records" if artifact == "eligible_decisions" else "excluded_records"
+        path = bundle.paths[key]
+        content = path.read_bytes().decode("utf-8")
+        newline = "\r\n" if "\r\n" in content else "\n"
+        lines = content.splitlines()
+        lines[0] += ",simulation_authorized"
+        for index in range(1, len(lines)):
+            lines[index] += ",true"
+        path.write_bytes((newline.join(lines) + newline).encode("utf-8"))
+        return
+    if artifact == "manifest":
+        path = bundle.paths["curation_manifest"]
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["simulation_authorized"] = True
+        path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return
+    if artifact == "report":
+        path = bundle.paths["curation_report"]
+        content = path.read_text(encoding="utf-8").replace(
+            "It is not production registry promotion, scientific validation, or permission for simulation.",
+            "It is scientific validation and permission for simulation.",
+        )
+        path.write_text(content, encoding="utf-8")
+        return
+    raise AssertionError(f"Unknown semantic artifact fixture: {artifact}")
+
+
+def _refresh_bundle_checksums(bundle: Any) -> None:
+    path = bundle.paths["curation_manifest"]
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["files"] = {
+        name: hashlib.sha256((bundle.output_directory / name).read_bytes()).hexdigest()
+        for name in manifest["files"]
+    }
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _reconstructed_plan_with_target(plan: Any, registry_index: Path, target: dict[str, Any]):

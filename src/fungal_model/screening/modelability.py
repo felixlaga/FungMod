@@ -8,7 +8,7 @@ from typing import Any, Literal, Mapping
 from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
-    parameter_is_simulation_authorized,
+    parameter_record_selection_key,
     parameter_simulation_authorization_blocker,
 )
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
@@ -469,7 +469,7 @@ def _best_parameter_record(
         ]
     if not candidates:
         return None
-    return max(candidates, key=lambda record: _parameter_specificity(record, mode=mode))
+    return max(candidates, key=lambda record: parameter_record_selection_key(record, mode=mode))
 
 
 def _chain_template_parameter_record(
@@ -501,27 +501,6 @@ def _chain_template_parameter_record(
 
 def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
-
-
-def _parameter_specificity(record: ParameterRecord, *, mode: ModelabilityMode) -> tuple[int, ...]:
-    authorization_score = int(parameter_is_simulation_authorized(record))
-    selector_score = sum(
-        value is not None
-        for value in (
-            record.enzyme_class,
-            record.substrate_class,
-            record.fungus_id,
-            record.substrate_id,
-            record.environment_id,
-        )
-    )
-    maturity_score = 1 if record.maturity == "calibrated" else 0
-    if mode == "exploratory":
-        value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
-        exploratory_score = 1 if _is_exploratory_parameter_record(record) else 0
-        return authorization_score, selector_score, value_score, exploratory_score, maturity_score
-    value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
-    return authorization_score, selector_score, value_score, maturity_score
 
 
 def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:
