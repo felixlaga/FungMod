@@ -63,7 +63,7 @@ def test_status_tracker_reconciles_completed_scoped_slices_without_overclaiming(
         assert boundary in text
 
 
-def test_pr47_registry_promotion_apply_contract_is_synchronized() -> None:
+def test_pr48_parameter_authoring_contract_is_synchronized() -> None:
     readme = _read(README)
     status = _read(STATUS_DOC)
     next_steps = _read(NEXT_STEPS)
@@ -80,6 +80,14 @@ def test_pr47_registry_promotion_apply_contract_is_synchronized() -> None:
         assert "PR #61" in text
         assert "2b6c639" in text
         assert "PR-47" in text
+        assert "PR #62" in text
+        assert "b1ebb860" in text
+        assert "PR-48" in text
+
+    for text in (readme, status, next_steps, roadmap, progress):
+        assert "author_parameter_record" in text
+        assert "identity" in text.lower()
+        assert "PARAMETER" in text
 
     for phrase in (
         "plan schema `2.0.0`",
@@ -101,7 +109,8 @@ def test_pr47_registry_promotion_apply_contract_is_synchronized() -> None:
     for text in (readme, status, next_steps, roadmap, progress):
         assert "CURATION-001 remains" in text or "CURATION-001 stays" in text
         assert "source-to-production" in text
-        assert "no guessed" in text.lower()
+        assert "nonidentity" in text.lower()
+        assert "non-parameter" in text.lower()
 
 
 def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> None:
@@ -109,10 +118,10 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-47: digest-confirmed transactional registry apply"
+    current_next = "PR-48: identity-only curator-authored ParameterRecord bridge"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
-    assert "The current next PR is PR-47 digest-confirmed transactional registry apply" in roadmap
+    assert "The current next PR is PR-48 identity-only curator-authored ParameterRecord bridge" in roadmap
     assert "The PR-31 slice should bridge" not in roadmap
     assert "PR-31 is deliberately build-first" not in roadmap
     assert "The completed PR-31 slice bridged explicit" in roadmap
@@ -131,8 +140,9 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "completed PR-44" in roadmap
     assert "completed PR-45" in roadmap
     assert "completed PR-46" in roadmap
-    assert "current PR-47" in roadmap
-    assert "PR-48" in roadmap
+    assert "completed PR-47" in roadmap
+    assert "current PR-48" in roadmap
+    assert "PR-49" in roadmap
     assert "branching, cycles, disconnected chains, and malformed topology" in roadmap
     assert "35 baseline nullable-member errors across 11" in roadmap
     assert "scientific modules using explicit contracts" in roadmap
@@ -172,7 +182,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-47: digest-confirmed transactional registry apply"
+    current_next = "PR-48: identity-only curator-authored ParameterRecord bridge"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -216,6 +226,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-43" not in text
         assert "Current next PR: **PR-44" not in text
         assert "Current next PR: **PR-45" not in text
+        assert "Current next PR: **PR-46" not in text
+        assert "Current next PR: **PR-47" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -401,11 +413,12 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-46 | CURATION-001 registry-promotion preview plan" in status
     assert "PR-47 | CURATION-001 digest-confirmed transactional apply" in status
     assert "complete after PR #61 merged as `2b6c639`" in status
-    assert "bounded apply contract completes once merged, while CURATION-001 remains partial" in status
+    assert "complete after PR #62 merged as `b1ebb860`; CURATION-001 remains partial" in status
     assert (
-        "PR-48 | CURATION-001 curator-authored source-to-production "
-        "registry-record bridge/schema workflow"
+        "PR-48 | CURATION-001 identity-only curator-authored ParameterRecord bridge"
     ) in status
+    assert "current; bounded PARAMETER identity bridge completes once merged" in status
+    assert "PR-49 | CURATION-001 reusable public curation-bundle loader" in status
     assert "entropy_production_rate_timeseries.json" in next_steps
     assert "entropy_production_rate_timeseries.json" in _read(README)
     assert "no silent conversion" in status
@@ -457,7 +470,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-47: digest-confirmed transactional registry apply"
+    current_next = "PR-48: identity-only curator-authored ParameterRecord bridge"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -502,6 +515,8 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-43" not in _current_next_lines(text)
         assert "PR-44" not in _current_next_lines(text)
         assert "PR-45" not in _current_next_lines(text)
+        assert "PR-46" not in _current_next_lines(text)
+        assert "PR-47" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
@@ -517,10 +532,10 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "PR-44 researcher source-provider onboarding is complete after PR #59" in gate
     assert "PR-45 CURATION-001 proposal-review and decision-bundle work is complete" in gate
     assert "PR-46 registry-promotion planning is complete" in gate
-    assert "selected PR-47 work is bounded transactional" in gate
+    assert "selected PR-48 work is a bounded identity-only" in gate
     assert "intentional plan\nschema `2.0.0`" in gate
-    assert "does not complete CURATION-001" in gate
-    assert "PR-48 CURATION-001 curator-authored" in gate
+    assert "CURATION-001 remains partial" in gate
+    assert "PR-49 reusable public checksum-validated" in gate
     assert "A future validation ingestion PR must not ingest" in gate
     assert "fabricate data unless those evidence requirements are met" in gate
     assert "Status: `complete`" not in gate

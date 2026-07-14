@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import hmac
 import json
 import os
@@ -20,6 +19,13 @@ from typing import Any, Iterator, Literal
 
 import yaml
 
+from fungal_model.api._integrity import (
+    canonicalize as _canonicalize,
+    first_symlink_component,
+    round_trip_differences as _round_trip_differences,
+    sha256_bytes as _sha256_bytes,
+    type_exact_equal as _type_exact_equal,
+)
 from fungal_model.api.curation import (
     CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
     CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
@@ -29,6 +35,14 @@ from fungal_model.api.curation import (
     CurationResult,
     curation_date_is_iso,
     curation_source_provenance_missing,
+)
+from fungal_model.api.parameter_record_authoring import (
+    PARAMETER_AUTHORING_WORKFLOW,
+    CuratorAuthoredParameterResult,
+    ParameterRecordAuthoringError,
+    is_curator_authored_parameter_record,
+    validate_authored_parameter_against_registry,
+    validate_parameter_authoring_bundle_record,
 )
 from fungal_model.registry.loaders import load_registry
 from fungal_model.registry.store import FungModRegistry
@@ -349,6 +363,18 @@ def plan_registry_promotion(
                 f"Accepted curation input contains duplicate record id {item.record_id!r}."
             )
         seen_ids.add(item.record_id)
+
+        if is_curator_authored_parameter_record(item.target_record):
+            try:
+                validate_authored_parameter_against_registry(
+                    item.target_record,
+                    registry_index=index.path,
+                )
+            except ParameterRecordAuthoringError as exc:
+                raise RegistryPromotionPlanError(
+                    f"Authored parameter record {item.record_id!r} failed planning-registry "
+                    f"revalidation: {exc}"
+                ) from exc
 
         if item.record_type == "product_maps":
             candidates.append(
@@ -1824,6 +1850,19 @@ def _accepted_records(
     value: CurationResult | str | Path,
 ) -> tuple[Literal["curation_result", "written_curation_bundle"], tuple[_AcceptedRecord, ...]]:
     if isinstance(value, CurationResult):
+        if isinstance(value, CuratorAuthoredParameterResult):
+            try:
+                value.verify_integrity()
+            except ParameterRecordAuthoringError as exc:
+                raise RegistryPromotionPlanError(str(exc)) from exc
+        elif any(
+            is_curator_authored_parameter_record(item.proposed_record)
+            for item in value.accepted_records
+        ):
+            raise RegistryPromotionPlanError(
+                "In-memory parameter-authoring records require CuratorAuthoredParameterResult "
+                "integrity metadata."
+            )
         records = tuple(_accepted_record_from_memory(item) for item in value.accepted_records)
         return "curation_result", records
     return "written_curation_bundle", _accepted_records_from_bundle(value)
@@ -1930,6 +1969,27 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
     summary = manifest.get("summary")
     if not isinstance(summary, Mapping) or summary.get("accepted_count") != len(accepted):
         raise RegistryPromotionPlanError("Curation manifest accepted_count does not match accepted artifacts.")
+    has_parameter_authoring_record = any(
+        is_curator_authored_parameter_record(item.target_record) for item in accepted
+    )
+    has_parameter_authoring_summary = (
+        isinstance(summary, Mapping) and summary.get("workflow") == PARAMETER_AUTHORING_WORKFLOW
+    )
+    if has_parameter_authoring_record or has_parameter_authoring_summary:
+        if len(accepted) != 1:
+            raise RegistryPromotionPlanError(
+                "A written parameter-authoring bundle must contain exactly one accepted parameter target."
+            )
+        item = accepted[0]
+        try:
+            validate_parameter_authoring_bundle_record(
+                summary=summary,
+                record_type=item.record_type,
+                target_record=item.target_record,
+                curation_metadata=item.curation_metadata,
+            )
+        except ParameterRecordAuthoringError as exc:
+            raise RegistryPromotionPlanError(str(exc)) from exc
     return tuple(accepted)
 
 
@@ -2434,38 +2494,6 @@ def _staged_registry(
         yield staged_index, stage
 
 
-def _round_trip_differences(
-    expected: Any,
-    actual: Any,
-    *,
-    path: str = "",
-) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
-    dropped: list[str] = []
-    synthesized: list[str] = []
-    changed: list[str] = []
-    if isinstance(expected, Mapping) and isinstance(actual, Mapping):
-        expected_keys = {str(key) for key in expected}
-        actual_keys = {str(key) for key in actual}
-        dropped.extend(_field_path(path, key) for key in sorted(expected_keys - actual_keys))
-        synthesized.extend(_field_path(path, key) for key in sorted(actual_keys - expected_keys))
-        for key in sorted(expected_keys & actual_keys):
-            nested_dropped, nested_synthesized, nested_changed = _round_trip_differences(
-                expected[key],
-                actual[key],
-                path=_field_path(path, key),
-            )
-            dropped.extend(nested_dropped)
-            synthesized.extend(nested_synthesized)
-            changed.extend(nested_changed)
-    elif not _type_exact_equal(expected, actual):
-        changed.append(path or "<record>")
-    return tuple(dropped), tuple(synthesized), tuple(changed)
-
-
-def _field_path(parent: str, field: str) -> str:
-    return field if not parent else f"{parent}.{field}"
-
-
 def _registry_digest(index: _RegistryIndex, *, overrides: Mapping[str, str]) -> str:
     file_hashes = _registry_tree_hashes(index.root)
     for relative_path, content in overrides.items():
@@ -2735,12 +2763,9 @@ def _read_yaml_mapping(path: Path, *, label: str) -> Mapping[str, Any]:
 
 
 def _reject_symlink_components(path: Path, *, label: str) -> None:
-    absolute = path if path.is_absolute() else Path.cwd() / path
-    current = Path(absolute.anchor)
-    for part in absolute.parts[1:]:
-        current /= part
-        if current.is_symlink():
-            raise RegistryPromotionPlanError(f"{label} contains a symlink component: {current}")
+    symlink = first_symlink_component(path)
+    if symlink is not None:
+        raise RegistryPromotionPlanError(f"{label} contains a symlink component: {symlink}")
 
 
 def _require_string_mapping_keys(value: Any, *, label: str) -> None:
@@ -2754,58 +2779,11 @@ def _require_string_mapping_keys(value: Any, *, label: str) -> None:
             _require_string_mapping_keys(item, label=label)
 
 
-def _canonicalize(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {
-            str(key): _canonicalize(value[key])
-            for key in sorted(value, key=lambda item: str(item))
-        }
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return [_canonicalize(item) for item in value]
-    return value
-
-
-def _type_exact_equal(left: Any, right: Any) -> bool:
-    if isinstance(left, Mapping) or isinstance(right, Mapping):
-        if not isinstance(left, Mapping) or not isinstance(right, Mapping):
-            return False
-        if len(left) != len(right):
-            return False
-        for left_key, left_value in left.items():
-            matching_keys = [
-                right_key
-                for right_key in right
-                if type(left_key) is type(right_key) and left_key == right_key
-            ]
-            if len(matching_keys) != 1:
-                return False
-            if not _type_exact_equal(left_value, right[matching_keys[0]]):
-                return False
-        return True
-
-    left_is_sequence = isinstance(left, Sequence) and not isinstance(
-        left, (str, bytes, bytearray)
-    )
-    right_is_sequence = isinstance(right, Sequence) and not isinstance(
-        right, (str, bytes, bytearray)
-    )
-    if left_is_sequence or right_is_sequence:
-        if not left_is_sequence or not right_is_sequence or len(left) != len(right):
-            return False
-        return all(_type_exact_equal(a, b) for a, b in zip(left, right))
-
-    return type(left) is type(right) and left == right
-
-
 def _format_validation_error(exc: Exception, *, stage: Path | None = None) -> str:
     message = " ".join(str(exc).split())
     if stage is not None:
         message = message.replace(str(stage), "<staged_registry>")
     return f"{type(exc).__name__}: {message}"
-
-
-def _sha256_bytes(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
 
 
 def _sha256_json(value: Any) -> str:

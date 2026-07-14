@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-47: digest-confirmed transactional registry apply**.
+Current next PR: **PR-48: identity-only curator-authored ParameterRecord bridge**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -44,15 +44,20 @@ process-bound entropy-production-rate diagnostics is complete after PR #58.
 PR-44 researcher source-provider onboarding is complete after PR #59. The
 PR-45 CURATION-001 proposal-review and decision-bundle work is complete after
 PR #60 merged as `5ac7864`. PR-46 registry-promotion planning is complete after
-PR #61 merged as `2b6c639`. The selected PR-47 work is bounded transactional
+PR #61 merged as `2b6c639`. PR-47 transactional apply is complete after PR #62
+merged as `b1ebb860`. The selected PR-48 work is a bounded identity-only
+PARAMETER authoring bridge from explicit accepted curation evidence to a
+complete curator-authored production mapping and promotion plan. It does not
+accept written source input, perform nonidentity conversion, support other
+record types, mutate/apply a registry, ingest validation data, change
+scientific fields, authorize simulation automatically, or claim validation.
+The completed PR-47 work is bounded transactional
 administrative registry apply with exact digest confirmation, intentional plan
 schema `2.0.0`, durable curation audit provenance, strict next-patch versioning,
 full-root staging/drift checks, locking, no overwrite, and verified rollback.
 It does not ingest validation data, change scientific fields, authorize
-simulation automatically, or claim validation.
-The bounded apply contract does not complete CURATION-001: the real frozen
-source path still lacks a curator-authored bridge into the exact production
-loader schema without guessed conversions or defaults.
+simulation automatically, or claim validation. CURATION-001 remains partial
+for nonidentity conversion and non-parameter source records.
 A future validation ingestion PR must not ingest, digitize, or
 fabricate data unless those evidence requirements are met.
 This gate does not complete VALIDATION-DATA-001.
@@ -156,10 +161,9 @@ schema, or biology changes in this gate PR.
 
 ## Next Action
 
-After PR-47, take the bounded PR-48 CURATION-001 curator-authored
-source-to-production registry-record bridge/schema workflow. Require explicit
-production fields and conversion metadata with no guessed conversions,
-fallbacks, defaults, invented science, or automatic promotion. Continue
+After PR-48, take the bounded PR-49 reusable public checksum-validated
+curation-bundle loader so future written-input APIs can reuse one existing
+manifest/checksum/path contract without duplicate parsing. Continue
 building PRODUCT-001, THERMO-003, and generic BIO-003 simulator capability.
 Later, find or obtain source-backed numeric time-course
 observations that satisfy the required evidence fields above. Then open a

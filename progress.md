@@ -26,16 +26,125 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-48 CURATION-001 Identity-Only Curator-Authored ParameterRecord Bridge
+
+Date: 2026-07-14
+
+Status: `current` for the bounded PARAMETER-only identity-authoring slice.
+PR-47 is `complete` after PR #62 merged as `b1ebb860`. CURATION-001 remains
+`partial` for nonidentity conversions and non-parameter source records.
+
+Completed in this pass:
+
+- Added top-level `author_parameter_record(...)` for a validated in-memory
+  `CurationResult`, one explicitly selected accepted PARAMETER source record,
+  one complete curator-authored production mapping, and an explicit registry
+  index. It returns `CuratorAuthoredParameterResult` without registry mutation
+  or apply.
+- Restricted conversion to `identity_no_conversion`. Original, source,
+  normalized, converted, and target values must be finite floats and
+  type-exactly equal; their units must be identical nonblank strings. Bools,
+  integers, numeric strings, nonfinite values, unknown/range/distribution
+  `ValueSpec` forms, and nonidentity methods fail closed.
+- Required complete accepted-curation evidence and exact source identity:
+  proposal record id, database, entry/reaction ids, query, source field,
+  snapshot path, explicit URL slot, frozen snapshot SHA256, curator, date,
+  reason, limitations, and pending-promotion decision policy. The snapshot
+  bytes are rehashed before authoring.
+- Required every loader-emitted production field, all explicit null selectors,
+  every exact `ValueSpec` field, closed maturity/allowed-use/range policies,
+  a closed non-validation confidence label, exact source parameter
+  symbol/value/units, and full outer source/curator
+  provenance. Loader-dropped, synthesized, defaulted, or type-coerced mappings
+  are rejected by exact production-loader round-trip comparison.
+- Resolved all non-null selectors and the process/parameter role against the
+  supplied registry. The authored result records the registry index identity
+  and digest, isolates itself from later input mutation, and revalidates its
+  authoring digest, selectors, and planning registry when passed to
+  `plan_registry_promotion(...)`.
+- Preserved the dual representation: accepted source/curation evidence is
+  durable `fungmod_parameter_bridge` audit metadata, while only the complete
+  curator-authored `ParameterRecord` is the loader and promotion target. The
+  specialized result reuses `CurationResult.write()` for deterministic,
+  checksummed output already consumable by promotion planning.
+- Kept written source curation input out of scope. Shared canonicalization,
+  type-exact comparison, round-trip difference, SHA256, and symlink helpers
+  live in one internal integrity module and are reused by registry promotion;
+  the production parameter factory is exposed through one focused loader
+  helper. No parallel curation-bundle parser was added.
+- The frozen SABIO-RK test completes explicit identity curation in a test-owned
+  proposal copy, re-authors canonical EntryID 35622 kcat using the existing
+  canonical record id, removes that target only from a copied temporary
+  registry, and produces one ADDABLE plan. Production `data_registry/` is
+  byte-checked as unchanged and no apply occurs.
+
+Tests added or modified: `tests/test_parameter_record_authoring.py` covers the
+real frozen SABIO path, in-memory and written-result planning, deterministic
+checksums, rechecksummed authored-bundle tampering, post-result mutation,
+unsupported written input, source acceptance/blocker/type failures, exact
+identity conversion, bool/int/string/nonfinite values, blank fields, source
+identity and snapshot digest conflicts, conservative policies, complete
+`ValueSpec` and loader fidelity, selector compatibility, unsafe output paths,
+planning-registry revalidation, and public exports.
+`tests/test_roadmap_orchestration_status.py` synchronizes PR-47 completion,
+PR-48 current scope, remaining CURATION-001 limits, and the PR-49 follow-up.
+
+What did not change: no production registry record or version, package version,
+source adapter, curation decision semantics, promotion apply behavior, process
+law, solver, simulation eligibility, biology, parameter value/unit/maturity in
+`data_registry/`, validation data, calibration, or empirical comparison.
+
+Scientific behavior impact: no new scientific result. The frozen SABIO case
+proves deterministic extraction, explicit identity mapping, provenance,
+loader fidelity, and copied-registry planning only. It is not current/correct
+science, validation, calibration, prediction, transferability evidence, or
+simulation authorization.
+
+Backward compatibility: additive public API and result/error types. Existing
+curation, planning, and apply inputs retain their contracts. Only records that
+carry the new reserved PARAMETER bridge marker receive the additional
+authoring-digest and registry-context revalidation.
+
+Remaining ambiguity and risk: nonidentity conversions require a separate
+closed conversion-method registry, unit parsing, dimensional compatibility,
+exact recomputation, and rounding policy; they are rejected here. Written
+curation input remains deferred until the existing private bundle parser can be
+made reusable without duplication. Non-parameter curation records remain
+unsupported. Registry locks remain relevant only at apply, which this API does
+not invoke.
+
+Risk level: high for scientific provenance and schema integrity, bounded by an
+identity-only policy, exact type checks, frozen-byte digest verification,
+loader and selector revalidation, immutable result copies, adversarial tests,
+and no mutation/apply path.
+
+Recommended next task after PR-48 merges: PR-49, a reusable public
+checksum-validated curation-bundle loader that centralizes the existing
+manifest/checksum/path contract before any specialized authoring API accepts a
+written source bundle. Add no scientific transformation or registry mutation.
+
+Verification:
+
+- Focused PARAMETER-authoring suite: 39 passed.
+- Focused curation, planning, apply, registry-loading, public-API, authoring,
+  and roadmap-status suite: 212 passed in 30.26s.
+- Canonical full pytest: 950 passed in 92.34s on the final code.
+- Focused Ruff: passed.
+- Full Ruff: passed for `src` and `tests`.
+- Full Pyright with the shared venv interpreter selected explicitly: 0 errors,
+  0 warnings, 0 informations. The bare worktree invocation could not resolve
+  `pint` because isolated worktrees do not contain the main checkout's
+  `.venv`; the repository-documented `--pythonpath` equivalent passed.
+- `git diff --check`: passed.
+
 ## PR-47 CURATION-001 Digest-Confirmed Transactional Apply
 
 Date: 2026-07-13
 
-Status: `current` for the bounded transactional apply slice; PR-46 is complete
-after PR #61 merged as `2b6c639`. The transactional apply contract is complete
-once PR-47 merges, but CURATION-001 remains `partial`: the real frozen source
-path cannot yet produce a loader-fidelitous curator-authored production record
-without a separate explicit schema/conversion bridge. VALIDATION-DATA-001
-remains `deferred; blocked/partial` for ingestion.
+Status: `complete` for the bounded transactional apply slice after PR #62
+merged as `b1ebb860`; PR-46 is complete after PR #61 merged as `2b6c639`.
+CURATION-001 remains `partial`, and VALIDATION-DATA-001 remains
+`deferred; blocked/partial` for ingestion.
 
 Completed in this pass:
 

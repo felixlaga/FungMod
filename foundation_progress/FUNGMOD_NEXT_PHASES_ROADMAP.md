@@ -69,8 +69,9 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-47 digest-confirmed transactional registry apply
-after PR-46 registry-promotion planning merged as PR #61 (`2b6c639`), PR-45
+The current next PR is PR-48 identity-only curator-authored ParameterRecord bridge
+after PR-47 transactional apply merged as PR #62 (`b1ebb860`), PR-46
+registry-promotion planning merged as PR #61 (`2b6c639`), PR-45
 source-proposal curation review merged as PR #60 (`5ac7864`), and PR-44
 researcher source-provider onboarding merged as PR #59,
 PR-43 process-bound entropy-production-rate timeseries merged as PR #58 and
@@ -208,7 +209,7 @@ review output cannot overlap a registry root in either direction and is refused
 if the plan payload no longer matches its construction digest. It
 has no mutation, overwrite, apply operation, version policy, simulation
 promotion, or validation claim. It completed after PR #61 merged as `2b6c639`.
-The current PR-47 `apply_registry_promotion(...)` slice intentionally advances
+The completed PR-47 `apply_registry_promotion(...)` slice intentionally advances
 plan schema to `2.0.0`, places durable curator/source audit metadata in exact
 prospective YAML, rejects preview-only `1.0.0` bundles at apply, and requires an
 exact confirmation digest plus exact next numeric patch version. It re-resolves
@@ -218,14 +219,18 @@ with interruption-safe digest-reconciled rollback and truthful cleanup state.
 Plan applicability is candidate-derived, and overlapping target/curator source
 identities must agree exactly. It does not alter scientific fields or package
 version, authorize simulation, or claim scientific validation. The bounded
-apply contract completes once PR-47 merges, but CURATION-001 remains partial:
-the real frozen source path cannot yet yield a loader-fidelitous
-curator-authored production record. The recommended next slice is PR-48
-CURATION-001 curator-authored source-to-production registry-record bridge/schema
-workflow. It must use explicit curator-authored production fields and
-conversion metadata only, with no guessed conversion, fallback/default,
-invented science, automatic promotion, simulation authorization, validation
-data, calibration, or empirical claim.
+apply contract completed after PR #62 merged as `b1ebb860`.
+The current PR-48 `author_parameter_record(...)` slice is limited to accepted
+in-memory PARAMETER curation results and complete curator-authored production
+mappings with exact identity conversion, source digest/provenance,
+loader-round-trip, selector, registry-context, and mutation checks. Its
+specialized checksummed curation output is promotion-plan-compatible but does
+not mutate or apply. Nonidentity conversion, written source input,
+non-parameter records, validation, calibration, and simulation authorization
+remain unsupported, so CURATION-001 remains partial. The recommended next
+slice is PR-49 reusable public checksum-validated curation-bundle loading,
+centralizing existing manifest/checksum/path parsing before any future written
+authoring input.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -329,11 +334,13 @@ proposals after PR #60; it adds no automatic trust, registry promotion,
 simulation-time fetch, scientific record, biology, solver behavior,
 thermodynamic behavior, or validation evidence. The completed PR-46 slice is
 limited to an immutable registry-promotion preview over explicit accepts after
-PR #61. The current PR-47 slice adds only digest-confirmed,
+PR #61. The completed PR-47 slice adds only digest-confirmed,
 strict-next-patch, no-overwrite transactional application of exact schema
-`2.0.0` prospective bytes. It adds no automatic simulation eligibility,
-scientific-field transformation, biology, solver, calibration, thermodynamic
-behavior, validation data, or validation evidence.
+`2.0.0` prospective bytes after PR #62. The current PR-48 slice adds only an
+identity-only PARAMETER source-to-production authoring result for explicit
+accepted source evidence and explicit complete production fields. Neither adds
+automatic simulation eligibility, scientific-field inference, biology, solver,
+calibration, thermodynamic behavior, validation data, or validation evidence.
 THERMO-003 remains partial after
 explicit reaction-quotient Gibbs checks, configured entropy-production-rate
 metadata diagnostics, configured JSON/CSV summaries, and configured-output
@@ -409,12 +416,13 @@ PR-42 arbitrary-length linear enzyme-chain assembly slice completed after PR
 #57; branching and cycles remain unsupported. PR-43 process-bound
 entropy-production-rate configured diagnostics completed after PR #58. PR-44
 review-gated SABIO-RK researcher source onboarding completed after PR #59.
-PR-45 source-proposal review/decision bundles completed after PR #60, and PR-46
-registry-promotion planning completed after PR #61 merged as `2b6c639`. The
-current PR-47 slice is transactional administrative registry promotion rather
-than validation ingestion, digitization, fabricated validation data,
-calibration, empirical comparison, scientific-field transformation, or
-automatic simulation authorization.
+PR-45 source-proposal review/decision bundles completed after PR #60, PR-46
+registry-promotion planning completed after PR #61 merged as `2b6c639`, and
+PR-47 transactional apply completed after PR #62 merged as `b1ebb860`. The
+current PR-48 slice is identity-only PARAMETER authoring for promotion planning,
+rather than validation ingestion, digitization, fabricated validation data,
+calibration, empirical comparison, scientific-field inference, registry apply,
+or automatic simulation authorization.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
@@ -1292,17 +1300,18 @@ accepted_registry_records.yml
 rejected_registry_records.yml
 ```
 
-Scoped status after PR #61: PR-45 supplies owned curator decision bundles and
+Scoped status after PR #62: PR-45 supplies owned curator decision bundles,
 PR-46 supplies checksum-verified, index-resolved, loader-validated promotion
-plans. The current PR-47 adds explicit digest-confirmed production apply with
+plans, and PR-47 supplies explicit digest-confirmed production apply with
 durable curation audit provenance, full-root drift detection/staging, strict
 next-patch versioning, candidate-derived applicability, source-identity
 consistency, locking, no overwrite, and interruption-safe verified rollback.
-Product maps remain blocked pending a destination contract. The bounded apply
-contract completes once PR-47 merges, while CURATION-001 remains partial until
-a real frozen source proposal can become a loader-fidelitous curator-authored
-production record without guessed conversions or defaults. This status does
-not claim scientific validation or automatic simulation authorization.
+The current PR-48 adds a real frozen SABIO PARAMETER identity path into a
+complete loader-fidelitous curator-authored target and promotion plan against a
+copied registry only. Product maps remain blocked pending a destination
+contract. CURATION-001 remains partial for nonidentity conversion and
+non-parameter source records. This status does not claim scientific validation
+or automatic simulation authorization.
 
 ## CURATION-001 acceptance criteria
 

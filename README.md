@@ -129,6 +129,10 @@ basic kinetics layer:
   reviewed registry-plan bytes on copied or explicitly selected registries,
   with strict next-patch versioning, full-root drift detection, durable curator
   audit provenance, rollback, and no automatic simulation or validation claim;
+- an identity-only, PARAMETER-specific CURATION-001 authoring bridge that binds
+  an explicitly accepted in-memory source result to a complete curator-authored
+  production `ParameterRecord`, verifies exact loader fidelity and source
+  provenance, and returns a promotion-plan-compatible result without applying it;
 - a registry-backed extracellular enzyme-chain assembler for ordered linear
   chains of two or more implemented process steps, whose stoichiometry,
   conserved quantities, entities, modifiers, and output labels come from
@@ -324,12 +328,81 @@ destination; product maps remain blocked as
 `unsupported_pending_destination_contract`. Production promotion does not
 authorize simulation, alter package version, or claim scientific validation.
 
-The current frozen SABIO-RK source path still cannot produce a
-loader-fidelitous, curator-authored production registry record without an
-explicit source-to-production schema/conversion workflow. No guessed
-conversion, default, or missing scientific field is permitted. CURATION-001
-therefore remains partial after PR-47. The bounded PR-48 follow-up is that
-curator-authored source-to-production registry-record bridge.
+After a curator explicitly completes and accepts an eligible PARAMETER source
+record as an in-memory `CurationResult`, author the separate production target
+without mutating or applying to a registry:
+
+```python
+from fungal_model import author_parameter_record, plan_registry_promotion
+
+accepted = accepted_review.accepted_records[0]
+source_identity = accepted.source_provenance
+authored = author_parameter_record(
+    accepted_review,
+    source_record_id="proposed_sabiork_parameter_618_35622_kcat_cellobiose",
+    parameter_record={
+        "record_id": "sabiork_reaction_618_kcat_cellobiose",
+        "name": "SABIO-RK Reaction 618 kcat for cellobiose",
+        "maturity": "literature_processed",
+        "provenance": {
+            "source_database": source_identity["source_database"],
+            "source_entry_ids": source_identity["source_entry_ids"],
+            "source_reaction_ids": source_identity["source_reaction_ids"],
+            "source_query": source_identity["source_query"],
+            "source_field": source_identity["source_field"],
+            "source_snapshot_path": source_identity["source_snapshot_path"],
+            "source_url": source_identity["source_url"],
+            "source_snapshot_sha256": source_identity["source_snapshot_sha256"],
+            "curator": "Researcher Name",
+            "curation_date": "2026-07-14",
+            "source_reaction_id": "618",
+            "selected_kinlaw_entry_id": "35622",
+        },
+        "notes": "Identity transcription only; not validated science.",
+        "parameter_symbol": "kcat_cellobiose",
+        "process_type": "homogeneous_michaelis_menten",
+        "enzyme_class": "beta_glucosidase",
+        "substrate_class": "cellobiose",
+        "fungus_id": "sabiork_beta_glucosidase_source",
+        "substrate_id": "cellobiose",
+        "environment_id": "sabiork_reaction_618_selected_conditions",
+        "value": {
+            "kind": "exact",
+            "units": "s^(-1)",
+            "value": 0.13,
+            "lower": None,
+            "upper": None,
+            "distribution": None,
+            "parameters": {},
+            "source": "SABIO-RK Reaction 618 selected kinetic law",
+            "confidence_level": "curator_accepted_identity_transcription_not_validation",
+            "notes": "Not validation, calibration, or simulation authorization.",
+        },
+        "range_scope": "single_source_entry",
+        "range_interpretation": "exact_identity_transcription_not_uncertainty",
+        "allowed_use": "registry_storage_only_no_simulation_authorization",
+    },
+    registry_index="path/to/copied_registry/registry_index.yml",
+)
+authored.write("data/proposed_records/sabiork/authored_parameter")
+plan = plan_registry_promotion(
+    authored,
+    registry_index="path/to/copied_registry/registry_index.yml",
+)
+```
+
+`author_parameter_record(...)` deliberately accepts only a validated in-memory
+`CurationResult`; a reusable public written-curation loader is deferred. The
+specialized result uses the existing deterministic, checksummed curation writer,
+and either that written bundle or the in-memory result is consumable by
+`plan_registry_promotion(...)` after authoring-digest, loader, registry-context,
+and selector revalidation. The source/acceptance evidence remains audit
+metadata; only the complete curator-authored `ParameterRecord` is the
+loader/promotion target. Original, converted, and target numeric values must be
+finite floats and type-exactly equal, units must be identical, and
+`conversion_method` must be `identity_no_conversion`. Nonidentity conversions,
+other record types, automatic apply, scientific validation, and simulation
+authorization remain explicitly unsupported, so CURATION-001 remains partial.
 
 ## Run A Virtual Experiment
 
@@ -699,11 +772,14 @@ write rechecks the immutable plan digest before touching its destination. The
 top-level `apply_registry_promotion(...)` API now supplies the separately
 reviewed digest-confirmed transaction, exact-next-patch version policy,
 full-root staging, single-writer lock, rollback, and structured apply result.
-This completes the bounded transactional-apply contract once PR-47 merges,
+This completed the bounded transactional-apply contract when PR-47 merged as
+PR #62 (`b1ebb860`),
 without making promoted records scientifically validated or automatically
-simulation-authorized. CURATION-001 remains partial until a real frozen source
-record can be explicitly curated into a loader-fidelitous production record
-without guessed conversions or defaults.
+simulation-authorized. The top-level `author_parameter_record(...)` API now
+adds the separate PARAMETER-only, identity-only source-to-production bridge over
+an accepted in-memory curation result. Its checksummed output remains planning
+input, not an apply instruction. CURATION-001 remains partial for nonidentity
+conversion and non-parameter source records.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
 The current library provides factories for first-order, mass-action,

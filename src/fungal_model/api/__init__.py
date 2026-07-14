@@ -7,6 +7,11 @@ from fungal_model.api.curation import (
     review_source_proposal,
 )
 from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid, environment_grid
+from fungal_model.api.parameter_record_authoring import (
+    CuratorAuthoredParameterResult,
+    ParameterRecordAuthoringError,
+    author_parameter_record,
+)
 from fungal_model.api.registry_promotion import (
     ProspectiveRegistryFile,
     RegistryPromotionAppliedFile,
@@ -36,12 +41,14 @@ __all__ = [
     "CurationDecision",
     "CurationError",
     "CurationResult",
+    "CuratorAuthoredParameterResult",
     "DegradationScreenResult",
     "AVAILABLE_SOURCE_PROVIDERS",
     "EnvironmentCase",
     "EnvironmentGrid",
     "environment_grid",
     "apply_registry_promotion",
+    "author_parameter_record",
     "plan_registry_promotion",
     "ProspectiveRegistryFile",
     "RegistryPromotionAppliedFile",
@@ -51,6 +58,7 @@ __all__ = [
     "RegistryPromotionPlan",
     "RegistryPromotionPlanError",
     "RegistryPromotionPlanWriteResult",
+    "ParameterRecordAuthoringError",
     "review_source_proposal",
     "source_proposal",
     "SourceProviderError",

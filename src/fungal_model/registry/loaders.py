@@ -67,6 +67,12 @@ def load_registry(path: str | Path) -> FungModRegistry:
         raise
 
 
+def load_parameter_record_mapping(data: Mapping[str, Any]) -> ParameterRecord:
+    """Load one parameter mapping through the production registry factory."""
+
+    return _parameter_record(data)
+
+
 def _load_records(
     index_path: Path,
     records: Mapping[Any, Any],
@@ -429,5 +435,6 @@ def _load_yaml(path: Path) -> Any:
 
 __all__ = [
     "RegistryLoadError",
+    "load_parameter_record_mapping",
     "load_registry",
 ]

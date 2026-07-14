@@ -3,7 +3,7 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status after PR-46 merged as PR #61 (`2b6c639`), with PR-47 selected:
+Scoped status after PR-47 merged as PR #62 (`b1ebb860`), with PR-48 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -12,8 +12,9 @@ BIO-READINESS-LITE: complete for the proposal template, validator, and tests.
 BIO-002: complete for arbitrary-length linear enzyme-chain assembly; branching
 and cycles remain unsupported.
 CASE-001: complete once PR-02 is merged for the researcher-facing named API path.
-CURATION-001: partial after the current PR-47 transactional apply contract; a
-curator-authored source-to-production registry-record bridge is still missing.
+CURATION-001: partial after PR-47 transactional apply and the current PR-48
+PARAMETER-only identity-authoring bridge; nonidentity conversions and
+non-parameter source records remain unsupported.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
@@ -196,7 +197,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-47: digest-confirmed transactional registry apply**.
+Current next PR: **PR-48: identity-only curator-authored ParameterRecord bridge**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -265,7 +266,7 @@ exact-duplicate/no-op, conflict, and blocked/unsupported records, and emits
 exact prospective YAML plus hashes/digests. PR-46 is complete after PR #61
 merged as `2b6c639` and has no registry mutation path of its own.
 
-The selected PR-47 work adds `apply_registry_promotion(...)` over intentional
+The completed PR-47 work adds `apply_registry_promotion(...)` over intentional
 plan schema `2.0.0`. Addable prospective records now carry deterministic
 `provenance.fungmod_curation` audit metadata, and written schema `1.0.0` plans
 remain preview-only and must be regenerated before apply. Apply requires the
@@ -279,16 +280,23 @@ package version, solver/biology behavior, validation data, simulation
 authorization, or scientific-validation claim is added. Applicability is true
 only for at least one addable record with no conflict or blocked candidate;
 source identities shared by target and curator provenance must agree exactly.
-The bounded apply contract completes once PR-47 merges, but CURATION-001 stays
-partial because the real frozen source path cannot yet yield a
-loader-fidelitous curator-authored production record.
+The bounded apply contract is complete after PR #62 merged as `b1ebb860`.
+The current PR-48 adds the source-to-production `author_parameter_record(...)`
+bridge for one explicitly accepted in-memory PARAMETER curation result and one complete curator-authored
+production mapping. It accepts identity conversion only, rechecks exact
+source/original/converted/target value and units, frozen-source SHA256, complete
+source and curator provenance, conservative maturity/allowed-use/range policy,
+loader round-trip fidelity, selector compatibility, and post-result mutation.
+The specialized result uses the existing checksummed curation writer and is
+consumable by `plan_registry_promotion(...)` after revalidation. It does not
+accept written source curation, infer or convert values, mutate/apply a
+registry, authorize simulation, or claim validation. CURATION-001 stays
+partial for nonidentity conversion and non-parameter source records.
 
-Recommended next task after PR-47: PR-48 CURATION-001 curator-authored
-source-to-production registry-record bridge/schema workflow. Bridge a real
-frozen source proposal into the exact production loader schema only through
-explicit curator-authored fields and conversion metadata, with no guessed
-conversion, fallback/default, invented science, automatic promotion,
-simulation authorization, validation data, calibration, or empirical claim.
+Recommended next task after PR-48: PR-49 reusable public checksum-validated
+curation-bundle loader. Reuse the existing manifest/checksum/path contract
+before considering written curation input for specialized authoring APIs; add
+no registry mutation, scientific transformation, or broader record claim.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer
