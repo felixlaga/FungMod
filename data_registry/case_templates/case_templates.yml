@@ -398,6 +398,19 @@ records:
               catalytic_parameters: []
               adsorption_parameters: []
               parameters: []
+      state_species:
+        solid_cellulose_equivalent_concentration:
+          species: cellulose_film_generic
+          entity_type: substrate
+        cellobiose_concentration:
+          species: cellobiose
+          entity_type: substrate
+        cellulase_concentration:
+          species: cellulase_generic
+          entity_type: enzyme
+        beta_glucosidase_concentration:
+          species: beta_glucosidase
+          entity_type: enzyme
       parameter_record_ids:
         solid_substrate_initial_concentration: bio002_initial_solid_cellulose_equivalent_concentration
         cellulase_initial_concentration: bio002_cellulase_initial_concentration
@@ -407,6 +420,74 @@ records:
         accessible_surface_area: bio002_cellulose_accessible_surface_area
         km: sabiork_reaction_618_Km_cellobiose
         kcat: sabiork_reaction_618_kcat_cellobiose
+      parameter_role_contracts:
+        solid_substrate_initial_concentration:
+          kind: initial_state
+          parameter_symbol: bio002_initial_solid_cellulose_equivalent_concentration
+          record_process_type: extracellular_enzyme_chain
+          enzyme_class: null
+          substrate_class: cellulose_film_generic
+          fungus_id: null
+          substrate_id: cellulose_film_generic
+          environment_id: sabiork_reaction_618_selected_conditions
+        cellulase_initial_concentration:
+          kind: initial_state
+          parameter_symbol: bio002_cellulase_initial_concentration
+          record_process_type: surface_catalysis
+          enzyme_class: cellulase_generic
+          substrate_class: cellulose_film_generic
+          fungus_id: null
+          substrate_id: cellulose_film_generic
+          environment_id: sabiork_reaction_618_selected_conditions
+        beta_glucosidase_initial_concentration:
+          kind: initial_state
+          parameter_symbol: bio002_beta_glucosidase_initial_concentration
+          record_process_type: extracellular_enzyme_chain
+          enzyme_class: beta_glucosidase
+          substrate_class: cellobiose
+          fungus_id: null
+          substrate_id: cellobiose
+          environment_id: sabiork_reaction_618_selected_conditions
+        surface_rate_constant:
+          kind: process_parameter
+          parameter_symbol: bio002_cellulose_to_cellobiose_surface_rate
+          enzyme_class: cellulase_generic
+          substrate_class: cellulose_film_generic
+          fungus_id: null
+          substrate_id: cellulose_film_generic
+          environment_id: sabiork_reaction_618_selected_conditions
+        adsorption_constant:
+          kind: process_parameter
+          parameter_symbol: bio002_cellulase_adsorption_constant
+          enzyme_class: cellulase_generic
+          substrate_class: cellulose_film_generic
+          fungus_id: null
+          substrate_id: cellulose_film_generic
+          environment_id: sabiork_reaction_618_selected_conditions
+        accessible_surface_area:
+          kind: process_parameter
+          parameter_symbol: bio002_cellulose_accessible_surface_area
+          enzyme_class: cellulase_generic
+          substrate_class: cellulose_film_generic
+          fungus_id: null
+          substrate_id: cellulose_film_generic
+          environment_id: sabiork_reaction_618_selected_conditions
+        km:
+          kind: process_parameter
+          parameter_symbol: Km_cellobiose
+          enzyme_class: beta_glucosidase
+          substrate_class: cellobiose
+          fungus_id: sabiork_beta_glucosidase_source
+          substrate_id: cellobiose
+          environment_id: sabiork_reaction_618_selected_conditions
+        kcat:
+          kind: process_parameter
+          parameter_symbol: kcat_cellobiose
+          enzyme_class: beta_glucosidase
+          substrate_class: cellobiose
+          fungus_id: sabiork_beta_glucosidase_source
+          substrate_id: cellobiose
+          environment_id: sabiork_reaction_618_selected_conditions
       product_maps:
         - id: bio002_cellulose_to_cellobiose_map
           name: BIO-002 cellulose-equivalent to cellobiose release map

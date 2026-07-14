@@ -13,6 +13,7 @@ from fungal_model.sources.sabiork import (
     PROPOSAL_STATUS,
     REVIEW_ONLY_ALLOWED_USE,
     SabioRKSource,
+    frozen_source_urls,
 )
 from fungal_model.sources.sabiork.fetch import HTTPResponseSnapshot
 
@@ -29,6 +30,10 @@ RAW_DIR = (
 REACTION_618_EXPORT = RAW_DIR / "kinlaw_entries_reaction_618.json"
 MINIMAL_EXPORT = ROOT / "tests" / "fixtures" / "sabiork_reaction_618_export_minimal.json"
 DATA_REGISTRY = ROOT / "data_registry"
+REACTION_618_SOURCE_URL = (
+    "https://sabio.h-its.org/export-api/sabio/kinlaw-entry/json?"
+    "q=SabioReactionID%3A618&page=1&pageSize=1000"
+)
 
 
 def test_minimal_top_level_sabiork_call_uses_frozen_snapshot_without_key() -> None:
@@ -38,6 +43,22 @@ def test_minimal_top_level_sabiork_call_uses_frozen_snapshot_without_key() -> No
     assert proposal.source_query == "SabioReactionID:618"
     assert proposal.source_snapshot_path == str(REACTION_618_EXPORT)
     assert proposal.reaction_records
+    parameter = next(
+        item
+        for item in proposal.proposed_records()["parameter_records"]
+        if item["record_id"] == "proposed_sabiork_parameter_618_35622_kcat_cellobiose"
+    )
+    assert parameter["provenance"]["source_url"] == REACTION_618_SOURCE_URL
+    assert parameter["provenance"]["source_urls"] == [REACTION_618_SOURCE_URL]
+    assert parameter["parameter_role"] == "kcat"
+    km_parameter = next(
+        item
+        for item in proposal.proposed_records()["parameter_records"]
+        if item["parameter_symbol"] == "Km_cellobiose"
+        and item["provenance"]["source_entry_ids"] == ["35622"]
+    )
+    assert km_parameter["parameter_role"] == "km"
+    assert frozen_source_urls(proposal.source_snapshot_path) == (REACTION_618_SOURCE_URL,)
     assert fungal_model.source_proposal is source_proposal
     assert "source_proposal" in fungal_model.__all__
 

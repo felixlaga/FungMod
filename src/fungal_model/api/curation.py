@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
 import json
 import math
 import shutil
@@ -744,31 +745,50 @@ def _write_bundle(root: Path, result: CurationResult) -> None:
     paths = _artifact_paths(root)
     _write_csv(paths["eligible_records"], result.eligible_records)
     _write_csv(paths["excluded_records"], result.excluded_records)
-    _write_yaml(paths["proposed_registry_records"], _records_payload("proposed", result.records, result))
-    _write_yaml(paths["accepted_registry_records"], _records_payload("accepted", result.accepted_records, result))
-    _write_yaml(paths["rejected_registry_records"], _records_payload("rejected", result.rejected_records, result))
-    paths["curation_report"].write_text(_report_markdown(result), encoding="utf-8")
+    _write_yaml(
+        paths["proposed_registry_records"],
+        curation_records_payload("proposed", result.records, result),
+    )
+    _write_yaml(
+        paths["accepted_registry_records"],
+        curation_records_payload("accepted", result.accepted_records, result),
+    )
+    _write_yaml(
+        paths["rejected_registry_records"],
+        curation_records_payload("rejected", result.rejected_records, result),
+    )
+    paths["curation_report"].write_text(render_curation_report(result), encoding="utf-8")
 
     checksums = {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for key, path in paths.items()
         if key != "curation_manifest"
     }
-    manifest = {
-        "kind": CURATION_MANIFEST_KIND,
-        "schema_version": CURATION_SCHEMA_VERSION,
-        "source_query": result.source_query,
-        "source_snapshot_path": result.source_snapshot_path,
-        "summary": result.summary(),
-        "files": checksums,
-        "allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
-        "production_registry_mutated": False,
-        "scientific_validation_claimed": False,
-    }
+    manifest = curation_manifest_payload(result, checksums)
     paths["curation_manifest"].write_text(
         json.dumps(_canonicalize(manifest), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def curation_manifest_payload(
+    result: CurationResult,
+    checksums: Mapping[str, str],
+) -> Mapping[str, Any]:
+    """Build the exact deterministic manifest written for a curation result."""
+
+    return {
+        "kind": CURATION_MANIFEST_KIND,
+        "schema_version": CURATION_SCHEMA_VERSION,
+        "source_query": result.source_query,
+        "source_snapshot_path": result.source_snapshot_path,
+        "proposal_limitations": list(result.proposal_limitations),
+        "summary": result.summary(),
+        "files": dict(checksums),
+        "allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
+        "production_registry_mutated": False,
+        "scientific_validation_claimed": False,
+    }
 
 
 def _artifact_paths(root: Path) -> dict[str, Path]:
@@ -783,11 +803,13 @@ def _artifact_paths(root: Path) -> dict[str, Path]:
     }
 
 
-def _records_payload(
+def curation_records_payload(
     bundle_status: str,
     records: Sequence[CurationRecord],
     result: CurationResult,
 ) -> Mapping[str, Any]:
+    """Build one exact deterministic decision-record payload."""
+
     return {
         "kind": "fungmod_curation_decision_records",
         "schema_version": CURATION_SCHEMA_VERSION,
@@ -795,6 +817,7 @@ def _records_payload(
         "allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
         "source_query": result.source_query,
         "source_snapshot_path": result.source_snapshot_path,
+        "proposal_limitations": list(result.proposal_limitations),
         "production_registry_promotion": False,
         "records": [record.to_dict() for record in records],
     }
@@ -805,31 +828,49 @@ def _write_yaml(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def _write_csv(path: Path, records: Sequence[CurationRecord]) -> None:
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=_CSV_FIELDS)
-        writer.writeheader()
-        for record in records:
-            provenance = record.source_provenance
-            writer.writerow(
-                {
-                    "record_type": record.record_type,
-                    "record_id": record.record_id,
-                    "classification": record.classification,
-                    "decision": record.decision,
-                    "explicit_decision": str(record.explicit_decision).lower(),
-                    "missing_fields": "; ".join(record.missing_fields),
-                    "reasons": "; ".join(record.reasons),
-                    "source_database": provenance.get("source_database", ""),
-                    "source_entry_ids": "; ".join(
-                        sorted(str(value) for value in provenance.get("source_entry_ids", []))
-                    ),
-                    "source_snapshot_path": provenance.get("source_snapshot_path", ""),
-                    "allowed_use": record.allowed_use,
-                }
-            )
+    path.write_text(render_curation_records_csv(records), encoding="utf-8")
 
 
-def _report_markdown(result: CurationResult) -> str:
+def render_curation_records_csv(records: Sequence[CurationRecord]) -> str:
+    """Render one deterministic eligible/excluded decision table."""
+
+    payload = curation_records_csv_payload(records)
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=payload["fieldnames"])
+    writer.writeheader()
+    writer.writerows(payload["rows"])
+    return output.getvalue()
+
+
+def curation_records_csv_payload(records: Sequence[CurationRecord]) -> Mapping[str, Any]:
+    """Build the exact header and rows for one curation decision table."""
+
+    rows = []
+    for record in records:
+        provenance = record.source_provenance
+        rows.append(
+            {
+                "record_type": record.record_type,
+                "record_id": record.record_id,
+                "classification": record.classification,
+                "decision": record.decision,
+                "explicit_decision": str(record.explicit_decision).lower(),
+                "missing_fields": "; ".join(record.missing_fields),
+                "reasons": "; ".join(record.reasons),
+                "source_database": provenance.get("source_database", ""),
+                "source_entry_ids": "; ".join(
+                    sorted(str(value) for value in provenance.get("source_entry_ids", []))
+                ),
+                "source_snapshot_path": provenance.get("source_snapshot_path", ""),
+                "allowed_use": record.allowed_use,
+            }
+        )
+    return {"fieldnames": list(_CSV_FIELDS), "rows": rows}
+
+
+def render_curation_report(result: CurationResult) -> str:
+    """Render the deterministic human-readable report for a curation result."""
+
     summary = result.summary()
     lines = [
         "# CURATION-001 Proposal Review",
@@ -872,6 +913,23 @@ def _report_markdown(result: CurationResult) -> str:
     lines.extend(["", "## Proposal Limitations", ""])
     lines.extend(f"- {limitation}" for limitation in result.proposal_limitations)
     return "\n".join(lines) + "\n"
+
+
+def validate_curation_report_limitations(
+    report_text: str,
+    proposal_limitations: Sequence[str],
+) -> None:
+    """Require the deterministic report's final limitations section to match exactly."""
+
+    if not isinstance(report_text, str) or not _nonempty_string_sequence(proposal_limitations):
+        raise CurationError("Curation report and proposal limitations must be explicit text.")
+    expected = "## Proposal Limitations\n\n" + "\n".join(
+        f"- {limitation}" for limitation in proposal_limitations
+    ) + "\n"
+    if not report_text.endswith(expected):
+        raise CurationError(
+            "Curation report proposal limitations disagree with the machine-readable bundle envelope."
+        )
 
 
 def _replace_directory(staging: Path, destination: Path) -> None:
@@ -1001,5 +1059,11 @@ __all__ = [
     "CurationRecord",
     "CurationResult",
     "CurationWriteResult",
+    "curation_manifest_payload",
+    "curation_records_csv_payload",
+    "curation_records_payload",
+    "render_curation_records_csv",
+    "render_curation_report",
     "review_source_proposal",
+    "validate_curation_report_limitations",
 ]

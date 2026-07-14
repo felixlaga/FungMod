@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -9,6 +10,7 @@ import pytest
 import yaml
 
 from fungal_model.registry import load_registry
+from fungal_model.registry.records import PARAMETER_ALLOWED_USE_STORAGE_ONLY
 from fungal_model.screening import ModelabilityReport, assess_modelability
 
 
@@ -66,6 +68,66 @@ def test_exact_only_case_is_modelable(tmp_path: Path) -> None:
     assert _has_item(report.known, "parameter", "k_surface_exact")
     assert not report.uncertain
     assert not report.missing
+
+
+@pytest.mark.parametrize("mode", ["exploratory", "scientific", "toy"])
+def test_storage_only_parameter_is_mode_independently_incompatible(
+    tmp_path: Path,
+    mode: str,
+) -> None:
+    registry = _registry_with_required_parameters(tmp_path, ["k_surface_exact"])
+    record = registry.parameters["toy_param_k_surface_exact"]
+    registry.parameters[record.record_id] = replace(
+        record,
+        maturity="literature_processed",
+        allowed_use=PARAMETER_ALLOWED_USE_STORAGE_ONLY,
+    )
+
+    report = assess_modelability(
+        fungus_id="toy_fungus_alpha",
+        substrate_id="toy_cellulose_like_solid",
+        environment_id="toy_lab_environment",
+        registry=registry,
+        mode=cast(Any, mode),
+    )
+
+    assert report.status == "underparameterized"
+    assert any(
+        item.item_id == "k_surface_exact" and "storage-only" in item.message
+        for item in report.incompatible
+    )
+
+
+@pytest.mark.parametrize(
+    ("mode", "allowed_use"),
+    [
+        ("exploratory", "exploratory_simulation_only_not_literature_curated"),
+        ("scientific", "scientific_or_exploratory_when_all_other_inputs_are_valid"),
+    ],
+)
+def test_other_explicit_allowed_use_values_keep_existing_mode_behavior(
+    tmp_path: Path,
+    mode: str,
+    allowed_use: str,
+) -> None:
+    registry = _registry_with_required_parameters(tmp_path, ["k_surface_exact"])
+    record = registry.parameters["toy_param_k_surface_exact"]
+    registry.parameters[record.record_id] = replace(
+        record,
+        maturity="literature_processed",
+        allowed_use=allowed_use,
+    )
+
+    report = assess_modelability(
+        fungus_id="toy_fungus_alpha",
+        substrate_id="toy_cellulose_like_solid",
+        environment_id="toy_lab_environment",
+        registry=registry,
+        mode=cast(Any, mode),
+    )
+
+    assert report.status == "modelable"
+    assert _has_item(report.known, "parameter", "k_surface_exact")
 
 
 def test_range_case_is_exploratory(tmp_path: Path) -> None:

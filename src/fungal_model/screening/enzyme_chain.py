@@ -8,20 +8,29 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import yaml
 
 from fungal_model.api.metrics import threshold_crossing_time
 from fungal_model.io.model_config import ModelConfig
-from fungal_model.registry.records import CaseTemplateRecord, ParameterRecord
+from fungal_model.registry.records import (
+    CaseTemplateRecord,
+    ParameterRecord,
+    ParameterRecordSelectionMode,
+)
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.results import SimulationResult
 from fungal_model.screening.template_environment_modifiers import (
     ENVIRONMENT_MODIFIER_TYPES,
     build_template_environment_entity,
     build_template_environment_modifier,
+)
+from fungal_model.screening.parameter_resolution import (
+    ExactTemplateParameterError,
+    exact_template_compatibility,
+    resolve_exact_template_parameter_records,
 )
 from fungal_model.workflows import run_configured_model
 
@@ -233,8 +242,6 @@ def _chain_spec(
     template = _chain_template(registry, template_id)
     metadata = _chain_metadata(template)
     state_roles = dict(template.state_roles)
-    parameter_records = _parameter_records(registry, metadata)
-    state_units = _state_units(template, parameter_records=parameter_records)
     product_maps = _mapping_sequence(metadata.get("product_maps"), field_name="process_state_metadata.product_maps")
     processes = _mapping_sequence(metadata.get("process_templates"), field_name="process_state_metadata.process_templates")
     resolved_environment_id = _chain_environment_id(
@@ -243,14 +250,26 @@ def _chain_spec(
         requires_environment=_process_templates_require_environment(processes),
         template_id=template.case_template_id,
     )
+    raw_mode = _metadata_text(metadata, "config_mode", "exploratory")
+    if raw_mode not in {"exploratory", "scientific", "toy"}:
+        raise EnzymeChainAssemblyError(
+            f"Template {template.case_template_id!r} has unsupported config_mode {raw_mode!r}."
+        )
     _validate_product_map_ids(template, product_maps)
-    _validate_process_templates(template, processes, state_roles=state_roles, parameter_records=parameter_records)
     topology = _linear_chain_topology(
         template=template,
         processes=processes,
         product_maps=product_maps,
         state_roles=state_roles,
     )
+    parameter_records = _parameter_records(
+        registry,
+        template,
+        environment_id=resolved_environment_id,
+        mode=cast(ParameterRecordSelectionMode, raw_mode),
+    )
+    state_units = _state_units(template, parameter_records=parameter_records)
+    _validate_process_templates(template, processes, state_roles=state_roles, parameter_records=parameter_records)
     conservation = _conservation_spec(
         template=template,
         metadata=metadata,
@@ -304,25 +323,35 @@ def _chain_metadata(template: CaseTemplateRecord) -> Mapping[str, Any]:
 
 def _parameter_records(
     registry: FungModRegistry,
-    metadata: Mapping[str, Any],
+    template: CaseTemplateRecord,
+    *,
+    environment_id: str | None,
+    mode: ParameterRecordSelectionMode,
 ) -> dict[str, ParameterRecord]:
-    record_ids = _mapping(metadata.get("parameter_record_ids"), field_name="process_state_metadata.parameter_record_ids")
-    records: dict[str, ParameterRecord] = {}
-    for role, record_id in record_ids.items():
-        role_text = str(role)
-        try:
-            record = registry.parameters[str(record_id)]
-        except KeyError as exc:
-            raise EnzymeChainAssemblyError(f"Unknown parameter record for role {role_text!r}: {record_id}") from exc
-        if not record.value.is_exact:
-            raise EnzymeChainAssemblyError(
-                f"Template parameter role {role_text!r} requires an exact parameter record for deterministic assembly; "
-                f"{record.record_id!r} has ValueSpec kind {record.value.kind!r}."
-            )
-        if record.value.value is None or record.value.units is None:
-            raise EnzymeChainAssemblyError(f"Parameter record {record.record_id!r} must define value and units.")
-        records[role_text] = record
-    return records
+    try:
+        compatibility = exact_template_compatibility(registry, template)
+        records = resolve_exact_template_parameter_records(
+            registry=registry,
+            template=template,
+            compatibility=compatibility,
+            required_roles=(
+                tuple(compatibility.parameter_roles)
+                if compatibility is not None
+                else tuple(template.process_state_metadata.get("parameter_record_ids", ()))
+            ),
+            environment_id=environment_id,
+            mode=mode,
+            value_requirement="exact",
+        )
+    except ExactTemplateParameterError as exc:
+        raise EnzymeChainAssemblyError(
+            f"Template {template.case_template_id!r} exact parameter mapping is invalid: {exc}"
+        ) from exc
+    if records is None:
+        raise EnzymeChainAssemblyError(
+            f"Template {template.case_template_id!r} must define parameter_record_ids."
+        )
+    return dict(records)
 
 
 def _state_units(

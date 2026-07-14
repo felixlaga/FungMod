@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import csv
+import json
 import shutil
 import socket
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pytest
 import yaml
@@ -12,7 +14,12 @@ import yaml
 from fungal_model import VirtualExperiment, environment_grid, virtual_experiment
 from fungal_model.api import VirtualExperimentError
 from fungal_model.api.report import write_virtual_experiment_report
-from fungal_model.registry import AmbiguousResolutionError, ResolutionError
+from fungal_model.registry import AmbiguousResolutionError, ResolutionError, load_registry
+from fungal_model.registry.records import (
+    PARAMETER_ALLOWED_USE_SCIENTIFIC,
+    PARAMETER_ALLOWED_USE_STORAGE_ONLY,
+)
+from fungal_model.screening import assess_modelability, build_model_config_from_registry_case
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -225,9 +232,273 @@ def test_scientific_mode_rejects_toy_scientific_inputs(tmp_path: Path) -> None:
     report = study.preflight(mode="scientific")[0]
 
     assert report.status == "underparameterized"
-    assert any("toy or synthetic" in item.message for item in report.incompatible)
-    with pytest.raises(VirtualExperimentError, match="toy or synthetic"):
+    assert any("does not exactly authorize scientific" in item.message for item in report.incompatible)
+    with pytest.raises(VirtualExperimentError, match="does not exactly authorize scientific"):
         study.simulate(mode="scientific", output_dir=tmp_path / "toy_blocked", quicklook=False)
+
+
+@pytest.mark.parametrize("mode", ["exploratory", "scientific"])
+def test_storage_only_parameter_blocks_virtual_experiment_simulation(
+    tmp_path: Path,
+    mode: str,
+) -> None:
+    registry = _modelable_toy_registry(tmp_path)
+    parameters_path = registry / "parameters" / "parameter_records.yml"
+    payload = _yaml_mapping(parameters_path)
+    records = cast(list[dict[str, Any]], payload["records"])
+    target = next(item for item in records if item["record_id"] == "toy_param_k_surface_exact")
+    target["maturity"] = "literature_processed"
+    target["allowed_use"] = PARAMETER_ALLOWED_USE_STORAGE_ONLY
+    parameters_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    study = virtual_experiment(
+        fungi="toy_fungus_alpha",
+        substrates="toy_cellulose_like_solid",
+        environments="toy_lab_environment",
+        registry=registry / "registry_index.yml",
+    )
+
+    report = study.preflight(mode=cast(Any, mode))[0]
+
+    assert report.status == "underparameterized"
+    assert any("storage-only" in item.message for item in report.incompatible)
+    with pytest.raises(VirtualExperimentError, match="storage-only"):
+        study.simulate(
+            mode=cast(Any, mode),
+            output_dir=tmp_path / f"storage_only_{mode}",
+            quicklook=False,
+        )
+
+
+def test_preflight_and_exploratory_runtime_choose_the_same_authorized_exact_record(
+    tmp_path: Path,
+) -> None:
+    registry = _modelable_toy_registry(tmp_path)
+    parameters_path = registry / "parameters" / "parameter_records.yml"
+    payload = _yaml_mapping(parameters_path)
+    records = cast(list[dict[str, Any]], payload["records"])
+    storage_only = next(
+        item for item in records if item["record_id"] == "toy_param_k_surface_exact"
+    )
+    authorized = deepcopy(storage_only)
+    authorized["record_id"] = "toy_param_k_surface_exact_authorized"
+    authorized["name"] = "Authorized exact surface rate selection fixture"
+    storage_only["maturity"] = "literature_processed"
+    storage_only["allowed_use"] = PARAMETER_ALLOWED_USE_STORAGE_ONLY
+    records.append(authorized)
+    parameters_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    study = virtual_experiment(
+        fungi="toy_fungus_alpha",
+        substrates="toy_cellulose_like_solid",
+        environments="toy_lab_environment",
+        registry=registry / "registry_index.yml",
+    )
+
+    report = study.preflight(mode="exploratory")[0]
+    selected = next(item for item in report.known if item.item_id == "k_surface_exact")
+    assert selected.details["record_id"] == authorized["record_id"]
+
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=4,
+        output_dir=tmp_path / "authorized_selection",
+        quicklook=False,
+    )
+    sampled = next(row for row in result.sampled_parameters() if row["symbol"] == "k_surface_exact")
+    assert sampled["source_record_id"] == authorized["record_id"]
+    assert sampled["source_record_id"] != storage_only["record_id"]
+
+
+@pytest.mark.parametrize("mode", ["exploratory", "scientific"])
+def test_maturity_tie_selection_agrees_across_preflight_runtime_and_outputs(
+    tmp_path: Path,
+    mode: Literal["exploratory", "scientific"],
+) -> None:
+    registry = _modelable_toy_registry(tmp_path)
+    parameters_path = registry / "parameters" / "parameter_records.yml"
+    payload = _yaml_mapping(parameters_path)
+    records = cast(list[dict[str, Any]], payload["records"])
+    required_ids = {
+        "toy_param_k_surface_exact",
+        "toy_param_k_ads_exact",
+        "toy_param_A_surface_exact",
+    }
+    for record in records:
+        if record["record_id"] in required_ids:
+            record["maturity"] = "calibrated"
+            record["allowed_use"] = PARAMETER_ALLOWED_USE_SCIENTIFIC
+    lower_maturity = next(
+        record for record in records if record["record_id"] == "toy_param_k_surface_exact"
+    )
+    preferred = deepcopy(lower_maturity)
+    lower_maturity["maturity"] = "literature_processed"
+    preferred["record_id"] = "calibrated_selection_tie"
+    preferred["name"] = "Calibrated-maturity ranking tie test fixture"
+    records.append(preferred)
+    parameters_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    study = virtual_experiment(
+        fungi="toy_fungus_alpha",
+        substrates="toy_cellulose_like_solid",
+        environments="toy_lab_environment",
+        registry=registry / "registry_index.yml",
+    )
+
+    preflight = study.preflight(mode=mode)[0]
+    selected = next(item for item in preflight.known if item.item_id == "k_surface_exact")
+    assert selected.details["record_id"] == preferred["record_id"]
+
+    result = study.simulate(
+        mode=mode,
+        n_samples=1,
+        seed=4,
+        output_dir=tmp_path / f"maturity_tie_{mode}",
+        quicklook=False,
+    )
+    sampled = next(row for row in result.sampled_parameters() if row["symbol"] == "k_surface_exact")
+    assert sampled["source_record_id"] == preferred["record_id"]
+    mechanism = next(
+        row for row in result.mechanism_summary() if row["mechanism_kind"] == "process_law"
+    )
+    mechanism_provenance = json.loads(mechanism["provenance"])
+    assert mechanism_provenance["role_record_ids"]["surface_rate_constant"] == preferred["record_id"]
+    report = result.write_report().read_text(encoding="utf-8")
+    assert "## Active mechanisms and modifiers" in report
+    assert f"maturity `{mechanism['maturity']}`" in report
+    if mode == "exploratory":
+        config = build_model_config_from_registry_case(
+            fungus_id="toy_fungus_alpha",
+            substrate_id="toy_cellulose_like_solid",
+            environment_id="toy_lab_environment",
+            registry=load_registry(registry / "registry_index.yml"),
+            mode="toy",
+        )
+        configured = next(
+            parameter
+            for parameter in config.parameters[0].parameters
+            if parameter["symbol"] == "k_surface_exact"
+        )
+        assert configured["name"] == preferred["name"]
+
+
+@pytest.mark.parametrize("mode", ["exploratory", "scientific"])
+def test_more_specific_exploratory_competitor_is_filtered_only_for_scientific_mode(
+    tmp_path: Path,
+    mode: Literal["exploratory", "scientific"],
+) -> None:
+    registry = _registry_with_exact_enzyme_concentration(tmp_path)
+    parameters_path = registry / "parameters" / "parameter_records.yml"
+    payload = _yaml_mapping(parameters_path)
+    records = cast(list[dict[str, Any]], payload["records"])
+    records[:] = [
+        record
+        for record in records
+        if record["record_id"]
+        not in {
+            "sabiork_reaction_618_literature_range_Km_cellobiose",
+            "sabiork_reaction_618_literature_range_kcat_cellobiose",
+        }
+    ]
+    permitted = next(
+        record
+        for record in records
+        if record["record_id"] == "sabiork_reaction_618_kcat_cellobiose"
+    )
+    competitor = deepcopy(permitted)
+    permitted["fungus_id"] = None
+    competitor["record_id"] = "probe_more_specific_exploratory_kcat"
+    competitor["name"] = "More-specific exploratory kcat selection probe"
+    competitor["maturity"] = "exploratory_prior"
+    competitor["allowed_use"] = "exploratory_simulation_only_not_literature_curated"
+    competitor["provenance"] = {
+        **competitor["provenance"],
+        "exploratory_prior": True,
+        "source": "Test-owned selection probe; not scientific evidence.",
+    }
+    records.append(competitor)
+    parameters_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    study = virtual_experiment(
+        fungi="beta-glucosidase source",
+        substrates="cellobiose",
+        environments="30C_pH5_assay",
+        registry=registry / "registry_index.yml",
+    )
+    expected_id = (
+        permitted["record_id"] if mode == "scientific" else competitor["record_id"]
+    )
+
+    preflight = study.preflight(mode=mode)[0]
+    inspected = next(item for item in preflight.known if item.item_id == "kcat_cellobiose")
+    assert inspected.details["record_id"] == expected_id
+    result = study.simulate(
+        mode=mode,
+        n_samples=1,
+        seed=8,
+        output_dir=tmp_path / f"exploratory_competitor_{mode}",
+        quicklook=False,
+    )
+    sampled = next(row for row in result.sampled_parameters() if row["symbol"] == "kcat_cellobiose")
+    assert sampled["source_record_id"] == expected_id
+    mechanism = next(
+        row for row in result.mechanism_summary() if row["mechanism_kind"] == "process_law"
+    )
+    mechanism_provenance = json.loads(mechanism["provenance"])
+    assert mechanism_provenance["role_record_ids"]["kcat"] == expected_id
+    if mode == "scientific":
+        config = build_model_config_from_registry_case(
+            fungus_id=FUNGUS_ID,
+            substrate_id=SUBSTRATE_ID,
+            environment_id=ENVIRONMENT_ID,
+            registry=load_registry(registry / "registry_index.yml"),
+            mode="scientific",
+        )
+        assert config.raw["provenance"]["parameter_record_ids"]["kcat"] == expected_id
+
+
+def test_toy_preflight_and_deterministic_builder_share_exploratory_competitor_selection(
+    tmp_path: Path,
+) -> None:
+    registry = _modelable_toy_registry(tmp_path)
+    parameters_path = registry / "parameters" / "parameter_records.yml"
+    payload = _yaml_mapping(parameters_path)
+    records = cast(list[dict[str, Any]], payload["records"])
+    permitted = next(
+        record for record in records if record["record_id"] == "toy_param_k_surface_exact"
+    )
+    competitor = deepcopy(permitted)
+    permitted["enzyme_class"] = None
+    competitor["record_id"] = "probe_more_specific_exploratory_surface_rate"
+    competitor["name"] = "More-specific exploratory surface-rate selection probe"
+    competitor["maturity"] = "exploratory_prior"
+    competitor["provenance"] = {
+        **competitor["provenance"],
+        "exploratory_prior": True,
+    }
+    records.append(competitor)
+    parameters_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    loaded = load_registry(registry / "registry_index.yml")
+
+    preflight = assess_modelability(
+        fungus_id="toy_fungus_alpha",
+        substrate_id="toy_cellulose_like_solid",
+        environment_id="toy_lab_environment",
+        registry=loaded,
+        mode="toy",
+    )
+    inspected = next(item for item in preflight.known if item.item_id == "k_surface_exact")
+    assert inspected.details["record_id"] == competitor["record_id"]
+    config = build_model_config_from_registry_case(
+        fungus_id="toy_fungus_alpha",
+        substrate_id="toy_cellulose_like_solid",
+        environment_id="toy_lab_environment",
+        registry=loaded,
+        mode="toy",
+    )
+    configured = next(
+        parameter
+        for parameter in config.parameters[0].parameters
+        if parameter["symbol"] == "k_surface_exact"
+    )
+    assert configured["name"] == competitor["name"]
 
 
 def test_result_table_accessors_return_standard_tables(tmp_path: Path) -> None:

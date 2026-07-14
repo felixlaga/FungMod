@@ -26,16 +26,269 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-48 CURATION-001 Identity-Only Curator-Authored ParameterRecord Bridge
+
+Date: 2026-07-14
+
+Status: `current` for the bounded PARAMETER-only identity-authoring slice.
+PR-47 is `complete` after PR #62 merged as `b1ebb860`. CURATION-001 remains
+`partial` for nonidentity conversions and non-parameter source records.
+
+Completed in this pass:
+
+- Added top-level `author_parameter_record(...)` for a validated in-memory
+  `CurationResult`, one explicitly selected accepted PARAMETER source record,
+  one complete curator-authored production mapping, and an explicit registry
+  index. It returns `CuratorAuthoredParameterResult` without registry mutation
+  or apply.
+- Restricted conversion to `identity_no_conversion`. Original, source,
+  normalized, converted, and target values must be finite floats and
+  type-exactly equal; their units must be identical nonblank strings. Bools,
+  integers, numeric strings, nonfinite values, unknown/range/distribution
+  `ValueSpec` forms, and nonidentity methods fail closed.
+- Required complete accepted-curation evidence and exact source identity:
+  proposal record id, database, entry/reaction ids, query, source field,
+  snapshot path, exact one-URL or ordered multi-page `source_url`/`source_urls`
+  cardinality from frozen fetch metadata,
+  frozen snapshot SHA256, curator, date, reason, limitations, and
+  pending-promotion decision policy. Snapshot bytes and frozen URL evidence are
+  revalidated before authoring and planning.
+- Required every loader-emitted production field, all explicit null selectors,
+  every exact `ValueSpec` field, closed maturity/allowed-use/range policies,
+  a closed non-validation confidence label, exact source parameter
+  symbol/value/units, and full outer source/curator
+  provenance. Loader-dropped, synthesized, defaulted, or type-coerced mappings
+  are rejected by exact production-loader round-trip comparison.
+- Resolved effective enzyme/substrate classes from every non-null entity id,
+  rejected class/entity disagreements, and required exactly one process
+  compatibility record matching the effective combination and the explicit
+  source/curator runtime parameter-role key. The authored result records the
+  registry index identity, a complete registry-tree digest, resolved classes,
+  compatibility record id, and role key; it isolates
+  itself from later input mutation, and revalidates its authoring digest,
+  selectors, and planning registry when passed to `plan_registry_promotion(...)`.
+- Preserved the dual representation: accepted source/curation evidence is
+  durable `fungmod_parameter_bridge` audit metadata, while only the complete
+  curator-authored `ParameterRecord` is the loader and promotion target. The
+  specialized result reuses `CurationResult.write()` for deterministic,
+  checksummed output already consumable by promotion planning.
+- Persisted result-level proposal limitations in manifest, summary, all three
+  decision YAML payloads, both decision CSV tables, bridge audit, and the
+  deterministic full report. Specialized planning reconstructs every semantic
+  artifact from the authored result and requires exact headers, keys, and
+  values. Public SHA256 checksums prove internal bundle consistency, not
+  external curator identity or cryptographic authorship.
+- Closed the full authored summary key/value schema, including every mutation,
+  validation, simulation, provenance, and limitation claim, and compare it
+  against manifest, accepted payload, bridge audit, and report representations.
+  Removing removable workflow labels cannot downgrade a parameter candidate
+  whose intrinsic target/curation provenance still has the authoring shape;
+  planning rejects it, apply independently rejects a legacy/reconstructed
+  generic plan lacking the bridge audit, and the shared runtime authorization
+  predicate blocks an externally installed relabelled record.
+- Reconciled frozen SABIO metadata as one offline structure: page/request/URL
+  cardinality and immutable raw-page order, page numbers, URLs, regular files,
+  unique exact `raw/page_NNNN.json` identities, byte sizes, and checksums must
+  agree. Collapsed or path-aliased multi-page metadata fails.
+- Bound source query, source snapshot path, proposal limitations, every
+  original/source/normalized/converted/target value and unit representation,
+  singular and plural source aliases, acceptance evidence, and every closed
+  policy field into exact-key audit schemas and the result digest. Both
+  authoring-owned provenance keys and outer mutation/validation/simulation
+  safety claims are rejected on input. Curator-authored outer provenance now
+  uses a closed identity-only field set, so validation, calibration,
+  empirical-status, simulation-readiness, authorization, or nested claim
+  aliases cannot be added alongside the owned false safety audit.
+- Made simulation admission one centralized authorization-and-mode predicate
+  used by modelability and every simulation parameter resolution path.
+  `registry_storage_only_no_simulation_authorization` and reserved authoring
+  evidence remain mode-independent blockers. Scientific mode accepts only the
+  exact canonical scientific permission; exploratory and toy modes use closed
+  explicit permission sets. Empty, unknown, negative, and near-match strings
+  fail closed before ranking.
+- Centralized mode-aware parameter eligibility and the complete dynamic ranking
+  key across modelability, ensemble sampling/runtime, deterministic case
+  assembly, and result-table/mechanism reconstruction. Ineligible records are
+  filtered before ranking; explicit records are rejected rather than silently
+  substituted. Exploratory and scientific value-kind preferences remain
+  mode-specific, while selector, exploratory-prior, and calibrated-maturity
+  tie-breaks now agree for identical admitted candidates; authorization is no
+  longer a ranking preference because unauthorized records cannot enter a
+  candidate set.
+- Added one neutral exact-template role resolver used by modelability/preflight,
+  ensemble/public runtime, deterministic assembly, direct chain assembly, and
+  result reconstruction. CASE-001 consumes its exact role-to-record IDs without
+  fallback and rejects mapping, symbol, nonnegative/exact-or-sampleable value,
+  selector/component-identity, environment, authorization, mode, and process
+  drift.
+  The outer process compatibility binds every ordered process-template ID to a
+  unique exact component compatibility record. Structural process `state_roles`
+  resolve through canonical `state_species` enzyme-entity or substrate IDs;
+  registry entities, enzyme capabilities, and the bound compatibility determine
+  each component's class pair, process, bond, and role-symbol authority.
+  Role/record selectors are assertions only, and `component_selectors` shadow
+  metadata is rejected. Process parameters and parameter-backed catalyst/
+  substrate initial states must match that independently resolved owning slot.
+  This rejects a coherent whole-role-group rewrite even when contracts, records,
+  and selector assertions are changed together.
+  Kinetic role ownership is derived from component `process_templates` and
+  conflicting metadata is rejected. Initial-state roles instead use an honest
+  per-role record-scope contract; they do not claim a kinetic process owner.
+  The BIO-002 cellulase initial-state record retains its declared surface-process
+  scope because it initializes the surface-release component; BIO-001 uses the
+  separate `bio001_cellulase_initial_concentration_prior` record. That storage/
+  applicability scope does not make the initial condition a surface-kinetic
+  parameter.
+- Added intrinsic `component_only` scope for component process compatibilities
+  and one registry-level authority graph validated at load and again on every
+  compatibility query. Component records require exactly one ordered outer
+  owner, complete unique semantic role content, canonical non-whitespace IDs,
+  no nesting or standalone case-template claim, and exact process-template
+  coverage. Standalone records keep their existing omitted/default scope in
+  serialization; corrupt or removed incoming bindings cannot reclassify a
+  marked component as an authoring or simulation candidate.
+- Cross-bound the configured outer template substrate entity ID to the exact
+  registry substrate identity consumed by the outer process's canonical
+  `state_species` slot; the same-class alternate-ID attack cannot pass by
+  parking the configured ID on an unused state.
+  Component compatibility now requires exact semantic key-to-symbol mappings
+  for parameter-backed catalyst/substrate initial states and nested modifiers,
+  rather than accepting symbol membership under a renamed key. The same shared
+  resolver rejects these drifts in modelability, ensemble/public simulation,
+  deterministic/direct assembly, and result reconstruction; a materially
+  different copied-registry three-step chain covers both initial-state and
+  nested product-inhibition role rewrites.
+- Preserved caller-supplied required roles when compatibility is present and
+  anchored implemented direct process parameters to process-type-owned
+  canonical fields. Explicit templates reject missing direct roles, coherent
+  semantic-key renames, and duplicate role reuse before modelability or
+  assembly. Every initial-state `parameter_role` and `units_from_role` must also
+  retain an explicit parameter record, so coherent outer-compatibility and
+  template truncation fails during preflight instead of later assembly. Optional
+  nested modifiers and dynamic fallback retain their existing contracts.
+  Malformed list-valued compatibility roles and component binding IDs now
+  produce `RegistryValidationError` instead of raw `TypeError`.
+- Centralized one parameter-provenance classifier across planning, apply, and
+  runtime. A reserved `fungmod_parameter_bridge` namespace always requires full
+  independent bridge schema/digest/policy validation at apply; the reserved
+  `fungmod_curation` namespace and distinctive nested source evidence remain
+  mode-independently non-simulatable even when malformed. Ordinary outer
+  `curator`, `curation_date`, and `parameter_role` metadata alone remain generic.
+- Kept written source curation input out of scope. Shared canonicalization,
+  type-exact comparison, round-trip difference, SHA256, full-tree hashing, and
+  symlink helpers live in one internal integrity module and are reused by
+  registry promotion; provenance classification lives in one neutral shared
+  module used by plan, apply, and runtime. No parallel curation-bundle parser
+  was added.
+- The frozen SABIO-RK test completes explicit identity curation in a test-owned
+  proposal copy, re-authors canonical EntryID 35622 kcat using the existing
+  canonical record id, removes that target only from a copied temporary
+  registry, and produces one ADDABLE plan. Production `data_registry/` is
+  byte-checked as unchanged and no apply occurs.
+
+Tests added or modified: `tests/test_parameter_record_authoring.py` covers the
+real frozen SABIO path, in-memory and written-result planning, deterministic
+checksums, rechecksummed authored-bundle tampering, post-result mutation,
+unsupported written input, source acceptance/blocker/type failures, exact
+identity conversion, bool/int/string/nonfinite values, blank fields, source
+identity and snapshot digest conflicts, conservative policies, complete
+`ValueSpec` and loader fidelity, selector compatibility, malformed and nested
+bridge evidence at plan/apply/runtime, exact written-envelope/report closure,
+ordinary curator-metadata compatibility, aliased raw pages, unsafe output paths,
+planning-registry revalidation, and public exports.
+`tests/test_roadmap_orchestration_status.py` synchronizes PR-47 completion,
+PR-48 current scope, remaining CURATION-001 limits, and the PR-49 follow-up.
+
+What did not change: no production registry parameter record, value, unit,
+maturity, allowed-use policy, or version; no package version,
+curation decision semantics, valid generic promotion transaction behavior, process law, solver,
+biology, validation data,
+calibration, or empirical comparison. The SABIO source adapter performs no
+network access here. Its proposal payload now adds explicit `parameter_role`
+and normalizes the SABIO `Km` role to runtime key `km`, alongside exact frozen
+URL provenance; source values and units are unchanged.
+
+Scientific behavior impact: no new scientific result. The frozen SABIO case
+proves deterministic extraction, explicit identity mapping, provenance,
+loader fidelity, and copied-registry planning only. It is not current/correct
+science, validation, calibration, prediction, transferability evidence, or
+simulation authorization.
+
+Backward compatibility: the public API and result/error types are additive,
+but behavior is not purely additive. SABIO proposal payloads gain explicit
+`parameter_role`, with `Km` normalized to runtime role key `km`; malformed
+multi-page frozen metadata is newly rejected. Parameter candidates with the
+intrinsic authoring provenance shape require the specialized contract even if
+labels are removed, and outer provenance safety claims are rejected. Existing
+generic curation, planning, and apply inputs without that shape retain their
+contracts. Deliberate safety change: parameters retaining either reserved
+authoring/curation provenance namespace are mode-independently non-simulatable;
+ordinary outer curator/date/role metadata alone remains generic. An exact
+`registry_storage_only_no_simulation_authorization` parameter is now rejected
+by modelability/preflight in every mode. Parameter simulation admission now uses
+closed exact `allowed_use` sets, so prior ad hoc, empty, negative, or near-match
+strings no longer authorize a mode. Explicit chain templates with
+`parameter_record_ids` must also provide complete `parameter_role_contracts`;
+the outer compatibility must provide exact ordered component-compatibility
+bindings, component compatibilities must carry intrinsic `component_only` scope
+with exactly one registry-validated owner, each configured substrate and
+the configured outer substrate and each parameter-backed component state must
+resolve through the exact structurally consumed canonical registry ID,
+initial-state/modifier symbols require exact semantic compatibility keys,
+direct process fields must satisfy the implemented process-type schema without
+omission, renaming, or role aliasing, role/record selectors are assertions only,
+and the old
+ownership-like `parameter_role_process_types` shape is rejected.
+CASE-001 initial-state records declare exact storage/reuse process scope, while
+kinetic owners are derived only from component process templates.
+
+Remaining ambiguity and risk: nonidentity conversions require a separate
+closed conversion-method registry, unit parsing, dimensional compatibility,
+exact recomputation, and rounding policy; they are rejected here. Written
+curation input remains deferred until the existing private bundle parser can be
+made reusable without duplication. Non-parameter curation records remain
+unsupported. Registry locks remain relevant only at apply, which this API does
+not invoke.
+
+Risk level: high for scientific provenance and schema integrity, bounded by an
+identity-only policy, exact type checks, frozen-byte digest verification,
+loader and selector revalidation, immutable result copies, adversarial tests,
+and no mutation/apply path.
+
+Recommended next task after PR-48 merges: PR-49, a reusable public
+checksum-validated curation-bundle loader that centralizes the existing
+manifest/checksum/path contract before any specialized authoring API accepts a
+written source bundle. Add no scientific transformation or registry mutation.
+
+Verification:
+
+- Focused authoring, source-provider, promotion-apply, direct chain, and roadmap
+  status suite: 171 passed in 28.59s.
+- Broader authoring, source, curation, promotion, modelability, ensemble,
+  case-builder, chain, and VirtualExperiment suite: 320 passed in 49.74s before
+  the final apply-time regression; the canonical suite below includes that
+  regression and all focused coverage.
+- Final-review authoring/resolver/registry/status regression suite: 230 passed
+  in 126.33s; the complete explicit CASE-001 malformation matrix passed 35
+  tests in 10.37s after its expected diagnostics were aligned with the stronger
+  exact process-role and consumed-substrate checks.
+- Canonical full pytest: 1144 passed in 249.30s on the final code.
+- Focused Ruff: passed.
+- Full Ruff: passed for `src` and `tests`.
+- Full Pyright with the shared venv interpreter selected explicitly: 0 errors,
+  0 warnings, 0 informations. The bare worktree invocation could not resolve
+  `pint` because isolated worktrees do not contain the main checkout's
+  `.venv`; the repository-documented `--pythonpath` equivalent passed.
+- `git diff --check`: passed.
+
 ## PR-47 CURATION-001 Digest-Confirmed Transactional Apply
 
 Date: 2026-07-13
 
-Status: `current` for the bounded transactional apply slice; PR-46 is complete
-after PR #61 merged as `2b6c639`. The transactional apply contract is complete
-once PR-47 merges, but CURATION-001 remains `partial`: the real frozen source
-path cannot yet produce a loader-fidelitous curator-authored production record
-without a separate explicit schema/conversion bridge. VALIDATION-DATA-001
-remains `deferred; blocked/partial` for ingestion.
+Status: `complete` for the bounded transactional apply slice after PR #62
+merged as `b1ebb860`; PR-46 is complete after PR #61 merged as `2b6c639`.
+CURATION-001 remains `partial`, and VALIDATION-DATA-001 remains
+`deferred; blocked/partial` for ingestion.
 
 Completed in this pass:
 

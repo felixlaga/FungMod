@@ -181,6 +181,7 @@ def test_explicit_accept_reject_decisions_require_metadata_and_preserve_provenan
 
     assert accepted_payload["production_registry_promotion"] is False
     assert accepted_payload["allowed_use"] == CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY
+    assert accepted_payload["proposal_limitations"] == list(result.proposal_limitations)
     assert accepted_record["source_value"] == accepted.proposed_record["source_value"]
     assert accepted_record["source_units"] == accepted.proposed_record["source_units"]
     assert accepted_record["normalized_start_value"] == accepted.proposed_record["normalized_start_value"]
@@ -460,6 +461,7 @@ def test_curation_write_is_deterministic_transactional_and_checksummed(tmp_path:
     manifest = json.loads(repeated.paths["curation_manifest"].read_text(encoding="utf-8"))
     assert manifest["production_registry_mutated"] is False
     assert manifest["scientific_validation_claimed"] is False
+    assert manifest["proposal_limitations"] == list(result.proposal_limitations)
     for filename, digest in manifest["files"].items():
         assert hashlib.sha256((repeated.output_directory / filename).read_bytes()).hexdigest() == digest
 

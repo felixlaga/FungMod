@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import hmac
 import json
 import os
@@ -20,6 +19,16 @@ from typing import Any, Iterator, Literal
 
 import yaml
 
+from fungal_model.api._integrity import (
+    CURATION_AUDIT_PROVENANCE_KEY as _CURATION_AUDIT_PROVENANCE_KEY,
+    canonicalize as _canonicalize,
+    first_symlink_component,
+    round_trip_differences as _round_trip_differences,
+    sha256_bytes as _sha256_bytes,
+    tree_file_hashes,
+    TreeIntegrityError,
+    type_exact_equal as _type_exact_equal,
+)
 from fungal_model.api.curation import (
     CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
     CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
@@ -30,6 +39,15 @@ from fungal_model.api.curation import (
     curation_date_is_iso,
     curation_source_provenance_missing,
 )
+from fungal_model.api.parameter_record_authoring import (
+    PARAMETER_AUTHORING_WORKFLOW,
+    CuratorAuthoredParameterResult,
+    ParameterRecordAuthoringError,
+    validate_authored_parameter_against_registry,
+    validate_parameter_authoring_bundle_record,
+    validate_parameter_authoring_plan_record,
+)
+from fungal_model.provenance import classify_parameter_provenance
 from fungal_model.registry.loaders import load_registry
 from fungal_model.registry.store import FungModRegistry
 
@@ -39,7 +57,6 @@ REGISTRY_PROMOTION_PLAN_MANIFEST_KIND = "fungmod_registry_promotion_plan_manifes
 
 _PROMOTION_APPLY_POLICY = "digest_confirmed_transactional_registry_root_swap"
 _PROMOTION_VERSION_POLICY = "strict_next_numeric_patch_version"
-_CURATION_AUDIT_PROVENANCE_KEY = "fungmod_curation"
 
 PromotionClassification = Literal[
     "addable",
@@ -349,6 +366,22 @@ def plan_registry_promotion(
                 f"Accepted curation input contains duplicate record id {item.record_id!r}."
             )
         seen_ids.add(item.record_id)
+
+        provenance = item.target_record.get("provenance")
+        if item.record_type == "parameter_records" and classify_parameter_provenance(
+            provenance if isinstance(provenance, Mapping) else None,
+            curation_metadata=item.curation_metadata,
+        ) == "parameter_bridge":
+            try:
+                validate_authored_parameter_against_registry(
+                    item.target_record,
+                    registry_index=index.path,
+                )
+            except ParameterRecordAuthoringError as exc:
+                raise RegistryPromotionPlanError(
+                    f"Authored parameter record {item.record_id!r} failed planning-registry "
+                    f"revalidation: {exc}"
+                ) from exc
 
         if item.record_type == "product_maps":
             candidates.append(
@@ -1254,6 +1287,26 @@ def _validate_apply_candidate_set(plan: RegistryPromotionPlan) -> None:
     for candidate in plan.candidates:
         _validate_accepted_curation(candidate.record_id, candidate.curation_metadata)
         _validate_target_record(candidate.record_id, candidate.target_record)
+        provenance = candidate.target_record.get("provenance")
+        provenance_class = (
+            classify_parameter_provenance(
+                provenance if isinstance(provenance, Mapping) else None,
+                curation_metadata=candidate.curation_metadata,
+            )
+            if candidate.record_type == "parameter_records"
+            else "generic"
+        )
+        if provenance_class == "parameter_bridge":
+            try:
+                validate_parameter_authoring_plan_record(
+                    candidate.target_record,
+                    candidate.curation_metadata,
+                )
+            except ParameterRecordAuthoringError as exc:
+                raise RegistryPromotionApplyError(
+                    f"Parameter candidate {candidate.record_id!r} failed complete specialized "
+                    f"bridge validation during apply: {exc}"
+                ) from exc
         _validate_source_identity_consistency(
             candidate.record_id,
             target_record=candidate.target_record,
@@ -1279,6 +1332,8 @@ def _validate_apply_candidate_set(plan: RegistryPromotionPlan) -> None:
                 raise RegistryPromotionApplyError(
                     f"Exact duplicate {candidate.record_id!r} has an unsupported reason."
                 )
+            if provenance_class != "generic":
+                _validate_exact_curation_audit(candidate)
         else:
             raise RegistryPromotionApplyError(
                 f"Promotion apply refuses candidate classification {candidate.classification!r}."
@@ -1290,13 +1345,13 @@ def _validate_exact_curation_audit(candidate: RegistryPromotionCandidate) -> Non
     provenance = candidate.target_record.get("provenance")
     if not isinstance(provenance, Mapping):
         raise RegistryPromotionApplyError(
-            f"Addable candidate {candidate.record_id!r} lacks mapping provenance."
+            f"Promotion candidate {candidate.record_id!r} lacks mapping provenance."
         )
     audit = provenance.get(_CURATION_AUDIT_PROVENANCE_KEY)
     expected = _curation_audit_payload(candidate.curation_metadata)
     if not _type_exact_equal(audit, expected):
         raise RegistryPromotionApplyError(
-            f"Addable candidate {candidate.record_id!r} lacks exact durable curation audit metadata."
+            f"Promotion candidate {candidate.record_id!r} lacks exact durable curation audit metadata."
         )
 
 
@@ -1374,6 +1429,21 @@ def _revalidate_plan_against_current_registry(
             raise RegistryPromotionApplyError(
                 f"Promotion candidate {candidate.record_id!r} target hash is stale."
             )
+        provenance = candidate.target_record.get("provenance")
+        if candidate.record_type == "parameter_records" and classify_parameter_provenance(
+            provenance if isinstance(provenance, Mapping) else None,
+            curation_metadata=candidate.curation_metadata,
+        ) == "parameter_bridge":
+            try:
+                validate_authored_parameter_against_registry(
+                    candidate.target_record,
+                    registry_index=index.path,
+                )
+            except ParameterRecordAuthoringError as exc:
+                raise RegistryPromotionApplyError(
+                    f"Authored parameter record {candidate.record_id!r} failed current-registry "
+                    f"revalidation during apply: {exc}"
+                ) from exc
         existing = _record_by_id(target, candidate.record_id)
         if candidate.classification == "addable":
             if existing is not None:
@@ -1824,6 +1894,26 @@ def _accepted_records(
     value: CurationResult | str | Path,
 ) -> tuple[Literal["curation_result", "written_curation_bundle"], tuple[_AcceptedRecord, ...]]:
     if isinstance(value, CurationResult):
+        if isinstance(value, CuratorAuthoredParameterResult):
+            try:
+                value.verify_integrity()
+            except ParameterRecordAuthoringError as exc:
+                raise RegistryPromotionPlanError(str(exc)) from exc
+        elif any(
+            item.record_type == "parameter_records"
+            and classify_parameter_provenance(
+                item.proposed_record.get("provenance")
+                if isinstance(item.proposed_record.get("provenance"), Mapping)
+                else None,
+                curation_metadata=item.to_dict()["curation"],
+            )
+            == "parameter_bridge"
+            for item in value.accepted_records
+        ):
+            raise RegistryPromotionPlanError(
+                "In-memory parameter-authoring records require CuratorAuthoredParameterResult "
+                "integrity metadata."
+            )
         records = tuple(_accepted_record_from_memory(item) for item in value.accepted_records)
         return "curation_result", records
     return "written_curation_bundle", _accepted_records_from_bundle(value)
@@ -1882,7 +1972,11 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
     if accepted_payload.get("production_registry_promotion") is not False:
         raise RegistryPromotionPlanError("Accepted curation artifact must not claim registry promotion.")
 
-    record_types = _accepted_record_types_from_csv(eligible_path)
+    eligible_csv_payload = _read_curation_csv_payload(
+        eligible_path,
+        label="Eligible curation records",
+    )
+    record_types = _accepted_record_types_from_csv_payload(eligible_csv_payload)
     raw_records = accepted_payload.get("records")
     if not isinstance(raw_records, list):
         raise RegistryPromotionPlanError("Accepted curation artifact requires a records list.")
@@ -1930,6 +2024,54 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
     summary = manifest.get("summary")
     if not isinstance(summary, Mapping) or summary.get("accepted_count") != len(accepted):
         raise RegistryPromotionPlanError("Curation manifest accepted_count does not match accepted artifacts.")
+    has_parameter_authoring_summary = (
+        isinstance(summary, Mapping) and summary.get("workflow") == PARAMETER_AUTHORING_WORKFLOW
+    )
+    requires_parameter_authoring = any(
+        item.record_type == "parameter_records"
+        and classify_parameter_provenance(
+            item.target_record.get("provenance")
+            if isinstance(item.target_record.get("provenance"), Mapping)
+            else None,
+            curation_metadata=item.curation_metadata,
+        )
+        == "parameter_bridge"
+        for item in accepted
+    )
+    if has_parameter_authoring_summary or requires_parameter_authoring:
+        if len(accepted) != 1:
+            raise RegistryPromotionPlanError(
+                "A written parameter-authoring bundle must contain exactly one accepted parameter target."
+            )
+        item = accepted[0]
+        try:
+            validate_parameter_authoring_bundle_record(
+                summary=summary,
+                manifest=manifest,
+                proposed_payload=_read_yaml_mapping(
+                    declared["proposed_registry_records.yml"],
+                    label="Proposed curation records",
+                ),
+                accepted_payload=accepted_payload,
+                rejected_payload=_read_yaml_mapping(
+                    declared["rejected_registry_records.yml"],
+                    label="Rejected curation records",
+                ),
+                eligible_records_csv_payload=eligible_csv_payload,
+                excluded_records_csv_payload=_read_curation_csv_payload(
+                    declared["excluded_records.csv"],
+                    label="Excluded curation records",
+                ),
+                record_type=item.record_type,
+                target_record=item.target_record,
+                curation_metadata=item.curation_metadata,
+                curation_report=_read_utf8_text(
+                    declared["curation_report.md"],
+                    label="Curation report",
+                ),
+            )
+        except ParameterRecordAuthoringError as exc:
+            raise RegistryPromotionPlanError(str(exc)) from exc
     return tuple(accepted)
 
 
@@ -2181,14 +2323,25 @@ def _verify_declared_curation_artifacts(
     return declared
 
 
-def _accepted_record_types_from_csv(path: Path) -> dict[str, str]:
+def _read_curation_csv_payload(path: Path, *, label: str) -> Mapping[str, Any]:
     try:
         with path.open(newline="", encoding="utf-8") as handle:
-            rows = tuple(csv.DictReader(handle))
+            reader = csv.DictReader(handle)
+            rows = [dict(row) for row in reader]
+            fieldnames = list(reader.fieldnames or ())
     except (OSError, UnicodeError, csv.Error) as exc:
-        raise RegistryPromotionPlanError(f"Malformed eligible-record CSV {path}: {exc}") from exc
+        raise RegistryPromotionPlanError(f"Malformed {label.lower()} CSV {path}: {exc}") from exc
+    return {"fieldnames": fieldnames, "rows": rows}
+
+
+def _accepted_record_types_from_csv_payload(payload: Mapping[str, Any]) -> dict[str, str]:
+    rows = payload.get("rows")
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
+        raise RegistryPromotionPlanError("Eligible-record CSV requires structured rows.")
     accepted: dict[str, str] = {}
     for row in rows:
+        if not isinstance(row, Mapping):
+            raise RegistryPromotionPlanError("Eligible-record CSV rows must be mappings.")
         if row.get("decision") != "accept" or row.get("explicit_decision") != "true":
             continue
         if row.get("classification") != "eligible_for_review":
@@ -2434,38 +2587,6 @@ def _staged_registry(
         yield staged_index, stage
 
 
-def _round_trip_differences(
-    expected: Any,
-    actual: Any,
-    *,
-    path: str = "",
-) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
-    dropped: list[str] = []
-    synthesized: list[str] = []
-    changed: list[str] = []
-    if isinstance(expected, Mapping) and isinstance(actual, Mapping):
-        expected_keys = {str(key) for key in expected}
-        actual_keys = {str(key) for key in actual}
-        dropped.extend(_field_path(path, key) for key in sorted(expected_keys - actual_keys))
-        synthesized.extend(_field_path(path, key) for key in sorted(actual_keys - expected_keys))
-        for key in sorted(expected_keys & actual_keys):
-            nested_dropped, nested_synthesized, nested_changed = _round_trip_differences(
-                expected[key],
-                actual[key],
-                path=_field_path(path, key),
-            )
-            dropped.extend(nested_dropped)
-            synthesized.extend(nested_synthesized)
-            changed.extend(nested_changed)
-    elif not _type_exact_equal(expected, actual):
-        changed.append(path or "<record>")
-    return tuple(dropped), tuple(synthesized), tuple(changed)
-
-
-def _field_path(parent: str, field: str) -> str:
-    return field if not parent else f"{parent}.{field}"
-
-
 def _registry_digest(index: _RegistryIndex, *, overrides: Mapping[str, str]) -> str:
     file_hashes = _registry_tree_hashes(index.root)
     for relative_path, content in overrides.items():
@@ -2478,48 +2599,15 @@ def _registry_digest(index: _RegistryIndex, *, overrides: Mapping[str, str]) -> 
 
 
 def _registry_tree_hashes(root: Path) -> dict[str, str]:
-    hashes: dict[str, str] = {}
-    for current_root, raw_directories, raw_files in os.walk(
-        root,
-        topdown=True,
-        onerror=_raise_registry_walk_error,
-        followlinks=False,
-    ):
-        current = Path(current_root)
-        for name in sorted(raw_directories):
-            path = current / name
-            if path.is_symlink():
-                raise RegistryPromotionPlanError(
-                    f"Registry root contains an unsafe symlink: {path}"
-                )
-            if not path.is_dir():
-                raise RegistryPromotionPlanError(
-                    f"Registry root contains an unsafe special entry: {path}"
-                )
-        for name in sorted(raw_files):
-            path = current / name
-            if path.is_symlink():
-                raise RegistryPromotionPlanError(
-                    f"Registry root contains an unsafe symlink: {path}"
-                )
-            if not path.is_file():
-                raise RegistryPromotionPlanError(
-                    f"Registry root contains an unsafe special entry: {path}"
-                )
-            relative = path.relative_to(root).as_posix()
-            hashes[relative] = _sha256_bytes(path.read_bytes())
-    return dict(sorted(hashes.items()))
+    try:
+        return tree_file_hashes(root, label="Registry root")
+    except TreeIntegrityError as exc:
+        raise RegistryPromotionPlanError(str(exc)) from exc
 
 
 def _raise_bundle_walk_error(error: OSError) -> None:
     raise RegistryPromotionApplyError(
         f"Cannot inspect promotion-plan bundle safely: {error}"
-    ) from error
-
-
-def _raise_registry_walk_error(error: OSError) -> None:
-    raise RegistryPromotionPlanError(
-        f"Cannot inspect registry root safely: {error}"
     ) from error
 
 
@@ -2734,13 +2822,17 @@ def _read_yaml_mapping(path: Path, *, label: str) -> Mapping[str, Any]:
     return payload
 
 
+def _read_utf8_text(path: Path, *, label: str) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise RegistryPromotionPlanError(f"Malformed {label.lower()} {path}: {exc}") from exc
+
+
 def _reject_symlink_components(path: Path, *, label: str) -> None:
-    absolute = path if path.is_absolute() else Path.cwd() / path
-    current = Path(absolute.anchor)
-    for part in absolute.parts[1:]:
-        current /= part
-        if current.is_symlink():
-            raise RegistryPromotionPlanError(f"{label} contains a symlink component: {current}")
+    symlink = first_symlink_component(path)
+    if symlink is not None:
+        raise RegistryPromotionPlanError(f"{label} contains a symlink component: {symlink}")
 
 
 def _require_string_mapping_keys(value: Any, *, label: str) -> None:
@@ -2754,58 +2846,11 @@ def _require_string_mapping_keys(value: Any, *, label: str) -> None:
             _require_string_mapping_keys(item, label=label)
 
 
-def _canonicalize(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {
-            str(key): _canonicalize(value[key])
-            for key in sorted(value, key=lambda item: str(item))
-        }
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return [_canonicalize(item) for item in value]
-    return value
-
-
-def _type_exact_equal(left: Any, right: Any) -> bool:
-    if isinstance(left, Mapping) or isinstance(right, Mapping):
-        if not isinstance(left, Mapping) or not isinstance(right, Mapping):
-            return False
-        if len(left) != len(right):
-            return False
-        for left_key, left_value in left.items():
-            matching_keys = [
-                right_key
-                for right_key in right
-                if type(left_key) is type(right_key) and left_key == right_key
-            ]
-            if len(matching_keys) != 1:
-                return False
-            if not _type_exact_equal(left_value, right[matching_keys[0]]):
-                return False
-        return True
-
-    left_is_sequence = isinstance(left, Sequence) and not isinstance(
-        left, (str, bytes, bytearray)
-    )
-    right_is_sequence = isinstance(right, Sequence) and not isinstance(
-        right, (str, bytes, bytearray)
-    )
-    if left_is_sequence or right_is_sequence:
-        if not left_is_sequence or not right_is_sequence or len(left) != len(right):
-            return False
-        return all(_type_exact_equal(a, b) for a, b in zip(left, right))
-
-    return type(left) is type(right) and left == right
-
-
 def _format_validation_error(exc: Exception, *, stage: Path | None = None) -> str:
     message = " ".join(str(exc).split())
     if stage is not None:
         message = message.replace(str(stage), "<staged_registry>")
     return f"{type(exc).__name__}: {message}"
-
-
-def _sha256_bytes(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
 
 
 def _sha256_json(value: Any) -> str:

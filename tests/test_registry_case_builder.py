@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import shutil
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -9,8 +11,12 @@ import yaml
 
 from fungal_model.io.model_config import ModelConfig
 from fungal_model.registry import load_registry
+from fungal_model.registry.records import PARAMETER_ALLOWED_USE_STORAGE_ONLY
 from fungal_model.screening import (
+    EnzymeChainAssemblyError,
     RegistryCaseBuildError,
+    assess_modelability,
+    build_extracellular_enzyme_chain_config,
     build_model_config_from_registry_case,
 )
 from fungal_model.screening.case_builder import get_registry_process_assembler
@@ -19,6 +25,7 @@ from fungal_model.workflows import run_configured_model
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_INDEX = ROOT / "data_registry" / "registry_index.yml"
+CHAIN_TEMPLATE_ID = "bio002_extracellular_enzyme_chain_template"
 
 
 def test_default_underparameterized_registry_case_is_not_built() -> None:
@@ -122,7 +129,7 @@ def test_builder_rejects_uncertain_parameter_case(tmp_path: Path) -> None:
 def test_scientific_builder_rejects_toy_scientific_inputs(tmp_path: Path) -> None:
     registry = _modelable_registry(tmp_path)
 
-    with pytest.raises(RegistryCaseBuildError, match="toy or synthetic"):
+    with pytest.raises(RegistryCaseBuildError, match="does not exactly authorize scientific"):
         build_model_config_from_registry_case(
             fungus_id="toy_fungus_alpha",
             substrate_id="toy_cellulose_like_solid",
@@ -152,6 +159,240 @@ def test_registry_process_assemblers_advertise_supported_roles() -> None:
     )
     assert homogeneous.deterministic_mode == "scientific"
     assert get_registry_process_assembler("unsupported_process") is None
+
+
+def test_real_case001_preflight_and_deterministic_build_use_explicit_template_records() -> None:
+    registry = load_registry(REGISTRY_INDEX)
+    report = assess_modelability(
+        fungus_id="generic_cellulase_source",
+        substrate_id="cellulose_film_generic",
+        environment_id="sabiork_reaction_618_selected_conditions",
+        registry=registry,
+        mode="toy",
+    )
+    assert report.status == "modelable"
+
+    config = build_model_config_from_registry_case(
+        fungus_id="generic_cellulase_source",
+        substrate_id="cellulose_film_generic",
+        environment_id="sabiork_reaction_618_selected_conditions",
+        registry=registry,
+        mode="toy",
+    )
+
+    assert config.raw["provenance"]["parameter_record_ids"] == {
+        "solid_substrate_initial_concentration": "bio002_initial_solid_cellulose_equivalent_concentration",
+        "cellulase_initial_concentration": "bio002_cellulase_initial_concentration",
+        "beta_glucosidase_initial_concentration": "bio002_beta_glucosidase_initial_concentration",
+        "surface_rate_constant": "bio002_cellulose_to_cellobiose_surface_rate",
+        "adsorption_constant": "bio002_cellulase_adsorption_constant",
+        "accessible_surface_area": "bio002_cellulose_accessible_surface_area",
+        "km": "sabiork_reaction_618_Km_cellobiose",
+        "kcat": "sabiork_reaction_618_kcat_cellobiose",
+    }
+
+
+@pytest.mark.parametrize(
+    ("malformation", "message"),
+    [
+        ("not_a_mapping", "must be a mapping"),
+        ("missing_record", "missing parameter record"),
+        ("symbol_mismatch", "expected symbol"),
+        ("process_mismatch", "requires record process_type"),
+        ("invented_process", "requires record process_type"),
+        ("missing_role_contract", "exactly the same role keys"),
+        ("ambiguous_role_process", "exact canonical"),
+        ("legacy_role_process_metadata", "deprecated parameter_role_process_types"),
+        ("missing_component_bindings", "exactly one owner binding"),
+        ("reordered_component_bindings", "exact ordered case-template process IDs"),
+        (
+            "duplicate_component_binding",
+            "compatibility_record_id values must be unique",
+        ),
+        ("missing_state_species", "state_species must be a mapping"),
+        ("duplicate_state_species", "reuses enzyme identity"),
+        ("wrong_state_entity_type", "exact substrate consumed"),
+        ("shadow_component_selectors", "component_selectors are unsupported"),
+        ("invented_initial_scope", "outer template process_type"),
+        ("invented_null_id_class", "selector enzyme_class"),
+        ("wrong_declared_component_class", "selector enzyme_class"),
+        ("cross_component_role_swap", "expected symbol"),
+        ("fungus_mismatch", "selector fungus_id"),
+        ("substrate_mismatch", "selector substrate_id"),
+        ("component_fungus_mismatch", "selector fungus_id"),
+        ("component_substrate_mismatch", "selector substrate_id"),
+        ("environment_mismatch", "selector environment_id"),
+        ("unauthorized", "storage-only"),
+        ("mode_ineligible", "does not exactly authorize exploratory"),
+    ],
+)
+def test_case001_explicit_template_mapping_fails_closed(
+    malformation: str,
+    message: str,
+) -> None:
+    registry = load_registry(REGISTRY_INDEX)
+    template = registry.case_templates[CHAIN_TEMPLATE_ID]
+    metadata = deepcopy(dict(template.process_state_metadata))
+    record_ids = deepcopy(dict(metadata["parameter_record_ids"]))
+    metadata["parameter_record_ids"] = record_ids
+    surface_role = "surface_rate_constant"
+    surface_id = "bio002_cellulose_to_cellobiose_surface_rate"
+    kcat_id = "sabiork_reaction_618_kcat_cellobiose"
+    outer_compatibility_id = "bio002_cellulase_cellulose_film_extracellular_chain"
+
+    if malformation == "not_a_mapping":
+        metadata["parameter_record_ids"] = []
+    elif malformation == "missing_record":
+        record_ids[surface_role] = "missing_explicit_surface_parameter"
+    elif malformation == "symbol_mismatch":
+        record_ids[surface_role] = "bio002_cellulase_adsorption_constant"
+    elif malformation == "process_mismatch":
+        registry.parameters[surface_id] = replace(
+            registry.parameters[surface_id],
+            process_type="homogeneous_michaelis_menten",
+        )
+    elif malformation == "invented_process":
+        registry.parameters[surface_id] = replace(
+            registry.parameters[surface_id],
+            process_type="invented_surface_mechanism",
+        )
+    elif malformation == "missing_role_contract":
+        role_contracts = deepcopy(dict(metadata["parameter_role_contracts"]))
+        role_contracts.pop(surface_role)
+        metadata["parameter_role_contracts"] = role_contracts
+    elif malformation == "ambiguous_role_process":
+        process_templates = deepcopy(list(metadata["process_templates"]))
+        process_templates[1]["parameter_roles"]["conflicting_surface_rate"] = surface_role
+        metadata["process_templates"] = process_templates
+    elif malformation == "legacy_role_process_metadata":
+        metadata["parameter_role_process_types"] = {
+            surface_role: "invented_surface_mechanism"
+        }
+    elif malformation == "missing_component_bindings":
+        outer = registry.process_compatibility[outer_compatibility_id]
+        registry.process_compatibility[outer_compatibility_id] = replace(
+            outer,
+            component_bindings=(),
+        )
+    elif malformation == "reordered_component_bindings":
+        outer = registry.process_compatibility[outer_compatibility_id]
+        registry.process_compatibility[outer_compatibility_id] = replace(
+            outer,
+            component_bindings=tuple(reversed(outer.component_bindings)),
+        )
+    elif malformation == "duplicate_component_binding":
+        outer = registry.process_compatibility[outer_compatibility_id]
+        registry.process_compatibility[outer_compatibility_id] = replace(
+            outer,
+            component_bindings=(
+                outer.component_bindings[0],
+                replace(
+                    outer.component_bindings[1],
+                    compatibility_record_id=(
+                        outer.component_bindings[0].compatibility_record_id
+                    ),
+                ),
+            ),
+        )
+    elif malformation == "missing_state_species":
+        metadata.pop("state_species")
+    elif malformation == "duplicate_state_species":
+        state_species = deepcopy(dict(metadata["state_species"]))
+        state_species["beta_glucosidase_concentration"] = {
+            "species": "cellulase_generic",
+            "entity_type": "enzyme",
+        }
+        metadata["state_species"] = state_species
+    elif malformation == "wrong_state_entity_type":
+        state_species = deepcopy(dict(metadata["state_species"]))
+        state_species["solid_cellulose_equivalent_concentration"], state_species[
+            "cellulase_concentration"
+        ] = (
+            state_species["cellulase_concentration"],
+            state_species["solid_cellulose_equivalent_concentration"],
+        )
+        metadata["state_species"] = state_species
+    elif malformation == "shadow_component_selectors":
+        process_templates = deepcopy(list(metadata["process_templates"]))
+        process_templates[0]["component_selectors"] = {
+            "enzyme_class": "cellulase_generic",
+            "substrate_class": "cellulose_film_generic",
+        }
+        metadata["process_templates"] = process_templates
+    elif malformation == "invented_initial_scope":
+        role_contracts = deepcopy(dict(metadata["parameter_role_contracts"]))
+        role_contracts["cellulase_initial_concentration"] = {
+            **role_contracts["cellulase_initial_concentration"],
+            "record_process_type": "invented_surface_mechanism",
+        }
+        metadata["parameter_role_contracts"] = role_contracts
+    elif malformation == "invented_null_id_class":
+        registry.parameters[surface_id] = replace(
+            registry.parameters[surface_id],
+            enzyme_class="invented_enzyme_class",
+            fungus_id=None,
+        )
+    elif malformation == "wrong_declared_component_class":
+        registry.parameters[surface_id] = replace(
+            registry.parameters[surface_id],
+            enzyme_class="beta_glucosidase",
+            fungus_id=None,
+        )
+    elif malformation == "cross_component_role_swap":
+        record_ids[surface_role] = kcat_id
+    elif malformation == "fungus_mismatch":
+        registry.parameters[surface_id] = replace(
+            registry.parameters[surface_id],
+            fungus_id="toy_fungus_alpha",
+        )
+    elif malformation == "substrate_mismatch":
+        registry.parameters[surface_id] = replace(
+            registry.parameters[surface_id],
+            substrate_id="toy_cellulose_like_solid",
+        )
+    elif malformation == "component_fungus_mismatch":
+        registry.parameters[kcat_id] = replace(
+            registry.parameters[kcat_id],
+            fungus_id="toy_fungus_alpha",
+        )
+    elif malformation == "component_substrate_mismatch":
+        registry.parameters[kcat_id] = replace(
+            registry.parameters[kcat_id],
+            substrate_id="toy_cellulose_like_solid",
+        )
+    elif malformation == "environment_mismatch":
+        original = registry.parameters[surface_id]
+        probe_id = "wrong_environment_explicit_surface_parameter"
+        registry.parameters[probe_id] = replace(
+            original,
+            record_id=probe_id,
+            environment_id="toy_lab_environment",
+        )
+        record_ids[surface_role] = probe_id
+    elif malformation == "unauthorized":
+        original = registry.parameters[surface_id]
+        probe_id = "unauthorized_explicit_surface_parameter"
+        registry.parameters[probe_id] = replace(
+            original,
+            record_id=probe_id,
+            allowed_use=PARAMETER_ALLOWED_USE_STORAGE_ONLY,
+        )
+        record_ids[surface_role] = probe_id
+    else:
+        registry.parameters[surface_id] = replace(
+            registry.parameters[surface_id],
+            allowed_use="",
+        )
+    registry.case_templates[CHAIN_TEMPLATE_ID] = replace(
+        template,
+        process_state_metadata=metadata,
+    )
+
+    with pytest.raises(EnzymeChainAssemblyError, match=message):
+        build_extracellular_enzyme_chain_config(
+            registry=registry,
+            environment_id="sabiork_reaction_618_selected_conditions",
+        )
 
 
 def test_ensemble_uses_registry_process_assembler_api() -> None:

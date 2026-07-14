@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import csv
+import shutil
 from pathlib import Path
 
 import numpy as np
 import pytest
+import yaml
 
 from fungal_model.registry import load_registry
 from fungal_model.screening import (
     BIO002_ENZYME_CHAIN_TEMPLATE_ID,
+    EnzymeChainAssemblyError,
     EXTRACELLULAR_ENZYME_CHAIN_PROCESS_TYPE,
     build_extracellular_enzyme_chain_config,
     run_extracellular_enzyme_chain_demo,
@@ -95,6 +98,24 @@ def test_bio002_chain_config_assembles_two_generic_processes_from_template() -> 
         ]
     ).casefold()
     assert not any(token in model_surface for token in forbidden)
+
+
+def test_direct_chain_resolver_rejects_storage_only_parameter(tmp_path: Path) -> None:
+    registry_root = tmp_path / "data_registry"
+    shutil.copytree(ROOT / "data_registry", registry_root)
+    parameters_path = registry_root / "parameters" / "parameter_records.yml"
+    payload = yaml.safe_load(parameters_path.read_text(encoding="utf-8"))
+    target = next(
+        item
+        for item in payload["records"]
+        if item["record_id"] == "bio002_cellulose_to_cellobiose_surface_rate"
+    )
+    target["allowed_use"] = "registry_storage_only_no_simulation_authorization"
+    parameters_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    registry = load_registry(registry_root / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="storage-only"):
+        build_extracellular_enzyme_chain_config(registry=registry)
 
 
 def test_bio002_demo_runs_with_stoichiometric_chain_dynamics_and_standard_tables(tmp_path: Path) -> None:

@@ -13,9 +13,16 @@ from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
     SubstrateRecord,
+    parameter_record_is_mode_eligible,
+    parameter_record_mode_eligibility_blocker,
+    parameter_record_selection_key,
 )
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.screening.modelability import ModelabilityReport, assess_modelability
+from fungal_model.screening.parameter_resolution import (
+    ExactTemplateParameterError,
+    resolve_exact_template_parameter_records,
+)
 from fungal_model.screening.template_environment_modifiers import (
     ENVIRONMENT_MODIFIER_TYPES,
     build_template_environment_entity,
@@ -102,14 +109,21 @@ def build_model_config_from_registry_case(
         )
     if mode != assembler.deterministic_mode:
         raise RegistryCaseBuildError(assembler.unsupported_mode_message)
+    case_template = select_registry_case_template(
+        registry=registry,
+        compatibility=compatibility,
+        assembler=assembler,
+    )
     parameter_records = _exact_role_parameters(
         registry=registry,
         compatibility=compatibility,
+        case_template=case_template,
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
         required_roles=assembler.required_parameter_roles,
         process_label=assembler.process_label,
+        mode=mode,
     )
     config_data = build_registry_process_config_data(
         registry=registry,
@@ -119,6 +133,7 @@ def build_model_config_from_registry_case(
         environment_id=environment_id,
         parameter_records=parameter_records,
         output_directory=output_directory,
+        case_template=case_template,
     )
     return ModelConfig.from_mapping(config_data)
 
@@ -138,6 +153,7 @@ def build_registry_process_config_data(
     environment_id: str,
     parameter_records: Mapping[str, ParameterRecord],
     output_directory: str | None,
+    case_template: CaseTemplateRecord | None = None,
 ) -> dict[str, Any]:
     """Build raw model-config data for a supported registry process."""
 
@@ -147,11 +163,12 @@ def build_registry_process_config_data(
             "Registry case builder does not support process_type "
             f"{compatibility.process_type!r}."
         )
-    case_template = select_registry_case_template(
-        registry=registry,
-        compatibility=compatibility,
-        assembler=assembler,
-    )
+    if case_template is None:
+        case_template = select_registry_case_template(
+            registry=registry,
+            compatibility=compatibility,
+            assembler=assembler,
+        )
     substrate = registry.get_substrate(substrate_id)
     return assembler.config_data_builder(
         registry=registry,
@@ -237,12 +254,35 @@ def _exact_role_parameters(
     *,
     registry: FungModRegistry,
     compatibility: ProcessCompatibilityRecord,
+    case_template: CaseTemplateRecord,
     fungus_id: str,
     substrate_id: str,
     environment_id: str,
     required_roles: tuple[str, ...],
     process_label: str,
+    mode: RegistryCaseConfigMode,
 ) -> Mapping[str, ParameterRecord]:
+    roles_to_resolve = _roles_to_resolve(
+        compatibility=compatibility,
+        required_roles=required_roles,
+    )
+    try:
+        explicit = resolve_exact_template_parameter_records(
+            registry=registry,
+            template=case_template,
+            compatibility=compatibility,
+            required_roles=tuple(compatibility.parameter_roles),
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            mode=mode,
+            value_requirement="exact",
+        )
+    except ExactTemplateParameterError as exc:
+        raise RegistryCaseBuildError(f"{process_label} exact parameter mapping is invalid: {exc}") from exc
+    if explicit is not None:
+        return explicit
+
     missing_roles = tuple(
         role for role in required_roles if role not in compatibility.parameter_roles
     )
@@ -253,10 +293,6 @@ def _exact_role_parameters(
         )
 
     resolved: dict[str, ParameterRecord] = {}
-    roles_to_resolve = _roles_to_resolve(
-        compatibility=compatibility,
-        required_roles=required_roles,
-    )
     for role in roles_to_resolve:
         symbol = compatibility.parameter_roles[role]
         record = _best_parameter_record(
@@ -266,24 +302,51 @@ def _exact_role_parameters(
             fungus_id=fungus_id,
             substrate_id=substrate_id,
             environment_id=environment_id,
+            mode=mode,
         )
         if record is None:
             raise RegistryCaseBuildError(
                 f"No registry parameter record found for role {role!r} and symbol {symbol!r}."
             )
-        if not record.value.is_exact:
-            raise RegistryCaseBuildError(
-                f"Deterministic registry case builder requires exact parameters; role {role!r} uses "
-                f"symbol {symbol!r} with ValueSpec kind {record.value.kind!r}."
-            )
-        validation = record.value.validate(nonnegative=True)
-        if not validation.passed:
-            raise RegistryCaseBuildError(
-                f"Parameter {symbol!r} for role {role!r} failed ValueSpec validation: "
-                f"{validation.to_dict()}"
-            )
+        _validate_deterministic_parameter_record(
+            record,
+            role=role,
+            expected_symbol=symbol,
+            mode=mode,
+        )
         resolved[role] = record
     return resolved
+
+
+def _validate_deterministic_parameter_record(
+    record: ParameterRecord,
+    *,
+    role: str,
+    expected_symbol: str,
+    mode: RegistryCaseConfigMode,
+) -> None:
+    if record.parameter_symbol != expected_symbol:
+        raise RegistryCaseBuildError(
+            f"Parameter role {role!r} expected symbol {expected_symbol!r}, but record "
+            f"{record.record_id!r} uses {record.parameter_symbol!r}."
+        )
+    eligibility_blocker = parameter_record_mode_eligibility_blocker(record, mode=mode)
+    if eligibility_blocker is not None:
+        raise RegistryCaseBuildError(
+            f"Parameter role {role!r} and symbol {expected_symbol!r} is mode-ineligible: "
+            f"{eligibility_blocker}"
+        )
+    if not record.value.is_exact:
+        raise RegistryCaseBuildError(
+            f"Deterministic registry case builder requires exact parameters; role {role!r} uses "
+            f"symbol {expected_symbol!r} with ValueSpec kind {record.value.kind!r}."
+        )
+    validation = record.value.validate(nonnegative=True)
+    if not validation.passed:
+        raise RegistryCaseBuildError(
+            f"Parameter {expected_symbol!r} for role {role!r} failed ValueSpec validation: "
+            f"{validation.to_dict()}"
+        )
 
 
 def _template_state(case_template: CaseTemplateRecord, role: str) -> str:
@@ -1344,14 +1407,20 @@ def _extracellular_enzyme_chain_config_data(
     parameter_records: Mapping[str, ParameterRecord],
     output_directory: str | None,
 ) -> dict[str, Any]:
-    from fungal_model.screening.enzyme_chain import build_extracellular_enzyme_chain_config
-
-    config = build_extracellular_enzyme_chain_config(
-        registry=registry,
-        template_id=case_template.case_template_id,
-        environment_id=environment_id,
-        output_directory=output_directory,
+    from fungal_model.screening.enzyme_chain import (
+        EnzymeChainAssemblyError,
+        build_extracellular_enzyme_chain_config,
     )
+
+    try:
+        config = build_extracellular_enzyme_chain_config(
+            registry=registry,
+            template_id=case_template.case_template_id,
+            environment_id=environment_id,
+            output_directory=output_directory,
+        )
+    except EnzymeChainAssemblyError as exc:
+        raise RegistryCaseBuildError(str(exc)) from exc
     data = config.to_dict()
     data["provenance"] = {
         **dict(data.get("provenance", {})),
@@ -1438,6 +1507,7 @@ def _best_parameter_record(
     fungus_id: str,
     substrate_id: str,
     environment_id: str,
+    mode: RegistryCaseConfigMode,
 ) -> ParameterRecord | None:
     candidates = [
         record
@@ -1449,30 +1519,18 @@ def _best_parameter_record(
         and _matches(record.fungus_id, fungus_id)
         and _matches(record.substrate_id, substrate_id)
         and _matches(record.environment_id, environment_id)
+        and parameter_record_is_mode_eligible(record, mode=mode)
     ]
     if not candidates:
         return None
-    return max(candidates, key=_parameter_specificity)
+    return max(
+        candidates,
+        key=lambda record: parameter_record_selection_key(record, mode=mode),
+    )
 
 
 def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
-
-
-def _parameter_specificity(record: ParameterRecord) -> tuple[int, int, int]:
-    selector_score = sum(
-        value is not None
-        for value in (
-            record.enzyme_class,
-            record.substrate_class,
-            record.fungus_id,
-            record.substrate_id,
-            record.environment_id,
-        )
-    )
-    value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
-    maturity_score = 1 if record.maturity == "calibrated" else 0
-    return selector_score, value_score, maturity_score
 
 
 def _validate_mode(mode: str) -> None:

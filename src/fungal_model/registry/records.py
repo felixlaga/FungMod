@@ -5,10 +5,11 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from fungal_model.core.validators import ValidationResult
 from fungal_model.core.value_spec import ValueSpec
+from fungal_model.provenance import classify_parameter_provenance
 
 
 def _tuple_of_strings(values: Sequence[Any] | None) -> tuple[str, ...]:
@@ -16,6 +17,54 @@ def _tuple_of_strings(values: Sequence[Any] | None) -> tuple[str, ...]:
 
 
 CASE_TEMPLATE_SCHEMA_VERSION = "1"
+PROCESS_COMPATIBILITY_SCOPE_STANDALONE = "standalone"
+PROCESS_COMPATIBILITY_SCOPE_COMPONENT = "component_only"
+PROCESS_COMPATIBILITY_SCOPES = frozenset(
+    {
+        PROCESS_COMPATIBILITY_SCOPE_STANDALONE,
+        PROCESS_COMPATIBILITY_SCOPE_COMPONENT,
+    }
+)
+
+
+def _is_canonical_nonblank_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value) and value == value.strip()
+
+
+PARAMETER_ALLOWED_USE_STORAGE_ONLY = "registry_storage_only_no_simulation_authorization"
+PARAMETER_ALLOWED_USE_SCIENTIFIC = (
+    "scientific_or_exploratory_when_all_other_inputs_are_valid"
+)
+PARAMETER_ALLOWED_USE_EXPLORATORY = (
+    "exploratory_simulation_only_not_literature_curated"
+)
+PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING = (
+    "exploratory_screening_only_not_calibrated_uncertainty_not_environment_response"
+)
+PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY = "software_tests_only_not_scientific"
+PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY = (
+    "preflight_and_gap_analysis_only_requires_measurement_or_curation"
+)
+ParameterRecordSelectionMode = Literal["exploratory", "scientific", "toy"]
+_PARAMETER_ALLOWED_USE_BY_MODE: Mapping[ParameterRecordSelectionMode, frozenset[str]] = {
+    "scientific": frozenset({PARAMETER_ALLOWED_USE_SCIENTIFIC}),
+    "exploratory": frozenset(
+        {
+            PARAMETER_ALLOWED_USE_SCIENTIFIC,
+            PARAMETER_ALLOWED_USE_EXPLORATORY,
+            PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING,
+            PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
+        }
+    ),
+    "toy": frozenset(
+        {
+            PARAMETER_ALLOWED_USE_SCIENTIFIC,
+            PARAMETER_ALLOWED_USE_EXPLORATORY,
+            PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING,
+            PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
+        }
+    ),
+}
 CASE_TEMPLATE_ALLOWED_STATE_ROLES = frozenset(
     {
         "substrate",
@@ -210,6 +259,20 @@ class EnvironmentRecord(RegistryRecord):
 
 
 @dataclass(frozen=True)
+class ProcessComponentBinding:
+    """Ordered binding from one template process to one component compatibility."""
+
+    process_template_id: str
+    compatibility_record_id: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "process_template_id": self.process_template_id,
+            "compatibility_record_id": self.compatibility_record_id,
+        }
+
+
+@dataclass(frozen=True)
 class ProcessCompatibilityRecord(RegistryRecord):
     """Record describing when a process type is categorically compatible."""
 
@@ -221,18 +284,77 @@ class ProcessCompatibilityRecord(RegistryRecord):
     parameter_roles: Mapping[str, str] = field(default_factory=dict)
     product_map_required: bool = False
     case_template_id: str = ""
+    component_bindings: tuple[ProcessComponentBinding, ...] = ()
+    compatibility_scope: str = PROCESS_COMPATIBILITY_SCOPE_STANDALONE
 
     def validate(self) -> ValidationResult:
         issues = self._common_issues()
         for field_name in ("enzyme_class", "substrate_class", "process_type"):
-            if not getattr(self, field_name):
+            value = getattr(self, field_name)
+            if not _is_canonical_nonblank_text(value):
                 issues.append({"field": field_name, "message": f"{field_name} is required."})
-        if not self.required_bond_classes:
+        if (
+            not isinstance(self.compatibility_scope, str)
+            or self.compatibility_scope not in PROCESS_COMPATIBILITY_SCOPES
+        ):
+            issues.append(
+                {
+                    "field": "compatibility_scope",
+                    "message": "Compatibility scope must be 'standalone' or 'component_only'.",
+                }
+            )
+        if (
+            not isinstance(self.required_bond_classes, tuple)
+            or not self.required_bond_classes
+            or any(
+                not _is_canonical_nonblank_text(value)
+                for value in self.required_bond_classes
+            )
+        ):
             issues.append({"field": "required_bond_classes", "message": "Required bond classes are required."})
+        required_parameters = self.required_parameters
+        if not isinstance(required_parameters, tuple) or any(
+            not _is_canonical_nonblank_text(value)
+            for value in required_parameters
+        ):
+            issues.append(
+                {
+                    "field": "required_parameters",
+                    "message": "Required parameters must be an immutable sequence of nonblank symbols.",
+                }
+            )
+            required_parameters = ()
+        if len(set(required_parameters)) != len(required_parameters):
+            issues.append(
+                {
+                    "field": "required_parameters",
+                    "message": "Required parameter symbols must be unique.",
+                }
+            )
+        parameter_roles = self.parameter_roles
+        if not isinstance(parameter_roles, Mapping):
+            issues.append(
+                {
+                    "field": "parameter_roles",
+                    "message": "Parameter roles must be a mapping.",
+                }
+            )
+            parameter_roles = {}
+        if any(
+            not _is_canonical_nonblank_text(role)
+            or not _is_canonical_nonblank_text(symbol)
+            for role, symbol in parameter_roles.items()
+        ):
+            issues.append(
+                {
+                    "field": "parameter_roles",
+                    "message": "Parameter role keys and symbols must be nonblank text.",
+                }
+            )
         unknown_role_parameters = tuple(
             symbol
-            for symbol in self.parameter_roles.values()
-            if symbol not in self.required_parameters
+            for symbol in parameter_roles.values()
+            if symbol not in required_parameters
         )
         if unknown_role_parameters:
             issues.append(
@@ -240,6 +362,84 @@ class ProcessCompatibilityRecord(RegistryRecord):
                     "field": "parameter_roles",
                     "message": "Parameter role mappings must reference required parameters.",
                     "details": {"unknown_symbols": unknown_role_parameters},
+                }
+            )
+        role_symbols = tuple(
+            symbol for symbol in parameter_roles.values() if isinstance(symbol, str)
+        )
+        if len(set(role_symbols)) != len(role_symbols):
+            issues.append(
+                {
+                    "field": "parameter_roles",
+                    "message": "Parameter role symbols must be unique.",
+                }
+            )
+        if not isinstance(self.case_template_id, str) or (
+            self.case_template_id
+            and not _is_canonical_nonblank_text(self.case_template_id)
+        ):
+            issues.append(
+                {
+                    "field": "case_template_id",
+                    "message": "Case template id must be empty or nonblank text.",
+                }
+            )
+        bindings = self.component_bindings
+        if not isinstance(bindings, tuple):
+            issues.append(
+                {
+                    "field": "component_bindings",
+                    "message": "Component bindings must be an immutable sequence.",
+                }
+            )
+            bindings = ()
+        process_ids: list[str] = []
+        compatibility_ids: list[str] = []
+        for index, binding in enumerate(bindings):
+            if not isinstance(binding, ProcessComponentBinding):
+                issues.append(
+                    {
+                        "field": f"component_bindings.{index}",
+                        "message": "Component bindings must use ProcessComponentBinding values.",
+                    }
+                )
+                continue
+            if not _is_canonical_nonblank_text(binding.process_template_id):
+                issues.append(
+                    {
+                        "field": f"component_bindings.{index}.process_template_id",
+                        "message": (
+                            "Component binding process_template_id must be canonical "
+                            "nonblank text without surrounding whitespace."
+                        ),
+                    }
+                )
+            else:
+                process_ids.append(binding.process_template_id)
+            if not _is_canonical_nonblank_text(binding.compatibility_record_id):
+                issues.append(
+                    {
+                        "field": f"component_bindings.{index}.compatibility_record_id",
+                        "message": (
+                            "Component binding compatibility_record_id must be canonical "
+                            "nonblank text without surrounding whitespace."
+                        ),
+                    }
+                )
+            else:
+                compatibility_ids.append(binding.compatibility_record_id)
+        if len(set(process_ids)) != len(process_ids):
+            issues.append(
+                {
+                    "field": "component_bindings",
+                    "message": "Component binding process_template_id values must be unique.",
+                }
+            )
+        if len(set(compatibility_ids)) != len(compatibility_ids):
+            issues.append(
+                {
+                    "field": "component_bindings",
+                    "message": "Component binding compatibility_record_id values must be unique.",
                 }
             )
         return _validation_result(self.record_id, issues)
@@ -258,6 +458,12 @@ class ProcessCompatibilityRecord(RegistryRecord):
                 "case_template_id": self.case_template_id,
             }
         )
+        if self.component_bindings:
+            data["component_bindings"] = [
+                binding.to_dict() for binding in self.component_bindings
+            ]
+        if self.compatibility_scope == PROCESS_COMPATIBILITY_SCOPE_COMPONENT:
+            data["compatibility_scope"] = self.compatibility_scope
         return data
 
 
@@ -382,6 +588,105 @@ class ParameterRecord(RegistryRecord):
             }
         )
         return data
+
+
+def parameter_simulation_authorization_blocker(record: ParameterRecord) -> str | None:
+    """Return the mode-independent simulation blocker for a parameter record."""
+
+    if record.allowed_use == PARAMETER_ALLOWED_USE_STORAGE_ONLY:
+        return "Parameter allowed_use is storage-only and does not authorize simulation in any mode."
+    if classify_parameter_provenance(record.provenance) != "generic":
+        return (
+            "Parameter provenance carries curator-authoring source evidence, which does not "
+            "authorize simulation even if its outer allowed_use is changed."
+        )
+    return None
+
+
+def parameter_is_simulation_authorized(record: ParameterRecord) -> bool:
+    """Return whether the record passes the mode-independent authorization policy."""
+
+    return parameter_simulation_authorization_blocker(record) is None
+
+
+def parameter_record_is_exploratory(record: ParameterRecord) -> bool:
+    """Return whether a parameter is explicitly limited to exploratory use."""
+
+    return record.maturity == "exploratory_prior" or bool(
+        record.provenance.get("exploratory_prior")
+    )
+
+
+def parameter_record_mode_eligibility_blocker(
+    record: ParameterRecord,
+    *,
+    mode: ParameterRecordSelectionMode,
+) -> str | None:
+    """Return the shared authorization and mode-eligibility blocker."""
+
+    if mode not in _PARAMETER_ALLOWED_USE_BY_MODE:
+        raise ValueError(f"Unsupported parameter selection mode: {mode!r}")
+    authorization_blocker = parameter_simulation_authorization_blocker(record)
+    if authorization_blocker is not None:
+        return authorization_blocker
+    if record.allowed_use not in _PARAMETER_ALLOWED_USE_BY_MODE[mode]:
+        return (
+            f"Parameter allowed_use {record.allowed_use!r} does not exactly authorize "
+            f"{mode} simulation."
+        )
+    if mode in {"exploratory", "toy"}:
+        return None
+    if parameter_record_is_exploratory(record):
+        return "Scientific mode rejects exploratory-prior parameter records."
+    maturity = record.maturity.casefold()
+    if maturity.startswith("toy") or maturity.startswith("synthetic"):
+        return "Scientific mode rejects toy or synthetic parameter records."
+    return None
+
+
+def parameter_record_is_mode_eligible(
+    record: ParameterRecord,
+    *,
+    mode: ParameterRecordSelectionMode,
+) -> bool:
+    """Return whether a parameter may enter candidate ranking for the mode."""
+
+    return parameter_record_mode_eligibility_blocker(record, mode=mode) is None
+
+
+def parameter_record_selection_key(
+    record: ParameterRecord,
+    *,
+    mode: ParameterRecordSelectionMode,
+) -> tuple[int, ...]:
+    """Return the shared mode-aware ranking key for parameter candidates."""
+
+    selector_score = sum(
+        value is not None
+        for value in (
+            record.enzyme_class,
+            record.substrate_class,
+            record.fungus_id,
+            record.substrate_id,
+            record.environment_id,
+        )
+    )
+    maturity_score = 1 if record.maturity == "calibrated" else 0
+    if mode == "exploratory":
+        value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
+        exploratory_score = int(
+            parameter_record_is_exploratory(record)
+        )
+        return (
+            selector_score,
+            value_score,
+            exploratory_score,
+            maturity_score,
+        )
+    if mode in {"scientific", "toy"}:
+        value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
+        return selector_score, value_score, maturity_score
+    raise ValueError(f"Unsupported parameter selection mode: {mode!r}")
 
 
 def _validation_result(record_id: str, issues: list[dict[str, Any]]) -> ValidationResult:
@@ -578,6 +883,19 @@ __all__ = [
     "EnvironmentRecord",
     "FungusRecord",
     "ParameterRecord",
+    "ParameterRecordSelectionMode",
+    "PARAMETER_ALLOWED_USE_EXPLORATORY",
+    "PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING",
+    "PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY",
+    "PARAMETER_ALLOWED_USE_SCIENTIFIC",
+    "PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY",
+    "PARAMETER_ALLOWED_USE_STORAGE_ONLY",
+    "parameter_is_simulation_authorized",
+    "parameter_record_is_exploratory",
+    "parameter_record_is_mode_eligible",
+    "parameter_record_mode_eligibility_blocker",
+    "parameter_record_selection_key",
+    "parameter_simulation_authorization_blocker",
     "ProcessCompatibilityRecord",
     "RegistryRecord",
     "SubstrateRecord",

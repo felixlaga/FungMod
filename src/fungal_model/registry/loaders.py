@@ -15,6 +15,14 @@ from fungal_model.registry.records import (
     EnvironmentRecord,
     FungusRecord,
     ParameterRecord,
+    PARAMETER_ALLOWED_USE_EXPLORATORY,
+    PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING,
+    PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY,
+    PARAMETER_ALLOWED_USE_SCIENTIFIC,
+    PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
+    PROCESS_COMPATIBILITY_SCOPES,
+    PROCESS_COMPATIBILITY_SCOPE_STANDALONE,
+    ProcessComponentBinding,
     ProcessCompatibilityRecord,
     SubstrateRecord,
     _tuple_of_strings,
@@ -65,6 +73,12 @@ def load_registry(path: str | Path) -> FungModRegistry:
         raise RegistryLoadError(f"Registry index {index_path} is missing required field: {exc.args[0]}") from exc
     except RegistryValidationError:
         raise
+
+
+def load_parameter_record_mapping(data: Mapping[str, Any]) -> ParameterRecord:
+    """Load one parameter mapping through the production registry factory."""
+
+    return _parameter_record(data)
 
 
 def _load_records(
@@ -163,7 +177,66 @@ def _process_compatibility_record(data: Mapping[str, Any]) -> ProcessCompatibili
         parameter_roles={str(role): str(symbol) for role, symbol in parameter_roles.items()},
         product_map_required=bool(data.get("product_map_required", False)),
         case_template_id=str(data.get("case_template_id", "") or ""),
+        component_bindings=_process_component_bindings(data),
+        compatibility_scope=_process_compatibility_scope(data),
     )
+
+
+def _process_compatibility_scope(data: Mapping[str, Any]) -> str:
+    value = data.get(
+        "compatibility_scope",
+        PROCESS_COMPATIBILITY_SCOPE_STANDALONE,
+    )
+    if not isinstance(value, str) or value not in PROCESS_COMPATIBILITY_SCOPES:
+        raise RegistryLoadError(
+            "process_compatibility.compatibility_scope must be 'standalone' "
+            "or 'component_only'."
+        )
+    return value
+
+
+def _process_component_bindings(
+    data: Mapping[str, Any],
+) -> tuple[ProcessComponentBinding, ...]:
+    if "component_bindings" not in data:
+        return ()
+    value = data["component_bindings"]
+    if not isinstance(value, (list, tuple)):
+        raise RegistryLoadError("process_compatibility.component_bindings must be a sequence.")
+    bindings: list[ProcessComponentBinding] = []
+    expected_fields = {"process_template_id", "compatibility_record_id"}
+    for index, item in enumerate(value):
+        if not isinstance(item, Mapping):
+            raise RegistryLoadError(
+                f"process_compatibility.component_bindings[{index}] must be a mapping."
+            )
+        if set(item) != expected_fields:
+            raise RegistryLoadError(
+                f"process_compatibility.component_bindings[{index}] must contain exactly "
+                "process_template_id and compatibility_record_id."
+            )
+        process_template_id = item["process_template_id"]
+        compatibility_record_id = item["compatibility_record_id"]
+        if not isinstance(process_template_id, str) or not process_template_id.strip():
+            raise RegistryLoadError(
+                f"process_compatibility.component_bindings[{index}].process_template_id "
+                "must be nonblank text."
+            )
+        if (
+            not isinstance(compatibility_record_id, str)
+            or not compatibility_record_id.strip()
+        ):
+            raise RegistryLoadError(
+                f"process_compatibility.component_bindings[{index}].compatibility_record_id "
+                "must be nonblank text."
+            )
+        bindings.append(
+            ProcessComponentBinding(
+                process_template_id=process_template_id,
+                compatibility_record_id=compatibility_record_id,
+            )
+        )
+    return tuple(bindings)
 
 
 _COMMON_RECORD_FIELDS = {
@@ -399,20 +472,21 @@ def _allowed_use(
     maturity: str,
     value: Mapping[str, Any],
 ) -> str:
-    explicit = data.get("allowed_use") or provenance.get("allowed_use")
-    if explicit is not None:
-        return str(explicit)
+    if "allowed_use" in data:
+        return str(data.get("allowed_use") or "")
+    if "allowed_use" in provenance:
+        return str(provenance.get("allowed_use") or "")
     value_kind = str(value.get("kind", ""))
     if maturity.startswith("toy"):
-        return "software_tests_only_not_scientific"
+        return PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY
     if maturity == "exploratory_prior" or provenance.get("exploratory_prior"):
-        return "exploratory_simulation_only_not_literature_curated"
+        return PARAMETER_ALLOWED_USE_EXPLORATORY
     if maturity == "literature_range" or value_kind in {"range", "distribution"}:
-        return "exploratory_screening_only_not_calibrated_uncertainty_not_environment_response"
+        return PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING
     if value_kind == "unknown":
-        return "preflight_and_gap_analysis_only_requires_measurement_or_curation"
+        return PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY
     if maturity == "literature_processed" and value_kind == "exact":
-        return "scientific_or_exploratory_when_all_other_inputs_are_valid"
+        return PARAMETER_ALLOWED_USE_SCIENTIFIC
     return "requires_record_specific_review"
 
 
@@ -429,5 +503,6 @@ def _load_yaml(path: Path) -> Any:
 
 __all__ = [
     "RegistryLoadError",
+    "load_parameter_record_mapping",
     "load_registry",
 ]

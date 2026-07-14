@@ -24,7 +24,13 @@ from fungal_model.api.output_schema import (
     output_schema_document,
     table_fieldnames,
 )
-from fungal_model.registry.records import ParameterRecord, RegistryRecord
+from fungal_model.registry.records import (
+    ParameterRecord,
+    RegistryRecord,
+    parameter_record_is_exploratory,
+    parameter_record_is_mode_eligible,
+    parameter_record_selection_key,
+)
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
 from fungal_model.screening import (
     EnsembleSample,
@@ -36,6 +42,10 @@ from fungal_model.screening.case_builder import (
     RegistryCaseBuildError,
     get_registry_process_assembler,
     select_registry_case_compatibility,
+)
+from fungal_model.screening.parameter_resolution import (
+    ExactTemplateParameterError,
+    resolve_exact_template_parameter_records,
 )
 
 
@@ -2320,13 +2330,17 @@ def _role_parameter_records(
     assembler = get_registry_process_assembler(compatibility.process_type)
     if assembler is None:
         return {}
-    chain_records = _chain_template_role_records(
+    explicit_records = _exact_template_role_records(
         registry=registry,
         compatibility=compatibility,
         required_roles=assembler.required_parameter_roles,
+        fungus_id=case.fungus_id,
+        substrate_id=case.substrate_id,
+        environment_id=case.environment_id,
+        mode=mode,
     )
-    if chain_records is not None:
-        return dict(chain_records)
+    if explicit_records is not None:
+        return dict(explicit_records)
     records: dict[str, ParameterRecord] = {}
     roles = tuple(dict.fromkeys((*assembler.required_parameter_roles, *compatibility.parameter_roles.keys())))
     for role in roles:
@@ -2349,33 +2363,42 @@ def _role_parameter_records(
     return records
 
 
-def _chain_template_role_records(
+def _exact_template_role_records(
     *,
     registry: FungModRegistry,
     compatibility: Any,
     required_roles: tuple[str, ...],
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    mode: str,
 ) -> Mapping[str, ParameterRecord] | None:
-    if compatibility.process_type != "extracellular_enzyme_chain":
-        return None
     if not compatibility.case_template_id:
-        return {}
+        return None
     try:
         template = registry.get_case_template(compatibility.case_template_id)
-    except RegistryLookupError:
-        return {}
-    parameter_ids = template.process_state_metadata.get("parameter_record_ids")
-    if not isinstance(parameter_ids, dict):
-        return {}
-    roles = tuple(dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys())))
-    records: dict[str, ParameterRecord] = {}
-    for role in roles:
-        record_id = parameter_ids.get(role)
-        if record_id is None:
-            continue
-        record = registry.parameters.get(str(record_id))
-        if record is not None:
-            records[role] = record
-    return records
+    except RegistryLookupError as exc:
+        raise RegistryCaseBuildError(
+            f"Compatibility {compatibility.record_id!r} references missing case template "
+            f"{compatibility.case_template_id!r}."
+        ) from exc
+    selection_mode = "scientific" if mode == "scientific" else "exploratory"
+    try:
+        return resolve_exact_template_parameter_records(
+            registry=registry,
+            template=template,
+            compatibility=compatibility,
+            required_roles=tuple(compatibility.parameter_roles),
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            mode=selection_mode,
+            value_requirement="exact" if selection_mode == "scientific" else "sampleable",
+        )
+    except ExactTemplateParameterError as exc:
+        raise RegistryCaseBuildError(
+            f"Result reconstruction rejected the exact template parameter mapping: {exc}"
+        ) from exc
 
 
 def _best_case_parameter_record(
@@ -2400,50 +2423,22 @@ def _best_case_parameter_record(
         and _matches(record.fungus_id, fungus_id)
         and _matches(record.substrate_id, substrate_id)
         and _matches(record.environment_id, environment_id)
+        and parameter_record_is_mode_eligible(
+            record,
+            mode="scientific" if mode == "scientific" else "exploratory",
+        )
     ]
-    if mode == "scientific":
-        candidates = [record for record in candidates if not _is_exploratory_record(record)]
     if not candidates:
         return None
+    selection_mode = "scientific" if mode == "scientific" else "exploratory"
     return max(
-        candidates, key=_scientific_parameter_record_priority if mode == "scientific" else _parameter_record_priority
+        candidates,
+        key=lambda record: parameter_record_selection_key(record, mode=selection_mode),
     )
 
 
 def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
-
-
-def _parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int]:
-    selector_score = sum(
-        value is not None
-        for value in (
-            record.enzyme_class,
-            record.substrate_class,
-            record.fungus_id,
-            record.substrate_id,
-            record.environment_id,
-        )
-    )
-    value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
-    exploratory_score = 1 if _is_exploratory_record(record) else 0
-    return selector_score, value_score, exploratory_score
-
-
-def _scientific_parameter_record_priority(record: ParameterRecord) -> tuple[int, int, int]:
-    selector_score = sum(
-        value is not None
-        for value in (
-            record.enzyme_class,
-            record.substrate_class,
-            record.fungus_id,
-            record.substrate_id,
-            record.environment_id,
-        )
-    )
-    value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
-    maturity_score = 1 if record.maturity == "calibrated" else 0
-    return selector_score, value_score, maturity_score
 
 
 def _trajectory_state_names(row: Mapping[str, str]) -> tuple[str, ...]:
@@ -2532,7 +2527,7 @@ def _provenance_source(provenance: Mapping[str, Any]) -> str:
 
 
 def _is_exploratory_record(record: ParameterRecord) -> bool:
-    return record.maturity == "exploratory_prior" or bool(record.provenance.get("exploratory_prior"))
+    return parameter_record_is_exploratory(record)
 
 
 def _parameter_source_class(record: ParameterRecord | None) -> str:

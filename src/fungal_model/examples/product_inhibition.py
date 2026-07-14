@@ -8,6 +8,8 @@ from typing import Any, cast
 
 import yaml
 
+from fungal_model.registry.records import PARAMETER_ALLOWED_USE_EXPLORATORY
+
 
 def prepare_reversible_product_inhibition_example_registry(
     destination: str | Path,
@@ -38,6 +40,9 @@ def prepare_reversible_product_inhibition_example_registry(
     shutil.copytree(source_dir, target_dir)
 
     _add_chain_template_modifier(target_dir / "case_templates" / "case_templates.yml")
+    _add_component_compatibility_role(
+        target_dir / "processes" / "process_compatibility.yml"
+    )
     _add_example_inhibition_parameter(
         target_dir / "parameters" / "parameter_records.yml",
         inhibition_constant_mM=inhibition_constant_mM,
@@ -55,6 +60,15 @@ def _add_chain_template_modifier(template_path: Path) -> None:
         metadata["parameter_record_ids"]["product_inhibition_constant"] = (
             "bio003_example_product_inhibition_constant"
         )
+        metadata["parameter_role_contracts"]["product_inhibition_constant"] = {
+            "kind": "process_parameter",
+            "parameter_symbol": "K_i_bio003_product_example",
+            "enzyme_class": "beta_glucosidase",
+            "substrate_class": "cellobiose",
+            "fungus_id": "sabiork_beta_glucosidase_source",
+            "substrate_id": "cellobiose",
+            "environment_id": "sabiork_reaction_618_selected_conditions",
+        }
         metadata["process_templates"][1]["modifiers"] = [
             {
                 "type": "product_inhibition",
@@ -69,6 +83,31 @@ def _add_chain_template_modifier(template_path: Path) -> None:
         template_path.write_text(yaml.safe_dump(template_data, sort_keys=False), encoding="utf-8")
         return
     raise ValueError("Missing BIO-002 extracellular enzyme-chain template in copied registry.")
+
+
+def _add_component_compatibility_role(compatibility_path: Path) -> None:
+    compatibility_data = _yaml_mapping(compatibility_path)
+    records = cast(list[dict[str, Any]], compatibility_data["records"])
+    updated: set[str] = set()
+    for record in records:
+        if record["record_id"] == "bio002_cellulase_cellulose_film_extracellular_chain":
+            record["required_parameters"].append("K_i_bio003_product_example")
+            record["parameter_roles"]["product_inhibition_constant"] = (
+                "K_i_bio003_product_example"
+            )
+            updated.add("outer")
+        if record["record_id"] == "bio002_beta_glucosidase_cellobiose_component":
+            record["required_parameters"].append("K_i_bio003_product_example")
+            record["parameter_roles"]["inhibition_constant"] = (
+                "K_i_bio003_product_example"
+            )
+            updated.add("component")
+    if updated != {"outer", "component"}:
+        raise ValueError("Missing BIO-002 chain compatibility records in copied registry.")
+    compatibility_path.write_text(
+        yaml.safe_dump(compatibility_data, sort_keys=False),
+        encoding="utf-8",
+    )
 
 
 def _add_example_inhibition_parameter(parameter_path: Path, *, inhibition_constant_mM: float) -> None:
@@ -91,11 +130,11 @@ def _add_example_inhibition_parameter(parameter_path: Path, *, inhibition_consta
             },
             "parameter_symbol": "K_i_bio003_product_example",
             "process_type": "homogeneous_michaelis_menten",
-            "enzyme_class": None,
-            "substrate_class": None,
-            "fungus_id": None,
-            "substrate_id": None,
-            "environment_id": None,
+            "enzyme_class": "beta_glucosidase",
+            "substrate_class": "cellobiose",
+            "fungus_id": "sabiork_beta_glucosidase_source",
+            "substrate_id": "cellobiose",
+            "environment_id": "sabiork_reaction_618_selected_conditions",
             "value": {
                 "kind": "exact",
                 "value": inhibition_constant_mM,
@@ -106,7 +145,7 @@ def _add_example_inhibition_parameter(parameter_path: Path, *, inhibition_consta
             },
             "range_scope": "researcher_facing_example_fixture",
             "range_interpretation": "configured mechanics only",
-            "allowed_use": "exploratory_example_only_not_scientific_validation",
+            "allowed_use": PARAMETER_ALLOWED_USE_EXPLORATORY,
             "notes": (
                 "Fixture K_i for demonstrating explicit registry-backed product-inhibition "
                 "assembly and output inspection."

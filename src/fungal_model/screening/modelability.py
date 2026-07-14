@@ -8,8 +8,20 @@ from typing import Any, Literal, Mapping
 from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
+    parameter_record_is_exploratory,
+    parameter_record_is_mode_eligible,
+    parameter_record_mode_eligibility_blocker,
+    parameter_record_selection_key,
 )
-from fungal_model.registry.store import FungModRegistry, RegistryLookupError
+from fungal_model.registry.store import (
+    FungModRegistry,
+    RegistryLookupError,
+    RegistryValidationError,
+)
+from fungal_model.screening.parameter_resolution import (
+    ExactTemplateParameterError,
+    resolve_exact_template_parameter_records,
+)
 
 ModelabilityMode = Literal["scientific", "exploratory", "toy"]
 ModelabilityStatus = Literal["modelable", "exploratory", "underparameterized", "unsupported"]
@@ -172,6 +184,16 @@ def assess_modelability(
                     substrate_class=substrate.substrate_class,
                     process_type=process_type,
                 )
+            except RegistryValidationError as exc:
+                incompatible.append(
+                    _item(
+                        "process_compatibility",
+                        "component_authority_graph",
+                        f"Registry process compatibility authority graph is invalid: {exc}",
+                        {},
+                    )
+                )
+                continue
             except RegistryLookupError:
                 incompatible.append(
                     _item(
@@ -273,16 +295,61 @@ def _evaluate_compatibility_parameters(
     missing: list[ReportItem] = []
     incompatible: list[ReportItem] = []
     required_parameters = tuple(dict.fromkeys(compatibility.required_parameters))
+    explicit_records: Mapping[str, ParameterRecord] | None = None
+    if compatibility.case_template_id:
+        try:
+            template = registry.get_case_template(compatibility.case_template_id)
+            explicit_records = resolve_exact_template_parameter_records(
+                registry=registry,
+                template=template,
+                compatibility=compatibility,
+                required_roles=tuple(compatibility.parameter_roles),
+                fungus_id=fungus_id,
+                substrate_id=substrate_id,
+                environment_id=environment_id,
+                mode=mode,
+                value_requirement="sampleable" if mode == "exploratory" else "exact",
+            )
+        except (RegistryLookupError, ExactTemplateParameterError) as exc:
+            role = exc.role if isinstance(exc, ExactTemplateParameterError) else ""
+            incompatible.append(
+                _item(
+                    "parameter",
+                    role or compatibility.record_id,
+                    f"Exact case-template parameter mapping is incompatible: {exc}",
+                    {
+                        "process_type": compatibility.process_type,
+                        "case_template_id": compatibility.case_template_id,
+                    },
+                )
+            )
+            return {
+                "compatibility": compatibility,
+                "known": known,
+                "uncertain": uncertain,
+                "missing": missing,
+                "incompatible": incompatible,
+                "required_parameters": required_parameters,
+                "status": "underparameterized",
+            }
     for symbol in required_parameters:
-        record = _best_parameter_record(
-            registry=registry,
-            parameter_symbol=symbol,
-            compatibility=compatibility,
-            fungus_id=fungus_id,
-            substrate_id=substrate_id,
-            environment_id=environment_id,
-            mode=mode,
-        )
+        if explicit_records is not None:
+            role = next(
+                role
+                for role, mapped_symbol in compatibility.parameter_roles.items()
+                if mapped_symbol == symbol
+            )
+            record = explicit_records[role]
+        else:
+            record = _best_parameter_record(
+                registry=registry,
+                parameter_symbol=symbol,
+                compatibility=compatibility,
+                fungus_id=fungus_id,
+                substrate_id=substrate_id,
+                environment_id=environment_id,
+                mode=mode,
+            )
         if record is None:
             missing.append(
                 _item(
@@ -318,7 +385,9 @@ def _evaluate_compatibility_parameters(
     }
 
 
-def _compatibility_evaluation_priority(evaluation: Mapping[str, Any]) -> tuple[int, int, int]:
+def _compatibility_evaluation_priority(
+    evaluation: Mapping[str, Any],
+) -> tuple[int, int, int]:
     status_score = {
         "modelable": 3,
         "exploratory": 2,
@@ -351,24 +420,33 @@ def _classify_parameter(
             )
         )
         return
+    if record.value.is_unknown:
+        missing.append(
+            _item(
+                "parameter",
+                record.parameter_symbol,
+                "Required parameter is explicitly unknown.",
+                {"record_id": record.record_id, "value": record.value.to_dict()},
+            )
+        )
+        return
+    eligibility_blocker = parameter_record_mode_eligibility_blocker(record, mode=mode)
+    if eligibility_blocker is not None:
+        incompatible.append(
+            _item(
+                "parameter",
+                record.parameter_symbol,
+                eligibility_blocker,
+                {
+                    "record_id": record.record_id,
+                    "maturity": record.maturity,
+                    "allowed_use": record.allowed_use,
+                    "value": record.value.to_dict(),
+                },
+            )
+        )
+        return
     if record.value.is_exact:
-        if mode == "scientific":
-            blocker = _scientific_parameter_blocker(record)
-            if blocker is not None:
-                incompatible.append(
-                    _item(
-                        "parameter",
-                        record.parameter_symbol,
-                        blocker,
-                        {
-                            "record_id": record.record_id,
-                            "maturity": record.maturity,
-                            "allowed_use": record.allowed_use,
-                            "value": record.value.to_dict(),
-                        },
-                    )
-                )
-                return
         known.append(
             _item(
                 "parameter",
@@ -394,16 +472,6 @@ def _classify_parameter(
             )
         )
         return
-    if record.value.is_unknown:
-        missing.append(
-            _item(
-                "parameter",
-                record.parameter_symbol,
-                "Required parameter is explicitly unknown.",
-                {"record_id": record.record_id, "value": record.value.to_dict()},
-            )
-        )
-        return
     incompatible.append(
         _item(
             "parameter",
@@ -424,15 +492,7 @@ def _best_parameter_record(
     environment_id: str,
     mode: ModelabilityMode,
 ) -> ParameterRecord | None:
-    chain_record = _chain_template_parameter_record(
-        registry=registry,
-        compatibility=compatibility,
-        parameter_symbol=parameter_symbol,
-        environment_id=environment_id,
-    )
-    if chain_record is not None:
-        return chain_record
-    candidates = [
+    matching = [
         record
         for record in registry.parameters.values()
         if record.parameter_symbol == parameter_symbol
@@ -443,80 +503,23 @@ def _best_parameter_record(
         and _matches(record.substrate_id, substrate_id)
         and _matches(record.environment_id, environment_id)
     ]
-    if mode == "scientific":
-        candidates = [
-            record
-            for record in candidates
-            if not _is_exploratory_parameter_record(record)
-        ]
+    candidates = [
+        record for record in matching if parameter_record_is_mode_eligible(record, mode=mode)
+    ]
     if not candidates:
-        return None
-    return max(candidates, key=lambda record: _parameter_specificity(record, mode=mode))
-
-
-def _chain_template_parameter_record(
-    *,
-    registry: FungModRegistry,
-    compatibility: ProcessCompatibilityRecord,
-    parameter_symbol: str,
-    environment_id: str,
-) -> ParameterRecord | None:
-    if compatibility.process_type != "extracellular_enzyme_chain" or not compatibility.case_template_id:
-        return None
-    try:
-        template = registry.get_case_template(compatibility.case_template_id)
-    except RegistryLookupError:
-        return None
-    parameter_ids = template.process_state_metadata.get("parameter_record_ids")
-    if not isinstance(parameter_ids, dict):
-        return None
-    for record_id in parameter_ids.values():
-        record = registry.parameters.get(str(record_id))
-        if (
-            record is not None
-            and record.parameter_symbol == parameter_symbol
-            and _matches(record.environment_id, environment_id)
-        ):
-            return record
-    return None
+        return next(
+            (
+                record
+                for record in matching
+                if record.value.is_unknown or not parameter_record_is_exploratory(record)
+            ),
+            None,
+        )
+    return max(candidates, key=lambda record: parameter_record_selection_key(record, mode=mode))
 
 
 def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
-
-
-def _parameter_specificity(record: ParameterRecord, *, mode: ModelabilityMode) -> tuple[int, ...]:
-    selector_score = sum(
-        value is not None
-        for value in (
-            record.enzyme_class,
-            record.substrate_class,
-            record.fungus_id,
-            record.substrate_id,
-            record.environment_id,
-        )
-    )
-    maturity_score = 1 if record.maturity == "calibrated" else 0
-    if mode == "exploratory":
-        value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
-        exploratory_score = 1 if _is_exploratory_parameter_record(record) else 0
-        return selector_score, value_score, exploratory_score, maturity_score
-    value_score = 2 if record.value.is_exact else 1 if record.value.is_uncertain else 0
-    return selector_score, value_score, maturity_score
-
-
-def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:
-    return record.maturity == "exploratory_prior" or bool(record.provenance.get("exploratory_prior"))
-
-
-def _scientific_parameter_blocker(record: ParameterRecord) -> str | None:
-    maturity = record.maturity.casefold()
-    if maturity.startswith("toy") or maturity.startswith("synthetic"):
-        return "Scientific mode rejects toy or synthetic parameter records."
-    allowed_use = record.allowed_use.casefold()
-    if "scientific" not in allowed_use:
-        return "Scientific mode requires parameter allowed_use to permit scientific use."
-    return None
 
 
 def _status(

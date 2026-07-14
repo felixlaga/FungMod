@@ -129,11 +129,25 @@ basic kinetics layer:
   reviewed registry-plan bytes on copied or explicitly selected registries,
   with strict next-patch versioning, full-root drift detection, durable curator
   audit provenance, rollback, and no automatic simulation or validation claim;
+- an identity-only, PARAMETER-specific CURATION-001 authoring bridge that binds
+  an explicitly accepted in-memory source result to a complete curator-authored
+  production `ParameterRecord`, verifies exact loader fidelity and source
+  provenance through a closed identity-only outer metadata schema, and returns
+  a promotion-plan-compatible result without applying it;
+- mode-independent modelability and simulation rejection for parameters whose
+  exact `allowed_use` is `registry_storage_only_no_simulation_authorization`;
 - a registry-backed extracellular enzyme-chain assembler for ordered linear
   chains of two or more implemented process steps, whose stoichiometry,
   conserved quantities, entities, modifiers, and output labels come from
   template data rather than mechanism-code biological names; branching and
-  cycles fail explicitly as unsupported;
+  cycles fail explicitly as unsupported. Component process compatibilities use
+  an intrinsic `component_only` scope and a registry-validated ownership graph,
+  so removing or corrupting an outer binding cannot expose a component as a
+  standalone compatibility. Exact templates also cross-bind configured
+  substrate entity IDs to the exact registry-backed `state_species` identity
+  consumed by the outer process, bind direct process parameters through
+  process-type-owned semantic fields, and bind initial-state and modifier
+  symbols through exact semantic compatibility keys;
 - a scoped CASE-001 researcher-facing path that runs the existing BIO-002
   cellulose-equivalent enzyme-chain virtual experiment from names and aliases
   through the top-level `virtual_experiment(...)` API.
@@ -294,6 +308,9 @@ and allowed-use decision. Apply writes those exact prospective bytes; it does
 not transform scientific values, units, maturity, target `allowed_use`,
 mechanisms, or IDs. Pre-PR-47 written schema `1.0.0` remains preview-only and
 is explicitly rejected at apply because it lacks that durable audit contract.
+Bundle checksums establish deterministic internal consistency and tamper
+detection relative to the manifest; they are not signatures and do not prove
+external curator identity or authorship.
 When the target record's outer provenance also carries a source database,
 entry ID or IDs, snapshot path, or source URL, that normalized source identity
 must agree type- and value-exactly with the curator source provenance before
@@ -324,12 +341,149 @@ destination; product maps remain blocked as
 `unsupported_pending_destination_contract`. Production promotion does not
 authorize simulation, alter package version, or claim scientific validation.
 
-The current frozen SABIO-RK source path still cannot produce a
-loader-fidelitous, curator-authored production registry record without an
-explicit source-to-production schema/conversion workflow. No guessed
-conversion, default, or missing scientific field is permitted. CURATION-001
-therefore remains partial after PR-47. The bounded PR-48 follow-up is that
-curator-authored source-to-production registry-record bridge.
+After a curator explicitly completes and accepts an eligible PARAMETER source
+record as an in-memory `CurationResult`, author the separate production target
+without mutating or applying to a registry:
+
+```python
+from fungal_model import author_parameter_record, plan_registry_promotion
+
+accepted = accepted_review.accepted_records[0]
+source_identity = accepted.source_provenance
+authored = author_parameter_record(
+    accepted_review,
+    source_record_id="proposed_sabiork_parameter_618_35622_kcat_cellobiose",
+    parameter_record={
+        "record_id": "sabiork_reaction_618_kcat_cellobiose",
+        "name": "SABIO-RK Reaction 618 kcat for cellobiose",
+        "maturity": "literature_processed",
+        "provenance": {
+            "source_database": source_identity["source_database"],
+            "source_entry_ids": source_identity["source_entry_ids"],
+            "source_reaction_ids": source_identity["source_reaction_ids"],
+            "source_query": source_identity["source_query"],
+            "source_field": source_identity["source_field"],
+            "source_snapshot_path": source_identity["source_snapshot_path"],
+            "source_url": source_identity["source_url"],
+            "source_urls": source_identity["source_urls"],
+            "source_snapshot_sha256": source_identity["source_snapshot_sha256"],
+            "parameter_role": accepted.proposed_record["parameter_role"],
+            "curator": "Researcher Name",
+            "curation_date": "2026-07-14",
+            "source_reaction_id": "618",
+            "selected_kinlaw_entry_id": "35622",
+        },
+        "notes": "Identity transcription only; not validated science.",
+        "parameter_symbol": "kcat_cellobiose",
+        "process_type": "homogeneous_michaelis_menten",
+        "enzyme_class": "beta_glucosidase",
+        "substrate_class": "cellobiose",
+        "fungus_id": "sabiork_beta_glucosidase_source",
+        "substrate_id": "cellobiose",
+        "environment_id": "sabiork_reaction_618_selected_conditions",
+        "value": {
+            "kind": "exact",
+            "units": "s^(-1)",
+            "value": 0.13,
+            "lower": None,
+            "upper": None,
+            "distribution": None,
+            "parameters": {},
+            "source": "SABIO-RK Reaction 618 selected kinetic law",
+            "confidence_level": "curator_accepted_identity_transcription_not_validation",
+            "notes": "Not validation, calibration, or simulation authorization.",
+        },
+        "range_scope": "single_source_entry",
+        "range_interpretation": "exact_identity_transcription_not_uncertainty",
+        "allowed_use": "registry_storage_only_no_simulation_authorization",
+    },
+    registry_index="path/to/copied_registry/registry_index.yml",
+)
+authored.write("data/proposed_records/sabiork/authored_parameter")
+plan = plan_registry_promotion(
+    authored,
+    registry_index="path/to/copied_registry/registry_index.yml",
+)
+```
+
+`author_parameter_record(...)` deliberately accepts only a validated in-memory
+`CurationResult`; a reusable public written-curation loader is deferred. The
+specialized result uses the existing deterministic, checksummed curation writer,
+and either that written bundle or the in-memory result is consumable by
+`plan_registry_promotion(...)` after authoring-digest, loader, registry-context,
+selector, closed-summary, and exact reconstruction of the manifest, all three
+decision YAML payloads, both decision CSV tables, and full report.
+Removing the bridge marker or specialized summary labels cannot downgrade a
+candidate with the intrinsic source/curator authoring provenance shape into a
+generic promotion; apply independently rejects a legacy or reconstructed
+generic plan unless the complete bridge audit, schema, digest, identity, and
+closed safety policies revalidate. The shared classifier treats either reserved
+`fungmod_parameter_bridge`/`fungmod_curation` namespace, including malformed
+forms and distinctive nested source evidence, as non-simulation provenance;
+ordinary outer `curator`, `curation_date`, or `parameter_role` fields alone do
+not trigger the bridge contract. Public checksums establish internal consistency only; they
+are not signatures or proof of curator authorship. Registry context binds the index plus the complete
+registry file tree; selector audit binds resolved entity classes, exactly one
+compatibility record, and the source/curator-authored runtime parameter-role
+key. The source/acceptance evidence remains audit
+metadata; only the complete curator-authored `ParameterRecord` is the
+loader/promotion target. Original, converted, and target numeric values must be
+finite floats and type-exactly equal, units must be identical, and
+`conversion_method` must be `identity_no_conversion`. Nonidentity conversions,
+other record types, automatic apply, scientific validation, and simulation
+authorization remain explicitly unsupported, so CURATION-001 remains partial.
+The curator-authored outer provenance is a closed identity-only schema: complete
+source identity and singular aliases, one explicit parameter role, curator and
+date, plus the established optional kinetic-record path. Additional validation,
+calibration, readiness, authorization, or nested claim metadata is rejected
+rather than reconciled by name guessing.
+The source adapter's `frozen_source_urls(...)` helper reads only adjacent local
+fetch metadata and performs no network access. It reconciles `total_pages`,
+`requests_made`, ordered `source_urls`, and, for immutable bundles, raw-page
+count/order/page numbers, URLs, unique exact `raw/page_NNNN.json` paths, sizes,
+and checksums. The
+bridge revalidates that frozen URL identity during authoring and planning. One fetched URL requires the
+same singular `source_url`; multiple ordered URLs require `source_url=None` and
+the exact nonempty `source_urls` sequence. Its exact storage-only `allowed_use`
+and its intrinsic bridge-derived provenance shape are enforced by one shared
+admission predicate in modelability, parameter ranking, case
+assembly, ensemble runtime, and chain-template resolution in every supported
+mode, so an authored or later promoted record cannot authorize
+`VirtualExperiment.simulate(...)`. Dynamic parameter searches in modelability,
+ensemble runtime, deterministic case assembly, and result-table reconstruction
+first apply one mode-aware eligibility predicate and then one complete ranking
+key, including the calibrated-maturity tie-break. Admission uses exact closed
+`allowed_use` values: scientific mode accepts only
+`scientific_or_exploratory_when_all_other_inputs_are_valid`; exploratory and toy
+modes additionally accept the named exploratory/screening and software-test
+policies. Empty, unknown, negative, near-match, storage-only, and
+bridge/curation-evidence policies fail closed before ranking.
+
+Explicit CASE-001 chain mappings use their exact role-to-record IDs and one
+shared resolver across preflight, ensemble/public simulation, deterministic
+assembly, direct chain assembly, and result reconstruction. Each mapped role has
+an exact symbol and selector contract. The outer process compatibility record
+binds each ordered process-template ID to one exact component compatibility
+record. Component `state_roles` then resolve through canonical `state_species`
+enzyme-entity or substrate IDs; classes derive from those declared entities and
+the registry, and must agree with enzyme capabilities and the bound component
+compatibility. Process parameters and parameter-backed catalyst/substrate
+initial states must match that independently resolved owning slot. Role/record
+selectors are assertions only, and `component_selectors` shadow metadata is
+rejected. Inventory membership or a mutually consistent rewrite of role
+contracts, records, and selector assertions is insufficient. Null record entity
+selectors may remain only where the record contract permits them; class
+assertions must still match the bound component identity.
+Component-process parameter ownership is derived from `process_templates`;
+implemented direct process types also impose their canonical parameter fields,
+so required roles cannot be truncated, renamed, or reused across fields before
+role ownership is resolved. The configured outer substrate entity must be the
+exact registry identity consumed by the outer substrate state; parking that ID
+on an unused state does not satisfy the contract.
+initial-state roles declare a
+`record_process_type` scope without claiming a kinetic owner. Missing,
+unauthorized, mode-ineligible, selector-incompatible, component-incompatible,
+or process-incompatible records are rejected without dynamic fallback.
 
 ## Run A Virtual Experiment
 
@@ -674,7 +828,11 @@ live refresh is explicit and uses immutable query-specific bundles with raw
 page checksums and a separate derived combined export. Proposed product maps,
 parameter records, and process-compatibility records are written for human
 review under a proposal bundle; they are not silently committed into the
-simulation registry. Use
+simulation registry. SABIO parameter proposals now include an explicit
+`parameter_role` aligned with runtime compatibility roles; the SABIO `Km`
+symbol role is normalized to runtime key `km`. This changes proposal payloads
+in addition to preserving exact frozen source URLs, but does not change source
+values, units, process laws, or scientific maturity. Use
 `scripts/fetch_sabiork_kinlaw_entries.py` to freeze raw SABIO-RK exports and
 `scripts/propose_sabiork_source_records.py` to create review-only proposal
 artifacts from a frozen snapshot.
@@ -699,11 +857,15 @@ write rechecks the immutable plan digest before touching its destination. The
 top-level `apply_registry_promotion(...)` API now supplies the separately
 reviewed digest-confirmed transaction, exact-next-patch version policy,
 full-root staging, single-writer lock, rollback, and structured apply result.
-This completes the bounded transactional-apply contract once PR-47 merges,
+This completed the bounded transactional-apply contract when PR-47 merged as
+PR #62 (`b1ebb860`),
 without making promoted records scientifically validated or automatically
-simulation-authorized. CURATION-001 remains partial until a real frozen source
-record can be explicitly curated into a loader-fidelitous production record
-without guessed conversions or defaults.
+simulation-authorized. The top-level `author_parameter_record(...)` API now
+adds the separate PARAMETER-only, identity-only source-to-production bridge over
+an accepted in-memory curation result. Its checksummed output remains planning
+input, not an apply instruction. Its exact storage-only policy is a simulation
+blocker in every modelability mode. CURATION-001 remains partial for
+nonidentity conversion and non-parameter source records.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
 The current library provides factories for first-order, mass-action,
