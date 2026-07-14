@@ -48,25 +48,37 @@ Completed in this pass:
   `ValueSpec` forms, and nonidentity methods fail closed.
 - Required complete accepted-curation evidence and exact source identity:
   proposal record id, database, entry/reaction ids, query, source field,
-  snapshot path, explicit URL slot, frozen snapshot SHA256, curator, date,
-  reason, limitations, and pending-promotion decision policy. The snapshot
-  bytes are rehashed before authoring.
+  snapshot path, exact `source_url`/`source_urls` from frozen fetch metadata,
+  frozen snapshot SHA256, curator, date, reason, limitations, and
+  pending-promotion decision policy. Snapshot bytes and frozen URL evidence are
+  revalidated before authoring and planning.
 - Required every loader-emitted production field, all explicit null selectors,
   every exact `ValueSpec` field, closed maturity/allowed-use/range policies,
   a closed non-validation confidence label, exact source parameter
   symbol/value/units, and full outer source/curator
   provenance. Loader-dropped, synthesized, defaulted, or type-coerced mappings
   are rejected by exact production-loader round-trip comparison.
-- Resolved all non-null selectors and the process/parameter role against the
-  supplied registry. The authored result records the registry index identity
-  and digest, isolates itself from later input mutation, and revalidates its
-  authoring digest, selectors, and planning registry when passed to
-  `plan_registry_promotion(...)`.
+- Resolved effective enzyme/substrate classes from every non-null entity id,
+  rejected class/entity disagreements, and required exactly one process
+  compatibility record matching the effective combination and parameter role.
+  The authored result records the registry index identity and digest, isolates
+  itself from later input mutation, and revalidates its authoring digest,
+  selectors, and planning registry when passed to `plan_registry_promotion(...)`.
 - Preserved the dual representation: accepted source/curation evidence is
   durable `fungmod_parameter_bridge` audit metadata, while only the complete
   curator-authored `ParameterRecord` is the loader and promotion target. The
   specialized result reuses `CurationResult.write()` for deterministic,
   checksummed output already consumable by promotion planning.
+- Bound source query, source snapshot path, proposal limitations, every
+  original/source/normalized/converted/target value and unit representation,
+  singular and plural source aliases, acceptance evidence, and every closed
+  policy field into exact-key audit schemas and the result digest. Both
+  authoring-owned provenance keys are reserved and rejected on input.
+- Made `registry_storage_only_no_simulation_authorization` a centralized,
+  mode-independent modelability blocker. Exploratory, scientific, and toy
+  preflight paths cannot use such a parameter, and
+  `VirtualExperiment.simulate(...)` fails before execution. Other explicit
+  `allowed_use` behavior remains unchanged.
 - Kept written source curation input out of scope. Shared canonicalization,
   type-exact comparison, round-trip difference, SHA256, and symlink helpers
   live in one internal integrity module and are reused by registry promotion;
@@ -90,9 +102,10 @@ planning-registry revalidation, and public exports.
 PR-48 current scope, remaining CURATION-001 limits, and the PR-49 follow-up.
 
 What did not change: no production registry record or version, package version,
-source adapter, curation decision semantics, promotion apply behavior, process
-law, solver, simulation eligibility, biology, parameter value/unit/maturity in
-`data_registry/`, validation data, calibration, or empirical comparison.
+curation decision semantics, promotion apply behavior, process law, solver,
+biology, parameter value/unit/maturity in `data_registry/`, validation data,
+calibration, or empirical comparison. The SABIO source adapter only adds exact
+frozen fetch URLs to proposal provenance; it performs no network access here.
 
 Scientific behavior impact: no new scientific result. The frozen SABIO case
 proves deterministic extraction, explicit identity mapping, provenance,
@@ -101,9 +114,12 @@ science, validation, calibration, prediction, transferability evidence, or
 simulation authorization.
 
 Backward compatibility: additive public API and result/error types. Existing
-curation, planning, and apply inputs retain their contracts. Only records that
-carry the new reserved PARAMETER bridge marker receive the additional
-authoring-digest and registry-context revalidation.
+curation, planning, and apply inputs retain their contracts. Records carrying
+the new reserved PARAMETER bridge marker receive additional authoring-digest
+and registry-context revalidation. Deliberate safety change: an exact
+`registry_storage_only_no_simulation_authorization` parameter is now rejected
+by modelability/preflight in every mode; behavior for other explicit
+`allowed_use` values is unchanged.
 
 Remaining ambiguity and risk: nonidentity conversions require a separate
 closed conversion-method registry, unit parsing, dimensional compatibility,
@@ -125,10 +141,11 @@ written source bundle. Add no scientific transformation or registry mutation.
 
 Verification:
 
-- Focused PARAMETER-authoring suite: 39 passed.
-- Focused curation, planning, apply, registry-loading, public-API, authoring,
-  and roadmap-status suite: 212 passed in 30.26s.
-- Canonical full pytest: 950 passed in 92.34s on the final code.
+- Focused PARAMETER-authoring suite: 63 passed.
+- Focused authoring, source-provider, curation, promotion-planning,
+  modelability, VirtualExperiment, and roadmap-status suite: 214 passed in
+  14.10s.
+- Canonical full pytest: 981 passed in 91.95s on the final code.
 - Focused Ruff: passed.
 - Full Ruff: passed for `src` and `tests`.
 - Full Pyright with the shared venv interpreter selected explicitly: 0 errors,

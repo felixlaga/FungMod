@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
 from fungal_model.registry.records import (
+    PARAMETER_ALLOWED_USE_STORAGE_ONLY,
     ParameterRecord,
     ProcessCompatibilityRecord,
 )
@@ -348,6 +349,21 @@ def _classify_parameter(
                 record.parameter_symbol,
                 "Parameter ValueSpec failed validation.",
                 {"record_id": record.record_id, "validation": validation.to_dict()},
+            )
+        )
+        return
+    if record.allowed_use == PARAMETER_ALLOWED_USE_STORAGE_ONLY:
+        incompatible.append(
+            _item(
+                "parameter",
+                record.parameter_symbol,
+                "Parameter allowed_use is storage-only and does not authorize simulation in any mode.",
+                {
+                    "record_id": record.record_id,
+                    "maturity": record.maturity,
+                    "allowed_use": record.allowed_use,
+                    "value": record.value.to_dict(),
+                },
             )
         )
         return

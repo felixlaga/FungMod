@@ -1815,15 +1815,36 @@ def _source_002_provenance(
     *,
     proposal: RegistryProposal,
 ) -> dict[str, Any]:
+    source_urls = frozen_source_urls(proposal.source_snapshot_path)
     return {
         "source_database": "SABIO-RK",
         "source_query": proposal.source_query,
         "source_snapshot_path": proposal.source_snapshot_path,
+        "source_url": source_urls[0] if len(source_urls) == 1 else None,
+        "source_urls": list(source_urls),
         "source_entry_ids": list(_unique_text(record.entry_id for record in records)),
         "source_reaction_ids": list(_unique_text(record.reaction_id for record in records)),
         "proposal_status": proposal.proposal_status,
         "notes": "SOURCE-002 review-only proposal; not automatically promoted to the production registry.",
     }
+
+
+def frozen_source_urls(source_snapshot_path: str) -> tuple[str, ...]:
+    """Read source URLs from local frozen-snapshot metadata without network access."""
+
+    urls: list[str] = []
+    for value in source_snapshot_path.split("; "):
+        metadata = _load_metadata(_metadata_path_for_export(Path(value)))
+        raw_urls = metadata.get("source_urls")
+        if raw_urls is None:
+            continue
+        if not isinstance(raw_urls, Sequence) or isinstance(raw_urls, (str, bytes)):
+            raise SabioRKSourceError("SABIO-RK fetch metadata source_urls must be a sequence.")
+        for url in raw_urls:
+            if not isinstance(url, str) or not url.strip():
+                raise SabioRKSourceError("SABIO-RK fetch metadata source_urls must contain nonblank URLs.")
+            urls.append(url)
+    return _unique_text(urls)
 
 
 def _source_002_enzyme_id(record: SabioRKReactionRecord) -> str:
@@ -2075,6 +2096,7 @@ __all__ = [
     "SabioRKSourceError",
     "SabioRKSourceSnapshot",
     "SourceDiscoveryResult",
+    "frozen_source_urls",
     "stable_registry_proposal_id",
     "stable_sabiork_token",
 ]

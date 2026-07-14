@@ -13,6 +13,7 @@ from fungal_model import VirtualExperiment, environment_grid, virtual_experiment
 from fungal_model.api import VirtualExperimentError
 from fungal_model.api.report import write_virtual_experiment_report
 from fungal_model.registry import AmbiguousResolutionError, ResolutionError
+from fungal_model.registry.records import PARAMETER_ALLOWED_USE_STORAGE_ONLY
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -228,6 +229,38 @@ def test_scientific_mode_rejects_toy_scientific_inputs(tmp_path: Path) -> None:
     assert any("toy or synthetic" in item.message for item in report.incompatible)
     with pytest.raises(VirtualExperimentError, match="toy or synthetic"):
         study.simulate(mode="scientific", output_dir=tmp_path / "toy_blocked", quicklook=False)
+
+
+@pytest.mark.parametrize("mode", ["exploratory", "scientific"])
+def test_storage_only_parameter_blocks_virtual_experiment_simulation(
+    tmp_path: Path,
+    mode: str,
+) -> None:
+    registry = _modelable_toy_registry(tmp_path)
+    parameters_path = registry / "parameters" / "parameter_records.yml"
+    payload = _yaml_mapping(parameters_path)
+    records = cast(list[dict[str, Any]], payload["records"])
+    target = next(item for item in records if item["record_id"] == "toy_param_k_surface_exact")
+    target["maturity"] = "literature_processed"
+    target["allowed_use"] = PARAMETER_ALLOWED_USE_STORAGE_ONLY
+    parameters_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    study = virtual_experiment(
+        fungi="toy_fungus_alpha",
+        substrates="toy_cellulose_like_solid",
+        environments="toy_lab_environment",
+        registry=registry / "registry_index.yml",
+    )
+
+    report = study.preflight(mode=cast(Any, mode))[0]
+
+    assert report.status == "underparameterized"
+    assert any("storage-only" in item.message for item in report.incompatible)
+    with pytest.raises(VirtualExperimentError, match="storage-only"):
+        study.simulate(
+            mode=cast(Any, mode),
+            output_dir=tmp_path / f"storage_only_{mode}",
+            quicklook=False,
+        )
 
 
 def test_result_table_accessors_return_standard_tables(tmp_path: Path) -> None:

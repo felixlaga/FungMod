@@ -16,6 +16,7 @@ def _tuple_of_strings(values: Sequence[Any] | None) -> tuple[str, ...]:
 
 
 CASE_TEMPLATE_SCHEMA_VERSION = "1"
+PARAMETER_ALLOWED_USE_STORAGE_ONLY = "registry_storage_only_no_simulation_authorization"
 CASE_TEMPLATE_ALLOWED_STATE_ROLES = frozenset(
     {
         "substrate",
@@ -578,6 +579,7 @@ __all__ = [
     "EnvironmentRecord",
     "FungusRecord",
     "ParameterRecord",
+    "PARAMETER_ALLOWED_USE_STORAGE_ONLY",
     "ProcessCompatibilityRecord",
     "RegistryRecord",
     "SubstrateRecord",

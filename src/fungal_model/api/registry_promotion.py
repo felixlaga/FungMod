@@ -20,6 +20,7 @@ from typing import Any, Iterator, Literal
 import yaml
 
 from fungal_model.api._integrity import (
+    CURATION_AUDIT_PROVENANCE_KEY as _CURATION_AUDIT_PROVENANCE_KEY,
     canonicalize as _canonicalize,
     first_symlink_component,
     round_trip_differences as _round_trip_differences,
@@ -53,7 +54,6 @@ REGISTRY_PROMOTION_PLAN_MANIFEST_KIND = "fungmod_registry_promotion_plan_manifes
 
 _PROMOTION_APPLY_POLICY = "digest_confirmed_transactional_registry_root_swap"
 _PROMOTION_VERSION_POLICY = "strict_next_numeric_patch_version"
-_CURATION_AUDIT_PROVENANCE_KEY = "fungmod_curation"
 
 PromotionClassification = Literal[
     "addable",
@@ -1984,6 +1984,8 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
         try:
             validate_parameter_authoring_bundle_record(
                 summary=summary,
+                manifest=manifest,
+                accepted_payload=accepted_payload,
                 record_type=item.record_type,
                 target_record=item.target_record,
                 curation_metadata=item.curation_metadata,

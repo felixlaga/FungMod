@@ -37,6 +37,7 @@ from fungal_model.api.parameter_record_authoring import (
     PARAMETER_AUTHORING_WORKFLOW,
     PARAMETER_BRIDGE_PROVENANCE_KEY,
     PARAMETER_IDENTITY_CONVERSION_METHOD,
+    parameter_authoring_digest,
 )
 
 
@@ -47,6 +48,10 @@ SOURCE_PARAMETER_ID = "proposed_sabiork_parameter_618_35622_kcat_cellobiose"
 CANONICAL_PARAMETER_ID = "sabiork_reaction_618_kcat_cellobiose"
 CURATOR = "PR-48 Test Curator"
 CURATION_DATE = "2026-07-14"
+SABIO_SOURCE_URL = (
+    "https://sabio.h-its.org/export-api/sabio/kinlaw-entry/json?"
+    "q=SabioReactionID%3A618&page=1&pageSize=1000"
+)
 
 
 def _proposal():
@@ -118,6 +123,7 @@ def _canonical_parameter_target(source: CurationResult) -> dict[str, Any]:
             "source_field": provenance["source_field"],
             "source_snapshot_path": provenance["source_snapshot_path"],
             "source_url": provenance["source_url"],
+            "source_urls": deepcopy(provenance["source_urls"]),
             "source_snapshot_sha256": provenance["source_snapshot_sha256"],
             "curator": CURATOR,
             "curation_date": CURATION_DATE,
@@ -238,13 +244,29 @@ def test_real_frozen_sabio_identity_path_is_addable_only_on_a_copied_registry(
         "proposal_allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
         "original_value": 0.13,
         "original_units": "s^(-1)",
+        "source_value": 0.13,
+        "source_units": "s^(-1)",
+        "normalized_start_value": 0.13,
+        "normalized_units": "s^(-1)",
         "converted_value": 0.13,
         "converted_units": "s^(-1)",
+        "target_value": 0.13,
+        "target_units": "s^(-1)",
         "conversion_method": PARAMETER_IDENTITY_CONVERSION_METHOD,
     }
     assert bridge["scientific_validation_claimed"] is False
     assert bridge["simulation_authorized"] is False
-    assert bridge["source_provenance"]["source_url"] is None
+    assert bridge["source_provenance"]["source_url"] == SABIO_SOURCE_URL
+    assert bridge["source_provenance"]["source_urls"] == [SABIO_SOURCE_URL]
+    assert bridge["source_aliases"] == {
+        "source_reaction_id": "618",
+        "selected_kinlaw_entry_id": "35622",
+    }
+    assert bridge["result_provenance"] == {
+        "source_query": source.source_query,
+        "source_snapshot_path": source.source_snapshot_path,
+        "proposal_limitations": list(source.proposal_limitations),
+    }
     assert candidate.target_record["provenance"]["fungmod_curation"]["curator"] == CURATOR
     assert _registry_snapshot(registry_index.parent) == copied_before
     assert _registry_snapshot() == production_before
@@ -308,6 +330,119 @@ def test_rechecksummed_authored_bundle_mutation_is_rejected_by_authoring_digest(
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     with pytest.raises(RegistryPromotionPlanError, match="changed after construction"):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("source_query", "SabioReactionID:999"),
+        ("source_snapshot_path", "/forged/source/snapshot.json"),
+        ("proposal_limitations", ("Forged result-level limitation.",)),
+    ],
+)
+def test_result_level_provenance_mutation_is_rejected_everywhere(
+    tmp_path: Path,
+    field: str,
+    replacement: Any,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    forged = replace(authored, **{field: replacement})
+    output = tmp_path / f"forged_{field}"
+
+    with pytest.raises(ParameterRecordAuthoringError, match="changed after construction"):
+        forged.verify_integrity()
+    with pytest.raises(ParameterRecordAuthoringError, match="changed after construction"):
+        forged.write(output)
+    assert not output.exists()
+    with pytest.raises(RegistryPromotionPlanError, match="changed after construction"):
+        plan_registry_promotion(forged, registry_index=registry_index)
+
+
+@pytest.mark.parametrize("field", ["source_query", "source_snapshot_path", "proposal_limitations"])
+def test_redigested_written_result_envelope_mutation_is_rejected_by_planning(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    bundle = authored.write(tmp_path / f"written_envelope_{field}")
+    accepted, manifest = _bundle_payloads(bundle)
+    replacement: Any = (
+        ["Forged result-level limitation."]
+        if field == "proposal_limitations"
+        else "SabioReactionID:999"
+        if field == "source_query"
+        else "/forged/source/snapshot.json"
+    )
+    manifest["summary"][field] = replacement
+    if field in {"source_query", "source_snapshot_path"}:
+        manifest[field] = replacement
+        accepted[field] = replacement
+    _redigest_bundle(bundle, accepted, manifest)
+
+    with pytest.raises(RegistryPromotionPlanError, match="result provenance|curation|audit"):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
+
+
+@pytest.mark.parametrize(
+    "malformation",
+    [
+        "missing_source_value",
+        "extra_predictive_claim",
+        "changed_parameter_symbol",
+        "changed_proposal_status",
+        "changed_proposal_allowed_use",
+        "changed_target_policy",
+        "extra_top_level_claim",
+    ],
+)
+def test_redigested_malformed_identity_audit_is_rejected_by_planning(
+    tmp_path: Path,
+    malformation: str,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    bundle = authored.write(tmp_path / f"malformed_audit_{malformation}")
+    accepted, manifest = _bundle_payloads(bundle)
+    audit = accepted["records"][0]["provenance"][PARAMETER_BRIDGE_PROVENANCE_KEY]
+    source_parameter = audit["source_parameter"]
+    if malformation == "missing_source_value":
+        del source_parameter["source_value"]
+    elif malformation == "extra_predictive_claim":
+        source_parameter["predictive_current_value"] = 0.13
+    elif malformation == "changed_parameter_symbol":
+        source_parameter["parameter_symbol"] = "validated_kcat"
+    elif malformation == "changed_proposal_status":
+        source_parameter["proposal_status"] = "current_validated"
+    elif malformation == "changed_proposal_allowed_use":
+        source_parameter["proposal_allowed_use"] = "predictive_simulation"
+    elif malformation == "changed_target_policy":
+        audit["target_policy"]["allowed_use"] = "scientific_simulation"
+    else:
+        audit["current_source_claim"] = True
+    _redigest_bundle(bundle, accepted, manifest)
+
+    with pytest.raises(RegistryPromotionPlanError, match="audit|policy|identity"):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
+
+
+def test_redigested_source_url_tampering_is_rejected_against_frozen_metadata(
+    tmp_path: Path,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    bundle = authored.write(tmp_path / "tampered_source_url")
+    accepted, manifest = _bundle_payloads(bundle)
+    record = accepted["records"][0]
+    forged_url = "https://example.test/forged-sabio-source"
+    for provenance in (
+        record["provenance"],
+        record["provenance"][PARAMETER_BRIDGE_PROVENANCE_KEY]["source_provenance"],
+        record["curation"]["source_provenance"],
+    ):
+        provenance["source_url"] = forged_url
+        provenance["source_urls"] = [forged_url]
+    _redigest_bundle(bundle, accepted, manifest)
+
+    with pytest.raises(RegistryPromotionPlanError, match="frozen SABIO-RK fetch metadata"):
         plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
 
 
@@ -568,8 +703,69 @@ def test_target_provenance_must_preserve_full_source_identity_and_curator(tmp_pa
         )
 
     target = _canonical_parameter_target(source)
-    del target["provenance"]["source_url"]
+    target["provenance"]["source_url"] = "https://example.test/forged"
     with pytest.raises(ParameterRecordAuthoringError, match="preserve every source identity field"):
+        author_parameter_record(
+            source,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=target,
+            registry_index=registry_index,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("source_reaction_id", "35622"),
+        ("selected_kinlaw_entry_id", "618"),
+    ],
+)
+def test_singular_source_identity_aliases_cannot_be_swapped(
+    tmp_path: Path,
+    field: str,
+    replacement: str,
+) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    target["provenance"][field] = replacement
+
+    with pytest.raises(ParameterRecordAuthoringError, match="singular source identity aliases"):
+        author_parameter_record(
+            source,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=target,
+            registry_index=registry_index,
+        )
+
+
+@pytest.mark.parametrize("field", ["source_reaction_id", "selected_kinlaw_entry_id"])
+def test_singular_source_identity_aliases_are_mandatory(tmp_path: Path, field: str) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    del target["provenance"][field]
+
+    with pytest.raises(ParameterRecordAuthoringError, match="singular source identity aliases"):
+        author_parameter_record(
+            source,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=target,
+            registry_index=registry_index,
+        )
+
+
+@pytest.mark.parametrize("reserved_key", [PARAMETER_BRIDGE_PROVENANCE_KEY, "fungmod_curation"])
+def test_authoring_rejects_reserved_provenance_key_collisions(
+    tmp_path: Path,
+    reserved_key: str,
+) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    target["provenance"][reserved_key] = {"attacker_supplied": True}
+
+    with pytest.raises(ParameterRecordAuthoringError, match="reserved provenance"):
         author_parameter_record(
             source,
             source_record_id=SOURCE_PARAMETER_ID,
@@ -686,13 +882,103 @@ def test_selector_combination_and_parameter_role_must_be_compatible(tmp_path: Pa
     target = _canonical_parameter_target(source)
     target["parameter_symbol"] = "not_required_by_process"
 
-    with pytest.raises(ParameterRecordAuthoringError, match="not required by a compatible"):
+    with pytest.raises(ParameterRecordAuthoringError, match="exactly one effective process compatibility"):
         author_parameter_record(
             source,
             source_record_id=SOURCE_PARAMETER_ID,
             parameter_record=target,
             registry_index=registry_index,
         )
+
+
+def test_required_parameter_without_explicit_role_is_not_compatible(tmp_path: Path) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    process_path = registry_index.parent / "processes" / "process_compatibility.yml"
+    payload = yaml.safe_load(process_path.read_text(encoding="utf-8"))
+    compatibility = next(
+        item
+        for item in payload["records"]
+        if item["record_id"] == "beta_glucosidase_cellobiose_homogeneous_mm"
+    )
+    del compatibility["parameter_roles"]["kcat"]
+    process_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ParameterRecordAuthoringError, match="exactly one effective process compatibility"):
+        author_parameter_record(
+            source,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=_canonical_parameter_target(source),
+            registry_index=registry_index,
+        )
+
+
+def test_null_class_selectors_resolve_from_entity_ids(tmp_path: Path) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    target["enzyme_class"] = None
+    target["substrate_class"] = None
+
+    authored = author_parameter_record(
+        source,
+        source_record_id=SOURCE_PARAMETER_ID,
+        parameter_record=target,
+        registry_index=registry_index,
+    )
+
+    assert authored.records[0].proposed_record["enzyme_class"] is None
+    assert authored.records[0].proposed_record["substrate_class"] is None
+
+
+def test_null_classes_cannot_borrow_unrelated_compatibility(tmp_path: Path) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    target["fungus_id"] = "toy_fungus_alpha"
+    target["enzyme_class"] = None
+    target["substrate_class"] = None
+
+    with pytest.raises(ParameterRecordAuthoringError, match="exactly one effective process compatibility"):
+        author_parameter_record(
+            source,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=target,
+            registry_index=registry_index,
+        )
+
+
+def test_planning_rejects_effective_compatibility_registry_drift(tmp_path: Path) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    target["enzyme_class"] = None
+    target["substrate_class"] = None
+    authored = author_parameter_record(
+        source,
+        source_record_id=SOURCE_PARAMETER_ID,
+        parameter_record=target,
+        registry_index=registry_index,
+    )
+    bundle = authored.write(tmp_path / "authored_before_registry_drift")
+    process_path = registry_index.parent / "processes" / "process_compatibility.yml"
+    process_payload = yaml.safe_load(process_path.read_text(encoding="utf-8"))
+    matching = next(
+        item
+        for item in process_payload["records"]
+        if item["process_type"] == "homogeneous_michaelis_menten"
+        and item["enzyme_class"] == "beta_glucosidase"
+        and item["substrate_class"] == "cellobiose"
+    )
+    duplicate = deepcopy(matching)
+    duplicate["record_id"] = "drifted_duplicate_beta_glucosidase_cellobiose"
+    process_payload["records"].append(duplicate)
+    process_path.write_text(yaml.safe_dump(process_payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(RegistryPromotionPlanError, match="exactly one effective process compatibility"):
+        plan_registry_promotion(authored, registry_index=registry_index)
+    with pytest.raises(RegistryPromotionPlanError, match="exactly one effective process compatibility"):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
 
 
 def test_deferred_rejected_blocked_and_unsupported_sources_are_rejected(tmp_path: Path) -> None:
@@ -804,3 +1090,35 @@ def test_public_exports_are_parameter_specific() -> None:
     assert fungal_model.CuratorAuthoredParameterResult is CuratorAuthoredParameterResult
     assert fungal_model.ParameterRecordAuthoringError is ParameterRecordAuthoringError
     assert not hasattr(fungal_model, "author_registry_record")
+
+
+def _bundle_payloads(bundle: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    accepted = yaml.safe_load(bundle.paths["accepted_registry_records"].read_text(encoding="utf-8"))
+    manifest = json.loads(bundle.paths["curation_manifest"].read_text(encoding="utf-8"))
+    assert isinstance(accepted, dict) and isinstance(manifest, dict)
+    return accepted, manifest
+
+
+def _redigest_bundle(
+    bundle: Any,
+    accepted: dict[str, Any],
+    manifest: dict[str, Any],
+) -> None:
+    accepted_path = bundle.paths["accepted_registry_records"]
+    accepted_path.write_text(yaml.safe_dump(accepted, sort_keys=False), encoding="utf-8")
+    record = deepcopy(accepted["records"][0])
+    curation = record.pop("curation")
+    summary = manifest["summary"]
+    summary["authoring_digest"] = parameter_authoring_digest(
+        record,
+        curation,
+        source_record_id=summary["source_record_id"],
+        source_query=summary["source_query"],
+        source_snapshot_path=summary["source_snapshot_path"],
+        proposal_limitations=tuple(summary["proposal_limitations"]),
+    )
+    manifest["files"][accepted_path.name] = hashlib.sha256(accepted_path.read_bytes()).hexdigest()
+    bundle.paths["curation_manifest"].write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )

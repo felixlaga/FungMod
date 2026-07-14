@@ -225,7 +225,8 @@ in-memory PARAMETER curation results and complete curator-authored production
 mappings with exact identity conversion, source digest/provenance,
 loader-round-trip, selector, registry-context, and mutation checks. Its
 specialized checksummed curation output is promotion-plan-compatible but does
-not mutate or apply. Nonidentity conversion, written source input,
+not mutate or apply. Its exact storage-only policy blocks modelability and
+simulation in every mode. Nonidentity conversion, written source input,
 non-parameter records, validation, calibration, and simulation authorization
 remain unsupported, so CURATION-001 remains partial. The recommended next
 slice is PR-49 reusable public checksum-validated curation-bundle loading,
@@ -1310,8 +1311,9 @@ The current PR-48 adds a real frozen SABIO PARAMETER identity path into a
 complete loader-fidelitous curator-authored target and promotion plan against a
 copied registry only. Product maps remain blocked pending a destination
 contract. CURATION-001 remains partial for nonidentity conversion and
-non-parameter source records. This status does not claim scientific validation
-or automatic simulation authorization.
+non-parameter source records. The authored storage-only policy blocks
+simulation in every mode. This status does not claim scientific validation or
+automatic simulation authorization.
 
 ## CURATION-001 acceptance criteria
 

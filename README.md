@@ -133,6 +133,8 @@ basic kinetics layer:
   an explicitly accepted in-memory source result to a complete curator-authored
   production `ParameterRecord`, verifies exact loader fidelity and source
   provenance, and returns a promotion-plan-compatible result without applying it;
+- mode-independent modelability and simulation rejection for parameters whose
+  exact `allowed_use` is `registry_storage_only_no_simulation_authorization`;
 - a registry-backed extracellular enzyme-chain assembler for ordered linear
   chains of two or more implemented process steps, whose stoichiometry,
   conserved quantities, entities, modifiers, and output labels come from
@@ -352,6 +354,7 @@ authored = author_parameter_record(
             "source_field": source_identity["source_field"],
             "source_snapshot_path": source_identity["source_snapshot_path"],
             "source_url": source_identity["source_url"],
+            "source_urls": source_identity["source_urls"],
             "source_snapshot_sha256": source_identity["source_snapshot_sha256"],
             "curator": "Researcher Name",
             "curation_date": "2026-07-14",
@@ -403,6 +406,12 @@ finite floats and type-exactly equal, units must be identical, and
 `conversion_method` must be `identity_no_conversion`. Nonidentity conversions,
 other record types, automatic apply, scientific validation, and simulation
 authorization remain explicitly unsupported, so CURATION-001 remains partial.
+The source adapter's `frozen_source_urls(...)` helper reads only adjacent local
+fetch metadata and performs no network access. The bridge revalidates that
+frozen URL identity during authoring and planning. Its exact storage-only
+`allowed_use` is enforced by centralized modelability/preflight checks in every
+mode, including exploratory mode, so an authored or later promoted record
+cannot authorize `VirtualExperiment.simulate(...)`.
 
 ## Run A Virtual Experiment
 
@@ -778,8 +787,9 @@ without making promoted records scientifically validated or automatically
 simulation-authorized. The top-level `author_parameter_record(...)` API now
 adds the separate PARAMETER-only, identity-only source-to-production bridge over
 an accepted in-memory curation result. Its checksummed output remains planning
-input, not an apply instruction. CURATION-001 remains partial for nonidentity
-conversion and non-parameter source records.
+input, not an apply instruction. Its exact storage-only policy is a simulation
+blocker in every modelability mode. CURATION-001 remains partial for
+nonidentity conversion and non-parameter source records.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
 The current library provides factories for first-order, mass-action,

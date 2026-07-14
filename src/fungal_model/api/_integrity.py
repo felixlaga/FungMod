@@ -8,6 +8,13 @@ from pathlib import Path
 from typing import Any
 
 
+CURATION_AUDIT_PROVENANCE_KEY = "fungmod_curation"
+PARAMETER_BRIDGE_PROVENANCE_KEY = "fungmod_parameter_bridge"
+RESERVED_PROVENANCE_KEYS = frozenset(
+    {CURATION_AUDIT_PROVENANCE_KEY, PARAMETER_BRIDGE_PROVENANCE_KEY}
+)
+
+
 def canonicalize(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {
@@ -93,6 +100,9 @@ def _field_path(parent: str, field: str) -> str:
 
 
 __all__ = [
+    "CURATION_AUDIT_PROVENANCE_KEY",
+    "PARAMETER_BRIDGE_PROVENANCE_KEY",
+    "RESERVED_PROVENANCE_KEYS",
     "canonicalize",
     "first_symlink_component",
     "round_trip_differences",
