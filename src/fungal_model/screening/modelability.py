@@ -8,6 +8,9 @@ from typing import Any, Literal, Mapping
 from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
+    parameter_record_is_exploratory,
+    parameter_record_is_mode_eligible,
+    parameter_record_mode_eligibility_blocker,
     parameter_record_selection_key,
     parameter_simulation_authorization_blocker,
 )
@@ -369,24 +372,33 @@ def _classify_parameter(
             )
         )
         return
+    if record.value.is_unknown:
+        missing.append(
+            _item(
+                "parameter",
+                record.parameter_symbol,
+                "Required parameter is explicitly unknown.",
+                {"record_id": record.record_id, "value": record.value.to_dict()},
+            )
+        )
+        return
+    eligibility_blocker = parameter_record_mode_eligibility_blocker(record, mode=mode)
+    if eligibility_blocker is not None:
+        incompatible.append(
+            _item(
+                "parameter",
+                record.parameter_symbol,
+                eligibility_blocker,
+                {
+                    "record_id": record.record_id,
+                    "maturity": record.maturity,
+                    "allowed_use": record.allowed_use,
+                    "value": record.value.to_dict(),
+                },
+            )
+        )
+        return
     if record.value.is_exact:
-        if mode == "scientific":
-            blocker = _scientific_parameter_blocker(record)
-            if blocker is not None:
-                incompatible.append(
-                    _item(
-                        "parameter",
-                        record.parameter_symbol,
-                        blocker,
-                        {
-                            "record_id": record.record_id,
-                            "maturity": record.maturity,
-                            "allowed_use": record.allowed_use,
-                            "value": record.value.to_dict(),
-                        },
-                    )
-                )
-                return
         known.append(
             _item(
                 "parameter",
@@ -408,16 +420,6 @@ def _classify_parameter(
                 "parameter",
                 record.parameter_symbol,
                 message,
-                {"record_id": record.record_id, "value": record.value.to_dict()},
-            )
-        )
-        return
-    if record.value.is_unknown:
-        missing.append(
-            _item(
-                "parameter",
-                record.parameter_symbol,
-                "Required parameter is explicitly unknown.",
                 {"record_id": record.record_id, "value": record.value.to_dict()},
             )
         )
@@ -450,7 +452,7 @@ def _best_parameter_record(
     )
     if chain_record is not None:
         return chain_record
-    candidates = [
+    matching = [
         record
         for record in registry.parameters.values()
         if record.parameter_symbol == parameter_symbol
@@ -461,14 +463,18 @@ def _best_parameter_record(
         and _matches(record.substrate_id, substrate_id)
         and _matches(record.environment_id, environment_id)
     ]
-    if mode == "scientific":
-        candidates = [
-            record
-            for record in candidates
-            if not _is_exploratory_parameter_record(record)
-        ]
+    candidates = [
+        record for record in matching if parameter_record_is_mode_eligible(record, mode=mode)
+    ]
     if not candidates:
-        return None
+        return next(
+            (
+                record
+                for record in matching
+                if record.value.is_unknown or not parameter_record_is_exploratory(record)
+            ),
+            None,
+        )
     return max(candidates, key=lambda record: parameter_record_selection_key(record, mode=mode))
 
 
@@ -501,20 +507,6 @@ def _chain_template_parameter_record(
 
 def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
-
-
-def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:
-    return record.maturity == "exploratory_prior" or bool(record.provenance.get("exploratory_prior"))
-
-
-def _scientific_parameter_blocker(record: ParameterRecord) -> str | None:
-    maturity = record.maturity.casefold()
-    if maturity.startswith("toy") or maturity.startswith("synthetic"):
-        return "Scientific mode rejects toy or synthetic parameter records."
-    allowed_use = record.allowed_use.casefold()
-    if "scientific" not in allowed_use:
-        return "Scientific mode requires parameter allowed_use to permit scientific use."
-    return None
 
 
 def _status(

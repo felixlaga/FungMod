@@ -18,6 +18,7 @@ def _tuple_of_strings(values: Sequence[Any] | None) -> tuple[str, ...]:
 
 CASE_TEMPLATE_SCHEMA_VERSION = "1"
 PARAMETER_ALLOWED_USE_STORAGE_ONLY = "registry_storage_only_no_simulation_authorization"
+ParameterRecordSelectionMode = Literal["exploratory", "scientific", "toy"]
 CASE_TEMPLATE_ALLOWED_STATE_ROLES = frozenset(
     {
         "substrate",
@@ -405,10 +406,49 @@ def parameter_is_simulation_authorized(record: ParameterRecord) -> bool:
     return parameter_simulation_authorization_blocker(record) is None
 
 
+def parameter_record_is_exploratory(record: ParameterRecord) -> bool:
+    """Return whether a parameter is explicitly limited to exploratory use."""
+
+    return record.maturity == "exploratory_prior" or bool(
+        record.provenance.get("exploratory_prior")
+    )
+
+
+def parameter_record_mode_eligibility_blocker(
+    record: ParameterRecord,
+    *,
+    mode: ParameterRecordSelectionMode,
+) -> str | None:
+    """Return the shared mode-specific eligibility blocker for a parameter."""
+
+    if mode in {"exploratory", "toy"}:
+        return None
+    if mode != "scientific":
+        raise ValueError(f"Unsupported parameter selection mode: {mode!r}")
+    if parameter_record_is_exploratory(record):
+        return "Scientific mode rejects exploratory-prior parameter records."
+    maturity = record.maturity.casefold()
+    if maturity.startswith("toy") or maturity.startswith("synthetic"):
+        return "Scientific mode rejects toy or synthetic parameter records."
+    if "scientific" not in record.allowed_use.casefold():
+        return "Scientific mode requires parameter allowed_use to permit scientific use."
+    return None
+
+
+def parameter_record_is_mode_eligible(
+    record: ParameterRecord,
+    *,
+    mode: ParameterRecordSelectionMode,
+) -> bool:
+    """Return whether a parameter may enter candidate ranking for the mode."""
+
+    return parameter_record_mode_eligibility_blocker(record, mode=mode) is None
+
+
 def parameter_record_selection_key(
     record: ParameterRecord,
     *,
-    mode: Literal["exploratory", "scientific", "toy"],
+    mode: ParameterRecordSelectionMode,
 ) -> tuple[int, ...]:
     """Return the shared mode-aware ranking key for parameter candidates."""
 
@@ -427,8 +467,7 @@ def parameter_record_selection_key(
     if mode == "exploratory":
         value_score = 2 if record.value.is_uncertain else 1 if record.value.is_exact else 0
         exploratory_score = int(
-            record.maturity == "exploratory_prior"
-            or bool(record.provenance.get("exploratory_prior"))
+            parameter_record_is_exploratory(record)
         )
         return (
             authorization_score,
@@ -637,8 +676,12 @@ __all__ = [
     "EnvironmentRecord",
     "FungusRecord",
     "ParameterRecord",
+    "ParameterRecordSelectionMode",
     "PARAMETER_ALLOWED_USE_STORAGE_ONLY",
     "parameter_is_simulation_authorized",
+    "parameter_record_is_exploratory",
+    "parameter_record_is_mode_eligible",
+    "parameter_record_mode_eligibility_blocker",
     "parameter_record_selection_key",
     "parameter_simulation_authorization_blocker",
     "ProcessCompatibilityRecord",

@@ -28,6 +28,8 @@ from fungal_model.registry.records import (
     ParameterRecord,
     RegistryRecord,
     parameter_is_simulation_authorized,
+    parameter_record_is_exploratory,
+    parameter_record_is_mode_eligible,
     parameter_record_selection_key,
 )
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
@@ -2329,6 +2331,7 @@ def _role_parameter_records(
         registry=registry,
         compatibility=compatibility,
         required_roles=assembler.required_parameter_roles,
+        mode=mode,
     )
     if chain_records is not None:
         return dict(chain_records)
@@ -2359,6 +2362,7 @@ def _chain_template_role_records(
     registry: FungModRegistry,
     compatibility: Any,
     required_roles: tuple[str, ...],
+    mode: str,
 ) -> Mapping[str, ParameterRecord] | None:
     if compatibility.process_type != "extracellular_enzyme_chain":
         return None
@@ -2378,7 +2382,12 @@ def _chain_template_role_records(
         if record_id is None:
             continue
         record = registry.parameters.get(str(record_id))
-        if record is not None and parameter_is_simulation_authorized(record):
+        selection_mode = "scientific" if mode == "scientific" else "exploratory"
+        if (
+            record is not None
+            and parameter_is_simulation_authorized(record)
+            and parameter_record_is_mode_eligible(record, mode=selection_mode)
+        ):
             records[role] = record
     return records
 
@@ -2406,9 +2415,11 @@ def _best_case_parameter_record(
         and _matches(record.fungus_id, fungus_id)
         and _matches(record.substrate_id, substrate_id)
         and _matches(record.environment_id, environment_id)
+        and parameter_record_is_mode_eligible(
+            record,
+            mode="scientific" if mode == "scientific" else "exploratory",
+        )
     ]
-    if mode == "scientific":
-        candidates = [record for record in candidates if not _is_exploratory_record(record)]
     if not candidates:
         return None
     selection_mode = "scientific" if mode == "scientific" else "exploratory"
@@ -2508,7 +2519,7 @@ def _provenance_source(provenance: Mapping[str, Any]) -> str:
 
 
 def _is_exploratory_record(record: ParameterRecord) -> bool:
-    return record.maturity == "exploratory_prior" or bool(record.provenance.get("exploratory_prior"))
+    return parameter_record_is_exploratory(record)
 
 
 def _parameter_source_class(record: ParameterRecord | None) -> str:

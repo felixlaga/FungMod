@@ -102,11 +102,20 @@ Completed in this pass:
   toy preflight paths cannot use such a parameter; ensemble and chain runtime
   refuse it, and authorized alternatives are ranked consistently. Other
   explicit `allowed_use` behavior remains unchanged.
-- Centralized the complete mode-aware dynamic parameter ranking key across
-  modelability, ensemble sampling/runtime, deterministic case assembly, and
-  result-table/mechanism reconstruction. Exploratory and scientific value-kind
-  preferences remain mode-specific, while selector, authorization, exploratory
-  prior, and calibrated-maturity tie-breaks now agree for identical candidates.
+- Centralized mode-aware parameter eligibility and the complete dynamic ranking
+  key across modelability, ensemble sampling/runtime, deterministic case
+  assembly, and result-table/mechanism reconstruction. Ineligible records are
+  filtered before ranking; explicit records are rejected rather than silently
+  substituted. Exploratory and scientific value-kind preferences remain
+  mode-specific, while selector, authorization, exploratory-prior, and
+  calibrated-maturity tie-breaks now agree for identical eligible candidates.
+- Made deterministic CASE-001 assembly consume the case template's exact
+  role-to-record IDs. Every required role now has one explicit component
+  process type, and assembly rejects missing IDs, symbol/process mismatches,
+  requested-case or component selector conflicts, environment drift,
+  mode-ineligible records, and simulation-unauthorized records without dynamic
+  fallback. The existing real CASE-001 template remains modelable and builds
+  with its eight declared parameter IDs.
 - Centralized one parameter-provenance classifier across planning, apply, and
   runtime. A reserved `fungmod_parameter_bridge` namespace always requires full
   independent bridge schema/digest/policy validation at apply; the reserved

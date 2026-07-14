@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import yaml
@@ -18,6 +18,8 @@ from fungal_model.io.model_config import ModelConfig
 from fungal_model.registry.records import (
     CaseTemplateRecord,
     ParameterRecord,
+    ParameterRecordSelectionMode,
+    parameter_record_mode_eligibility_blocker,
     parameter_simulation_authorization_blocker,
 )
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
@@ -237,8 +239,6 @@ def _chain_spec(
     template = _chain_template(registry, template_id)
     metadata = _chain_metadata(template)
     state_roles = dict(template.state_roles)
-    parameter_records = _parameter_records(registry, metadata)
-    state_units = _state_units(template, parameter_records=parameter_records)
     product_maps = _mapping_sequence(metadata.get("product_maps"), field_name="process_state_metadata.product_maps")
     processes = _mapping_sequence(metadata.get("process_templates"), field_name="process_state_metadata.process_templates")
     resolved_environment_id = _chain_environment_id(
@@ -247,6 +247,18 @@ def _chain_spec(
         requires_environment=_process_templates_require_environment(processes),
         template_id=template.case_template_id,
     )
+    raw_mode = _metadata_text(metadata, "config_mode", "exploratory")
+    if raw_mode not in {"exploratory", "scientific", "toy"}:
+        raise EnzymeChainAssemblyError(
+            f"Template {template.case_template_id!r} has unsupported config_mode {raw_mode!r}."
+        )
+    parameter_records = _parameter_records(
+        registry,
+        metadata,
+        environment_id=resolved_environment_id,
+        mode=cast(ParameterRecordSelectionMode, raw_mode),
+    )
+    state_units = _state_units(template, parameter_records=parameter_records)
     _validate_product_map_ids(template, product_maps)
     _validate_process_templates(template, processes, state_roles=state_roles, parameter_records=parameter_records)
     topology = _linear_chain_topology(
@@ -309,6 +321,9 @@ def _chain_metadata(template: CaseTemplateRecord) -> Mapping[str, Any]:
 def _parameter_records(
     registry: FungModRegistry,
     metadata: Mapping[str, Any],
+    *,
+    environment_id: str | None,
+    mode: ParameterRecordSelectionMode,
 ) -> dict[str, ParameterRecord]:
     record_ids = _mapping(metadata.get("parameter_record_ids"), field_name="process_state_metadata.parameter_record_ids")
     records: dict[str, ParameterRecord] = {}
@@ -322,6 +337,20 @@ def _parameter_records(
         if blocker is not None:
             raise EnzymeChainAssemblyError(
                 f"Template parameter role {role_text!r} is unauthorized: {blocker}"
+            )
+        eligibility_blocker = parameter_record_mode_eligibility_blocker(record, mode=mode)
+        if eligibility_blocker is not None:
+            raise EnzymeChainAssemblyError(
+                f"Template parameter role {role_text!r} is mode-ineligible: {eligibility_blocker}"
+            )
+        if (
+            environment_id is not None
+            and record.environment_id is not None
+            and record.environment_id != environment_id
+        ):
+            raise EnzymeChainAssemblyError(
+                f"Template parameter role {role_text!r} record {record.record_id!r} is scoped "
+                f"to environment {record.environment_id!r}, not {environment_id!r}."
             )
         if not record.value.is_exact:
             raise EnzymeChainAssemblyError(

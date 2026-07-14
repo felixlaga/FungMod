@@ -18,6 +18,8 @@ from fungal_model.io.model_config import ModelConfig
 from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
+    parameter_record_is_mode_eligible,
+    parameter_record_mode_eligibility_blocker,
     parameter_record_selection_key,
     parameter_simulation_authorization_blocker,
 )
@@ -582,6 +584,13 @@ def _chain_template_role_records(
             raise RegistryScreenSimulationError(
                 f"Parameter role {role!r} and symbol {record.parameter_symbol!r} is unauthorized: {blocker}"
             )
+        mode = "scientific" if scientific else "exploratory"
+        eligibility_blocker = parameter_record_mode_eligibility_blocker(record, mode=mode)
+        if eligibility_blocker is not None:
+            raise RegistryScreenSimulationError(
+                f"{mode.capitalize()} mode rejected parameter role {role!r} and symbol "
+                f"{record.parameter_symbol!r}: {eligibility_blocker}"
+            )
         validation = record.value.validate(nonnegative=True)
         if not validation.passed:
             raise RegistryScreenSimulationError(
@@ -628,6 +637,7 @@ def _best_exploratory_parameter_record(
         and _matches(record.fungus_id, fungus_id)
         and _matches(record.substrate_id, substrate_id)
         and _matches(record.environment_id, environment_id)
+        and parameter_record_is_mode_eligible(record, mode="exploratory")
     ]
     if not candidates:
         return None
@@ -651,12 +661,12 @@ def _best_scientific_parameter_record(
         for record in registry.parameters.values()
         if record.parameter_symbol == parameter_symbol
         and record.process_type == compatibility.process_type
-        and not _is_exploratory_parameter_record(record)
         and _matches(record.enzyme_class, compatibility.enzyme_class)
         and _matches(record.substrate_class, compatibility.substrate_class)
         and _matches(record.fungus_id, fungus_id)
         and _matches(record.substrate_id, substrate_id)
         and _matches(record.environment_id, environment_id)
+        and parameter_record_is_mode_eligible(record, mode="scientific")
     ]
     if not candidates:
         return None
@@ -670,21 +680,11 @@ def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
 
 
-def _is_exploratory_parameter_record(record: ParameterRecord) -> bool:
-    return record.maturity == "exploratory_prior" or bool(record.provenance.get("exploratory_prior"))
-
-
 def _scientific_parameter_record_blocker(record: ParameterRecord) -> str | None:
     authorization_blocker = parameter_simulation_authorization_blocker(record)
     if authorization_blocker is not None:
         return authorization_blocker
-    maturity = record.maturity.casefold()
-    if maturity.startswith("toy") or maturity.startswith("synthetic"):
-        return "toy or synthetic parameter records are not scientific inputs"
-    allowed_use = record.allowed_use.casefold()
-    if "scientific" not in allowed_use:
-        return f"allowed_use={record.allowed_use!r} does not permit scientific use"
-    return None
+    return parameter_record_mode_eligibility_blocker(record, mode="scientific")
 
 
 def _sample_role_records(

@@ -438,8 +438,11 @@ assembly, ensemble runtime, and chain-template resolution in every supported
 mode, so an authored or later promoted record cannot authorize
 `VirtualExperiment.simulate(...)`. Dynamic parameter searches in modelability,
 ensemble runtime, deterministic case assembly, and result-table reconstruction
-also use one complete mode-aware ranking key, including the calibrated-maturity
-tie-break, so identical candidate sets cannot select different records.
+first apply one mode-aware eligibility predicate and then one complete ranking
+key, including the calibrated-maturity tie-break. Explicit CASE-001 chain
+mappings use their exact role-to-record IDs and reject missing, unauthorized,
+mode-ineligible, selector-incompatible, or role/process-incompatible records
+without dynamic fallback.
 
 ## Run A Virtual Experiment
 

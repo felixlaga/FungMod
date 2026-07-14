@@ -407,6 +407,15 @@ records:
         accessible_surface_area: bio002_cellulose_accessible_surface_area
         km: sabiork_reaction_618_Km_cellobiose
         kcat: sabiork_reaction_618_kcat_cellobiose
+      parameter_role_process_types:
+        solid_substrate_initial_concentration: extracellular_enzyme_chain
+        cellulase_initial_concentration: surface_catalysis
+        beta_glucosidase_initial_concentration: extracellular_enzyme_chain
+        surface_rate_constant: surface_catalysis
+        adsorption_constant: surface_catalysis
+        accessible_surface_area: surface_catalysis
+        km: homogeneous_michaelis_menten
+        kcat: homogeneous_michaelis_menten
       product_maps:
         - id: bio002_cellulose_to_cellobiose_map
           name: BIO-002 cellulose-equivalent to cellobiose release map
