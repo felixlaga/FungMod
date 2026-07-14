@@ -56,6 +56,14 @@ _MODIFIER_COMPATIBILITY_ROLE_BY_FIELD = {
         "minimum_water_activity_role": "minimum_water_activity",
     },
 }
+_DIRECT_PROCESS_PARAMETER_FIELDS = {
+    "surface_catalysis": (
+        "surface_rate_constant",
+        "adsorption_constant",
+        "accessible_surface_area",
+    ),
+    "homogeneous_michaelis_menten": ("km", "kcat"),
+}
 
 
 @dataclass(frozen=True)
@@ -139,10 +147,13 @@ def resolve_exact_template_parameter_records(
         raise ExactTemplateParameterError(
             f"Case template {template.case_template_id!r} parameter_record_ids cannot be empty."
         )
-    effective_required_roles = (
-        tuple(compatibility.parameter_roles)
-        if compatibility is not None
-        else tuple(required_roles)
+    effective_required_roles = tuple(
+        dict.fromkeys(
+            (
+                *required_roles,
+                *(compatibility.parameter_roles if compatibility is not None else ()),
+            )
+        )
     )
     if set(contracts) != set(record_ids):
         raise ExactTemplateParameterError(
@@ -311,11 +322,13 @@ def _process_role_owners(
                 f"Case template {template.case_template_id!r} process {process_type!r} "
                 "must define parameter_roles as a mapping."
             )
-        referenced_roles = {
-            value: str(process_field)
-            for process_field, value in parameter_roles.items()
-            if isinstance(value, str) and value in record_roles
-        }
+        referenced_roles = _direct_parameter_role_keys(
+            template=template,
+            process_id=process_id,
+            process_type=process_type,
+            parameter_roles=parameter_roles,
+            record_roles=record_roles,
+        )
         for role, semantic_key in _nested_parameter_role_keys(
             raw_template.get("modifiers"),
             record_roles=record_roles,
@@ -348,6 +361,58 @@ def _process_role_owners(
         role_keys,
         tuple(process_templates),
     )
+
+
+def _direct_parameter_role_keys(
+    *,
+    template: CaseTemplateRecord,
+    process_id: str,
+    process_type: str,
+    parameter_roles: Mapping[Any, Any],
+    record_roles: frozenset[str],
+) -> dict[str, str]:
+    invalid = tuple(
+        (field, role)
+        for field, role in parameter_roles.items()
+        if not isinstance(field, str)
+        or not field.strip()
+        or not isinstance(role, str)
+        or not role.strip()
+    )
+    if invalid:
+        raise ExactTemplateParameterError(
+            f"Case template {template.case_template_id!r} process {process_id!r} "
+            "parameter_roles requires nonblank text fields and roles."
+        )
+    role_values = tuple(parameter_roles.values())
+    duplicate_roles = tuple(
+        sorted({role for role in role_values if role_values.count(role) > 1})
+    )
+    if duplicate_roles:
+        raise ExactTemplateParameterError(
+            f"Case template {template.case_template_id!r} process {process_id!r} "
+            "reuses explicit parameter roles across process fields: "
+            f"{', '.join(duplicate_roles)}.",
+            role=duplicate_roles[0],
+        )
+    unknown_roles = tuple(role for role in role_values if role not in record_roles)
+    if unknown_roles:
+        raise ExactTemplateParameterError(
+            f"Case template {template.case_template_id!r} process {process_id!r} "
+            "references parameter roles without explicit records: "
+            f"{', '.join(unknown_roles)}.",
+            role=unknown_roles[0],
+        )
+    required_fields = _DIRECT_PROCESS_PARAMETER_FIELDS.get(process_type, ())
+    missing_fields = tuple(field for field in required_fields if field not in parameter_roles)
+    unexpected_fields = tuple(field for field in parameter_roles if field not in required_fields)
+    if required_fields and (missing_fields or unexpected_fields):
+        raise ExactTemplateParameterError(
+            f"Case template {template.case_template_id!r} process {process_id!r} "
+            f"must use the exact canonical {process_type!r} parameter fields; "
+            f"missing={list(missing_fields)}, unexpected={list(unexpected_fields)}."
+        )
+    return {str(role): str(field) for field, role in parameter_roles.items()}
 
 
 def _nested_parameter_role_keys(
@@ -636,7 +701,18 @@ def _state_species_components(
     declared_states = frozenset(template.state_roles.values())
     resolved: dict[str, _StateComponent] = {}
     identities: set[tuple[str, str]] = set()
-    bound_substrate_entities: set[str] = set()
+    outer_substrate_state = template.state_roles.get("substrate")
+    if not isinstance(outer_substrate_state, str) or not outer_substrate_state.strip():
+        raise ExactTemplateParameterError(
+            f"Case template {template.case_template_id!r} requires one exact outer "
+            "substrate state role."
+        )
+    if len(substrate_entities) != 1:
+        raise ExactTemplateParameterError(
+            f"Case template {template.case_template_id!r} explicit component resolution "
+            "requires exactly one configured outer substrate entity."
+        )
+    configured_substrate_id = next(iter(substrate_entities))
     for entity_id, substrate_class in substrate_entities.items():
         substrate = registry.substrates.get(entity_id)
         if substrate is None:
@@ -703,25 +779,25 @@ def _state_species_components(
                 )
             component_class = substrate.substrate_class
             declared_class = substrate_entities.get(species)
-            if declared_class is not None:
-                if declared_class != component_class:
-                    raise ExactTemplateParameterError(
-                        f"Case template state {state_name!r} substrate identity {species!r} "
-                        "disagrees with its configured entity class."
-                    )
-                bound_substrate_entities.add(species)
+            if declared_class is not None and declared_class != component_class:
+                raise ExactTemplateParameterError(
+                    f"Case template state {state_name!r} substrate identity {species!r} "
+                    "disagrees with its configured entity class."
+                )
         resolved[state_name] = _StateComponent(
             entity_type=entity_type,
             entity_id=species,
             component_class=component_class,
         )
-    missing_substrate_entities = tuple(
-        sorted(set(substrate_entities) - bound_substrate_entities)
-    )
-    if missing_substrate_entities:
+    outer_component = resolved.get(outer_substrate_state)
+    if (
+        outer_component is None
+        or outer_component.entity_type != "substrate"
+        or outer_component.entity_id != configured_substrate_id
+    ):
         raise ExactTemplateParameterError(
-            "Configured substrate entity IDs must each appear exactly in canonical "
-            f"state_species; missing {missing_substrate_entities}."
+            f"Configured substrate identity {configured_substrate_id!r} must be the exact "
+            f"substrate consumed by outer state {outer_substrate_state!r}."
         )
     return resolved
 
@@ -893,6 +969,12 @@ def _require_component_assertions(
                 f"disagrees with bound component value {value!r}.",
                 role=role,
             )
+    _require_substrate_identity_assertion(
+        role=role,
+        contract=contract,
+        resolved=resolved,
+        label="Template role",
+    )
     symbol = contract["parameter_symbol"]
     compatibility_symbols = tuple(resolved.compatibility.parameter_roles.values())
     if (
@@ -938,6 +1020,12 @@ def _require_initial_state_binding(
                 f"{expected[selector]!r}.",
                 role=initial_role,
             )
+    _require_substrate_identity_assertion(
+        role=initial_role,
+        contract=contract,
+        resolved=resolved,
+        label="Initial-state role",
+    )
     symbol = contract["parameter_symbol"]
     expected_compatibility_role = (
         _INITIAL_STATE_COMPATIBILITY_ROLE_BY_PROCESS_FIELD.get(process_field)
@@ -969,6 +1057,22 @@ def _require_initial_state_binding(
             f"Initial-state role {initial_role!r} record_process_type must be the outer "
             "template or its bound component process type.",
             role=initial_role,
+        )
+
+
+def _require_substrate_identity_assertion(
+    *,
+    role: str,
+    contract: Mapping[str, Any],
+    resolved: _ResolvedProcessComponent,
+    label: str,
+) -> None:
+    substrate_id = contract["substrate_id"]
+    if substrate_id is not None and substrate_id != resolved.substrate.entity_id:
+        raise ExactTemplateParameterError(
+            f"{label} {role!r} substrate_id {substrate_id!r} disagrees with consumed "
+            f"component identity {resolved.substrate.entity_id!r}.",
+            role=role,
         )
 
 

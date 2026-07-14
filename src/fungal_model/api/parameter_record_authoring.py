@@ -208,14 +208,16 @@ _AUDIT_FIELDS = frozenset(
         "production_registry_mutated",
     }
 )
-_OUTER_PROVENANCE_SAFETY_FIELDS = frozenset(
+_TARGET_PROVENANCE_REQUIRED_FIELDS = frozenset(
     {
-        "production_registry_mutated",
-        "registry_mutated",
-        "scientific_validation_claimed",
-        "simulation_authorized",
+        *_SOURCE_IDENTITY_FIELDS,
+        *_SOURCE_ALIAS_FIELDS,
+        "parameter_role",
+        "curator",
+        "curation_date",
     }
 )
+_TARGET_PROVENANCE_OPTIONAL_FIELDS = frozenset({"kinetic_record"})
 
 
 class ParameterRecordAuthoringError(ValueError):
@@ -926,12 +928,27 @@ def _validate_target_schema(record: Mapping[str, Any], *, audit_required: bool) 
         raise ParameterRecordAuthoringError(
             "ParameterRecord reserved provenance keys are authoring-owned and cannot collide."
         )
-    conflicting_safety = set(provenance) & _OUTER_PROVENANCE_SAFETY_FIELDS
-    if conflicting_safety:
+    authored_fields = set(provenance) - expected_reserved
+    missing_provenance = sorted(_TARGET_PROVENANCE_REQUIRED_FIELDS - authored_fields)
+    unknown_provenance = sorted(
+        authored_fields
+        - _TARGET_PROVENANCE_REQUIRED_FIELDS
+        - _TARGET_PROVENANCE_OPTIONAL_FIELDS
+    )
+    if missing_provenance or unknown_provenance:
         raise ParameterRecordAuthoringError(
-            "ParameterRecord outer provenance cannot supply authoring-owned safety claims: "
-            + ", ".join(sorted(conflicting_safety))
-            + "."
+            "ParameterRecord provenance must match the closed identity-only authoring "
+            f"schema; missing={missing_provenance}, unknown={unknown_provenance}."
+        )
+    if any(
+        not _text(provenance.get(field))
+        for field in ("parameter_role", "curator", "curation_date")
+    ) or any(
+        field in provenance and not _text(provenance.get(field))
+        for field in _TARGET_PROVENANCE_OPTIONAL_FIELDS
+    ):
+        raise ParameterRecordAuthoringError(
+            "ParameterRecord curator, role, date, and optional provenance paths must be nonblank text."
         )
     value = record.get("value")
     if not isinstance(value, Mapping) or set(value) != _VALUE_FIELDS:

@@ -130,6 +130,34 @@ def test_in_memory_component_binding_mutation_fails_registry_validation() -> Non
         registry.get_process_compatibility()
 
 
+@pytest.mark.parametrize("malformation", ["list_role_symbol", "list_process_template_id"])
+def test_malformed_in_memory_compatibility_values_raise_registry_validation(
+    malformation: str,
+) -> None:
+    registry = load_registry(REGISTRY_INDEX)
+    record_id = "bio002_cellulase_cellulose_film_extracellular_chain"
+    outer = registry.process_compatibility[record_id]
+    if malformation == "list_role_symbol":
+        registry.process_compatibility[record_id] = replace(
+            outer,
+            parameter_roles=cast(Any, {"kcat": ["kcat_cellobiose"]}),
+        )
+    else:
+        registry.process_compatibility[record_id] = replace(
+            outer,
+            component_bindings=(
+                replace(
+                    outer.component_bindings[0],
+                    process_template_id=cast(Any, ["not-text"]),
+                ),
+                outer.component_bindings[1],
+            ),
+        )
+
+    with pytest.raises(RegistryValidationError, match="Invalid process compatibility record"):
+        registry.get_process_compatibility()
+
+
 def test_component_only_scope_survives_removed_owner_bindings_at_query_time() -> None:
     registry = load_registry(REGISTRY_INDEX)
     outer_id = "bio002_cellulase_cellulose_film_extracellular_chain"

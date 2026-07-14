@@ -238,9 +238,14 @@ derive from component process templates. Exact ordered outer-compatibility
 bindings plus intrinsic component-only scope, structural state/entity IDs, and
 registry capabilities independently resolve each component slot through one
 load/query-validated registry authority graph; role/record selectors are
-assertions only. Configured substrate entity IDs must resolve exactly through
-registry-backed `state_species`, and each process must bind its roles and
-parameter-backed states to that slot through exact semantic compatibility keys.
+assertions only. The configured outer substrate entity ID must be the exact
+registry-backed `state_species` identity consumed by the outer process, and
+each process must bind its roles and parameter-backed states to that slot
+through exact semantic compatibility keys. Implemented direct process types
+also impose canonical required fields and reject truncation, semantic renaming,
+or role reuse before modelability. Curator-authored outer provenance is limited
+to the closed identity-only bridge schema; unsupported validation, calibration,
+readiness, or authorization claim metadata is rejected.
 Initial-state roles declare record scope without claiming
 kinetic ownership. Nonidentity
 conversion, written source input, non-parameter records, validation,

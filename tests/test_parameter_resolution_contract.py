@@ -165,6 +165,28 @@ def test_shared_exact_resolver_rejects_cross_component_role_swap() -> None:
         )
 
 
+def test_shared_exact_resolver_preserves_caller_required_roles_with_compatibility() -> None:
+    registry = load_registry(REGISTRY_INDEX)
+    template = registry.case_templates[CHAIN_TEMPLATE_ID]
+    compatibility = registry.process_compatibility[CHAIN_COMPATIBILITY_ID]
+
+    with pytest.raises(
+        ExactTemplateParameterError,
+        match="missing explicit parameter record IDs for: independent_required_role",
+    ):
+        resolve_exact_template_parameter_records(
+            registry=registry,
+            template=template,
+            compatibility=compatibility,
+            required_roles=("independent_required_role",),
+            fungus_id=FUNGUS_ID,
+            substrate_id=SUBSTRATE_ID,
+            environment_id=ENVIRONMENT_ID,
+            mode="exploratory",
+            value_requirement="sampleable",
+        )
+
+
 def test_shared_exact_resolver_cross_binds_configured_substrate_entity_id() -> None:
     registry = load_registry(REGISTRY_INDEX)
     template = registry.case_templates[CHAIN_TEMPLATE_ID]
@@ -260,6 +282,10 @@ def test_shared_exact_resolver_requires_nested_modifier_semantic_role_key(
     ("drift", "message"),
     [
         ("substrate_entity_id", "missing registry substrate entity"),
+        ("same_class_substrate_identity", "must be the exact substrate consumed"),
+        ("direct_role_truncation", "exact canonical"),
+        ("direct_role_alias", "reuses explicit parameter roles"),
+        ("direct_role_rename", "exact canonical"),
         (
             "initial_state_role",
             "exact component compatibility role 'enzyme_initial_concentration'",
@@ -343,7 +369,7 @@ def test_shared_exact_resolver_rejects_coherent_whole_component_role_group_swap(
     template = _coherently_swap_second_component(registry)
     compatibility = registry.process_compatibility[CHAIN_COMPATIBILITY_ID]
 
-    with pytest.raises(ExactTemplateParameterError, match="process_type does not match"):
+    with pytest.raises(ExactTemplateParameterError, match="exact substrate consumed"):
         resolve_exact_template_parameter_records(
             registry=registry,
             template=template,
@@ -365,7 +391,7 @@ def test_shared_exact_resolver_rejects_coherent_whole_component_role_group_swap(
         ("standalone_component_binding", "intrinsic component-only compatibility"),
         ("component_compatibility", "process_type does not match"),
         ("enzyme_capability", "does not authorize process type"),
-        ("state_species", "state identities require component pair"),
+        ("state_species", "exact substrate consumed"),
     ],
 )
 def test_shared_exact_resolver_rejects_each_independent_component_authority_drift(
@@ -621,7 +647,10 @@ def test_coherent_whole_component_role_group_swap_is_rejected_by_every_public_pa
     valid_study.registry.case_templates[CHAIN_TEMPLATE_ID] = _coherently_swap_second_component(
         valid_study.registry
     )
-    with pytest.raises(RegistryValidationError, match="process_type does not match"):
+    with pytest.raises(
+        RegistryValidationError,
+        match="process_type does not match|exact substrate consumed",
+    ):
         valid_result.write_tables(tmp_path / "rewritten_tables")
 
     registry = valid_study.registry
@@ -633,7 +662,11 @@ def test_coherent_whole_component_role_group_swap_is_rejected_by_every_public_pa
         mode="exploratory",
     )
     assert report.status == "unsupported"
-    assert any("process_type does not match" in item.message for item in report.incompatible)
+    assert any(
+        "process_type does not match" in item.message
+        or "exact substrate consumed" in item.message
+        for item in report.incompatible
+    )
 
     study = VirtualExperiment.from_registry(
         fungi=FUNGUS_ID,
@@ -641,7 +674,10 @@ def test_coherent_whole_component_role_group_swap_is_rejected_by_every_public_pa
         environments=ENVIRONMENT_ID,
         registry=registry,
     )
-    with pytest.raises(VirtualExperimentError, match="process_type does not match"):
+    with pytest.raises(
+        VirtualExperimentError,
+        match="process_type does not match|exact substrate consumed",
+    ):
         study.simulate(
             mode="exploratory",
             n_samples=1,
@@ -656,7 +692,10 @@ def test_coherent_whole_component_role_group_swap_is_rejected_by_every_public_pa
             registry=registry,
             mode="toy",
         )
-    with pytest.raises(EnzymeChainAssemblyError, match="process_type does not match"):
+    with pytest.raises(
+        EnzymeChainAssemblyError,
+        match="process_type does not match|exact substrate consumed",
+    ):
         build_extracellular_enzyme_chain_config(
             registry=registry,
             environment_id=ENVIRONMENT_ID,
@@ -834,6 +873,12 @@ def _apply_contract_drift_in_memory(
             process_state_metadata=metadata,
         )
         return
+    if drift == "same_class_substrate_identity":
+        _replace_outer_substrate_with_same_class_alternate(registry)
+        return
+    if drift in {"direct_role_truncation", "direct_role_alias", "direct_role_rename"}:
+        _mutate_direct_kcat_contract(registry, mutation=drift)
+        return
     _rename_component_role(
         registry,
         component_id="bio002_beta_glucosidase_cellobiose_component",
@@ -865,6 +910,12 @@ def _apply_contract_drift_in_files(registry_dir: Path, *, drift: str) -> None:
         )
         substrates[0]["id"] = "rewritten_configured_substrate"
         path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+        return
+    if drift == "same_class_substrate_identity":
+        _replace_outer_substrate_with_same_class_alternate_in_files(registry_dir)
+        return
+    if drift in {"direct_role_truncation", "direct_role_alias", "direct_role_rename"}:
+        _mutate_direct_kcat_contract_in_files(registry_dir, mutation=drift)
         return
     path = registry_dir / "processes" / "process_compatibility.yml"
     payload = _yaml_mapping(path)
@@ -912,6 +963,212 @@ def _coherently_swap_second_component(
     _swap_component_state_species(metadata)
     _rewrite_bound_component_compatibility(registry)
     return replace(template, process_state_metadata=metadata)
+
+
+def _replace_outer_substrate_with_same_class_alternate(
+    registry: FungModRegistry,
+) -> None:
+    alternate_id = "alternate_cellulose_film_same_class"
+    registry.substrates[alternate_id] = replace(
+        registry.substrates[SUBSTRATE_ID],
+        record_id=alternate_id,
+        name="Alternate same-class cellulose film test identity",
+    )
+    template = registry.case_templates[CHAIN_TEMPLATE_ID]
+    metadata = deepcopy(dict(template.process_state_metadata))
+    state_species = deepcopy(dict(metadata["state_species"]))
+    state_species["solid_cellulose_equivalent_concentration"]["species"] = alternate_id
+    state_species["beta_D_glucose_concentration"] = {
+        "species": SUBSTRATE_ID,
+        "entity_type": "substrate",
+    }
+    metadata["state_species"] = state_species
+    registry.case_templates[CHAIN_TEMPLATE_ID] = replace(
+        template,
+        process_state_metadata=metadata,
+    )
+
+
+def _replace_outer_substrate_with_same_class_alternate_in_files(
+    registry_dir: Path,
+) -> None:
+    alternate_id = "alternate_cellulose_film_same_class"
+    substrate_path = registry_dir / "substrates" / "substrates.yml"
+    substrate_payload = _yaml_mapping(substrate_path)
+    substrates = cast(list[dict[str, Any]], substrate_payload["records"])
+    canonical = next(record for record in substrates if record["record_id"] == SUBSTRATE_ID)
+    alternate = deepcopy(canonical)
+    alternate["record_id"] = alternate_id
+    alternate["name"] = "Alternate same-class cellulose film test identity"
+    substrates.append(alternate)
+    substrate_path.write_text(
+        yaml.safe_dump(substrate_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    template_path = registry_dir / "case_templates" / "case_templates.yml"
+    template_payload = _yaml_mapping(template_path)
+    template = next(
+        record
+        for record in cast(list[dict[str, Any]], template_payload["records"])
+        if record["record_id"] == CHAIN_TEMPLATE_ID
+    )
+    state_species = template["process_state_metadata"]["state_species"]
+    state_species["solid_cellulose_equivalent_concentration"]["species"] = alternate_id
+    state_species["beta_D_glucose_concentration"] = {
+        "species": SUBSTRATE_ID,
+        "entity_type": "substrate",
+    }
+    template_path.write_text(
+        yaml.safe_dump(template_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def _mutate_direct_kcat_contract(
+    registry: FungModRegistry,
+    *,
+    mutation: str,
+) -> None:
+    template = registry.case_templates[CHAIN_TEMPLATE_ID]
+    metadata = deepcopy(dict(template.process_state_metadata))
+    process = cast(list[dict[str, Any]], metadata["process_templates"])[1]
+    roles = cast(dict[str, str], process["parameter_roles"])
+    if mutation == "direct_role_alias":
+        roles["kcat"] = roles["km"]
+    else:
+        if mutation == "direct_role_rename":
+            roles.pop("kcat")
+            roles["unrelated_kcat"] = "unrelated_kcat"
+            _rename_template_role(metadata, old_role="kcat", new_role="unrelated_kcat")
+            _rename_compatibility_role(
+                registry,
+                record_id=CHAIN_COMPATIBILITY_ID,
+                old_role="kcat",
+                new_role="unrelated_kcat",
+            )
+            _rename_compatibility_role(
+                registry,
+                record_id="bio002_beta_glucosidase_cellobiose_component",
+                old_role="kcat",
+                new_role="unrelated_kcat",
+            )
+        else:
+            roles.pop("kcat")
+            _remove_template_role(metadata, role="kcat")
+            _remove_compatibility_role(
+                registry,
+                record_id=CHAIN_COMPATIBILITY_ID,
+                role="kcat",
+            )
+            _remove_compatibility_role(
+                registry,
+                record_id="bio002_beta_glucosidase_cellobiose_component",
+                role="kcat",
+            )
+    registry.case_templates[CHAIN_TEMPLATE_ID] = replace(
+        template,
+        process_state_metadata=metadata,
+    )
+
+
+def _mutate_direct_kcat_contract_in_files(
+    registry_dir: Path,
+    *,
+    mutation: str,
+) -> None:
+    template_path = registry_dir / "case_templates" / "case_templates.yml"
+    template_payload = _yaml_mapping(template_path)
+    template = next(
+        record
+        for record in cast(list[dict[str, Any]], template_payload["records"])
+        if record["record_id"] == CHAIN_TEMPLATE_ID
+    )
+    metadata = cast(dict[str, Any], template["process_state_metadata"])
+    process = cast(list[dict[str, Any]], metadata["process_templates"])[1]
+    roles = cast(dict[str, str], process["parameter_roles"])
+    if mutation == "direct_role_alias":
+        roles["kcat"] = roles["km"]
+    elif mutation == "direct_role_rename":
+        roles.pop("kcat")
+        roles["unrelated_kcat"] = "unrelated_kcat"
+        _rename_template_role(metadata, old_role="kcat", new_role="unrelated_kcat")
+    else:
+        roles.pop("kcat")
+        _remove_template_role(metadata, role="kcat")
+    template_path.write_text(
+        yaml.safe_dump(template_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+    if mutation == "direct_role_alias":
+        return
+
+    process_path = registry_dir / "processes" / "process_compatibility.yml"
+    process_payload = _yaml_mapping(process_path)
+    for record in cast(list[dict[str, Any]], process_payload["records"]):
+        if record["record_id"] not in {
+            CHAIN_COMPATIBILITY_ID,
+            "bio002_beta_glucosidase_cellobiose_component",
+        }:
+            continue
+        compatibility_roles = cast(dict[str, str], record["parameter_roles"])
+        symbol = compatibility_roles.pop("kcat")
+        if mutation == "direct_role_rename":
+            compatibility_roles["unrelated_kcat"] = symbol
+        else:
+            cast(list[str], record["required_parameters"]).remove(symbol)
+    process_path.write_text(
+        yaml.safe_dump(process_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def _rename_template_role(
+    metadata: dict[str, Any],
+    *,
+    old_role: str,
+    new_role: str,
+) -> None:
+    record_ids = cast(dict[str, Any], metadata["parameter_record_ids"])
+    contracts = cast(dict[str, Any], metadata["parameter_role_contracts"])
+    record_ids[new_role] = record_ids.pop(old_role)
+    contracts[new_role] = contracts.pop(old_role)
+
+
+def _remove_template_role(metadata: dict[str, Any], *, role: str) -> None:
+    cast(dict[str, Any], metadata["parameter_record_ids"]).pop(role)
+    cast(dict[str, Any], metadata["parameter_role_contracts"]).pop(role)
+
+
+def _rename_compatibility_role(
+    registry: FungModRegistry,
+    *,
+    record_id: str,
+    old_role: str,
+    new_role: str,
+) -> None:
+    record = registry.process_compatibility[record_id]
+    roles = dict(record.parameter_roles)
+    roles[new_role] = roles.pop(old_role)
+    registry.process_compatibility[record_id] = replace(record, parameter_roles=roles)
+
+
+def _remove_compatibility_role(
+    registry: FungModRegistry,
+    *,
+    record_id: str,
+    role: str,
+) -> None:
+    record = registry.process_compatibility[record_id]
+    roles = dict(record.parameter_roles)
+    symbol = roles.pop(role)
+    registry.process_compatibility[record_id] = replace(
+        record,
+        parameter_roles=roles,
+        required_parameters=tuple(
+            value for value in record.required_parameters if value != symbol
+        ),
+    )
 
 
 def _reuse_outer_component_binding(registry: FungModRegistry) -> None:

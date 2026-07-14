@@ -1406,7 +1406,7 @@ def test_singular_source_identity_aliases_are_mandatory(tmp_path: Path, field: s
     target = _canonical_parameter_target(source)
     del target["provenance"][field]
 
-    with pytest.raises(ParameterRecordAuthoringError, match="singular source identity aliases"):
+    with pytest.raises(ParameterRecordAuthoringError, match="closed identity-only authoring schema"):
         author_parameter_record(
             source,
             source_record_id=SOURCE_PARAMETER_ID,
@@ -1452,13 +1452,90 @@ def test_authoring_rejects_outer_provenance_safety_claims(
     target = _canonical_parameter_target(source)
     target["provenance"][safety_field] = False
 
-    with pytest.raises(ParameterRecordAuthoringError, match="authoring-owned safety claims"):
+    with pytest.raises(ParameterRecordAuthoringError, match="closed identity-only authoring schema"):
         author_parameter_record(
             source,
             source_record_id=SOURCE_PARAMETER_ID,
             parameter_record=target,
             registry_index=registry_index,
         )
+
+
+@pytest.mark.parametrize(
+    ("field", "claim"),
+    [
+        ("confidence_level", "empirically_validated"),
+        ("validation_status", "validated"),
+        ("calibration_status", "calibrated"),
+        ("empirically_validated", True),
+        ("calibrated", True),
+        ("simulation_ready", True),
+        ("scientific_assessment", {"simulation_ready": True}),
+    ],
+)
+def test_authoring_closed_provenance_rejects_scientific_claim_aliases(
+    tmp_path: Path,
+    field: str,
+    claim: Any,
+) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    target["provenance"][field] = claim
+
+    with pytest.raises(ParameterRecordAuthoringError, match="closed identity-only authoring schema"):
+        author_parameter_record(
+            source,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=target,
+            registry_index=registry_index,
+        )
+
+
+def test_authoring_closed_provenance_accepts_owned_identity_metadata(
+    tmp_path: Path,
+) -> None:
+    source = _accepted_source_curation(tmp_path)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    authored = author_parameter_record(
+        source,
+        source_record_id=SOURCE_PARAMETER_ID,
+        parameter_record=_canonical_parameter_target(source),
+        registry_index=registry_index,
+    )
+
+    plan = plan_registry_promotion(authored, registry_index=registry_index)
+
+    assert plan.summary()["addable_count"] == 1
+    assert plan.summary()["apply_available"] is True
+
+
+@pytest.mark.parametrize(
+    ("field", "claim"),
+    [
+        ("confidence_level", "empirically_validated"),
+        ("validation_status", "validated"),
+        ("calibration_status", "calibrated"),
+        ("simulation_ready", True),
+        ("scientific_assessment", {"simulation_ready": True}),
+    ],
+)
+def test_rechecksummed_claim_alias_cannot_become_addable_promotion(
+    tmp_path: Path,
+    field: str,
+    claim: Any,
+) -> None:
+    _, registry_index, _, authored = _author(tmp_path)
+    bundle = authored.write(tmp_path / f"forged_outer_claim_{field}")
+    accepted, manifest = _bundle_payloads(bundle)
+    accepted["records"][0]["provenance"][field] = claim
+    _redigest_bundle(bundle, accepted, manifest)
+
+    with pytest.raises(
+        RegistryPromotionPlanError,
+        match="closed identity-only authoring schema|shared curation builder",
+    ):
+        plan_registry_promotion(bundle.output_directory, registry_index=registry_index)
 
 
 def test_conservative_maturity_and_allowed_use_are_closed_policies(tmp_path: Path) -> None:

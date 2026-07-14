@@ -95,7 +95,10 @@ Completed in this pass:
   singular and plural source aliases, acceptance evidence, and every closed
   policy field into exact-key audit schemas and the result digest. Both
   authoring-owned provenance keys and outer mutation/validation/simulation
-  safety claims are reserved and rejected on input.
+  safety claims are rejected on input. Curator-authored outer provenance now
+  uses a closed identity-only field set, so validation, calibration,
+  empirical-status, simulation-readiness, authorization, or nested claim
+  aliases cannot be added alongside the owned false safety audit.
 - Made simulation admission one centralized authorization-and-mode predicate
   used by modelability and every simulation parameter resolution path.
   `registry_storage_only_no_simulation_authorization` and reserved authoring
@@ -144,8 +147,10 @@ Completed in this pass:
   coverage. Standalone records keep their existing omitted/default scope in
   serialization; corrupt or removed incoming bindings cannot reclassify a
   marked component as an authoring or simulation candidate.
-- Cross-bound every configured template substrate entity ID to the exact
-  registry substrate identity and canonical `state_species` declaration.
+- Cross-bound the configured outer template substrate entity ID to the exact
+  registry substrate identity consumed by the outer process's canonical
+  `state_species` slot; the same-class alternate-ID attack cannot pass by
+  parking the configured ID on an unused state.
   Component compatibility now requires exact semantic key-to-symbol mappings
   for parameter-backed catalyst/substrate initial states and nested modifiers,
   rather than accepting symbol membership under a renamed key. The same shared
@@ -153,6 +158,13 @@ Completed in this pass:
   deterministic/direct assembly, and result reconstruction; a materially
   different copied-registry three-step chain covers both initial-state and
   nested product-inhibition role rewrites.
+- Preserved caller-supplied required roles when compatibility is present and
+  anchored implemented direct process parameters to process-type-owned
+  canonical fields. Explicit templates reject missing direct roles, coherent
+  semantic-key renames, and duplicate role reuse before modelability or
+  assembly, while optional nested modifiers and dynamic fallback retain their
+  existing contracts. Malformed list-valued compatibility roles and component
+  binding IDs now produce `RegistryValidationError` instead of raw `TypeError`.
 - Centralized one parameter-provenance classifier across planning, apply, and
   runtime. A reserved `fungmod_parameter_bridge` namespace always requires full
   independent bridge schema/digest/policy validation at apply; the reserved
@@ -217,9 +229,12 @@ strings no longer authorize a mode. Explicit chain templates with
 the outer compatibility must provide exact ordered component-compatibility
 bindings, component compatibilities must carry intrinsic `component_only` scope
 with exactly one registry-validated owner, each configured substrate and
-parameter-backed component state must resolve through a canonical registry ID,
+the configured outer substrate and each parameter-backed component state must
+resolve through the exact structurally consumed canonical registry ID,
 initial-state/modifier symbols require exact semantic compatibility keys,
-role/record selectors are assertions only, and the old
+direct process fields must satisfy the implemented process-type schema without
+omission, renaming, or role aliasing, role/record selectors are assertions only,
+and the old
 ownership-like `parameter_role_process_types` shape is rejected.
 CASE-001 initial-state records declare exact storage/reuse process scope, while
 kinetic owners are derived only from component process templates.
@@ -250,10 +265,11 @@ Verification:
   case-builder, chain, and VirtualExperiment suite: 320 passed in 49.74s before
   the final apply-time regression; the canonical suite below includes that
   regression and all focused coverage.
-- Eleventh-pass registry-graph/config regression slice: 58 passed in 10.66s;
-  the complete explicit CASE-001 malformation matrix then passed 26 tests in
-  1.70s after expected error wording was aligned with the stronger graph.
-- Canonical full pytest: 1123 passed in 355.79s on the final code.
+- Twelfth-pass authoring/resolver/registry/status regression suite: 229 passed
+  in 118.09s; the complete explicit CASE-001 malformation matrix passed 35
+  tests in 10.37s after its expected diagnostics were aligned with the stronger
+  exact process-role and consumed-substrate checks.
+- Canonical full pytest: 1143 passed in 207.84s on the final code.
 - Focused Ruff: passed.
 - Full Ruff: passed for `src` and `tests`.
 - Full Pyright with the shared venv interpreter selected explicitly: 0 errors,

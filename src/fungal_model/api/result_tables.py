@@ -2388,7 +2388,7 @@ def _exact_template_role_records(
             registry=registry,
             template=template,
             compatibility=compatibility,
-            required_roles=required_roles,
+            required_roles=tuple(compatibility.parameter_roles),
             fungus_id=fungus_id,
             substrate_id=substrate_id,
             environment_id=environment_id,

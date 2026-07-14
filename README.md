@@ -132,7 +132,8 @@ basic kinetics layer:
 - an identity-only, PARAMETER-specific CURATION-001 authoring bridge that binds
   an explicitly accepted in-memory source result to a complete curator-authored
   production `ParameterRecord`, verifies exact loader fidelity and source
-  provenance, and returns a promotion-plan-compatible result without applying it;
+  provenance through a closed identity-only outer metadata schema, and returns
+  a promotion-plan-compatible result without applying it;
 - mode-independent modelability and simulation rejection for parameters whose
   exact `allowed_use` is `registry_storage_only_no_simulation_authorization`;
 - a registry-backed extracellular enzyme-chain assembler for ordered linear
@@ -143,8 +144,10 @@ basic kinetics layer:
   an intrinsic `component_only` scope and a registry-validated ownership graph,
   so removing or corrupting an outer binding cannot expose a component as a
   standalone compatibility. Exact templates also cross-bind configured
-  substrate entity IDs to registry-backed `state_species` identities and bind
-  initial-state and modifier symbols through exact semantic compatibility keys;
+  substrate entity IDs to the exact registry-backed `state_species` identity
+  consumed by the outer process, bind direct process parameters through
+  process-type-owned semantic fields, and bind initial-state and modifier
+  symbols through exact semantic compatibility keys;
 - a scoped CASE-001 researcher-facing path that runs the existing BIO-002
   cellulose-equivalent enzyme-chain virtual experiment from names and aliases
   through the top-level `virtual_experiment(...)` API.
@@ -429,6 +432,11 @@ finite floats and type-exactly equal, units must be identical, and
 `conversion_method` must be `identity_no_conversion`. Nonidentity conversions,
 other record types, automatic apply, scientific validation, and simulation
 authorization remain explicitly unsupported, so CURATION-001 remains partial.
+The curator-authored outer provenance is a closed identity-only schema: complete
+source identity and singular aliases, one explicit parameter role, curator and
+date, plus the established optional kinetic-record path. Additional validation,
+calibration, readiness, authorization, or nested claim metadata is rejected
+rather than reconciled by name guessing.
 The source adapter's `frozen_source_urls(...)` helper reads only adjacent local
 fetch metadata and performs no network access. It reconciles `total_pages`,
 `requests_made`, ordered `source_urls`, and, for immutable bundles, raw-page
@@ -467,6 +475,11 @@ contracts, records, and selector assertions is insufficient. Null record entity
 selectors may remain only where the record contract permits them; class
 assertions must still match the bound component identity.
 Component-process parameter ownership is derived from `process_templates`;
+implemented direct process types also impose their canonical parameter fields,
+so required roles cannot be truncated, renamed, or reused across fields before
+role ownership is resolved. The configured outer substrate entity must be the
+exact registry identity consumed by the outer substrate state; parking that ID
+on an unused state does not satisfy the contract.
 initial-state roles declare a
 `record_process_type` scope without claiming a kinetic owner. Missing,
 unauthorized, mode-ineligible, selector-incompatible, component-incompatible,

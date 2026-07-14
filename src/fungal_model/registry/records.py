@@ -364,7 +364,9 @@ class ProcessCompatibilityRecord(RegistryRecord):
                     "details": {"unknown_symbols": unknown_role_parameters},
                 }
             )
-        role_symbols = tuple(parameter_roles.values())
+        role_symbols = tuple(
+            symbol for symbol in parameter_roles.values() if isinstance(symbol, str)
+        )
         if len(set(role_symbols)) != len(role_symbols):
             issues.append(
                 {
@@ -402,8 +404,6 @@ class ProcessCompatibilityRecord(RegistryRecord):
                     }
                 )
                 continue
-            process_ids.append(binding.process_template_id)
-            compatibility_ids.append(binding.compatibility_record_id)
             if not _is_canonical_nonblank_text(binding.process_template_id):
                 issues.append(
                     {
@@ -414,6 +414,8 @@ class ProcessCompatibilityRecord(RegistryRecord):
                         ),
                     }
                 )
+            else:
+                process_ids.append(binding.process_template_id)
             if not _is_canonical_nonblank_text(binding.compatibility_record_id):
                 issues.append(
                     {
@@ -424,6 +426,8 @@ class ProcessCompatibilityRecord(RegistryRecord):
                         ),
                     }
                 )
+            else:
+                compatibility_ids.append(binding.compatibility_record_id)
         if len(set(process_ids)) != len(process_ids):
             issues.append(
                 {

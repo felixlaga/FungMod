@@ -262,15 +262,6 @@ def _exact_role_parameters(
     process_label: str,
     mode: RegistryCaseConfigMode,
 ) -> Mapping[str, ParameterRecord]:
-    missing_roles = tuple(
-        role for role in required_roles if role not in compatibility.parameter_roles
-    )
-    if missing_roles:
-        raise RegistryCaseBuildError(
-            f"{process_label} registry compatibility is missing parameter role "
-            f"mappings for: {', '.join(missing_roles)}."
-        )
-
     roles_to_resolve = _roles_to_resolve(
         compatibility=compatibility,
         required_roles=required_roles,
@@ -280,7 +271,7 @@ def _exact_role_parameters(
             registry=registry,
             template=case_template,
             compatibility=compatibility,
-            required_roles=roles_to_resolve,
+            required_roles=tuple(compatibility.parameter_roles),
             fungus_id=fungus_id,
             substrate_id=substrate_id,
             environment_id=environment_id,
@@ -291,6 +282,15 @@ def _exact_role_parameters(
         raise RegistryCaseBuildError(f"{process_label} exact parameter mapping is invalid: {exc}") from exc
     if explicit is not None:
         return explicit
+
+    missing_roles = tuple(
+        role for role in required_roles if role not in compatibility.parameter_roles
+    )
+    if missing_roles:
+        raise RegistryCaseBuildError(
+            f"{process_label} registry compatibility is missing parameter role "
+            f"mappings for: {', '.join(missing_roles)}."
+        )
 
     resolved: dict[str, ParameterRecord] = {}
     for role in roles_to_resolve:
