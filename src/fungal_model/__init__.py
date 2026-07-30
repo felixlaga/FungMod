@@ -3,7 +3,7 @@
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__ = version("fungal-model")
+    __version__ = version("fungmod")
 except PackageNotFoundError:  # pragma: no cover - editable tree before install
     __version__ = "0.1.0"
 
@@ -158,6 +158,7 @@ from fungal_model.processes import (
     CompatibilityIssue,
 )
 from fungal_model.results import SimulationResult
+from fungal_model.resources import default_registry_path, example_data_path, package_data_path
 from fungal_model.solvers import ProcessODESolver, RunRequest
 from fungal_model.substrates.base import Substrate
 from fungal_model.validation import InvalidDataMaturityError, MaturityIssue
@@ -218,6 +219,8 @@ __all__ = [
     "EnvironmentGrid",
     "environment_grid",
     "default_parameter_conversion_registry",
+    "default_registry_path",
+    "example_data_path",
     "Film1DGeometry",
     "Fungus",
     "Geometry",
@@ -255,6 +258,7 @@ __all__ = [
     "ModelConfig",
     "OutputConfig",
     "Parameter",
+    "package_data_path",
     "ParameterRecordAuthoringError",
     "REGISTRY_RECORD_AUTHORING_ALLOWED_MATURITIES",
     "REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY",

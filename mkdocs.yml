@@ -1,0 +1,81 @@
+site_name: FungMod
+site_description: Registry-backed mechanistic virtual experiments for fungal and enzyme-mediated substrate degradation.
+site_url: https://fungmod.readthedocs.io/
+repo_url: https://github.com/felixlaga/FungMod
+repo_name: felixlaga/FungMod
+edit_uri: edit/main/docs/
+copyright: Copyright 2026 FungMod contributors
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: green
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Use dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: green
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Use light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            heading_level: 2
+            members_order: source
+            merge_init_into_class: true
+            separate_signature: true
+            show_root_heading: true
+            show_source: false
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Install: install.md
+  - Quickstart: quickstart.md
+  - Core concepts:
+      - Virtual experiments: concepts/virtual-experiments.md
+      - Outputs and artifacts: concepts/outputs.md
+  - Tutorials:
+      - Full example notebooks: notebooks.md
+      - Configured models: configured-models.md
+  - Capability map: capabilities.md
+  - Scientific integrity: scientific-integrity.md
+  - API reference: api.md
+  - Release notes: release-notes.md
+
+strict: true

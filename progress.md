@@ -26,6 +26,79 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PUBLIC-RELEASE-001 Installable Package, Documentation, And Full Notebooks
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout for the first public alpha
+distribution and documentation surface.
+
+Completed in this pass:
+
+- Renamed the unpublished distribution from `fungal-model` to the available
+  PyPI project name `fungmod` at version `0.1.0`, while retaining the
+  `fungal_model` implementation namespace and adding a `fungmod` convenience
+  namespace.
+- Added complete Python package metadata, MIT license text, project URLs,
+  supported Python classifiers, notebook/docs extras, and build/twine tooling.
+- Added immutable wheel-packaged mirrors of the registry, frozen SABIO-RK
+  source evidence, and example data/configs, plus public bounded path helpers
+  and installed-wheel path resolution.
+- Added an artificial, framework-labelled configured example that exercises
+  dynamic reaction quotient/Gibbs evaluation, required electron-balance
+  binding, native solver-time forward-rate blocking, conservation,
+  static-condition entropy-rate diagnostics, solver metadata, and output
+  manifests without adding biological evidence.
+- Added deterministic full notebooks
+  `20_zero_to_complete_virtual_experiment.ipynb` and
+  `21_advanced_capabilities.ipynb`, covering zero-to-report and
+  provenance-to-thermodynamics workflows through public APIs.
+- Added a strict MkDocs Material site and Read the Docs v2 configuration with
+  install, quickstart, concepts, output reference, notebooks, configured-model
+  tutorial, capability map, scientific-integrity guidance, API reference, and
+  release notes.
+- Added CI/release contracts for notebook execution, documentation builds,
+  wheel/sdist checks, isolated installation smoke, and PyPI Trusted
+  Publishing.
+
+Tests added or modified:
+
+- Added `tests/test_packaged_distribution.py` for namespace/version,
+  resource-drift, path-containment, non-checkout registry/config execution,
+  and frozen-source discovery contracts.
+- Added `tests/test_release_notebooks.py` for deterministic notebook
+  generation, public-API/no-shortcut guardrails, scientific-scope wording, and
+  full cell execution.
+- Added release/docs/package contract assertions and CI jobs.
+
+What did not change: no production biological record, mechanism law, solver
+equation, empirical dataset, calibration result, scientific-mode eligibility,
+or validation claim was added. The dynamic thermodynamic showcase uses
+artificial testing inputs and existing implemented behavior only.
+
+Scientific behavior impact: no existing scientific behavior changed. The
+default registry and example assets can now be located after wheel
+installation; advanced examples expose already implemented mechanics under
+explicit framework-benchmark labels.
+
+Backward compatibility: the `fungal_model` import namespace remains supported.
+The distribution name change affects only installation metadata and is safe
+because neither `fungmod` nor `fungal-model` had an existing PyPI release at
+the audited time. Relative repository data paths retain their current
+behavior; packaged fallback occurs only for known shipped `data/` and
+`data_registry/` assets when the relative path does not exist.
+
+Remaining ambiguity and risk: Read the Docs project import and first PyPI
+Trusted Publisher registration are provider-owned setup gates. The package
+resource mirror is byte-checked against repository data and recorded as
+contained debt in `ARCHITECTURE_DEBT.md`.
+
+Risk level: medium release/process risk, low scientific-behavior risk.
+
+Recommended next task: after the release artifacts, PyPI installation, and
+hosted documentation are verified, select a new roadmap slice only by explicit
+user direction.
+
 ## PR-59 Final PRODUCT-001 Integration
 
 Date: 2026-07-30

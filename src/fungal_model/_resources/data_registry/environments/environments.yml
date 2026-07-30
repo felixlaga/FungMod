@@ -1,0 +1,97 @@
+kind: fungmod_registry_records
+record_type: environments
+records:
+  - record_id: toy_lab_environment
+    name: Toy lab environment
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Fake environment record for loader tests only.
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: FungMod toy registry fixture.
+        confidence_level: testing
+        notes: Artificial exact temperature for registry tests only.
+      ph:
+        kind: range
+        lower: 5.0
+        upper: 7.0
+        units: dimensionless
+        source: FungMod toy registry fixture.
+        confidence_level: testing
+        notes: Artificial pH range for registry tests only.
+      oxygen_concentration:
+        kind: not_applicable
+        units: null
+        source: FungMod toy registry fixture.
+        confidence_level: testing
+        notes: Oxygen is intentionally not represented in this toy R1 registry case.
+    notes: Toy/development environment only; not empirical data.
+
+  - record_id: bio001_cellulose_surface_pilot_environment
+    name: BIO-001 cellulose surface pilot assay context
+    display_name: BIO-001 cellulose surface pilot context
+    aliases:
+      - BIO-001 cellulose surface context
+      - 30C_pH5_cellulose_surface_context
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-001 controlled virtual-experiment scaffold.
+      confidence_level: exploratory_assumption
+      environment_effect_status: metadata_only
+      notes: User-specified virtual-experiment context; no pH or temperature response law is applied.
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: user-supplied exploratory condition
+        confidence_level: exploratory_assumption
+        notes: Assay-context temperature for BIO-001 virtual experiment; not used by a calibrated response model.
+      ph:
+        kind: exact
+        value: 5.0
+        units: dimensionless
+        source: user-supplied exploratory condition
+        confidence_level: exploratory_assumption
+        notes: Assay-context pH for BIO-001 virtual experiment; not used by a calibrated response model.
+      oxygen_concentration:
+        kind: not_applicable
+        units: null
+        source: FungMod BIO-001 controlled virtual-experiment scaffold.
+        confidence_level: exploratory_assumption
+        notes: Oxygen limitation is not represented in the enzyme-mediated surface-degradation pilot.
+    notes: BIO-001 context only; environment is metadata and does not modify kinetics.
+
+  - record_id: sabiork_reaction_618_selected_conditions
+    name: SABIO-RK Reaction 618 selected assay conditions
+    display_name: 30C pH5 assay conditions
+    aliases:
+      - 30C_pH5_assay
+      - 30 C pH 5 assay
+      - SABIO-RK Reaction 618 assay conditions
+    maturity: literature_processed
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: SABIO-RK Reaction 618 selected kinetic law
+        confidence_level: literature_curated
+        notes: Converted from original SABIO-RK temperature; original stored in KineticRecord.
+      ph:
+        kind: exact
+        value: 5.0
+        units: dimensionless
+        source: SABIO-RK Reaction 618 selected kinetic law
+        confidence_level: literature_curated
+        notes: SABIO-RK assay pH.
+    notes: Assay conditions for first real kinetic pilot.

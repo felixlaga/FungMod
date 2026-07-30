@@ -1,0 +1,111 @@
+kind: model_config
+name: toy homogeneous competitive-inhibition benchmark
+mode: toy
+maturity: framework_benchmark
+provenance:
+  source: FungMod framework benchmark; not a scientific case.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: Exercises the provenance-bound competitive-inhibition law with artificial states and parameters.
+  validity_range: framework tests only
+  units: not_applicable
+entities:
+  environment:
+    id: environment
+    path: data/environments/lab_30C_pH7.yml
+    loader: environment
+  geometry:
+    id: geometry
+    path: data/geometries/well_mixed_100ml.yml
+    loader: well_mixed
+parameters:
+  - id: competitive_inhibition_parameters
+    parameters:
+      - name: toy Michaelis constant
+        symbol: K_m_competitive
+        value: 0.5
+        units: mole / liter
+        uncertainty: 0.0
+        source: FungMod artificial competitive-inhibition benchmark.
+        confidence_level: testing
+        notes: Artificial value for framework verification only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy maximum conversion rate
+        symbol: V_max_competitive
+        value: 0.2
+        units: mole / liter / second
+        uncertainty: 0.0
+        source: FungMod artificial competitive-inhibition benchmark.
+        confidence_level: testing
+        notes: Artificial value for framework verification only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy competitive inhibition constant
+        symbol: K_i_competitive
+        value: 0.25
+        units: mole / liter
+        uncertainty: 0.0
+        source: FungMod artificial competitive-inhibition benchmark.
+        confidence_level: testing
+        notes: Artificial value for framework verification only; not biological evidence.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+processes:
+  - id: generic_competitive_conversion
+    process_type: homogeneous_michaelis_menten
+    states:
+      substrate: substrate_pool
+      product: product_pool
+    parameters:
+      km: K_m_competitive
+      vmax: V_max_competitive
+      rate_units: mole / liter / second
+    modifiers:
+      - type: competitive_inhibition
+        substrate_state: substrate_pool
+        inhibitor_state: inhibitor_pool
+        michaelis_constant: K_m_competitive
+        inhibition_constant: K_i_competitive
+        primary_source: https://pubmed.ncbi.nlm.nih.gov/7985803/
+        maturity: literature_backed_software_tested
+    assumptions:
+      - artificial homogeneous competitive-inhibition benchmark only
+initial_state:
+  states:
+    substrate_pool:
+      value: 1.0
+      units: mole / liter
+    product_pool:
+      value: 0.0
+      units: mole / liter
+    inhibitor_pool:
+      value: 0.5
+      units: mole / liter
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 10.0
+    units: second
+  points: 11
+validators:
+  - id: non_negative_states
+    validator_type: non_negative
+    species:
+      - substrate_pool
+      - product_pool
+      - inhibitor_pool
+  - id: closed_conversion_balance
+    validator_type: mass_balance
+    conserved_weights:
+      substrate_pool: 1.0
+      product_pool: 1.0
+outputs:
+  directory: outputs/toy_homogeneous_competitive_inhibition
+  save:
+    - record
+    - validation_report
+  plots:
+    - state_trajectories

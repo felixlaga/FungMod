@@ -219,6 +219,12 @@ without validation claims.
 
 Current next PR: **none selected; scoped queue complete through PR-59**.
 
+PUBLIC-RELEASE-001 is complete in the current checkout as a user-directed
+release/readiness slice outside the numbered roadmap queue. The Python
+distribution, packaged assets, two full public notebooks, Read the Docs site,
+and release gates expose existing implemented capabilities without adding
+biology, empirical data, calibration, or validation claims.
+
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
 has no real observation table under `data/experiments/literature/`. That blocks

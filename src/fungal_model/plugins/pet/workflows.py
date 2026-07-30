@@ -11,14 +11,14 @@ import numpy as np
 import yaml
 
 from fungal_model.core.units import Q_, require_quantity
+from fungal_model.resources import example_data_path
 from fungal_model.results import SimulationResult
 from fungal_model.workflows import run_configured_model
 
 from .loaders import pet_substrate_loader_registry
 
-ROOT = Path(__file__).resolve().parents[4]
-DATA = ROOT / "data"
-DEFAULT_MODEL_CONFIG = DATA / "model_configs" / "toy_surface_pet_plugin.yml"
+DATA = example_data_path()
+DEFAULT_MODEL_CONFIG = example_data_path("model_configs/toy_surface_pet_plugin.yml")
 
 
 @dataclass(frozen=True)

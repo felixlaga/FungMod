@@ -1,0 +1,21 @@
+kind: enzyme
+name: toy generic surface catalyst
+enzyme_class: generic surface catalyst
+target_bond_types:
+  - generic_linkage
+target_substrate_names: []
+target_substrate_classes:
+  - framework benchmark
+validity_labels:
+  - toy
+  - benchmark
+provenance:
+  source: FungMod foundation benchmark config; not a scientific catalyst.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: Compatibility metadata for the dummy non-PET surface benchmark only.
+  validity_range: framework tests only
+  units: not_applicable
+catalytic_parameters: []
+adsorption_parameters: []
+parameters: []

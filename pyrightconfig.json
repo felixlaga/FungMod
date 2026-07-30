@@ -1,5 +1,5 @@
 {
-  "include": ["src/fungal_model"],
+  "include": ["src/fungal_model", "src/fungmod"],
   "exclude": [
     "**/__pycache__",
     "build",

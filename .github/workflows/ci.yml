@@ -30,3 +30,131 @@ jobs:
 
       - name: Run tests with coverage
         run: python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml
+
+  documentation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install documentation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[docs]"
+
+      - name: Build documentation strictly
+        run: python -m mkdocs build --strict
+
+  release-notebooks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install notebook dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[notebooks]"
+
+      - name: Verify deterministic notebook sources
+        run: python scripts/build_release_notebooks.py --check
+
+      - name: Execute zero-to-report notebook
+        env:
+          FUNGMOD_NOTEBOOK_OUTPUT_ROOT: /tmp/fungmod-notebooks
+          FUNGMOD_NOTEBOOK_SAMPLES: "2"
+          MPLBACKEND: Agg
+        run: >-
+          jupyter nbconvert
+          --to notebook
+          --execute notebooks/examples/20_zero_to_complete_virtual_experiment.ipynb
+          --output /tmp/fungmod-zero-to-report.ipynb
+          --ExecutePreprocessor.timeout=300
+
+      - name: Execute advanced-capabilities notebook
+        env:
+          FUNGMOD_NOTEBOOK_OUTPUT_ROOT: /tmp/fungmod-notebooks
+          FUNGMOD_NOTEBOOK_SAMPLES: "2"
+          MPLBACKEND: Agg
+        run: >-
+          jupyter nbconvert
+          --to notebook
+          --execute notebooks/examples/21_advanced_capabilities.ipynb
+          --output /tmp/fungmod-advanced-capabilities.ipynb
+          --ExecutePreprocessor.timeout=300
+
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: Verify packaged resources
+        run: python scripts/check_packaged_resources.py
+
+      - name: Build wheel and source distribution
+        run: python -m build
+
+      - name: Check distribution metadata
+        run: python -m twine check dist/*
+
+      - name: Install wheel in an isolated environment
+        run: |
+          python -m venv /tmp/fungmod-wheel-smoke
+          /tmp/fungmod-wheel-smoke/bin/python -m pip install --upgrade pip
+          /tmp/fungmod-wheel-smoke/bin/python -m pip install dist/fungmod-*.whl
+
+      - name: Run installed-wheel smoke outside the checkout
+        working-directory: /tmp
+        env:
+          MPLBACKEND: Agg
+        run: |
+          /tmp/fungmod-wheel-smoke/bin/python - <<'PY'
+          from pathlib import Path
+          import fungmod as fm
+
+          output = Path("/tmp/fungmod-wheel-output")
+          study = fm.virtual_experiment(
+              fungi="beta-glucosidase source",
+              substrates="cellobiose",
+              environments="SABIO-RK Reaction 618 selected assay conditions",
+          )
+          result = study.simulate(
+              mode="exploratory",
+              n_samples=2,
+              seed=618,
+              output_dir=output / "reaction_618",
+              quicklook=False,
+          )
+          assert result.final_metrics()
+          assert fm.source_proposal(provider="sabiork", reaction_id="618").reaction_records
+          configured = fm.run_configured_model(
+              fm.example_data_path("model_configs/showcase_dynamic_thermodynamics.yml"),
+              output_dir=output / "configured",
+          )
+          assert configured.solver_metadata["success"] is True
+          print(f"fungmod {fm.__version__} installed-wheel smoke passed")
+          PY

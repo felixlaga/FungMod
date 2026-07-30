@@ -1,0 +1,90 @@
+kind: dataset_candidate_review
+candidate_id: resa_buckin_2011_cellobiose_hydrolysis
+name: Resa and Buckin 2011 cellobiose hydrolysis time-course candidate
+status: selected_for_schema_review
+dataset_maturity: literature_raw
+source:
+  type: literature
+  citation: Resa P, Buckin V. Ultrasonic analysis of kinetic mechanism of hydrolysis of cellobiose by beta-glucosidase. Anal Biochem. 2011;415(1):1-11.
+  doi: 10.1016/j.ab.2011.03.003
+  url: https://pubmed.ncbi.nlm.nih.gov/21385562/
+  authors:
+    - Pablo Resa
+    - Vitaly Buckin
+  year: 2011
+  notes: PubMed abstract reports real-time HR-US monitoring of cellobiose hydrolysis by Aspergillus niger beta-glucosidase at 50 C and pH 4.9, including glucose release time profiles and agreement with a discontinuous glucose assay.
+intended_use:
+  purpose: Candidate source for future beta-glucosidase/cellobiose time-course comparison after full-text data availability, units, preprocessing, and uncertainty are reviewed.
+  measured_quantities:
+    - glucose released over time
+    - reaction-rate time profile
+  model_targets:
+    - beta_D_glucose_concentration
+    - cellobiose_concentration
+  not_for:
+    - immediate data ingestion
+    - calibration before observations are extracted and units are checked
+    - whole-fungus degradation claims
+    - secretion, uptake, biomass, oxygen, PET, or cellulose morphology models
+schema_gate:
+  requires_literature_schema: true
+  requires_units: true
+  requires_uncertainty: true
+  requires_preprocessing: true
+  requires_no_real_data_in_review: true
+review:
+  selected_by: FungMod REAL-002B candidate search
+  review_date: 2026-06-04
+  schema_result: blocked_missing_extraction_metadata
+  decision_notes: Selected for schema review because the abstract names continuous reaction-progress and glucose-release profiles, but blocked from ingestion because no figure/table values, digitization metadata, uncertainty definition, or preprocessing record has been extracted.
+schema_review:
+  review_type: literature_metadata_pre_ingestion
+  reviewed_by: FungMod REAL-002C literature-schema review
+  review_date: 2026-06-04
+  evidence_checked:
+    - PubMed metadata and abstract at https://pubmed.ncbi.nlm.nih.gov/21385562/
+    - DOI metadata link 10.1016/j.ab.2011.03.003
+    - Repository literature-data contract in data/experiments/literature/README.md
+  available_metadata:
+    - citation
+    - DOI
+    - authors
+    - year
+    - organism and enzyme from abstract
+    - substrate and glucose-release time-profile description from abstract
+    - assay temperature and pH from abstract
+  missing_for_experiment_dataset:
+    - figure_or_table identifier for extractable observations
+    - extraction_method and extraction_tool
+    - extracted_by and extraction_date for observation values
+    - raw time and value units for extracted rows
+    - uncertainty definition for extracted observations
+    - digitization, table, or supplementary-data provenance
+    - unit-conversion notes
+    - preprocessing steps and excluded-point decisions
+    - machine-readable observation CSV
+  decision: blocked_do_not_ingest
+  decision_notes: The source remains promising, but the repository should not create an ExperimentDataset until the full text or supplementary material is reviewed and numeric observations can be extracted with explicit units, uncertainty policy, and preprocessing provenance.
+  next_action: Obtain the full text or supplementary data, identify the exact figure/table containing glucose release or reaction progress over time, then create a literature_raw ExperimentDataset only if all required metadata fields can be completed.
+access_review:
+  review_type: full_text_and_supplement_access_check
+  reviewed_by: FungMod REAL-002D access review
+  review_date: 2026-06-05
+  sources_checked:
+    - name: PubMed
+      url: https://pubmed.ncbi.nlm.nih.gov/21385562/
+      result: Metadata and abstract available; PubMed links full text source to Elsevier Science.
+    - name: ScienceDirect
+      url: https://www.sciencedirect.com/science/article/pii/S0003269711001606
+      result: Publisher article page identified for DOI 10.1016/j.ab.2011.03.003; public checks did not identify a machine-readable supplementary data file or extractable observation table.
+    - name: Web search
+      url: https://www.sciencedirect.com/science/article/abs/pii/S0003269711001606
+      result: Search snippets confirmed article sections and reaction-progress claims, but no public supplementary-data download or observation CSV was found.
+  access_status: no_ingestable_observations_found
+  full_text_status: publisher_page_identified
+  supplementary_data_status: not_found_in_public_checks
+  observation_extraction_status: blocked
+  decision: keep_candidate_blocked_do_not_ingest
+  decision_notes: PubMed and publisher metadata support the candidate's relevance, but REAL-002D did not find accessible numeric observation rows, supplementary files, or digitization-ready figure/table metadata. The repository must still avoid creating a literature ExperimentDataset.
+  next_action: Use institutional access, author manuscript, or supplementary files if available; otherwise select a different source with tabular or machine-readable time-course observations.
+notes: Candidate review only. This file intentionally contains no observations, measurement rows, CSV paths, extracted figure data, calibrated parameters, or validation claims.

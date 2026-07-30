@@ -1,0 +1,52 @@
+kind: experiment_dataset
+dataset_id: fake_literature_schema_example_v1
+name: Fake literature schema example
+maturity: literature_raw
+notes: Fake schema-test metadata only. This is not real literature data.
+
+source:
+  type: literature
+  citation: Fake Author et al. Fake Journal 2099; schema test only.
+  doi: 10.0000/fake-schema-test
+  url: null
+  authors:
+    - Fake Author
+    - Schema Tester
+  year: 2099
+  figure_or_table: Figure 1
+  extraction_method: manual digitization schema test
+  extraction_tool: fake digitizer 0.0
+  extracted_by: FungMod schema test
+  extraction_date: 2026-05-31
+  raw_units:
+    time: second
+    value: kilogram
+    uncertainty: kilogram
+  notes: Fake metadata used only to test required literature provenance fields.
+
+measurement_definitions:
+  measured_quantity: fake released product amount
+  units: kilogram
+  uncertainty_definition: fake one-sigma uncertainty reported for schema testing
+  measurement_method: fake reported measurement method
+
+preprocessing:
+  status: raw_digitized_schema_test
+  steps:
+    - copied fake points from fake figure metadata
+  unit_conversions:
+    - no conversion; fake units already use SI labels
+  excluded_points: []
+  notes: Fake preprocessing notes for schema validation only.
+
+digitization:
+  software: fake digitizer 0.0
+  axis_calibration:
+    x_axis: fake seconds
+    y_axis: fake kilograms
+  estimated_digitization_error:
+    value: 0.0
+    units: kilogram
+  included_points: 3
+  excluded_points: []
+  exclusion_reason: none; fake schema test

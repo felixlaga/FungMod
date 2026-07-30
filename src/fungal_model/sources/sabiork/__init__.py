@@ -15,6 +15,7 @@ from typing import Any
 import yaml
 
 from fungal_model.data.sabiork import SabioRKExport, load_sabiork_kinlaw_export
+from fungal_model.resources import example_data_path
 from fungal_model.sources.sabiork.fetch import COMBINED_EXPORT_FILENAME, query_bundle_key
 
 
@@ -1127,6 +1128,7 @@ def _local_snapshot_roots(cache_dir: Path) -> tuple[Path, ...]:
             cache_dir,
             repo_root / "data" / "source_snapshots" / "sabiork",
             repo_root / "data" / "kinetic_records" / "sabiork",
+            example_data_path("kinetic_records/sabiork"),
         )
     )
 

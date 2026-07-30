@@ -32,6 +32,13 @@ Use this workflow for each roadmap PR:
 
 Current next PR: **none selected; scoped queue complete through PR-59**.
 
+PUBLIC-RELEASE-001 is a completed, explicitly user-directed release/readiness
+slice outside the numbered PR queue. It packages the existing engine as
+`fungmod`, adds immutable install-time assets, full zero-to-report and
+advanced-capabilities notebooks, Read the Docs content, and release gates.
+Artificial showcase values remain framework-labelled and do not change
+biology, validation, calibration, or scientific-mode authorization.
+
 PR-49 is complete after PR #64 merged as `bbe2ee6`. PR-50 is complete after PR
 #65 merged as `933d2c8` for its bounded written-source authoring scope:
 `author_parameter_record(...)` accepts a `LoadedCurationBundle`, reloads its

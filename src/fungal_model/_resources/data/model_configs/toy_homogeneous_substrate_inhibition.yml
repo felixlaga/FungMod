@@ -1,0 +1,106 @@
+kind: model_config
+name: toy homogeneous Haldane substrate-inhibition benchmark
+mode: toy
+maturity: framework_benchmark
+provenance:
+  source: FungMod framework benchmark; not a scientific case.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: Exercises the provenance-bound Haldane substrate-inhibition law with artificial states and parameters.
+  validity_range: framework tests only
+  units: not_applicable
+entities:
+  environment:
+    id: environment
+    path: data/environments/lab_30C_pH7.yml
+    loader: environment
+  geometry:
+    id: geometry
+    path: data/geometries/well_mixed_100ml.yml
+    loader: well_mixed
+parameters:
+  - id: substrate_inhibition_parameters
+    parameters:
+      - name: toy Michaelis constant
+        symbol: K_m_substrate
+        value: 0.4
+        units: mole / liter
+        uncertainty: 0.0
+        source: FungMod artificial substrate-inhibition benchmark.
+        confidence_level: testing
+        notes: Artificial value for framework verification only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy maximum conversion rate
+        symbol: V_max_substrate
+        value: 0.15
+        units: mole / liter / second
+        uncertainty: 0.0
+        source: FungMod artificial substrate-inhibition benchmark.
+        confidence_level: testing
+        notes: Artificial value for framework verification only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy substrate inhibition constant
+        symbol: K_i_substrate
+        value: 0.3
+        units: mole / liter
+        uncertainty: 0.0
+        source: FungMod artificial substrate-inhibition benchmark.
+        confidence_level: testing
+        notes: Artificial value for framework verification only; not biological evidence.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+processes:
+  - id: generic_substrate_inhibited_conversion
+    process_type: homogeneous_michaelis_menten
+    states:
+      substrate: source_pool
+      product: released_pool
+    parameters:
+      km: K_m_substrate
+      vmax: V_max_substrate
+      rate_units: mole / liter / second
+    modifiers:
+      - type: substrate_inhibition
+        substrate_state: source_pool
+        michaelis_constant: K_m_substrate
+        inhibition_constant: K_i_substrate
+        primary_source: https://doi.org/10.1016/j.biortech.2010.01.084
+        maturity: literature_backed_software_tested
+    assumptions:
+      - artificial homogeneous Haldane substrate-inhibition benchmark only
+initial_state:
+  states:
+    source_pool:
+      value: 2.0
+      units: mole / liter
+    released_pool:
+      value: 0.0
+      units: mole / liter
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 10.0
+    units: second
+  points: 11
+validators:
+  - id: non_negative_states
+    validator_type: non_negative
+    species:
+      - source_pool
+      - released_pool
+  - id: closed_conversion_balance
+    validator_type: mass_balance
+    conserved_weights:
+      source_pool: 1.0
+      released_pool: 1.0
+outputs:
+  directory: outputs/toy_homogeneous_substrate_inhibition
+  save:
+    - record
+    - validation_report
+  plots:
+    - state_trajectories

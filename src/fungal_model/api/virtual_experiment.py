@@ -15,6 +15,7 @@ from fungal_model.api.output_schema import OUTPUT_SCHEMA_VERSION
 from fungal_model.api.quicklook import write_quicklook_plots as write_quicklook_plot_files
 from fungal_model.api.report import write_virtual_experiment_report
 from fungal_model.api.result_tables import WrittenTables, write_preflight_tables, write_standard_tables
+from fungal_model.resources import default_registry_path
 from fungal_model.registry.records import ParameterRecord
 from fungal_model.registry import FungModRegistry, RegistryResolver, ResolvedRecord, load_registry
 from fungal_model.screening import (
@@ -26,6 +27,7 @@ from fungal_model.screening import (
 )
 
 VirtualExperimentMode = Literal["exploratory", "scientific"]
+DEFAULT_REGISTRY_REFERENCE = "data_registry/registry_index.yml"
 
 
 class VirtualExperimentError(ValueError):
@@ -51,7 +53,7 @@ class VirtualExperiment:
         fungi: Sequence[str] | str,
         substrates: Sequence[str] | str,
         environments: Sequence[str] | str | EnvironmentGrid,
-        registry: str | Path | FungModRegistry = "data_registry/registry_index.yml",
+        registry: str | Path | FungModRegistry = DEFAULT_REGISTRY_REFERENCE,
         resolve_names: bool = False,
     ) -> "VirtualExperiment":
         """Create a virtual experiment from curated registry IDs or opted-in aliases."""
@@ -103,7 +105,7 @@ class VirtualExperiment:
         fungi: Sequence[str] | str,
         substrates: Sequence[str] | str,
         environments: Sequence[str] | str | EnvironmentGrid,
-        registry: str | Path | FungModRegistry = "data_registry/registry_index.yml",
+        registry: str | Path | FungModRegistry = DEFAULT_REGISTRY_REFERENCE,
     ) -> "VirtualExperiment":
         """Create a virtual experiment by resolving researcher-facing names and aliases."""
 
@@ -443,7 +445,7 @@ def virtual_experiment(
     fungi: Sequence[str] | str,
     substrates: Sequence[str] | str,
     environments: Sequence[str] | str | EnvironmentGrid,
-    registry: str | Path | FungModRegistry = "data_registry/registry_index.yml",
+    registry: str | Path | FungModRegistry = DEFAULT_REGISTRY_REFERENCE,
 ) -> VirtualExperiment:
     """Create a researcher-facing virtual experiment from registry IDs, names, or aliases."""
 
@@ -465,6 +467,8 @@ def _load_registry_source(registry: str | Path | FungModRegistry) -> tuple[FungM
     if isinstance(registry, FungModRegistry):
         return registry, registry.registry_id
     path = Path(registry)
+    if str(registry) == DEFAULT_REGISTRY_REFERENCE and not path.exists():
+        path = default_registry_path()
     return load_registry(path), str(path)
 
 

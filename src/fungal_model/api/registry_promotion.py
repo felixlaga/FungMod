@@ -39,6 +39,7 @@ from fungal_model.api.curation import (
     curation_source_provenance_missing,
     load_curation_bundle,
 )
+from fungal_model.resources import default_registry_path
 from fungal_model.api.curator_signatures import (
     AuthenticatedCurationBundle,
     CuratorSignatureError,
@@ -2756,9 +2757,7 @@ def _safe_output_path(output_dir: str | Path, *, registry_root: Path) -> Path:
         )
     _reject_symlink_components(path, label="Promotion-plan output path")
     resolved = path.resolve(strict=False)
-    package_registry = (Path(__file__).resolve().parents[3] / "data_registry").resolve(
-        strict=False
-    )
+    package_registry = default_registry_path().parent.resolve(strict=False)
     for forbidden in {registry_root.resolve(strict=False), package_registry}:
         if (
             resolved == forbidden

@@ -1,0 +1,15 @@
+kind: product_map
+name: toy plugin surface mass-equivalent release map
+product_map_type: one_to_one
+maturity: framework_benchmark
+provenance:
+  source: FungMod foundation product-map benchmark; not a scientific stoichiometry.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: One-to-one mass-equivalent mapping for a plugin surface benchmark.
+  validity_range: framework tests only
+  units: not_applicable
+substrate_state: solid_polymer_amount
+product_state: released_product_amount
+notes: Uses configured state names so plugin examples do not force generic names.
+parameters: []

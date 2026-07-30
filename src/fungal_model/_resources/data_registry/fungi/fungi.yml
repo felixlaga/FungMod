@@ -1,0 +1,58 @@
+kind: fungmod_registry_records
+record_type: fungi
+records:
+  - record_id: toy_fungus_alpha
+    name: Toy fungus alpha
+    maturity: toy_development
+    provenance:
+      source: FungMod R1 toy registry fixture.
+      confidence_level: testing
+      notes: Fake fungus capability record for loader tests only.
+    enzyme_classes:
+      - toy_cellulase
+    assimilable_products:
+      - toy_sugar_product
+    notes: Toy/development record only; not a real fungus or literature capability.
+
+  - record_id: generic_cellulase_source
+    name: Generic cellulase enzyme source
+    display_name: Generic cellulase source
+    aliases:
+      - generic cellulase source
+      - cellulase enzyme source
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-001 controlled virtual-experiment scaffold.
+      confidence_level: exploratory_assumption
+      notes: User-specified enzyme-source metadata for the first insoluble cellulose surface-degradation pilot; not a whole-fungus record.
+    enzyme_classes:
+      - cellulase_generic
+    assimilable_products: []
+    notes: >
+      Enzyme-source pseudo-record for an enzyme-mediated cellulose surface
+      degradation pilot. This is not a whole-fungus growth model and must not
+      imply secretion, uptake, biomass growth, oxygen limitation, or organism-
+      level degradation.
+
+  - record_id: sabiork_beta_glucosidase_source
+    name: SABIO-RK Reaction 618 beta-glucosidase source
+    display_name: beta-glucosidase source
+    aliases:
+      - beta-glucosidase source
+      - beta glucosidase source
+      - SABIO-RK beta-glucosidase source
+    database_ids:
+      sabiork_reaction:
+        - "618"
+    maturity: literature_processed
+    provenance:
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+    enzyme_classes:
+      - beta_glucosidase
+    assimilable_products: []
+    notes: >
+      Enzyme-source pseudo-record for a purified or recombinant enzyme
+      kinetics case. This is not a whole-fungus growth model and must not imply
+      secretion, uptake, biomass growth, or organism-level degradation.

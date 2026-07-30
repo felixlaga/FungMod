@@ -26,7 +26,7 @@ def test_quality_tool_configs_exist() -> None:
     assert "F" in pyproject["tool"]["ruff"]["lint"]["select"]
     assert pyproject["tool"]["coverage"]["run"]["source"] == ["fungal_model"]
     assert pyproject["tool"]["coverage"]["report"]["fail_under"] >= 80
-    assert pyright["include"] == ["src/fungal_model"]
+    assert pyright["include"] == ["src/fungal_model", "src/fungmod"]
     assert pyright["typeCheckingMode"] == "basic"
     assert pyright["reportArgumentType"] is True
     assert pyright["reportAssignmentType"] is True
@@ -42,7 +42,8 @@ def test_quality_tool_configs_exist() -> None:
     debt_register = (ROOT / "ARCHITECTURE_DEBT.md").read_text(encoding="utf-8")
     assert "FD-005 Pyright optional-value baseline" in debt_register
     assert "Status: resolved in PR-41" in debt_register
-    assert "there are no active architecture-debt entries" in debt_register
+    assert "FD-007 Wheel-packaged resource mirror" in debt_register
+    assert "Status: active and contained in PUBLIC-RELEASE-001" in debt_register
 
 
 def test_ci_runs_lint_typecheck_and_coverage() -> None:

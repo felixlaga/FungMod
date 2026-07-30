@@ -1,0 +1,629 @@
+kind: fungmod_registry_records
+record_type: case_templates
+schema_version: "1"
+records:
+  - record_id: toy_surface_catalysis_registry_template
+    case_template_id: toy_surface_catalysis_registry_template
+    name: Toy surface-catalysis registry assembly template
+    maturity: toy_development
+    provenance:
+      source: FungMod R3 toy registry fixture.
+      confidence_level: testing
+      notes: Software-test assembly template for the existing toy surface-catalysis registry case.
+    schema_version: "1"
+    process_type: surface_catalysis
+    state_roles:
+      substrate: solid_substrate_amount
+      product: released_product_amount
+      catalyst: free_catalyst_concentration
+    initial_state_mapping:
+      substrate:
+        value: 0.0001
+        units: kilogram
+      product:
+        value: 0.0
+        units: kilogram
+      catalyst:
+        value: 1.0
+        units: mole / liter
+    product_map:
+      id: registry_case_release_map
+      product_map_type: one_to_one
+      substrate_state_role: substrate
+      product_state_role: product
+      stoichiometric_yield: 1.0
+      notes: Mass-equivalent toy map; not a chemical stoichiometry claim.
+    stoichiometric_yields:
+      product: 1.0
+    time_grid:
+      start: 0.0
+      stop: 20.0
+      points: 41
+      units: second
+    observable_roles:
+      - substrate
+      - product
+      - catalyst
+    output_state_roles:
+      substrate: solid_substrate_amount
+      product: released_product_amount
+      catalyst: free_catalyst_concentration
+    process_state_metadata:
+      config_name: "toy registry case {fungus_id} on {substrate_id}"
+      config_mode: toy
+      config_maturity: framework_benchmark
+      public_path: false
+      bond_type: toy_beta_1_4_glycosidic
+      accessible_site_pool: configured accessible site pool
+      geometry:
+        kind: geometry
+        name: toy registry well-mixed 100 mL
+        geometry_type: well_mixed
+        provenance:
+          source: FungMod R3 toy registry case builder.
+          measurement_method: defined benchmark metadata
+          confidence_level: testing
+          notes: Template-owned toy geometry for registry-to-config workflow tests.
+          validity_range: R3 framework tests only
+          units: not_applicable
+        volume:
+          value: 100.0
+          units: milliliter
+        surface_area:
+          value: 0.1
+          units: meter ** 2
+        parameters: []
+    limitations:
+      - Toy registry case builder only.
+      - Uses the existing generic surface-catalysis factory without adding biology.
+    validity_notes:
+      - Software-test fixture only; not a scientific process rule.
+    notes: Toy template keeps legacy test behavior while exercising config-driven case assembly.
+
+  - record_id: bio001_cellulose_surface_catalysis_template
+    case_template_id: bio001_cellulose_surface_catalysis_template
+    name: BIO-001 cellulose surface-catalysis assembly template
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-001 controlled virtual-experiment scaffold.
+      confidence_level: exploratory_assumption
+      bio_milestone: BIO-001
+      notes: Assembly metadata for the existing BIO-001 enzyme-mediated cellulose surface-degradation pilot.
+    schema_version: "1"
+    process_type: surface_catalysis
+    state_roles:
+      substrate: solid_substrate_remaining
+      product: soluble_product_amount
+      catalyst: free_enzyme_concentration
+      accessibility_proxy: accessible_site_fraction_remaining_proxy
+    initial_state_mapping:
+      substrate:
+        parameter_role: substrate_initial_amount
+        units_from_role: substrate_initial_amount
+      product:
+        value: 0.0
+        units_from_role: substrate_initial_amount
+      catalyst:
+        parameter_role: enzyme_initial_concentration
+        units_from_role: enzyme_initial_concentration
+    product_map:
+      id: bio001_cellulose_surface_release_map
+      product_map_type: one_to_one
+      substrate_state_role: substrate
+      product_state_role: product
+      stoichiometric_yield: 1.0
+      notes: Mass-equivalent soluble product release map for BIO-001; not full cellulose stoichiometry.
+    stoichiometric_yields:
+      product: 1.0
+    time_grid:
+      start: 0.0
+      stop: 4000.0
+      points: 81
+      units: second
+    observable_roles:
+      - substrate
+      - product
+      - accessibility_proxy
+      - degradation_rate
+      - product_release_rate
+    output_state_roles:
+      substrate: solid_substrate_remaining
+      product: soluble_product_amount
+      enzyme: free_enzyme_concentration
+      accessibility_proxy: accessible_site_fraction_remaining_proxy
+    process_state_metadata:
+      config_name: "BIO-001 cellulose surface virtual experiment {fungus_id} on {substrate_id}"
+      config_mode: exploratory
+      config_maturity: exploratory
+      public_path: true
+      bond_type: beta_1_4_glycosidic
+      accessible_site_pool: cellulose accessible beta-1,4-glycosidic surface
+      geometry:
+        kind: geometry
+        name: BIO-001 well-mixed enzyme assay context
+        geometry_type: well_mixed
+        provenance:
+          source: FungMod BIO-001 controlled virtual-experiment scaffold.
+          measurement_method: user-specified virtual-experiment context
+          confidence_level: exploratory_assumption
+          notes: Geometry context for an enzyme-mediated surface-degradation pilot; no spatial gradients are modeled.
+          validity_range: BIO-001 cellulose surface-degradation pilot only
+          units: not_applicable
+        volume:
+          value: 100.0
+          units: milliliter
+        surface_area:
+          value: 0.5
+          units: meter ** 2
+        parameters: []
+    limitations:
+      - Enzyme-mediated insoluble cellulose surface degradation pilot.
+      - Accessible surface area is constant within each sample; surface renewal and morphology are not modeled.
+      - Soluble product release is represented by a mass-equivalent product class.
+    validity_notes:
+      - BIO-001 does not model whole-fungus growth, secretion, uptake, biomass, oxygen limitation, or lignocellulose structure.
+      - Time-grid values preserve the pre-ASSEMBLY-001 runtime defaults for existing BIO-001 tests and outputs.
+    notes: >
+      Template describes BIO-001 assembly only. It does not provide evidence
+      for parameter values or scientific validity beyond the linked registry
+      records and explicit exploratory priors.
+
+  - record_id: sabiork_reaction_618_homogeneous_mm_template
+    case_template_id: sabiork_reaction_618_homogeneous_mm_template
+    name: SABIO-RK Reaction 618 homogeneous Michaelis-Menten assembly template
+    maturity: literature_metadata
+    provenance:
+      source: SABIO-RK Reaction 618 selected kinetic law
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "35622"
+      confidence_level: literature_metadata
+      notes: Assembly metadata for the existing local Reaction 618 beta-glucosidase cellobiose kinetic pilot.
+    schema_version: "1"
+    process_type: homogeneous_michaelis_menten
+    state_roles:
+      substrate: cellobiose_concentration
+      product: beta_D_glucose_concentration
+      enzyme: beta_glucosidase_concentration
+    initial_state_mapping:
+      substrate:
+        parameter_role: substrate_initial_concentration
+        units_from_role: substrate_initial_concentration
+      product:
+        value: 0.0
+        units_from_role: substrate_initial_concentration
+      enzyme:
+        parameter_role: enzyme_initial_concentration
+        units_from_role: enzyme_initial_concentration
+    product_map:
+      id: sabiork_reaction_618_product_map
+      product_map_type: stoichiometric
+      substrate_state_role: substrate
+      product_state_role: product
+      stoichiometric_yield: 2.0
+      notes: Reaction 618 stoichiometry; homogeneous product dynamics use this 2:1 glucose yield.
+    stoichiometric_yields:
+      product: 2.0
+    time_grid:
+      start: 0.0
+      stop: 1000.0
+      points: 101
+      units: second
+    observable_roles:
+      - substrate
+      - product
+      - enzyme
+      - degradation_rate
+      - product_release_rate
+    output_state_roles:
+      substrate: cellobiose_concentration
+      product: beta_D_glucose_concentration
+      enzyme: beta_glucosidase_concentration
+    process_state_metadata:
+      config_name: "SABIO-RK Reaction 618 beta-glucosidase cellobiose homogeneous Michaelis-Menten"
+      config_mode: scientific
+      config_maturity: scientific
+      process_id: sabiork_reaction_618_homogeneous_mm
+      parameter_set_id: sabiork_reaction_618_parameters
+      product_map_name: SABIO-RK Reaction 618 cellobiose to beta-D-glucose product map
+      public_path: true
+    limitations:
+      - Dissolved homogeneous Michaelis-Menten kinetics for the selected SABIO-RK entry.
+      - This is an enzyme-kinetics case, not a whole-fungus growth or uptake model.
+      - Stoichiometric yield drives product formation, but this remains an enzyme-kinetics case without growth or uptake.
+    validity_notes:
+      - Template metadata does not resolve the missing selected-entry enzyme concentration.
+      - Time-grid values preserve the pre-ASSEMBLY-001 runtime defaults for existing Reaction 618 tests and outputs.
+    notes: >
+      Template describes how the local Reaction 618 registry case is assembled.
+      It does not fetch SABIO-RK data and does not create parameter evidence.
+
+  - record_id: bio002_extracellular_enzyme_chain_template
+    case_template_id: bio002_extracellular_enzyme_chain_template
+    name: BIO-002 reusable extracellular enzyme-chain degradation template
+    maturity: exploratory_metadata
+    provenance:
+      source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+      confidence_level: exploratory_assumption
+      bio_milestone: BIO-002
+      notes: >
+        Assembly metadata for a reusable extracellular enzyme-chain mechanism.
+        The demo chain is solid cellulose-equivalent substrate to cellobiose to
+        beta-D-glucose; it is not organism-specific and is not a whole-fungus model.
+    schema_version: "1"
+    process_type: extracellular_enzyme_chain
+    state_roles:
+      substrate: solid_cellulose_equivalent_concentration
+      intermediate: cellobiose_concentration
+      product: beta_D_glucose_concentration
+      surface_catalyst: cellulase_concentration
+      homogeneous_catalyst: beta_glucosidase_concentration
+    initial_state_mapping:
+      substrate:
+        parameter_role: solid_substrate_initial_concentration
+        units_from_role: solid_substrate_initial_concentration
+      intermediate:
+        value: 0.0
+        units: mM
+      product:
+        value: 0.0
+        units: mM
+      surface_catalyst:
+        parameter_role: cellulase_initial_concentration
+        units_from_role: cellulase_initial_concentration
+      homogeneous_catalyst:
+        parameter_role: beta_glucosidase_initial_concentration
+        units_from_role: beta_glucosidase_initial_concentration
+    product_map:
+      id: bio002_cellobiose_to_glucose_map
+      product_map_type: stoichiometric
+      substrate_state_role: intermediate
+      product_state_role: product
+      stoichiometric_yield: 2.0
+      notes: Cellobiose hydrolysis produces two beta-D-glucose equivalents.
+    stoichiometric_yields:
+      intermediate: 1.0
+      product: 2.0
+    time_grid:
+      start: 0.0
+      stop: 4000.0
+      points: 81
+      units: second
+    observable_roles:
+      - substrate
+      - intermediate
+      - product
+      - surface_catalyst
+      - homogeneous_catalyst
+      - degradation_rate
+      - product_release_rate
+      - solid_substrate_degraded_fraction
+      - final_glucose_yield
+    output_state_roles:
+      substrate: solid_cellulose_equivalent_concentration
+      intermediate: cellobiose_concentration
+      product: beta_D_glucose_concentration
+      surface_catalyst: cellulase_concentration
+      homogeneous_catalyst: beta_glucosidase_concentration
+    process_state_metadata:
+      topology_type: linear
+      config_name: BIO-002 extracellular enzyme-chain cellulose-equivalent demo
+      config_mode: exploratory
+      config_maturity: exploratory
+      public_path: true
+      entities:
+        geometry:
+          id: geometry
+          loader: well_mixed
+          data:
+            kind: geometry
+            name: BIO-002 well-mixed extracellular enzyme-chain assay context
+            geometry_type: well_mixed
+            provenance:
+              source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+              measurement_method: explicit virtual-experiment context
+              confidence_level: exploratory_assumption
+              notes: Well-mixed assay context; no spatial gradients, transport limitation, or morphology evolution are modeled.
+              validity_range: BIO-002 enzyme-chain demo only
+              units: not_applicable
+            volume:
+              value: 100.0
+              units: milliliter
+            surface_area:
+              value: 0.5
+              units: meter ** 2
+            parameters: []
+        substrates:
+          - id: cellulose_film_generic
+            loader: generic_solid
+            data:
+              kind: substrate
+              name: Generic insoluble cellulose-equivalent substrate
+              substrate_type: generic_solid
+              chemical_class: cellulose_film_generic
+              physical_state: solid_polymer
+              bond_types:
+                - beta_1_4_glycosidic
+              accessible_bonds:
+                - beta_1_4_glycosidic
+              required_enzyme_classes:
+                - cellulase_generic
+              degradation_products:
+                - name: cellobiose
+                  source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+                  notes: BIO-002 soluble intermediate in a cellulose-equivalent enzyme-chain scaffold.
+              completeness: partial
+              default_degradation_model: heterogeneous_surface
+              water_activity_dependence: unknown
+              provenance:
+                source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+                confidence_level: exploratory_assumption
+                notes: Solid substrate represented as an explicit cellobiose-equivalent concentration state.
+              parameters: []
+        enzymes:
+          - id: cellulase_generic
+            data:
+              kind: enzyme
+              name: Generic extracellular cellulase catalyst
+              enzyme_class: cellulase_generic
+              target_bond_types:
+                - beta_1_4_glycosidic
+              target_substrate_classes:
+                - cellulose_film_generic
+              target_substrate_names:
+                - Generic insoluble cellulose-equivalent substrate
+              validity_labels:
+                - BIO-002
+                - surface_cellobiose_release
+                - exploratory_metadata
+              provenance:
+                source: FungMod BIO-002 reusable extracellular enzyme-chain scaffold.
+                confidence_level: exploratory_assumption
+                notes: Explicit catalyst metadata; no secretion, uptake, biomass, or growth is represented.
+              catalytic_parameters: []
+              adsorption_parameters: []
+              parameters: []
+          - id: beta_glucosidase
+            data:
+              kind: enzyme
+              name: beta-glucosidase
+              enzyme_class: beta_glucosidase
+              target_bond_types:
+                - beta_1_4_glycosidic
+              target_substrate_classes:
+                - cellobiose
+              target_substrate_names:
+                - Cellobiose
+              validity_labels:
+                - BIO-002
+                - homogeneous_cellobiose_hydrolysis
+              provenance:
+                source: SABIO-RK Reaction 618 selected kinetic law and BIO-002 scaffold metadata.
+                confidence_level: literature_curated
+                notes: Enzyme metadata for cellobiose hydrolysis; no uptake or biomass is represented.
+              catalytic_parameters: []
+              adsorption_parameters: []
+              parameters: []
+      state_species:
+        solid_cellulose_equivalent_concentration:
+          species: cellulose_film_generic
+          entity_type: substrate
+        cellobiose_concentration:
+          species: cellobiose
+          entity_type: substrate
+        cellulase_concentration:
+          species: cellulase_generic
+          entity_type: enzyme
+        beta_glucosidase_concentration:
+          species: beta_glucosidase
+          entity_type: enzyme
+      parameter_record_ids:
+        solid_substrate_initial_concentration: bio002_initial_solid_cellulose_equivalent_concentration
+        cellulase_initial_concentration: bio002_cellulase_initial_concentration
+        beta_glucosidase_initial_concentration: bio002_beta_glucosidase_initial_concentration
+        surface_rate_constant: bio002_cellulose_to_cellobiose_surface_rate
+        adsorption_constant: bio002_cellulase_adsorption_constant
+        accessible_surface_area: bio002_cellulose_accessible_surface_area
+        km: sabiork_reaction_618_Km_cellobiose
+        kcat: sabiork_reaction_618_kcat_cellobiose
+      parameter_role_contracts:
+        solid_substrate_initial_concentration:
+          kind: initial_state
+          parameter_symbol: bio002_initial_solid_cellulose_equivalent_concentration
+          record_process_type: extracellular_enzyme_chain
+          enzyme_class: null
+          substrate_class: cellulose_film_generic
+          fungus_id: null
+          substrate_id: cellulose_film_generic
+          environment_id: sabiork_reaction_618_selected_conditions
+        cellulase_initial_concentration:
+          kind: initial_state
+          parameter_symbol: bio002_cellulase_initial_concentration
+          record_process_type: surface_catalysis
+          enzyme_class: cellulase_generic
+          substrate_class: cellulose_film_generic
+          fungus_id: null
+          substrate_id: cellulose_film_generic
+          environment_id: sabiork_reaction_618_selected_conditions
+        beta_glucosidase_initial_concentration:
+          kind: initial_state
+          parameter_symbol: bio002_beta_glucosidase_initial_concentration
+          record_process_type: extracellular_enzyme_chain
+          enzyme_class: beta_glucosidase
+          substrate_class: cellobiose
+          fungus_id: null
+          substrate_id: cellobiose
+          environment_id: sabiork_reaction_618_selected_conditions
+        surface_rate_constant:
+          kind: process_parameter
+          parameter_symbol: bio002_cellulose_to_cellobiose_surface_rate
+          enzyme_class: cellulase_generic
+          substrate_class: cellulose_film_generic
+          fungus_id: null
+          substrate_id: cellulose_film_generic
+          environment_id: sabiork_reaction_618_selected_conditions
+        adsorption_constant:
+          kind: process_parameter
+          parameter_symbol: bio002_cellulase_adsorption_constant
+          enzyme_class: cellulase_generic
+          substrate_class: cellulose_film_generic
+          fungus_id: null
+          substrate_id: cellulose_film_generic
+          environment_id: sabiork_reaction_618_selected_conditions
+        accessible_surface_area:
+          kind: process_parameter
+          parameter_symbol: bio002_cellulose_accessible_surface_area
+          enzyme_class: cellulase_generic
+          substrate_class: cellulose_film_generic
+          fungus_id: null
+          substrate_id: cellulose_film_generic
+          environment_id: sabiork_reaction_618_selected_conditions
+        km:
+          kind: process_parameter
+          parameter_symbol: Km_cellobiose
+          enzyme_class: beta_glucosidase
+          substrate_class: cellobiose
+          fungus_id: sabiork_beta_glucosidase_source
+          substrate_id: cellobiose
+          environment_id: sabiork_reaction_618_selected_conditions
+        kcat:
+          kind: process_parameter
+          parameter_symbol: kcat_cellobiose
+          enzyme_class: beta_glucosidase
+          substrate_class: cellobiose
+          fungus_id: sabiork_beta_glucosidase_source
+          substrate_id: cellobiose
+          environment_id: sabiork_reaction_618_selected_conditions
+      product_maps:
+        - id: bio002_cellulose_to_cellobiose_map
+          name: BIO-002 cellulose-equivalent to cellobiose release map
+          product_map_type: stoichiometric
+          reactants:
+            substrate: 1.0
+          products:
+            intermediate: 1.0
+          notes: One cellulose-equivalent cleavage unit releases one cellobiose-equivalent intermediate.
+        - id: bio002_cellobiose_to_glucose_map
+          name: BIO-002 cellobiose to beta-D-glucose map
+          product_map_type: stoichiometric
+          reactants:
+            intermediate: 1.0
+          products:
+            product: 2.0
+          notes: Reuses the Reaction 618 stoichiometric glucose yield.
+      process_templates:
+        - id: bio002_surface_cellulose_to_cellobiose
+          process_type: surface_catalysis
+          state_roles:
+            substrate: substrate
+            catalyst: surface_catalyst
+            product: intermediate
+          fixed_states:
+            bond_type: beta_1_4_glycosidic
+            accessible_site_pool: cellulose beta-1,4-glycosidic accessible surface
+          parameter_roles:
+            surface_rate_constant: surface_rate_constant
+            adsorption_constant: adsorption_constant
+            accessible_surface_area: accessible_surface_area
+          fixed_parameters:
+            rate_units: mM / second
+          product_map: bio002_cellulose_to_cellobiose_map
+          assumptions:
+            - Solid cellulose-like substrate is represented as an explicit cellobiose-equivalent concentration pool.
+            - Accessible surface area is constant during each run; surface renewal and morphology are not modeled.
+        - id: bio002_cellobiose_to_glucose_mm
+          process_type: homogeneous_michaelis_menten
+          state_roles:
+            substrate: intermediate
+            product: product
+            enzyme: homogeneous_catalyst
+          parameter_roles:
+            km: km
+            kcat: kcat
+          fixed_parameters:
+            rate_units: mM / second
+          product_map: bio002_cellobiose_to_glucose_map
+          assumptions:
+            - Dissolved cellobiose hydrolysis uses the generic homogeneous Michaelis-Menten process.
+            - Stoichiometric product dynamics use two glucose equivalents per cellobiose consumed.
+      conservation:
+        id: cellobiose_equivalent_balance
+        closed_system: true
+        state_weights:
+          substrate: 1.0
+          intermediate: 1.0
+          product: 0.5
+      chain_outputs:
+        state_series:
+          - role: substrate
+            label: solid_substrate_remaining
+          - role: intermediate
+            label: cellobiose
+          - role: product
+            label: glucose
+          - role: surface_catalyst
+            label: cellulase
+          - role: homogeneous_catalyst
+            label: beta_glucosidase
+        derived_series:
+          - id: degraded_fraction
+            kind: fractional_depletion
+            role: substrate
+            label: solid_substrate_degraded_fraction
+            units: dimensionless
+            threshold_fractions:
+              - 0.1
+              - 0.5
+              - 0.9
+            notes: Fraction of the initial cellulose-equivalent substrate pool consumed.
+          - id: product_yield
+            kind: conserved_equivalent_fraction
+            role: product
+            denominator_role: substrate
+            label: glucose_yield
+            units: dimensionless
+            notes: Product converted to substrate-equivalent units using declared conservation weights.
+        final_metrics:
+          - id: final_substrate_remaining
+            kind: final_state
+            role: substrate
+            label: solid_substrate_remaining
+          - id: final_intermediate
+            kind: final_state
+            role: intermediate
+            label: cellobiose
+          - id: final_product
+            kind: final_state
+            role: product
+            label: glucose
+          - id: final_degraded_fraction
+            kind: final_derived
+            derived_series: degraded_fraction
+            label: solid_substrate_degraded_fraction
+          - id: final_product_yield
+            kind: final_derived
+            derived_series: product_yield
+            label: final_glucose_yield
+        process_rate_metrics:
+          include_maximum: true
+      suggested_experiments:
+        - id: bio002_timecourse_cellobiose_glucose
+          priority: high
+          description: Measure solid-substrate loss, cellobiose, and glucose over time for an extracellular enzyme mixture.
+          rationale: Needed to calibrate or validate the linked surface-release and homogeneous hydrolysis steps together.
+        - id: bio002_accessible_surface_area
+          priority: medium
+          description: Independently estimate accessible cellulose surface area for the assay material.
+          rationale: Surface release remains exploratory until accessible area is measured or constrained.
+    limitations:
+      - Reusable extracellular enzyme-chain mechanism only; not whole-fungus growth, secretion, uptake, or biomass.
+      - Solid cellulose-like substrate is represented as a cellobiose-equivalent concentration pool, not full cellulose morphology.
+      - Accessible surface area is constant; surface renewal, crystallinity, pore transport, and morphology evolution are not modeled.
+      - The first step uses exploratory scaffold parameters; only the cellobiose-to-glucose kinetic constants come from the local Reaction 618 registry records.
+      - No PET, lignin, full lignocellulose, organism-specific physiology, or environmental response law is represented.
+    validity_notes:
+      - BIO-002 demonstrates reusable process assembly and stoichiometric product dynamics, not experimental validation.
+      - Parameter values are suitable for exploratory software exercising and hypothesis generation only unless separately calibrated.
+    notes: >
+      Template describes a reusable extracellular enzyme chain assembled from
+      generic surface catalysis and homogeneous Michaelis-Menten process laws.

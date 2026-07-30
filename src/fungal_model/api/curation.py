@@ -24,6 +24,7 @@ from fungal_model.api._integrity import (
     first_symlink_component,
     type_exact_equal as _type_exact_equal,
 )
+from fungal_model.resources import default_registry_path
 from fungal_model.sources.sabiork import PROPOSAL_STATUS, RegistryProposal, stable_sabiork_token
 
 
@@ -1692,8 +1693,11 @@ def _safe_output_path(output_dir: str | Path) -> Path:
         raise CurationError(f"Curation output path traversal is not allowed: {path}")
     _reject_symlink_components(path, label="Curation output path")
     resolved = path.resolve(strict=False)
-    registry = (Path(__file__).resolve().parents[3] / "data_registry").resolve(strict=False)
-    if resolved == registry or registry in resolved.parents:
+    registry_roots = {
+        (Path(__file__).resolve().parents[3] / "data_registry").resolve(strict=False),
+        default_registry_path().parent.resolve(strict=False),
+    }
+    if any(resolved == registry or registry in resolved.parents for registry in registry_roots):
         raise CurationError("CURATION-001 decision bundles cannot be written inside data_registry/.")
     return resolved
 

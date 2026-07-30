@@ -1,5 +1,11 @@
 # FungMod
 
+[![PyPI](https://img.shields.io/pypi/v/fungmod.svg)](https://pypi.org/project/fungmod/)
+[![Python](https://img.shields.io/pypi/pyversions/fungmod.svg)](https://pypi.org/project/fungmod/)
+[![Documentation](https://readthedocs.org/projects/fungmod/badge/?version=latest)](https://fungmod.readthedocs.io/)
+[![CI](https://github.com/felixlaga/FungMod/actions/workflows/ci.yml/badge.svg)](https://github.com/felixlaga/FungMod/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 Before changing the codebase, start with the root agent/developer contract and
 the active directive:
 
@@ -219,7 +225,26 @@ validated biology is forbidden.
 ## Install
 
 ```bash
-python3 -m pip install -e ".[dev]"
+python3 -m pip install fungmod
+```
+
+FungMod is a Python package, so it installs with `pip`, not npm. The
+distribution provides both the concise and original import namespaces:
+
+```python
+import fungmod
+import fungal_model
+```
+
+The wheel includes the immutable registry snapshot, frozen source evidence,
+and example configurations needed by the public examples. Full installation,
+notebook, and packaged-data guidance is available at
+[fungmod.readthedocs.io](https://fungmod.readthedocs.io/).
+
+For development:
+
+```bash
+python3 -m pip install -e ".[dev,docs,notebooks]"
 ```
 
 ## Test
@@ -237,6 +262,9 @@ package-quality gates below:
 python -m ruff check src tests
 python -m pyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"
 python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml
+python -m mkdocs build --strict
+python -m build
+python -m twine check dist/*
 ```
 
 The current Pyright gate resolves imports from the active Python interpreter
@@ -887,8 +915,20 @@ These researcher-facing notebooks are not empirical validation:
 - `17_configured_environment_modifiers_example.ipynb`
 - `18_configured_oxygen_water_modifiers_example.ipynb`
 - `19_solver_diagnostics_example.ipynb`
+- `20_zero_to_complete_virtual_experiment.ipynb`
+- `21_advanced_capabilities.ipynb`
 
-Notebook tests check that notebooks import `fungal_model`, avoid defining core
+The two release notebooks provide complete public workflows. Notebook 20 moves
+from installation and alias resolution through preflight, an exploratory
+environment screen, metrics, uncertainty, provenance, limitations, report
+writing, and manifest verification. Notebook 21 connects frozen source
+evidence, a Reaction 618 uncertainty screen, provenance-bound inhibition-law
+benchmarks, dynamic Gibbs enforcement, entropy/conservation/solver
+diagnostics, and advanced bundle verification. Their software benchmarks are
+not empirical validation or organism-specific biological evidence.
+
+Notebook tests check that notebooks import the public `fungmod` or
+`fungal_model` namespace, avoid defining core
 rate laws/classes or low-level solvers inline, and execute every foundation,
 product-tour, and configured-output diagnostics smoke path. The thermodynamics notebook
 uses configured explicit-Q Gibbs and entropy-production-rate metadata only and

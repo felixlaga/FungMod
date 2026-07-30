@@ -35,6 +35,7 @@ from fungal_model.io.yaml_loader import (
     load_parameter_set,
     load_substrate,
 )
+from fungal_model.resources import package_data_path
 from fungal_model.workflows.configured_errors import raise_configured_model_execution_error
 
 
@@ -266,6 +267,11 @@ def _resolve_config_path(path: str, config: ModelConfig) -> Path:
         sibling = config.path.parent / candidate
         if sibling.exists():
             return sibling
+    if candidate.parts and candidate.parts[0] in {"data", "data_registry"}:
+        try:
+            return package_data_path(candidate)
+        except FileNotFoundError:
+            pass
     return candidate
 
 

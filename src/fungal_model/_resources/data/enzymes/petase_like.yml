@@ -1,0 +1,22 @@
+kind: enzyme
+name: toy PETase-like hydrolase
+enzyme_class: PETase-like hydrolase
+target_bond_types:
+  - ester
+target_substrate_names:
+  - polyethylene terephthalate
+target_substrate_classes:
+  - synthetic polyester
+validity_labels:
+  - toy
+  - benchmark
+provenance:
+  source: Toy PETase-like enzyme configuration for FungMod integration tests.
+  measurement_method: defined benchmark metadata
+  confidence_level: testing
+  notes: Compatibility metadata only; no real enzyme claim.
+  validity_range: toy benchmark only
+  units: not_applicable
+catalytic_parameters: []
+adsorption_parameters: []
+parameters: []

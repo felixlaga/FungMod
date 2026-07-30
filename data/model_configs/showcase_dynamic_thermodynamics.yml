@@ -1,0 +1,228 @@
+kind: model_config
+name: artificial dynamic thermodynamic enforcement showcase
+mode: toy
+maturity: framework_benchmark
+provenance:
+  source: FungMod artificial release-showcase benchmark; not a scientific case.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: Exercises explicit dynamic thermodynamic enforcement and diagnostics without biological claims.
+  validity_range: framework tests only
+  units: not_applicable
+entities:
+  environment:
+    id: environment
+    path: data/environments/lab_30C_pH7.yml
+    loader: environment
+  geometry:
+    id: geometry
+    path: data/geometries/well_mixed_100ml.yml
+    loader: well_mixed
+  substrates:
+    - id: dissolved_substrate
+      loader: generic_dissolved
+      data:
+        kind: substrate
+        name: generic dissolved thermodynamic benchmark substrate
+        substrate_type: generic_dissolved
+        chemical_class: framework benchmark
+        physical_state: dissolved
+        bond_types: []
+        accessible_bonds: []
+        required_enzyme_classes: []
+        degradation_products:
+          - name: generic product
+            notes: Artificial product for software-contract verification only.
+parameters:
+  - id: homogeneous_parameters
+    parameters:
+      - name: artificial first-order conversion constant
+        symbol: k_ab
+        value: 0.1
+        units: 1 / second
+        uncertainty: 0.0
+        source: FungMod artificial dynamic-thermodynamics benchmark.
+        confidence_level: testing
+        notes: Artificial value for software-contract verification only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+processes:
+  - id: a_to_b
+    process_type: first_order
+    states:
+      source: dissolved_substrate_amount
+      product: released_product_amount
+    parameters:
+      rate_constant: k_ab
+    assumptions:
+      - artificial homogeneous benchmark only
+initial_state:
+  states:
+    dissolved_substrate_amount:
+      value: 1.0
+      units: millimolar
+    released_product_amount:
+      value: 0.0
+      units: millimolar
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 20.0
+    units: second
+  points: 41
+chemistry_metadata:
+  species:
+    substrate_species:
+      name: substrate_species
+      electron_equivalents: 2.0
+      electron_source: FungMod artificial dynamic-thermodynamics benchmark.
+      source: FungMod artificial dynamic-thermodynamics benchmark.
+    product_species:
+      name: product_species
+      electron_equivalents: 2.0
+      electron_source: FungMod artificial dynamic-thermodynamics benchmark.
+      source: FungMod artificial dynamic-thermodynamics benchmark.
+reaction_metadata:
+  - id: a_to_b_reaction
+    name: a_to_b_reaction
+    source: FungMod artificial dynamic-thermodynamics benchmark.
+    reactants:
+      - species: substrate_species
+        state_name: dissolved_substrate_amount
+        coefficient: 1.0
+    products:
+      - species: product_species
+        state_name: released_product_amount
+        coefficient: 1.0
+balance_checks:
+  - id: a_to_b_electron_balance
+    process_id: a_to_b
+    reaction_id: a_to_b_reaction
+    checks:
+      - electron
+    required: true
+    state_species:
+      dissolved_substrate_amount:
+        species: substrate_species
+        role: reactant
+      released_product_amount:
+        species: product_species
+        role: product
+thermodynamic_constraints:
+  - id: a_to_b_dynamic
+    process_id: a_to_b
+    reaction_id: a_to_b_reaction
+    electron_balance_check_id: a_to_b_electron_balance
+    enforcement_mode: block_unfavorable_forward_rate
+    standard_energy:
+      method: standard_delta_gibbs
+      standard_delta_gibbs:
+        name: artificial standard Gibbs energy
+        symbol: delta_g_standard_ab
+        value: 0.0
+        units: joule / mole
+        uncertainty: 0.0
+        source: FungMod artificial dynamic-thermodynamics benchmark.
+        confidence_level: testing
+        notes: Artificial software-contract value; not biological evidence.
+        measurement_method: defined framework benchmark value
+        validity_range: framework tests only
+    temperature:
+      name: artificial benchmark temperature
+      symbol: temperature_ab
+      value: 303.15
+      units: kelvin
+      uncertainty: 0.0
+      source: FungMod artificial dynamic-thermodynamics benchmark.
+      confidence_level: testing
+      notes: Artificial software-contract value; not biological evidence.
+      measurement_method: defined framework benchmark value
+      validity_range: framework tests only
+    gas_constant:
+      name: molar gas constant
+      symbol: gas_constant
+      value: 8.31446261815324
+      units: joule / mole / kelvin
+      uncertainty: 0.0
+      source: 2019 SI definition and CODATA exact molar gas constant.
+      confidence_level: high
+      notes: Explicit constant for the benchmark calculation.
+      measurement_method: exact SI constant
+      validity_range: universal constant
+    activity_model:
+      type: ideal_dilute_concentration_ratio_with_explicit_floor
+      standard_concentration:
+        name: artificial standard concentration
+        symbol: c_standard_ab
+        value: 1.0
+        units: millimolar
+        uncertainty: 0.0
+        source: FungMod artificial dynamic-thermodynamics benchmark.
+        confidence_level: testing
+        notes: Artificial software-contract value; not biological evidence.
+        measurement_method: defined framework benchmark value
+        validity_range: framework tests only
+      minimum_activity:
+        name: explicit numerical activity floor
+        symbol: minimum_activity_ab
+        value: 1.0e-12
+        units: dimensionless
+        uncertainty: 0.0
+        source: FungMod artificial dynamic-thermodynamics benchmark.
+        confidence_level: testing
+        notes: Numerical benchmark guardrail, not a physical activity model.
+        measurement_method: defined framework benchmark value
+        validity_range: framework tests only
+    absolute_tolerance:
+      name: dynamic Gibbs sign tolerance
+      symbol: delta_g_tolerance_ab
+      value: 0.0
+      units: joule / mole
+      uncertainty: 0.0
+      source: FungMod artificial dynamic-thermodynamics benchmark.
+      confidence_level: testing
+      notes: Artificial software-contract value; not biological evidence.
+      measurement_method: defined framework benchmark value
+      validity_range: framework tests only
+    provenance_refs:
+      - FungMod artificial framework benchmark reaction metadata.
+      - Explicit test-only activity and thermodynamic parameter records.
+validators:
+  - id: non_negative_states
+    validator_type: non_negative
+    species:
+      - dissolved_substrate_amount
+      - released_product_amount
+  - id: closed_mass_balance
+    validator_type: mass_balance
+    conserved_weights:
+      dissolved_substrate_amount: 1.0
+      released_product_amount: 1.0
+outputs:
+  directory: outputs/showcase_dynamic_thermodynamics
+  save:
+    - record
+    - validation_report
+  plots:
+    - state_trajectories
+  entropy_production_rate_timeseries:
+    - id: a_to_b_static_entropy_rate
+      process_id: a_to_b
+      process_rate_interpretation: reaction_extent_rate
+      condition_specific_delta_gibbs:
+        value: -100.0
+        units: joule / mole
+        source: FungMod artificial static diagnostic value; not dynamic Gibbs evidence.
+      temperature:
+        value: 303.15
+        units: kelvin
+        source: FungMod artificial dynamic-thermodynamics benchmark.
+      extent_rate_units: mole / second
+      process_rate_to_extent_rate:
+        value: 0.001
+        units: liter
+        source: Explicit one-milliliter benchmark control volume.
+      provenance_refs:
+        - FungMod artificial release-showcase benchmark.

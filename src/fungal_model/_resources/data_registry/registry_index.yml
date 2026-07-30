@@ -1,0 +1,19 @@
+kind: fungmod_registry_index
+registry_id: toy_registry
+version: 0.1.0
+maturity: development
+description: FungMod registry with toy fixtures and the first curated SABIO-RK enzyme-kinetics pilot.
+records:
+  fungi: fungi/fungi.yml
+  enzyme_classes: enzymes/enzyme_classes.yml
+  substrates: substrates/substrates.yml
+  environments: environments/environments.yml
+  process_compatibility: processes/process_compatibility.yml
+  parameters: parameters/parameter_records.yml
+  case_templates: case_templates/case_templates.yml
+  product_maps: product_maps/product_maps.yml
+provenance:
+  created_by: FungMod
+  source: FungMod R1 toy registry fixture.
+  confidence_level: testing
+  notes: Not a complete biological database. Real records must carry explicit provenance and scoped interpretation.

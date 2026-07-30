@@ -7,12 +7,43 @@ ID, status, reason, risk, exit condition, removal milestone, and tests
 protecting the boundary. New foundation work should remove entries from this
 file, not normalize them.
 
-Current state: there are no active architecture-debt entries. `FD-005` was
-resolved in PR-41 by enabling Pyright optional-member-access checking and
-narrowing nullable scientific values explicitly. `FD-006` process-to-`Reaction`
-adapter debt was resolved in Phase 1 Task 4; retained `Reaction`,
-`SimulationEngine`, and `ReactionDiffusionEngine1D` APIs are intentional
-explicit low-level APIs, not native configured workflow dependencies.
+Current state: `FD-007` is the only active, contained architecture-debt entry.
+`FD-005` was resolved in PR-41 by enabling Pyright optional-member-access
+checking and narrowing nullable scientific values explicitly. `FD-006`
+process-to-`Reaction` adapter debt was resolved in Phase 1 Task 4; retained
+`Reaction`, `SimulationEngine`, and `ReactionDiffusionEngine1D` APIs are
+intentional explicit low-level APIs, not native configured workflow
+dependencies.
+
+## FD-007 Wheel-packaged resource mirror
+
+Status: active and contained in PUBLIC-RELEASE-001
+
+Reason: setuptools package-data assets must live inside an installed package.
+The repository's existing human-editable `data/` and `data_registry/` roots are
+also used directly by tests, curation workflows, and contributor tooling, so
+PUBLIC-RELEASE-001 mirrors their tracked files under
+`src/fungal_model/_resources/` rather than moving the source-of-truth paths in
+the release slice.
+
+Risk: a contributor could update a registry, frozen source artifact, or example
+config without updating the wheel mirror, producing checkout/install behavior
+drift.
+
+Exit condition: either make package-owned resources the single canonical data
+root without breaking writable-registry/curation boundaries, or replace the
+mirror with a build backend that deterministically stages the canonical roots
+inside the wheel.
+
+Removal milestone: the next packaging-layout revision after the first public
+release, if it can preserve explicit writable-copy semantics and cross-platform
+wheel behavior.
+
+Tests protecting it: `scripts/check_packaged_resources.py` compares every
+source and packaged file by relative path and SHA-256;
+`tests/test_packaged_distribution.py` runs that check and proves default
+virtual-experiment, configured-model, and frozen-source workflows from outside
+the checkout. CI also builds a wheel and runs an isolated installation smoke.
 
 ## FD-001 Legacy PET workflow in the generic workflow package
 
