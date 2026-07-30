@@ -569,9 +569,10 @@ def _thermodynamic_summary_lines(
         "and `thermodynamic_summary.csv` artifacts, including rows copied into standard "
         "`thermodynamic_diagnostics.csv`, plus configured process-bound "
         "`entropy_production_rate_timeseries.json`/`.csv` artifacts when present. They do not "
-        "infer activities, reaction quotients, concentrations, redox potentials, electron "
-        "balances, validation evidence, or solver-time thermodynamic enforcement; they also "
-        "do not infer dynamic delta Gibbs."
+        "independently infer, recompute, or revalidate activities, reaction quotients, "
+        "concentrations, redox potentials, electron balances, validation evidence, dynamic "
+        "delta Gibbs, or solver-time thermodynamic enforcement, and this report does not "
+        "apply that enforcement."
     ]
     if summary:
         lines.append(
@@ -580,6 +581,9 @@ def _thermodynamic_summary_lines(
             f"status_counts={_format_counts(summary.get('status_counts'))}; "
             f"severity_counts={_format_counts(summary.get('severity_counts'))}; "
             f"explicit reaction-quotient Gibbs rows `{_summary_value(summary, 'has_reaction_quotient_gibbs')}`; "
+            f"dynamic reaction quotient `{_summary_value(summary, 'has_dynamic_reaction_quotient')}`; "
+            f"redox standard energy `{_summary_value(summary, 'has_redox_standard_energy')}`; "
+            f"electron-balance binding `{_summary_value(summary, 'has_electron_balance_binding')}`; "
             f"entropy-production-rate rows `{_summary_value(summary, 'has_entropy_production_rate')}`; "
             f"solver-time enforcement `{_summary_value(summary, 'has_solver_time_enforcement')}`."
         )
@@ -694,6 +698,21 @@ def _thermodynamic_row_details(row: Mapping[str, str]) -> str:
     solver_time = _value(row, "solver_time_enforcement")
     if solver_time:
         details.append(f"solver_time_enforcement `{solver_time}`")
+    for field, label in (
+        ("constraint_id", "constraint"),
+        ("process_id", "process"),
+        ("reaction_id", "reaction"),
+        ("electron_balance_check_id", "electron balance check"),
+        ("standard_energy_method", "standard energy method"),
+        ("recorded_evaluation_count", "recorded evaluations"),
+        ("recorded_unfavorable_count", "recorded unfavorable"),
+        ("recorded_blocked_count", "recorded blocked"),
+        ("minimum_delta_gibbs", "minimum delta_gibbs"),
+        ("maximum_delta_gibbs", "maximum delta_gibbs"),
+    ):
+        value = _value(row, field)
+        if value:
+            details.append(f"{label} `{value}`")
     return "; ".join(details)
 
 

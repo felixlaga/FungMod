@@ -143,6 +143,43 @@ def test_artificial_three_step_chain_assembles_runs_and_writes_tables(tmp_path: 
     assert {row["metric"] for row in thresholds} == {"x_pool_depleted_fraction"}
 
 
+def test_virtual_experiment_tables_preserve_each_chain_process_rate_identity(tmp_path: Path) -> None:
+    registry_dir = _copy_registry(tmp_path)
+    _insert_generic_chain_fixture(registry_dir)
+    study = VirtualExperiment.from_registry(
+        fungi=GENERIC_FUNGUS_ID,
+        substrates=GENERIC_SUBSTRATE_ID,
+        environments=GENERIC_ENVIRONMENT_ID,
+        registry=registry_dir / "registry_index.yml",
+    )
+
+    result = study.simulate(
+        mode="exploratory",
+        n_samples=1,
+        seed=19,
+        output_dir=tmp_path / "virtual_product_tables",
+        quicklook=False,
+    )
+
+    time_rows = result.time_series()
+    process_rows = {
+        row["state"]: row
+        for row in time_rows
+        if row["state_role"] == "process_rate"
+    }
+    assert set(process_rows) == {
+        "process_rate.x_surface_to_y_fixture",
+        "process_rate.y_to_q_homogeneous_fixture",
+        "process_rate.q_to_z_homogeneous_fixture",
+    }
+    assert {row["source"] for row in process_rows.values()} == {
+        "simulation_process_rate"
+    }
+    assert {"degradation_rate", "product_release_rate"}.issubset(
+        {row["state"] for row in time_rows}
+    )
+
+
 def test_artificial_branching_pathway_assembles_and_runs(tmp_path: Path) -> None:
     def declare_branching_topology(template: dict[str, Any]) -> None:
         metadata = template["process_state_metadata"]

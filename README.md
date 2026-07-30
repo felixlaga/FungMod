@@ -649,6 +649,12 @@ configured conservation diagnostics copied from existing per-sample
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
+In output schema `1.8.0`, `time_series_long.csv` retains legacy
+`degradation_rate`/`product_release_rate` presentation aliases and also writes
+authoritative `process_rate.<process_id>` rows for every configured process.
+Persisted `derived_quantities.csv` values are copied under the collision-safe
+`derived_quantity.<name>` namespace with explicit thermodynamic or general
+derived roles; the standard writer does not recompute them.
 Preflight tables include machine-readable simulation policy columns such as
 `simulation_allowed_for_mode`, `blocking_reason`, and
 `recommended_next_action`.
@@ -676,11 +682,12 @@ tolerances, pass/fail thresholds, validation evidence, chemistry,
 thermodynamics, calibration, empirical comparison, or biology.
 `thermodynamic_diagnostics.csv` copies existing per-sample configured-output
 `thermodynamic_summary.json`/`.csv` fields into a standard virtual-experiment
-table with explicit artifact-presence, entropy-budget, allowed-use, and
-interpretation guardrails. If no configured thermodynamic artifacts exist, the
-table remains header-only; it does not infer activities, reaction quotients,
-concentrations, redox potentials, electron balances, validation evidence, or
-solver-time thermodynamic enforcement.
+table with explicit artifact-presence, entropy-budget, dynamic-Q/redox/electron
+binding and solver-enforcement flags, returned-time-point counts and Gibbs
+extrema, allowed-use, and interpretation guardrails. If no configured
+thermodynamic artifacts exist, the table remains header-only. The standard
+bridge may display explicit configured evidence, but it does not independently
+infer, recompute, revalidate, or enforce thermodynamics.
 `solver_diagnostics.csv` copies existing per-sample configured-output
 `solver_diagnostics.json`/`.csv` fields into a standard virtual-experiment
 table with explicit artifact-presence, metadata-availability, allowed-use, and

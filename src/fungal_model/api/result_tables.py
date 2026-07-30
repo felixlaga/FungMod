@@ -208,11 +208,13 @@ def _build_table_rows(
             state_roles = _state_roles(sample)
             trajectory_rows = _read_trajectory(sample)
             rate_rows = _read_process_rates(sample)
+            derived_rows = _read_derived_quantities(sample)
             rows["time_series_long"].extend(
                 _time_series_rows(
                     sample_context=sample_context,
                     trajectory_rows=trajectory_rows,
                     rate_rows=rate_rows,
+                    derived_rows=derived_rows,
                     state_roles=state_roles,
                 )
             )
@@ -936,11 +938,19 @@ def _read_process_rates(sample: EnsembleSample) -> list[dict[str, str]]:
     return _read_csv(path)
 
 
+def _read_derived_quantities(sample: EnsembleSample) -> list[dict[str, str]]:
+    path = Path(sample.output_directory) / "derived_quantities.csv"
+    if not path.exists():
+        return []
+    return _read_csv(path)
+
+
 def _time_series_rows(
     *,
     sample_context: Mapping[str, Any],
     trajectory_rows: Sequence[Mapping[str, str]],
     rate_rows: Sequence[Mapping[str, str]],
+    derived_rows: Sequence[Mapping[str, str]],
     state_roles: Mapping[str, str],
 ) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
@@ -952,6 +962,8 @@ def _time_series_rows(
     initial_substrate = _initial_state_value(trajectory_rows, substrate_state)
     initial_product = _initial_state_value(trajectory_rows, product_state)
     rate_by_index = _rate_by_index(rate_rows)
+    rate_rows_by_index = _quantity_rows_by_index(rate_rows)
+    derived_rows_by_index = _quantity_rows_by_index(derived_rows)
     for index, row in enumerate(trajectory_rows):
         base = {
             **_base_sample_columns(sample_context),
@@ -1031,6 +1043,28 @@ def _time_series_rows(
                         "source": "simulation_process_rate",
                     }
                 )
+        for rate in rate_rows_by_index.get(index, ()):
+            output.append(
+                {
+                    **base,
+                    "state": f"process_rate.{rate['name']}",
+                    "state_role": "process_rate",
+                    "value": rate["value"],
+                    "units": rate["units"],
+                    "source": "simulation_process_rate",
+                }
+            )
+        for derived in derived_rows_by_index.get(index, ()):
+            output.append(
+                {
+                    **base,
+                    "state": f"derived_quantity.{derived['name']}",
+                    "state_role": _derived_quantity_role(derived["name"]),
+                    "value": derived["value"],
+                    "units": derived["units"],
+                    "source": "simulation_derived_quantity",
+                }
+            )
     return output
 
 
@@ -1640,8 +1674,12 @@ def _thermodynamic_diagnostic_rows(
         "summary_status_counts": _json_string(summary.get("status_counts")),
         "summary_severity_counts": _json_string(summary.get("severity_counts")),
         "summary_has_reaction_quotient_gibbs": summary.get("has_reaction_quotient_gibbs", ""),
+        "summary_has_dynamic_reaction_quotient": summary.get("has_dynamic_reaction_quotient", ""),
+        "summary_has_redox_standard_energy": summary.get("has_redox_standard_energy", ""),
+        "summary_has_electron_balance_binding": summary.get("has_electron_balance_binding", ""),
         "summary_has_entropy_production_rate": summary.get("has_entropy_production_rate", ""),
         "summary_has_entropy_budget": summary.get("has_entropy_budget", ""),
+        "summary_has_solver_time_enforcement": summary.get("has_solver_time_enforcement", ""),
         "entropy_budget_scope": summary.get("entropy_budget_scope", ""),
         "entropy_budget_units": summary.get("entropy_budget_units", ""),
         "entropy_budget_total": summary.get("entropy_budget_total", ""),
@@ -1655,8 +1693,9 @@ def _thermodynamic_diagnostic_rows(
         "allowed_use": "configured_metadata_inspection_only",
         "interpretation_guardrail": (
             "Rows are copied from existing configured thermodynamic_summary artifacts only; "
-            "they do not infer activities, reaction quotients, concentrations, redox potentials, "
-            "electron balances, validation evidence, or solver-time thermodynamic enforcement."
+            "the standard table does not independently infer or recompute activities, reaction "
+            "quotients, concentrations, redox potentials, electron balances, validation evidence, "
+            "or solver-time thermodynamic enforcement, and it does not revalidate or enforce them."
         ),
     }
     return [
@@ -1679,6 +1718,16 @@ def _thermodynamic_diagnostic_rows(
             "dynamic_reaction_quotient": row.get("dynamic_reaction_quotient", ""),
             "activity_model": row.get("activity_model", ""),
             "solver_time_enforcement": row.get("solver_time_enforcement", ""),
+            "constraint_id": row.get("constraint_id", ""),
+            "process_id": row.get("process_id", ""),
+            "reaction_id": row.get("reaction_id", ""),
+            "electron_balance_check_id": row.get("electron_balance_check_id", ""),
+            "standard_energy_method": row.get("standard_energy_method", ""),
+            "recorded_evaluation_count": row.get("recorded_evaluation_count", ""),
+            "recorded_unfavorable_count": row.get("recorded_unfavorable_count", ""),
+            "recorded_blocked_count": row.get("recorded_blocked_count", ""),
+            "minimum_delta_gibbs": row.get("minimum_delta_gibbs", ""),
+            "maximum_delta_gibbs": row.get("maximum_delta_gibbs", ""),
             "message": row.get("message", ""),
         }
         for row_index, row in enumerate(source_rows)
@@ -2495,6 +2544,41 @@ def _rate_by_index(rate_rows: Sequence[Mapping[str, str]]) -> dict[int, dict[str
             "units": row.get("units", ""),
         }
     return output
+
+
+def _quantity_rows_by_index(
+    rows: Sequence[Mapping[str, str]],
+) -> dict[int, list[dict[str, Any]]]:
+    output: dict[int, list[dict[str, Any]]] = {}
+    for row in rows:
+        try:
+            index = int(str(row.get("index", "")))
+        except ValueError:
+            continue
+        name = str(row.get("name", ""))
+        value = _optional_float(row.get("value"))
+        if not name or value is None:
+            continue
+        output.setdefault(index, []).append(
+            {
+                "name": name,
+                "value": value,
+                "units": row.get("units", ""),
+            }
+        )
+    return output
+
+
+def _derived_quantity_role(name: str) -> str:
+    if ".activity." in name:
+        return "thermodynamic_activity"
+    if name.endswith((".reaction_quotient", ".log_reaction_quotient")):
+        return "thermodynamic_reaction_quotient"
+    if name.endswith(".delta_gibbs"):
+        return "thermodynamic_gibbs_energy"
+    if name.endswith((".favorable", ".rate_blocked")):
+        return "thermodynamic_enforcement_flag"
+    return "simulation_derived_quantity"
 
 
 def _maximum_process_rate(rate_rows: Sequence[Mapping[str, str]]) -> dict[str, Any] | None:
