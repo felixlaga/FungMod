@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import hmac
 import io
 import json
 import math
+import re
 import shutil
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -18,6 +20,10 @@ from typing import Any, Literal
 
 import yaml
 
+from fungal_model.api._integrity import (
+    first_symlink_component,
+    type_exact_equal as _type_exact_equal,
+)
 from fungal_model.sources.sabiork import PROPOSAL_STATUS, RegistryProposal, stable_sabiork_token
 
 
@@ -150,6 +156,34 @@ _CSV_FIELDS = (
     "source_snapshot_path",
     "allowed_use",
 )
+_CURATION_BUNDLE_FILES = frozenset(
+    {
+        "curation_report.md",
+        "eligible_records.csv",
+        "excluded_records.csv",
+        "proposed_registry_records.yml",
+        "accepted_registry_records.yml",
+        "rejected_registry_records.yml",
+    }
+)
+_CURATION_RECORD_METADATA_FIELDS = frozenset(
+    {
+        "schema_version",
+        "classification",
+        "missing_fields",
+        "reasons",
+        "decision",
+        "explicit_decision",
+        "curator",
+        "decision_reason",
+        "curation_date",
+        "allowed_use",
+        "limitations",
+        "source_provenance",
+        "promotion_status",
+    }
+)
+_SHA256_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 class CurationError(ValueError):
@@ -278,6 +312,107 @@ class CurationResult:
             raise
 
         return CurationWriteResult(output_directory=root, paths=_artifact_paths(root))
+
+
+@dataclass(frozen=True)
+class LoadedCurationBundle:
+    """Checksum-validated structured view of one written curation bundle."""
+
+    output_directory: Path
+    manifest_path: Path
+    paths: Mapping[str, Path]
+    manifest: Mapping[str, Any]
+    result: CurationResult
+    accepted_records: tuple[CurationRecord, ...]
+    proposed_records_payload: Mapping[str, Any]
+    accepted_records_payload: Mapping[str, Any]
+    rejected_records_payload: Mapping[str, Any]
+    eligible_records_csv_payload: Mapping[str, Any]
+    excluded_records_csv_payload: Mapping[str, Any]
+    curation_report: str
+
+
+def load_curation_bundle(bundle_or_manifest: str | Path) -> LoadedCurationBundle:
+    """Load one owned written curation bundle after complete integrity checks.
+
+    The loader verifies bundle ownership, schema version, the exact artifact
+    inventory, every declared SHA-256 checksum, path containment, and the
+    deterministic shared curation YAML/CSV/report contracts. These checks prove
+    internal bundle consistency only; they do not authenticate a curator,
+    promote records, mutate a registry, or authorize simulation.
+    """
+
+    return _load_curation_bundle(bundle_or_manifest, validate_shared_semantics=True)
+
+
+def _load_curation_bundle_for_promotion(
+    bundle_or_manifest: str | Path,
+) -> LoadedCurationBundle:
+    """Load shared integrity data while leaving extension checks to promotion."""
+
+    return _load_curation_bundle(bundle_or_manifest, validate_shared_semantics=False)
+
+
+def _load_curation_bundle(
+    bundle_or_manifest: str | Path,
+    *,
+    validate_shared_semantics: bool,
+) -> LoadedCurationBundle:
+    manifest_path = _curation_manifest_path(bundle_or_manifest)
+    manifest = _read_json_mapping(manifest_path, label="Curation manifest")
+    _validate_loaded_manifest_envelope(manifest)
+    root = manifest_path.parent
+    paths = _verify_declared_curation_artifacts(root, manifest)
+
+    proposed_payload = _read_yaml_mapping(
+        paths["proposed_registry_records.yml"],
+        label="Proposed curation records",
+    )
+    accepted_payload = _read_yaml_mapping(
+        paths["accepted_registry_records.yml"],
+        label="Accepted curation records",
+    )
+    rejected_payload = _read_yaml_mapping(
+        paths["rejected_registry_records.yml"],
+        label="Rejected curation records",
+    )
+    eligible_csv_payload = _read_curation_csv_payload(
+        paths["eligible_records.csv"],
+        label="Eligible curation records",
+    )
+    excluded_csv_payload = _read_curation_csv_payload(
+        paths["excluded_records.csv"],
+        label="Excluded curation records",
+    )
+    report = _read_utf8_text(paths["curation_report.md"], label="Curation report")
+
+    result, accepted_records = _curation_result_from_written_payloads(
+        manifest=manifest,
+        proposed_payload=proposed_payload,
+        accepted_payload=accepted_payload,
+        rejected_payload=rejected_payload,
+        eligible_csv_payload=eligible_csv_payload,
+        excluded_csv_payload=excluded_csv_payload,
+        report=report,
+        validate_shared_semantics=validate_shared_semantics,
+    )
+    return LoadedCurationBundle(
+        output_directory=root,
+        manifest_path=manifest_path,
+        paths={
+            **{_artifact_key(name): path for name, path in paths.items()},
+            "curation_manifest": manifest_path,
+        },
+        manifest=deepcopy(dict(manifest)),
+        result=result,
+        accepted_records=accepted_records,
+        proposed_records_payload=deepcopy(dict(proposed_payload)),
+        accepted_records_payload=deepcopy(dict(accepted_payload)),
+        rejected_records_payload=deepcopy(dict(rejected_payload)),
+        eligible_records_csv_payload=deepcopy(dict(eligible_csv_payload)),
+        excluded_records_csv_payload=deepcopy(dict(excluded_csv_payload)),
+        curation_report=report,
+    )
 
 
 def review_source_proposal(
@@ -803,6 +938,560 @@ def _artifact_paths(root: Path) -> dict[str, Path]:
     }
 
 
+def _artifact_key(filename: str) -> str:
+    keys = {
+        "curation_report.md": "curation_report",
+        "eligible_records.csv": "eligible_records",
+        "excluded_records.csv": "excluded_records",
+        "proposed_registry_records.yml": "proposed_registry_records",
+        "accepted_registry_records.yml": "accepted_registry_records",
+        "rejected_registry_records.yml": "rejected_registry_records",
+    }
+    return keys[filename]
+
+
+def _curation_manifest_path(value: str | Path) -> Path:
+    path = Path(value)
+    if ".." in path.parts:
+        raise CurationError(f"Curation bundle path traversal is not allowed: {path}")
+    _reject_symlink_components(path, label="Curation bundle path")
+    manifest = path / "curation_manifest.json" if path.is_dir() else path
+    if manifest.name != "curation_manifest.json":
+        raise CurationError(
+            "Written curation input must be a bundle directory or curation_manifest.json."
+        )
+    _reject_symlink_components(manifest, label="Curation manifest path")
+    if not manifest.is_file():
+        raise CurationError(f"Curation manifest does not exist: {manifest}")
+    return manifest.resolve(strict=True)
+
+
+def _validate_loaded_manifest_envelope(manifest: Mapping[str, Any]) -> None:
+    if manifest.get("kind") != CURATION_MANIFEST_KIND:
+        raise CurationError(
+            f"Written input is not an owned curation bundle of kind {CURATION_MANIFEST_KIND!r}."
+        )
+    if manifest.get("schema_version") != CURATION_SCHEMA_VERSION:
+        raise CurationError(
+            f"Unsupported curation bundle schema version {manifest.get('schema_version')!r}."
+        )
+    if manifest.get("allowed_use") != CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY:
+        raise CurationError("Curation bundle must remain review-only at bundle level.")
+    if manifest.get("production_registry_mutated") is not False:
+        raise CurationError("Curation bundle must declare production_registry_mutated: false.")
+    if manifest.get("scientific_validation_claimed") is not False:
+        raise CurationError("Curation bundle must declare scientific_validation_claimed: false.")
+
+
+def _verify_declared_curation_artifacts(
+    root: Path,
+    manifest: Mapping[str, Any],
+) -> dict[str, Path]:
+    files = manifest.get("files")
+    if not isinstance(files, Mapping) or any(not isinstance(name, str) for name in files):
+        raise CurationError("Curation manifest requires a string-keyed files checksum mapping.")
+    names = set(files)
+    if names != _CURATION_BUNDLE_FILES:
+        missing = sorted(_CURATION_BUNDLE_FILES - names)
+        unexpected = sorted(names - _CURATION_BUNDLE_FILES)
+        raise CurationError(
+            "Curation manifest artifact set does not match its owned schema; "
+            f"missing={missing}, unexpected={unexpected}."
+        )
+
+    try:
+        actual_names = {path.name for path in root.iterdir()}
+    except OSError as exc:
+        raise CurationError(f"Cannot inspect curation bundle directory {root}: {exc}") from exc
+    expected_names = set(names) | {"curation_manifest.json"}
+    if actual_names != expected_names:
+        missing = sorted(expected_names - actual_names)
+        unexpected = sorted(actual_names - expected_names)
+        raise CurationError(
+            "Curation bundle directory does not match its owned artifact inventory; "
+            f"missing={missing}, unexpected={unexpected}."
+        )
+
+    declared: dict[str, Path] = {}
+    for name in sorted(names):
+        digest = files[name]
+        if not isinstance(digest, str) or _SHA256_PATTERN.fullmatch(digest) is None:
+            raise CurationError(
+                f"Curation manifest checksum for {name!r} must be a SHA-256 hex digest."
+            )
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise CurationError(f"Curation manifest artifact path is unsafe: {name!r}.")
+        artifact = root / relative
+        _reject_symlink_components(artifact, label="Curation artifact path")
+        try:
+            resolved = artifact.resolve(strict=True)
+        except OSError as exc:
+            raise CurationError(f"Declared curation artifact does not exist: {artifact}") from exc
+        if resolved.parent != root:
+            raise CurationError(
+                f"Declared curation artifact resolves outside its bundle: {name!r}."
+            )
+        if not resolved.is_file():
+            raise CurationError(f"Declared curation artifact is not a file: {artifact}")
+        try:
+            actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise CurationError(f"Cannot read declared curation artifact: {artifact}") from exc
+        if not hmac.compare_digest(actual, digest.lower()):
+            raise CurationError(
+                f"Curation artifact checksum mismatch for {name!r}: "
+                f"expected {digest.lower()}, got {actual}."
+            )
+        declared[name] = resolved
+    return declared
+
+
+def _curation_result_from_written_payloads(
+    *,
+    manifest: Mapping[str, Any],
+    proposed_payload: Mapping[str, Any],
+    accepted_payload: Mapping[str, Any],
+    rejected_payload: Mapping[str, Any],
+    eligible_csv_payload: Mapping[str, Any],
+    excluded_csv_payload: Mapping[str, Any],
+    report: str,
+    validate_shared_semantics: bool,
+) -> tuple[CurationResult, tuple[CurationRecord, ...]]:
+    if validate_shared_semantics:
+        _validate_loaded_records_envelope(proposed_payload, bundle_status="proposed")
+        _validate_loaded_records_envelope(accepted_payload, bundle_status="accepted")
+        _validate_loaded_records_envelope(rejected_payload, bundle_status="rejected")
+
+    source_query = _required_text(
+        proposed_payload,
+        "source_query",
+        scope="written curation bundle",
+    )
+    source_snapshot_path = _required_text(
+        proposed_payload,
+        "source_snapshot_path",
+        scope="written curation bundle",
+    )
+    proposal_limitations = _loaded_string_sequence(
+        proposed_payload.get("proposal_limitations"),
+        field="proposal_limitations",
+        allow_empty=False,
+    )
+    record_types = _loaded_record_types(
+        eligible_csv_payload,
+        excluded_csv_payload,
+        validate_schema=validate_shared_semantics,
+    )
+    raw_records = proposed_payload.get("records")
+    if not isinstance(raw_records, list):
+        raise CurationError("Proposed curation artifact requires a records list.")
+
+    records: list[CurationRecord] = []
+    seen_ids: set[str] = set()
+    for index, raw_record in enumerate(raw_records):
+        if not isinstance(raw_record, Mapping):
+            raise CurationError(f"Proposed curation record at index {index} must be a mapping.")
+        record_id = raw_record.get("record_id")
+        if not isinstance(record_id, str) or not record_id.strip():
+            raise CurationError(
+                f"Proposed curation record at index {index} requires a non-empty record_id."
+            )
+        if record_id in seen_ids:
+            raise CurationError(f"Proposed curation artifact contains duplicate id {record_id!r}.")
+        seen_ids.add(record_id)
+        try:
+            record_type = record_types[record_id]
+        except KeyError as exc:
+            raise CurationError(
+                f"Proposed curation record {record_id!r} lacks a matching CSV row."
+            ) from exc
+        records.append(
+            _loaded_curation_record(
+                raw_record,
+                record_type=record_type,
+                index=index,
+                allow_extra_metadata=not validate_shared_semantics,
+            )
+        )
+    if seen_ids != set(record_types):
+        raise CurationError("Proposed curation YAML and eligible/excluded CSV rows do not match.")
+
+    result = CurationResult(
+        source_query=source_query,
+        source_snapshot_path=source_snapshot_path,
+        proposal_limitations=proposal_limitations,
+        records=tuple(records),
+    )
+    accepted_records = (
+        result.accepted_records
+        if validate_shared_semantics
+        else _loaded_records_from_payload(
+            accepted_payload,
+            record_types=record_types,
+            label="Accepted curation artifact",
+            allow_extra_metadata=True,
+        )
+    )
+    if not validate_shared_semantics:
+        return result, accepted_records
+
+    expected_payloads = {
+        "proposed_registry_records.yml": curation_records_payload(
+            "proposed",
+            result.records,
+            result,
+        ),
+        "accepted_registry_records.yml": curation_records_payload(
+            "accepted",
+            result.accepted_records,
+            result,
+        ),
+        "rejected_registry_records.yml": curation_records_payload(
+            "rejected",
+            result.rejected_records,
+            result,
+        ),
+        "eligible_records.csv": curation_records_csv_payload(result.eligible_records),
+        "excluded_records.csv": curation_records_csv_payload(result.excluded_records),
+    }
+    actual_payloads = {
+        "proposed_registry_records.yml": proposed_payload,
+        "accepted_registry_records.yml": accepted_payload,
+        "rejected_registry_records.yml": rejected_payload,
+        "eligible_records.csv": eligible_csv_payload,
+        "excluded_records.csv": excluded_csv_payload,
+    }
+    for name, expected in expected_payloads.items():
+        if not _type_exact_equal(actual_payloads[name], expected):
+            raise CurationError(
+                f"Written bundle artifact {name!r} disagrees with the shared "
+                "curation builders and reconstructed result."
+            )
+
+    files = manifest.get("files")
+    assert isinstance(files, Mapping)
+    expected_manifest = curation_manifest_payload(result, files)
+    if set(manifest) != set(expected_manifest):
+        raise CurationError("Curation manifest fields do not match the owned bundle schema.")
+    for field, expected in expected_manifest.items():
+        if field == "summary":
+            continue
+        if not _type_exact_equal(manifest.get(field), expected):
+            raise CurationError(
+                f"Curation manifest field {field!r} disagrees with its reconstructed result."
+            )
+
+    summary = manifest.get("summary")
+    if not isinstance(summary, Mapping):
+        raise CurationError("Curation manifest requires a summary mapping.")
+    base_summary = result.summary()
+    for field, expected in base_summary.items():
+        if field not in summary or not _type_exact_equal(summary[field], expected):
+            raise CurationError(
+                f"Curation manifest summary field {field!r} disagrees with its artifacts."
+            )
+    extra_summary_fields = set(summary) - set(base_summary)
+    if extra_summary_fields:
+        workflow = summary.get("workflow")
+        if not isinstance(workflow, str) or not workflow.strip():
+            raise CurationError(
+                "Extended curation summary fields require an explicit workflow contract."
+            )
+        validate_curation_report_limitations(report, result.proposal_limitations)
+    elif report != render_curation_report(result):
+        raise CurationError(
+            "Curation report disagrees with the shared deterministic report builder."
+        )
+    return result, accepted_records
+
+
+def _validate_loaded_records_envelope(
+    payload: Mapping[str, Any],
+    *,
+    bundle_status: str,
+) -> None:
+    expected_fields = {
+        "kind",
+        "schema_version",
+        "bundle_status",
+        "allowed_use",
+        "source_query",
+        "source_snapshot_path",
+        "proposal_limitations",
+        "production_registry_promotion",
+        "records",
+    }
+    if set(payload) != expected_fields:
+        raise CurationError(
+            f"{bundle_status.capitalize()} curation artifact fields do not match its schema."
+        )
+    if payload.get("kind") != "fungmod_curation_decision_records":
+        raise CurationError(
+            f"{bundle_status.capitalize()} curation artifact has an unsupported kind."
+        )
+    if payload.get("schema_version") != CURATION_SCHEMA_VERSION:
+        raise CurationError(
+            f"{bundle_status.capitalize()} curation artifact has an unsupported schema version."
+        )
+    if payload.get("bundle_status") != bundle_status:
+        raise CurationError(
+            f"{bundle_status.capitalize()} curation artifact must use "
+            f"bundle_status: {bundle_status}."
+        )
+    if payload.get("allowed_use") != CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY:
+        raise CurationError(
+            f"{bundle_status.capitalize()} curation artifact must remain review-only."
+        )
+    if payload.get("production_registry_promotion") is not False:
+        raise CurationError(
+            f"{bundle_status.capitalize()} curation artifact must not claim registry promotion."
+        )
+
+
+def _loaded_record_types(
+    eligible_payload: Mapping[str, Any],
+    excluded_payload: Mapping[str, Any],
+    *,
+    validate_schema: bool,
+) -> dict[str, str]:
+    record_types: dict[str, str] = {}
+    for label, payload in (
+        ("Eligible", eligible_payload),
+        ("Excluded", excluded_payload),
+    ):
+        if validate_schema and payload.get("fieldnames") != list(_CSV_FIELDS):
+            raise CurationError(f"{label}-record CSV header does not match its schema.")
+        rows = payload.get("rows")
+        if not isinstance(rows, list):
+            raise CurationError(f"{label}-record CSV requires structured rows.")
+        for row in rows:
+            if not isinstance(row, Mapping):
+                raise CurationError(f"{label}-record CSV rows must be mappings.")
+            record_id = row.get("record_id")
+            record_type = row.get("record_type")
+            if not isinstance(record_id, str) or not record_id.strip():
+                raise CurationError(f"{label}-record CSV row requires record_id.")
+            if not isinstance(record_type, str) or record_type not in _RECORD_TYPES:
+                raise CurationError(
+                    f"{label}-record CSV row {record_id!r} has unsupported record_type."
+                )
+            if record_id in record_types:
+                raise CurationError(
+                    f"Curation CSV artifacts contain duplicate record id {record_id!r}."
+                )
+            record_types[record_id] = record_type
+    return record_types
+
+
+def _loaded_curation_record(
+    raw_record: Mapping[str, Any],
+    *,
+    record_type: str,
+    index: int,
+    allow_extra_metadata: bool,
+) -> CurationRecord:
+    payload = deepcopy(dict(raw_record))
+    curation = payload.pop("curation", None)
+    record_id = payload.get("record_id")
+    assert isinstance(record_id, str)
+    _require_string_mapping_keys(payload, label=f"Proposed curation record {record_id!r}")
+    if not isinstance(curation, Mapping):
+        raise CurationError(f"Proposed curation record {record_id!r} lacks curation metadata.")
+    metadata_fields = set(curation)
+    if (
+        not _CURATION_RECORD_METADATA_FIELDS.issubset(metadata_fields)
+        if allow_extra_metadata
+        else metadata_fields != _CURATION_RECORD_METADATA_FIELDS
+    ):
+        raise CurationError(
+            f"Proposed curation record {record_id!r} has an unsupported curation envelope."
+        )
+    if curation.get("schema_version") != CURATION_SCHEMA_VERSION:
+        raise CurationError(
+            f"Proposed curation record {record_id!r} has an unsupported schema version."
+        )
+    classification = curation.get("classification")
+    if classification not in {"eligible_for_review", "blocked_excluded"}:
+        raise CurationError(
+            f"Proposed curation record {record_id!r} has an unsupported classification."
+        )
+    decision = curation.get("decision")
+    if decision not in _DECISIONS:
+        raise CurationError(
+            f"Proposed curation record {record_id!r} has an unsupported decision."
+        )
+    explicit_decision = curation.get("explicit_decision")
+    if type(explicit_decision) is not bool:
+        raise CurationError(
+            f"Proposed curation record {record_id!r} requires boolean explicit_decision."
+        )
+    curator = curation.get("curator")
+    if curator is not None and not isinstance(curator, str):
+        raise CurationError(
+            f"Proposed curation record {record_id!r} has invalid curator metadata."
+        )
+    decision_reason = curation.get("decision_reason")
+    curation_date = curation.get("curation_date")
+    allowed_use = curation.get("allowed_use")
+    if not all(isinstance(value, str) for value in (decision_reason, curation_date, allowed_use)):
+        raise CurationError(
+            f"Proposed curation record {record_id!r} has invalid decision text metadata."
+        )
+    assert isinstance(decision_reason, str)
+    assert isinstance(curation_date, str)
+    assert isinstance(allowed_use, str)
+    if allowed_use not in CURATION_DECISION_ALLOWED_USES:
+        raise CurationError(
+            f"Proposed curation record {record_id!r} has unsupported allowed_use."
+        )
+    if curation.get("promotion_status") != "not_promoted_to_production_registry":
+        raise CurationError(
+            f"Proposed curation record {record_id!r} has unsupported promotion status."
+        )
+    source_provenance = curation.get("source_provenance")
+    if not isinstance(source_provenance, Mapping):
+        raise CurationError(
+            f"Proposed curation record {record_id!r} requires source provenance."
+        )
+    _require_string_mapping_keys(
+        source_provenance,
+        label=f"Proposed curation record {record_id!r} source provenance",
+    )
+    return CurationRecord(
+        record_type=record_type,
+        record_id=record_id,
+        proposed_record=payload,
+        classification=classification,
+        missing_fields=_loaded_string_sequence(
+            curation.get("missing_fields"),
+            field=f"records[{index}].curation.missing_fields",
+            allow_empty=True,
+        ),
+        reasons=_loaded_string_sequence(
+            curation.get("reasons"),
+            field=f"records[{index}].curation.reasons",
+            allow_empty=True,
+        ),
+        decision=decision,
+        explicit_decision=explicit_decision,
+        curator=curator,
+        decision_reason=decision_reason,
+        curation_date=curation_date,
+        allowed_use=allowed_use,
+        limitations=_loaded_string_sequence(
+            curation.get("limitations"),
+            field=f"records[{index}].curation.limitations",
+            allow_empty=False,
+        ),
+        source_provenance=deepcopy(dict(source_provenance)),
+    )
+
+
+def _loaded_records_from_payload(
+    payload: Mapping[str, Any],
+    *,
+    record_types: Mapping[str, str],
+    label: str,
+    allow_extra_metadata: bool,
+) -> tuple[CurationRecord, ...]:
+    raw_records = payload.get("records")
+    if not isinstance(raw_records, list):
+        raise CurationError(f"{label} requires a records list.")
+    records: list[CurationRecord] = []
+    seen_ids: set[str] = set()
+    for index, raw_record in enumerate(raw_records):
+        if not isinstance(raw_record, Mapping):
+            raise CurationError(f"{label} record at index {index} must be a mapping.")
+        record_id = raw_record.get("record_id")
+        if not isinstance(record_id, str) or not record_id.strip():
+            raise CurationError(f"{label} record at index {index} requires record_id.")
+        if record_id in seen_ids:
+            raise CurationError(f"{label} contains duplicate record id {record_id!r}.")
+        seen_ids.add(record_id)
+        try:
+            record_type = record_types[record_id]
+        except KeyError as exc:
+            raise CurationError(
+                f"{label} record {record_id!r} lacks a matching CSV row."
+            ) from exc
+        records.append(
+            _loaded_curation_record(
+                raw_record,
+                record_type=record_type,
+                index=index,
+                allow_extra_metadata=allow_extra_metadata,
+            )
+        )
+    return tuple(records)
+
+
+def _loaded_string_sequence(
+    value: Any,
+    *,
+    field: str,
+    allow_empty: bool,
+) -> tuple[str, ...]:
+    if (
+        not isinstance(value, Sequence)
+        or isinstance(value, (str, bytes, bytearray))
+        or (not allow_empty and not value)
+        or any(not isinstance(item, str) or not item.strip() for item in value)
+    ):
+        qualifier = "a string sequence" if allow_empty else "a non-empty string sequence"
+        raise CurationError(f"Written curation field {field!r} must be {qualifier}.")
+    return tuple(value)
+
+
+def _read_json_mapping(path: Path, *, label: str) -> Mapping[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise CurationError(f"Malformed {label.lower()} {path}: {exc}") from exc
+    if not isinstance(payload, Mapping):
+        raise CurationError(f"{label} {path} must contain a JSON object.")
+    return payload
+
+
+def _read_yaml_mapping(path: Path, *, label: str) -> Mapping[str, Any]:
+    try:
+        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise CurationError(f"Malformed {label.lower()} {path}: {exc}") from exc
+    if not isinstance(payload, Mapping):
+        raise CurationError(f"{label} {path} must contain a YAML mapping.")
+    return payload
+
+
+def _read_curation_csv_payload(path: Path, *, label: str) -> Mapping[str, Any]:
+    try:
+        with path.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            rows = [dict(row) for row in reader]
+            fieldnames = list(reader.fieldnames or ())
+    except (OSError, UnicodeError, csv.Error) as exc:
+        raise CurationError(f"Malformed {label.lower()} CSV {path}: {exc}") from exc
+    return {"fieldnames": fieldnames, "rows": rows}
+
+
+def _read_utf8_text(path: Path, *, label: str) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise CurationError(f"Malformed {label.lower()} {path}: {exc}") from exc
+
+
+def _require_string_mapping_keys(value: Any, *, label: str) -> None:
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise CurationError(f"{label} contains a non-string mapping key.")
+            _require_string_mapping_keys(item, label=label)
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for item in value:
+            _require_string_mapping_keys(item, label=label)
+
+
 def curation_records_payload(
     bundle_status: str,
     records: Sequence[CurationRecord],
@@ -987,12 +1676,9 @@ def _safe_output_path(output_dir: str | Path) -> Path:
 
 
 def _reject_symlink_components(path: Path, *, label: str) -> None:
-    absolute = path if path.is_absolute() else Path.cwd() / path
-    current = Path(absolute.anchor)
-    for part in absolute.parts[1:]:
-        current /= part
-        if current.is_symlink():
-            raise CurationError(f"{label} contains a symlink component: {current}")
+    symlink = first_symlink_component(path)
+    if symlink is not None:
+        raise CurationError(f"{label} contains a symlink component: {symlink}")
 
 
 def _canonicalize(value: Any, *, field_name: str | None = None) -> Any:
@@ -1059,9 +1745,11 @@ __all__ = [
     "CurationRecord",
     "CurationResult",
     "CurationWriteResult",
+    "LoadedCurationBundle",
     "curation_manifest_payload",
     "curation_records_csv_payload",
     "curation_records_payload",
+    "load_curation_bundle",
     "render_curation_records_csv",
     "render_curation_report",
     "review_source_proposal",

@@ -69,8 +69,11 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-48 identity-only curator-authored ParameterRecord bridge
-after PR-47 transactional apply merged as PR #62 (`b1ebb860`), PR-46
+The current next PR is PR-50 checksum-loaded written source input for
+identity-only ParameterRecord authoring after PR-49 completed its bounded
+public curation-bundle loader in the current checkout, PR-48 identity-only
+curator-authored ParameterRecord authoring merged as PR #63 (`764d1e4`),
+PR-47 transactional apply merged as PR #62 (`b1ebb860`), PR-46
 registry-promotion planning merged as PR #61 (`2b6c639`), PR-45
 source-proposal curation review merged as PR #60 (`5ac7864`), and PR-44
 researcher source-provider onboarding merged as PR #59,
@@ -220,7 +223,7 @@ Plan applicability is candidate-derived, and overlapping target/curator source
 identities must agree exactly. It does not alter scientific fields or package
 version, authorize simulation, or claim scientific validation. The bounded
 apply contract completed after PR #62 merged as `b1ebb860`.
-The current PR-48 `author_parameter_record(...)` slice is limited to accepted
+The completed PR-48 `author_parameter_record(...)` slice is limited to accepted
 in-memory PARAMETER curation results and complete curator-authored production
 mappings with exact identity conversion, source digest/provenance,
 loader-round-trip, ordered frozen-URL, full-registry-context, exact role/
@@ -246,14 +249,20 @@ also impose canonical required fields and reject truncation, semantic renaming,
 or role reuse before modelability. Curator-authored outer provenance is limited
 to the closed identity-only bridge schema; unsupported validation, calibration,
 readiness, or authorization claim metadata is rejected.
-Initial-state roles declare record scope without claiming
-kinetic ownership. Nonidentity
-conversion, written source input, non-parameter records, validation,
-calibration, and simulation authorization remain unsupported, so CURATION-001
-remains partial. The recommended next
-slice is PR-49 reusable public checksum-validated curation-bundle loading,
-centralizing existing manifest/checksum/path parsing before any future written
-authoring input.
+Initial-state roles declare record scope without claiming kinetic ownership.
+The completed PR-49 slice adds public `load_curation_bundle(...)` and
+`LoadedCurationBundle`, centralizes owned manifest/schema, exact inventory,
+SHA-256, path/symlink containment, structured parsing, shared artifact,
+summary, and deterministic report validation, and routes written promotion
+planning through that path. Checksums remain internal-consistency evidence,
+not curator authentication, and the loader performs no registry mutation,
+scientific transformation, validation claim, or simulation authorization.
+Nonidentity conversion, direct written source input to specialized authoring,
+non-parameter records, validation, calibration, and simulation authorization
+remain unsupported, so CURATION-001 remains partial. The recommended next
+slice is PR-50 checksum-loaded written source input for identity-only
+ParameterRecord authoring, preserving every PR-48 guardrail without conversion
+or broader record support.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -359,9 +368,12 @@ thermodynamic behavior, or validation evidence. The completed PR-46 slice is
 limited to an immutable registry-promotion preview over explicit accepts after
 PR #61. The completed PR-47 slice adds only digest-confirmed,
 strict-next-patch, no-overwrite transactional application of exact schema
-`2.0.0` prospective bytes after PR #62. The current PR-48 slice adds only an
+`2.0.0` prospective bytes after PR #62. The completed PR-48 slice adds only an
 identity-only PARAMETER source-to-production authoring result for explicit
-accepted source evidence and explicit complete production fields. Neither adds
+accepted source evidence and explicit complete production fields. The
+completed PR-49 slice centralizes public written curation-bundle integrity and
+reconstruction without accepting direct specialized written authoring input.
+None adds
 automatic simulation eligibility, scientific-field inference, biology, solver,
 calibration, thermodynamic behavior, validation data, or validation evidence.
 THERMO-003 remains partial after
@@ -441,11 +453,14 @@ entropy-production-rate configured diagnostics completed after PR #58. PR-44
 review-gated SABIO-RK researcher source onboarding completed after PR #59.
 PR-45 source-proposal review/decision bundles completed after PR #60, PR-46
 registry-promotion planning completed after PR #61 merged as `2b6c639`, and
-PR-47 transactional apply completed after PR #62 merged as `b1ebb860`. The
-current PR-48 slice is identity-only PARAMETER authoring for promotion planning,
-rather than validation ingestion, digitization, fabricated validation data,
-calibration, empirical comparison, scientific-field inference, registry apply,
-or automatic simulation authorization.
+PR-47 transactional apply completed after PR #62 merged as `b1ebb860`, PR-48
+identity-only PARAMETER authoring completed after PR #63 merged as `764d1e4`,
+and PR-49 reusable public curation-bundle loading completed in the current
+checkout. The selected PR-50 slice is checksum-loaded written source input for
+the same identity-only PARAMETER authoring path, rather than validation
+ingestion, digitization, fabricated validation data, calibration, empirical
+comparison, scientific-field inference, registry apply, nonidentity
+conversion, broader record support, or automatic simulation authorization.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
@@ -1323,16 +1338,18 @@ accepted_registry_records.yml
 rejected_registry_records.yml
 ```
 
-Scoped status after PR #62: PR-45 supplies owned curator decision bundles,
+Scoped status after PR #63 and bounded PR-49 completion: PR-45 supplies owned curator decision bundles,
 PR-46 supplies checksum-verified, index-resolved, loader-validated promotion
 plans, and PR-47 supplies explicit digest-confirmed production apply with
 durable curation audit provenance, full-root drift detection/staging, strict
 next-patch versioning, candidate-derived applicability, source-identity
 consistency, locking, no overwrite, and interruption-safe verified rollback.
-The current PR-48 adds a real frozen SABIO PARAMETER identity path into a
+PR-48 adds a real frozen SABIO PARAMETER identity path into a
 complete loader-fidelitous curator-authored target and promotion plan against a
-copied registry only. Product maps remain blocked pending a destination
-contract. CURATION-001 remains partial for nonidentity conversion and
+copied registry only. PR-49 adds public checksum-validated loading and shared
+artifact reconstruction without mutation or curator authentication. Product
+maps remain blocked pending a destination contract. CURATION-001 remains
+partial for direct written specialized authoring, nonidentity conversion, and
 non-parameter source records. The authored storage-only policy blocks
 simulation in every mode. This status does not claim scientific validation or
 automatic simulation authorization.
