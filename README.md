@@ -151,6 +151,11 @@ basic kinetics layer:
   path and symlink containment, and the shared deterministic YAML/CSV/report
   contracts before reconstructing a structured `LoadedCurationBundle` and
   `CurationResult`;
+- an opt-in Ed25519 curator-authentication layer,
+  `sign_curation_bundle(...)` and `load_authenticated_curation_bundle(...)`,
+  that signs the exact manifest bytes in a sibling sidecar, binds the signer to
+  every explicit curator decision, and verifies against caller-supplied
+  `TrustedCuratorKey` bindings before authoring or promotion planning;
 - mode-independent modelability and simulation rejection for parameters whose
   exact `allowed_use` is `registry_storage_only_no_simulation_authorization`;
 - a registry-backed extracellular enzyme-chain assembler for ordered linear
@@ -305,6 +310,47 @@ internal consistency relative to the manifest only; it is not a signature,
 curator authentication, scientific validation, registry mutation, promotion,
 or simulation authorization.
 
+An owned bundle can additionally be authenticated with an Ed25519 signature:
+
+```python
+from fungal_model import (
+    TrustedCuratorKey,
+    load_authenticated_curation_bundle,
+    sign_curation_bundle,
+)
+
+sign_curation_bundle(
+    "data/proposed_records/sabiork/reaction_618_curation",
+    curator_id="Researcher Name",
+    key_id="researcher-ed25519-2026",
+    private_key=private_key,
+)
+trusted_key = TrustedCuratorKey.from_public_key(
+    curator_id="Researcher Name",
+    key_id="researcher-ed25519-2026",
+    public_key=private_key.public_key(),
+)
+authenticated = load_authenticated_curation_bundle(
+    "data/proposed_records/sabiork/reaction_618_curation",
+    trusted_curator_keys={trusted_key.key_id: trusted_key},
+)
+```
+
+The deterministic signature sidecar is a sibling of the bundle, so the
+bundle's closed internal inventory stays unchanged. The Ed25519 message binds
+the exact manifest bytes; the manifest in turn binds the owned artifact
+checksums. Trust is explicit and caller-owned: key ID, public key, curator
+identity, and every explicit decision curator must agree.
+`AuthenticatedCurationBundle.reload()` repeats checksum and signature
+verification, and authoring/planning revalidates authenticated input at its
+use boundary. The signature proves possession of a caller-trusted private key
+and authorship of those exact manifest bytes. It does not prove scientific
+validity, curation authority outside the caller's trust policy, registry
+mutation, or simulation authorization. Unsigned `LoadedCurationBundle` input
+remains supported and distinguishable. A subsequently detached promotion plan
+is digest-confirmed review/apply evidence, not independent curator-signature
+evidence.
+
 Plan the registry effect of the curation decisions and inspect whether the
 whole candidate set is applicable. The deferred SABIO-RK review above has no
 addable accepted record, so its plan is intentionally not applied:
@@ -331,7 +377,8 @@ if summary["apply_available"]:
 ```
 
 `plan_registry_promotion(...)` accepts either the in-memory `CurationResult` or
-its written owned curation bundle. Written inputs reuse
+its written owned curation bundle, including an explicitly authenticated
+`AuthenticatedCurationBundle`. Written inputs reuse
 `load_curation_bundle(...)` for the manifest, checksum, inventory, and path
 contract before workflow-specific authoring validation. Only explicit
 `accept` decisions are considered. Candidates are
@@ -486,8 +533,10 @@ closed. The six index-backed non-parameter families, including product maps,
 have a separate complete target authoring bridge. Product-map targets require
 explicit state names and positive float coefficients; no source participant is
 translated automatically. Automatic apply, scientific validation, and
-automatic simulation authorization remain unsupported, so CURATION-001
-remains partial for curator authentication/signatures. The curator-authored
+automatic simulation authorization remain unsupported. CURATION-001 is
+complete for its defined review, authoring, authentication,
+promotion-planning, and transactional-apply scope; this completion does not
+claim scientific validation. The curator-authored
 outer provenance is a closed
 parameter-authoring schema: complete
 source identity and singular aliases, one explicit parameter role, curator and
@@ -931,8 +980,10 @@ input, not an apply instruction. Its exact storage-only policy is a simulation
 blocker in every modelability mode. The top-level
 `author_registry_records(...)` API separately authors the six index-backed
 non-parameter families, including product maps, without inferred fields or
-authoring/planning mutation. CURATION-001 remains partial for curator
-authentication/signatures.
+authoring/planning mutation. `AuthenticatedCurationBundle` adds opt-in
+caller-trusted Ed25519 verification and revalidation at authoring/planning
+boundaries. CURATION-001 is complete for that defined curation workflow, not
+for scientific validation or automatic simulation authorization.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
 The current library provides factories for first-order, mass-action,

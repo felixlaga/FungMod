@@ -36,6 +36,10 @@ from fungal_model.api.curation import (
     render_curation_report,
     validate_reviewable_source_record,
 )
+from fungal_model.api.curator_signatures import (
+    AuthenticatedCurationBundle,
+    CuratorSignatureError,
+)
 from fungal_model.provenance import REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY
 from fungal_model.registry.loaders import (
     RegistryLoadError,
@@ -122,7 +126,9 @@ class CuratorAuthoredRegistryResult(CurationResult):
 
 
 def author_registry_records(
-    curation_result: CurationResult | LoadedCurationBundle,
+    curation_result: (
+        CurationResult | LoadedCurationBundle | AuthenticatedCurationBundle
+    ),
     *,
     registry_records: Mapping[str, Mapping[str, Any]],
 ) -> CuratorAuthoredRegistryResult:
@@ -597,8 +603,16 @@ def _registry_authoring_summary(
 
 
 def _authoring_source_result(
-    value: CurationResult | LoadedCurationBundle,
+    value: CurationResult | LoadedCurationBundle | AuthenticatedCurationBundle,
 ) -> CurationResult:
+    if isinstance(value, AuthenticatedCurationBundle):
+        try:
+            return value.reload().bundle.result
+        except (CurationError, CuratorSignatureError) as exc:
+            raise RegistryRecordAuthoringError(
+                "Authenticated curation source failed current checksum or "
+                "signature validation."
+            ) from exc
     if isinstance(value, LoadedCurationBundle):
         try:
             return load_curation_bundle(value.manifest_path).result
@@ -609,7 +623,8 @@ def _authoring_source_result(
     if isinstance(value, CurationResult):
         return value
     raise RegistryRecordAuthoringError(
-        "author_registry_records requires a validated in-memory CurationResult or checksum-loaded LoadedCurationBundle."
+        "author_registry_records requires a validated in-memory CurationResult "
+        "or checksum-loaded LoadedCurationBundle/AuthenticatedCurationBundle."
     )
 
 

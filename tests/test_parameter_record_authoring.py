@@ -10,6 +10,7 @@ from typing import Any, cast
 
 import pytest
 import yaml
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 import fungal_model
 import fungal_model.api.registry_promotion as promotion_module
@@ -24,12 +25,15 @@ from fungal_model import (
     ParameterRecordAuthoringError,
     RegistryPromotionApplyError,
     RegistryPromotionPlanError,
+    TrustedCuratorKey,
     VirtualExperimentError,
     author_parameter_record,
     apply_registry_promotion,
     plan_registry_promotion,
     load_curation_bundle,
+    load_authenticated_curation_bundle,
     review_source_proposal,
+    sign_curation_bundle,
     source_proposal,
     virtual_experiment,
 )
@@ -257,6 +261,41 @@ def _author(tmp_path: Path) -> tuple[CurationResult, Path, dict[str, Any], Curat
         registry_index=registry_index,
     )
     return source, registry_index, target, authored
+
+
+def test_authenticated_written_source_revalidates_before_parameter_authoring(
+    tmp_path: Path,
+) -> None:
+    source = _accepted_source_curation(tmp_path)
+    written = source.write(tmp_path / "signed_parameter_source")
+    private_key = Ed25519PrivateKey.generate()
+    key_id = "pr54-parameter-authoring-key"
+    sign_curation_bundle(
+        written.output_directory,
+        curator_id=CURATOR,
+        key_id=key_id,
+        private_key=private_key,
+    )
+    trusted_key = TrustedCuratorKey.from_public_key(
+        curator_id=CURATOR,
+        key_id=key_id,
+        public_key=private_key.public_key(),
+    )
+    authenticated = load_authenticated_curation_bundle(
+        written.output_directory,
+        trusted_curator_keys={key_id: trusted_key},
+    )
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+
+    authored = author_parameter_record(
+        authenticated,
+        source_record_id=SOURCE_PARAMETER_ID,
+        parameter_record=_canonical_parameter_target(source),
+        registry_index=registry_index,
+    )
+
+    assert authored.accepted_records[0].record_id == CANONICAL_PARAMETER_ID
+    assert authenticated.reload().verification.curator_id == CURATOR
 
 
 def test_real_frozen_sabio_identity_path_is_addable_only_on_a_copied_registry(

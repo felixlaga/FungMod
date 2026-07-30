@@ -69,9 +69,10 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-54 authenticated curator-signature contract after
-PR-53 completed product-map registry destination and ownership in the current
-checkout, PR-52 completed its five-family index-backed non-parameter
+The current next PR is PR-55 arbitrary reaction onboarding and assembly
+contract after PR-54 completed caller-trusted Ed25519 curator authentication
+in the current checkout, PR-53 completed product-map registry destination and
+ownership after PR #68 merged as `19baedd`, PR-52 completed its five-family index-backed non-parameter
 authoring bridge after PR #67 merged as `5da611b`, PR-51 completed its versioned
 nonidentity ParameterRecord conversion registry after PR #66 merged as
 `bef938f`, PR-50 completed checksum-loaded
@@ -278,10 +279,15 @@ production-loader fidelity, deterministic in-memory/written validation, and no
 authoring/planning mutation. PR-53 adds the index-owned product-map
 destination, strict production record/loader contract, exact runtime-map
 conversion, and curator-authored promotion/apply without translating
-participants or inferring stoichiometry. CURATION-001 remains partial for
-curator authentication/signatures. The recommended next slice is PR-54:
-authenticate curator signatures against explicitly trusted public keys while
-retaining SHA-256 as consistency evidence only.
+participants or inferring stoichiometry. PR-54 adds exact-manifest Ed25519
+signing, caller-supplied trusted key/curator bindings, decision-curator
+matching, closed sibling sidecars, and boundary revalidation for authenticated
+authoring/planning inputs. SHA-256 remains consistency evidence only, and
+authentication does not claim scientific validation or simulation
+authorization. CURATION-001 is complete for this defined curation workflow.
+The recommended next slice is PR-55: arbitrary reaction onboarding and
+assembly through explicit generic source, registry, template, and mechanism
+contracts.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -479,10 +485,11 @@ PR-49 reusable public curation-bundle loading completed after PR #64 merged as
 #65 merged as `933d2c8`, PR-51 registered nonidentity conversion completed
 after PR #66 merged as `bef938f`, PR-52 index-backed non-parameter authoring
 completed after PR #67 merged as `5da611b`, and PR-53 product-map registry ownership
-completed in the current checkout. The selected PR-54 slice adds authenticated
-curator signatures rather than validation ingestion, digitization, fabricated
-validation data, calibration, empirical comparison, inferred stoichiometry,
-or automatic simulation authorization.
+completed after PR #68 merged as `19baedd`. PR-54 authenticated curator signatures are
+complete in the current checkout. The selected PR-55 slice adds arbitrary
+reaction onboarding and assembly rather than validation ingestion,
+digitization, fabricated validation data, calibration, empirical comparison,
+inferred biology, or automatic simulation authorization.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
@@ -1378,8 +1385,13 @@ non-parameter families through exact source identity, reserved integrity
 evidence, production loader fidelity, and promotion/apply revalidation. PR-53
 adds the sixth family, product maps, through an explicit production schema,
 owner, loader, index destination, and unchanged-state/unchanged-coefficient
-runtime conversion. CURATION-001 remains partial for curator
-authentication/signatures. This status does not claim scientific validation or
+runtime conversion. At that PR-53 checkpoint CURATION-001 remained partial
+for curator authentication/signatures. PR-54 completes that defined workflow with
+Ed25519 signatures over exact manifest bytes, explicit caller trust,
+decision-curator identity binding, and authoring/planning boundary
+revalidation. CURATION-001 is therefore complete for the defined review,
+authoring, authentication, planning, and transactional-apply scope. This
+status does not claim scientific validation, external curation authority, or
 automatic simulation authorization.
 
 ## CURATION-001 acceptance criteria

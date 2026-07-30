@@ -26,12 +26,98 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-54 CURATION-001 Authenticated Curator Signatures
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout. This completes CURATION-001 for its
+defined review, authoring, authentication, promotion-planning, and
+transactional-apply workflow. It does not complete scientific validation or
+authorize simulation.
+
+Completed in this pass:
+
+- Added a closed versioned Ed25519 signature contract for exact
+  `curation_manifest.json` bytes. The signature is written atomically as a
+  deterministic sibling sidecar so the curation bundle's closed internal
+  inventory remains unchanged; the manifest continues to bind every owned
+  artifact checksum.
+- Added explicit `TrustedCuratorKey` bindings and
+  `load_authenticated_curation_bundle(...)`. Trust is caller-owned and binds
+  one key ID, Ed25519 public key, and curator identity. The signature envelope,
+  public-key digest, exact manifest digest, signature bytes, and every explicit
+  decision curator must agree.
+- Added `AuthenticatedCurationBundle.reload()` and revalidation at
+  `author_parameter_record(...)`, `author_registry_records(...)`, and
+  `plan_registry_promotion(...)` use boundaries.
+- Kept SHA-256 scoped to consistency checking. The signature result explicitly
+  records `production_registry_mutated`, `scientific_validation_claimed`, and
+  `simulation_authorized` as false; true or malformed envelope values fail
+  closed.
+- Kept unsigned `LoadedCurationBundle` use backward compatible and
+  distinguishable. A detached promotion plan remains digest-confirmed
+  review/apply evidence and does not independently prove curator
+  authentication.
+
+Tests added or modified:
+
+- Added signature coverage for the authenticated authoring-to-planning path,
+  exact-manifest byte binding, tampered signatures, untrusted keys, forbidden
+  validation/authorization claims, mismatched decision-curator identity,
+  reload stability, and package-root exports.
+- Updated the active roadmap status contract to mark CURATION-001 complete for
+  its defined workflow and select PR-55 arbitrary reaction onboarding and
+  assembly.
+
+What did not change: no private-key storage, global trust registry, certificate
+authority, key revocation, registry mutation, plan/apply schema, scientific
+field, parameter, mechanism, process law, numerical method, solver, configured
+model, output schema, validation data, calibration, empirical comparison, or
+automatic simulation authorization changed.
+
+Scientific behavior impact: none. Signature verification authenticates exact
+manifest authorship against caller-supplied trust. It does not establish that
+the signed biology, parameters, decisions, or promoted records are
+scientifically valid.
+
+Backward compatibility: `LoadedCurationBundle`, in-memory curation results,
+existing authored bundles, promotion plans, and apply behavior remain
+supported. Authenticated loading is opt-in. The only new runtime dependency is
+`cryptography>=42.0`.
+
+Remaining ambiguity and risk: callers own curator identity, public-key
+distribution, key rotation, and revocation policy; FungMod deliberately does
+not invent a PKI or global curator authority. A signature sibling must remain
+available with the bundle for later authentication. Downstream detached plans
+retain their existing digest contract but not independent signature evidence.
+
+Risk level: medium security/workflow risk, bounded by Ed25519-only key types,
+domain-separated exact-byte signing, closed sidecar fields, explicit caller
+trust, exact curator matching, fail-closed verification, and use-boundary
+reloads.
+
+Recommended next task: PR-55, generalize arbitrary reaction onboarding and
+assembly through explicit generic source, registry, template, and supported
+mechanism contracts without reaction-specific branches or silent fallback
+values.
+
+Verification:
+
+- Focused curation/signature/authoring/promotion/roadmap suite: `233 passed in
+  114.45s`.
+- Ruff over `src` and `tests`: `All checks passed!`.
+- Pyright with the documented venv interpreter: `0 errors, 0 warnings, 0
+  informations`.
+- Canonical pytest with coverage: `1181 passed in 431.38s`; total coverage
+  `83.95%`, above the required `80.0%`.
+- `git diff --check`: passed.
+
 ## PR-53 CURATION-001 Product-Map Registry Ownership
 
 Date: 2026-07-30
 
-Status: `complete` in the current checkout. CURATION-001 remains `partial`
-only for authenticated curator signatures.
+Status: `complete` after PR #68 merged as `19baedd`. At that checkpoint,
+CURATION-001 remained `partial` only for authenticated curator signatures.
 
 Completed in this pass:
 
