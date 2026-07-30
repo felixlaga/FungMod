@@ -4,6 +4,7 @@ import csv
 import json
 import shutil
 import socket
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -11,7 +12,18 @@ import pytest
 import yaml
 
 from fungal_model import ConfiguredModelExecutionError, VirtualExperiment
-from fungal_model.registry import load_registry
+from fungal_model.core.value_spec import ValueSpec
+from fungal_model.registry import (
+    CaseTemplateRecord,
+    EnzymeClassRecord,
+    EnvironmentRecord,
+    FungModRegistry,
+    FungusRecord,
+    ParameterRecord,
+    ProcessCompatibilityRecord,
+    SubstrateRecord,
+    load_registry,
+)
 from fungal_model.registry.records import (
     PARAMETER_ALLOWED_USE_SCIENTIFIC,
     PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
@@ -37,6 +49,130 @@ ENZYME_CONCENTRATION_SYMBOL = "enzyme_concentration_beta_glucosidase"
 BIO_FUNGUS_ID = "generic_cellulase_source"
 BIO_SUBSTRATE_ID = "cellulose_film_generic"
 BIO_ENVIRONMENT_ID = "bio001_cellulose_surface_pilot_environment"
+
+
+def test_materially_different_homogeneous_reaction_onboards_without_python_branch(
+    tmp_path: Path,
+) -> None:
+    registry = _arbitrary_homogeneous_fixture_registry()
+
+    config = build_model_config_from_registry_case(
+        fungus_id="fixture_enzyme_source",
+        substrate_id="fixture_dissolved_substrate",
+        environment_id="fixture_environment",
+        registry=registry,
+        mode="toy",
+        output_directory=str(tmp_path / "fixture_outputs"),
+    )
+    data = config.to_dict()
+
+    assert data["name"] == "PR-55 arbitrary homogeneous reaction fixture"
+    assert data["parameters"][0]["id"] == "fixture_parameter_set"
+    assert data["processes"][0]["id"] == "fixture_homogeneous_process"
+    assert data["processes"][0]["states"] == {
+        "substrate": "fixture_substrate_concentration",
+        "product": "fixture_product_concentration",
+        "enzyme": "fixture_enzyme_concentration",
+    }
+    assert data["processes"][0]["product_map"] == "fixture_product_map"
+    assert data["entities"]["enzymes"][0]["data"]["name"] == "Fixture hydrolase"
+    assert data["entities"]["product_maps"][0]["data"]["products"] == {
+        "fixture_product_concentration": 1.5
+    }
+    assert data["provenance"]["source"] == "PR-55 software test fixture."
+    assert "Reaction 618" not in json.dumps(data)
+
+    config_path = tmp_path / "fixture_config.yml"
+    config_path.write_text(
+        yaml.safe_dump(data, sort_keys=False),
+        encoding="utf-8",
+    )
+    result = run_configured_model(
+        config_path,
+        output_dir=tmp_path / "fixture_outputs",
+    )
+
+    substrate = result.state("fixture_substrate_concentration").to("mM")
+    product = result.state("fixture_product_concentration").to("mM")
+    assert substrate.magnitude[-1] < substrate.magnitude[0]
+    assert product.magnitude[-1] > product.magnitude[0]
+    assert "fixture_homogeneous_process" in result.process_rates
+
+
+def test_arbitrary_homogeneous_reaction_requires_explicit_process_identity(
+    tmp_path: Path,
+) -> None:
+    registry = _arbitrary_homogeneous_fixture_registry()
+    template = registry.get_case_template("fixture_homogeneous_template")
+    metadata = dict(template.process_state_metadata)
+    del metadata["process_id"]
+    incomplete_template = replace(
+        template,
+        process_state_metadata=metadata,
+    )
+    incomplete_registry = replace(
+        registry,
+        case_templates={incomplete_template.record_id: incomplete_template},
+    )
+
+    with pytest.raises(
+        RegistryCaseBuildError,
+        match="missing explicit process-state metadata.*process_id",
+    ):
+        build_model_config_from_registry_case(
+            fungus_id="fixture_enzyme_source",
+            substrate_id="fixture_dissolved_substrate",
+            environment_id="fixture_environment",
+            registry=incomplete_registry,
+            mode="toy",
+            output_directory=str(tmp_path / "incomplete"),
+        )
+
+
+def test_arbitrary_homogeneous_reaction_rejects_provenance_identity_conflict(
+    tmp_path: Path,
+) -> None:
+    registry = _arbitrary_homogeneous_fixture_registry()
+    template = registry.get_case_template("fixture_homogeneous_template")
+    compatibility = registry.process_compatibility[
+        "fixture_hydrolase_compatibility"
+    ]
+    conflicting_template = replace(
+        template,
+        provenance={
+            **template.provenance,
+            "source_database": "fixture_source_a",
+        },
+    )
+    conflicting_compatibility = replace(
+        compatibility,
+        provenance={
+            **compatibility.provenance,
+            "source_database": "fixture_source_b",
+        },
+    )
+    conflicting_registry = replace(
+        registry,
+        case_templates={
+            conflicting_template.record_id: conflicting_template
+        },
+        process_compatibility={
+            conflicting_compatibility.record_id: conflicting_compatibility
+        },
+    )
+
+    with pytest.raises(
+        RegistryCaseBuildError,
+        match="provenance disagree.*source_database",
+    ):
+        build_model_config_from_registry_case(
+            fungus_id="fixture_enzyme_source",
+            substrate_id="fixture_dissolved_substrate",
+            environment_id="fixture_environment",
+            registry=conflicting_registry,
+            mode="toy",
+            output_directory=str(tmp_path / "conflicting"),
+        )
 
 
 def test_reaction_618_assembles_and_simulates_from_template(tmp_path: Path) -> None:
@@ -75,6 +211,24 @@ def test_reaction_618_assembles_and_simulates_from_template(tmp_path: Path) -> N
     product = result.state("beta_D_glucose_concentration").to("mM").magnitude
     assert substrate[-1] < substrate[0]
     assert product[-1] > product[0]
+
+
+def test_homogeneous_request_mode_must_match_explicit_template_mode(
+    tmp_path: Path,
+) -> None:
+    registry = _registry_with_exact_enzyme_concentration(tmp_path)
+
+    with pytest.raises(
+        RegistryCaseBuildError,
+        match="mode 'toy'.*explicit config_mode 'scientific'",
+    ):
+        build_model_config_from_registry_case(
+            fungus_id=REACTION_FUNGUS_ID,
+            substrate_id=REACTION_SUBSTRATE_ID,
+            environment_id=REACTION_ENVIRONMENT_ID,
+            registry=registry,
+            mode="toy",
+        )
 
 
 def test_bio001_assembles_and_simulates_from_template(tmp_path: Path) -> None:
@@ -1493,6 +1647,224 @@ def _environment_modifier_parameter_record(
         "allowed_use": PARAMETER_ALLOWED_USE_SCIENTIFIC,
         "notes": notes,
     }
+
+
+def _arbitrary_homogeneous_fixture_registry() -> FungModRegistry:
+    provenance = {
+        "source": "PR-55 software test fixture.",
+        "confidence_level": "testing",
+        "notes": (
+            "Artificial metadata for generic homogeneous-assembly software "
+            "verification only; not scientific data."
+        ),
+    }
+    fungus_id = "fixture_enzyme_source"
+    enzyme_class_id = "fixture_hydrolase"
+    substrate_id = "fixture_dissolved_substrate"
+    substrate_class = "fixture_dissolved_class"
+    environment_id = "fixture_environment"
+    process_type = "homogeneous_michaelis_menten"
+    parameter_specs = (
+        ("fixture_km_record", "fixture_km", "km", 0.75, "mM"),
+        ("fixture_kcat_record", "fixture_kcat", "kcat", 0.08, "1 / second"),
+        (
+            "fixture_substrate_initial_record",
+            "fixture_substrate_initial",
+            "substrate_initial_concentration",
+            4.0,
+            "mM",
+        ),
+        (
+            "fixture_enzyme_initial_record",
+            "fixture_enzyme_initial",
+            "enzyme_initial_concentration",
+            0.2,
+            "mM",
+        ),
+    )
+    parameter_roles = {
+        role: symbol
+        for _, symbol, role, _, _ in parameter_specs
+    }
+    parameters = tuple(
+        ParameterRecord(
+            record_id=record_id,
+            name=f"Fixture parameter for {role}",
+            maturity="software_test_fixture",
+            provenance=provenance,
+            notes="Artificial exact parameter for PR-55 software verification.",
+            parameter_symbol=symbol,
+            process_type=process_type,
+            enzyme_class=enzyme_class_id,
+            substrate_class=substrate_class,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            value=ValueSpec(
+                kind="exact",
+                value=value,
+                units=units,
+                source="PR-55 software test fixture.",
+                confidence_level="testing",
+                notes="Artificial exact value; not scientific data.",
+            ),
+            range_scope="software_test_fixture",
+            range_interpretation="configured mechanics only",
+            allowed_use=PARAMETER_ALLOWED_USE_SOFTWARE_TESTS_ONLY,
+        )
+        for record_id, symbol, role, value, units in parameter_specs
+    )
+    template = CaseTemplateRecord(
+        record_id="fixture_homogeneous_template",
+        name="PR-55 arbitrary homogeneous reaction fixture template",
+        maturity="software_test_fixture",
+        provenance=provenance,
+        notes=(
+            "Artificial template proving a second homogeneous reaction can be "
+            "onboarded without a Python reaction branch."
+        ),
+        case_template_id="fixture_homogeneous_template",
+        process_type=process_type,
+        state_roles={
+            "substrate": "fixture_substrate_concentration",
+            "product": "fixture_product_concentration",
+            "enzyme": "fixture_enzyme_concentration",
+        },
+        initial_state_mapping={
+            "substrate": {
+                "parameter_role": "substrate_initial_concentration",
+                "units_from_role": "substrate_initial_concentration",
+            },
+            "product": {
+                "value": 0.0,
+                "units_from_role": "substrate_initial_concentration",
+            },
+            "enzyme": {
+                "parameter_role": "enzyme_initial_concentration",
+                "units_from_role": "enzyme_initial_concentration",
+            },
+        },
+        product_map={
+            "id": "fixture_product_map",
+            "product_map_type": "stoichiometric",
+            "substrate_state_role": "substrate",
+            "product_state_role": "product",
+            "stoichiometric_yield": 1.5,
+            "notes": "Artificial 1.5 yield for software verification only.",
+        },
+        stoichiometric_yields={"product": 1.5},
+        time_grid={
+            "start": 0.0,
+            "stop": 20.0,
+            "points": 21,
+            "units": "second",
+        },
+        observable_roles=(
+            "substrate",
+            "product",
+            "enzyme",
+            "degradation_rate",
+            "product_release_rate",
+        ),
+        output_state_roles={
+            "substrate": "fixture_substrate_concentration",
+            "product": "fixture_product_concentration",
+            "enzyme": "fixture_enzyme_concentration",
+        },
+        process_state_metadata={
+            "config_name": "PR-55 arbitrary homogeneous reaction fixture",
+            "config_mode": "toy",
+            "config_maturity": "framework_benchmark",
+            "process_id": "fixture_homogeneous_process",
+            "parameter_set_id": "fixture_parameter_set",
+            "product_map_name": "Fixture substrate-to-product map",
+        },
+        limitations=(
+            "Artificial homogeneous Michaelis-Menten software fixture only.",
+            "No biological identity or validation claim is made.",
+        ),
+        validity_notes=(
+            "Valid only for deterministic generic-assembly software verification.",
+        ),
+    )
+    compatibility = ProcessCompatibilityRecord(
+        record_id="fixture_hydrolase_compatibility",
+        name="Fixture hydrolase compatibility",
+        maturity="software_test_fixture",
+        provenance=provenance,
+        notes="Artificial compatibility for PR-55 software verification only.",
+        enzyme_class=enzyme_class_id,
+        substrate_class=substrate_class,
+        required_bond_classes=("fixture_bond",),
+        process_type=process_type,
+        required_parameters=tuple(symbol for _, symbol, _, _, _ in parameter_specs),
+        parameter_roles=parameter_roles,
+        product_map_required=True,
+        case_template_id=template.case_template_id,
+    )
+    return FungModRegistry.build(
+        registry_id="pr55_fixture_registry",
+        version="1.0.0",
+        maturity="software_test_fixture",
+        provenance=provenance,
+        fungi=(
+            FungusRecord(
+                record_id=fungus_id,
+                name="Fixture enzyme source",
+                maturity="software_test_fixture",
+                provenance=provenance,
+                notes="Artificial enzyme-source fixture; not a fungus claim.",
+                enzyme_classes=(enzyme_class_id,),
+            ),
+        ),
+        enzyme_classes=(
+            EnzymeClassRecord(
+                record_id=enzyme_class_id,
+                name="Fixture hydrolase",
+                maturity="software_test_fixture",
+                provenance=provenance,
+                notes="Artificial enzyme-class fixture; not biological data.",
+                target_bond_classes=("fixture_bond",),
+                compatible_substrate_classes=(substrate_class,),
+                compatible_processes=(process_type,),
+            ),
+        ),
+        substrates=(
+            SubstrateRecord(
+                record_id=substrate_id,
+                name="Fixture dissolved substrate",
+                maturity="software_test_fixture",
+                provenance=provenance,
+                notes="Artificial dissolved-substrate fixture; not scientific data.",
+                substrate_class=substrate_class,
+                physical_state="dissolved",
+                bond_classes=("fixture_bond",),
+                products=("fixture_product",),
+            ),
+        ),
+        environments=(
+            EnvironmentRecord(
+                record_id=environment_id,
+                name="Fixture environment",
+                maturity="software_test_fixture",
+                provenance=provenance,
+                notes="Artificial environment fixture; not empirical data.",
+                conditions={
+                    "temperature": ValueSpec(
+                        kind="exact",
+                        value=300.0,
+                        units="kelvin",
+                        source="PR-55 software test fixture.",
+                        confidence_level="testing",
+                        notes="Artificial condition; not empirical data.",
+                    )
+                },
+            ),
+        ),
+        process_compatibility=(compatibility,),
+        parameters=parameters,
+        case_templates=(template,),
+    )
 
 
 def _registry_with_exact_enzyme_concentration(tmp_path: Path):

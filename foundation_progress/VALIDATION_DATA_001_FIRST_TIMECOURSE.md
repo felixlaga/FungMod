@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-55: arbitrary reaction onboarding and assembly contract**.
+Current next PR: **PR-56: branching and cyclic enzyme-pathway assembly contract**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -64,11 +64,16 @@ families with closed schemas, owned destinations, loader fidelity, conservative
 policies, and no authoring/planning mutation. PR-53 is complete after PR #68
 merged as `19baedd` with product-map production ownership, a loader schema, an
 index-declared destination, and authoring/promotion support without inferred
-participants or coefficients. PR-54 is complete in the current checkout with
-caller-trusted Ed25519 signatures over exact manifest bytes,
+participants or coefficients. PR-54 is complete after PR #69 merged as
+`35a3ecb` with caller-trusted Ed25519 signatures over exact manifest bytes,
 decision-curator identity binding, and authoring/planning boundary
 revalidation. It does not ingest validation data, establish scientific
 validity, authorize simulation automatically, or claim validation.
+PR-55 is complete in the current checkout with arbitrary reaction onboarding
+for already implemented homogeneous Michaelis-Menten semantics. Explicit
+registry/template records own per-reaction identity, mode, provenance, states,
+parameters, product maps, and time grids; an artificial second reaction proves
+the generic path without adding biological evidence or validation data.
 The completed PR-47 work is bounded transactional
 administrative registry apply with exact digest confirmation, intentional plan
 schema `2.0.0`, durable curation audit provenance, strict next-patch versioning,
@@ -180,11 +185,11 @@ schema, or biology changes in this gate PR.
 
 ## Next Action
 
-After PR-54, take the bounded PR-55 arbitrary reaction onboarding and assembly
-contract. Generalize explicit source, registry/template, and supported
-mechanism assembly without reaction-specific branches, invented biology, or
-silent fallback values. Continue building PRODUCT-001, THERMO-003, and generic
-BIO-003 simulator capability.
+After PR-55, take the bounded PR-56 branching and cyclic enzyme-pathway
+assembly contract. Extend explicit registry-owned topology and component
+assembly beyond ordered linear chains without substrate/fungus branches,
+invented biology, or silent fallback values. Continue building PRODUCT-001,
+THERMO-003, and generic BIO-003 simulator capability.
 Later, find or obtain source-backed numeric time-course
 observations that satisfy the required evidence fields above. Then open a
 separate ingestion PR for VALIDATION-DATA-001 with the dataset, comparison

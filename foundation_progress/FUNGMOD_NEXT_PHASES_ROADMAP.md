@@ -55,9 +55,9 @@ written:
   no-network tests;
 - RESOLVE-001 is complete for strict registry-backed exact and
   case-insensitive alias resolution;
-- ASSEMBLY-001 case-template assembly basics are complete for current
-  Reaction 618 and BIO-001 cases, but partial relative to arbitrary reaction
-  onboarding;
+- ASSEMBLY-001 is complete for arbitrary reactions using implemented
+  homogeneous Michaelis-Menten semantics and for the existing template-backed
+  surface and linear-chain scopes;
 - API-003 is complete for existing registry records, aliases, environment
   grids, scientific/exploratory modes, and table access;
 - BIO-READINESS-LITE is complete for the template, validator, and tests;
@@ -69,9 +69,10 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-55 arbitrary reaction onboarding and assembly
-contract after PR-54 completed caller-trusted Ed25519 curator authentication
-in the current checkout, PR-53 completed product-map registry destination and
+The current next PR is PR-56 branching and cyclic enzyme-pathway assembly
+contract after PR-55 completed arbitrary supported-reaction onboarding in the
+current checkout, PR-54 completed caller-trusted Ed25519 curator
+authentication after PR #69 merged as `35a3ecb`, PR-53 completed product-map registry destination and
 ownership after PR #68 merged as `19baedd`, PR-52 completed its five-family index-backed non-parameter
 authoring bridge after PR #67 merged as `5da611b`, PR-51 completed its versioned
 nonidentity ParameterRecord conversion registry after PR #66 merged as
@@ -285,9 +286,12 @@ matching, closed sibling sidecars, and boundary revalidation for authenticated
 authoring/planning inputs. SHA-256 remains consistency evidence only, and
 authentication does not claim scientific validation or simulation
 authorization. CURATION-001 is complete for this defined curation workflow.
-The recommended next slice is PR-55: arbitrary reaction onboarding and
-assembly through explicit generic source, registry, template, and mechanism
-contracts.
+PR-55 removes Reaction 618/SABIO-RK/cellobiose/beta-glucosidase tokens and
+fallback identities from generic homogeneous assembly, makes per-reaction
+identity/mode/provenance/template data explicit, and proves a materially
+different artificial reaction through the same implemented law. The
+recommended next slice is PR-56: branching and cyclic enzyme-pathway assembly
+through explicit registry-owned graph topology and component contracts.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -486,10 +490,12 @@ PR-49 reusable public curation-bundle loading completed after PR #64 merged as
 after PR #66 merged as `bef938f`, PR-52 index-backed non-parameter authoring
 completed after PR #67 merged as `5da611b`, and PR-53 product-map registry ownership
 completed after PR #68 merged as `19baedd`. PR-54 authenticated curator signatures are
-complete in the current checkout. The selected PR-55 slice adds arbitrary
-reaction onboarding and assembly rather than validation ingestion,
-digitization, fabricated validation data, calibration, empirical comparison,
-inferred biology, or automatic simulation authorization.
+complete after PR #69 merged as `35a3ecb`. PR-55 arbitrary supported-reaction
+onboarding and assembly is complete in the current checkout. The selected
+PR-56 slice adds branching and cyclic enzyme-pathway assembly rather than
+validation ingestion, digitization, fabricated validation data, calibration,
+empirical comparison, inferred biology, or automatic simulation
+authorization.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
@@ -948,13 +954,16 @@ RESOLVE-001 is complete when:
 
 Move case-specific model assembly information out of Python branches and into registry/config schemas.
 
-Current risk:
+Historical risk before PR-55:
 
 ```text
 case_builder.py hardcodes Reaction 618 and BIO-001 state names, product-map names, and time-grid defaults.
 ```
 
-That does not scale.
+PR-55 removes the Reaction 618/SABIO-RK/cellobiose/beta-glucosidase tokens
+from the generic builder. Existing BIO-001-specific surface metadata remains
+within its declared exploratory template-backed scope; it is not used to
+onboard arbitrary homogeneous reactions.
 
 For arbitrary reactions and substrates, state roles, products, stoichiometry, and time grids must be data-driven.
 
@@ -1092,6 +1101,16 @@ Complete when:
 - Reaction 618 and BIO-001 still pass tests;
 - output tables still use biological state roles correctly.
 ```
+
+Scoped completion after PR-55: a materially different artificial homogeneous
+reaction supplies config/process/parameter-set/product-map identities, states,
+initial values, time grid, request mode, provenance, entity metadata,
+parameters, and outputs through registry/template data, then assembles and
+simulates without a new Python branch. Missing identity/provenance and
+request/template mode mismatch fail closed. This completes arbitrary reaction
+onboarding only for already implemented process-law semantics; unsupported
+rate laws remain explicit blockers and require separate provenance-backed,
+maturity-labelled implementations.
 
 ---
 

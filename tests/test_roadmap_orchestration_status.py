@@ -42,7 +42,7 @@ def test_status_tracker_reconciles_completed_scoped_slices_without_overclaiming(
     required_statuses = {
         "SOURCE-002 notebook-driven SABIO-RK discovery and proposals": "complete for scoped offline discovery/proposal workflow",
         "RESOLVE-001 name and alias resolver": "complete for strict registry-backed exact and case-insensitive alias resolution",
-        "ASSEMBLY-001 case-template assembly basics": "complete for current Reaction 618 and BIO-001 template-backed assembly basics; partial relative to arbitrary reaction onboarding",
+        "ASSEMBLY-001 case-template assembly": "complete for arbitrary reactions using implemented homogeneous Michaelis-Menten semantics and for the existing template-backed surface/linear-chain scopes after PR-55",
         "API-003 researcher-facing virtual experiment API": "complete for existing registry records, aliases, environment grids, scientific/exploratory modes, and table access",
         "BIO-READINESS-LITE scaffold": "complete for proposal template, validator, and tests",
         "BIO-002 reusable linear extracellular enzyme chain": "complete for arbitrary-length linear chain assembly and software verification; partial relative to branching graphs and broad pathway biology",
@@ -132,11 +132,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-55: arbitrary reaction onboarding and assembly contract"
+    current_next = "PR-56: branching and cyclic enzyme-pathway assembly contract"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
     assert (
-        "The current next PR is PR-55 arbitrary reaction onboarding and assembly"
+        "The current next PR is PR-56 branching and cyclic enzyme-pathway assembly"
         in roadmap
     )
     assert "The PR-31 slice should bridge" not in roadmap
@@ -166,6 +166,7 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "PR-53" in roadmap
     assert "PR-54" in roadmap
     assert "PR-55" in roadmap
+    assert "PR-56" in roadmap
     assert "branching, cycles, disconnected chains, and malformed topology" in roadmap
     assert "35 baseline nullable-member errors across 11" in roadmap
     assert "scientific modules using explicit contracts" in roadmap
@@ -205,7 +206,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-55: arbitrary reaction onboarding and assembly contract"
+    current_next = "PR-56: branching and cyclic enzyme-pathway assembly contract"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -258,6 +259,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-52" not in text
         assert "Current next PR: **PR-53" not in text
         assert "Current next PR: **PR-54" not in text
+        assert "Current next PR: **PR-55" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -461,6 +463,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "complete after PR #68 merged as `19baedd` | Added an empty index-owned production destination" in status
     assert "completes CURATION-001 for its defined curation workflow" in status
     assert "PR-55 | Arbitrary reaction onboarding and assembly contract" in status
+    assert "complete in the current checkout | Removed Reaction 618/SABIO-RK" in status
+    assert "PR-56 | Branching and cyclic enzyme-pathway assembly contract" in status
     assert "caller-supplied trust" in status
     assert "exact manifest authorship" in status
     assert "exact storage-only policy blocks simulation in every mode" in status
@@ -520,7 +524,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-55: arbitrary reaction onboarding and assembly contract"
+    current_next = "PR-56: branching and cyclic enzyme-pathway assembly contract"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -574,6 +578,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-52" not in _current_next_lines(text)
         assert "PR-53" not in _current_next_lines(text)
         assert "PR-54" not in _current_next_lines(text)
+        assert "PR-55" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
@@ -594,7 +599,8 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "PR-51 scope is complete after PR #66 merged as `bef938f`" in gate
     assert "PR-52 follow-up is complete after PR #67 merged as `5da611b`" in gate
     assert "PR-53 is complete after PR #68\nmerged as `19baedd` with product-map production ownership" in gate
-    assert "PR-54 is complete in the current checkout with\ncaller-trusted Ed25519 signatures" in gate
+    assert "PR-54 is complete after PR #69 merged as\n`35a3ecb` with" in gate
+    assert "PR-55 is complete in the current checkout with arbitrary reaction onboarding" in gate
     assert "intentional plan\nschema `2.0.0`" in gate
     assert "CURATION-001 is complete for\nits defined review" in gate
     assert "PR-49 reusable public checksum-validated" in gate

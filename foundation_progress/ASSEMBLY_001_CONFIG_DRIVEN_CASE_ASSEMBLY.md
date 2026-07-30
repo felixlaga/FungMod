@@ -2,7 +2,10 @@
 
 ## Status
 
-Implemented.
+Complete for arbitrary onboarding of reactions supported by the implemented
+homogeneous Michaelis-Menten process law after PR-55. Surface and chain
+assembly remain template-backed for their existing scopes; branching and
+cyclic pathway topology is a separate follow-up.
 
 ASSEMBLY-001 moves case-specific assembly metadata for the current registry-run
 cases into explicit registry case templates. The change is architectural only:
@@ -25,7 +28,10 @@ The following per-case wiring now lives in
 
 `src/fungal_model/screening/case_builder.py` now selects a template through
 `ProcessCompatibilityRecord.case_template_id` and uses template data when
-building Reaction 618 and BIO-001 configs.
+building Reaction 618 and BIO-001 configs. PR-55 removes all Reaction 618,
+cellobiose, beta-glucosidase, and SABIO-RK tokens from the generic case builder
+and proves the same supported homogeneous law with a materially different
+artificial reaction fixture.
 
 ## Template Schema Fields
 
@@ -68,9 +74,9 @@ explicit validation or assembly errors.
 - the legacy runtime grid `0..1000 second`, `101` points.
 
 The stoichiometric yield is recorded as template metadata and as a loaded
-product-map entity. The current homogeneous Michaelis-Menten process still uses
-the legacy one-to-one product contribution semantics, so ASSEMBLY-001 does not
-change Reaction 618 outputs.
+product-map entity used by the generic configured contribution path. PR-55
+changes only where existing reaction-specific assembly metadata is owned, so
+Reaction 618 numerical outputs remain unchanged.
 
 ## BIO-001 Representation
 
@@ -91,9 +97,9 @@ The BIO-001 template remains an exploratory assembly description. It is not a
 whole-fungus model and does not add secretion, uptake, biomass growth, oxygen
 limitation, or morphology dynamics.
 
-## What Remains Hardcoded
+## Process-Law Boundaries That Remain
 
-Some process-specific scaffolding intentionally remains in Python:
+Some process-law-specific scaffolding intentionally remains in Python:
 
 - how homogeneous Michaelis-Menten and surface-catalysis configs are shaped;
 - entity helper data for substrate, enzyme, and geometry config sections;
@@ -101,11 +107,14 @@ Some process-specific scaffolding intentionally remains in Python:
 - model mode and maturity selection for the existing deterministic builders;
 - validator selection and mass-balance weights;
 - derived output metric formulas in `result_tables.py`;
-- the homogeneous process contribution law, including its legacy one-to-one
-  product-state update.
+- the homogeneous process rate law and generic product-map contribution
+  semantics.
 
-These are process/foundation responsibilities rather than case-template
-responsibilities for ASSEMBLY-001.
+PR-55 makes homogeneous request modes and all per-reaction config, process,
+parameter-set, product-map, entity, state, time-grid, provenance, and output
+identities explicit. Missing process identity or provenance fails rather than
+using a Reaction 618 fallback. These remaining items are implemented
+process/foundation responsibilities rather than per-reaction branches.
 
 ## Output Table Changes
 
@@ -124,9 +133,11 @@ Added:
 - `tests/test_config_driven_case_assembly.py`
 
 Coverage includes template loading, invalid template failures, missing-template
-selection, process-type mismatch, Reaction 618 assembly/simulation, BIO-001
-assembly/simulation, output role preservation, no runtime registry mutation,
-and a network-call guard.
+selection, process-type/mode mismatch, Reaction 618 assembly/simulation,
+BIO-001 assembly/simulation, a materially different artificial homogeneous
+reaction, missing process identity, output role preservation, no runtime
+registry mutation, reaction-token hardcoding guardrails, and a network-call
+guard.
 
 ## Scientific Limitations
 
@@ -139,9 +150,10 @@ Templates describe assembly only. They do not:
 - create product uptake, biomass, secretion, or whole-fungus biology;
 - implement dynamic surface accessibility or morphology changes.
 
-## Before Adding More Reactions
+## Adding More Supported Reactions
 
-Before adding more SABIO-RK reactions or substrates, FungMod should have:
+Adding another reaction that uses an already implemented homogeneous
+Michaelis-Menten law requires:
 
 - curated local reaction/product/parameter records;
 - reviewed product-map semantics for the process law being used;
@@ -150,5 +162,11 @@ Before adding more SABIO-RK reactions or substrates, FungMod should have:
   map, time grid, output roles, and limitations;
 - tests proving that registry assembly does not require new Python branches for
   state names, product states, or time grids;
-- a decision on whether homogeneous stoichiometric product yields should become
-  process-level contribution semantics rather than metadata.
+- explicit config, process, parameter-set, and product-map identities in
+  `process_state_metadata`;
+- explicit provenance source and confidence metadata.
+
+An unsupported rate law remains an explicit blocker and requires a separately
+provenance-backed, maturity-labelled, tested mechanism implementation. This
+contract does not make artificial fixtures scientific or authorize arbitrary
+biology.
