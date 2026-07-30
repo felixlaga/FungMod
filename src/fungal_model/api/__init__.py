@@ -34,6 +34,16 @@ from fungal_model.api.registry_promotion import (
     apply_registry_promotion,
     plan_registry_promotion,
 )
+from fungal_model.api.registry_record_authoring import (
+    REGISTRY_RECORD_AUTHORING_ALLOWED_MATURITIES,
+    REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY,
+    REGISTRY_RECORD_AUTHORING_SCHEMA_VERSION,
+    REGISTRY_RECORD_AUTHORING_WORKFLOW,
+    SUPPORTED_AUTHORED_REGISTRY_RECORD_TYPES,
+    CuratorAuthoredRegistryResult,
+    RegistryRecordAuthoringError,
+    author_registry_records,
+)
 from fungal_model.api.source_provider import (
     AVAILABLE_SOURCE_PROVIDERS,
     SourceProviderError,
@@ -58,6 +68,7 @@ __all__ = [
     "ParameterConversionMethod",
     "ParameterConversionRegistry",
     "CuratorAuthoredParameterResult",
+    "CuratorAuthoredRegistryResult",
     "DegradationScreenResult",
     "AVAILABLE_SOURCE_PROVIDERS",
     "EnvironmentCase",
@@ -77,6 +88,13 @@ __all__ = [
     "RegistryPromotionPlanError",
     "RegistryPromotionPlanWriteResult",
     "ParameterRecordAuthoringError",
+    "REGISTRY_RECORD_AUTHORING_ALLOWED_MATURITIES",
+    "REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY",
+    "REGISTRY_RECORD_AUTHORING_SCHEMA_VERSION",
+    "REGISTRY_RECORD_AUTHORING_WORKFLOW",
+    "RegistryRecordAuthoringError",
+    "SUPPORTED_AUTHORED_REGISTRY_RECORD_TYPES",
+    "author_registry_records",
     "review_source_proposal",
     "source_proposal",
     "SourceProviderError",

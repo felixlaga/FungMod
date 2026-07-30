@@ -8,8 +8,13 @@ from typing import Any, Literal
 
 CURATION_AUDIT_PROVENANCE_KEY = "fungmod_curation"
 PARAMETER_BRIDGE_PROVENANCE_KEY = "fungmod_parameter_bridge"
+REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY = "fungmod_registry_record_authoring"
 RESERVED_PROVENANCE_KEYS = frozenset(
-    {CURATION_AUDIT_PROVENANCE_KEY, PARAMETER_BRIDGE_PROVENANCE_KEY}
+    {
+        CURATION_AUDIT_PROVENANCE_KEY,
+        PARAMETER_BRIDGE_PROVENANCE_KEY,
+        REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY,
+    }
 )
 
 ParameterProvenanceClass = Literal[
@@ -73,6 +78,7 @@ def _has_distinctive_parameter_source_evidence(value: Any) -> bool:
 __all__ = [
     "CURATION_AUDIT_PROVENANCE_KEY",
     "PARAMETER_BRIDGE_PROVENANCE_KEY",
+    "REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY",
     "RESERVED_PROVENANCE_KEYS",
     "ParameterProvenanceClass",
     "classify_parameter_provenance",

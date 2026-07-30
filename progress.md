@@ -26,13 +26,106 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-52 CURATION-001 Non-Parameter Registry-Record Authoring
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout for the five index-backed
+non-parameter record families. PR-51 is `complete` after PR #66 merged as
+`bef938f`. CURATION-001 remains `partial` for product-map destination
+ownership and curator authentication/signatures.
+
+Completed in this pass:
+
+- Added public `author_registry_records(...)`,
+  `CuratorAuthoredRegistryResult`, and a versioned
+  `fungmod_registry_record_authoring` audit contract for `fungi`,
+  `substrates`, `enzyme_classes`, `process_compatibility`, and
+  `case_templates`.
+- Required one explicitly accepted source record per complete curator-authored
+  production target, preserved nonconflicting source identity, rejected
+  pre-populated reserved provenance, and bound the source, target, curation,
+  result provenance, destination family, safety flags, and record/result
+  digests.
+- Restricted target maturity to the explicit `exploratory_metadata` and
+  `literature_metadata` labels; authoring cannot claim validated or unrestricted
+  maturity.
+- Added a public single-record production-loader entry point and required exact
+  loader round-trip fidelity. Fields that would be dropped, synthesized,
+  defaulted, or type-changed fail before promotion planning.
+- Extended in-memory, checksum-written, promotion-plan, and transactional-apply
+  validation so generic `CurationResult` objects cannot spoof the specialized
+  authoring namespace and every authored record is independently revalidated.
+- Kept product maps outside this bridge because the production registry index
+  still has no declared product-map owner or destination.
+
+Tests added or modified:
+
+- `tests/test_registry_record_authoring.py` covers all five supported families,
+  checksum-loaded written sources, source reload and checksum failure, raw-path
+  rejection, product-map rejection, source-identity conflicts, dropped-field
+  rejection, in-memory tamper detection, namespace-spoof rejection, public
+  exports, promotion planning, and transactional apply against a copied
+  registry.
+- Existing curation review, parameter authoring, promotion plan/apply, registry
+  loading, configured workflow, biology, numerical, and no-shortcut tests
+  remain applicable.
+
+What did not change: no production registry file, registry version, package
+version, source evidence, scientific field, parameter, process law, solver,
+simulation admission policy, output schema, notebook, validation data,
+calibration, or empirical comparison changed. Authoring and planning do not
+apply a registry mutation, and no record is called scientifically validated or
+automatically simulation-authorized.
+
+Scientific behavior impact: none. This is an administrative source-to-loader
+bridge for complete curator-supplied metadata. It does not infer biological
+capabilities, substrate structure, process compatibility, case behavior, or
+missing values.
+
+Backward compatibility: existing ordinary curation, ParameterRecord authoring,
+written bundle loading, promotion planning, and apply contracts retain their
+public behavior. The new reserved provenance namespace only rejects attempts
+to pre-populate or spoof the new specialized contract.
+
+Remaining ambiguity and risk: a production loader can prove schema and
+round-trip fidelity, not biological truth. Curators remain responsible for
+every authored scientific field. Product maps remain blocked until ownership,
+storage schema, loader, and index destination are explicit. SHA-256 digests
+prove internal consistency only; curator authentication is still absent.
+
+Risk level: medium administrative/scientific-metadata risk, bounded by explicit
+acceptance, source identity, closed supported types, reserved provenance,
+deterministic digests, exact loader fidelity, full prospective-registry
+validation, no overwrite, copied-registry apply tests, and no mutation during
+authoring or planning.
+
+Recommended next task: PR-53, define production product-map record ownership,
+an index-declared destination and loader schema, then admit curator-authored
+product maps through the same source identity, integrity, planning, and
+transactional-apply controls.
+
+Verification:
+
+- Focused authoring suite: `13 passed`.
+- Authoring plus promotion plan/apply suites: `120 passed`.
+- Ruff over the repository's configured gate, `src` and `tests`: `All checks
+  passed!`. A broader ad hoc scan also reports 17 existing E402 import-order
+  violations in notebooks and `scripts/propose_sabiork_source_records.py`;
+  those unrelated files were not changed in this slice.
+- Pyright with the documented venv interpreter: `0 errors, 0 warnings, 0
+  informations`.
+- Canonical pytest with coverage: `1171 passed in 411.07s`; total coverage
+  `83.95%`, above the required `80.0%`.
+- `git diff --check`: passed.
+
 ## PR-51 CURATION-001 Versioned Nonidentity Parameter Conversion Registry
 
 Date: 2026-07-30
 
-Status: `complete` in the current checkout for the bounded nonidentity
+Status: `complete` after PR #66 merged as `bef938f` for the bounded nonidentity
 ParameterRecord conversion slice. PR-50 is `complete` after PR #65 merged as
-`933d2c8`. CURATION-001 remains `partial` for
+`933d2c8`. At that point CURATION-001 remained `partial` for
 non-parameter authoring, product-map destination ownership, and curator
 authentication.
 

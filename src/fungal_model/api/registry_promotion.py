@@ -47,7 +47,17 @@ from fungal_model.api.parameter_record_authoring import (
     validate_parameter_authoring_bundle_record,
     validate_parameter_authoring_plan_record,
 )
-from fungal_model.provenance import classify_parameter_provenance
+from fungal_model.api.registry_record_authoring import (
+    REGISTRY_RECORD_AUTHORING_WORKFLOW,
+    CuratorAuthoredRegistryResult,
+    RegistryRecordAuthoringError,
+    validate_registry_record_authoring_bundle,
+    validate_registry_record_authoring_plan_record,
+)
+from fungal_model.provenance import (
+    REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY,
+    classify_parameter_provenance,
+)
 from fungal_model.registry.loaders import load_registry
 from fungal_model.registry.store import FungModRegistry
 
@@ -358,6 +368,21 @@ def plan_registry_promotion(
         seen_ids.add(item.record_id)
 
         provenance = item.target_record.get("provenance")
+        if (
+            isinstance(provenance, Mapping)
+            and REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY in provenance
+        ):
+            try:
+                validate_registry_record_authoring_plan_record(
+                    item.record_type,
+                    item.target_record,
+                    item.curation_metadata,
+                )
+            except RegistryRecordAuthoringError as exc:
+                raise RegistryPromotionPlanError(
+                    f"Authored registry record {item.record_id!r} failed planning "
+                    f"revalidation: {exc}"
+                ) from exc
         if item.record_type == "parameter_records" and classify_parameter_provenance(
             provenance if isinstance(provenance, Mapping) else None,
             curation_metadata=item.curation_metadata,
@@ -1278,6 +1303,22 @@ def _validate_apply_candidate_set(plan: RegistryPromotionPlan) -> None:
         _validate_accepted_curation(candidate.record_id, candidate.curation_metadata)
         _validate_target_record(candidate.record_id, candidate.target_record)
         provenance = candidate.target_record.get("provenance")
+        registry_authored = (
+            isinstance(provenance, Mapping)
+            and REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY in provenance
+        )
+        if registry_authored:
+            try:
+                validate_registry_record_authoring_plan_record(
+                    candidate.record_type,
+                    candidate.target_record,
+                    candidate.curation_metadata,
+                )
+            except RegistryRecordAuthoringError as exc:
+                raise RegistryPromotionApplyError(
+                    f"Authored registry candidate {candidate.record_id!r} failed "
+                    f"specialized validation during apply: {exc}"
+                ) from exc
         provenance_class = (
             classify_parameter_provenance(
                 provenance if isinstance(provenance, Mapping) else None,
@@ -1322,7 +1363,7 @@ def _validate_apply_candidate_set(plan: RegistryPromotionPlan) -> None:
                 raise RegistryPromotionApplyError(
                     f"Exact duplicate {candidate.record_id!r} has an unsupported reason."
                 )
-            if provenance_class != "generic":
+            if provenance_class != "generic" or registry_authored:
                 _validate_exact_curation_audit(candidate)
         else:
             raise RegistryPromotionApplyError(
@@ -1420,6 +1461,21 @@ def _revalidate_plan_against_current_registry(
                 f"Promotion candidate {candidate.record_id!r} target hash is stale."
             )
         provenance = candidate.target_record.get("provenance")
+        if (
+            isinstance(provenance, Mapping)
+            and REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY in provenance
+        ):
+            try:
+                validate_registry_record_authoring_plan_record(
+                    candidate.record_type,
+                    candidate.target_record,
+                    candidate.curation_metadata,
+                )
+            except RegistryRecordAuthoringError as exc:
+                raise RegistryPromotionApplyError(
+                    f"Authored registry record {candidate.record_id!r} failed "
+                    f"current-registry revalidation during apply: {exc}"
+                ) from exc
         if candidate.record_type == "parameter_records" and classify_parameter_provenance(
             provenance if isinstance(provenance, Mapping) else None,
             curation_metadata=candidate.curation_metadata,
@@ -1884,11 +1940,26 @@ def _accepted_records(
     value: CurationResult | str | Path,
 ) -> tuple[Literal["curation_result", "written_curation_bundle"], tuple[_AcceptedRecord, ...]]:
     if isinstance(value, CurationResult):
-        if isinstance(value, CuratorAuthoredParameterResult):
+        if isinstance(value, CuratorAuthoredRegistryResult):
+            try:
+                value.verify_integrity()
+            except RegistryRecordAuthoringError as exc:
+                raise RegistryPromotionPlanError(str(exc)) from exc
+        elif isinstance(value, CuratorAuthoredParameterResult):
             try:
                 value.verify_integrity()
             except ParameterRecordAuthoringError as exc:
                 raise RegistryPromotionPlanError(str(exc)) from exc
+        elif any(
+            isinstance(item.proposed_record.get("provenance"), Mapping)
+            and REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY
+            in item.proposed_record["provenance"]
+            for item in value.accepted_records
+        ):
+            raise RegistryPromotionPlanError(
+                "In-memory registry-authoring records require "
+                "CuratorAuthoredRegistryResult integrity metadata."
+            )
         elif any(
             item.record_type == "parameter_records"
             and classify_parameter_provenance(
@@ -1942,6 +2013,9 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
     has_parameter_authoring_summary = (
         isinstance(summary, Mapping) and summary.get("workflow") == PARAMETER_AUTHORING_WORKFLOW
     )
+    has_registry_authoring_summary = (
+        summary.get("workflow") == REGISTRY_RECORD_AUTHORING_WORKFLOW
+    )
     requires_parameter_authoring = any(
         item.record_type == "parameter_records"
         and classify_parameter_provenance(
@@ -1953,7 +2027,18 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
         == "parameter_bridge"
         for item in accepted
     )
-    if not has_parameter_authoring_summary and not requires_parameter_authoring:
+    requires_registry_authoring = any(
+        isinstance(item.target_record.get("provenance"), Mapping)
+        and REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY
+        in item.target_record["provenance"]
+        for item in accepted
+    )
+    if (
+        not has_parameter_authoring_summary
+        and not requires_parameter_authoring
+        and not has_registry_authoring_summary
+        and not requires_registry_authoring
+    ):
         try:
             bundle = load_curation_bundle(value)
         except CurationError as exc:
@@ -1980,6 +2065,28 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
                 curation_report=bundle.curation_report,
             )
         except ParameterRecordAuthoringError as exc:
+            raise RegistryPromotionPlanError(str(exc)) from exc
+    elif has_registry_authoring_summary or requires_registry_authoring:
+        try:
+            validate_registry_record_authoring_bundle(
+                summary=summary,
+                manifest=bundle.manifest,
+                proposed_payload=bundle.proposed_records_payload,
+                accepted_payload=bundle.accepted_records_payload,
+                rejected_payload=bundle.rejected_records_payload,
+                eligible_records_csv_payload=bundle.eligible_records_csv_payload,
+                excluded_records_csv_payload=bundle.excluded_records_csv_payload,
+                records=tuple(
+                    (
+                        item.record_type,
+                        item.target_record,
+                        item.curation_metadata,
+                    )
+                    for item in accepted
+                ),
+                curation_report=bundle.curation_report,
+            )
+        except RegistryRecordAuthoringError as exc:
             raise RegistryPromotionPlanError(str(exc)) from exc
     return accepted
 

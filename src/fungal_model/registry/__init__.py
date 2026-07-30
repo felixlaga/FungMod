@@ -1,7 +1,12 @@
 """Registry APIs for FungMod plug-and-play metadata."""
 
 from fungal_model.core.value_spec import ValueSpec, ValueSpecError
-from fungal_model.registry.loaders import RegistryLoadError, load_registry
+from fungal_model.registry.loaders import (
+    RegistryLoadError,
+    RegistryRecordType,
+    load_registry,
+    load_registry_record_mapping,
+)
 from fungal_model.registry.records import (
     CaseTemplateRecord,
     EnzymeClassRecord,
@@ -49,6 +54,7 @@ __all__ = [
     "ProcessCompatibilityRecord",
     "RegistryResolver",
     "RegistryLoadError",
+    "RegistryRecordType",
     "RegistryLookupError",
     "RegistryRecord",
     "RegistryValidationError",
@@ -58,4 +64,5 @@ __all__ = [
     "ValueSpec",
     "ValueSpecError",
     "load_registry",
+    "load_registry_record_mapping",
 ]

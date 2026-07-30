@@ -134,6 +134,13 @@ basic kinetics layer:
   production `ParameterRecord`, verifies exact loader fidelity and source
   provenance through a closed identity-only outer metadata schema, and returns
   a promotion-plan-compatible result without applying it;
+- a non-parameter CURATION-001 authoring bridge,
+  `author_registry_records(...)`, for complete curator-supplied `fungi`,
+  `substrates`, `enzyme_classes`, `process_compatibility`, and
+  `case_templates` targets, with accepted-source identity, reserved
+  audit/digest evidence, exact production-loader fidelity, deterministic
+  in-memory and written integrity, promotion/apply revalidation, and no
+  authoring/planning registry mutation;
 - a public `load_curation_bundle(...)` reader that verifies the owned
   manifest/schema, exact artifact inventory, every declared SHA-256 checksum,
   path and symlink containment, and the shared deterministic YAML/CSV/report
@@ -469,9 +476,10 @@ source/target units with Pint, requires compatible dimensionality, recomputes
 the converted float, and applies 12-decimal-place half-even rounding. Unknown
 methods, unparseable or incompatible units, matching unit text, nonfinite
 values, and curator-supplied results that disagree with recomputation fail
-closed. Other record types, automatic apply, scientific validation, and
-simulation authorization remain explicitly unsupported, so CURATION-001
-remains partial. The curator-authored outer provenance is a closed
+closed. The five index-backed non-parameter families have a separate complete
+target authoring bridge; product maps, automatic apply, scientific validation,
+and automatic simulation authorization remain explicitly unsupported, so
+CURATION-001 remains partial. The curator-authored outer provenance is a closed
 parameter-authoring schema: complete
 source identity and singular aliases, one explicit parameter role, curator and
 date, plus the established optional kinetic-record path. Additional validation,
@@ -906,12 +914,16 @@ full-root staging, single-writer lock, rollback, and structured apply result.
 This completed the bounded transactional-apply contract when PR-47 merged as
 PR #62 (`b1ebb860`),
 without making promoted records scientifically validated or automatically
-simulation-authorized. The top-level `author_parameter_record(...)` API now
-adds the separate PARAMETER-only, identity-only source-to-production bridge over
-an accepted in-memory curation result. Its checksummed output remains planning
+simulation-authorized. The top-level `author_parameter_record(...)` API adds
+the separate PARAMETER-specific source-to-production bridge over accepted
+in-memory or checksum-loaded curation, including the one registered
+nonidentity unit-conversion policy. Its checksummed output remains planning
 input, not an apply instruction. Its exact storage-only policy is a simulation
-blocker in every modelability mode. CURATION-001 remains partial for
-nonidentity conversion and non-parameter source records.
+blocker in every modelability mode. The top-level
+`author_registry_records(...)` API separately authors the five index-backed
+non-parameter families without inferred fields or authoring/planning mutation.
+CURATION-001 remains partial for product-map destination ownership and curator
+authentication/signatures.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
 The current library provides factories for first-order, mass-action,
