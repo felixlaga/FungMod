@@ -51,6 +51,7 @@ SUPPORTED_AUTHORED_REGISTRY_RECORD_TYPES = (
     "enzyme_classes",
     "process_compatibility",
     "case_templates",
+    "product_maps",
 )
 REGISTRY_RECORD_AUTHORING_ALLOWED_MATURITIES = (
     "exploratory_metadata",
@@ -62,6 +63,7 @@ _REGISTRY_KEY_BY_RECORD_TYPE: Mapping[str, str] = {
     "enzyme_classes": "enzyme_classes",
     "process_compatibility": "process_compatibility",
     "case_templates": "case_templates",
+    "product_maps": "product_maps",
 }
 _AUDIT_FIELDS = {
     "schema_version",

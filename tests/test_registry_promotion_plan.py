@@ -290,23 +290,36 @@ def test_same_id_with_different_content_is_conflict_and_never_overwritten(
     assert _registry_snapshot(registry_index) == before
 
 
-def test_product_map_is_blocked_pending_destination_contract(tmp_path: Path) -> None:
+def test_complete_product_map_uses_index_declared_destination(tmp_path: Path) -> None:
     registry_index = _copy_registry(tmp_path)
     product_map = {
         "record_id": "synthetic_product_map",
-        "product_map_type": "synthetic_fixture",
+        "name": "Synthetic product-map promotion fixture",
+        "maturity": "synthetic_fixture",
+        "provenance": {
+            "source": "Synthetic software fixture.",
+            "confidence_level": "testing",
+            "notes": "Not scientific data.",
+        },
+        "notes": "Synthetic destination-contract fixture only.",
+        "product_map_type": "stoichiometric",
+        "reactants": {"synthetic_substrate": 1.0},
+        "products": {"synthetic_product": 2.0},
     }
     result = _curation_result(_curation_record("product_maps", product_map))
 
     plan = plan_registry_promotion(result, registry_index=registry_index)
 
     candidate = plan.candidates[0]
-    assert candidate.classification == "blocked_unsupported"
-    assert candidate.reason == "unsupported_pending_destination_contract"
-    assert candidate.registry_key is None
-    assert candidate.target_path is None
-    assert plan.prospective_files == ()
-    assert plan.summary()["apply_available"] is False
+    assert candidate.classification == "addable"
+    assert candidate.reason == "accepted_record_is_addable_without_overwrite"
+    assert candidate.registry_key == "product_maps"
+    assert candidate.target_path is not None
+    assert candidate.target_path.as_posix().endswith(
+        "/product_maps/product_maps.yml"
+    )
+    assert len(plan.prospective_files) == 1
+    assert plan.summary()["apply_available"] is True
 
 
 def test_apply_available_allows_addable_with_exact_duplicate_only(tmp_path: Path) -> None:

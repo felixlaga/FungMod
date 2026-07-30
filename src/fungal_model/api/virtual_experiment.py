@@ -525,6 +525,7 @@ def _registry_with_runtime_environment_overlay(
         process_compatibility=registry.process_compatibility.values(),
         parameters=(*registry.parameters.values(), *runtime_parameters),
         case_templates=registry.case_templates.values(),
+        product_maps=registry.product_maps.values(),
     )
 
 

@@ -137,10 +137,15 @@ basic kinetics layer:
 - a non-parameter CURATION-001 authoring bridge,
   `author_registry_records(...)`, for complete curator-supplied `fungi`,
   `substrates`, `enzyme_classes`, `process_compatibility`, and
-  `case_templates` targets, with accepted-source identity, reserved
+  `case_templates`, and `product_maps` targets, with accepted-source identity, reserved
   audit/digest evidence, exact production-loader fidelity, deterministic
   in-memory and written integrity, promotion/apply revalidation, and no
   authoring/planning registry mutation;
+- an index-owned `product_maps` registry destination and strict
+  `ProductMapRecord` schema whose explicit positive-float reactant/product
+  coefficients load without participant translation or inferred
+  stoichiometry and can be converted explicitly to the existing runtime
+  `ProductReleaseMap`;
 - a public `load_curation_bundle(...)` reader that verifies the owned
   manifest/schema, exact artifact inventory, every declared SHA-256 checksum,
   path and symlink containment, and the shared deterministic YAML/CSV/report
@@ -372,10 +377,11 @@ Raw stored content still defines exact-duplicate/no-op classification, and an
 exact duplicate is never rewritten merely to add audit metadata. Plans with a
 conflict or blocked candidate, or without at least one addable record, cannot
 apply, and their summaries and written manifests report
-`apply_available: false`. `parameter_records` map to the registry index's `parameters`
-destination; product maps remain blocked as
-`unsupported_pending_destination_contract`. Production promotion does not
-authorize simulation, alter package version, or claim scientific validation.
+`apply_available: false`. `parameter_records` map to the registry index's
+`parameters` destination and `product_maps` map to the index-owned
+`product_maps/product_maps.yml` destination. Production promotion does not
+infer product-map participants or coefficients, authorize simulation, alter
+package version, or claim scientific validation.
 
 After a curator explicitly completes and accepts an eligible PARAMETER source
 record as an in-memory `CurationResult`, author the separate production target
@@ -476,10 +482,13 @@ source/target units with Pint, requires compatible dimensionality, recomputes
 the converted float, and applies 12-decimal-place half-even rounding. Unknown
 methods, unparseable or incompatible units, matching unit text, nonfinite
 values, and curator-supplied results that disagree with recomputation fail
-closed. The five index-backed non-parameter families have a separate complete
-target authoring bridge; product maps, automatic apply, scientific validation,
-and automatic simulation authorization remain explicitly unsupported, so
-CURATION-001 remains partial. The curator-authored outer provenance is a closed
+closed. The six index-backed non-parameter families, including product maps,
+have a separate complete target authoring bridge. Product-map targets require
+explicit state names and positive float coefficients; no source participant is
+translated automatically. Automatic apply, scientific validation, and
+automatic simulation authorization remain unsupported, so CURATION-001
+remains partial for curator authentication/signatures. The curator-authored
+outer provenance is a closed
 parameter-authoring schema: complete
 source identity and singular aliases, one explicit parameter role, curator and
 date, plus the established optional kinetic-record path. Additional validation,
@@ -920,9 +929,9 @@ in-memory or checksum-loaded curation, including the one registered
 nonidentity unit-conversion policy. Its checksummed output remains planning
 input, not an apply instruction. Its exact storage-only policy is a simulation
 blocker in every modelability mode. The top-level
-`author_registry_records(...)` API separately authors the five index-backed
-non-parameter families without inferred fields or authoring/planning mutation.
-CURATION-001 remains partial for product-map destination ownership and curator
+`author_registry_records(...)` API separately authors the six index-backed
+non-parameter families, including product maps, without inferred fields or
+authoring/planning mutation. CURATION-001 remains partial for curator
 authentication/signatures.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.

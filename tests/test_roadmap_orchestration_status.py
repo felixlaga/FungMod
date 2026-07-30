@@ -96,11 +96,11 @@ def test_pr48_parameter_authoring_contract_is_synchronized() -> None:
         "full-root",
         "same-filesystem registry copy",
         "verified rollback",
-        "Product maps remain blocked",
+        "At that historical PR-47 checkpoint product maps",
     ):
         assert phrase in next_steps
 
-    assert "unsupported_pending_destination_contract" in readme
+    assert "`product_maps/product_maps.yml` destination" in readme
     assert "parameter_records" in readme
     assert "strict numeric `MAJOR.MINOR.PATCH`" in readme
     assert "Pre-PR-47 written schema `1.0.0`" in readme
@@ -129,13 +129,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = (
-        "PR-53: product-map registry destination and ownership contract"
-    )
+    current_next = "PR-54: authenticated curator-signature contract"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
     assert (
-        "The current next PR is PR-53 product-map registry destination and ownership"
+        "The current next PR is PR-54 authenticated curator-signature contract"
         in roadmap
     )
     assert "The PR-31 slice should bridge" not in roadmap
@@ -163,6 +161,7 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "completed PR-51" in roadmap
     assert "completed PR-52" in roadmap
     assert "PR-53" in roadmap
+    assert "PR-54" in roadmap
     assert "branching, cycles, disconnected chains, and malformed topology" in roadmap
     assert "35 baseline nullable-member errors across 11" in roadmap
     assert "scientific modules using explicit contracts" in roadmap
@@ -202,9 +201,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = (
-        "PR-53: product-map registry destination and ownership contract"
-    )
+    current_next = "PR-54: authenticated curator-signature contract"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -255,6 +252,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-50" not in text
         assert "Current next PR: **PR-51" not in text
         assert "Current next PR: **PR-52" not in text
+        assert "Current next PR: **PR-53" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -452,8 +450,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-51 | CURATION-001 versioned nonidentity ParameterRecord conversion registry" in status
     assert "complete after PR #66 merged as `bef938f` for the bounded registered-conversion scope" in status
     assert "PR-52 | CURATION-001 non-parameter curator-authored registry-record bridge" in status
-    assert "complete in the current checkout for the five index-backed non-parameter families" in status
+    assert "complete after PR #67 merged as `5da611b` for the five index-backed" in status
     assert "PR-53 | CURATION-001 product-map registry destination and ownership contract" in status
+    assert "PR-54 | CURATION-001 authenticated curator-signature contract" in status
+    assert "complete in the current checkout | Added an empty index-owned production destination" in status
     assert "exact storage-only policy blocks simulation in every mode" in status
     assert "closed exact per-mode `allowed_use` permissions" in status
     assert "intrinsic component-only scope" in status
@@ -511,9 +511,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = (
-        "PR-53: product-map registry destination and ownership contract"
-    )
+    current_next = "PR-54: authenticated curator-signature contract"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -565,6 +563,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-50" not in _current_next_lines(text)
         assert "PR-51" not in _current_next_lines(text)
         assert "PR-52" not in _current_next_lines(text)
+        assert "PR-53" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
@@ -583,8 +582,9 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "PR-48 identity-only PARAMETER authoring is complete" in gate
     assert "PR-50 checksum-loaded\nwritten-source authoring is complete" in gate
     assert "PR-51 scope is complete after PR #66 merged as `bef938f`" in gate
-    assert "PR-52 follow-up is complete in the current checkout" in gate
-    assert "selected PR-53 follow-up\ndefines product-map production ownership" in gate
+    assert "PR-52 follow-up is complete after PR #67 merged as `5da611b`" in gate
+    assert "PR-53 is complete in the current\ncheckout with product-map production ownership" in gate
+    assert "selected PR-54 follow-up adds authenticated\ncurator signatures" in gate
     assert "intentional plan\nschema `2.0.0`" in gate
     assert "CURATION-001 remains partial" in gate
     assert "PR-49 reusable public checksum-validated" in gate

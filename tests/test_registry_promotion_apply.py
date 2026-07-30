@@ -523,8 +523,8 @@ def test_conflict_blocked_and_no_addable_plans_are_refused(
         record = _curation_record("parameter_records", existing)
     elif candidate_kind == "blocked":
         record = _curation_record(
-            "product_maps",
-            {"record_id": "blocked_product_map", "product_map_type": "synthetic"},
+            "unsupported_records",
+            {"record_id": "blocked_unsupported_record"},
         )
     else:
         record = _curation_record("parameter_records", existing)
@@ -562,8 +562,8 @@ def test_checksum_valid_non_applicable_written_bundle_remains_non_applicable(
         record = _curation_record("parameter_records", existing)
     elif candidate_kind == "blocked":
         record = _curation_record(
-            "product_maps",
-            {"record_id": "blocked_product_map", "product_map_type": "synthetic"},
+            "unsupported_records",
+            {"record_id": "blocked_unsupported_record"},
         )
     else:
         record = _curation_record("parameter_records", existing)

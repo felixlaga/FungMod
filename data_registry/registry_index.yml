@@ -11,6 +11,7 @@ records:
   process_compatibility: processes/process_compatibility.yml
   parameters: parameters/parameter_records.yml
   case_templates: case_templates/case_templates.yml
+  product_maps: product_maps/product_maps.yml
 provenance:
   created_by: FungMod
   source: FungMod R1 toy registry fixture.

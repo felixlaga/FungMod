@@ -102,6 +102,7 @@ from fungal_model.io import (
 )
 from fungal_model.registry import (
     AmbiguousResolutionError,
+    ProductMapRecord,
     RegistryResolver,
     ResolutionError,
     ResolvedRecord,
@@ -258,6 +259,7 @@ __all__ = [
     "ProcessODESolver",
     "ProspectiveRegistryFile",
     "ProductMapRegistry",
+    "ProductMapRecord",
     "ProductReleaseMap",
     "RateModifierProcess",
     "RegistryLookupError",

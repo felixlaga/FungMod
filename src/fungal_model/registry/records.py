@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -165,7 +166,6 @@ class FungusRecord(RegistryRecord):
         )
         return data
 
-
 @dataclass(frozen=True)
 class EnzymeClassRecord(RegistryRecord):
     """Minimal enzyme-class compatibility record."""
@@ -256,6 +256,111 @@ class EnvironmentRecord(RegistryRecord):
         data = super().to_dict()
         data["conditions"] = {key: value.to_dict() for key, value in self.conditions.items()}
         return data
+
+
+@dataclass(frozen=True)
+class ProductMapRecord(RegistryRecord):
+    """Registry-owned state-to-state stoichiometric mapping."""
+
+    product_map_type: str = ""
+    reactants: Mapping[str, float] = field(default_factory=dict)
+    products: Mapping[str, float] = field(default_factory=dict)
+
+    def validate(self) -> ValidationResult:
+        issues = self._common_issues()
+        if self.product_map_type not in {"one_to_one", "stoichiometric"}:
+            issues.append(
+                {
+                    "field": "product_map_type",
+                    "message": "Product map type must be one_to_one or stoichiometric.",
+                }
+            )
+        issues.extend(_stoichiometric_mapping_issues("reactants", self.reactants))
+        issues.extend(_stoichiometric_mapping_issues("products", self.products))
+        if self.product_map_type == "one_to_one" and (
+            len(self.reactants) != 1
+            or len(self.products) != 1
+            or tuple(self.reactants.values()) != (1.0,)
+            or tuple(self.products.values()) != (1.0,)
+        ):
+            issues.append(
+                {
+                    "field": "product_map_type",
+                    "message": (
+                        "A one_to_one product map requires exactly one reactant and "
+                        "one product, each with coefficient 1.0."
+                    ),
+                }
+            )
+        return _validation_result(self.record_id, issues)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = super().to_dict()
+        data.update(
+            {
+                "product_map_type": self.product_map_type,
+                "reactants": dict(self.reactants),
+                "products": dict(self.products),
+            }
+        )
+        return data
+
+    def to_product_release_map(self) -> Any:
+        """Build the runtime map without translating states or coefficients."""
+
+        validation = self.validate()
+        if not validation.passed:
+            raise ValueError(
+                f"Invalid product map record {self.record_id!r}: {validation.details}"
+            )
+        from fungal_model.processes import ProductReleaseMap
+
+        return ProductReleaseMap(
+            reactants=dict(self.reactants),
+            products=dict(self.products),
+            notes=self.notes,
+            name=self.name,
+            maturity=self.maturity,
+            source=self.provenance.get("source"),
+        )
+
+
+def _stoichiometric_mapping_issues(
+    field_name: str,
+    values: Mapping[str, float],
+) -> list[dict[str, Any]]:
+    if not isinstance(values, Mapping) or not values:
+        return [
+            {
+                "field": field_name,
+                "message": f"Product map {field_name} must be a nonempty mapping.",
+            }
+        ]
+    issues: list[dict[str, Any]] = []
+    for state, coefficient in values.items():
+        if not _is_canonical_nonblank_text(state):
+            issues.append(
+                {
+                    "field": field_name,
+                    "message": "Product map state names must be canonical nonblank text.",
+                }
+            )
+        if (
+            isinstance(coefficient, bool)
+            or not isinstance(coefficient, float)
+            or not math.isfinite(coefficient)
+            or coefficient <= 0.0
+        ):
+            issues.append(
+                {
+                    "field": f"{field_name}.{state}",
+                    "message": (
+                        "Product map coefficients must be finite positive floats; "
+                        "no coefficient conversion is inferred."
+                    ),
+                }
+            )
+    return issues
 
 
 @dataclass(frozen=True)
@@ -897,6 +1002,7 @@ __all__ = [
     "parameter_record_selection_key",
     "parameter_simulation_authorization_blocker",
     "ProcessCompatibilityRecord",
+    "ProductMapRecord",
     "RegistryRecord",
     "SubstrateRecord",
     "_tuple_of_strings",

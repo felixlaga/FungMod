@@ -69,9 +69,10 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-53 product-map registry destination and ownership
-contract after PR-52 completed its five-family index-backed non-parameter
-authoring bridge in the current checkout, PR-51 completed its versioned
+The current next PR is PR-54 authenticated curator-signature contract after
+PR-53 completed product-map registry destination and ownership in the current
+checkout, PR-52 completed its five-family index-backed non-parameter
+authoring bridge after PR #67 merged as `5da611b`, PR-51 completed its versioned
 nonidentity ParameterRecord conversion registry after PR #66 merged as
 `bef938f`, PR-50 completed checksum-loaded
 written-source authoring after PR #65 merged as `933d2c8`, PR-49 public
@@ -274,11 +275,13 @@ units, dimensional compatibility, deterministic recomputation, and
 `enzyme_classes`, `process_compatibility`, and `case_templates` targets with
 accepted-source identity, reserved audit/digest evidence, exact
 production-loader fidelity, deterministic in-memory/written validation, and no
-authoring/planning mutation. CURATION-001 remains partial for product-map
-destination ownership and curator authentication/signatures. The recommended
-next slice is PR-53 product-map registry destination and ownership: define one
-production schema, loader, owner, and index-declared destination without
-inferring stoichiometry or authorizing simulation automatically.
+authoring/planning mutation. PR-53 adds the index-owned product-map
+destination, strict production record/loader contract, exact runtime-map
+conversion, and curator-authored promotion/apply without translating
+participants or inferring stoichiometry. CURATION-001 remains partial for
+curator authentication/signatures. The recommended next slice is PR-54:
+authenticate curator signatures against explicitly trusted public keys while
+retaining SHA-256 as consistency evidence only.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -474,12 +477,12 @@ identity-only PARAMETER authoring completed after PR #63 merged as `764d1e4`,
 PR-49 reusable public curation-bundle loading completed after PR #64 merged as
 `bbe2ee6`, PR-50 checksum-loaded written-source authoring completed after PR
 #65 merged as `933d2c8`, PR-51 registered nonidentity conversion completed
-after PR #66 merged as `bef938f`, and PR-52 index-backed non-parameter
-authoring completed in the current checkout. The selected PR-53 slice defines
-product-map registry destination ownership and its production loader contract,
-rather than validation ingestion, digitization, fabricated validation data,
-calibration, empirical comparison, inferred stoichiometry,
-registry apply, or automatic simulation authorization.
+after PR #66 merged as `bef938f`, PR-52 index-backed non-parameter authoring
+completed after PR #67 merged as `5da611b`, and PR-53 product-map registry ownership
+completed in the current checkout. The selected PR-54 slice adds authenticated
+curator signatures rather than validation ingestion, digitization, fabricated
+validation data, calibration, empirical comparison, inferred stoichiometry,
+or automatic simulation authorization.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
@@ -1370,11 +1373,12 @@ artifact reconstruction without mutation or curator authentication. PR-50
 accepts a revalidated loaded written source in the identity-only authoring
 bridge. PR-51 admits only one versioned registered, dimensionally compatible,
 deterministically recomputed nonidentity conversion policy. PR-52 admits
-complete curator-authored targets for the five index-backed non-parameter
-families through exact source identity, reserved integrity evidence, production
-loader fidelity, and promotion/apply revalidation. Product maps remain blocked
-pending their production schema, owner, loader, and index destination.
-CURATION-001 remains partial for that product-map contract and curator
+complete curator-authored targets for the original five index-backed
+non-parameter families through exact source identity, reserved integrity
+evidence, production loader fidelity, and promotion/apply revalidation. PR-53
+adds the sixth family, product maps, through an explicit production schema,
+owner, loader, index destination, and unchanged-state/unchanged-coefficient
+runtime conversion. CURATION-001 remains partial for curator
 authentication/signatures. This status does not claim scientific validation or
 automatic simulation authorization.
 

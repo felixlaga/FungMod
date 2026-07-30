@@ -39,6 +39,7 @@ SUPPORTED_TYPES = (
     "enzyme_classes",
     "process_compatibility",
     "case_templates",
+    "product_maps",
 )
 
 
@@ -158,6 +159,19 @@ def _targets() -> dict[str, dict[str, Any]]:
             registry.process_compatibility["beta_glucosidase_cellobiose_homogeneous_mm"].to_dict()
         ),
         "case_templates": deepcopy(registry.case_templates["toy_surface_catalysis_registry_template"].to_dict()),
+        "product_maps": {
+            "record_id": "placeholder",
+            "name": "Authored product map contract fixture",
+            "maturity": "literature_metadata",
+            "provenance": {},
+            "notes": (
+                "Explicit curator-supplied state mapping for storage and "
+                "promotion contract testing only."
+            ),
+            "product_map_type": "stoichiometric",
+            "reactants": {"test_substrate_amount": 1.0},
+            "products": {"test_product_amount": 1.0},
+        },
     }
     targets: dict[str, dict[str, Any]] = {}
     for record_type, target in fixtures.items():
@@ -257,6 +271,11 @@ def test_authored_families_survive_transactional_apply(tmp_path: Path) -> None:
     assert "authored_enzyme_classes" in registry.enzyme_classes
     assert "authored_process_compatibility" in registry.process_compatibility
     assert "authored_case_templates" in registry.case_templates
+    product_map = registry.get_product_map("authored_product_maps")
+    assert product_map.reactants == {"test_substrate_amount": 1.0}
+    assert product_map.to_product_release_map().products == {
+        "test_product_amount": 1.0
+    }
 
 
 def test_rejects_raw_written_source_path(tmp_path: Path) -> None:
@@ -288,21 +307,17 @@ def test_reloads_checksum_loaded_source_at_authoring_time(tmp_path: Path) -> Non
         )
 
 
-def test_rejects_unsupported_product_map_source() -> None:
-    source = _source_result("product_maps")
+def test_product_map_authoring_requires_explicit_float_coefficients() -> None:
+    target = _targets()["source_product_maps"]
+    target["reactants"]["test_substrate_amount"] = 1
 
     with pytest.raises(
         RegistryRecordAuthoringError,
-        match="does not support source type 'product_maps'",
+        match="must be an explicit float",
     ):
         author_registry_records(
-            source,
-            registry_records={
-                "source_product_maps": {
-                    "record_id": "authored_product_map",
-                    "provenance": _source_provenance("source_product_maps"),
-                }
-            },
+            _source_result("product_maps"),
+            registry_records={"source_product_maps": target},
         )
 
 
