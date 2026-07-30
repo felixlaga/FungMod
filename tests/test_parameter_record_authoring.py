@@ -20,6 +20,7 @@ from fungal_model import (
     CurationResult,
     CuratorAuthoredParameterResult,
     LoadedCurationBundle,
+    PINT_DECIMAL_PLACES_HALF_EVEN_12_V1,
     ParameterRecordAuthoringError,
     RegistryPromotionApplyError,
     RegistryPromotionPlanError,
@@ -1278,7 +1279,7 @@ def test_target_rejects_value_or_unit_mismatch(tmp_path: Path) -> None:
         )
 
 
-def test_nonidentity_conversion_is_explicitly_deferred(tmp_path: Path) -> None:
+def test_unregistered_nonidentity_conversion_is_rejected(tmp_path: Path) -> None:
     source = _accepted_source_curation(tmp_path)
     selected = source.accepted_records[0]
     proposed = deepcopy(dict(selected.proposed_record))
@@ -1290,11 +1291,101 @@ def test_nonidentity_conversion_is_explicitly_deferred(tmp_path: Path) -> None:
     )
     registry_index = _copy_registry_without_canonical_parameter(tmp_path)
 
-    with pytest.raises(ParameterRecordAuthoringError, match="nonidentity is deferred"):
+    with pytest.raises(ParameterRecordAuthoringError, match="is not registered exactly once"):
         author_parameter_record(
             source,
             source_record_id=SOURCE_PARAMETER_ID,
             parameter_record=_canonical_parameter_target(source),
+            registry_index=registry_index,
+        )
+
+
+def test_registered_nonidentity_conversion_is_recomputed_and_audited(
+    tmp_path: Path,
+) -> None:
+    source = _accepted_source_curation(tmp_path)
+    selected = source.accepted_records[0]
+    proposed = deepcopy(dict(selected.proposed_record))
+    proposed["conversion_method"] = PINT_DECIMAL_PLACES_HALF_EVEN_12_V1
+    proposed["converted_value"] = 7.8
+    proposed["converted_units"] = "1 / minute"
+    changed = replace(selected, proposed_record=proposed)
+    source = replace(
+        source,
+        records=tuple(
+            changed if item.record_id == SOURCE_PARAMETER_ID else item
+            for item in source.records
+        ),
+    )
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    target["value"]["value"] = 7.8
+    target["value"]["units"] = "1 / minute"
+
+    authored = author_parameter_record(
+        source,
+        source_record_id=SOURCE_PARAMETER_ID,
+        parameter_record=target,
+        registry_index=registry_index,
+    )
+    plan = plan_registry_promotion(authored, registry_index=registry_index)
+    bundle = authored.write(tmp_path / "registered_conversion_bundle")
+    written_plan = plan_registry_promotion(
+        bundle.output_directory,
+        registry_index=registry_index,
+    )
+
+    audit = authored.records[0].proposed_record["provenance"][
+        PARAMETER_BRIDGE_PROVENANCE_KEY
+    ]
+    assert authored.summary()["identity_conversion_only"] is False
+    assert audit["source_parameter"]["source_value"] == 0.13
+    assert audit["source_parameter"]["source_units"] == "s^(-1)"
+    assert audit["source_parameter"]["converted_value"] == 7.8
+    assert audit["source_parameter"]["converted_units"] == "1 / minute"
+    assert PINT_DECIMAL_PLACES_HALF_EVEN_12_V1 in audit["conversion_policy"]
+    assert plan.summary()["addable_count"] == 1
+    assert written_plan.summary()["addable_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("converted_value", "converted_units", "message"),
+    [
+        (7.7, "1 / minute", "deterministic registered-method recomputation"),
+        (0.13, "meter", "compatible dimensionality"),
+        (0.13, "s^(-1)", "distinct source and target unit text"),
+    ],
+)
+def test_registered_nonidentity_conversion_fails_closed(
+    tmp_path: Path,
+    converted_value: float,
+    converted_units: str,
+    message: str,
+) -> None:
+    source = _accepted_source_curation(tmp_path)
+    selected = source.accepted_records[0]
+    proposed = deepcopy(dict(selected.proposed_record))
+    proposed["conversion_method"] = PINT_DECIMAL_PLACES_HALF_EVEN_12_V1
+    proposed["converted_value"] = converted_value
+    proposed["converted_units"] = converted_units
+    changed = replace(selected, proposed_record=proposed)
+    source = replace(
+        source,
+        records=tuple(
+            changed if item.record_id == SOURCE_PARAMETER_ID else item
+            for item in source.records
+        ),
+    )
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    target = _canonical_parameter_target(source)
+    target["value"]["value"] = converted_value
+    target["value"]["units"] = converted_units
+
+    with pytest.raises(ParameterRecordAuthoringError, match=message):
+        author_parameter_record(
+            source,
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=target,
             registry_index=registry_index,
         )
 

@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-51: versioned nonidentity ParameterRecord conversion registry**.
+Current next PR: **PR-52: non-parameter curator-authored registry-record bridge**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -57,7 +57,10 @@ call time, and preserves every existing source, registry, loader, policy, and
 no-mutation guardrail. The selected PR-51 follow-up is a versioned nonidentity
 ParameterRecord conversion registry with explicit parseable units,
 dimensional compatibility, deterministic recomputation, and a closed rounding
-policy. It does not support other record types, mutate/apply a registry, ingest
+policy. That PR-51 scope is complete in the current checkout. The selected
+PR-52 follow-up covers non-parameter authoring for index-backed record
+families with closed schemas, owned destinations, loader fidelity, conservative
+policies, and no mutation. It keeps product maps blocked and does not ingest
 validation data, authorize simulation automatically, or claim validation.
 The completed PR-47 work is bounded transactional
 administrative registry apply with exact digest confirmation, intentional plan
@@ -169,10 +172,11 @@ schema, or biology changes in this gate PR.
 
 ## Next Action
 
-After PR-50, take the bounded PR-51 versioned nonidentity ParameterRecord
-conversion registry with explicit unit parsing, dimensional compatibility,
-deterministic recomputation, and rounding policy, adding no guessed conversion,
-registry mutation, validation claim, or broader record support. Continue building PRODUCT-001,
+After PR-51, take the bounded PR-52 non-parameter curator-authored
+registry-record bridge for index-backed record families, with exact source
+identity, closed target schemas, owned destinations, loader fidelity,
+conservative policies, and no mutation. Keep product maps separate until
+destination ownership is explicit. Continue building PRODUCT-001,
 THERMO-003, and generic BIO-003 simulator capability.
 Later, find or obtain source-backed numeric time-course
 observations that satisfy the required evidence fields above. Then open a

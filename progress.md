@@ -26,6 +26,94 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-51 CURATION-001 Versioned Nonidentity Parameter Conversion Registry
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout for the bounded nonidentity
+ParameterRecord conversion slice. PR-50 is `complete` after PR #65 merged as
+`933d2c8`. CURATION-001 remains `partial` for
+non-parameter authoring, product-map destination ownership, and curator
+authentication.
+
+Completed in this pass:
+
+- Added public immutable `ParameterConversionMethod` and
+  `ParameterConversionRegistry` contracts with an exact registry schema
+  version and unique named methods.
+- Added the registered
+  `pint_unit_conversion_decimal_places_half_even_12_v1` method. It accepts
+  finite floats only, parses explicit source and target units with Pint,
+  rejects identical unit text and incompatible dimensionality, converts
+  deterministically, and applies 12-decimal-place half-even rounding.
+- Extended `author_parameter_record(...)` so an explicitly accepted source may
+  use that registered nonidentity method. Original/source/normalized values and
+  units remain type-exact; converted and target values/units must match the
+  registered-method recomputation type-exactly.
+- Bound the method identifier, version, rounding policy, input value/unit,
+  converted value/unit, target value/unit, and conversion policy into the
+  existing authoring audit and digest. In-memory and written promotion planning
+  independently revalidate the conversion.
+- Preserved `identity_no_conversion` behavior and its existing written bundle
+  summary contract.
+
+Tests added or modified:
+
+- `tests/test_parameter_conversion.py` covers public exports, registry version,
+  the named method policy, deterministic conversion, unknown and duplicate
+  methods, nonfinite values, unparseable units, incompatible dimensions, and
+  identical unit text.
+- `tests/test_parameter_record_authoring.py` covers registered conversion
+  authoring, audit content, in-memory and written promotion planning, exact
+  recomputation, dimensional rejection, identical-unit rejection, and
+  unregistered-method rejection.
+- Existing identity, authored-bundle, adversarial mutation, apply, storage-only,
+  loader, selector, provenance, and no-mutation tests remain applicable.
+
+What did not change: no registry record, source evidence, production
+parameter, registry version, package version, curation decision, promotion
+transaction, process law, solver, biology, validation data, calibration,
+empirical comparison, output table, or notebook behavior. No conversion is
+selected implicitly and no live source access occurs.
+
+Scientific behavior impact: additive administrative unit transcription only.
+The registered method performs dimensionally compatible unit conversion; it
+does not validate the source value, improve evidence quality, infer a
+parameter, fit a model, make a value transferable, or authorize simulation.
+
+Backward compatibility: existing identity authoring retains its exact method
+identifier, audit policy, summary flag, and result behavior. Previously
+unsupported nonidentity methods continue to fail unless they exactly match a
+registered versioned method and recomputation.
+
+Remaining ambiguity and risk: Pint unit parsing defines dimensional
+compatibility but not biological comparability. The fixed rounding policy is
+explicit and deterministic, not a statement about measurement precision.
+Non-parameter authoring, product-map promotion, and curator authentication
+remain unsupported.
+
+Risk level: medium administrative/scientific-transcription risk, bounded by a
+closed method registry, explicit units, dimensional checks, deterministic
+recomputation, exact audit/digest binding, storage-only output, promotion
+revalidation, and no registry mutation during authoring.
+
+Recommended next task: PR-52, a non-parameter curator-authored registry-record
+bridge for the index-backed record families. Preserve exact source identity,
+closed record schemas, destination ownership, loader fidelity, conservative
+allowed-use/maturity policy, and no mutation; keep product maps separate until
+their destination contract exists.
+
+Verification:
+
+- Full conversion and parameter-authoring suites:
+  `119 passed in 113.85s`.
+- Ruff: `All checks passed!`.
+- Pyright: `0 errors, 0 warnings, 0 informations`.
+- Canonical pytest with coverage:
+  `1158 passed in 534.68s`; total coverage `84.08%`, above the required
+  `80.0%`.
+- `git diff --check`: passed.
+
 ## PR-50 CURATION-001 Checksum-Loaded Written Source Authoring
 
 Date: 2026-07-30

@@ -9,6 +9,14 @@ from fungal_model.api.curation import (
     review_source_proposal,
 )
 from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid, environment_grid
+from fungal_model.api.parameter_conversion import (
+    PARAMETER_CONVERSION_REGISTRY_SCHEMA_VERSION,
+    PINT_DECIMAL_PLACES_HALF_EVEN_12_V1,
+    ParameterConversionError,
+    ParameterConversionMethod,
+    ParameterConversionRegistry,
+    default_parameter_conversion_registry,
+)
 from fungal_model.api.parameter_record_authoring import (
     CuratorAuthoredParameterResult,
     ParameterRecordAuthoringError,
@@ -44,12 +52,18 @@ __all__ = [
     "CurationError",
     "CurationResult",
     "LoadedCurationBundle",
+    "PARAMETER_CONVERSION_REGISTRY_SCHEMA_VERSION",
+    "PINT_DECIMAL_PLACES_HALF_EVEN_12_V1",
+    "ParameterConversionError",
+    "ParameterConversionMethod",
+    "ParameterConversionRegistry",
     "CuratorAuthoredParameterResult",
     "DegradationScreenResult",
     "AVAILABLE_SOURCE_PROVIDERS",
     "EnvironmentCase",
     "EnvironmentGrid",
     "environment_grid",
+    "default_parameter_conversion_registry",
     "apply_registry_promotion",
     "author_parameter_record",
     "plan_registry_promotion",
