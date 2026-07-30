@@ -3,7 +3,8 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status after PR-47 merged as PR #62 (`b1ebb860`), with PR-48 selected:
+Scoped status after PR-48 merged as PR #63 (`764d1e4`) and bounded PR-49
+public-loader completion in the current checkout, with PR-50 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -12,9 +13,10 @@ BIO-READINESS-LITE: complete for the proposal template, validator, and tests.
 BIO-002: complete for arbitrary-length linear enzyme-chain assembly; branching
 and cycles remain unsupported.
 CASE-001: complete once PR-02 is merged for the researcher-facing named API path.
-CURATION-001: partial after PR-47 transactional apply and the current PR-48
-PARAMETER-only identity-authoring bridge; nonidentity conversions and
-non-parameter source records remain unsupported.
+CURATION-001: partial after PR-47 transactional apply, completed PR-48
+PARAMETER-only identity authoring, and completed PR-49 reusable public
+curation-bundle loading; direct written specialized authoring, nonidentity
+conversions, and non-parameter source records remain unsupported.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
@@ -197,7 +199,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-48: identity-only curator-authored ParameterRecord bridge**.
+Current next PR: **PR-50: checksum-loaded written source input for identity-only ParameterRecord authoring**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -281,7 +283,7 @@ authorization, or scientific-validation claim is added. Applicability is true
 only for at least one addable record with no conflict or blocked candidate;
 source identities shared by target and curator provenance must agree exactly.
 The bounded apply contract is complete after PR #62 merged as `b1ebb860`.
-The current PR-48 adds the source-to-production `author_parameter_record(...)`
+The completed PR-48 adds the source-to-production `author_parameter_record(...)`
 bridge for one explicitly accepted in-memory PARAMETER curation result and one complete curator-authored
 production mapping. It accepts identity conversion only, rechecks exact
 source/original/converted/target value and units, frozen-source SHA256, complete
@@ -293,10 +295,19 @@ accept written source curation, infer or convert values, mutate/apply a
 registry, authorize simulation, or claim validation. CURATION-001 stays
 partial for nonidentity conversion and non-parameter source records.
 
-Recommended next task after PR-48: PR-49 reusable public checksum-validated
-curation-bundle loader. Reuse the existing manifest/checksum/path contract
-before considering written curation input for specialized authoring APIs; add
-no registry mutation, scientific transformation, or broader record claim.
+The completed PR-49 adds top-level `load_curation_bundle(...)` and
+`LoadedCurationBundle`, verifies the owned manifest/schema, exact artifact
+inventory, declared SHA-256 checksums, path/symlink containment, and shared
+deterministic curation artifacts, and routes written promotion planning through
+that path. Checksums establish internal consistency only, not curator identity.
+It adds no registry mutation, scientific transformation, validation claim, or
+broader record support.
+
+Recommended next task: PR-50 checksum-loaded written source input for
+identity-only ParameterRecord authoring. Accept only a successfully loaded
+source result and preserve every PR-48 authoring constraint; add no
+nonidentity conversion, registry mutation, scientific-field inference,
+validation claim, or broader record support.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

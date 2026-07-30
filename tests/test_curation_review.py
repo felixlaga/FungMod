@@ -10,9 +10,12 @@ from typing import Any, NoReturn
 import pytest
 import yaml
 
+import fungal_model
 from fungal_model import (
     CurationDecision,
     CurationError,
+    LoadedCurationBundle,
+    load_curation_bundle,
     review_source_proposal,
     source_proposal,
 )
@@ -464,6 +467,79 @@ def test_curation_write_is_deterministic_transactional_and_checksummed(tmp_path:
     assert manifest["proposal_limitations"] == list(result.proposal_limitations)
     for filename, digest in manifest["files"].items():
         assert hashlib.sha256((repeated.output_directory / filename).read_bytes()).hexdigest() == digest
+
+
+def test_public_curation_bundle_loader_reconstructs_verified_result(tmp_path: Path) -> None:
+    result = review_source_proposal(_proposal())
+    written = result.write(tmp_path / "curation")
+
+    loaded = load_curation_bundle(written.output_directory)
+    loaded_from_manifest = load_curation_bundle(written.paths["curation_manifest"])
+
+    assert isinstance(loaded, LoadedCurationBundle)
+    assert loaded.result.summary() == result.summary()
+    assert loaded_from_manifest.result.summary() == result.summary()
+    assert loaded.output_directory == written.output_directory
+    assert loaded.paths == written.paths
+    assert loaded.manifest["production_registry_mutated"] is False
+    assert loaded.manifest["scientific_validation_claimed"] is False
+    assert loaded.accepted_records_payload["records"] == []
+    round_trip = loaded.result.write(tmp_path / "round_trip")
+    assert {path.name: path.read_bytes() for path in round_trip.paths.values()} == {
+        path.name: path.read_bytes() for path in written.paths.values()
+    }
+    assert fungal_model.load_curation_bundle is load_curation_bundle
+    assert fungal_model.LoadedCurationBundle is LoadedCurationBundle
+
+
+def test_public_curation_bundle_loader_rejects_checksum_and_semantic_drift(
+    tmp_path: Path,
+) -> None:
+    result = review_source_proposal(_proposal())
+    checksum_bundle = result.write(tmp_path / "checksum").output_directory
+    report = checksum_bundle / "curation_report.md"
+    report.write_text(report.read_text(encoding="utf-8") + "tampered\n", encoding="utf-8")
+
+    with pytest.raises(CurationError, match="checksum mismatch for 'curation_report.md'"):
+        load_curation_bundle(checksum_bundle)
+
+    semantic_bundle = result.write(tmp_path / "semantic").output_directory
+    proposed_path = semantic_bundle / "proposed_registry_records.yml"
+    proposed = yaml.safe_load(proposed_path.read_text(encoding="utf-8"))
+    original_classification = proposed["records"][0]["curation"]["classification"]
+    proposed["records"][0]["curation"]["classification"] = (
+        "blocked_excluded"
+        if original_classification == "eligible_for_review"
+        else "eligible_for_review"
+    )
+    proposed_path.write_text(yaml.safe_dump(proposed, sort_keys=False), encoding="utf-8")
+    manifest_path = semantic_bundle / "curation_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"][proposed_path.name] = hashlib.sha256(proposed_path.read_bytes()).hexdigest()
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CurationError, match="eligible_records.csv.*disagrees"):
+        load_curation_bundle(semantic_bundle)
+
+
+def test_public_curation_bundle_loader_rejects_extra_and_symlinked_inputs(
+    tmp_path: Path,
+) -> None:
+    result = review_source_proposal(_proposal())
+    bundle = result.write(tmp_path / "curation").output_directory
+    (bundle / "undeclared.txt").write_text("not owned\n", encoding="utf-8")
+
+    with pytest.raises(CurationError, match="owned artifact inventory"):
+        load_curation_bundle(bundle)
+
+    clean_bundle = result.write(tmp_path / "clean").output_directory
+    link = tmp_path / "curation_link"
+    link.symlink_to(clean_bundle, target_is_directory=True)
+    with pytest.raises(CurationError, match="contains a symlink component"):
+        load_curation_bundle(link)
 
 
 def test_curation_refuses_to_replace_unowned_existing_directory(tmp_path: Path) -> None:

@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-48: identity-only curator-authored ParameterRecord bridge**.
+Current next PR: **PR-50: checksum-loaded written source input for identity-only ParameterRecord authoring**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -45,11 +45,18 @@ PR-44 researcher source-provider onboarding is complete after PR #59. The
 PR-45 CURATION-001 proposal-review and decision-bundle work is complete after
 PR #60 merged as `5ac7864`. PR-46 registry-promotion planning is complete after
 PR #61 merged as `2b6c639`. PR-47 transactional apply is complete after PR #62
-merged as `b1ebb860`. The selected PR-48 work is a bounded identity-only
+merged as `b1ebb860`. PR-48 identity-only PARAMETER authoring is complete
+after PR #63 merged as `764d1e4`. PR-49 reusable public checksum-validated
+curation-bundle loading is complete in the current checkout. It centralizes the
+owned manifest/schema, exact artifact inventory, declared checksums,
+path/symlink containment, and shared deterministic curation-artifact contract
+without registry mutation or scientific transformation. The selected PR-50
+follow-up is a bounded written-source path through that loaded result for the
+existing identity-only
 PARAMETER authoring bridge from explicit accepted curation evidence to a
 complete curator-authored production mapping and promotion plan. It does not
-accept written source input, perform nonidentity conversion, support other
-record types, mutate/apply a registry, ingest validation data, change
+perform nonidentity conversion, support other record types, mutate/apply a
+registry, ingest validation data, change
 scientific fields, authorize simulation automatically, or claim validation.
 The completed PR-47 work is bounded transactional
 administrative registry apply with exact digest confirmation, intentional plan
@@ -161,10 +168,11 @@ schema, or biology changes in this gate PR.
 
 ## Next Action
 
-After PR-48, take the bounded PR-49 reusable public checksum-validated
-curation-bundle loader so future written-input APIs can reuse one existing
-manifest/checksum/path contract without duplicate parsing. Continue
-building PRODUCT-001, THERMO-003, and generic BIO-003 simulator capability.
+After PR-49, take the bounded PR-50 checksum-loaded written source input for
+identity-only ParameterRecord authoring, preserving every PR-48 guardrail and
+adding no conversion, registry mutation, scientific transformation,
+validation claim, or broader record support. Continue building PRODUCT-001,
+THERMO-003, and generic BIO-003 simulator capability.
 Later, find or obtain source-backed numeric time-course
 observations that satisfy the required evidence fields above. Then open a
 separate ingestion PR for VALIDATION-DATA-001 with the dataset, comparison

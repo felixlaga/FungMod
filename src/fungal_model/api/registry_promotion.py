@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import hmac
 import json
 import os
@@ -31,13 +30,14 @@ from fungal_model.api._integrity import (
 )
 from fungal_model.api.curation import (
     CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
-    CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
-    CURATION_MANIFEST_KIND,
-    CURATION_SCHEMA_VERSION,
+    CurationError,
     CurationRecord,
     CurationResult,
+    LoadedCurationBundle,
+    _load_curation_bundle_for_promotion,
     curation_date_is_iso,
     curation_source_provenance_missing,
+    load_curation_bundle,
 )
 from fungal_model.api.parameter_record_authoring import (
     PARAMETER_AUTHORING_WORKFLOW,
@@ -73,16 +73,6 @@ _CURATION_TO_REGISTRY_KEY: Mapping[str, str] = {
     "process_compatibility": "process_compatibility",
     "case_templates": "case_templates",
 }
-_CURATION_BUNDLE_FILES = frozenset(
-    {
-        "curation_report.md",
-        "eligible_records.csv",
-        "excluded_records.csv",
-        "proposed_registry_records.yml",
-        "accepted_registry_records.yml",
-        "rejected_registry_records.yml",
-    }
-)
 _SHA256_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
 _STRICT_VERSION_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 
@@ -1941,43 +1931,66 @@ def _accepted_record_from_memory(record: CurationRecord) -> _AcceptedRecord:
 
 
 def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, ...]:
-    manifest_path = _curation_manifest_path(value)
-    manifest = _read_json_mapping(manifest_path, label="Curation manifest")
-    if manifest.get("kind") != CURATION_MANIFEST_KIND:
-        raise RegistryPromotionPlanError(
-            f"Written input is not an owned curation bundle of kind {CURATION_MANIFEST_KIND!r}."
-        )
-    if manifest.get("schema_version") != CURATION_SCHEMA_VERSION:
-        raise RegistryPromotionPlanError(
-            f"Unsupported curation bundle schema version {manifest.get('schema_version')!r}."
-        )
-    if manifest.get("production_registry_mutated") is not False:
-        raise RegistryPromotionPlanError("Curation bundle must declare production_registry_mutated: false.")
-    if manifest.get("scientific_validation_claimed") is not False:
-        raise RegistryPromotionPlanError("Curation bundle must declare scientific_validation_claimed: false.")
-
-    root = manifest_path.parent
-    declared = _verify_declared_curation_artifacts(root, manifest)
-    accepted_path = declared["accepted_registry_records.yml"]
-    eligible_path = declared["eligible_records.csv"]
-    accepted_payload = _read_yaml_mapping(accepted_path, label="Accepted curation records")
-    if accepted_payload.get("kind") != "fungmod_curation_decision_records":
-        raise RegistryPromotionPlanError("Accepted curation artifact has an unsupported kind.")
-    if accepted_payload.get("schema_version") != CURATION_SCHEMA_VERSION:
-        raise RegistryPromotionPlanError("Accepted curation artifact has an unsupported schema version.")
-    if accepted_payload.get("bundle_status") != "accepted":
-        raise RegistryPromotionPlanError("Accepted curation artifact must use bundle_status: accepted.")
-    if accepted_payload.get("allowed_use") != CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY:
-        raise RegistryPromotionPlanError("Accepted curation artifact must remain review-only at bundle level.")
-    if accepted_payload.get("production_registry_promotion") is not False:
-        raise RegistryPromotionPlanError("Accepted curation artifact must not claim registry promotion.")
-
-    eligible_csv_payload = _read_curation_csv_payload(
-        eligible_path,
-        label="Eligible curation records",
+    try:
+        bundle = _load_curation_bundle_for_promotion(value)
+    except CurationError as exc:
+        raise RegistryPromotionPlanError(str(exc)) from exc
+    accepted = _accepted_records_from_loaded_bundle(bundle)
+    summary = bundle.manifest.get("summary")
+    if not isinstance(summary, Mapping):
+        raise RegistryPromotionPlanError("Curation manifest requires a summary mapping.")
+    has_parameter_authoring_summary = (
+        isinstance(summary, Mapping) and summary.get("workflow") == PARAMETER_AUTHORING_WORKFLOW
     )
-    record_types = _accepted_record_types_from_csv_payload(eligible_csv_payload)
-    raw_records = accepted_payload.get("records")
+    requires_parameter_authoring = any(
+        item.record_type == "parameter_records"
+        and classify_parameter_provenance(
+            item.target_record.get("provenance")
+            if isinstance(item.target_record.get("provenance"), Mapping)
+            else None,
+            curation_metadata=item.curation_metadata,
+        )
+        == "parameter_bridge"
+        for item in accepted
+    )
+    if not has_parameter_authoring_summary and not requires_parameter_authoring:
+        try:
+            bundle = load_curation_bundle(value)
+        except CurationError as exc:
+            raise RegistryPromotionPlanError(str(exc)) from exc
+        accepted = _accepted_records_from_loaded_bundle(bundle)
+    if has_parameter_authoring_summary or requires_parameter_authoring:
+        if len(accepted) != 1:
+            raise RegistryPromotionPlanError(
+                "A written parameter-authoring bundle must contain exactly one accepted parameter target."
+            )
+        item = accepted[0]
+        try:
+            validate_parameter_authoring_bundle_record(
+                summary=summary,
+                manifest=bundle.manifest,
+                proposed_payload=bundle.proposed_records_payload,
+                accepted_payload=bundle.accepted_records_payload,
+                rejected_payload=bundle.rejected_records_payload,
+                eligible_records_csv_payload=bundle.eligible_records_csv_payload,
+                excluded_records_csv_payload=bundle.excluded_records_csv_payload,
+                record_type=item.record_type,
+                target_record=item.target_record,
+                curation_metadata=item.curation_metadata,
+                curation_report=bundle.curation_report,
+            )
+        except ParameterRecordAuthoringError as exc:
+            raise RegistryPromotionPlanError(str(exc)) from exc
+    return accepted
+
+
+def _accepted_records_from_loaded_bundle(
+    bundle: LoadedCurationBundle,
+) -> tuple[_AcceptedRecord, ...]:
+    record_types = _accepted_record_types_from_csv_payload(
+        bundle.eligible_records_csv_payload
+    )
+    raw_records = bundle.accepted_records_payload.get("records")
     if not isinstance(raw_records, list):
         raise RegistryPromotionPlanError("Accepted curation artifact requires a records list.")
     accepted: list[_AcceptedRecord] = []
@@ -2002,7 +2015,8 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
             record_type = record_types[record_id]
         except KeyError as exc:
             raise RegistryPromotionPlanError(
-                f"Accepted curation record {record_id!r} lacks a matching accepted eligible-record row."
+                f"Accepted curation record {record_id!r} lacks a matching "
+                "accepted eligible-record row."
             ) from exc
         _validate_target_record(record_id, record_payload)
         accepted.append(
@@ -2016,63 +2030,46 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
 
     accepted_ids = [item.record_id for item in accepted]
     if len(accepted_ids) != len(set(accepted_ids)):
-        raise RegistryPromotionPlanError("Accepted curation artifact contains duplicate record IDs.")
+        raise RegistryPromotionPlanError(
+            "Accepted curation artifact contains duplicate record IDs."
+        )
     if set(accepted_ids) != set(record_types):
         raise RegistryPromotionPlanError(
             "Accepted curation YAML and eligible-record CSV accepted decisions do not match."
         )
-    summary = manifest.get("summary")
-    if not isinstance(summary, Mapping) or summary.get("accepted_count") != len(accepted):
-        raise RegistryPromotionPlanError("Curation manifest accepted_count does not match accepted artifacts.")
-    has_parameter_authoring_summary = (
-        isinstance(summary, Mapping) and summary.get("workflow") == PARAMETER_AUTHORING_WORKFLOW
-    )
-    requires_parameter_authoring = any(
-        item.record_type == "parameter_records"
-        and classify_parameter_provenance(
-            item.target_record.get("provenance")
-            if isinstance(item.target_record.get("provenance"), Mapping)
-            else None,
-            curation_metadata=item.curation_metadata,
-        )
-        == "parameter_bridge"
-        for item in accepted
-    )
-    if has_parameter_authoring_summary or requires_parameter_authoring:
-        if len(accepted) != 1:
-            raise RegistryPromotionPlanError(
-                "A written parameter-authoring bundle must contain exactly one accepted parameter target."
-            )
-        item = accepted[0]
-        try:
-            validate_parameter_authoring_bundle_record(
-                summary=summary,
-                manifest=manifest,
-                proposed_payload=_read_yaml_mapping(
-                    declared["proposed_registry_records.yml"],
-                    label="Proposed curation records",
-                ),
-                accepted_payload=accepted_payload,
-                rejected_payload=_read_yaml_mapping(
-                    declared["rejected_registry_records.yml"],
-                    label="Rejected curation records",
-                ),
-                eligible_records_csv_payload=eligible_csv_payload,
-                excluded_records_csv_payload=_read_curation_csv_payload(
-                    declared["excluded_records.csv"],
-                    label="Excluded curation records",
-                ),
-                record_type=item.record_type,
-                target_record=item.target_record,
-                curation_metadata=item.curation_metadata,
-                curation_report=_read_utf8_text(
-                    declared["curation_report.md"],
-                    label="Curation report",
-                ),
-            )
-        except ParameterRecordAuthoringError as exc:
-            raise RegistryPromotionPlanError(str(exc)) from exc
     return tuple(accepted)
+
+
+def _accepted_record_types_from_csv_payload(
+    payload: Mapping[str, Any],
+) -> dict[str, str]:
+    rows = payload.get("rows")
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
+        raise RegistryPromotionPlanError("Eligible-record CSV requires structured rows.")
+    accepted: dict[str, str] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            raise RegistryPromotionPlanError("Eligible-record CSV rows must be mappings.")
+        if row.get("decision") != "accept" or row.get("explicit_decision") != "true":
+            continue
+        if row.get("classification") != "eligible_for_review":
+            raise RegistryPromotionPlanError(
+                f"Eligible-record CSV marks accepted record {row.get('record_id')!r} as blocked."
+            )
+        raw_record_id = row.get("record_id")
+        raw_record_type = row.get("record_type")
+        record_id = raw_record_id.strip() if isinstance(raw_record_id, str) else ""
+        record_type = raw_record_type.strip() if isinstance(raw_record_type, str) else ""
+        if not record_id or not record_type:
+            raise RegistryPromotionPlanError(
+                "Eligible-record CSV accepted rows require record_id and record_type."
+            )
+        if record_id in accepted:
+            raise RegistryPromotionPlanError(
+                f"Eligible-record CSV contains duplicate accepted id {record_id!r}."
+            )
+        accepted[record_id] = record_type
+    return accepted
 
 
 def _validate_accepted_curation(record_id: str, curation: Mapping[str, Any]) -> None:
@@ -2254,112 +2251,6 @@ def _canonical_source_identity(
     if entry_ids is not None:
         identity["source_entry_ids"] = entry_ids
     return identity
-
-
-def _curation_manifest_path(value: str | Path) -> Path:
-    path = Path(value)
-    if ".." in path.parts:
-        raise RegistryPromotionPlanError(f"Curation bundle path traversal is not allowed: {path}")
-    _reject_symlink_components(path, label="Curation bundle path")
-    manifest = path / "curation_manifest.json" if path.is_dir() else path
-    if manifest.name != "curation_manifest.json":
-        raise RegistryPromotionPlanError(
-            "Written curation input must be a bundle directory or curation_manifest.json."
-        )
-    _reject_symlink_components(manifest, label="Curation manifest path")
-    if not manifest.is_file():
-        raise RegistryPromotionPlanError(f"Curation manifest does not exist: {manifest}")
-    return manifest.resolve(strict=True)
-
-
-def _verify_declared_curation_artifacts(
-    root: Path,
-    manifest: Mapping[str, Any],
-) -> dict[str, Path]:
-    files = manifest.get("files")
-    if not isinstance(files, Mapping):
-        raise RegistryPromotionPlanError("Curation manifest requires a files checksum mapping.")
-    names = {str(name) for name in files}
-    if names != _CURATION_BUNDLE_FILES:
-        missing = sorted(_CURATION_BUNDLE_FILES - names)
-        unexpected = sorted(names - _CURATION_BUNDLE_FILES)
-        raise RegistryPromotionPlanError(
-            "Curation manifest artifact set does not match its owned schema; "
-            f"missing={missing}, unexpected={unexpected}."
-        )
-
-    declared: dict[str, Path] = {}
-    for name in sorted(names):
-        digest = files[name]
-        if not isinstance(digest, str) or _SHA256_PATTERN.fullmatch(digest) is None:
-            raise RegistryPromotionPlanError(
-                f"Curation manifest checksum for {name!r} must be a SHA-256 hex digest."
-            )
-        relative = Path(name)
-        if relative.is_absolute() or ".." in relative.parts:
-            raise RegistryPromotionPlanError(
-                f"Curation manifest artifact path is unsafe: {name!r}."
-            )
-        artifact = root / relative
-        _reject_symlink_components(artifact, label="Curation artifact path")
-        try:
-            resolved = artifact.resolve(strict=True)
-        except OSError as exc:
-            raise RegistryPromotionPlanError(
-                f"Declared curation artifact does not exist: {artifact}"
-            ) from exc
-        if root != resolved.parent and root not in resolved.parents:
-            raise RegistryPromotionPlanError(
-                f"Declared curation artifact resolves outside its bundle: {name!r}."
-            )
-        if not resolved.is_file():
-            raise RegistryPromotionPlanError(f"Declared curation artifact is not a file: {artifact}")
-        actual = _sha256_bytes(resolved.read_bytes())
-        if not hmac.compare_digest(actual, digest.lower()):
-            raise RegistryPromotionPlanError(
-                f"Curation artifact checksum mismatch for {name!r}: expected {digest.lower()}, got {actual}."
-            )
-        declared[name] = resolved
-    return declared
-
-
-def _read_curation_csv_payload(path: Path, *, label: str) -> Mapping[str, Any]:
-    try:
-        with path.open(newline="", encoding="utf-8") as handle:
-            reader = csv.DictReader(handle)
-            rows = [dict(row) for row in reader]
-            fieldnames = list(reader.fieldnames or ())
-    except (OSError, UnicodeError, csv.Error) as exc:
-        raise RegistryPromotionPlanError(f"Malformed {label.lower()} CSV {path}: {exc}") from exc
-    return {"fieldnames": fieldnames, "rows": rows}
-
-
-def _accepted_record_types_from_csv_payload(payload: Mapping[str, Any]) -> dict[str, str]:
-    rows = payload.get("rows")
-    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
-        raise RegistryPromotionPlanError("Eligible-record CSV requires structured rows.")
-    accepted: dict[str, str] = {}
-    for row in rows:
-        if not isinstance(row, Mapping):
-            raise RegistryPromotionPlanError("Eligible-record CSV rows must be mappings.")
-        if row.get("decision") != "accept" or row.get("explicit_decision") != "true":
-            continue
-        if row.get("classification") != "eligible_for_review":
-            raise RegistryPromotionPlanError(
-                f"Eligible-record CSV marks accepted record {row.get('record_id')!r} as blocked."
-            )
-        record_id = row.get("record_id", "").strip()
-        record_type = row.get("record_type", "").strip()
-        if not record_id or not record_type:
-            raise RegistryPromotionPlanError(
-                "Eligible-record CSV accepted rows require record_id and record_type."
-            )
-        if record_id in accepted:
-            raise RegistryPromotionPlanError(
-                f"Eligible-record CSV contains duplicate accepted id {record_id!r}."
-            )
-        accepted[record_id] = record_type
-    return accepted
 
 
 def _load_registry_index(value: str | Path) -> _RegistryIndex:

@@ -26,6 +26,101 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-49 CURATION-001 Reusable Public Curation-Bundle Loader
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout for the bounded public-loader
+slice. PR-48 is `complete` after PR #63 merged as `764d1e4`. CURATION-001
+remains `partial` for direct written input to specialized authoring,
+nonidentity conversion, non-parameter authoring, and product-map destination
+ownership.
+
+Completed in this pass:
+
+- Added top-level `load_curation_bundle(...)` and
+  `LoadedCurationBundle`. The loader accepts an owned curation directory or
+  its exact `curation_manifest.json`, returns the reconstructed
+  `CurationResult`, and exposes the already-read manifest, verified artifact
+  paths, parsed YAML/CSV payloads, report text, and accepted records for
+  workflow-specific validation.
+- Centralized the written curation manifest, schema, exact artifact inventory,
+  SHA-256, path traversal, symlink, containment, JSON/YAML/CSV/text parsing,
+  summary-count, shared record-envelope, cross-artifact, and deterministic
+  report checks in `fungal_model.api.curation`.
+- Rewired `plan_registry_promotion(...)` to reuse that loader for every written
+  curation input. Parameter-authoring bundles continue through their stronger
+  closed workflow validator after the shared integrity pass; the loader does
+  not replace the independent authoring digest, audit-schema, frozen-source,
+  registry-context, selector, or apply-time checks.
+- Kept the trust boundary explicit: manifest checksums prove internal
+  consistency and detect changes relative to the manifest. They do not
+  authenticate a curator or establish cryptographic authorship.
+- Rejected undeclared bundle files in addition to missing or unexpected
+  manifest declarations, and preserved rejection of path traversal and any
+  symlink component before bundle content is trusted.
+
+Tests added or modified:
+
+- `tests/test_curation_review.py` now covers public directory and manifest
+  loading, deterministic reconstruction/rewrite, top-level exports,
+  checksum failure, checksum-refreshed cross-artifact semantic drift,
+  undeclared artifacts, and symlinked inputs.
+- Existing curation, promotion-plan, promotion-apply, and parameter-authoring
+  tests continue to exercise the shared loader through the planner, including
+  adversarial checksum-valid authored-bundle mutations that must reach the
+  stronger specialized validator.
+- `tests/test_roadmap_orchestration_status.py` synchronizes PR-48 completion,
+  PR-49 completion and scope, remaining CURATION-001 limits, and the PR-50
+  follow-up.
+
+What did not change: no registry record, parameter value, unit, maturity,
+allowed-use policy, registry version, package version, curation decision
+semantics, promotion classification, apply transaction, process law, solver,
+biology, validation data, calibration, empirical comparison, output table, or
+notebook behavior. No live source access occurs.
+
+Scientific behavior impact: none. Loading a bundle reconstructs administrative
+review artifacts only. It does not make their contents current or correct
+science, validation evidence, calibration evidence, transferable parameters,
+or simulation-authorized inputs.
+
+Backward compatibility: additive public API. Written promotion inputs now pass
+through the shared loader and newly reject undeclared sibling artifacts or
+cross-artifact disagreement even when an attacker refreshes manifest
+checksums. Valid generic and specialized curation bundles retain their
+existing promotion behavior and error boundaries.
+
+Remaining ambiguity and risk: `author_parameter_record(...)` still accepts
+only an in-memory `CurationResult`; direct written source input needs a
+separate explicit API contract. Checksums remain unauthenticated. Nonidentity
+conversion requires a closed conversion-method registry, unit parsing,
+dimensional compatibility, exact recomputation, and rounding policy.
+Non-parameter records and product-map promotion remain unsupported or blocked
+as documented.
+
+Risk level: medium for administrative bundle integrity, bounded by exact owned
+inventory, checksum, path/symlink, shared semantic reconstruction, existing
+specialized authoring validation, and no mutation/apply behavior in the
+loader.
+
+Recommended next task: PR-50, a bounded written-source input path for
+identity-only parameter authoring that accepts only a successfully
+`load_curation_bundle(...)`-validated source result and preserves every PR-48
+authoring constraint. Add no conversion, registry mutation, scientific
+transformation, validation claim, or broader record support.
+
+Verification:
+
+- Focused documentation and roadmap synchronization suites:
+  `15 passed in 0.06s`.
+- Ruff: `All checks passed!`.
+- Pyright: `0 errors, 0 warnings, 0 informations`.
+- Canonical pytest with coverage:
+  `1147 passed in 395.49s`; total coverage `84.10%`, above the required
+  `80.0%`.
+- `git diff --check`: passed.
+
 ## PR-48 CURATION-001 Identity-Only Curator-Authored ParameterRecord Bridge
 
 Date: 2026-07-14

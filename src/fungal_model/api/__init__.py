@@ -4,6 +4,8 @@ from fungal_model.api.curation import (
     CurationDecision,
     CurationError,
     CurationResult,
+    LoadedCurationBundle,
+    load_curation_bundle,
     review_source_proposal,
 )
 from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid, environment_grid
@@ -41,6 +43,7 @@ __all__ = [
     "CurationDecision",
     "CurationError",
     "CurationResult",
+    "LoadedCurationBundle",
     "CuratorAuthoredParameterResult",
     "DegradationScreenResult",
     "AVAILABLE_SOURCE_PROVIDERS",
@@ -50,6 +53,7 @@ __all__ = [
     "apply_registry_promotion",
     "author_parameter_record",
     "plan_registry_promotion",
+    "load_curation_bundle",
     "ProspectiveRegistryFile",
     "RegistryPromotionAppliedFile",
     "RegistryPromotionApplyError",

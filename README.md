@@ -134,6 +134,11 @@ basic kinetics layer:
   production `ParameterRecord`, verifies exact loader fidelity and source
   provenance through a closed identity-only outer metadata schema, and returns
   a promotion-plan-compatible result without applying it;
+- a public `load_curation_bundle(...)` reader that verifies the owned
+  manifest/schema, exact artifact inventory, every declared SHA-256 checksum,
+  path and symlink containment, and the shared deterministic YAML/CSV/report
+  contracts before reconstructing a structured `LoadedCurationBundle` and
+  `CurationResult`;
 - mode-independent modelability and simulation rejection for parameters whose
   exact `allowed_use` is `registry_storage_only_no_simulation_authorization`;
 - a registry-backed extracellular enzyme-chain assembler for ordered linear
@@ -265,6 +270,29 @@ Product-map participants also require parseable finite positive stoichiometry,
 and each finite positive product yield must match exactly one product name or
 id and its participant stoichiometry; no conversion is inferred.
 
+Reload an owned decision bundle through the same integrity contract used by
+promotion planning:
+
+```python
+from fungal_model import load_curation_bundle
+
+loaded = load_curation_bundle(
+    "data/proposed_records/sabiork/reaction_618_curation"
+)
+review = loaded.result
+```
+
+The loader accepts either the bundle directory or
+`curation_manifest.json`. It requires exactly the six owned artifacts plus the
+manifest, rejects undeclared files and symlinked/path-traversing inputs,
+verifies every declared SHA-256 checksum before parsing, and reconstructs the
+shared curation result only when the manifest, decision YAML, eligible/excluded
+CSV, summary, and report agree. `LoadedCurationBundle` also exposes the
+verified raw artifact payloads for workflow-specific validators. This proves
+internal consistency relative to the manifest only; it is not a signature,
+curator authentication, scientific validation, registry mutation, promotion,
+or simulation authorization.
+
 Plan the registry effect of the curation decisions and inspect whether the
 whole candidate set is applicable. The deferred SABIO-RK review above has no
 addable accepted record, so its plan is intentionally not applied:
@@ -291,9 +319,10 @@ if summary["apply_available"]:
 ```
 
 `plan_registry_promotion(...)` accepts either the in-memory `CurationResult` or
-its written owned curation bundle. Written inputs verify the manifest
-kind/schema and every declared artifact checksum before accepted records are
-trusted. Only explicit `accept` decisions are considered. Candidates are
+its written owned curation bundle. Written inputs reuse
+`load_curation_bundle(...)` for the manifest, checksum, inventory, and path
+contract before workflow-specific authoring validation. Only explicit
+`accept` decisions are considered. Candidates are
 validated through the actual destination registry loader and classified as
 addable, exact duplicate/no-op, conflict, or blocked/unsupported. Exact target
 paths, before hashes, deterministic prospective YAML, post hashes, and a full
@@ -406,8 +435,9 @@ plan = plan_registry_promotion(
 )
 ```
 
-`author_parameter_record(...)` deliberately accepts only a validated in-memory
-`CurationResult`; a reusable public written-curation loader is deferred. The
+`author_parameter_record(...)` deliberately still accepts only a validated
+in-memory `CurationResult`; callers may inspect `load_curation_bundle(...).result`,
+but direct written-source input remains a separate follow-up contract. The
 specialized result uses the existing deterministic, checksummed curation writer,
 and either that written bundle or the in-memory result is consumable by
 `plan_registry_promotion(...)` after authoring-digest, loader, registry-context,
@@ -691,6 +721,8 @@ loading, model assembly, execution, and result inspection:
 - `CurationDecision`
 - `CurationResult`
 - `CurationError`
+- `load_curation_bundle`
+- `LoadedCurationBundle`
 - `run_configured_model`
 - `load_model_config`
 - `load_substrate`
