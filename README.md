@@ -460,12 +460,19 @@ registry file tree; selector audit binds resolved entity classes, exactly one
 compatibility record, and the source/curator-authored runtime parameter-role
 key. The source/acceptance evidence remains audit
 metadata; only the complete curator-authored `ParameterRecord` is the
-loader/promotion target. Original, converted, and target numeric values must be
-finite floats and type-exactly equal, units must be identical, and
-`conversion_method` must be `identity_no_conversion`. Nonidentity conversions,
-other record types, automatic apply, scientific validation, and simulation
-authorization remain explicitly unsupported, so CURATION-001 remains partial.
-The curator-authored outer provenance is a closed identity-only schema: complete
+loader/promotion target. Identity transcription still requires type-exact value
+and unit correspondence. Nonidentity transcription is admitted only when
+`conversion_method` resolves in the versioned
+`ParameterConversionRegistry`; the built-in
+`pint_unit_conversion_decimal_places_half_even_12_v1` method parses explicit
+source/target units with Pint, requires compatible dimensionality, recomputes
+the converted float, and applies 12-decimal-place half-even rounding. Unknown
+methods, unparseable or incompatible units, matching unit text, nonfinite
+values, and curator-supplied results that disagree with recomputation fail
+closed. Other record types, automatic apply, scientific validation, and
+simulation authorization remain explicitly unsupported, so CURATION-001
+remains partial. The curator-authored outer provenance is a closed
+parameter-authoring schema: complete
 source identity and singular aliases, one explicit parameter role, curator and
 date, plus the established optional kinetic-record path. Additional validation,
 calibration, readiness, authorization, or nested claim metadata is rejected
@@ -726,6 +733,10 @@ loading, model assembly, execution, and result inspection:
 - `CurationError`
 - `load_curation_bundle`
 - `LoadedCurationBundle`
+- `ParameterConversionMethod`
+- `ParameterConversionRegistry`
+- `ParameterConversionError`
+- `default_parameter_conversion_registry`
 - `run_configured_model`
 - `load_model_config`
 - `load_substrate`

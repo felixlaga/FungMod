@@ -25,6 +25,10 @@ from fungal_model.api._integrity import (
     tree_content_digest,
     type_exact_equal,
 )
+from fungal_model.api.parameter_conversion import (
+    ParameterConversionError,
+    default_parameter_conversion_registry,
+)
 from fungal_model.api.curation import (
     CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
     CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
@@ -268,6 +272,7 @@ class CuratorAuthoredParameterResult(CurationResult):
     authoring_digest: str
 
     def summary(self) -> dict[str, Any]:
+        conversion_method = _target_conversion_method(self.records[0].proposed_record)
         return _parameter_authoring_summary(
             source_query=self.source_query,
             source_snapshot_path=self.source_snapshot_path,
@@ -275,6 +280,7 @@ class CuratorAuthoredParameterResult(CurationResult):
             source_record_id=self.source_record_id,
             authored_record_id=self.authored_record_id,
             authoring_digest=self.authoring_digest,
+            conversion_method=conversion_method,
         )
 
     def verify_integrity(self) -> None:
@@ -584,6 +590,7 @@ def validate_parameter_authoring_bundle_record(
         source_record_id=source_id,
         authored_record_id=authored_id,
         authoring_digest=digest,
+        conversion_method=_target_conversion_method(target_record),
     )
     if not type_exact_equal(summary, expected_summary):
         raise ParameterRecordAuthoringError(
@@ -693,6 +700,7 @@ def _parameter_authoring_summary(
     source_record_id: str,
     authored_record_id: str,
     authoring_digest: str,
+    conversion_method: str,
 ) -> dict[str, Any]:
     return {
         "schema_version": CURATION_SCHEMA_VERSION,
@@ -713,7 +721,9 @@ def _parameter_authoring_summary(
         "source_record_id": source_record_id,
         "authored_record_id": authored_record_id,
         "authoring_digest": authoring_digest,
-        "identity_conversion_only": True,
+        "identity_conversion_only": (
+            conversion_method == PARAMETER_IDENTITY_CONVERSION_METHOD
+        ),
         "loader_round_trip_verified": True,
         "selector_compatibility_verified": True,
         "promotion_plan_compatible": True,
@@ -875,11 +885,10 @@ def _validate_source_record(
         "proposal_status": PROPOSAL_STATUS,
         "review_required": True,
         "allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
-        "conversion_method": PARAMETER_IDENTITY_CONVERSION_METHOD,
     }
     if any(not type_exact_equal(source.get(key), value) for key, value in expected.items()):
         raise ParameterRecordAuthoringError(
-            "Source must remain review-only and use identity_no_conversion; nonidentity is deferred."
+            "Source must remain review-only with its owned proposal policies."
         )
     proposed_provenance = source.get("provenance")
     if not isinstance(proposed_provenance, Mapping):
@@ -913,16 +922,105 @@ def _validate_source_record(
         )
     pairs = (
         ("original_value", "source_value"),
-        ("converted_value", "source_value"),
         ("normalized_start_value", "source_value"),
         ("original_units", "source_units"),
-        ("converted_units", "source_units"),
         ("normalized_units", "source_units"),
     )
     if any(not type_exact_equal(source[left], source[right]) for left, right in pairs):
         raise ParameterRecordAuthoringError(
-            "Identity conversion requires exact source/original/normalized/converted correspondence."
+            "Conversion input violates exact source/original/normalized/converted "
+            "correspondence requirements."
         )
+    _validate_parameter_conversion(source)
+
+
+def _validate_parameter_conversion(source_parameter: Mapping[str, Any]) -> None:
+    method_id = source_parameter.get("conversion_method")
+    if not _text(method_id):
+        raise ParameterRecordAuthoringError(
+            "Parameter conversion_method must be explicit nonblank text."
+        )
+    source_value = source_parameter.get("source_value")
+    converted_value = source_parameter.get("converted_value")
+    source_units = source_parameter.get("source_units")
+    converted_units = source_parameter.get("converted_units")
+    _finite_float(source_value, field="source.source_value")
+    _finite_float(converted_value, field="source.converted_value")
+    if not _text(source_units) or not _text(converted_units):
+        raise ParameterRecordAuthoringError(
+            "Parameter conversion source and converted units must be explicit text."
+        )
+    assert isinstance(method_id, str)
+    assert isinstance(source_value, float)
+    assert isinstance(source_units, str)
+    assert isinstance(converted_units, str)
+    if method_id == PARAMETER_IDENTITY_CONVERSION_METHOD:
+        if not type_exact_equal(source_value, converted_value) or not type_exact_equal(
+            source_units, converted_units
+        ):
+            raise ParameterRecordAuthoringError(
+                "Identity conversion requires exact source/converted value and unit correspondence."
+            )
+        return
+    try:
+        method = default_parameter_conversion_registry().resolve(method_id)
+        recomputed = method.convert(
+            source_value,
+            source_units=source_units,
+            target_units=converted_units,
+        )
+    except ParameterConversionError as exc:
+        raise ParameterRecordAuthoringError(
+            f"Registered nonidentity conversion is invalid: {exc}"
+        ) from exc
+    if not type_exact_equal(converted_value, recomputed):
+        raise ParameterRecordAuthoringError(
+            "Converted value must equal deterministic registered-method recomputation "
+            f"type-exactly; expected {recomputed!r}."
+        )
+
+
+def _conversion_policy(method_id: Any) -> str:
+    if method_id == PARAMETER_IDENTITY_CONVERSION_METHOD:
+        return "identity_only_nonidentity_deferred"
+    if not isinstance(method_id, str):
+        raise ParameterRecordAuthoringError(
+            "Parameter conversion_method must be explicit nonblank text."
+        )
+    try:
+        method = default_parameter_conversion_registry().resolve(method_id)
+    except ParameterConversionError as exc:
+        raise ParameterRecordAuthoringError(
+            f"Registered nonidentity conversion is invalid: {exc}"
+        ) from exc
+    return (
+        "registered_nonidentity_conversion:"
+        f"{method.method_id}:{method.version}:{method.rounding_mode}:"
+        f"{method.decimal_places}"
+    )
+
+
+def _target_conversion_method(target: Mapping[str, Any]) -> str:
+    provenance = target.get("provenance")
+    audit = (
+        provenance.get(PARAMETER_BRIDGE_PROVENANCE_KEY)
+        if isinstance(provenance, Mapping)
+        else None
+    )
+    source_parameter = (
+        audit.get("source_parameter") if isinstance(audit, Mapping) else None
+    )
+    method_id = (
+        source_parameter.get("conversion_method")
+        if isinstance(source_parameter, Mapping)
+        else None
+    )
+    if not _text(method_id):
+        raise ParameterRecordAuthoringError(
+            "Parameter bridge audit lacks its conversion method."
+        )
+    assert isinstance(method_id, str)
+    return method_id
 
 
 def _validate_target_schema(record: Mapping[str, Any], *, audit_required: bool) -> None:
@@ -1089,7 +1187,7 @@ def _audit_payload(
         "supported_record_type": "parameter_records",
         "source_proposal_record_id": source.record_id,
         "authored_record_id": authored_record_id,
-        "conversion_policy": "identity_only_nonidentity_deferred",
+        "conversion_policy": _conversion_policy(proposed["conversion_method"]),
         "source_parameter": {
             "parameter_symbol": proposed["parameter_symbol"],
             "parameter_role": proposed["parameter_role"],
@@ -1136,7 +1234,6 @@ def _validate_audit(
         "source_proposal_record_id": source_record_id,
         "authored_record_id": target.get("record_id"),
         "authoring_digest": expected_digest,
-        "conversion_policy": "identity_only_nonidentity_deferred",
         "scientific_validation_claimed": False,
         "simulation_authorized": False,
         "production_registry_mutated": False,
@@ -1173,24 +1270,44 @@ def _validate_audit(
         "proposal_allowed_use": CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
         "target_value": value.get("value"),
         "target_units": value.get("units"),
-        "conversion_method": PARAMETER_IDENTITY_CONVERSION_METHOD,
     }
     if (
         any(
-            not type_exact_equal(source_parameter.get(field), source_parameter.get(numeric_fields[0]))
-            for field in numeric_fields[1:]
+            not type_exact_equal(source_parameter.get(field), source_parameter.get("source_value"))
+            for field in ("original_value", "normalized_start_value")
         )
         or any(not _text(source_parameter.get(field)) for field in unit_fields)
         or any(
-            not type_exact_equal(source_parameter.get(field), source_parameter.get(unit_fields[0]))
-            for field in unit_fields[1:]
+            not type_exact_equal(source_parameter.get(field), source_parameter.get("source_units"))
+            for field in ("original_units", "normalized_units")
+        )
+        or not type_exact_equal(
+            source_parameter.get("target_value"),
+            source_parameter.get("converted_value"),
+        )
+        or not type_exact_equal(
+            source_parameter.get("target_units"),
+            source_parameter.get("converted_units"),
         )
         or any(
             not type_exact_equal(source_parameter.get(field), expected_value)
             for field, expected_value in parameter_expected.items()
         )
     ):
-        raise ParameterRecordAuthoringError("Parameter bridge audit violates identity correspondence.")
+        raise ParameterRecordAuthoringError(
+            "Parameter bridge audit violates source, conversion, or target correspondence."
+        )
+    _validate_parameter_conversion(source_parameter)
+    expected_conversion_policy = _conversion_policy(
+        source_parameter.get("conversion_method")
+    )
+    if not type_exact_equal(
+        audit.get("conversion_policy"),
+        expected_conversion_policy,
+    ):
+        raise ParameterRecordAuthoringError(
+            "Parameter bridge audit conversion policy changed."
+        )
     source_provenance = audit.get("source_provenance")
     if (
         not isinstance(source_provenance, Mapping)

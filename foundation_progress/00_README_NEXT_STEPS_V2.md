@@ -3,9 +3,10 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status after PR-49 merged as PR #64 (`bbe2ee6`) and bounded PR-50
-written-source authoring completion in the current checkout, with PR-51
-selected:
+Scoped status after PR-49 merged as PR #64 (`bbe2ee6`), PR-50 written-source
+authoring merged as PR #65 (`933d2c8`), and bounded
+PR-51 registered nonidentity conversion completion in the current checkout,
+with PR-52 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -17,8 +18,8 @@ CASE-001: complete once PR-02 is merged for the researcher-facing named API path
 CURATION-001: partial after PR-47 transactional apply, completed PR-48
 PARAMETER-only identity authoring, and completed PR-49 reusable public
 curation-bundle loading, and completed PR-50 checksum-loaded written-source
-authoring; nonidentity conversions and non-parameter source records remain
-unsupported.
+authoring, and completed PR-51 versioned nonidentity conversion; non-parameter
+source records remain unsupported.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
@@ -201,7 +202,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-51: versioned nonidentity ParameterRecord conversion registry**.
+Current next PR: **PR-52: non-parameter curator-authored registry-record bridge**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -312,11 +313,19 @@ registry-context, loader-fidelity, and no-mutation guardrail. Raw paths remain
 unsupported, and no scientific value, registry, validation status, or
 simulation authorization is changed.
 
-Recommended next task: PR-51 versioned nonidentity ParameterRecord conversion
-registry. Admit only explicit named conversions with parseable source/target
-units, compatible dimensionality, deterministic recomputation from the source
-value, and an explicit rounding policy; add no guessed conversion, registry
-mutation, validation claim, or broader record support.
+The completed PR-51 adds a public immutable versioned conversion-method
+registry and the named
+`pint_unit_conversion_decimal_places_half_even_12_v1` policy. Registered
+nonidentity authoring requires finite floats, parseable explicit distinct
+source/target units, compatible dimensionality, deterministic recomputation,
+12-decimal-place half-even rounding, and exact audit/digest-bound
+converted/target correspondence.
+
+Recommended next task: PR-52 non-parameter curator-authored registry-record
+bridge. Cover only index-backed record families with exact source identity,
+closed target schemas, owned destinations, loader/type fidelity, conservative
+policies, and no mutation. Keep product maps separate until their destination
+contract exists.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer
