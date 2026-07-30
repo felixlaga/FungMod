@@ -56,22 +56,24 @@ written:
 - RESOLVE-001 is complete for strict registry-backed exact and
   case-insensitive alias resolution;
 - ASSEMBLY-001 is complete for arbitrary reactions using implemented
-  homogeneous Michaelis-Menten semantics and for the existing template-backed
-  surface and linear-chain scopes;
+  homogeneous Michaelis-Menten semantics and for template-backed surface plus
+  linear, branching, and cyclic pathway scopes;
 - API-003 is complete for existing registry records, aliases, environment
   grids, scientific/exploratory modes, and table access;
 - BIO-READINESS-LITE is complete for the template, validator, and tests;
-- BIO-002 is complete for arbitrary-length linear enzyme-chain assembly and
-  software verification, but partial relative to branching graphs and broad
-  pathway biology;
+- BIO-002 is complete for linear, branching, and cyclic enzyme-pathway
+  assembly and software verification, but partial relative to broad
+  provenance-backed pathway biology;
 - Phase 2 static balance checks are complete for scoped static metadata,
   validators, assembly-time checks, and process-reaction binding, but partial
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-56 branching and cyclic enzyme-pathway assembly
-contract after PR-55 completed arbitrary supported-reaction onboarding in the
-current checkout, PR-54 completed caller-trusted Ed25519 curator
+The current next PR is PR-57 dynamic thermodynamic feasibility and
+solver-enforcement contract after PR-56 completed branching and cyclic
+enzyme-pathway assembly in the current checkout, PR-55 completed arbitrary
+supported-reaction onboarding after PR #70 merged as `6b3d275`, PR-54 completed
+caller-trusted Ed25519 curator
 authentication after PR #69 merged as `35a3ecb`, PR-53 completed product-map registry destination and
 ownership after PR #68 merged as `19baedd`, PR-52 completed its five-family index-backed non-parameter
 authoring bridge after PR #67 merged as `5da611b`, PR-51 completed its versioned
@@ -188,7 +190,7 @@ parameter roles, modifiers, provenance, maturity, assumptions, limitations,
 standard outputs, fail-fast modelability, the BIO-002 two-step template, and
 the researcher API. An artificial three-step framework benchmark proves the
 generic path; branching, cycles, disconnected chains, and malformed topology
-remain explicitly unsupported after PR #57. No new rate law, production constant,
+were explicitly unsupported at the PR #57 linear-only checkpoint. No new rate law, production constant,
 empirical record, validation data, calibration, inferred parameter, or hidden
 notebook science was added. The completed PR-43 slice adds post-simulation,
 process-bound entropy-production-rate JSON/CSV trajectories from native
@@ -290,8 +292,13 @@ PR-55 removes Reaction 618/SABIO-RK/cellobiose/beta-glucosidase tokens and
 fallback identities from generic homogeneous assembly, makes per-reaction
 identity/mode/provenance/template data explicit, and proves a materially
 different artificial reaction through the same implemented law. The
-recommended next slice is PR-56: branching and cyclic enzyme-pathway assembly
-through explicit registry-owned graph topology and component contracts.
+PR-56 slice adds explicit registry-owned `linear`, `branching`, and `cyclic`
+graph types, directed process/product-map state-role edges, connectivity and
+substrate-reachability checks, exact declared branch/cycle semantics, and
+conserved artificial branch/cycle execution through the standard solver. The
+recommended next slice is PR-57: dynamic thermodynamic feasibility and
+solver-enforcement through explicit activity/Q, redox/electron-balance, and
+process/reaction contracts without inferred chemistry.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -477,7 +484,7 @@ completed after PR #54 as a virtual-experiment solver diagnostics bridge. PR-40
 completed after PR #55 as a virtual-experiment conservation diagnostics bridge.
 PR-41 completed after PR #56 as a Pyright optional-member-access ratchet. The
 PR-42 arbitrary-length linear enzyme-chain assembly slice completed after PR
-#57; branching and cycles remain unsupported. PR-43 process-bound
+#57; branching and cycles were unsupported at that checkpoint. PR-43 process-bound
 entropy-production-rate configured diagnostics completed after PR #58. PR-44
 review-gated SABIO-RK researcher source onboarding completed after PR #59.
 PR-45 source-proposal review/decision bundles completed after PR #60, PR-46
@@ -491,11 +498,12 @@ after PR #66 merged as `bef938f`, PR-52 index-backed non-parameter authoring
 completed after PR #67 merged as `5da611b`, and PR-53 product-map registry ownership
 completed after PR #68 merged as `19baedd`. PR-54 authenticated curator signatures are
 complete after PR #69 merged as `35a3ecb`. PR-55 arbitrary supported-reaction
-onboarding and assembly is complete in the current checkout. The selected
-PR-56 slice adds branching and cyclic enzyme-pathway assembly rather than
-validation ingestion, digitization, fabricated validation data, calibration,
-empirical comparison, inferred biology, or automatic simulation
-authorization.
+onboarding and assembly is complete after PR #70 merged as `6b3d275`. PR-56 branching
+and cyclic enzyme-pathway assembly is complete in the current checkout. The
+selected PR-57 slice adds dynamic thermodynamic feasibility and solver
+enforcement rather than validation ingestion, digitization, fabricated
+validation data, calibration, empirical comparison, inferred biology, or
+automatic simulation authorization.
 
 Validation remains important, but it is now deliberately deferred behind core
 simulator capability. Real time-course observations are needed before FungMod
@@ -1111,6 +1119,17 @@ request/template mode mismatch fail closed. This completes arbitrary reaction
 onboarding only for already implemented process-law semantics; unsupported
 rate laws remain explicit blockers and require separate provenance-backed,
 maturity-labelled implementations.
+
+Scoped completion after PR-56: enzyme-pathway templates explicitly declare
+`linear`, `branching`, or `cyclic` topology. One distinct process-owned
+stoichiometric map supplies directed state-role edges from one implemented
+rate-law input to one or more explicit products. Assembly verifies graph
+connectivity, substrate reachability, distinct runtime topology states,
+process/map role agreement, the declared branch/cycle shape, conservation,
+parameters, and supported process laws before execution. Artificial conserved
+branching and cyclic fixtures assemble and run through the standard configured
+solver; they add no production biology, parameter evidence, rate law, or
+validation claim.
 
 ---
 

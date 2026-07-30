@@ -9,17 +9,18 @@ PR-51 registered nonidentity conversion merged as PR #66 (`bef938f`), bounded
 PR-52 index-backed non-parameter authoring merged as PR #67 (`5da611b`), and
 bounded PR-53 product-map ownership merged as PR #68 (`19baedd`), with
 PR-54 authenticated curator signatures merged as PR #69 (`35a3ecb`) and
-PR-55 arbitrary supported-reaction assembly complete in the current checkout,
-with PR-56 selected:
+PR-55 arbitrary supported-reaction assembly merged as PR #70 (`6b3d275`),
+PR-56 branching/cyclic pathway assembly complete in the current checkout, and
+PR-57 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
 PRE-BIO-001 / ASSEMBLY-001: complete for arbitrary reactions using implemented
-homogeneous Michaelis-Menten semantics and current template-backed surface and
-linear-chain scopes.
+homogeneous Michaelis-Menten semantics and template-backed surface plus
+linear/branching/cyclic pathway scopes.
 BIO-READINESS-LITE: complete for the proposal template, validator, and tests.
-BIO-002: complete for arbitrary-length linear enzyme-chain assembly; branching
-and cycles remain unsupported.
+BIO-002: complete for linear, branching, and cyclic enzyme-pathway assembly
+and software verification; broad pathway biology remains partial.
 CASE-001: complete once PR-02 is merged for the researcher-facing named API path.
 CURATION-001: complete for its defined workflow after PR-47 transactional apply, completed PR-48
 PARAMETER-only identity authoring, and completed PR-49 reusable public
@@ -211,7 +212,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-56: branching and cyclic enzyme-pathway assembly contract**.
+Current next PR: **PR-57: dynamic thermodynamic feasibility and solver-enforcement contract**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -366,10 +367,15 @@ simulates through the same implemented law. Missing identity/provenance,
 request/template mode mismatch, incomplete parameters, and unsupported laws
 fail closed; the fixture is not scientific data.
 
-Recommended next task: PR-56 branching and cyclic enzyme-pathway assembly
-contract. Extend registry-owned topology beyond ordered linear chains while
-keeping component ownership, process-law support, stoichiometry, parameter
-roles, conservation, limitations, and unsupported execution states explicit.
+PR-56 adds explicit `linear`, `branching`, and `cyclic` registry-owned pathway
+topology, directed process/product-map state-role edges, graph connectivity
+and substrate-reachability checks, declared branch/cycle enforcement, and
+conserved artificial branch/cycle execution through the standard solver.
+
+Recommended next task: PR-57 dynamic thermodynamic feasibility and
+solver-enforcement contract. Add explicit provenance-bound activity/Q,
+redox/electron-balance, dynamic Gibbs-feasibility, and process enforcement
+without inferring missing chemistry or using silent constants.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

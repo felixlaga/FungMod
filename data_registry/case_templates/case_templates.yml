@@ -306,6 +306,7 @@ records:
       surface_catalyst: cellulase_concentration
       homogeneous_catalyst: beta_glucosidase_concentration
     process_state_metadata:
+      topology_type: linear
       config_name: BIO-002 extracellular enzyme-chain cellulose-equivalent demo
       config_mode: exploratory
       config_maturity: exploratory

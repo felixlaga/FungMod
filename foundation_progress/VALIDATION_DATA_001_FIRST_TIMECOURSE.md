@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-56: branching and cyclic enzyme-pathway assembly contract**.
+Current next PR: **PR-57: dynamic thermodynamic feasibility and solver-enforcement contract**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -69,7 +69,7 @@ participants or coefficients. PR-54 is complete after PR #69 merged as
 decision-curator identity binding, and authoring/planning boundary
 revalidation. It does not ingest validation data, establish scientific
 validity, authorize simulation automatically, or claim validation.
-PR-55 is complete in the current checkout with arbitrary reaction onboarding
+PR-55 is complete after PR #70 merged as `6b3d275` with arbitrary reaction onboarding
 for already implemented homogeneous Michaelis-Menten semantics. Explicit
 registry/template records own per-reaction identity, mode, provenance, states,
 parameters, product maps, and time grids; an artificial second reaction proves
@@ -185,11 +185,11 @@ schema, or biology changes in this gate PR.
 
 ## Next Action
 
-After PR-55, take the bounded PR-56 branching and cyclic enzyme-pathway
-assembly contract. Extend explicit registry-owned topology and component
-assembly beyond ordered linear chains without substrate/fungus branches,
-invented biology, or silent fallback values. Continue building PRODUCT-001,
-THERMO-003, and generic BIO-003 simulator capability.
+After PR-56, take the bounded PR-57 dynamic thermodynamic feasibility and
+solver-enforcement contract. Require explicit provenance-bound activity or
+reaction-quotient data, redox/electron balance, and process/reaction ownership;
+do not infer chemistry or use silent fallback values. Continue building
+PRODUCT-001, THERMO-003, and generic BIO-003 simulator capability.
 Later, find or obtain source-backed numeric time-course
 observations that satisfy the required evidence fields above. Then open a
 separate ingestion PR for VALIDATION-DATA-001 with the dataset, comparison

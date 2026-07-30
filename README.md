@@ -165,11 +165,15 @@ basic kinetics layer:
   records. A materially different artificial reaction assembles and runs
   without a new Python branch, while missing identities, provenance, mode
   mismatches, unsupported mechanisms, and incomplete parameters fail closed;
-- a registry-backed extracellular enzyme-chain assembler for ordered linear
-  chains of two or more implemented process steps, whose stoichiometry,
+- a registry-backed extracellular enzyme-pathway assembler for explicit
+  `linear`, `branching`, and `cyclic` graphs of two or more implemented process
+  steps, whose topology type, directed state-role edges, stoichiometry,
   conserved quantities, entities, modifiers, and output labels come from
-  template data rather than mechanism-code biological names; branching and
-  cycles fail explicitly as unsupported. Component process compatibilities use
+  template data rather than mechanism-code biological names. Each process owns
+  one distinct map with one implemented rate-law input and one or more explicit
+  products; graph connectivity, substrate reachability, declared topology
+  shape, process/map role agreement, and conservation are checked before
+  execution. Component process compatibilities use
   an intrinsic `component_only` scope and a registry-validated ownership graph,
   so removing or corrupting an outer binding cannot expose a component as a
   standalone compatibility. Exact templates also cross-bind configured

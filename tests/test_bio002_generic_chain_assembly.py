@@ -68,6 +68,28 @@ def test_artificial_three_step_chain_assembles_runs_and_writes_tables(tmp_path: 
         "product_map_ids": ["x_to_y_fixture_map", "y_to_q_fixture_map", "q_to_z_fixture_map"],
         "state_roles": ["substrate", "intermediate_1", "intermediate_2", "product"],
         "state_names": ["polymer_x_pool", "oligomer_y_pool", "fragment_q_pool", "monomer_z_pool"],
+        "edges": [
+            {
+                "process_id": "x_surface_to_y_fixture",
+                "product_map_id": "x_to_y_fixture_map",
+                "reactant_role": "substrate",
+                "product_role": "intermediate_1",
+            },
+            {
+                "process_id": "y_to_q_homogeneous_fixture",
+                "product_map_id": "y_to_q_fixture_map",
+                "reactant_role": "intermediate_1",
+                "product_role": "intermediate_2",
+            },
+            {
+                "process_id": "q_to_z_homogeneous_fixture",
+                "product_map_id": "q_to_z_fixture_map",
+                "reactant_role": "intermediate_2",
+                "product_role": "product",
+            },
+        ],
+        "entry_state_roles": ["substrate"],
+        "terminal_state_roles": ["product"],
         "branching_supported": False,
         "cycles_supported": False,
     }
@@ -119,6 +141,101 @@ def test_artificial_three_step_chain_assembles_runs_and_writes_tables(tmp_path: 
     assert "final_glucose_yield" not in metrics
     assert "glucose_yield" not in series_names
     assert {row["metric"] for row in thresholds} == {"x_pool_depleted_fraction"}
+
+
+def test_artificial_branching_pathway_assembles_and_runs(tmp_path: Path) -> None:
+    def declare_branching_topology(template: dict[str, Any]) -> None:
+        metadata = template["process_state_metadata"]
+        metadata["topology_type"] = "branching"
+        metadata["product_maps"][0]["products"] = {
+            "intermediate_1": 1.0,
+            "intermediate_2": 1.0,
+        }
+
+    registry_dir = _registry_with_modified_chain(tmp_path, declare_branching_topology)
+    registry = load_registry(registry_dir / "registry_index.yml")
+    config = build_extracellular_enzyme_chain_config(
+        registry=registry,
+        template_id=GENERIC_TEMPLATE_ID,
+        output_directory=tmp_path / "branching_bundle",
+    )
+    config_path = tmp_path / "branching_pathway.yml"
+    config_path.write_text(yaml.safe_dump(config.to_dict(), sort_keys=False), encoding="utf-8")
+    result = run_configured_model(config_path, output_dir=tmp_path / "branching_bundle")
+
+    topology = config.to_dict()["case_template"]["chain_topology"]
+    assert topology["topology_type"] == "branching"
+    assert topology["entry_state_roles"] == ["substrate"]
+    assert topology["terminal_state_roles"] == ["product"]
+    assert topology["branching_supported"] is True
+    assert topology["cycles_supported"] is False
+    assert [
+        (edge["reactant_role"], edge["product_role"])
+        for edge in topology["edges"]
+    ] == [
+        ("substrate", "intermediate_1"),
+        ("substrate", "intermediate_2"),
+        ("intermediate_1", "intermediate_2"),
+        ("intermediate_2", "product"),
+    ]
+    polymer = result.state("polymer_x_pool").to("mM").magnitude
+    oligomer = result.state("oligomer_y_pool").to("mM").magnitude
+    fragment = result.state("fragment_q_pool").to("mM").magnitude
+    monomer = result.state("monomer_z_pool").to("mM").magnitude
+    conserved = polymer + (2.0 / 3.0) * oligomer + (1.0 / 3.0) * fragment + (1.0 / 9.0) * monomer
+    assert result.solver_metadata["success"] is True
+    assert polymer[-1] < polymer[0]
+    assert monomer[-1] > monomer[0]
+    assert conserved[-1] == pytest.approx(conserved[0], rel=1.0e-6, abs=1.0e-6)
+
+
+def test_artificial_cyclic_pathway_assembles_and_runs(tmp_path: Path) -> None:
+    def declare_cyclic_topology(template: dict[str, Any]) -> None:
+        metadata = template["process_state_metadata"]
+        metadata["topology_type"] = "cyclic"
+        metadata["product_maps"][2]["products"] = {
+            "product": 1.5,
+            "substrate": 1.0 / 6.0,
+        }
+        template["product_map"]["stoichiometric_yield"] = 1.5
+        template["stoichiometric_yields"]["product"] = 1.5
+
+    registry_dir = _registry_with_modified_chain(tmp_path, declare_cyclic_topology)
+    registry = load_registry(registry_dir / "registry_index.yml")
+    config = build_extracellular_enzyme_chain_config(
+        registry=registry,
+        template_id=GENERIC_TEMPLATE_ID,
+        output_directory=tmp_path / "cyclic_bundle",
+    )
+    config_path = tmp_path / "cyclic_pathway.yml"
+    config_path.write_text(yaml.safe_dump(config.to_dict(), sort_keys=False), encoding="utf-8")
+    result = run_configured_model(config_path, output_dir=tmp_path / "cyclic_bundle")
+
+    topology = config.to_dict()["case_template"]["chain_topology"]
+    assert topology["topology_type"] == "cyclic"
+    assert topology["entry_state_roles"] == []
+    assert topology["terminal_state_roles"] == ["product"]
+    assert topology["branching_supported"] is True
+    assert topology["cycles_supported"] is True
+    assert [
+        (edge["reactant_role"], edge["product_role"])
+        for edge in topology["edges"]
+    ] == [
+        ("substrate", "intermediate_1"),
+        ("intermediate_1", "intermediate_2"),
+        ("intermediate_2", "product"),
+        ("intermediate_2", "substrate"),
+    ]
+    polymer = result.state("polymer_x_pool").to("mM").magnitude
+    oligomer = result.state("oligomer_y_pool").to("mM").magnitude
+    fragment = result.state("fragment_q_pool").to("mM").magnitude
+    monomer = result.state("monomer_z_pool").to("mM").magnitude
+    conserved = polymer + (2.0 / 3.0) * oligomer + (1.0 / 3.0) * fragment + (1.0 / 9.0) * monomer
+    assert result.solver_metadata["success"] is True
+    assert np.max(oligomer) > oligomer[0]
+    assert np.max(fragment) > fragment[0]
+    assert monomer[-1] > monomer[0]
+    assert conserved[-1] == pytest.approx(conserved[0], rel=1.0e-6, abs=1.0e-6)
 
 
 def test_artificial_chain_rejects_coherent_whole_component_role_group_swap(
@@ -262,6 +379,43 @@ def test_linear_chain_requires_at_least_two_processes(tmp_path: Path) -> None:
         build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
 
 
+def test_chain_requires_explicit_supported_topology_type(tmp_path: Path) -> None:
+    registry_dir = _registry_with_modified_chain(
+        tmp_path,
+        lambda template: template["process_state_metadata"].pop("topology_type"),
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="topology_type"):
+        build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
+
+
+def test_branching_topology_requires_an_actual_branch(tmp_path: Path) -> None:
+    registry_dir = _registry_with_modified_chain(
+        tmp_path,
+        lambda template: template["process_state_metadata"].update(
+            {"topology_type": "branching"}
+        ),
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="no divergent or convergent state"):
+        build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
+
+
+def test_cyclic_topology_requires_an_actual_cycle(tmp_path: Path) -> None:
+    registry_dir = _registry_with_modified_chain(
+        tmp_path,
+        lambda template: template["process_state_metadata"].update(
+            {"topology_type": "cyclic"}
+        ),
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="contains no directed cycle"):
+        build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
+
+
 def test_linear_chain_rejects_process_product_map_count_mismatch(tmp_path: Path) -> None:
     def add_disconnected_map(template: dict[str, Any]) -> None:
         template["process_state_metadata"]["product_maps"].append(
@@ -351,6 +505,27 @@ def test_chain_product_maps_reject_non_positive_or_non_finite_coefficients(
 
     with pytest.raises(EnzymeChainAssemblyError, match="positive and finite"):
         build_extracellular_enzyme_chain_config(registry=registry, template_id=GENERIC_TEMPLATE_ID)
+
+
+def test_homogeneous_pathway_map_rejects_unsupported_reactant_coefficient(
+    tmp_path: Path,
+) -> None:
+    def change_homogeneous_reactant_coefficient(template: dict[str, Any]) -> None:
+        product_map = template["process_state_metadata"]["product_maps"][1]
+        product_map["reactants"] = {"intermediate_1": 2.0}
+        product_map["products"] = {"intermediate_2": 4.0}
+
+    registry_dir = _registry_with_modified_chain(
+        tmp_path,
+        change_homogeneous_reactant_coefficient,
+    )
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    with pytest.raises(EnzymeChainAssemblyError, match="requires reactant coefficient 1.0"):
+        build_extracellular_enzyme_chain_config(
+            registry=registry,
+            template_id=GENERIC_TEMPLATE_ID,
+        )
 
 
 def test_chain_product_maps_reject_empty_required_maps(tmp_path: Path) -> None:
@@ -551,6 +726,7 @@ def _generic_chain_template() -> dict[str, Any]:
             "catalyst_3": "catalyst_gamma_pool",
         },
         "process_state_metadata": {
+            "topology_type": "linear",
             "config_name": "Artificial three-step linear chain framework benchmark",
             "config_mode": "toy",
             "config_maturity": "framework_benchmark",
