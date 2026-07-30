@@ -39,6 +39,10 @@ from fungal_model.api.curation import (
     curation_source_provenance_missing,
     load_curation_bundle,
 )
+from fungal_model.api.curator_signatures import (
+    AuthenticatedCurationBundle,
+    CuratorSignatureError,
+)
 from fungal_model.api.parameter_record_authoring import (
     PARAMETER_AUTHORING_WORKFLOW,
     CuratorAuthoredParameterResult,
@@ -342,7 +346,9 @@ def _candidate_set_apply_available(
 
 
 def plan_registry_promotion(
-    curation_bundle_or_result: CurationResult | str | Path,
+    curation_bundle_or_result: (
+        CurationResult | AuthenticatedCurationBundle | str | Path
+    ),
     registry_index: str | Path = "data_registry/registry_index.yml",
 ) -> RegistryPromotionPlan:
     """Plan accepted-record registry changes without mutating registry files.
@@ -1928,7 +1934,7 @@ def _replace_registry_path(source: Path, destination: Path, *, phase: str) -> No
 
 
 def _accepted_records(
-    value: CurationResult | str | Path,
+    value: CurationResult | AuthenticatedCurationBundle | str | Path,
 ) -> tuple[Literal["curation_result", "written_curation_bundle"], tuple[_AcceptedRecord, ...]]:
     if isinstance(value, CurationResult):
         if isinstance(value, CuratorAuthoredRegistryResult):
@@ -1968,6 +1974,18 @@ def _accepted_records(
             )
         records = tuple(_accepted_record_from_memory(item) for item in value.accepted_records)
         return "curation_result", records
+    if isinstance(value, AuthenticatedCurationBundle):
+        try:
+            authenticated = value.reload()
+        except (CurationError, CuratorSignatureError) as exc:
+            raise RegistryPromotionPlanError(
+                "Authenticated curation input failed current checksum or "
+                "signature revalidation."
+            ) from exc
+        return (
+            "written_curation_bundle",
+            _accepted_records_from_validated_bundle(authenticated.bundle),
+        )
     return "written_curation_bundle", _accepted_records_from_bundle(value)
 
 
@@ -1997,6 +2015,12 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
         bundle = _load_curation_bundle_for_promotion(value)
     except CurationError as exc:
         raise RegistryPromotionPlanError(str(exc)) from exc
+    return _accepted_records_from_validated_bundle(bundle)
+
+
+def _accepted_records_from_validated_bundle(
+    bundle: LoadedCurationBundle,
+) -> tuple[_AcceptedRecord, ...]:
     accepted = _accepted_records_from_loaded_bundle(bundle)
     summary = bundle.manifest.get("summary")
     if not isinstance(summary, Mapping):
@@ -2031,7 +2055,7 @@ def _accepted_records_from_bundle(value: str | Path) -> tuple[_AcceptedRecord, .
         and not requires_registry_authoring
     ):
         try:
-            bundle = load_curation_bundle(value)
+            bundle = load_curation_bundle(bundle.manifest_path)
         except CurationError as exc:
             raise RegistryPromotionPlanError(str(exc)) from exc
         accepted = _accepted_records_from_loaded_bundle(bundle)

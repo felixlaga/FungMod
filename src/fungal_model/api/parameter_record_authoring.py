@@ -46,6 +46,10 @@ from fungal_model.api.curation import (
     load_curation_bundle,
     render_curation_report,
 )
+from fungal_model.api.curator_signatures import (
+    AuthenticatedCurationBundle,
+    CuratorSignatureError,
+)
 from fungal_model.registry.loaders import load_parameter_record_mapping, load_registry
 from fungal_model.registry.records import PARAMETER_ALLOWED_USE_STORAGE_ONLY
 from fungal_model.registry.store import FungModRegistry, RegistryLookupError
@@ -307,7 +311,9 @@ class CuratorAuthoredParameterResult(CurationResult):
 
 
 def author_parameter_record(
-    curation_result: CurationResult | LoadedCurationBundle,
+    curation_result: (
+        CurationResult | LoadedCurationBundle | AuthenticatedCurationBundle
+    ),
     *,
     source_record_id: str,
     parameter_record: Mapping[str, Any],
@@ -315,10 +321,11 @@ def author_parameter_record(
 ) -> CuratorAuthoredParameterResult:
     """Build one production ParameterRecord without conversion or registry mutation.
 
-    A written source must first be represented by ``LoadedCurationBundle``.
-    Its manifest is reloaded at authoring time so checksum, inventory, path,
-    and shared semantic validation cannot be bypassed by mutating a previously
-    loaded in-memory view.
+    A written source must first be represented by ``LoadedCurationBundle`` or
+    ``AuthenticatedCurationBundle``. Its manifest is reloaded at authoring time
+    so checksum, inventory, path, signature (when present), and shared semantic
+    validation cannot be bypassed by mutating a previously loaded in-memory
+    view.
     """
 
     source_result = _authoring_source_result(curation_result)
@@ -803,8 +810,16 @@ def _validate_result_provenance(
 
 
 def _authoring_source_result(
-    value: CurationResult | LoadedCurationBundle,
+    value: CurationResult | LoadedCurationBundle | AuthenticatedCurationBundle,
 ) -> CurationResult:
+    if isinstance(value, AuthenticatedCurationBundle):
+        try:
+            return value.reload().bundle.result
+        except (CurationError, CuratorSignatureError) as exc:
+            raise ParameterRecordAuthoringError(
+                "Authenticated curation source failed checksum or signature "
+                "revalidation before authoring."
+            ) from exc
     if isinstance(value, LoadedCurationBundle):
         try:
             return load_curation_bundle(value.manifest_path).result
@@ -816,7 +831,7 @@ def _authoring_source_result(
         return value
     raise ParameterRecordAuthoringError(
         "author_parameter_record requires a validated in-memory CurationResult "
-        "or checksum-loaded LoadedCurationBundle."
+        "or checksum-loaded LoadedCurationBundle/AuthenticatedCurationBundle."
     )
 
 

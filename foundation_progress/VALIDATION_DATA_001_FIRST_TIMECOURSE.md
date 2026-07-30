@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-54: authenticated curator-signature contract**.
+Current next PR: **PR-55: arbitrary reaction onboarding and assembly contract**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -61,19 +61,22 @@ policy. That PR-51 scope is complete after PR #66 merged as `bef938f`. The
 PR-52 follow-up is complete after PR #67 merged as `5da611b` for non-parameter
 authoring across the five index-backed record
 families with closed schemas, owned destinations, loader fidelity, conservative
-policies, and no authoring/planning mutation. PR-53 is complete in the current
-checkout with product-map production ownership, a loader schema, an
+policies, and no authoring/planning mutation. PR-53 is complete after PR #68
+merged as `19baedd` with product-map production ownership, a loader schema, an
 index-declared destination, and authoring/promotion support without inferred
-participants or coefficients. The selected PR-54 follow-up adds authenticated
-curator signatures. It does not ingest
-validation data, authorize simulation automatically, or claim validation.
+participants or coefficients. PR-54 is complete in the current checkout with
+caller-trusted Ed25519 signatures over exact manifest bytes,
+decision-curator identity binding, and authoring/planning boundary
+revalidation. It does not ingest validation data, establish scientific
+validity, authorize simulation automatically, or claim validation.
 The completed PR-47 work is bounded transactional
 administrative registry apply with exact digest confirmation, intentional plan
 schema `2.0.0`, durable curation audit provenance, strict next-patch versioning,
 full-root staging/drift checks, locking, no overwrite, and verified rollback.
 It does not ingest validation data, change scientific fields, authorize
-simulation automatically, or claim validation. CURATION-001 remains partial
-for curator authentication/signatures.
+simulation automatically, or claim validation. CURATION-001 is complete for
+its defined review, authoring, authentication, planning, and transactional
+apply workflow; that status does not complete scientific validation.
 A future validation ingestion PR must not ingest, digitize, or
 fabricate data unless those evidence requirements are met.
 This gate does not complete VALIDATION-DATA-001.
@@ -177,11 +180,11 @@ schema, or biology changes in this gate PR.
 
 ## Next Action
 
-After PR-53, take the bounded PR-54 authenticated curator-signature contract.
-Verify signed owned artifacts against explicitly trusted public keys and keep
-SHA-256 scoped to consistency checking; do not imply scientific validation or
-authorize simulation automatically. Continue building PRODUCT-001,
-THERMO-003, and generic BIO-003 simulator capability.
+After PR-54, take the bounded PR-55 arbitrary reaction onboarding and assembly
+contract. Generalize explicit source, registry/template, and supported
+mechanism assembly without reaction-specific branches, invented biology, or
+silent fallback values. Continue building PRODUCT-001, THERMO-003, and generic
+BIO-003 simulator capability.
 Later, find or obtain source-backed numeric time-course
 observations that satisfy the required evidence fields above. Then open a
 separate ingestion PR for VALIDATION-DATA-001 with the dataset, comparison

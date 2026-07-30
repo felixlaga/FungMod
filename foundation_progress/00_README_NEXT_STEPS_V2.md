@@ -7,8 +7,9 @@ Scoped status after PR-49 merged as PR #64 (`bbe2ee6`), PR-50 written-source
 authoring merged as PR #65 (`933d2c8`), and bounded
 PR-51 registered nonidentity conversion merged as PR #66 (`bef938f`), bounded
 PR-52 index-backed non-parameter authoring merged as PR #67 (`5da611b`), and
-bounded PR-53 product-map ownership completion in the current
-checkout, with PR-54 selected:
+bounded PR-53 product-map ownership merged as PR #68 (`19baedd`), with
+PR-54 authenticated curator signatures complete in the current checkout and
+PR-55 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -17,13 +18,14 @@ BIO-READINESS-LITE: complete for the proposal template, validator, and tests.
 BIO-002: complete for arbitrary-length linear enzyme-chain assembly; branching
 and cycles remain unsupported.
 CASE-001: complete once PR-02 is merged for the researcher-facing named API path.
-CURATION-001: partial after PR-47 transactional apply, completed PR-48
+CURATION-001: complete for its defined workflow after PR-47 transactional apply, completed PR-48
 PARAMETER-only identity authoring, and completed PR-49 reusable public
 curation-bundle loading, and completed PR-50 checksum-loaded written-source
 authoring, completed PR-51 versioned nonidentity conversion, and completed
 PR-52 authoring for the original five index-backed non-parameter families and
-PR-53 product-map storage/authoring; curator authentication/signatures remain
-unsupported.
+PR-53 product-map storage/authoring, plus PR-54 caller-trusted Ed25519 curator
+authentication. Completion does not claim scientific validation or automatic
+simulation authorization.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
@@ -206,7 +208,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-54: authenticated curator-signature contract**.
+Current next PR: **PR-55: arbitrary reaction onboarding and assembly contract**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -341,9 +343,22 @@ curator-authored planning/apply support. State names and positive float
 coefficients are supplied exactly; no participant translation or
 stoichiometric inference is allowed.
 
-Recommended next task: PR-54 authenticated curator-signature contract. Add
-cryptographic curator authentication and trusted-public-key verification over
-the owned artifacts while keeping SHA-256 limited to consistency evidence.
+PR-54 adds `sign_curation_bundle(...)`,
+`load_authenticated_curation_bundle(...)`, `TrustedCuratorKey`, and
+`AuthenticatedCurationBundle`. Ed25519 signs exact manifest bytes in a sibling
+sidecar; the manifest binds all owned artifact checksums. The caller explicitly
+owns the trusted key-ID/public-key/curator binding, every explicit decision
+curator must match, and authenticated input is reloaded before authoring or
+promotion planning. SHA-256 remains consistency evidence. Authentication proves
+trusted-key possession and exact-manifest authorship only; it does not prove
+scientific validity, general curation authority, registry mutation, or
+simulation authorization. Detached promotion plans remain digest-confirmed
+review/apply artifacts rather than independent signature evidence.
+
+Recommended next task: PR-55 arbitrary reaction onboarding and assembly
+contract. Generalize explicit source, registry/template, and assembly
+contracts for arbitrary supported reactions without mechanism-specific
+branches, invented biology, or silent fallback values.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer
