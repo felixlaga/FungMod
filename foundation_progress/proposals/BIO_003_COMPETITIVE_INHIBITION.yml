@@ -1,0 +1,82 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-003
+mechanism_id: competitive_inhibition
+general_process_family: generic competitive inhibition of a homogeneous Michaelis-Menten process
+mathematical_law: >
+  A configured homogeneous Michaelis-Menten rate is evaluated as
+  v = Vmax*S / (Km*(1 + I/Ki) + S), implemented by multiplying the existing
+  base rate by (Km + S) / (Km*(1 + I/Ki) + S). S, I, Km, and Ki are explicit,
+  unit-compatible configured state and parameter records.
+state_variables:
+  - name: substrate_pool
+    role: homogeneous_substrate
+    units: explicit amount or concentration units
+  - name: inhibitor_pool
+    role: competitive_inhibitor
+    units: explicit amount or concentration units
+parameters:
+  - symbol: K_m
+    meaning: Michaelis constant already owned by the matched base process
+    units: units compatible with substrate_pool
+  - symbol: K_i
+    meaning: positive competitive inhibition constant
+    units: units compatible with inhibitor_pool
+units:
+  substrate_policy: substrate_pool and K_m must be compatible
+  inhibitor_policy: inhibitor_pool and K_i must be compatible
+  activity_policy: the modifier factor must be finite and dimensionless
+valid_substrate_classes:
+  - any explicitly configured dissolved substrate supported by homogeneous Michaelis-Menten semantics
+valid_enzyme_or_source_classes:
+  - any explicitly configured catalyst represented by the matched homogeneous Michaelis-Menten base process
+environment_variables:
+  - name: none
+    required: false
+    notes: This state-driven law does not infer an environmental response.
+output_curves:
+  - substrate trajectory
+  - product trajectory
+  - competitive-inhibited process rate
+summary_metrics:
+  - initial competitive-inhibited rate
+  - final substrate remaining
+  - final product formed
+assumptions:
+  - One inhibitor competes within the selected single-substrate Michaelis-Menten law.
+  - The modifier substrate and K_m exactly match the base process.
+  - The configured primary_source is law provenance, not evidence for configured parameter values.
+not_in_scope:
+  - Mixed, uncompetitive, irreversible, covalent, time-dependent, or allosteric inhibition.
+  - Toxicity, uptake, secretion, biomass, growth, or whole-organism physiology.
+  - Inference of inhibitor identity, K_i, validation, or calibration.
+unknowns:
+  - Production parameter records and case applicability require separate curation.
+  - Combined inhibition mechanisms require a separately implemented rate law.
+suggested_experiments:
+  - Measure initial rates over multiple substrate and inhibitor concentrations to estimate K_m and K_i.
+  - Record units, enzyme loading, temperature, pH, and inhibitor identity.
+blocking_failure_modes:
+  - Missing primary source or maturity label.
+  - Missing, negative, or unit-incompatible substrate or inhibitor state.
+  - Missing, non-positive, or mismatched K_m or K_i.
+  - Attachment to a process other than the exact homogeneous Michaelis-Menten base law.
+tests_required:
+  - Unit test the selected competitive-inhibition equation and zero-inhibitor identity.
+  - Configured artificial benchmark test with explicit primary provenance and maturity.
+  - Fail-closed tests for missing provenance, invalid parameters, and base-law mismatch.
+  - Output test that source, maturity, assumption, equation, and limitations are visible.
+limitations:
+  - Software-tested only with artificial framework benchmarks.
+  - The cited primary study supports the selected competitive-inhibition equation, not any FungMod production case.
+  - No empirical validation or organism-specific applicability is claimed.
+demo_case:
+  case_id: CASE-002
+  purpose: Exercise the generic law on an artificial homogeneous benchmark.
+  distinction: The benchmark verifies software behavior and is not scientific data.
+data_dependencies:
+  - DATA-003
+validation_status: software_tested
+primary_provenance:
+  citation: Kinetic applications using high substrate and competitive inhibitor concentrations to determine Ki or Km
+  url: https://pubmed.ncbi.nlm.nih.gov/7985803/
+  evidence_scope: Primary experimental enzyme-kinetics study that states the competitive-inhibition equation used by this mechanism.

@@ -33,8 +33,10 @@ from .homogeneous import (
 )
 from .rate_modifiers import (
     RateModifierProcess,
+    competitive_inhibition_modifier_from_config,
     ph_modifier_from_config,
     product_inhibition_modifier_from_config,
+    substrate_inhibition_modifier_from_config,
     temperature_modifier_from_config,
 )
 from .registry import MissingProcessIssue, ProcessLibrary, ProcessRegistry
@@ -80,6 +82,7 @@ __all__ = [
     "ProcessRegistry",
     "ProductReleaseMap",
     "RateModifierProcess",
+    "competitive_inhibition_modifier_from_config",
     "StateVariableSpec",
     "SurfaceCatalysisFactory",
     "SurfaceCatalysisModel",
@@ -89,6 +92,7 @@ __all__ = [
     "homogeneous_process_assumption",
     "ph_modifier_from_config",
     "product_inhibition_modifier_from_config",
+    "substrate_inhibition_modifier_from_config",
     "surface_catalysis_assumption",
     "surface_catalysis_rate",
     "temperature_modifier_from_config",

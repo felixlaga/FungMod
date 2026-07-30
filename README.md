@@ -80,6 +80,12 @@ basic kinetics layer:
   assembly,
 - environment-driven temperature, pH, water-activity, oxygen, and product
   inhibition modifiers,
+- provenance-bound competitive and Haldane substrate-inhibition modifiers for
+  explicitly matched homogeneous Michaelis-Menten processes. These laws
+  require explicit primary-source and maturity metadata, exact substrate and
+  `K_m` ownership, positive unit-compatible `K_i`, and expose their assumptions
+  and limitations. The included cases are artificial software benchmarks, not
+  production parameter evidence or validation,
 - compatibility checks for enzyme/substrate/bond/fungus pairings during model
   assembly,
 - a top-level notebook set that imports package code rather than redefining

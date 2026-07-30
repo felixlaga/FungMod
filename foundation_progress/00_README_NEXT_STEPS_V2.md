@@ -11,8 +11,9 @@ bounded PR-53 product-map ownership merged as PR #68 (`19baedd`), with
 PR-54 authenticated curator signatures merged as PR #69 (`35a3ecb`) and
 PR-55 arbitrary supported-reaction assembly merged as PR #70 (`6b3d275`),
 PR-56 branching/cyclic pathway assembly complete after PR #71 merged as
-`caa0a17`, and PR-57 dynamic thermodynamic solver enforcement complete in the
-current checkout, with PR-58 selected:
+`caa0a17`, PR-57 dynamic thermodynamic solver enforcement complete after PR
+#72 merged as `ae8a5a3`, and PR-58 biological-law expansion complete in the
+current checkout with PR-59 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -202,10 +203,12 @@ artifacts, report/index links, and the explicit header-only/no-metadata
 guardrail without solver behavior changes, numerical quality thresholds,
 validation/calibration evidence, thermodynamic enforcement, inferred
 scientific values, or biology claims.
-BIO-003: partial/software-tested for generic reversible product inhibition as
-an explicit configured process modifier, registry-backed case-template
-assembly, and a non-PET configured framework benchmark when explicit
-product-state and K_i records exist.
+BIO-003: partial/software-tested for generic reversible product inhibition plus
+provenance-bound competitive and Haldane substrate inhibition. The PR-58 laws
+are limited to exactly matched homogeneous Michaelis-Menten processes and
+require explicit primary-source/maturity metadata and positive
+unit-compatible parameters. Their fixtures are artificial software evidence,
+not production applicability or validation.
 The scoped reversible-product-inhibition target now has a public example
 notebook, `12_reversible_product_inhibition_example.ipynb`, that compares
 inhibited and uninhibited exploratory virtual experiments and inspects
@@ -213,7 +216,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-58: broader provenance-backed biological laws contract**.
+Current next PR: **PR-59: final PRODUCT-001 integration**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -380,9 +383,17 @@ forward-rate blocking. All scientific/numerical inputs, constants, floors,
 tolerances, units, state/reaction bindings, and provenance are explicit and
 fail closed.
 
-Recommended next task: PR-58 broader provenance-backed biological laws
-contract. Select mechanisms only where primary provenance, explicit parameters,
-maturity, assumptions, limitations, and generic tests satisfy `AGENTS.md`.
+PR-58 adds provenance-bound competitive and Haldane substrate-inhibition laws
+for exactly matched homogeneous Michaelis-Menten processes. It requires
+explicit primary-source and maturity metadata, exact substrate and `K_m`
+ownership, positive unit-compatible `K_i`, visible assumptions/limitations,
+and two materially different artificial configured benchmarks. It does not add
+production parameter records, case applicability, validation, growth,
+secretion, uptake, toxicity, or whole-fungus physiology.
+
+Recommended next task: PR-59 final PRODUCT-001 integration over implemented
+simulator outputs only. Do not add a new biological law, production constant,
+validation claim, or inferred mechanism.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

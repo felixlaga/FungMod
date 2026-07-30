@@ -12,6 +12,12 @@ VALIDATION_GATE = ROOT / "foundation_progress" / "VALIDATION_DATA_001_FIRST_TIME
 PROGRESS_LEDGER = ROOT / "progress.md"
 BIO003_DOC = ROOT / "foundation_progress" / "BIO_003_GENERIC_PROCESS_LAWS.md"
 BIO003_PROPOSAL = ROOT / "foundation_progress" / "proposals" / "BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml"
+BIO003_COMPETITIVE_PROPOSAL = (
+    ROOT / "foundation_progress" / "proposals" / "BIO_003_COMPETITIVE_INHIBITION.yml"
+)
+BIO003_SUBSTRATE_PROPOSAL = (
+    ROOT / "foundation_progress" / "proposals" / "BIO_003_SUBSTRATE_INHIBITION.yml"
+)
 FINAL_GOAL_PLAN = ROOT / "foundation_progress" / "FUNGMOD_FINAL_GOAL_PR_PLAN_2026_06_20.html"
 
 
@@ -132,11 +138,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-58: broader provenance-backed biological laws contract"
+    current_next = "PR-59: final PRODUCT-001 integration"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
     assert (
-        "The current next PR is\nPR-58 broader provenance-backed biological laws"
+        "The current next PR is PR-59 final PRODUCT-001 integration"
         in roadmap
     )
     assert "The PR-31 slice should bridge" not in roadmap
@@ -208,7 +214,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-58: broader provenance-backed biological laws contract"
+    current_next = "PR-59: final PRODUCT-001 integration"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -474,8 +480,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         "`linear`/`branching`/`cyclic`"
     ) in status
     assert "PR-57 | Dynamic thermodynamic feasibility and solver-enforcement contract" in status
-    assert "complete in the current checkout | Added optional explicit ideal-dilute" in status
+    assert "complete after PR #72 merged as `ae8a5a3` | Added optional explicit ideal-dilute" in status
     assert "PR-58 | Broader provenance-backed biological laws contract" in status
+    assert "complete in the current checkout | Added provenance-bound competitive" in status
+    assert "PR-59 | Final PRODUCT-001 integration" in status
     assert "PR-57 | Dynamic thermodynamic feasibility and solver-enforcement contract" in status
     assert "caller-supplied trust" in status
     assert "exact manifest authorship" in status
@@ -517,6 +525,32 @@ def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> 
     assert "No organism-specific inhibition behavior" in progress
 
 
+def test_pr58_biological_laws_are_provenance_bound_and_do_not_overclaim() -> None:
+    readme = _read(README)
+    status = _read(STATUS_DOC)
+    next_steps = _read(NEXT_STEPS)
+    roadmap = _read(ACTIVE_ROADMAP)
+    progress = _read(PROGRESS_LEDGER)
+    bio003_doc = _read(BIO003_DOC)
+    competitive = _read(BIO003_COMPETITIVE_PROPOSAL)
+    substrate = _read(BIO003_SUBSTRATE_PROPOSAL)
+
+    for text in (readme, status, next_steps, roadmap, progress, bio003_doc):
+        assert "competitive" in text.lower()
+        assert "Haldane" in text
+        assert "homogeneous Michaelis-Menten" in text
+    for proposal in (competitive, substrate):
+        assert "proposal_kind: bio_mechanism_proposal" in proposal
+        assert "validation_status: software_tested" in proposal
+        assert "primary_provenance:" in proposal
+        assert "No empirical validation" in proposal
+    assert "https://pubmed.ncbi.nlm.nih.gov/7985803/" in competitive
+    assert "https://doi.org/10.1016/j.biortech.2010.01.084" in substrate
+    assert "artificial software benchmarks" in readme
+    assert "not production applicability or validation" in next_steps
+    assert "whole-fungus" in progress
+
+
 def test_final_goal_html_plan_records_pr_slices_and_notebook_candidates() -> None:
     html = _read(FINAL_GOAL_PLAN)
 
@@ -536,7 +570,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-58: broader provenance-backed biological laws contract"
+    current_next = "PR-59: final PRODUCT-001 integration"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -593,6 +627,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-55" not in _current_next_lines(text)
         assert "PR-56" not in _current_next_lines(text)
         assert "PR-57" not in _current_next_lines(text)
+        assert "PR-58" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
