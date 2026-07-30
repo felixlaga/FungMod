@@ -19,6 +19,7 @@ from fungal_model import (
     CurationError,
     CurationResult,
     CuratorAuthoredParameterResult,
+    LoadedCurationBundle,
     ParameterRecordAuthoringError,
     RegistryPromotionApplyError,
     RegistryPromotionPlanError,
@@ -26,6 +27,7 @@ from fungal_model import (
     author_parameter_record,
     apply_registry_promotion,
     plan_registry_promotion,
+    load_curation_bundle,
     review_source_proposal,
     source_proposal,
     virtual_experiment,
@@ -474,14 +476,61 @@ def test_in_memory_result_is_directly_promotion_plan_compatible(tmp_path: Path) 
     assert plan.summary()["production_registry_mutated"] is False
 
 
-def test_authoring_source_input_is_intentionally_in_memory_only(tmp_path: Path) -> None:
+def test_checksum_loaded_written_source_authors_the_same_parameter(tmp_path: Path) -> None:
     source = _accepted_source_curation(tmp_path)
     source_bundle = source.write(tmp_path / "source_bundle")
     registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    registry_before = _registry_snapshot(registry_index.parent)
+    loaded = load_curation_bundle(source_bundle.output_directory)
+    target = _canonical_parameter_target(source)
 
-    with pytest.raises(ParameterRecordAuthoringError, match="validated in-memory CurationResult"):
+    from_memory = author_parameter_record(
+        source,
+        source_record_id=SOURCE_PARAMETER_ID,
+        parameter_record=target,
+        registry_index=registry_index,
+    )
+    from_written = author_parameter_record(
+        loaded,
+        source_record_id=SOURCE_PARAMETER_ID,
+        parameter_record=target,
+        registry_index=registry_index,
+    )
+
+    assert isinstance(loaded, LoadedCurationBundle)
+    assert from_written == from_memory
+    assert from_written.authoring_digest == from_memory.authoring_digest
+    assert _registry_snapshot(registry_index.parent) == registry_before
+
+    with pytest.raises(
+        ParameterRecordAuthoringError,
+        match="CurationResult or checksum-loaded LoadedCurationBundle",
+    ):
         author_parameter_record(
             cast(Any, source_bundle.output_directory),
+            source_record_id=SOURCE_PARAMETER_ID,
+            parameter_record=target,
+            registry_index=registry_index,
+        )
+
+
+def test_loaded_written_source_is_revalidated_at_authoring_time(tmp_path: Path) -> None:
+    source = _accepted_source_curation(tmp_path)
+    source_bundle = source.write(tmp_path / "source_bundle")
+    loaded = load_curation_bundle(source_bundle.output_directory)
+    registry_index = _copy_registry_without_canonical_parameter(tmp_path)
+    accepted_path = source_bundle.paths["accepted_registry_records"]
+    accepted_path.write_text(
+        accepted_path.read_text(encoding="utf-8") + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ParameterRecordAuthoringError,
+        match="failed integrity revalidation",
+    ):
+        author_parameter_record(
+            loaded,
             source_record_id=SOURCE_PARAMETER_ID,
             parameter_record=_canonical_parameter_target(source),
             registry_index=registry_index,
