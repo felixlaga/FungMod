@@ -69,10 +69,11 @@ written:
   dynamic-constraint binding.
 ```
 
-The current next PR is
-PR-58 broader provenance-backed biological laws after PR-57 completed dynamic
-thermodynamic feasibility and native solver-time enforcement in the current
-checkout, PR-56 completed branching and cyclic enzyme-pathway assembly after
+The current next PR is PR-59 final PRODUCT-001 integration after PR-58
+completed the bounded provenance-backed competitive and Haldane
+substrate-inhibition laws and PR-57 completed dynamic thermodynamic feasibility
+and native solver-time enforcement in the current checkout, PR-56 completed
+branching and cyclic enzyme-pathway assembly after
 PR #71 merged as `caa0a17`, PR-55 completed arbitrary
 supported-reaction onboarding after PR #70 merged as `6b3d275`, PR-54 completed
 caller-trusted Ed25519 curator
@@ -305,9 +306,15 @@ tolerance, and provenance references; a passing bound electron/redox check;
 trajectory-derived ideal-dilute activities/Q and dynamic Gibbs energy; and
 native solver-time blocking of unfavorable nonnegative forward rates. It does
 not infer chemistry, supply silent constants, implement reverse fluxes or
-nonideal activities, or claim empirical validation. The current next PR is
-PR-58 broader provenance-backed biological laws, limited to mechanisms with
-explicit sources, maturity, parameters, assumptions, tests, and limitations.
+nonideal activities, or claim empirical validation. The completed PR-58 slice
+adds competitive and Haldane substrate-inhibition modifiers for exactly
+matched homogeneous Michaelis-Menten processes. Both require explicit
+primary-source and maturity metadata, exact substrate and `K_m` binding,
+positive unit-compatible `K_i`, visible assumptions and limitations, and
+artificial framework benchmarks. The citations support the selected laws in
+their study systems; they do not supply production FungMod parameters, case
+applicability, or validation. The current next PR is PR-59 final PRODUCT-001
+integration over already implemented simulator outputs.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -1711,6 +1718,15 @@ where to inspect mechanism summaries, configured metadata, limitations, and
 final metrics. This does not add organism-specific inhibition behavior,
 toxicity, uptake, secretion, biomass, physiology, calibration, validation,
 multi-product inhibition, or fallback inhibition constants.
+
+Competitive and Haldane substrate-inhibition modifiers are additionally
+software-tested for explicit homogeneous Michaelis-Menten configuration.
+Their primary law references, maturity labels, substrate/Km ownership, Ki
+parameters, assumptions, and limitations are mandatory. They reject other
+base-process families, mismatched states or parameters, unsupported combined
+inhibition, and missing provenance. The included fixtures are artificial and
+make no organism, substrate, production-parameter, empirical-validity, or
+whole-fungus claim.
 
 ---
 

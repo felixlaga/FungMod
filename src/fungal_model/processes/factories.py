@@ -6,6 +6,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from fungal_model.modifiers import (
+    CompetitiveInhibitionModifier,
+    ProductInhibitionModifier,
+    SubstrateInhibitionModifier,
+)
 from fungal_model.processes.base import Process
 from fungal_model.processes.homogeneous import (
     FirstOrderDecayProcess,
@@ -14,9 +19,11 @@ from fungal_model.processes.homogeneous import (
 )
 from fungal_model.processes.rate_modifiers import (
     RateModifierProcess,
+    competitive_inhibition_modifier_from_config,
     oxygen_modifier_from_config,
     ph_modifier_from_config,
     product_inhibition_modifier_from_config,
+    substrate_inhibition_modifier_from_config,
     temperature_modifier_from_config,
     water_activity_modifier_from_config,
 )
@@ -341,6 +348,7 @@ def _apply_rate_modifiers(
     )
     if not modifiers:
         return process
+    _validate_inhibition_modifier_compatibility(process, modifiers)
     return RateModifierProcess(
         base_process=process,
         rate_modifiers=modifiers,
@@ -353,6 +361,16 @@ def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> 
     modifier_type = str(mapping.get("type") or mapping.get("modifier_type") or "").strip()
     if modifier_type == "product_inhibition":
         return product_inhibition_modifier_from_config(mapping, state_units=context.state_units)
+    if modifier_type == "competitive_inhibition":
+        return competitive_inhibition_modifier_from_config(
+            mapping,
+            state_units=context.state_units,
+        )
+    if modifier_type == "substrate_inhibition":
+        return substrate_inhibition_modifier_from_config(
+            mapping,
+            state_units=context.state_units,
+        )
     if modifier_type == "temperature_arrhenius_reference":
         return temperature_modifier_from_config(mapping)
     if modifier_type == "ph_gaussian":
@@ -362,6 +380,52 @@ def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> 
     if modifier_type == "water_activity_threshold":
         return water_activity_modifier_from_config(mapping)
     raise ValueError(f"Unsupported rate modifier type: {modifier_type!r}.")
+
+
+def _validate_inhibition_modifier_compatibility(
+    process: Process,
+    modifiers: tuple[Any, ...],
+) -> None:
+    mechanistic: list[
+        CompetitiveInhibitionModifier | SubstrateInhibitionModifier
+    ] = [
+        modifier
+        for modifier in modifiers
+        if isinstance(
+            modifier,
+            (CompetitiveInhibitionModifier, SubstrateInhibitionModifier),
+        )
+    ]
+    if not mechanistic:
+        return
+    if process.process_type != "homogeneous_michaelis_menten":
+        raise ValueError(
+            "competitive_inhibition and substrate_inhibition modifiers require "
+            "a homogeneous_michaelis_menten base process."
+        )
+    if len(mechanistic) > 1:
+        raise ValueError(
+            "At most one mechanistic enzyme-inhibition modifier is supported "
+            "per process."
+        )
+    if any(isinstance(modifier, ProductInhibitionModifier) for modifier in modifiers):
+        raise ValueError(
+            "A mechanistic enzyme-inhibition modifier cannot be composed with "
+            "product_inhibition without an explicit combined rate law."
+        )
+    modifier = mechanistic[0]
+    substrate_state = str(getattr(process, "substrate_state", ""))
+    km_symbol = str(getattr(process, "km_symbol", ""))
+    if modifier.substrate_state != substrate_state:
+        raise ValueError(
+            "Enzyme-inhibition modifier substrate_state must exactly match its "
+            "homogeneous Michaelis-Menten base process."
+        )
+    if modifier.michaelis_constant_symbol != km_symbol:
+        raise ValueError(
+            "Enzyme-inhibition modifier michaelis_constant must exactly match "
+            "its homogeneous Michaelis-Menten base process."
+        )
 
 
 def _missing_config_fields(process_config: Any, fields: Sequence[str]) -> tuple[str, ...]:

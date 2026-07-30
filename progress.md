@@ -26,11 +26,89 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-58 Broader Provenance-Backed Biological Laws
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout for competitive and Haldane
+substrate-inhibition laws on explicitly matched homogeneous Michaelis-Menten
+processes.
+
+Completed in this pass:
+
+- Added `CompetitiveInhibitionModifier` using
+  `v = Vmax*S / (Km*(1 + I/Ki) + S)`.
+- Added `SubstrateInhibitionModifier` using the Haldane form
+  `v = Vmax*S / (Km + S + S^2/Ki)`.
+- Required exact base-process type, substrate-state, and Michaelis-constant
+  ownership plus finite nonnegative states and positive unit-compatible
+  parameters.
+- Required a nonblank primary-law source and the explicit
+  `literature_backed_software_tested` maturity label for both laws.
+- Added assumptions, limitations, parameter/state requirements, failure modes,
+  serialization, configured metadata, and fail-closed rejection of unsupported
+  combined inhibition.
+- Added BIO-readiness proposals and two materially different artificial
+  configured benchmarks.
+
+Tests added or modified:
+
+- Added direct equation tests for competitive and Haldane factors.
+- Added configured solver/output tests for both artificial benchmark systems.
+- Added failure tests for missing primary provenance, nonpositive parameters,
+  non-Michaelis-Menten base processes, and mismatched substrate/Km ownership.
+- Added machine-checkable proposal and active-status coverage.
+
+What did not change: no production registry record, production biological
+identity, case applicability, whole-fungus growth, secretion, uptake, toxicity,
+parameter inference, validation dataset, calibration, empirical comparison, or
+simulation authorization changed. The existing reversible product-inhibition
+modifier and all existing configs retain their behavior.
+
+Scientific behavior impact: only configs that explicitly select one of the new
+complete modifier contracts change numerical rates. The cited primary studies
+support the selected equation in their study systems; they do not support the
+artificial fixture parameters or establish applicability to a FungMod
+production case.
+
+Backward compatibility: existing modifier types and configs remain unchanged.
+The new modifier types are additive and opt-in. Unsupported composition fails
+before execution instead of silently multiplying mechanistically incomplete
+rate laws.
+
+Remaining ambiguity and risk: these are reduced single-substrate rate laws.
+Competitive inhibition supports one inhibitor; the Haldane law does not
+identify a molecular inhibitory complex. Mixed, uncompetitive, irreversible,
+time-dependent, allosteric, multiple-inhibitor, transport, and whole-organism
+effects remain unsupported. Production use requires separately curated
+parameter and applicability evidence.
+
+Risk level: medium scientific risk, bounded by primary-law citations, mandatory
+maturity/provenance, exact base-law ownership, unit and positivity checks,
+closed composition, artificial labels, and no production records.
+
+Recommended next task: PR-59, integrate already implemented solver diagnostics
+and trajectories into standard PRODUCT-001 researcher outputs without adding a
+new mechanism or scientific claim.
+
+Verification:
+
+- PR-58 implementation/factory focused suite: `31 passed in 9.80s`.
+- Final PR-58 biological-law/factory/roadmap focused suite: `41 passed in
+  10.23s`.
+- Both new BIO-003 proposals: readiness validation passed.
+- Broad full pytest regression: `1215 passed in 219.92s`.
+- Canonical pytest with coverage: `1215 passed in 431.91s`; total coverage
+  `83.94%`, above the required `80%`.
+- Ruff over `src tests`: passed.
+- Pyright with the venv interpreter: `0 errors, 0 warnings, 0 informations`.
+- `git diff --check`: passed.
+
 ## PR-57 Dynamic Thermodynamic Feasibility And Solver Enforcement
 
 Date: 2026-07-30
 
-Status: `complete` in the current checkout for optional explicit
+Status: `complete` after PR #72 merged as `ae8a5a3` for optional explicit
 single-reaction ideal-dilute activity/Q evaluation and native forward-rate
 enforcement.
 

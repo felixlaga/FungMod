@@ -9,9 +9,11 @@ from typing import Any
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity
 from fungal_model.modifiers import (
+    CompetitiveInhibitionModifier,
     OxygenModifier,
     PHModifier,
     ProductInhibitionModifier,
+    SubstrateInhibitionModifier,
     TemperatureModifier,
     WaterActivityModifier,
 )
@@ -122,6 +124,121 @@ def product_inhibition_modifier_from_config(
         product_state=product_state,
         inhibition_constant_symbol=inhibition_constant,
         product_units=state_units[product_state],
+    )
+
+
+def competitive_inhibition_modifier_from_config(
+    modifier_config: Mapping[str, Any],
+    *,
+    state_units: Mapping[str, str],
+) -> CompetitiveInhibitionModifier:
+    """Build a provenance-bound competitive-inhibition modifier."""
+
+    substrate_state = _required_text(
+        modifier_config,
+        "substrate_state",
+        field_name="substrate_state",
+        modifier_type="competitive_inhibition",
+    )
+    inhibitor_state = _required_text(
+        modifier_config,
+        "inhibitor_state",
+        field_name="inhibitor_state",
+        modifier_type="competitive_inhibition",
+    )
+    _require_state(
+        substrate_state,
+        state_units=state_units,
+        modifier_type="competitive_inhibition",
+    )
+    _require_state(
+        inhibitor_state,
+        state_units=state_units,
+        modifier_type="competitive_inhibition",
+    )
+    return CompetitiveInhibitionModifier(
+        substrate_state=substrate_state,
+        inhibitor_state=inhibitor_state,
+        michaelis_constant_symbol=_required_symbol(
+            modifier_config,
+            "michaelis_constant",
+            "michaelis_constant_symbol",
+            field_name="michaelis_constant",
+            modifier_type="competitive_inhibition",
+        ),
+        inhibition_constant_symbol=_required_symbol(
+            modifier_config,
+            "inhibition_constant",
+            "inhibition_constant_symbol",
+            "K_i",
+            field_name="inhibition_constant",
+            modifier_type="competitive_inhibition",
+        ),
+        substrate_units=state_units[substrate_state],
+        inhibitor_units=state_units[inhibitor_state],
+        primary_source=_required_text(
+            modifier_config,
+            "primary_source",
+            field_name="primary_source",
+            modifier_type="competitive_inhibition",
+        ),
+        maturity=_required_text(
+            modifier_config,
+            "maturity",
+            field_name="maturity",
+            modifier_type="competitive_inhibition",
+        ),
+    )
+
+
+def substrate_inhibition_modifier_from_config(
+    modifier_config: Mapping[str, Any],
+    *,
+    state_units: Mapping[str, str],
+) -> SubstrateInhibitionModifier:
+    """Build a provenance-bound Haldane substrate-inhibition modifier."""
+
+    substrate_state = _required_text(
+        modifier_config,
+        "substrate_state",
+        field_name="substrate_state",
+        modifier_type="substrate_inhibition",
+    )
+    _require_state(
+        substrate_state,
+        state_units=state_units,
+        modifier_type="substrate_inhibition",
+    )
+    return SubstrateInhibitionModifier(
+        substrate_state=substrate_state,
+        michaelis_constant_symbol=_required_symbol(
+            modifier_config,
+            "michaelis_constant",
+            "michaelis_constant_symbol",
+            field_name="michaelis_constant",
+            modifier_type="substrate_inhibition",
+        ),
+        inhibition_constant_symbol=_required_symbol(
+            modifier_config,
+            "inhibition_constant",
+            "inhibition_constant_symbol",
+            "K_i",
+            field_name="inhibition_constant",
+            modifier_type="substrate_inhibition",
+        ),
+        substrate_units=state_units[substrate_state],
+        primary_source=_required_text(
+            modifier_config,
+            "primary_source",
+            field_name="primary_source",
+            modifier_type="substrate_inhibition",
+        ),
+        maturity=_required_text(
+            modifier_config,
+            "maturity",
+            field_name="maturity",
+            modifier_type="substrate_inhibition",
+        ),
     )
 
 
@@ -243,6 +360,21 @@ def _required_state_variables(
                     )
                 )
                 existing.add(key)
+        elif isinstance(modifier, CompetitiveInhibitionModifier):
+            key = (modifier.inhibitor_state, modifier.inhibitor_units)
+            if key not in existing:
+                specs.append(
+                    StateVariableSpec(
+                        modifier.inhibitor_state,
+                        modifier.inhibitor_units,
+                        role="competitive_inhibitor",
+                        description=(
+                            "Explicit inhibitor state for provenance-bound "
+                            "competitive Michaelis-Menten inhibition."
+                        ),
+                    )
+                )
+                existing.add(key)
     return tuple(specs)
 
 
@@ -250,6 +382,16 @@ def _modifier_limitations(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
     limitations = ["Rate is scaled only by explicitly configured generic modifiers."]
     if any(isinstance(modifier, ProductInhibitionModifier) for modifier in modifiers):
         limitations.append("Product inhibition support is single-product reversible inhibition only.")
+    if any(isinstance(modifier, CompetitiveInhibitionModifier) for modifier in modifiers):
+        limitations.append(
+            "Competitive inhibition supports one inhibitor on an explicitly matched "
+            "homogeneous Michaelis-Menten process only."
+        )
+    if any(isinstance(modifier, SubstrateInhibitionModifier) for modifier in modifiers):
+        limitations.append(
+            "Haldane substrate inhibition supports one explicitly matched homogeneous "
+            "Michaelis-Menten substrate only and does not identify a molecular mechanism."
+        )
     if any(isinstance(modifier, TemperatureModifier) for modifier in modifiers):
         limitations.append(
             "Temperature scaling uses the existing Arrhenius reference-rate modifier "
@@ -281,6 +423,22 @@ def _modifier_failure_modes(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
                 "missing product inhibitor state",
                 "negative product inhibitor state",
                 "missing, non-positive, or unit-incompatible product inhibition constant",
+            )
+        )
+    if any(isinstance(modifier, CompetitiveInhibitionModifier) for modifier in modifiers):
+        modes.extend(
+            (
+                "missing or negative competitive inhibitor state",
+                "missing, non-positive, or unit-incompatible competitive inhibition constant",
+                "competitive inhibition attached to a non-Michaelis-Menten process",
+            )
+        )
+    if any(isinstance(modifier, SubstrateInhibitionModifier) for modifier in modifiers):
+        modes.extend(
+            (
+                "missing or negative substrate state",
+                "missing, non-positive, or unit-incompatible substrate inhibition constant",
+                "substrate inhibition attached to a non-Michaelis-Menten process",
             )
         )
     if any(isinstance(modifier, TemperatureModifier) for modifier in modifiers):
@@ -336,6 +494,28 @@ def _required_parameters(
                 units=modifier.product_units,
                 name="product inhibition constant",
                 description="Positive K_i for explicit reversible product inhibition.",
+            )
+        elif isinstance(modifier, CompetitiveInhibitionModifier):
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.inhibition_constant_symbol,
+                units=modifier.inhibitor_units,
+                name="competitive inhibition constant",
+                description=(
+                    "Positive K_i for the explicit competitive inhibitor state."
+                ),
+            )
+        elif isinstance(modifier, SubstrateInhibitionModifier):
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.inhibition_constant_symbol,
+                units=modifier.substrate_units,
+                name="substrate inhibition constant",
+                description=(
+                    "Positive K_i for the explicit Haldane substrate-inhibition law."
+                ),
             )
         elif isinstance(modifier, TemperatureModifier):
             _add_requirement(
@@ -479,6 +659,18 @@ def _modifier_source(modifier_config: Mapping[str, Any], default: str) -> str:
     return source or default
 
 
+def _require_state(
+    state_name: str,
+    *,
+    state_units: Mapping[str, str],
+    modifier_type: str,
+) -> None:
+    if state_name not in state_units:
+        raise ValueError(
+            f"{modifier_type} modifier references unknown state {state_name!r}."
+        )
+
+
 def _unique_assumptions(assumptions: list[Any]) -> tuple[Any, ...]:
     result: list[Any] = []
     seen: set[str] = set()
@@ -492,9 +684,11 @@ def _unique_assumptions(assumptions: list[Any]) -> tuple[Any, ...]:
 
 __all__ = [
     "RateModifierProcess",
+    "competitive_inhibition_modifier_from_config",
     "oxygen_modifier_from_config",
     "ph_modifier_from_config",
     "product_inhibition_modifier_from_config",
+    "substrate_inhibition_modifier_from_config",
     "temperature_modifier_from_config",
     "water_activity_modifier_from_config",
 ]

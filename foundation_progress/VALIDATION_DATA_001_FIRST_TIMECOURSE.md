@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-58: broader provenance-backed biological laws contract**.
+Current next PR: **PR-59: final PRODUCT-001 integration**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -76,8 +76,8 @@ parameters, product maps, and time grids; an artificial second reaction proves
 the generic path without adding biological evidence or validation data.
 PR-56 branching/cyclic pathway assembly is complete after PR #71 merged as
 `caa0a17`. PR-57 dynamic thermodynamic feasibility and native solver-time
-enforcement are complete in the current checkout for explicit sourced molar
-activity/Q inputs, passing bound electron/redox evidence, and direct or
+enforcement are complete after PR #72 merged as `ae8a5a3` for explicit sourced
+molar activity/Q inputs, passing bound electron/redox evidence, and direct or
 redox-derived standard energy. Neither slice adds validation data or empirical
 biological evidence.
 The completed PR-47 work is bounded transactional

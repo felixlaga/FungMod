@@ -1,0 +1,78 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-003
+mechanism_id: substrate_inhibition
+general_process_family: generic Haldane substrate inhibition of a homogeneous Michaelis-Menten process
+mathematical_law: >
+  A configured homogeneous Michaelis-Menten rate is evaluated as
+  v = Vmax*S / (Km + S + S^2/Ki), implemented by multiplying the existing
+  base rate by (Km + S) / (Km + S + S^2/Ki). S, Km, and Ki are explicit,
+  unit-compatible configured state and parameter records.
+state_variables:
+  - name: substrate_pool
+    role: homogeneous_substrate_and_inhibitor
+    units: explicit amount or concentration units
+parameters:
+  - symbol: K_m
+    meaning: Michaelis constant already owned by the matched base process
+    units: units compatible with substrate_pool
+  - symbol: K_i
+    meaning: positive Haldane substrate inhibition constant
+    units: units compatible with substrate_pool
+units:
+  substrate_policy: substrate_pool, K_m, and K_i must be compatible
+  activity_policy: the modifier factor must be finite and dimensionless
+valid_substrate_classes:
+  - any explicitly configured dissolved substrate with evidence supporting Haldane substrate inhibition
+valid_enzyme_or_source_classes:
+  - any explicitly configured catalyst represented by the matched homogeneous Michaelis-Menten base process
+environment_variables:
+  - name: none
+    required: false
+    notes: This state-driven law does not infer an environmental response.
+output_curves:
+  - substrate trajectory
+  - product trajectory
+  - substrate-inhibited process rate
+summary_metrics:
+  - initial substrate-inhibited rate
+  - final substrate remaining
+  - final product formed
+assumptions:
+  - The selected Haldane law is applicable only when separately supported for a case.
+  - The modifier substrate and K_m exactly match the base process.
+  - The configured primary_source is law provenance, not evidence for configured parameter values.
+not_in_scope:
+  - Inferring the molecular cause of substrate inhibition.
+  - Multiple substrates, activation, transport, toxicity, uptake, growth, or whole-organism physiology.
+  - Inference of K_i, validation, or calibration.
+unknowns:
+  - Production parameter records and case applicability require separate curation.
+  - More detailed molecular mechanisms require separately implemented process laws.
+suggested_experiments:
+  - Measure initial rates across substrate concentrations above and below the observed rate maximum.
+  - Record units, enzyme loading, temperature, pH, and candidate inhibitory complexes.
+blocking_failure_modes:
+  - Missing primary source or maturity label.
+  - Missing, negative, or unit-incompatible substrate state.
+  - Missing, non-positive, or mismatched K_m or K_i.
+  - Attachment to a process other than the exact homogeneous Michaelis-Menten base law.
+tests_required:
+  - Unit test the selected Haldane equation and finite positive activity.
+  - Configured materially different artificial benchmark with explicit provenance and maturity.
+  - Fail-closed tests for missing provenance, invalid parameters, and base-law mismatch.
+  - Output test that source, maturity, assumption, equation, and limitations are visible.
+limitations:
+  - Software-tested only with artificial framework benchmarks.
+  - The cited primary study supports use of the Haldane function in its study system, not any FungMod production case.
+  - No empirical validation or organism-specific applicability is claimed.
+demo_case:
+  case_id: CASE-002
+  purpose: Exercise the generic law on an artificial homogeneous benchmark.
+  distinction: The benchmark verifies software behavior and is not scientific data.
+data_dependencies:
+  - DATA-003
+validation_status: software_tested
+primary_provenance:
+  citation: Expression, purification and use of the soluble domain of Lactobacillus paracasei beta-fructosidase to optimise production of bioethanol from grass fructans
+  url: https://doi.org/10.1016/j.biortech.2010.01.084
+  evidence_scope: Primary purified-enzyme study that fits the exact single-substrate inhibition equation and reports substrate inhibition for two tested fructans.

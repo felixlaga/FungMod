@@ -1,7 +1,7 @@
 # BIO-003: Generic Mechanism Expansion Through Process Laws
 
-Status: `partial/software-tested` for the first BIO-003 mechanism-family
-target.
+Status: `partial/software-tested` for three bounded BIO-003 mechanism-family
+targets.
 
 BIO-003 should expand biology through reusable process laws and modifiers, not
 case-specific fungus, substrate, enzyme, or experiment branches.
@@ -25,6 +25,46 @@ This target was selected because the repository already contains a generic
 available to configured process assembly as an explicit generic rate modifier,
 and registry-backed case templates can expose it when explicit product-state
 and `K_i` parameter records exist.
+
+## Additional provenance-backed targets
+
+PR-58 adds two configured homogeneous enzyme-rate laws:
+
+```text
+competitive_inhibition
+substrate_inhibition
+```
+
+Their machine-checkable proposals are:
+
+```text
+foundation_progress/proposals/BIO_003_COMPETITIVE_INHIBITION.yml
+foundation_progress/proposals/BIO_003_SUBSTRATE_INHIBITION.yml
+```
+
+Both modifiers require an exact homogeneous Michaelis-Menten
+(`homogeneous_michaelis_menten`) base process, an explicit substrate state and
+`K_m` symbol that exactly match that base, a positive finite unit-compatible
+`K_i`, a nonblank `primary_source`, and the explicit
+`literature_backed_software_tested` maturity label.
+
+Competitive inhibition uses
+`v = Vmax*S / (Km*(1 + I/Ki) + S)` and additionally requires an explicit
+nonnegative inhibitor state. Its primary law evidence is the experimental
+kinetics study at `https://pubmed.ncbi.nlm.nih.gov/7985803/`.
+
+Substrate inhibition uses the Haldane form
+`v = Vmax*S / (Km + S + S^2/Ki)`. Its primary law evidence is the purified
+beta-fructosidase study by Martel et al. (2010),
+`https://doi.org/10.1016/j.biortech.2010.01.084`, which explicitly fits that
+equation and reports substrate inhibition for two tested fructans.
+
+These sources support the selected mathematical laws in their study systems.
+They do not support the artificial benchmark parameters, establish
+applicability to a production FungMod case, or constitute FungMod validation.
+More than one mechanistic enzyme-inhibition modifier per process and
+composition with the older generic product-inhibition factor fail closed
+because no combined law has been implemented.
 
 ## Researcher-facing example coverage
 
@@ -61,9 +101,13 @@ This selected target does not permit:
 - organism-specific product inhibition branches;
 - substrate-specific shortcuts;
 - whole-fungus toxicity, uptake, secretion, biomass, or physiology claims;
-- competitive, mixed, uncompetitive, or multi-product inhibition claims;
+- competitive or substrate-inhibition claims outside their explicit PR-58
+  configuration contracts;
+- mixed, uncompetitive, irreversible, time-dependent, covalent, combined, or
+  multi-product inhibition claims;
 - validation or calibration claims without real observations;
 - silent fallback inhibition constants.
+- production applicability inferred from a law citation or artificial fixture.
 
 ## Completion signal for this scoped BIO-003 slice
 
@@ -83,3 +127,10 @@ This scoped slice can be marked complete only when:
 - notebook/example tests show the researcher-facing virtual-experiment example
   executes through public APIs and exposes the active modifier in standard
   output tables.
+
+The PR-58 competitive/substrate-inhibition slice is complete only when both new
+proposals pass BIO readiness validation, both selected equations execute
+through materially different artificial configured benchmarks, primary source
+and maturity metadata are visible in outputs, and missing provenance,
+nonpositive parameters, base-law mismatch, and unsupported composition fail
+closed.

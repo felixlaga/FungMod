@@ -277,6 +277,53 @@ def _configured_process_modifier_row(
                 ),
             }
         )
+    elif modifier_type == "competitive_inhibition":
+        row.update(
+            {
+                "substrate_state": modifier.get("substrate_state", ""),
+                "inhibitor_state": modifier.get("inhibitor_state", ""),
+                "michaelis_constant": modifier.get(
+                    "michaelis_constant",
+                    modifier.get("michaelis_constant_symbol", ""),
+                ),
+                "inhibition_constant": modifier.get(
+                    "inhibition_constant",
+                    modifier.get("inhibition_constant_symbol", modifier.get("K_i", "")),
+                ),
+                "primary_source": modifier.get("primary_source", ""),
+                "maturity": modifier.get("maturity", ""),
+                "equation": (
+                    "rate = Vmax*S / (Km*(1 + I/Ki) + S)"
+                ),
+                "limitation": (
+                    "One inhibitor on an explicitly matched homogeneous "
+                    "Michaelis-Menten process only; no mixed, uncompetitive, "
+                    "irreversible, toxicity, or whole-organism claim."
+                ),
+            }
+        )
+    elif modifier_type == "substrate_inhibition":
+        row.update(
+            {
+                "substrate_state": modifier.get("substrate_state", ""),
+                "michaelis_constant": modifier.get(
+                    "michaelis_constant",
+                    modifier.get("michaelis_constant_symbol", ""),
+                ),
+                "inhibition_constant": modifier.get(
+                    "inhibition_constant",
+                    modifier.get("inhibition_constant_symbol", modifier.get("K_i", "")),
+                ),
+                "primary_source": modifier.get("primary_source", ""),
+                "maturity": modifier.get("maturity", ""),
+                "equation": "rate = Vmax*S / (Km + S + S^2/Ki)",
+                "limitation": (
+                    "One explicitly matched homogeneous substrate only; the "
+                    "Haldane law does not identify a molecular mechanism or "
+                    "represent transport, toxicity, growth, or physiology."
+                ),
+            }
+        )
     elif modifier_type == "temperature_arrhenius_reference":
         row.update(
             {
