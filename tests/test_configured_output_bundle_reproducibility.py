@@ -50,7 +50,9 @@ def test_configured_output_manifest_lists_existing_reproducibility_files(tmp_pat
 
     packages = _json(output_dir / "package_versions.json")
     assert packages["fungal_model"]["version"] == result.model_version
-    assert packages["distributions"]["fungal-model"] is not None
+    assert packages["fungal_model"]["distribution"] == "fungmod"
+    assert packages["distributions"]["fungmod"] is not None
+    assert "fungal-model" in packages["distributions"]
     assert "numpy" in packages["distributions"]
 
     revision = _json(output_dir / "source_revision.json")

@@ -1171,11 +1171,11 @@ def _run_environment() -> dict[str, Any]:
 
 
 def _package_versions(result: SimulationResult) -> dict[str, Any]:
-    distributions = ("fungal-model", "numpy", "scipy", "pint", "matplotlib", "PyYAML")
+    distributions = ("fungmod", "fungal-model", "numpy", "scipy", "pint", "matplotlib", "PyYAML")
     return {
         "fungal_model": {
             "version": result.model_version,
-            "distribution": "fungal-model",
+            "distribution": "fungmod",
         },
         "distributions": {
             distribution: _distribution_version(distribution)
