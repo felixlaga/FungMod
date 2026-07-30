@@ -17,6 +17,7 @@ from .model_config import (
     ProcessConfig,
     ReactionMetadataConfig,
     ReactionParticipantMetadataConfig,
+    ThermodynamicConstraintConfig,
     TimeConfig,
     ValidatorConfig,
     load_model_config,
@@ -86,6 +87,7 @@ __all__ = [
     "validate_config",
     "validate_model_config_mapping",
     "TimeConfig",
+    "ThermodynamicConstraintConfig",
     "ValidatorConfig",
     "ValidatorRegistry",
 ]

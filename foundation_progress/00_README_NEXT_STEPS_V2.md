@@ -10,8 +10,9 @@ PR-52 index-backed non-parameter authoring merged as PR #67 (`5da611b`), and
 bounded PR-53 product-map ownership merged as PR #68 (`19baedd`), with
 PR-54 authenticated curator signatures merged as PR #69 (`35a3ecb`) and
 PR-55 arbitrary supported-reaction assembly merged as PR #70 (`6b3d275`),
-PR-56 branching/cyclic pathway assembly complete in the current checkout, and
-PR-57 selected:
+PR-56 branching/cyclic pathway assembly complete after PR #71 merged as
+`caa0a17`, and PR-57 dynamic thermodynamic solver enforcement complete in the
+current checkout, with PR-58 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -73,13 +74,12 @@ The completed provenance/limitations report example-notebook slice adds
 writes Markdown/HTML/index report artifacts and inspects the table-derived
 decision summary plus existing decision-support links and rows without
 validation claims.
-THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validator,
-configured entropy-production-rate metadata diagnostic, configured
-thermodynamic JSON/CSV summaries, notebook coverage for both explicit-Q and
-entropy-rate output rows, and a configured entropy-budget JSON summary over
-numeric explicit entropy-rate rows; there are still no inferred activities,
-concentrations, redox potentials, electron balances, or solver-time
-thermodynamic enforcement.
+THERMO-003: partial after explicit reaction-quotient Gibbs/entropy validation,
+configured entropy-rate diagnostics and summaries, and PR-57 dynamic
+ideal-dilute molar activity/Q/Gibbs evaluation with required bound
+electron/redox evidence and native solver-time forward-rate blocking.
+Nonideal activities, reverse rates, coupled-network optimization,
+electrochemical gradients, and empirical validation remain unsupported.
 The completed PR-43 slice adds opt-in process-bound
 `entropy_production_rate_timeseries.json`/`.csv` diagnostics after simulation
 from native process-rate trajectories only when explicit sourced delta G,
@@ -91,16 +91,17 @@ The JSON summary includes `has_entropy_budget`,
 `entropy_budget_evaluated_count`, `entropy_budget_negative_count`, and
 `entropy_budget_status` fields while leaving missing or non-numeric
 entropy-rate metadata unevaluated rather than treating it as zero.
-Report utilities now add Markdown, HTML, and report-folder index visibility for
+Report utilities add Markdown, HTML, and report-folder index visibility for
 existing configured-output `thermodynamic_summary.json` and
-`thermodynamic_summary.csv` artifacts without inferring thermodynamic inputs or
-adding solver-time enforcement.
+`thermodynamic_summary.csv` artifacts without inferring thermodynamic inputs
+or enforcement that those artifacts do not contain.
 Standard virtual-experiment outputs now include `thermodynamic_diagnostics.csv`
 and `DegradationScreenResult.thermodynamic_diagnostics()` as a bridge over
-existing per-sample configured-output `thermodynamic_summary.json`/`.csv` artifacts only. The table is header-only when no configured thermodynamic
-artifacts exist and must not be read as inferred activities, reaction
-quotients, concentrations, redox potentials, electron balances, validation
-evidence, or solver-time thermodynamic enforcement.
+existing per-sample configured-output `thermodynamic_summary.json`/`.csv`
+artifacts only. The table is header-only when no configured thermodynamic
+artifacts exist. When PR-57 dynamic rows are present, the table copies their
+explicit activity/Q, electron/redox-binding, and solver-enforcement evidence;
+it does not infer missing values or establish empirical validation.
 Example notebooks now include
 `11_thermodynamics_entropy_diagnostics.ipynb` for configured explicit-Q Gibbs,
 entropy-production-rate, and entropy-budget output inspection without
@@ -212,7 +213,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-57: dynamic thermodynamic feasibility and solver-enforcement contract**.
+Current next PR: **PR-58: broader provenance-backed biological laws contract**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -372,10 +373,16 @@ topology, directed process/product-map state-role edges, graph connectivity
 and substrate-reachability checks, declared branch/cycle enforcement, and
 conserved artificial branch/cycle execution through the standard solver.
 
-Recommended next task: PR-57 dynamic thermodynamic feasibility and
-solver-enforcement contract. Add explicit provenance-bound activity/Q,
-redox/electron-balance, dynamic Gibbs-feasibility, and process enforcement
-without inferring missing chemistry or using silent constants.
+PR-57 adds optional explicit ideal-dilute molar activities, trajectory Q and
+dynamic Gibbs energy, required passing process-bound electron/redox evidence,
+direct standard-Gibbs or redox-derived standard energy, and native RHS
+forward-rate blocking. All scientific/numerical inputs, constants, floors,
+tolerances, units, state/reaction bindings, and provenance are explicit and
+fail closed.
+
+Recommended next task: PR-58 broader provenance-backed biological laws
+contract. Select mechanisms only where primary provenance, explicit parameters,
+maturity, assumptions, limitations, and generic tests satisfy `AGENTS.md`.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer
@@ -450,9 +457,10 @@ schema changes, or silent fallback constants.
 
 The completed THERMO-003 thermodynamic-summary report ergonomics slice exposes
 existing `thermodynamic_summary.json` and `thermodynamic_summary.csv` artifacts
-in Markdown, HTML, and index report paths only. It does not infer activities,
-reaction quotients, concentrations, redox potentials, electron balances,
-validation evidence, or solver-time thermodynamic enforcement.
+in Markdown, HTML, and index report paths only. It may display explicit PR-57
+dynamic rows but does not infer activities, reaction quotients, concentrations,
+redox potentials, electron balances, validation evidence, or solver
+enforcement when those artifacts do not contain them.
 
 The completed provenance/limitations report ergonomics slice improves
 inspection of existing assumption, limitation, missing-parameter,

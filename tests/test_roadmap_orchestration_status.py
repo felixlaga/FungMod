@@ -46,7 +46,7 @@ def test_status_tracker_reconciles_completed_scoped_slices_without_overclaiming(
         "API-003 researcher-facing virtual experiment API": "complete for existing registry records, aliases, environment grids, scientific/exploratory modes, and table access",
         "BIO-READINESS-LITE scaffold": "complete for proposal template, validator, and tests",
         "BIO-002 reusable extracellular enzyme pathway": "complete for linear, branching, and cyclic graph assembly plus software verification; partial relative to broad pathway biology",
-        "Phase 2 static balance checks": "complete for scoped static metadata, validator, assembly-time balance checks, and corrective process-reaction binding; partial relative to dynamic thermodynamic feasibility",
+        "Phase 2 static balance checks": "complete for scoped static metadata, validator, assembly-time balance checks, corrective process-reaction binding, and explicit dynamic constraint binding",
     }
 
     for phase, status in required_statuses.items():
@@ -57,8 +57,8 @@ def test_status_tracker_reconciles_completed_scoped_slices_without_overclaiming(
         "No fuzzy matching or automatic external fetch",
         "Scientific mode means exact non-exploratory inputs, not empirical validation",
         "No whole-fungus growth, secretion, uptake, biomass, PET, lignin",
-        "Explicit caller-supplied reaction-quotient Gibbs checks now exist",
-        "no inferred activity model, redox potential model, or solver-time thermodynamic enforcement",
+        "Explicit configured dynamic constraints now require a passing process-bound electron/redox check",
+        "does not infer chemistry, support nonideal activities/reverse fluxes, or validate biology",
     ):
         assert boundary in text
 
@@ -132,11 +132,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-57: dynamic thermodynamic feasibility and solver-enforcement contract"
+    current_next = "PR-58: broader provenance-backed biological laws contract"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
     assert (
-        "The current next PR is PR-57 dynamic thermodynamic feasibility and"
+        "The current next PR is\nPR-58 broader provenance-backed biological laws"
         in roadmap
     )
     assert "The PR-31 slice should bridge" not in roadmap
@@ -168,6 +168,7 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "PR-55" in roadmap
     assert "PR-56" in roadmap
     assert "PR-57" in roadmap
+    assert "PR-58" in roadmap
     assert "branching, cycles, disconnected chains, and malformed topology" in roadmap
     assert "35 baseline nullable-member errors across 11" in roadmap
     assert "scientific modules using explicit contracts" in roadmap
@@ -207,7 +208,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-57: dynamic thermodynamic feasibility and solver-enforcement contract"
+    current_next = "PR-58: broader provenance-backed biological laws contract"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -261,6 +262,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-53" not in text
         assert "Current next PR: **PR-54" not in text
         assert "Current next PR: **PR-55" not in text
+        assert "Current next PR: **PR-56" not in text
+        assert "Current next PR: **PR-57" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -363,7 +366,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "header-only when no artifacts exist" in status
     assert "report utilities now expose existing configured-output thermodynamic summary and solver diagnostics artifacts" in status
     assert "thermodynamic_summary.csv` artifacts without inferring thermodynamic inputs" in next_steps
-    assert "existing per-sample configured-output `thermodynamic_summary.json`/`.csv` artifacts only" in next_steps
+    assert "When PR-57 dynamic rows are present" in next_steps
     assert "provenance/limitation decision summary" in status
     assert "decision-support table links" in next_steps
     assert "provenance/limitations report example-notebook slice" in next_steps
@@ -466,7 +469,13 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-55 | Arbitrary reaction onboarding and assembly contract" in status
     assert "complete after PR #70 merged as `6b3d275` | Removed Reaction 618/SABIO-RK" in status
     assert "PR-56 | Branching and cyclic enzyme-pathway assembly contract" in status
-    assert "complete in the current checkout | Added explicit `linear`/`branching`/`cyclic`" in status
+    assert (
+        "complete after PR #71 merged as `caa0a17` | Added explicit "
+        "`linear`/`branching`/`cyclic`"
+    ) in status
+    assert "PR-57 | Dynamic thermodynamic feasibility and solver-enforcement contract" in status
+    assert "complete in the current checkout | Added optional explicit ideal-dilute" in status
+    assert "PR-58 | Broader provenance-backed biological laws contract" in status
     assert "PR-57 | Dynamic thermodynamic feasibility and solver-enforcement contract" in status
     assert "caller-supplied trust" in status
     assert "exact manifest authorship" in status
@@ -527,7 +536,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-57: dynamic thermodynamic feasibility and solver-enforcement contract"
+    current_next = "PR-58: broader provenance-backed biological laws contract"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
@@ -583,6 +592,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-54" not in _current_next_lines(text)
         assert "PR-55" not in _current_next_lines(text)
         assert "PR-56" not in _current_next_lines(text)
+        assert "PR-57" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps

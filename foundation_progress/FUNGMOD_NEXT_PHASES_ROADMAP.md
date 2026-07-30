@@ -65,13 +65,15 @@ written:
   assembly and software verification, but partial relative to broad
   provenance-backed pathway biology;
 - Phase 2 static balance checks are complete for scoped static metadata,
-  validators, assembly-time checks, and process-reaction binding, but partial
-  relative to dynamic thermodynamic feasibility.
+  validators, assembly-time checks, process-reaction binding, and explicit
+  dynamic-constraint binding.
 ```
 
-The current next PR is PR-57 dynamic thermodynamic feasibility and
-solver-enforcement contract after PR-56 completed branching and cyclic
-enzyme-pathway assembly in the current checkout, PR-55 completed arbitrary
+The current next PR is
+PR-58 broader provenance-backed biological laws after PR-57 completed dynamic
+thermodynamic feasibility and native solver-time enforcement in the current
+checkout, PR-56 completed branching and cyclic enzyme-pathway assembly after
+PR #71 merged as `caa0a17`, PR-55 completed arbitrary
 supported-reaction onboarding after PR #70 merged as `6b3d275`, PR-54 completed
 caller-trusted Ed25519 curator
 authentication after PR #69 merged as `35a3ecb`, PR-53 completed product-map registry destination and
@@ -296,9 +298,16 @@ PR-56 slice adds explicit registry-owned `linear`, `branching`, and `cyclic`
 graph types, directed process/product-map state-role edges, connectivity and
 substrate-reachability checks, exact declared branch/cycle semantics, and
 conserved artificial branch/cycle execution through the standard solver. The
-recommended next slice is PR-57: dynamic thermodynamic feasibility and
-solver-enforcement through explicit activity/Q, redox/electron-balance, and
-process/reaction contracts without inferred chemistry.
+completed PR-57 slice adds optional dynamic thermodynamic constraints over
+explicitly bound molar states: sourced standard Gibbs or redox-derived energy,
+temperature, gas/Faraday constants, standard concentration, activity floor,
+tolerance, and provenance references; a passing bound electron/redox check;
+trajectory-derived ideal-dilute activities/Q and dynamic Gibbs energy; and
+native solver-time blocking of unfavorable nonnegative forward rates. It does
+not infer chemistry, supply silent constants, implement reverse fluxes or
+nonideal activities, or claim empirical validation. The current next PR is
+PR-58 broader provenance-backed biological laws, limited to mechanisms with
+explicit sources, maturity, parameters, assumptions, tests, and limitations.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
