@@ -16,6 +16,7 @@ from fungal_model.registry import (
     RegistryValidationError,
     ValueSpec,
     load_registry,
+    load_registry_record_mapping,
 )
 
 
@@ -29,6 +30,27 @@ def test_load_toy_registry_index() -> None:
     assert registry.registry_id == "toy_registry"
     assert registry.version == "0.1.0"
     assert registry.maturity == "development"
+    assert registry.product_maps == {}
+
+
+def test_product_map_record_loader_never_translates_participant_identity() -> None:
+    with pytest.raises(
+        RegistryLoadError,
+        match="does not translate participant identities",
+    ):
+        load_registry_record_mapping(
+            "product_maps",
+            {
+                "record_id": "nontext_participant_fixture",
+                "name": "Nontext participant fixture",
+                "maturity": "synthetic_fixture",
+                "provenance": {"source": "Synthetic software fixture."},
+                "notes": "Loader rejection fixture only.",
+                "product_map_type": "stoichiometric",
+                "reactants": {1: 1.0},
+                "products": {"product": 1.0},
+            },
+        )
 
 
 def test_load_toy_fungus_record() -> None:

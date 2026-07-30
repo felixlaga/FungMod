@@ -5,9 +5,10 @@ status.
 
 Scoped status after PR-49 merged as PR #64 (`bbe2ee6`), PR-50 written-source
 authoring merged as PR #65 (`933d2c8`), and bounded
-PR-51 registered nonidentity conversion merged as PR #66 (`bef938f`), and
-bounded PR-52 index-backed non-parameter authoring completion in the current
-checkout, with PR-53 selected:
+PR-51 registered nonidentity conversion merged as PR #66 (`bef938f`), bounded
+PR-52 index-backed non-parameter authoring merged as PR #67 (`5da611b`), and
+bounded PR-53 product-map ownership completion in the current
+checkout, with PR-54 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -20,8 +21,9 @@ CURATION-001: partial after PR-47 transactional apply, completed PR-48
 PARAMETER-only identity authoring, and completed PR-49 reusable public
 curation-bundle loading, and completed PR-50 checksum-loaded written-source
 authoring, completed PR-51 versioned nonidentity conversion, and completed
-PR-52 authoring for the five index-backed non-parameter families; product maps
-and curator authentication/signatures remain unsupported.
+PR-52 authoring for the original five index-backed non-parameter families and
+PR-53 product-map storage/authoring; curator authentication/signatures remain
+unsupported.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
@@ -204,7 +206,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-53: product-map registry destination and ownership contract**.
+Current next PR: **PR-54: authenticated curator-signature contract**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -282,7 +284,8 @@ only from the current index, rechecks full-root and target drift, stages and
 loader-validates a complete same-filesystem registry copy, excludes concurrent
 or reentrant cooperating writers, and swaps with verified rollback. Results
 record plan/confirmation binding, versions, digests, changed hashes, IDs, and
-transaction/cleanup state. Product maps remain blocked. No scientific fields,
+transaction/cleanup state. At that historical PR-47 checkpoint product maps
+remained blocked; PR-53 now supplies their explicit destination. No scientific fields,
 package version, solver/biology behavior, validation data, simulation
 authorization, or scientific-validation claim is added. Applicability is true
 only for at least one addable record with no conflict or blocked candidate;
@@ -332,10 +335,15 @@ written integrity, exact production-loader fidelity, and promotion/apply
 revalidation without mutating the production registry during authoring or
 planning.
 
-Recommended next task: PR-53 product-map registry destination and ownership
-contract. Define one production record schema, loader, owner, and
-index-declared destination before enabling curator-authored product-map
-promotion. Do not infer stoichiometry or authorize simulation automatically.
+PR-53 adds the index-owned `product_maps/product_maps.yml` destination, strict
+`ProductMapRecord` schema/loader, explicit runtime conversion, and
+curator-authored planning/apply support. State names and positive float
+coefficients are supplied exactly; no participant translation or
+stoichiometric inference is allowed.
+
+Recommended next task: PR-54 authenticated curator-signature contract. Add
+cryptographic curator authentication and trusted-public-key verification over
+the owned artifacts while keeping SHA-256 limited to consistency evidence.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

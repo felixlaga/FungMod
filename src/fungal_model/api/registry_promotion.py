@@ -82,6 +82,7 @@ _CURATION_TO_REGISTRY_KEY: Mapping[str, str] = {
     "parameter_records": "parameters",
     "process_compatibility": "process_compatibility",
     "case_templates": "case_templates",
+    "product_maps": "product_maps",
 }
 _SHA256_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
 _STRICT_VERSION_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
@@ -397,16 +398,6 @@ def plan_registry_promotion(
                     f"Authored parameter record {item.record_id!r} failed planning-registry "
                     f"revalidation: {exc}"
                 ) from exc
-
-        if item.record_type == "product_maps":
-            candidates.append(
-                _candidate(
-                    item,
-                    classification="blocked_unsupported",
-                    reason="unsupported_pending_destination_contract",
-                )
-            )
-            continue
 
         registry_key = _CURATION_TO_REGISTRY_KEY.get(item.record_type)
         if registry_key is None:
@@ -1344,7 +1335,7 @@ def _validate_apply_candidate_set(plan: RegistryPromotionPlan) -> None:
             curation_metadata=candidate.curation_metadata,
         )
         expected_key = _CURATION_TO_REGISTRY_KEY.get(candidate.record_type)
-        if expected_key is None or candidate.record_type == "product_maps":
+        if expected_key is None:
             raise RegistryPromotionApplyError(
                 f"Promotion apply does not support record type {candidate.record_type!r}."
             )

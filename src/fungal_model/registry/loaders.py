@@ -15,6 +15,7 @@ from fungal_model.registry.records import (
     EnvironmentRecord,
     FungusRecord,
     ParameterRecord,
+    ProductMapRecord,
     PARAMETER_ALLOWED_USE_EXPLORATORY,
     PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING,
     PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY,
@@ -36,6 +37,7 @@ RegistryRecordType = Literal[
     "enzyme_classes",
     "environments",
     "parameter_records",
+    "product_maps",
     "process_compatibility",
     "case_templates",
 ]
@@ -72,6 +74,11 @@ def load_registry(path: str | Path) -> FungModRegistry:
                 _process_compatibility_record,
             ),
             parameters=_load_records(index_path, records, "parameters", _parameter_record),
+            product_maps=(
+                _load_records(index_path, records, "product_maps", _product_map_record)
+                if "product_maps" in records
+                else ()
+            ),
             case_templates=(
                 _load_records(index_path, records, "case_templates", _case_template_record)
                 if "case_templates" in records
@@ -99,6 +106,7 @@ def load_registry_record_mapping(
     | EnzymeClassRecord
     | EnvironmentRecord
     | ParameterRecord
+    | ProductMapRecord
     | ProcessCompatibilityRecord
     | CaseTemplateRecord
 ):
@@ -110,6 +118,7 @@ def load_registry_record_mapping(
         "enzyme_classes": _enzyme_class_record,
         "environments": _environment_record,
         "parameter_records": _parameter_record,
+        "product_maps": _product_map_record,
         "process_compatibility": _process_compatibility_record,
         "case_templates": _case_template_record,
     }
@@ -208,6 +217,49 @@ def _environment_record(data: Mapping[str, Any]) -> EnvironmentRecord:
             if isinstance(value, Mapping)
         },
     )
+
+
+def _product_map_record(data: Mapping[str, Any]) -> ProductMapRecord:
+    reactants = data.get("reactants", {}) or {}
+    products = data.get("products", {}) or {}
+    if not isinstance(reactants, Mapping) or not isinstance(products, Mapping):
+        raise RegistryLoadError(
+            "product_maps.reactants and product_maps.products must be mappings."
+        )
+    return ProductMapRecord(
+        **_common_record_fields(data),
+        product_map_type=str(data.get("product_map_type", "")),
+        reactants=_product_map_terms(reactants, field_name="reactants"),
+        products=_product_map_terms(products, field_name="products"),
+    )
+
+
+def _product_map_terms(
+    values: Mapping[Any, Any],
+    *,
+    field_name: str,
+) -> dict[str, float]:
+    output: dict[str, float] = {}
+    for state, value in values.items():
+        if not isinstance(state, str):
+            raise RegistryLoadError(
+                f"product_maps.{field_name} state names must be explicit text; "
+                "the production loader does not translate participant identities."
+            )
+        output[state] = _product_map_coefficient(
+            value,
+            field_name=f"{field_name}.{state}",
+        )
+    return output
+
+
+def _product_map_coefficient(value: Any, *, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, float):
+        raise RegistryLoadError(
+            f"product_maps.{field_name} must be an explicit float; "
+            "the production loader does not infer or convert coefficients."
+        )
+    return value
 
 
 def _process_compatibility_record(data: Mapping[str, Any]) -> ProcessCompatibilityRecord:
@@ -552,4 +604,5 @@ __all__ = [
     "RegistryLoadError",
     "load_parameter_record_mapping",
     "load_registry",
+    "load_registry_record_mapping",
 ]

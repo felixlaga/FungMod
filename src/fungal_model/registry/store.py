@@ -12,6 +12,7 @@ from fungal_model.registry.records import (
     EnvironmentRecord,
     FungusRecord,
     ParameterRecord,
+    ProductMapRecord,
     ProcessCompatibilityRecord,
     PROCESS_COMPATIBILITY_SCOPE_COMPONENT,
     PROCESS_COMPATIBILITY_SCOPE_STANDALONE,
@@ -51,6 +52,7 @@ class FungModRegistry:
     process_compatibility: dict[str, ProcessCompatibilityRecord]
     parameters: dict[str, ParameterRecord]
     case_templates: dict[str, CaseTemplateRecord]
+    product_maps: dict[str, ProductMapRecord]
 
     @classmethod
     def build(
@@ -67,6 +69,7 @@ class FungModRegistry:
         process_compatibility: Iterable[ProcessCompatibilityRecord],
         parameters: Iterable[ParameterRecord],
         case_templates: Iterable[CaseTemplateRecord] = (),
+        product_maps: Iterable[ProductMapRecord] = (),
     ) -> "FungModRegistry":
         registry = cls(
             registry_id=registry_id,
@@ -80,6 +83,7 @@ class FungModRegistry:
             process_compatibility=_records_by_id(process_compatibility, "process_compatibility"),
             parameters=_records_by_id(parameters, "parameters"),
             case_templates=_records_by_id(case_templates, "case_templates"),
+            product_maps=_records_by_id(product_maps, "product_maps"),
         )
         registry.validate_process_compatibility_authority_graph()
         return registry
@@ -98,6 +102,11 @@ class FungModRegistry:
 
     def get_case_template(self, record_id: str) -> CaseTemplateRecord:
         return _lookup(self.case_templates, record_id, "case template")
+
+    def get_product_map(self, record_id: str) -> ProductMapRecord:
+        """Return one storage-owned product-map record."""
+
+        return _lookup(self.product_maps, record_id, "product map")
 
     def get_process_compatibility(
         self,
@@ -310,6 +319,7 @@ class FungModRegistry:
                 "process_compatibility": [record.to_dict() for record in self.process_compatibility.values()],
                 "parameters": [record.to_dict() for record in self.parameters.values()],
                 "case_templates": [record.to_dict() for record in self.case_templates.values()],
+                "product_maps": [record.to_dict() for record in self.product_maps.values()],
             },
         }
 

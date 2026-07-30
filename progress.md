@@ -26,13 +26,86 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-53 CURATION-001 Product-Map Registry Ownership
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout. CURATION-001 remains `partial`
+only for authenticated curator signatures.
+
+Completed in this pass:
+
+- Added the index-owned `data_registry/product_maps/product_maps.yml`
+  destination and a strict `ProductMapRecord` schema owned by
+  `FungModRegistry`.
+- Added production loading and exact single-record loader support for explicit
+  `one_to_one` and `stoichiometric` maps. Reactant/product state names and
+  finite positive float coefficients are required exactly; integers, booleans,
+  missing mappings, unsupported types, and invalid coefficients fail closed.
+- Added explicit conversion from a validated storage record to the existing
+  runtime `ProductReleaseMap` without translating participant identities or
+  coefficients.
+- Extended `author_registry_records(...)`, promotion planning, written-plan
+  validation, and transactional apply to the index-declared `product_maps`
+  destination through the existing source-identity, reserved audit/digest,
+  loader-fidelity, no-overwrite, drift, staging, rollback, and no-mutation
+  controls.
+
+Tests added or modified:
+
+- Extended registry loading, record-authoring, promotion-plan, and
+  transactional-apply coverage for product-map storage ownership, explicit
+  coefficient typing, exact destination resolution, runtime conversion, and
+  copied-registry apply.
+- Updated the active roadmap status contract to select PR-54 authenticated
+  curator signatures.
+
+What did not change: the indexed product-map file contains no scientific
+records. No source participant is automatically mapped to a runtime state, no
+stoichiometry is inferred or converted, and no process law, solver, configured
+model, output schema, validation data, calibration, empirical comparison,
+scientific-validation status, or automatic simulation authorization changed.
+
+Scientific behavior impact: none until a caller explicitly selects a valid
+promoted map and converts it to the existing runtime type. The conversion
+preserves the exact stored states and coefficients.
+
+Backward compatibility: registry indexes without a `product_maps` key still
+load with an empty product-map mapping. Existing file-backed and inline config
+product-map loaders retain their behavior. Promotion into product maps is now
+available only where the current index explicitly declares the destination.
+
+Remaining ambiguity and risk: exact schema and loader fidelity do not prove
+that curator-supplied state identities or stoichiometry are scientifically
+correct. SHA-256 still proves internal consistency only and does not
+authenticate the curator.
+
+Risk level: medium scientific-metadata risk, bounded by explicit float-only
+coefficients, no participant conversion, strict loader round trips, reserved
+integrity evidence, no overwrite, full staged-registry validation, and copied
+registry apply tests.
+
+Recommended next task: PR-54, add an authenticated curator-signature and
+trusted-public-key verification contract while keeping checksums scoped to
+internal consistency.
+
+Verification:
+
+- Focused registry/authoring/promotion/apply/roadmap suites: `164 passed`.
+- Ruff over `src` and `tests`: `All checks passed!`.
+- Pyright with the documented venv interpreter: `0 errors, 0 warnings, 0
+  informations`.
+- Canonical pytest with coverage: `1172 passed in 513.75s`; total coverage
+  `83.96%`, above the required `80.0%`.
+- `git diff --check`: passed.
+
 ## PR-52 CURATION-001 Non-Parameter Registry-Record Authoring
 
 Date: 2026-07-30
 
-Status: `complete` in the current checkout for the five index-backed
+Status: `complete` after PR #67 merged as `5da611b` for the five index-backed
 non-parameter record families. PR-51 is `complete` after PR #66 merged as
-`bef938f`. CURATION-001 remains `partial` for product-map destination
+`bef938f`. At that checkpoint CURATION-001 remained `partial` for product-map destination
 ownership and curator authentication/signatures.
 
 Completed in this pass:
