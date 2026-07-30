@@ -66,13 +66,29 @@ class ChainConservationSpec:
 
 
 @dataclass(frozen=True)
-class ChainTopologySpec:
-    """Validated ordered topology for a non-branching process chain."""
+class ChainTopologyEdge:
+    """One explicit directed state-role edge owned by a process/product map."""
 
+    process_id: str
+    product_map_id: str
+    reactant_role: str
+    product_role: str
+
+
+@dataclass(frozen=True)
+class ChainTopologySpec:
+    """Validated executable topology for a registry-owned process graph."""
+
+    topology_type: str
     process_ids: tuple[str, ...]
     product_map_ids: tuple[str, ...]
     state_roles: tuple[str, ...]
     state_names: tuple[str, ...]
+    edges: tuple[ChainTopologyEdge, ...]
+    entry_state_roles: tuple[str, ...]
+    terminal_state_roles: tuple[str, ...]
+    has_branching: bool
+    has_cycles: bool
 
 
 @dataclass(frozen=True)
@@ -256,8 +272,9 @@ def _chain_spec(
             f"Template {template.case_template_id!r} has unsupported config_mode {raw_mode!r}."
         )
     _validate_product_map_ids(template, product_maps)
-    topology = _linear_chain_topology(
+    topology = _chain_topology(
         template=template,
+        metadata=metadata,
         processes=processes,
         product_maps=product_maps,
         state_roles=state_roles,
@@ -864,21 +881,39 @@ def _validate_process_templates(
                 )
 
 
-def _linear_chain_topology(
+def _chain_topology(
     *,
     template: CaseTemplateRecord,
+    metadata: Mapping[str, Any],
     processes: Sequence[Mapping[str, Any]],
     product_maps: Sequence[Mapping[str, Any]],
     state_roles: Mapping[str, str],
 ) -> ChainTopologySpec:
     template_id = template.case_template_id
-    if len(processes) < 2:
+    topology_type = _required_text(
+        metadata,
+        "topology_type",
+        field_name="process_state_metadata",
+    )
+    if topology_type not in {"linear", "branching", "cyclic"}:
         raise EnzymeChainAssemblyError(
-            f"Template {template_id!r} must declare at least two ordered process_templates for a linear chain."
+            f"Template {template_id!r} declares unsupported topology_type "
+            f"{topology_type!r}; expected 'linear', 'branching', or 'cyclic'."
+        )
+    if len(processes) < 2:
+        if topology_type == "linear":
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} must declare at least two ordered "
+                "process_templates for a linear chain."
+            )
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} must declare at least two process_templates "
+            f"for a {topology_type} pathway."
         )
     if len(product_maps) != len(processes):
         raise EnzymeChainAssemblyError(
-            f"Template {template_id!r} linear chain must declare exactly one product map per process template; "
+            f"Template {template_id!r} {topology_type} pathway must declare exactly "
+            "one product map per process template; "
             f"found {len(product_maps)} product maps and {len(processes)} processes."
         )
 
@@ -888,9 +923,15 @@ def _linear_chain_topology(
     }
     process_ids: list[str] = []
     product_map_ids: list[str] = []
-    links: list[tuple[str, str]] = []
-    for index, process in enumerate(processes):
+    edges: list[ChainTopologyEdge] = []
+    ordered_roles: list[str] = []
+    for process in processes:
         process_id = _required_text(process, "id", field_name="process_state_metadata.process_templates")
+        process_type = _required_text(
+            process,
+            "process_type",
+            field_name=f"process_template {process_id}",
+        )
         if process_id in process_ids:
             raise EnzymeChainAssemblyError(
                 f"Template {template_id!r} repeats process template id {process_id!r}."
@@ -900,21 +941,43 @@ def _linear_chain_topology(
         map_id = _required_text(process, "product_map", field_name=f"process_template {process_id}")
         if map_id in product_map_ids:
             raise EnzymeChainAssemblyError(
-                f"Template {template_id!r} non-linear chain reuses product map {map_id!r}; "
-                "branching and cycles are unsupported."
+                f"Template {template_id!r} reuses product map {map_id!r}; every "
+                "pathway process must own one distinct product map."
+            )
+        if map_id not in maps_by_id:
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} process {process_id!r} references "
+                f"unknown product map {map_id!r}."
             )
         product_map_ids.append(map_id)
         product_map = maps_by_id[map_id]
         reactants = _mapping(product_map.get("reactants"), field_name=f"product_map {map_id}.reactants")
         products = _mapping(product_map.get("products"), field_name=f"product_map {map_id}.products")
-        if len(reactants) != 1 or len(products) != 1:
+        if len(reactants) != 1:
             raise EnzymeChainAssemblyError(
-                f"Template {template_id!r} product map {map_id!r} is non-linear: linear chains require "
-                "exactly one reactant role and one product role per step; branching is unsupported."
+                f"Template {template_id!r} product map {map_id!r} must declare "
+                "exactly one reactant role because each implemented pathway "
+                "process has one explicit rate-law input."
             )
         reactant_role = str(next(iter(reactants)))
-        product_role = str(next(iter(products)))
-        for role in (reactant_role, product_role):
+        reactant_coefficient = _positive_finite_float(
+            reactants[reactant_role],
+            field_name=f"product_map {map_id}.reactants.{reactant_role}",
+        )
+        if process_type == "homogeneous_michaelis_menten" and not math.isclose(
+            reactant_coefficient,
+            1.0,
+            rel_tol=1.0e-12,
+            abs_tol=1.0e-12,
+        ):
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} homogeneous process {process_id!r} "
+                f"requires reactant coefficient 1.0 in product map {map_id!r}; "
+                "the implemented rate contribution consumes one substrate "
+                "equivalent per rate extent."
+            )
+        product_roles = tuple(str(role) for role in products)
+        for role in (reactant_role, *product_roles):
             if role not in state_roles:
                 raise EnzymeChainAssemblyError(
                     f"Template {template_id!r} product map {map_id!r} references unknown state role {role!r}."
@@ -932,43 +995,218 @@ def _linear_chain_topology(
             )
         process_input_role = str(process_state_roles[input_fields[0]])
         process_product_role = str(process_state_roles["product"])
-        if process_input_role != reactant_role or process_product_role != product_role:
+        if process_input_role != reactant_role or process_product_role not in product_roles:
             raise EnzymeChainAssemblyError(
                 f"Template {template_id!r} process {process_id!r} state-role mapping does not match product map "
-                f"{map_id!r}: expected {reactant_role!r} -> {product_role!r}."
+                f"{map_id!r}: expected input {reactant_role!r} and one of product roles "
+                f"{product_roles!r}."
             )
-        if links and links[-1][1] != reactant_role:
-            raise EnzymeChainAssemblyError(
-                f"Template {template_id!r} process {process_id!r} is disconnected or non-linear: ordered step "
-                f"{index + 1} consumes {reactant_role!r}, but the previous step produces {links[-1][1]!r}. "
-                "Branching and reordered steps are unsupported."
+        for role in (reactant_role, *product_roles):
+            if role not in ordered_roles:
+                ordered_roles.append(role)
+        edges.extend(
+            ChainTopologyEdge(
+                process_id=process_id,
+                product_map_id=map_id,
+                reactant_role=reactant_role,
+                product_role=product_role,
             )
-        links.append((reactant_role, product_role))
+            for product_role in product_roles
+        )
 
     unused_maps = sorted(set(maps_by_id).difference(product_map_ids))
     if unused_maps:
         raise EnzymeChainAssemblyError(
-            f"Template {template_id!r} has disconnected product map(s) not used by the ordered process chain: "
+            f"Template {template_id!r} has product map(s) not owned by a pathway process: "
             f"{', '.join(unused_maps)}."
         )
-    topology_roles = (links[0][0], *(product_role for _, product_role in links))
+
+    topology_roles = tuple(ordered_roles)
     topology_names = tuple(state_roles[role] for role in topology_roles)
-    if len(set(topology_roles)) != len(topology_roles) or len(set(topology_names)) != len(topology_names):
+    if len(set(topology_names)) != len(topology_names):
         raise EnzymeChainAssemblyError(
-            f"Template {template_id!r} declares a cycle or repeated state in its ordered process chain; "
-            "only acyclic linear chains are supported."
+            f"Template {template_id!r} maps multiple pathway roles to the same "
+            "state name; topology roles must have distinct runtime states."
         )
-    if topology_roles[0] != "substrate" or topology_roles[-1] != "product":
+    if "substrate" not in topology_roles or "product" not in topology_roles:
         raise EnzymeChainAssemblyError(
-            f"Template {template_id!r} linear chain must start at state role 'substrate' and end at state role "
-            f"'product'; found {topology_roles[0]!r} -> {topology_roles[-1]!r}."
+            f"Template {template_id!r} {topology_type} pathway must include the "
+            "declared 'substrate' and 'product' endpoint roles."
         )
+    _require_connected_topology(template_id=template_id, roles=topology_roles, edges=edges)
+    predecessors = {role: set[str]() for role in topology_roles}
+    successors = {role: set[str]() for role in topology_roles}
+    for edge in edges:
+        successors[edge.reactant_role].add(edge.product_role)
+        predecessors[edge.product_role].add(edge.reactant_role)
+    in_degree = {role: len(predecessors[role]) for role in topology_roles}
+    out_degree = {role: len(successors[role]) for role in topology_roles}
+    entry_roles = tuple(role for role in topology_roles if in_degree[role] == 0)
+    terminal_roles = tuple(role for role in topology_roles if out_degree[role] == 0)
+    has_branching = any(
+        in_degree[role] > 1 or out_degree[role] > 1
+        for role in topology_roles
+    )
+    has_cycles = _has_directed_cycle(roles=topology_roles, edges=edges)
+
+    if topology_type == "linear":
+        _validate_linear_topology(
+            template_id=template_id,
+            processes=processes,
+            edges=edges,
+            state_roles=state_roles,
+        )
+    else:
+        reachable = _directed_reachable("substrate", edges)
+        missing_from_substrate = sorted(set(topology_roles).difference(reachable))
+        if missing_from_substrate:
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} {topology_type} pathway has state "
+                "roles not reachable from 'substrate': "
+                f"{', '.join(missing_from_substrate)}."
+            )
+        if topology_type == "branching":
+            if has_cycles:
+                raise EnzymeChainAssemblyError(
+                    f"Template {template_id!r} declares topology_type='branching' "
+                    "but contains a directed cycle; use topology_type='cyclic'."
+                )
+            if not has_branching:
+                raise EnzymeChainAssemblyError(
+                    f"Template {template_id!r} declares topology_type='branching' "
+                    "but has no divergent or convergent state."
+                )
+            if in_degree["substrate"] != 0 or out_degree["product"] != 0:
+                raise EnzymeChainAssemblyError(
+                    f"Template {template_id!r} branching pathway requires "
+                    "'substrate' to be an entry role and 'product' to be a terminal role."
+                )
+        elif not has_cycles:
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} declares topology_type='cyclic' but "
+                "contains no directed cycle."
+            )
+
     return ChainTopologySpec(
+        topology_type=topology_type,
         process_ids=tuple(process_ids),
         product_map_ids=tuple(product_map_ids),
         state_roles=topology_roles,
         state_names=topology_names,
+        edges=tuple(edges),
+        entry_state_roles=entry_roles,
+        terminal_state_roles=terminal_roles,
+        has_branching=has_branching,
+        has_cycles=has_cycles,
     )
+
+
+def _validate_linear_topology(
+    *,
+    template_id: str,
+    processes: Sequence[Mapping[str, Any]],
+    edges: Sequence[ChainTopologyEdge],
+    state_roles: Mapping[str, str],
+) -> None:
+    if len(edges) != len(processes):
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} product map is non-linear: linear chains "
+            "require exactly one product role per step; branching is unsupported."
+        )
+    links = [(edge.reactant_role, edge.product_role) for edge in edges]
+    for index, (reactant_role, _) in enumerate(links[1:], start=1):
+        previous_product = links[index - 1][1]
+        if previous_product != reactant_role:
+            raise EnzymeChainAssemblyError(
+                f"Template {template_id!r} process "
+                f"{edges[index].process_id!r} is disconnected or non-linear: "
+                f"ordered step {index + 1} consumes {reactant_role!r}, but the "
+                f"previous step produces {previous_product!r}. Branching and "
+                "reordered steps are unsupported."
+            )
+    ordered_roles = (links[0][0], *(product for _, product in links))
+    ordered_names = tuple(state_roles[role] for role in ordered_roles)
+    if len(set(ordered_roles)) != len(ordered_roles) or len(set(ordered_names)) != len(ordered_names):
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} declares a cycle or repeated state in "
+            "its ordered process chain; only acyclic linear chains are supported."
+        )
+    if ordered_roles[0] != "substrate" or ordered_roles[-1] != "product":
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} linear chain must start at state role "
+            "'substrate' and end at state role 'product'; found "
+            f"{ordered_roles[0]!r} -> {ordered_roles[-1]!r}."
+        )
+
+
+def _require_connected_topology(
+    *,
+    template_id: str,
+    roles: Sequence[str],
+    edges: Sequence[ChainTopologyEdge],
+) -> None:
+    adjacency = {role: set[str]() for role in roles}
+    for edge in edges:
+        adjacency[edge.reactant_role].add(edge.product_role)
+        adjacency[edge.product_role].add(edge.reactant_role)
+    visited: set[str] = set()
+    pending = [roles[0]]
+    while pending:
+        role = pending.pop()
+        if role in visited:
+            continue
+        visited.add(role)
+        pending.extend(adjacency[role].difference(visited))
+    missing = sorted(set(roles).difference(visited))
+    if missing:
+        raise EnzymeChainAssemblyError(
+            f"Template {template_id!r} pathway graph is disconnected; "
+            f"unreachable state roles: {', '.join(missing)}."
+        )
+
+
+def _directed_reachable(
+    start_role: str,
+    edges: Sequence[ChainTopologyEdge],
+) -> set[str]:
+    adjacency: dict[str, set[str]] = {}
+    for edge in edges:
+        adjacency.setdefault(edge.reactant_role, set()).add(edge.product_role)
+    visited: set[str] = set()
+    pending = [start_role]
+    while pending:
+        role = pending.pop()
+        if role in visited:
+            continue
+        visited.add(role)
+        pending.extend(adjacency.get(role, set()).difference(visited))
+    return visited
+
+
+def _has_directed_cycle(
+    *,
+    roles: Sequence[str],
+    edges: Sequence[ChainTopologyEdge],
+) -> bool:
+    adjacency = {role: set[str]() for role in roles}
+    for edge in edges:
+        adjacency[edge.reactant_role].add(edge.product_role)
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(role: str) -> bool:
+        if role in visiting:
+            return True
+        if role in visited:
+            return False
+        visiting.add(role)
+        if any(visit(product) for product in adjacency[role]):
+            return True
+        visiting.remove(role)
+        visited.add(role)
+        return False
+
+    return any(visit(role) for role in roles if role not in visited)
 
 
 def _conservation_spec(
@@ -1231,13 +1469,24 @@ def _case_template_config(chain: ChainTemplateSpec) -> dict[str, Any]:
         "observable_roles": list(chain.template.observable_roles),
         "output_state_roles": dict(chain.template.output_state_roles),
         "chain_topology": {
-            "topology_type": "linear",
+            "topology_type": chain.topology.topology_type,
             "process_ids": list(chain.topology.process_ids),
             "product_map_ids": list(chain.topology.product_map_ids),
             "state_roles": list(chain.topology.state_roles),
             "state_names": list(chain.topology.state_names),
-            "branching_supported": False,
-            "cycles_supported": False,
+            "edges": [
+                {
+                    "process_id": edge.process_id,
+                    "product_map_id": edge.product_map_id,
+                    "reactant_role": edge.reactant_role,
+                    "product_role": edge.product_role,
+                }
+                for edge in chain.topology.edges
+            ],
+            "entry_state_roles": list(chain.topology.entry_state_roles),
+            "terminal_state_roles": list(chain.topology.terminal_state_roles),
+            "branching_supported": chain.topology.has_branching,
+            "cycles_supported": chain.topology.has_cycles,
         },
         "limitations": list(chain.template.limitations),
         "validity_notes": list(chain.template.validity_notes),

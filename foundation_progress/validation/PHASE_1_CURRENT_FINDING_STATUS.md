@@ -2,9 +2,9 @@
 
 Reviewed baseline commit: `95253b838afdd645be67e9e6ebceab6f703cd9e3`
 
-PR-42 implementation branch: `codex/pr42-linear-chain-generalization`
+Current implementation branch: `agent/pr-56-branching-cyclic-pathways`
 
-Verified at: `2026-07-12`
+Verified at: `2026-07-30`
 
 This report summarizes the Phase 1 reconciled critical/high audit claims.
 Detailed current evidence is in `findings.yaml`; P1.3 and P1.4 superseded the
@@ -24,8 +24,8 @@ initial P1.2 execution-path and process-to-`Reaction` adapter rows.
 | P1-AUDIT-ENV-001 | high | partially_resolved | medium | Environment modifiers and metadata-only grid guards exist. | No validated general environmental response model. | Future ENV response task. |
 | P1-AUDIT-SUBSTRATE-001 | high | stale | medium | Non-PET substrates and BIO-001/BIO-002 paths exist. | Breadth is not empirical validation. | Keep maturity labels. |
 | P1-AUDIT-BIO001-001 | high | partially_resolved | medium | Product amount naming and proxy labelling are fixed. | BIO-001 remains exploratory and unvalidated. | Future validation-data task. |
-| P1-AUDIT-BIO002-001 | high | partially_resolved | medium | Arbitrary-length linear chain genericity is tested with an unrelated artificial three-step framework benchmark; existing two-step behavior is preserved. | Not empirical validation or arbitrary pathway biology; branching and cycles remain unsupported. | Preserve template-specific claims and topology guardrails. |
-| P1-AUDIT-CHAIN-001 | high | partially_resolved | medium | Ordered acyclic linear chains of two or more existing process-law steps are supported; disconnected, branching, cyclic, and malformed topologies fail before execution. | Complex graph/pathway claims remain unsupported and scientifically unvalidated. | Future graph-topology task only if explicitly justified. |
+| P1-AUDIT-BIO002-001 | high | partially_resolved | medium | Linear, branching, and cyclic graph genericity is tested with unrelated artificial conserved framework fixtures; existing two-step behavior is preserved. | Not empirical validation or broad provenance-backed pathway biology. | Preserve template-specific claims and topology guardrails; add biology only through the active evidence rule. |
+| P1-AUDIT-CHAIN-001 | high | resolved | none | Explicit linear, branching, and cyclic graphs over existing process laws validate directed process/map edges, connectivity, substrate reachability, declared graph shape, state identity, and conservation before execution. | Graph support does not validate biology or implement unsupported rate laws. | Preserve graph and conservation guardrails. |
 | V001-PC001 | critical | partially_resolved | high | Versioned schema and data dictionary exist; some standard outputs remain absent. | Schema does not validate predictions. | Later schema/output task. |
 | V001-PC002 | high | resolved | none | Public scientific simulation exists and rejects inappropriate inputs. | Scientific means exact/unvalidated. | Preserve output labels. |
 | V001-PC003 | critical | resolved | none | BIO-001 no longer emits mass-valued concentration wording. | BIO-001 remains exploratory. | Preserve tests. |

@@ -75,6 +75,22 @@ def test_bio002_chain_config_assembles_two_generic_processes_from_template() -> 
             "cellobiose_concentration",
             "beta_D_glucose_concentration",
         ],
+        "edges": [
+            {
+                "process_id": "bio002_surface_cellulose_to_cellobiose",
+                "product_map_id": "bio002_cellulose_to_cellobiose_map",
+                "reactant_role": "substrate",
+                "product_role": "intermediate",
+            },
+            {
+                "process_id": "bio002_cellobiose_to_glucose_mm",
+                "product_map_id": "bio002_cellobiose_to_glucose_map",
+                "reactant_role": "intermediate",
+                "product_role": "product",
+            },
+        ],
+        "entry_state_roles": ["substrate"],
+        "terminal_state_roles": ["product"],
         "branching_supported": False,
         "cycles_supported": False,
     }

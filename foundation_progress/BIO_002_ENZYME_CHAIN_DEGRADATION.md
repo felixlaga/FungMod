@@ -1,19 +1,27 @@
-# BIO-002: Reusable Extracellular Enzyme-Chain Degradation
+# BIO-002: Reusable Extracellular Enzyme-Pathway Degradation
 
 ## Mechanism Scope
 
-BIO-002 assembly supports reusable arbitrary-length linear extracellular
-process chains with a minimum of two steps:
+BIO-002 assembly supports reusable extracellular process graphs with a minimum
+of two steps and an explicit `topology_type` of `linear`, `branching`, or
+`cyclic`:
 
 ```text
-substrate pool -> intermediate 1 -> ... -> intermediate N -> product
+linear:    substrate -> intermediate 1 -> ... -> product
+branching: substrate -> one or more explicit downstream paths
+cyclic:    one or more explicit directed state-role cycles
 ```
 
-The ordered process templates and their one-reactant/one-product stoichiometric
-maps define the chain topology. Every step must consume the preceding step's
-product, every topology state must be unique, and the chain must begin at the
-`substrate` role and end at the `product` role. Branching, cycles, reordered
-steps, disconnected maps, and graph-style pathways fail before model execution.
+Process templates and their distinct stoichiometric maps define the graph.
+Every implemented process has one explicit rate-law input; a map may declare
+one or more products so one process can create explicit divergent edges.
+Linear topology retains ordered contiguous one-product steps and unique states.
+Branching topology must contain an actual divergence or convergence, remain
+acyclic, and be reachable from the `substrate` role. Cyclic topology must
+contain an actual directed cycle and remain reachable from `substrate`.
+All graph forms must include `substrate` and `product`, use distinct runtime
+states for topology roles, remain connected, agree exactly with process state
+roles, and satisfy the declared conservation weights before execution.
 
 The generic Python assembler does not know the biological identities used by a
 demonstration case. It reads the following from the registry case template:
@@ -22,7 +30,7 @@ demonstration case. It reads the following from the registry case template:
 entity IDs, loaders, names, and metadata
 state names, roles, units, and initial values
 surface and homogeneous catalyst states
-ordered process sequence, process types, and linear state topology
+process sequence, process types, declared graph type, and directed state edges
 parameter-record IDs
 product-map IDs and stoichiometric coefficients
 conserved-equivalent weights
@@ -44,7 +52,7 @@ run_extracellular_enzyme_chain_demo(...)
 write_enzyme_chain_standard_tables(...)
 ```
 
-## Backward-Compatible Demonstration Template
+## Backward-Compatible Linear Demonstration Template
 
 The current registry template remains the two-step BIO-002 demonstration:
 
@@ -102,10 +110,20 @@ conserved weights: 1, 2/3, 1/3, 1/9
 
 It assembles and runs through `run_configured_model` using the same generic
 code, maps an existing product-inhibition modifier on the third step, preserves
-the declared conserved equivalent, and writes configured standard outputs. It
-is software verification only, not scientific biology, validation data, or
-calibration evidence. The test also guards against reintroducing demonstration
-biological names into the generic assembler.
+the declared conserved equivalent, and writes configured standard outputs.
+The same fixture is copied and modified in tests to execute:
+
+```text
+branching: polymer_X -> oligomer_Y and fragment_Q -> monomer_Z
+cyclic:    polymer_X -> oligomer_Y -> fragment_Q -> polymer_X
+                                      \-> monomer_Z
+```
+
+Those graph fixtures preserve the same explicit conserved equivalent and run
+through the standard configured solver. They are software verification only,
+not scientific biology, validation data, or calibration evidence. The test
+also guards against reintroducing demonstration biological names into the
+generic assembler.
 
 ## Validation and Failure Modes
 
@@ -122,9 +140,13 @@ output metrics that reference unknown roles or derived series
 fewer than two process steps
 process/product-map count mismatches
 process state-role mappings that disagree with stoichiometric maps
-disconnected or reordered steps
-multi-reactant or multi-product branching maps
-cycles or repeated topology states
+missing or unsupported topology types
+disconnected graphs or states unreachable from the declared substrate role
+linear graphs with reordered, branching, cyclic, or repeated topology states
+branching declarations without an actual divergence/convergence
+branching declarations that contain a directed cycle
+cyclic declarations without an actual directed cycle
+multiple roles aliased to one runtime topology state
 ```
 
 The real mechanism proposal is machine-readable:
@@ -155,11 +177,9 @@ lignin
 full lignocellulose
 organism-specific behavior
 experimental validation across biological systems
-branching process graphs
-cyclic pathways
 ```
 
 The first configured surface step uses exploratory scaffold parameters unless a
 case supplies calibrated evidence. The current work establishes reusable
-architecture and software verification, not Atmodeller-level scientific
-validation.
+linear/branching/cyclic pathway architecture and software verification, not
+Atmodeller-level scientific validation or broader biological pathway coverage.

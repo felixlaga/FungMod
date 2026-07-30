@@ -3,9 +3,9 @@
 ## Status
 
 Complete for arbitrary onboarding of reactions supported by the implemented
-homogeneous Michaelis-Menten process law after PR-55. Surface and chain
-assembly remain template-backed for their existing scopes; branching and
-cyclic pathway topology is a separate follow-up.
+homogeneous Michaelis-Menten process law after PR-55 and for template-backed
+surface plus explicit linear, branching, and cyclic enzyme-pathway assembly
+after PR-56.
 
 ASSEMBLY-001 moves case-specific assembly metadata for the current registry-run
 cases into explicit registry case templates. The change is architectural only:
@@ -165,6 +165,11 @@ Michaelis-Menten law requires:
 - explicit config, process, parameter-set, and product-map identities in
   `process_state_metadata`;
 - explicit provenance source and confidence metadata.
+
+Pathway templates additionally require an explicit `topology_type`, distinct
+process-owned product maps, directed state-role edges with one implemented
+rate-law input and one or more explicit products, conservation weights, and
+graph semantics that match the declared linear, branching, or cyclic shape.
 
 An unsupported rate law remains an explicit blocker and requires a separately
 provenance-backed, maturity-labelled, tested mechanism implementation. This

@@ -26,13 +26,97 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-56 Branching And Cyclic Enzyme-Pathway Assembly
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout for explicit linear, branching, and
+cyclic graphs over already implemented configured process laws.
+
+Completed in this pass:
+
+- Replaced the linear-only topology parser with an explicit registry-owned
+  `topology_type` contract admitting only `linear`, `branching`, or `cyclic`.
+- Derived directed state-role edges from each distinct process-owned
+  stoichiometric map while retaining one explicit implemented rate-law input
+  and allowing one or more explicit product edges.
+- Added fail-closed validation for graph connectivity, substrate reachability,
+  distinct runtime topology states, process/map role agreement, declared
+  branch/cycle shape, map ownership, endpoints, and conservation.
+- Preserved stricter ordered, contiguous, acyclic, one-product semantics for
+  templates that declare `linear`.
+- Emitted process/map-owned edges, entry roles, terminal roles, and actual
+  branch/cycle flags in inspectable `case_template.chain_topology` metadata.
+- Kept the production BIO-002 template explicitly linear and unchanged in its
+  processes, scientific metadata, parameters, state names, stoichiometry,
+  outputs, and numerical behavior.
+
+Tests added or modified:
+
+- Added a test-local artificial branching graph with one process producing two
+  conserved downstream states; it assembles and runs through the standard
+  configured solver.
+- Added a test-local artificial cyclic graph with an explicit conserved return
+  edge and terminal product edge; it assembles and runs through the same path.
+- Added fail-closed tests for missing topology type, a declared branching graph
+  without a branch, and a declared cyclic graph without a cycle.
+- Updated the existing artificial three-step and production two-step topology
+  assertions for explicit edges and entry/terminal roles while preserving
+  existing malformed-linear rejection coverage.
+
+What did not change: no production biological identity, production parameter,
+source record, process rate law, numerical equation, solver setting, output
+table schema, validation data, calibration, empirical comparison, or
+simulation authorization changed. Graph fixtures are artificial software
+evidence only.
+
+Scientific behavior impact: existing production runs are unchanged. New graph
+execution occurs only when templates explicitly own every process, map, state,
+coefficient, parameter, topology type, and conservation weight and the process
+laws already exist.
+
+Backward compatibility: the existing BIO-002 helper signatures, production
+linear configuration, process/state IDs, outputs, and two-step behavior remain
+supported. `case_template.chain_topology` gains additive edge and
+entry/terminal metadata. Enzyme-pathway templates must now declare their
+topology type explicitly instead of receiving an implicit linear default.
+
+Remaining ambiguity and risk: graph execution does not make a pathway
+biologically supported. Multi-reactant rate-law semantics, broader pathway
+laws, whole-fungus physiology, and empirical validity remain separate
+provenance-backed work. Dynamic thermodynamic feasibility is not yet enforced
+by the solver.
+
+Risk level: medium architecture risk, bounded by explicit topology ownership,
+pre-execution graph/conservation checks, executable conserved branch/cycle
+fixtures, preserved linear regressions, and no production biology changes.
+
+Recommended next task: PR-57, implement explicit provenance-bound activity or
+reaction-quotient inputs, dynamic Gibbs feasibility, redox/electron balance,
+and solver-time process enforcement without inferred chemistry or silent
+constants.
+
+Verification:
+
+- Focused BIO-002 linear/branching/cyclic and roadmap suite: `39 passed in
+  16.37s`.
+- Broader pathway/configuration/registry/roadmap regression suite: `198 passed
+  in 28.14s`.
+- Ruff over the repository's documented `src` and `tests` gate: `All checks
+  passed!`.
+- Pyright with the documented venv interpreter: `0 errors, 0 warnings, 0
+  informations`.
+- Canonical pytest with coverage: `1192 passed in 485.32s`; total coverage
+  `83.99%`, above the required `80%`.
+- `git diff --check`: passed.
+
 ## PR-55 Arbitrary Reaction Onboarding And Assembly
 
 Date: 2026-07-30
 
-Status: `complete` in the current checkout for arbitrary reactions using the
-already implemented homogeneous Michaelis-Menten process law. Unsupported
-process laws remain explicit blockers.
+Status: `complete` after PR #70 merged as `6b3d275` for arbitrary reactions
+using the already implemented homogeneous Michaelis-Menten process law.
+Unsupported process laws remain explicit blockers.
 
 Completed in this pass:
 
