@@ -2,7 +2,7 @@
 
 Reviewed baseline commit: `95253b838afdd645be67e9e6ebceab6f703cd9e3`
 
-Current implementation branch: `agent/pr-56-branching-cyclic-pathways`
+Current implementation branch: `agent/pr-57-dynamic-thermodynamic-enforcement`
 
 Verified at: `2026-07-30`
 
@@ -19,8 +19,8 @@ initial P1.2 execution-path and process-to-`Reaction` adapter rows.
 | P1-AUDIT-VALIDATORS-001 | high | resolved | none | Configured validators are loaded, attached, executed, and strict failures are tested. | Validators are software checks, not empirical validation. | Preserve guardrails in P1.3. |
 | P1-AUDIT-CONFIGURED-API-001 | high | resolved | none | `run_configured_model` is public, tested, and writes configured bundles. | Benchmark configs are not scientific biology. | No P1.2 action. |
 | P1-AUDIT-QA-001 | high | resolved | none | CI, Ruff, Pyright, and the 80% coverage gate exist; PR-41 enabled Pyright optional-member access and resolved FD-005. | Quality gates do not validate science. | Preserve the stricter quality-config guardrail. |
-| P1-AUDIT-THERMO-001 | critical | confirmed | critical | Gibbs metadata exists, but solver thermodynamic feasibility is not enforced. | Thermodynamic overclaiming remains possible. | Future thermodynamic enforcement task. |
-| P1-AUDIT-BALANCE-001 | high | partially_resolved | medium | Carbon/oxygen validators and stoichiometry metadata exist; redox/global enforcement absent. | Balance only holds where validators and weights are configured. | Future scientific validator hardening. |
+| P1-AUDIT-THERMO-001 | critical | partially_resolved | medium | Optional configured constraints now derive ideal-dilute molar activities/Q and dynamic Gibbs energy from explicit sourced inputs and block unfavorable nonnegative forward rates at every native solver RHS call. | Nonideal activities, reverse rates, coupled-network thermodynamics, electrochemical gradients, and empirical validity remain unsupported. | Preserve fail-closed binding/provenance guardrails; extend only through explicit generic contracts. |
+| P1-AUDIT-BALANCE-001 | high | partially_resolved | medium | Dynamic constraints require a passing process/reaction-bound electron/redox check; carbon/oxygen and stoichiometry validators remain available. | Electron checks depend on supplied species metadata, and no global coupled-network balance is inferred. | Preserve explicit balance bindings; add broader enforcement only with complete chemistry. |
 | P1-AUDIT-ENV-001 | high | partially_resolved | medium | Environment modifiers and metadata-only grid guards exist. | No validated general environmental response model. | Future ENV response task. |
 | P1-AUDIT-SUBSTRATE-001 | high | stale | medium | Non-PET substrates and BIO-001/BIO-002 paths exist. | Breadth is not empirical validation. | Keep maturity labels. |
 | P1-AUDIT-BIO001-001 | high | partially_resolved | medium | Product amount naming and proxy labelling are fixed. | BIO-001 remains exploratory and unvalidated. | Future validation-data task. |
@@ -51,15 +51,17 @@ initial P1.2 execution-path and process-to-`Reaction` adapter rows.
 
 ## Confirmed Engineering Blockers
 
-- Arbitrary-length linear process chains are implemented; branching, cycles,
-  and general pathway graphs remain unsupported.
+- Linear, branching, and cyclic enzyme-pathway graphs are implemented over
+  supported process laws; arbitrary new process laws remain explicit work.
 - Full execution-path mapping was completed in P1.3; adapter retirement was
   completed in P1.4.
 - Bayesian calibration and Sobol/global sensitivity remain absent.
 
 ## Confirmed Scientific Blockers
 
-- Thermodynamic feasibility is not enforced by the solver.
+- Dynamic thermodynamic feasibility is enforced only for explicitly configured
+  single-process forward-rate constraints; broader coupled-network,
+  reverse-flux, and nonideal thermodynamics remain unsupported.
 - BIO-001 has no empirical validation data.
 - Broad substrate support, BIO-001, and BIO-002 are not publication-grade
   validation of arbitrary fungus/substrate/environment combinations.
@@ -77,5 +79,5 @@ repository audit inputs are recorded in catalogue notes instead.
   claims.
 - Documentation was used only as secondary evidence for implementation claims.
 - Passing tests show current software contracts execute; they do not prove
-  empirical biology, environmental response, thermodynamic feasibility, or
-  publication readiness.
+  empirical biology, environmental response, empirical thermodynamic validity,
+  or publication readiness.

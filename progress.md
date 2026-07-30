@@ -26,12 +26,109 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-57 Dynamic Thermodynamic Feasibility And Solver Enforcement
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout for optional explicit
+single-reaction ideal-dilute activity/Q evaluation and native forward-rate
+enforcement.
+
+Completed in this pass:
+
+- Added a structured optional `thermodynamic_constraints` model-config section
+  that binds one constraint to one assembled process, one explicit reaction,
+  and one required passing electron/redox balance check.
+- Added immutable activity participant, dynamic constraint, and evaluation
+  contracts for molar state activities, reaction quotient, standard and
+  state-specific Gibbs energy, favorability, and blocking evidence.
+- Required exact sourced scalar parameters for temperature, gas constant,
+  standard concentration, explicit positive activity floor, nonnegative Gibbs
+  tolerance, and either direct standard Gibbs energy or the complete
+  `delta_g_standard = -n*F*E_standard` redox input set.
+- Required explicit reaction-participant state names, exact verified
+  state/species binding, compatible molar concentration units, positive
+  stoichiometric coefficients, unique IDs, nonblank provenance references,
+  and the sole supported `block_unfavorable_forward_rate` enforcement mode.
+- Applied the constraint after the native process rate is evaluated and before
+  its contributions are accumulated at every internal
+  `ProcessODESolver` RHS call. The same enforced rate is recorded in
+  `process_rates`.
+- Added standard derived trajectories for per-constraint activities, Q,
+  `ln(Q)`, dynamic Gibbs energy, favorability, and rate-blocking flags.
+- Added assembly-report ownership, solver metadata, a
+  `dynamic_thermodynamic_feasibility` validation row, and configured
+  thermodynamic JSON/CSV summary flags/fields for direct or redox-derived
+  energy, electron binding, and solver enforcement.
+
+Tests added or modified:
+
+- Added an artificial first-order `A -> B` molar framework fixture whose zero
+  standard Gibbs energy stops the forward process near equal activities,
+  while the otherwise identical unconstrained model continues converting.
+- Exercised both direct standard-Gibbs and redox-derived standard-energy paths
+  through configured assembly, native solver execution, derived trajectories,
+  assembly/solver metadata, validation results, and output artifacts.
+- Added fail-closed tests for an unsupported activity model, missing parameter
+  provenance, unknown process ownership, non-concentration state units, and a
+  failed bound electron balance.
+- Preserved existing configured/native/static-thermodynamic regression
+  coverage for models that do not declare a dynamic constraint.
+
+What did not change: no production case template, registry biology, parameter
+record, organism/substrate identity, existing process rate law, default solver
+setting, validation dataset, calibration, empirical comparison, or simulation
+authorization changed. No thermodynamic constraint is inferred for an
+existing config.
+
+Scientific behavior impact: only configs that explicitly opt into the complete
+constraint contract change numerical behavior. For those configs, an
+unfavorable nonnegative forward process rate is set to zero at solver time.
+The artificial equilibrium fixture is software evidence only, not a measured
+or validated biological reaction.
+
+Backward compatibility: existing configs omit `thermodynamic_constraints` and
+retain their prior assembly, solver, process-rate, validation, and output
+behavior. Existing configured thermodynamic metadata diagnostics remain
+supported; dynamic rows and derived quantities are additive when configured.
+
+Remaining ambiguity and risk: the activity model is ideal dilute and uses one
+explicit common standard concentration plus explicit numerical floor. Reverse
+rates, nonideal activity coefficients, coupled-network optimization,
+electrochemical gradients, environmental-temperature trajectories,
+multi-constraint ownership per process, and empirical validity are
+unsupported. A hard forward-rate boundary is numerically discontinuous and is
+bounded here by native solver regression and explicit returned blocking
+evidence.
+
+Risk level: medium scientific/numerical risk, bounded by opt-in ownership,
+complete sourced inputs, passing static electron/binding evidence, closed
+methods, exact unit checks, no defaults, artificial tests, and unchanged
+existing configurations.
+
+Recommended next task: PR-58, implement broader biological laws only after
+selecting mechanisms with primary provenance, explicit parameter and maturity
+contracts, assumptions, limitations, and materially different generic tests.
+
+Verification:
+
+- Dynamic/configured/native/static-thermodynamic/roadmap focused regression:
+  `130 passed in 16.15s`.
+- Broad full pytest regression: `1202 passed in 222.76s`.
+- Ruff over the repository's documented `src` and `tests` gate: `All checks
+  passed!`.
+- Pyright with the documented venv interpreter: `0 errors, 0 warnings, 0
+  informations`.
+- Canonical pytest with coverage: `1202 passed in 531.22s`; total coverage
+  `83.91%`, above the required `80%`.
+- `git diff --check`: passed.
+
 ## PR-56 Branching And Cyclic Enzyme-Pathway Assembly
 
 Date: 2026-07-30
 
-Status: `complete` in the current checkout for explicit linear, branching, and
-cyclic graphs over already implemented configured process laws.
+Status: `complete` after PR #71 merged as `caa0a17` for explicit linear,
+branching, and cyclic graphs over already implemented configured process laws.
 
 Completed in this pass:
 

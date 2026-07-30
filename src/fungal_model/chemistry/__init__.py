@@ -11,11 +11,19 @@ from .stoichiometry import (
     StoichiometricReactionMetadata,
     StoichiometricTerm,
 )
-from .thermodynamics import GibbsFreeEnergyEstimate
+from .thermodynamics import (
+    DynamicActivityParticipant,
+    DynamicThermodynamicConstraint,
+    DynamicThermodynamicEvaluation,
+    GibbsFreeEnergyEstimate,
+)
 
 __all__ = [
     "CarbonContent",
     "charge_balance_residual",
+    "DynamicActivityParticipant",
+    "DynamicThermodynamicConstraint",
+    "DynamicThermodynamicEvaluation",
     "electron_balance_residual",
     "element_balance_residual",
     "ElementalComposition",

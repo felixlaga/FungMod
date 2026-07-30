@@ -23,6 +23,9 @@ from fungal_model.processes import (
 )
 from fungal_model.workflows.configured_errors import raise_configured_model_execution_error
 from fungal_model.workflows.configured_inputs import ConfiguredInputs
+from fungal_model.workflows.dynamic_thermodynamics import (
+    configured_dynamic_thermodynamic_constraints,
+)
 from fungal_model.workflows.static_balance import (
     blocking_static_balance_validations,
     configured_static_balance_validations,
@@ -121,6 +124,23 @@ class ConfiguredProcessAssembler:
                 },
             )
         try:
+            thermodynamic_constraints = (
+                configured_dynamic_thermodynamic_constraints(
+                    config,
+                    processes=processes,
+                    state_units=inputs.state_units(),
+                    static_balance_validations=static_balance_validations,
+                )
+            )
+        except ValueError as exc:
+            raise_configured_model_execution_error(
+                config,
+                stage="model_assembly",
+                missing_capabilities=("dynamic_thermodynamic_constraints",),
+                message=str(exc),
+                details={"error_type": type(exc).__name__},
+            )
+        try:
             validators = (
                 *inputs.validators,
                 *(static_validation_callable(validation) for validation in static_balance_validations),
@@ -139,6 +159,7 @@ class ConfiguredProcessAssembler:
                     validation.to_dict()
                     for validation in static_balance_validations
                 ),
+                thermodynamic_constraints=thermodynamic_constraints,
                 allow_unsourced_for_testing=config.mode == "toy",
             ).assemble()
         except ModelAssemblyError as exc:

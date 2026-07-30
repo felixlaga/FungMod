@@ -21,6 +21,7 @@ from fungal_model.processes.base import Process, StateVariableSpec
 from fungal_model.processes.registry import MissingProcessIssue, ProcessRegistry
 
 if TYPE_CHECKING:
+    from fungal_model.chemistry.thermodynamics import DynamicThermodynamicConstraint
     from fungal_model.results import SimulationResult
 
 
@@ -121,6 +122,7 @@ class AssemblyReport:
     incompatible_units: tuple[ParameterIssue, ...] = ()
     incompatible_mechanisms: tuple[CompatibilityIssue, ...] = ()
     static_balance_checks: tuple[Mapping[str, Any], ...] = ()
+    dynamic_thermodynamic_constraints: tuple[Mapping[str, Any], ...] = ()
     warnings: tuple[str, ...] = ()
 
     @property
@@ -133,7 +135,7 @@ class AssemblyReport:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "success": self.success,
             "context": self.context.to_dict(),
             "matched_processes": [
@@ -156,6 +158,12 @@ class AssemblyReport:
             ],
             "warnings": list(self.warnings),
         }
+        if self.dynamic_thermodynamic_constraints:
+            data["dynamic_thermodynamic_constraints"] = [
+                dict(constraint)
+                for constraint in self.dynamic_thermodynamic_constraints
+            ]
+        return data
 
     def human_readable(self) -> str:
         lines = ["Assembly report:"]
@@ -180,6 +188,7 @@ class AssembledModel:
     validators: tuple[Any, ...]
     solver_settings: SolverSettings
     assembly_report: AssemblyReport
+    thermodynamic_constraints: tuple[DynamicThermodynamicConstraint, ...] = ()
 
     def run(
         self,
@@ -207,7 +216,7 @@ class AssembledModel:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "processes": [process.to_dict() for process in self.processes],
             "parameters": self.parameters.to_dict(),
             "context": self.context.to_dict(),
@@ -219,6 +228,12 @@ class AssembledModel:
             "solver_settings": self.solver_settings.to_dict(),
             "assembly_report": self.assembly_report.to_dict(),
         }
+        if self.thermodynamic_constraints:
+            data["thermodynamic_constraints"] = [
+                constraint.to_dict()
+                for constraint in self.thermodynamic_constraints
+            ]
+        return data
 
 
 @dataclass(frozen=True)
@@ -236,6 +251,7 @@ class ModelBuilder:
     state_variables: Sequence[StateVariableSpec] = ()
     validators: Sequence[Any] = ()
     static_balance_checks: Sequence[Mapping[str, Any]] = ()
+    thermodynamic_constraints: Sequence[DynamicThermodynamicConstraint] = ()
     solver_settings: SolverSettings = field(default_factory=SolverSettings)
     allow_unsourced_for_testing: bool = False
 
@@ -264,6 +280,10 @@ class ModelBuilder:
             incompatible_units=incompatible_units,
             incompatible_mechanisms=incompatible_mechanisms,
             static_balance_checks=tuple(dict(check) for check in self.static_balance_checks),
+            dynamic_thermodynamic_constraints=tuple(
+                constraint.to_dict()
+                for constraint in self.thermodynamic_constraints
+            ),
         )
         if missing_processes:
             raise MissingProcessError("Model assembly failed: missing process.", report=report)
@@ -287,6 +307,7 @@ class ModelBuilder:
             state_variables=_collect_state_variables(processes, self.state_variables),
             assumptions=_collect_assumptions(processes),
             validators=tuple(self.validators),
+            thermodynamic_constraints=tuple(self.thermodynamic_constraints),
             solver_settings=self.solver_settings,
             assembly_report=report,
         )

@@ -671,6 +671,59 @@ class BalanceCheckConfig:
 
 
 @dataclass(frozen=True)
+class ThermodynamicConstraintConfig:
+    """One explicit dynamic thermodynamic solver constraint."""
+
+    id: str
+    process_id: str
+    reaction_id: str
+    electron_balance_check_id: str
+    enforcement_mode: str
+    raw: Mapping[str, Any]
+
+    @classmethod
+    def from_mapping(
+        cls,
+        data: Mapping[str, Any],
+        *,
+        index: int,
+    ) -> "ThermodynamicConstraintConfig":
+        identifier = str(data.get("id") or f"thermodynamic_constraint_{index}").strip()
+        process_id = str(data.get("process_id") or "").strip()
+        reaction_id = str(data.get("reaction_id") or "").strip()
+        balance_check_id = str(data.get("electron_balance_check_id") or "").strip()
+        enforcement_mode = str(data.get("enforcement_mode") or "").strip()
+        missing = [
+            field
+            for field, value in (
+                ("id", identifier),
+                ("process_id", process_id),
+                ("reaction_id", reaction_id),
+                ("electron_balance_check_id", balance_check_id),
+                ("enforcement_mode", enforcement_mode),
+            )
+            if not value
+        ]
+        if missing:
+            raise ModelConfigError(
+                "Thermodynamic constraint requires nonblank "
+                + ", ".join(missing)
+                + "."
+            )
+        return cls(
+            id=identifier,
+            process_id=process_id,
+            reaction_id=reaction_id,
+            electron_balance_check_id=balance_check_id,
+            enforcement_mode=enforcement_mode,
+            raw=deepcopy(dict(data)),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return deepcopy(dict(self.raw))
+
+
+@dataclass(frozen=True)
 class ModelConfig:
     """Loaded generic model configuration."""
 
@@ -689,6 +742,7 @@ class ModelConfig:
     chemistry_metadata: ChemistryMetadataConfig | None = None
     reaction_metadata: tuple[ReactionMetadataConfig, ...] = ()
     balance_checks: tuple[BalanceCheckConfig, ...] = ()
+    thermodynamic_constraints: tuple[ThermodynamicConstraintConfig, ...] = ()
     path: Path | None = None
 
     @classmethod
@@ -720,6 +774,12 @@ class ModelConfig:
             balance_checks=tuple(
                 BalanceCheckConfig.from_mapping(item, index=index)
                 for index, item in enumerate(_as_sequence(data.get("balance_checks", ())))
+            ),
+            thermodynamic_constraints=tuple(
+                ThermodynamicConstraintConfig.from_mapping(item, index=index)
+                for index, item in enumerate(
+                    _as_sequence(data.get("thermodynamic_constraints", ()))
+                )
             ),
             path=None if path is None else Path(path),
         )
@@ -820,6 +880,7 @@ __all__ = [
     "ReactionParticipantMetadataConfig",
     "REQUIRED_MODEL_CONFIG_FIELDS",
     "TimeConfig",
+    "ThermodynamicConstraintConfig",
     "VALID_MODEL_MATURITIES",
     "VALID_MODEL_MODES",
     "ValidatorConfig",

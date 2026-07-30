@@ -394,6 +394,16 @@ def _thermodynamic_summary(result: SimulationResult) -> dict[str, Any]:
         for item in thermodynamic_rows
         if item.get("name") == "entropy_production_rate_metadata"
     ]
+    dynamic_rows = [
+        item
+        for item in thermodynamic_rows
+        if item.get("name") == "dynamic_thermodynamic_feasibility"
+    ]
+    has_redox_standard_energy = any(
+        isinstance(item.get("details"), Mapping)
+        and item["details"].get("standard_energy_method") == "redox_potential"
+        for item in dynamic_rows
+    )
     entropy_budget = _entropy_budget_summary(entropy_rate_rows)
     return {
         "kind": "configured_thermodynamic_summary",
@@ -401,16 +411,27 @@ def _thermodynamic_summary(result: SimulationResult) -> dict[str, Any]:
         "status_counts": _count_by_key(thermodynamic_rows, "status"),
         "severity_counts": _count_by_key(thermodynamic_rows, "severity"),
         "has_reaction_quotient_gibbs": bool(reaction_quotient_rows),
+        "has_dynamic_reaction_quotient": bool(dynamic_rows),
+        "has_redox_standard_energy": has_redox_standard_energy,
+        "has_electron_balance_binding": bool(dynamic_rows),
         "has_entropy_production_rate": bool(entropy_rate_rows),
         **entropy_budget,
-        "has_solver_time_enforcement": False,
+        "has_solver_time_enforcement": bool(dynamic_rows),
         "supported_scope": (
             "Explicit condition-specific and caller-supplied reaction-quotient "
-            "Gibbs metadata checks plus configured entropy-production-rate diagnostics only."
+            "Gibbs metadata checks, configured entropy-production-rate diagnostics, "
+            "and configured trajectory-derived ideal-dilute activities, reaction "
+            "quotients, dynamic Gibbs feasibility, bound electron/redox checks, "
+            "and solver-time forward-rate blocking where present."
         ),
         "unsupported_scope": (
-            "No inferred activity model, inferred reaction quotient, concentration model, "
-            "redox-potential model, electron-balance model, or solver-time thermodynamic enforcement."
+            "No inferred species chemistry, inferred thermodynamic inputs, nonideal "
+            "activity coefficients, reverse rates, coupled-network thermodynamic "
+            "optimization, electrochemical gradients, or empirical validation."
+            if dynamic_rows
+            else "No inferred activity model, inferred reaction quotient, concentration "
+            "model, redox-potential model, electron-balance model, or solver-time "
+            "thermodynamic enforcement."
         ),
         "rows": [_thermodynamic_summary_row(item) for item in thermodynamic_rows],
     }
@@ -469,6 +490,7 @@ def _is_thermodynamic_validation(item: Mapping[str, Any]) -> bool:
             "thermodynamic_feasibility",
             "reaction_quotient_thermodynamic_feasibility",
             "entropy_production_rate_metadata",
+            "dynamic_thermodynamic_feasibility",
         }
         or (
             isinstance(details, Mapping)
@@ -514,6 +536,25 @@ def _thermodynamic_summary_row(item: Mapping[str, Any]) -> dict[str, Any]:
         "dynamic_reaction_quotient": details_map.get("dynamic_reaction_quotient", ""),
         "activity_model": details_map.get("activity_model", ""),
         "solver_time_enforcement": details_map.get("solver_time_enforcement", ""),
+        "constraint_id": details_map.get("constraint_id", ""),
+        "process_id": details_map.get("process_id", ""),
+        "reaction_id": details_map.get("reaction_id", ""),
+        "electron_balance_check_id": details_map.get(
+            "electron_balance_check_id",
+            "",
+        ),
+        "standard_energy_method": details_map.get("standard_energy_method", ""),
+        "recorded_evaluation_count": details_map.get(
+            "recorded_evaluation_count",
+            "",
+        ),
+        "recorded_unfavorable_count": details_map.get(
+            "recorded_unfavorable_count",
+            "",
+        ),
+        "recorded_blocked_count": details_map.get("recorded_blocked_count", ""),
+        "minimum_delta_gibbs": details_map.get("minimum_delta_gibbs", ""),
+        "maximum_delta_gibbs": details_map.get("maximum_delta_gibbs", ""),
         "missing_metadata": details_map.get("missing_metadata", []),
         "provenance_refs": details_map.get("provenance_refs", []),
     }

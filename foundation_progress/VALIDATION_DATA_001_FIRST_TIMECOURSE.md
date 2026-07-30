@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-57: dynamic thermodynamic feasibility and solver-enforcement contract**.
+Current next PR: **PR-58: broader provenance-backed biological laws contract**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -74,6 +74,12 @@ for already implemented homogeneous Michaelis-Menten semantics. Explicit
 registry/template records own per-reaction identity, mode, provenance, states,
 parameters, product maps, and time grids; an artificial second reaction proves
 the generic path without adding biological evidence or validation data.
+PR-56 branching/cyclic pathway assembly is complete after PR #71 merged as
+`caa0a17`. PR-57 dynamic thermodynamic feasibility and native solver-time
+enforcement are complete in the current checkout for explicit sourced molar
+activity/Q inputs, passing bound electron/redox evidence, and direct or
+redox-derived standard energy. Neither slice adds validation data or empirical
+biological evidence.
 The completed PR-47 work is bounded transactional
 administrative registry apply with exact digest confirmation, intentional plan
 schema `2.0.0`, durable curation audit provenance, strict next-patch versioning,

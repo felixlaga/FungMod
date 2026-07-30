@@ -36,6 +36,15 @@ basic kinetics layer:
 - carbon conservation, oxygen limitation, and biomass-yield validation checks,
 - explicit reaction-quotient Gibbs feasibility and entropy-production
   diagnostics for caller-supplied dimensionless Q and entropy-rate metadata,
+- optional configured dynamic thermodynamic constraints that derive
+  ideal-dilute activities and reaction quotients from explicitly bound molar
+  trajectory states, compute `delta_g = delta_g_standard + R*T*ln(Q)` from
+  fully sourced inputs, require a passing bound electron/redox balance check,
+  and block an unfavorable nonnegative forward process rate at every native
+  solver RHS evaluation. Standard Gibbs and redox-derived
+  `delta_g_standard = -n*F*E_standard` inputs are supported; activity floors,
+  standard concentration, temperature, gas/Faraday constants, tolerances, and
+  provenance references are mandatory rather than inferred,
 - configured thermodynamic JSON/CSV summary outputs for explicit Gibbs/entropy
   validation diagnostics, including an aggregate explicit entropy-rate budget
   and report/index visibility for existing summary artifacts plus a standard
@@ -185,11 +194,12 @@ basic kinetics layer:
   cellulose-equivalent enzyme-chain virtual experiment from names and aliases
   through the top-level `virtual_experiment(...)` API.
 
-It does not yet implement full thermodynamic flux analysis, resolved intracellular
-metabolism, 2D/3D spatial models, publication-grade calibration against
-curated biological datasets, or global uncertainty analysis. Those stages are
-documented in `progress.md` and should be added only after the current virtual
-experiment layer has tests, provenance, and validation.
+It does not yet implement coupled-network thermodynamic flux optimization,
+nonideal activity coefficients, reverse-rate thermodynamics, resolved
+intracellular metabolism, 2D/3D spatial models, publication-grade calibration
+against curated biological datasets, or global uncertainty analysis. Those
+stages are documented in `progress.md` and should be added only after the
+current virtual-experiment layer has tests, provenance, and validation.
 
 ## Scientific Philosophy
 
@@ -1099,7 +1109,11 @@ Current capability labels mean:
 - Fungal growth currently uses a simple assimilable-product uptake law; oxygen, transporters, toxicity, regulation, and intracellular metabolism are not modelled.
 - Enzyme production has an explicit active-biomass cost, but the cost parameter is lumped and must be sourced before scientific use.
 - Stage 7 oxygen handling is currently a validation check against available oxygen, not a coupled oxygen state in the ODE model.
-- Gibbs free energy values are metadata with provenance; full thermodynamic feasibility constraints are not yet enforced by the solver.
+- Optional single-process dynamic Gibbs constraints can block unfavorable
+  configured forward rates when all molar activity, reaction, electron/redox,
+  constant, tolerance, and provenance inputs are explicit. Coupled-network,
+  reverse-rate, nonideal-activity, and electrochemical thermodynamics remain
+  unsupported.
 - Spatial modelling is currently 1D finite-volume method-of-lines only.
 - Stage 8 diffusion fields are unit-aware, but geometry is a simple uniform 1D grid; 2D, variable geometry, and true volume/area coupling are not implemented.
 - PET is marked `partial`. Cellulose has narrow registry-backed exploratory
