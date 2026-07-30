@@ -158,6 +158,13 @@ basic kinetics layer:
   `TrustedCuratorKey` bindings before authoring or promotion planning;
 - mode-independent modelability and simulation rejection for parameters whose
   exact `allowed_use` is `registry_storage_only_no_simulation_authorization`;
+- registry/template-driven onboarding for arbitrary reactions supported by the
+  implemented homogeneous Michaelis-Menten law: config/process/parameter-set
+  identities, state roles, initial values, product maps, yields, time grids,
+  provenance, enzyme/substrate metadata, and output roles come from explicit
+  records. A materially different artificial reaction assembles and runs
+  without a new Python branch, while missing identities, provenance, mode
+  mismatches, unsupported mechanisms, and incomplete parameters fail closed;
 - a registry-backed extracellular enzyme-chain assembler for ordered linear
   chains of two or more implemented process steps, whose stoichiometry,
   conserved quantities, entities, modifiers, and output labels come from

@@ -26,14 +26,98 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-55 Arbitrary Reaction Onboarding And Assembly
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout for arbitrary reactions using the
+already implemented homogeneous Michaelis-Menten process law. Unsupported
+process laws remain explicit blockers.
+
+Completed in this pass:
+
+- Removed all Reaction 618, SABIO-RK, cellobiose, and beta-glucosidase tokens
+  from the generic registry case builder.
+- Moved homogeneous config name/mode/maturity, process ID, parameter-set ID,
+  product-map name, state roles, initial conditions, yields, time grid,
+  provenance, enzyme/substrate metadata, parameters, and output roles to
+  explicit registry/template ownership.
+- Preserved the public `RegistryProcessAssembler.deterministic_mode` contract
+  while adding explicit supported-request modes. Homogeneous templates may be
+  toy or scientific, but the request must match the template's declared mode.
+- Required canonical process/config/parameter-set/product-map identity and
+  explicit provenance source/confidence. Missing identities, malformed
+  provenance, request/template mode mismatch, incomplete parameters, and
+  unsupported process laws fail without fallback.
+- Added a materially different artificial homogeneous reaction that assembles
+  and simulates through the standard public registry case path. It is labelled
+  throughout as software-test-only and is not production registry data.
+
+Tests added or modified:
+
+- Added assembly/simulation coverage for the second artificial reaction,
+  template-owned IDs/states/product yield/provenance, and no Reaction 618
+  leakage.
+- Added fail-closed coverage for missing process identity and
+  request/template mode mismatch.
+- Added a generic-source guard that prevents Reaction 618, SABIO-RK,
+  cellobiose, or beta-glucosidase display tokens from returning to
+  `case_builder.py`.
+- Kept Reaction 618, BIO-001, registry template, registry builder, and
+  configured execution regressions in the focused gate.
+
+What did not change: no production biology, production parameter, source
+record, numerical rate law, stoichiometric contribution behavior, solver,
+output schema, validation dataset, calibration, empirical comparison,
+scientific-validation status, or simulation authorization changed. The
+artificial fixture is test-local.
+
+Scientific behavior impact: none for existing cases. Reaction 618 continues to
+use its existing explicit template, process/product-map identities,
+parameters, provenance, states, yield, and time grid. New reactions run only
+when every required record is explicit and the selected process law is already
+implemented.
+
+Backward compatibility: existing `deterministic_mode` inspection and Reaction
+618 scientific assembly remain supported. Homogeneous assembly additionally
+admits explicit toy templates. Requests whose mode disagrees with template
+mode now fail rather than returning a config whose declared mode differs from
+the request.
+
+Remaining ambiguity and risk: registry generality does not imply mechanism
+generality. A new rate law still requires its own provenance-backed,
+maturity-labelled implementation and tests. Branching and cyclic pathway
+topology remains unsupported until PR-56.
+
+Risk level: low-to-medium architecture risk, bounded by unchanged implemented
+rate laws, explicit template ownership, a materially different test case,
+hardcoding guardrails, mode matching, no production-data additions, and
+existing-case regression coverage.
+
+Recommended next task: PR-56, extend registry-owned enzyme-pathway topology
+from ordered linear chains to explicit branching and cyclic graphs while
+preserving component ownership, supported-law checks, stoichiometry,
+conservation, parameters, limitations, and honest failure states.
+
+Verification:
+
+- Focused assembly/registry/Reaction 618/hardcoding suite: `101 passed in
+  16.80s`.
+- Ruff over `src` and `tests`: `All checks passed!`.
+- Pyright with the documented venv interpreter: `0 errors, 0 warnings, 0
+  informations`.
+- Canonical pytest with coverage: `1186 passed in 415.03s`; total coverage
+  `83.95%` (required `80%`).
+- `git diff --check`: passed.
+
 ## PR-54 CURATION-001 Authenticated Curator Signatures
 
 Date: 2026-07-30
 
-Status: `complete` in the current checkout. This completes CURATION-001 for its
-defined review, authoring, authentication, promotion-planning, and
-transactional-apply workflow. It does not complete scientific validation or
-authorize simulation.
+Status: `complete` after PR #69 merged as `35a3ecb`. This completes
+CURATION-001 for its defined review, authoring, authentication,
+promotion-planning, and transactional-apply workflow. It does not complete
+scientific validation or authorize simulation.
 
 Completed in this pass:
 

@@ -65,6 +65,21 @@ def test_hardcoding_allowlist_is_documented_as_architecture_debt() -> None:
     assert "tests/test_guardrails_no_hardcoding.py" in debt
 
 
+def test_registry_case_builder_has_no_reaction_specific_onboarding_tokens() -> None:
+    case_builder = (
+        ROOT / "src" / "fungal_model" / "screening" / "case_builder.py"
+    ).read_text(encoding="utf-8")
+
+    for forbidden in (
+        "reaction_618",
+        "Reaction 618",
+        "beta-glucosidase",
+        "cellobiose",
+        "SABIO-RK",
+    ):
+        assert forbidden not in case_builder
+
+
 def _python_files(paths: tuple[str, ...]) -> tuple[Path, ...]:
     files: list[Path] = []
     for relative in paths:

@@ -8,12 +8,15 @@ authoring merged as PR #65 (`933d2c8`), and bounded
 PR-51 registered nonidentity conversion merged as PR #66 (`bef938f`), bounded
 PR-52 index-backed non-parameter authoring merged as PR #67 (`5da611b`), and
 bounded PR-53 product-map ownership merged as PR #68 (`19baedd`), with
-PR-54 authenticated curator signatures complete in the current checkout and
-PR-55 selected:
+PR-54 authenticated curator signatures merged as PR #69 (`35a3ecb`) and
+PR-55 arbitrary supported-reaction assembly complete in the current checkout,
+with PR-56 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
-PRE-BIO-001 / ASSEMBLY-001 basics: complete for current template-backed cases.
+PRE-BIO-001 / ASSEMBLY-001: complete for arbitrary reactions using implemented
+homogeneous Michaelis-Menten semantics and current template-backed surface and
+linear-chain scopes.
 BIO-READINESS-LITE: complete for the proposal template, validator, and tests.
 BIO-002: complete for arbitrary-length linear enzyme-chain assembly; branching
 and cycles remain unsupported.
@@ -208,7 +211,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-55: arbitrary reaction onboarding and assembly contract**.
+Current next PR: **PR-56: branching and cyclic enzyme-pathway assembly contract**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -355,10 +358,18 @@ scientific validity, general curation authority, registry mutation, or
 simulation authorization. Detached promotion plans remain digest-confirmed
 review/apply artifacts rather than independent signature evidence.
 
-Recommended next task: PR-55 arbitrary reaction onboarding and assembly
-contract. Generalize explicit source, registry/template, and assembly
-contracts for arbitrary supported reactions without mechanism-specific
-branches, invented biology, or silent fallback values.
+PR-55 removes Reaction 618, SABIO-RK, cellobiose, and beta-glucosidase tokens
+from the generic homogeneous builder. Explicit templates own config, process,
+parameter-set, product-map, state, time-grid, mode, provenance, entity, and
+output identities. A materially different artificial reaction assembles and
+simulates through the same implemented law. Missing identity/provenance,
+request/template mode mismatch, incomplete parameters, and unsupported laws
+fail closed; the fixture is not scientific data.
+
+Recommended next task: PR-56 branching and cyclic enzyme-pathway assembly
+contract. Extend registry-owned topology beyond ordered linear chains while
+keeping component ownership, process-law support, stoichiometry, parameter
+roles, conservation, limitations, and unsupported execution states explicit.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

@@ -65,8 +65,17 @@ class RegistryProcessAssembler:
     required_parameter_roles: tuple[str, ...]
     required_state_roles: tuple[str, ...]
     deterministic_mode: RegistryCaseConfigMode
+    additional_supported_modes: tuple[RegistryCaseConfigMode, ...]
+    required_process_state_metadata: tuple[str, ...]
+    enforce_template_mode_match: bool
     unsupported_mode_message: str
     config_data_builder: Callable[..., dict[str, Any]]
+
+    @property
+    def supported_request_modes(self) -> tuple[RegistryCaseConfigMode, ...]:
+        """Return the backward-compatible primary mode plus explicit additions."""
+
+        return (self.deterministic_mode, *self.additional_supported_modes)
 
 
 def build_model_config_from_registry_case(
@@ -107,13 +116,23 @@ def build_model_config_from_registry_case(
             "Registry case builder does not support process_type "
             f"{compatibility.process_type!r}."
         )
-    if mode != assembler.deterministic_mode:
+    if mode not in assembler.supported_request_modes:
         raise RegistryCaseBuildError(assembler.unsupported_mode_message)
     case_template = select_registry_case_template(
         registry=registry,
         compatibility=compatibility,
         assembler=assembler,
     )
+    if (
+        assembler.enforce_template_mode_match
+        and case_template.process_state_metadata.get("config_mode") != mode
+    ):
+        raise RegistryCaseBuildError(
+            "Requested registry case mode "
+            f"{mode!r} disagrees with case template "
+            f"{case_template.case_template_id!r} explicit config_mode "
+            f"{case_template.process_state_metadata.get('config_mode')!r}."
+        )
     parameter_records = _exact_role_parameters(
         registry=registry,
         compatibility=compatibility,
@@ -169,6 +188,12 @@ def build_registry_process_config_data(
             compatibility=compatibility,
             assembler=assembler,
         )
+    else:
+        case_template = _validate_case_template_for_assembler(
+            template=case_template,
+            compatibility=compatibility,
+            assembler=assembler,
+        )
     substrate = registry.get_substrate(substrate_id)
     return assembler.config_data_builder(
         registry=registry,
@@ -210,18 +235,56 @@ def select_registry_case_template(
             "Registry case builder does not support process_type "
             f"{compatibility.process_type!r}."
         )
+    return _validate_case_template_for_assembler(
+        template=template,
+        compatibility=compatibility,
+        assembler=selected_assembler,
+    )
+
+
+def _validate_case_template_for_assembler(
+    *,
+    template: CaseTemplateRecord,
+    compatibility: ProcessCompatibilityRecord,
+    assembler: RegistryProcessAssembler,
+) -> CaseTemplateRecord:
+    if template.case_template_id != compatibility.case_template_id:
+        raise RegistryCaseBuildError(
+            "Explicit case template identity mismatch: "
+            f"template {template.case_template_id!r}, compatibility "
+            f"{compatibility.record_id!r} requires "
+            f"{compatibility.case_template_id!r}."
+        )
     if template.process_type != compatibility.process_type:
         raise RegistryCaseBuildError(
             "Case template process_type mismatch: "
             f"template {template.case_template_id!r} uses {template.process_type!r}, "
             f"but compatibility {compatibility.record_id!r} uses {compatibility.process_type!r}."
         )
-    missing_roles = tuple(role for role in selected_assembler.required_state_roles if role not in template.state_roles)
+    missing_roles = tuple(
+        role
+        for role in assembler.required_state_roles
+        if role not in template.state_roles
+    )
     if missing_roles:
         raise RegistryCaseBuildError(
             "Case template "
             f"{template.case_template_id!r} is missing state role(s) required for "
-            f"{selected_assembler.process_label}: {', '.join(missing_roles)}."
+            f"{assembler.process_label}: {', '.join(missing_roles)}."
+        )
+    missing_process_metadata = tuple(
+        field_name
+        for field_name in assembler.required_process_state_metadata
+        if not _canonical_template_text(
+            template.process_state_metadata.get(field_name)
+        )
+    )
+    if missing_process_metadata:
+        raise RegistryCaseBuildError(
+            "Case template "
+            f"{template.case_template_id!r} is missing explicit process-state "
+            f"metadata required for {assembler.process_label}: "
+            f"{', '.join(missing_process_metadata)}."
         )
     return template
 
@@ -356,6 +419,15 @@ def _template_state(case_template: CaseTemplateRecord, role: str) -> str:
         raise RegistryCaseBuildError(
             f"Case template {case_template.case_template_id!r} is missing state role {role!r}."
         ) from exc
+
+
+def _canonical_template_text(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and value == value.strip()
+        and all(ord(character) >= 32 for character in value)
+    )
 
 
 def _template_time_config(case_template: CaseTemplateRecord) -> dict[str, Any]:
@@ -1037,6 +1109,10 @@ def _homogeneous_mm_config_data(
     substrate_state = _template_state(case_template, "substrate")
     product_state = _template_state(case_template, "product")
     enzyme_state = _template_state(case_template, "enzyme")
+    process_id = str(case_template.process_state_metadata["process_id"])
+    parameter_set_id = str(
+        case_template.process_state_metadata["parameter_set_id"]
+    )
     substrate_initial = parameter_records["substrate_initial_concentration"]
     substrate_units = _record_units(substrate_initial, role="substrate_initial_concentration")
     rate_units = f"{substrate_units} / second"
@@ -1060,6 +1136,7 @@ def _homogeneous_mm_config_data(
         environment_id=environment_id,
         modifiers=modifiers,
     )
+    enzyme_class = registry.get_enzyme_class(compatibility.enzyme_class)
     entities: dict[str, Any] = {
         "substrates": [
             {
@@ -1068,6 +1145,7 @@ def _homogeneous_mm_config_data(
                 "data": _homogeneous_substrate_data(
                     substrate=substrate,
                     enzyme_class=compatibility.enzyme_class,
+                    case_template=case_template,
                     provenance=provenance,
                 ),
             }
@@ -1076,8 +1154,12 @@ def _homogeneous_mm_config_data(
             {
                 "id": compatibility.enzyme_class,
                 "data": _homogeneous_enzyme_data(
+                    enzyme_class_name=enzyme_class.name,
+                    enzyme_class_maturity=enzyme_class.maturity,
+                    enzyme_class_notes=enzyme_class.notes,
                     compatibility=compatibility,
                     substrate=substrate,
+                    case_template=case_template,
                     provenance=provenance,
                 ),
             }
@@ -1086,8 +1168,10 @@ def _homogeneous_mm_config_data(
             _product_map_entity(
                 case_template=case_template,
                 provenance=provenance,
-                name="SABIO-RK Reaction 618 cellobiose to beta-D-glucose product map",
-                maturity="literature_metadata",
+                name=str(
+                    case_template.process_state_metadata["product_map_name"]
+                ),
+                maturity=case_template.maturity,
             )
         ],
     }
@@ -1095,20 +1179,17 @@ def _homogeneous_mm_config_data(
         entities["environment"] = environment_entity
     return {
         "kind": "model_config",
-        "name": _template_config_name(
-            case_template=case_template,
-            fungus_id=fungus_id,
-            substrate_id=substrate_id,
-            fallback="SABIO-RK Reaction 618 beta-glucosidase cellobiose homogeneous Michaelis-Menten",
+        "name": str(case_template.process_state_metadata["config_name"]),
+        "mode": str(case_template.process_state_metadata["config_mode"]),
+        "maturity": str(
+            case_template.process_state_metadata["config_maturity"]
         ),
-        "mode": _template_config_mode(case_template, fallback="scientific"),
-        "maturity": _template_config_maturity(case_template, fallback="scientific"),
         "provenance": provenance,
         "case_template": _case_template_config(case_template),
         "entities": entities,
         "parameters": [
             {
-                "id": "sabiork_reaction_618_parameters",
+                "id": parameter_set_id,
                 "parameters": [
                     _scientific_parameter_config(record, role=role)
                     for role, record in parameter_records.items()
@@ -1117,7 +1198,7 @@ def _homogeneous_mm_config_data(
         ],
         "processes": [
             {
-                "id": "sabiork_reaction_618_homogeneous_mm",
+                "id": process_id,
                 "process_type": "homogeneous_michaelis_menten",
                 "states": {
                     "substrate": substrate_state,
@@ -1134,10 +1215,7 @@ def _homogeneous_mm_config_data(
                 "output_state_roles": dict(case_template.output_state_roles),
                 "assumptions": _process_assumptions(
                     case_template,
-                    (
-                        "Dissolved homogeneous Michaelis-Menten kinetics for the selected SABIO-RK entry.",
-                        "This is an enzyme-kinetics case, not a whole-fungus growth or uptake model.",
-                    ),
+                    (),
                 ),
             }
         ],
@@ -1174,6 +1252,7 @@ def _homogeneous_substrate_data(
     *,
     substrate: SubstrateRecord,
     enzyme_class: str,
+    case_template: CaseTemplateRecord,
     provenance: Mapping[str, Any],
 ) -> dict[str, Any]:
     return {
@@ -1189,7 +1268,10 @@ def _homogeneous_substrate_data(
             {
                 "name": product,
                 "source": provenance["source"],
-                "notes": "Product listed by SABIO-RK Reaction 618 stoichiometry.",
+                "notes": (
+                    "Product declared by the selected registry substrate and "
+                    "case-template product-map contract."
+                ),
             }
             for product in substrate.products
         ],
@@ -1198,8 +1280,9 @@ def _homogeneous_substrate_data(
         "water_activity_dependence": "unknown",
         "provenance": {
             "source": provenance["source"],
-            "confidence_level": "literature_curated",
-            "notes": "Cellobiose substrate metadata from the curated Reaction 618 registry case.",
+            "confidence_level": provenance["confidence_level"],
+            "notes": substrate.notes,
+            "validity_range": "; ".join(case_template.validity_notes),
         },
         "parameters": [],
     }
@@ -1207,27 +1290,31 @@ def _homogeneous_substrate_data(
 
 def _homogeneous_enzyme_data(
     *,
+    enzyme_class_name: str,
+    enzyme_class_maturity: str,
+    enzyme_class_notes: str,
     compatibility: ProcessCompatibilityRecord,
     substrate: SubstrateRecord,
+    case_template: CaseTemplateRecord,
     provenance: Mapping[str, Any],
 ) -> dict[str, Any]:
     return {
         "kind": "enzyme",
-        "name": "beta-glucosidase",
+        "name": enzyme_class_name,
         "enzyme_class": compatibility.enzyme_class,
         "target_bond_types": list(compatibility.required_bond_classes),
         "target_substrate_classes": [substrate.substrate_class],
         "target_substrate_names": [substrate.name],
-        "validity_labels": ["literature_metadata", "homogeneous_enzyme_kinetics"],
+        "validity_labels": [
+            enzyme_class_maturity,
+            "homogeneous_enzyme_kinetics",
+        ],
         "provenance": {
             "source": provenance["source"],
-            "measurement_method": "SABIO-RK kinetic-law curation",
-            "confidence_level": "literature_curated",
-            "notes": (
-                "Enzyme metadata for the selected Reaction 618 kinetic-law entry; "
-                "does not model secretion, uptake, biomass growth, or organism-level degradation."
-            ),
-            "validity_range": "Selected SABIO-RK EntryID assay conditions.",
+            "measurement_method": "registry-backed case-template assembly",
+            "confidence_level": provenance["confidence_level"],
+            "notes": enzyme_class_notes,
+            "validity_range": "; ".join(case_template.validity_notes),
             "units": "not_applicable",
         },
         "catalytic_parameters": [],
@@ -1365,8 +1452,18 @@ def _scientific_parameter_config(record: ParameterRecord, *, role: str) -> dict[
         "confidence_level": record.value.confidence_level
         or record.provenance.get("confidence_level", "literature_curated"),
         "notes": f"{record.notes} Registry case role: {role}.",
-        "measurement_method": "SABIO-RK selected kinetic-law curation",
-        "validity_range": "Selected SABIO-RK EntryID assay conditions only.",
+        "measurement_method": str(
+            record.provenance.get(
+                "measurement_method",
+                "registry-backed exact ValueSpec",
+            )
+        ),
+        "validity_range": str(
+            record.provenance.get(
+                "validity_range",
+                "Linked registry record and case-template scope only.",
+            )
+        ),
     }
 
 
@@ -1388,11 +1485,15 @@ def _record_units(record: ParameterRecord, *, role: str) -> str:
 
 def _record_source(record: ParameterRecord) -> str:
     source = record.provenance.get("source")
-    if source is not None:
+    if _canonical_template_text(source):
         return str(source)
-    if record.provenance.get("source_database") == "SABIO-RK":
-        return "SABIO-RK Reaction 618 selected kinetic law"
-    return "FungMod registry record"
+    source_database = record.provenance.get("source_database")
+    if _canonical_template_text(source_database):
+        return str(source_database)
+    raise RegistryCaseBuildError(
+        f"Parameter record {record.record_id!r} requires explicit value source, "
+        "provenance source, or provenance source_database text."
+    )
 
 
 def _extracellular_enzyme_chain_config_data(
@@ -1457,12 +1558,30 @@ def _homogeneous_mm_provenance(
     parameter_records: Mapping[str, ParameterRecord],
 ) -> dict[str, Any]:
     environment = registry.get_environment(environment_id)
-    source = "SABIO-RK Reaction 618 selected kinetic law"
+    source = _registry_provenance_source(case_template)
+    confidence_level = _required_provenance_text(
+        case_template.provenance,
+        field_name="confidence_level",
+        record_label=f"Case template {case_template.case_template_id!r}",
+    )
     return {
         "source": source,
-        "source_database": compatibility.provenance.get("source_database", "SABIO-RK"),
-        "source_reaction_id": compatibility.provenance.get("source_reaction_id"),
-        "selected_kinlaw_entry_id": compatibility.provenance.get("selected_kinlaw_entry_id"),
+        "confidence_level": confidence_level,
+        "source_database": _consistent_optional_provenance_text(
+            "source_database",
+            compatibility.provenance,
+            case_template.provenance,
+        ),
+        "source_reaction_id": _consistent_optional_provenance_text(
+            "source_reaction_id",
+            compatibility.provenance,
+            case_template.provenance,
+        ),
+        "selected_kinlaw_entry_id": _consistent_optional_provenance_text(
+            "selected_kinlaw_entry_id",
+            compatibility.provenance,
+            case_template.provenance,
+        ),
         "kinetic_record": _first_present(
             record.provenance.get("kinetic_record")
             for record in parameter_records.values()
@@ -1485,11 +1604,57 @@ def _homogeneous_mm_provenance(
             name: value.to_dict()
             for name, value in environment.conditions.items()
         },
-        "notes": (
-            "Homogeneous Michaelis-Menten config assembled from local FungMod registry "
-            "records derived from the selected SABIO-RK Reaction 618 entry."
-        ),
+        "notes": case_template.notes,
     }
+
+
+def _registry_provenance_source(record: CaseTemplateRecord) -> str:
+    source = record.provenance.get("source")
+    if _canonical_template_text(source):
+        return str(source)
+    source_database = record.provenance.get("source_database")
+    if _canonical_template_text(source_database):
+        return str(source_database)
+    raise RegistryCaseBuildError(
+        f"Case template {record.case_template_id!r} requires explicit provenance "
+        "source or source_database text for homogeneous assembly."
+    )
+
+
+def _required_provenance_text(
+    provenance: Mapping[str, Any],
+    *,
+    field_name: str,
+    record_label: str,
+) -> str:
+    value = provenance.get(field_name)
+    if not _canonical_template_text(value):
+        raise RegistryCaseBuildError(
+            f"{record_label} requires explicit provenance {field_name!r} text."
+        )
+    return str(value)
+
+
+def _consistent_optional_provenance_text(
+    field_name: str,
+    *provenance_mappings: Mapping[str, Any],
+) -> str | None:
+    values = tuple(
+        mapping[field_name]
+        for mapping in provenance_mappings
+        if mapping.get(field_name) is not None
+    )
+    if not values:
+        return None
+    if any(
+        not _canonical_template_text(value) or value != values[0]
+        for value in values
+    ):
+        raise RegistryCaseBuildError(
+            "Registry compatibility and case-template provenance disagree on "
+            f"canonical {field_name!r} text."
+        )
+    return str(values[0])
 
 
 def _first_present(values) -> Any | None:
@@ -1548,6 +1713,9 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
         required_parameter_roles=SURFACE_CATALYSIS_PARAMETER_ROLES,
         required_state_roles=("substrate", "product", "catalyst"),
         deterministic_mode="toy",
+        additional_supported_modes=(),
+        required_process_state_metadata=(),
+        enforce_template_mode_match=False,
         unsupported_mode_message=(
             "Surface-catalysis registry assembly currently only emits toy model configs."
         ),
@@ -1559,8 +1727,19 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
         required_parameter_roles=HOMOGENEOUS_MM_PARAMETER_ROLES,
         required_state_roles=("substrate", "product", "enzyme"),
         deterministic_mode="scientific",
+        additional_supported_modes=("toy",),
+        required_process_state_metadata=(
+            "config_name",
+            "config_mode",
+            "config_maturity",
+            "process_id",
+            "parameter_set_id",
+            "product_map_name",
+        ),
+        enforce_template_mode_match=True,
         unsupported_mode_message=(
-            "Homogeneous Michaelis-Menten registry assembly requires mode='scientific'."
+            "Homogeneous Michaelis-Menten registry assembly supports mode='toy' "
+            "or mode='scientific'."
         ),
         config_data_builder=_homogeneous_mm_config_data,
     ),
@@ -1570,6 +1749,9 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
         required_parameter_roles=EXTRACELLULAR_ENZYME_CHAIN_PARAMETER_ROLES,
         required_state_roles=("substrate", "intermediate", "product", "surface_catalyst", "homogeneous_catalyst"),
         deterministic_mode="toy",
+        additional_supported_modes=(),
+        required_process_state_metadata=(),
+        enforce_template_mode_match=False,
         unsupported_mode_message=(
             "Extracellular enzyme-chain registry assembly currently emits the existing "
             "exploratory CASE-001/BIO-002 template through exploratory screens."

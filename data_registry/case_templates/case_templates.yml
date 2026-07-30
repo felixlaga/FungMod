@@ -173,9 +173,11 @@ records:
     name: SABIO-RK Reaction 618 homogeneous Michaelis-Menten assembly template
     maturity: literature_metadata
     provenance:
+      source: SABIO-RK Reaction 618 selected kinetic law
       source_database: SABIO-RK
       source_reaction_id: "618"
       selected_kinlaw_entry_id: "35622"
+      confidence_level: literature_metadata
       notes: Assembly metadata for the existing local Reaction 618 beta-glucosidase cellobiose kinetic pilot.
     schema_version: "1"
     process_type: homogeneous_michaelis_menten
@@ -221,6 +223,9 @@ records:
       config_name: "SABIO-RK Reaction 618 beta-glucosidase cellobiose homogeneous Michaelis-Menten"
       config_mode: scientific
       config_maturity: scientific
+      process_id: sabiork_reaction_618_homogeneous_mm
+      parameter_set_id: sabiork_reaction_618_parameters
+      product_map_name: SABIO-RK Reaction 618 cellobiose to beta-D-glucose product map
       public_path: true
     limitations:
       - Dissolved homogeneous Michaelis-Menten kinetics for the selected SABIO-RK entry.

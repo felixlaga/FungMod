@@ -150,6 +150,7 @@ def test_registry_process_assemblers_advertise_supported_roles() -> None:
         "accessible_surface_area",
     )
     assert surface.deterministic_mode == "toy"
+    assert surface.supported_request_modes == ("toy",)
     assert homogeneous is not None
     assert homogeneous.required_parameter_roles == (
         "km",
@@ -158,6 +159,7 @@ def test_registry_process_assemblers_advertise_supported_roles() -> None:
         "enzyme_initial_concentration",
     )
     assert homogeneous.deterministic_mode == "scientific"
+    assert homogeneous.supported_request_modes == ("scientific", "toy")
     assert get_registry_process_assembler("unsupported_process") is None
 
 
