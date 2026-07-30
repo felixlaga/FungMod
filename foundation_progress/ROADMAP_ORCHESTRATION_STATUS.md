@@ -30,7 +30,7 @@ Use this workflow for each roadmap PR:
 
 ## Phase And PR Queue
 
-Current next PR: **PR-59: final PRODUCT-001 integration**.
+Current next PR: **none selected; scoped queue complete through PR-59**.
 
 PR-49 is complete after PR #64 merged as `bbe2ee6`. PR-50 is complete after PR
 #65 merged as `933d2c8` for its bounded written-source authoring scope:
@@ -92,15 +92,20 @@ solver RHS evaluation. Returned activity/Q/Gibbs/blocking trajectories,
 solver metadata, validation rows, and configured thermodynamic summaries remain
 inspectable. Missing or incompatible chemistry, units, provenance, bindings,
 constants, or enforcement modes fail closed.
-PR-58 is complete in the current checkout for provenance-bound competitive and
-Haldane substrate-inhibition laws on exactly matched homogeneous
+PR-58 is complete after PR #73 merged as `68c715b` for provenance-bound
+competitive and Haldane substrate-inhibition laws on exactly matched homogeneous
 Michaelis-Menten processes. Primary-source and maturity metadata, substrate/Km
 ownership, positive unit-compatible Ki, assumptions, limitations, and
 artificial materially different benchmarks are mandatory. No production
 parameter or applicability evidence, whole-fungus biology, or validation claim
 was added.
-Recommended next task: **PR-59: final PRODUCT-001 integration** over implemented
-simulator outputs only.
+PR-59 is complete in the current checkout for final PRODUCT-001 integration.
+Standard output schema `1.8.0` preserves explicit `process_rate.<process_id>`
+identity, copies persisted namespaced derived trajectories, and exposes PR-57
+dynamic thermodynamic bindings/counts/extrema in the standard diagnostics and
+report without recomputation or new scientific behavior.
+Recommended next task: **none in the user-scoped queue**. Review, verify, and
+merge PR-59, then stop rather than selecting another PR.
 
 Validation remains important, but it is no longer allowed to block the core
 simulator roadmap. The current priority is to build the virtual-experiment
@@ -169,8 +174,8 @@ before improving the simulator itself.
 | PR-55 | Arbitrary reaction onboarding and assembly contract | complete after PR #70 merged as `6b3d275` | Removed Reaction 618/SABIO-RK/cellobiose/beta-glucosidase tokens and fallback identities from the generic homogeneous builder. Templates explicitly own config/process/parameter-set/product-map identity, mode, states, time grid, provenance, entities, parameters, and outputs. A materially different artificial reaction runs through the same implemented law; missing identity/provenance and unsupported laws fail closed. No new biology or production scientific data. |
 | PR-56 | Branching and cyclic enzyme-pathway assembly contract | complete after PR #71 merged as `caa0a17` | Added explicit `linear`/`branching`/`cyclic` topology ownership, directed process/map edges, graph connectivity and reachability checks, exact declared-shape checks, and executable conserved artificial branch/cycle fixtures. Existing production BIO-002 remains an unchanged linear exploratory case. No new production biology, parameters, rate laws, or validation claims. |
 | PR-57 | Dynamic thermodynamic feasibility and solver-enforcement contract | complete after PR #72 merged as `ae8a5a3` | Added optional explicit ideal-dilute concentration activities and floors, trajectory Q/dynamic Gibbs, direct or redox-derived standard energy, required bound electron/redox evidence, native RHS forward-rate blocking, derived trajectories, metadata, validation, and configured summaries. Every scientific input is sourced and explicit; missing/incompatible inputs block. No reverse flux, inferred chemistry, nonideal activity, coupled-network optimization, or empirical-validation claim. |
-| PR-58 | Broader provenance-backed biological laws contract | complete in the current checkout | Added provenance-bound competitive and Haldane substrate-inhibition modifiers for exactly matched homogeneous Michaelis-Menten processes. Explicit primary-source/maturity metadata, substrate/Km ownership, positive unit-compatible Ki, assumptions, limitations, and materially different artificial tests are required. No production constants, applicability, hidden branches, whole-fungus biology, or validation claims. |
-| PR-59 | Final PRODUCT-001 integration | recommended next after PR-58 | Integrate already implemented simulator trajectories and diagnostics into the standard researcher-facing virtual-experiment outputs without adding a new biological law, inferred value, production parameter, validation claim, or empirical interpretation. |
+| PR-58 | Broader provenance-backed biological laws contract | complete after PR #73 merged as `68c715b` | Added provenance-bound competitive and Haldane substrate-inhibition modifiers for exactly matched homogeneous Michaelis-Menten processes. Explicit primary-source/maturity metadata, substrate/Km ownership, positive unit-compatible Ki, assumptions, limitations, and materially different artificial tests are required. No production constants, applicability, hidden branches, whole-fungus biology, or validation claims. |
+| PR-59 | Final PRODUCT-001 integration | complete in the current checkout | Added schema `1.8.0`, explicit namespaced per-process rate rows, persisted derived-quantity trajectories with thermodynamic roles, dynamic thermodynamic summary/binding/count/extrema fields, and report visibility. Existing legacy rows remain; no new biological law, inferred value, production parameter, solver change, validation claim, or empirical interpretation. |
 | Future | VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred until source-backed observations satisfy the active evidence gate | Add sourced observations only after simulator outputs are mature enough that comparison is meaningful and the evidence gate is satisfied. Validation, calibration, and empirical comparison claims require real observations. |
 
 If a future orchestrator changes the queue, update this table, explain the

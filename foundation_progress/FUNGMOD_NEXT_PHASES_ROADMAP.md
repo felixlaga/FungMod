@@ -69,10 +69,11 @@ written:
   dynamic-constraint binding.
 ```
 
-The current next PR is PR-59 final PRODUCT-001 integration after PR-58
-completed the bounded provenance-backed competitive and Haldane
-substrate-inhibition laws and PR-57 completed dynamic thermodynamic feasibility
-and native solver-time enforcement in the current checkout, PR-56 completed
+No next PR is selected. The user-scoped queue is complete through PR-59 after
+the final PRODUCT-001 integration, PR-58 completed the bounded
+provenance-backed competitive and Haldane substrate-inhibition laws, PR-57
+completed dynamic thermodynamic feasibility and native solver-time
+enforcement, and PR-56 completed
 branching and cyclic enzyme-pathway assembly after
 PR #71 merged as `caa0a17`, PR-55 completed arbitrary
 supported-reaction onboarding after PR #70 merged as `6b3d275`, PR-54 completed
@@ -313,8 +314,12 @@ primary-source and maturity metadata, exact substrate and `K_m` binding,
 positive unit-compatible `K_i`, visible assumptions and limitations, and
 artificial framework benchmarks. The citations support the selected laws in
 their study systems; they do not supply production FungMod parameters, case
-applicability, or validation. The current next PR is PR-59 final PRODUCT-001
-integration over already implemented simulator outputs.
+applicability, or validation. The completed PR-59 slice raises the standard
+output schema to `1.8.0`, preserves explicit per-process rate identity, copies
+persisted derived trajectories with thermodynamic roles, and exposes existing
+dynamic thermodynamic binding/count/extrema evidence in standard diagnostics
+and reports. It does not change simulation or scientific behavior. No next PR
+is selected; the user-scoped queue is complete through PR-59.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -1676,15 +1681,16 @@ Do not emit thermodynamic state, entropy production, redox behavior, or
 organism-specific physiology unless the equations, parameters, provenance,
 maturity labels, and tests exist.
 
-Current scoped support remains explicit-metadata-only: reaction-quotient Gibbs
-diagnostics use caller-supplied Q/T metadata; scalar entropy-production-rate
-diagnostics use caller-supplied condition-specific delta G, reaction extent
-rate, and temperature metadata; and configured process-bound timeseries derive
-`-DeltaG * extent_rate(t) / T` after simulation from a named native process-rate
-trajectory only when sourced, dimensionally compatible metadata are supplied.
-These diagnostics do not infer activities, reaction quotients, concentrations,
-redox potentials, electron balances, dynamic delta G, or solver-time
-thermodynamic feasibility.
+Current scoped support includes explicit-metadata reaction-quotient Gibbs
+diagnostics; scalar and configured process-bound entropy-production-rate
+diagnostics; and PR-57 optional dynamic constraints over explicitly bound molar
+states. The dynamic path derives ideal-dilute activities, Q, and
+`delta_g = delta_g_standard + R*T*ln(Q)` from complete sourced inputs, requires
+a passing bound electron/redox check, and blocks unfavorable nonnegative
+forward rates at native solver RHS evaluations. PR-59 copies the persisted
+dynamic trajectories and configured binding/count/extrema evidence into
+standard PRODUCT outputs. The PRODUCT bridge does not infer or recompute these
+quantities, revalidate their inputs, or apply solver enforcement.
 
 ---
 

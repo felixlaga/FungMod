@@ -12,8 +12,9 @@ PR-54 authenticated curator signatures merged as PR #69 (`35a3ecb`) and
 PR-55 arbitrary supported-reaction assembly merged as PR #70 (`6b3d275`),
 PR-56 branching/cyclic pathway assembly complete after PR #71 merged as
 `caa0a17`, PR-57 dynamic thermodynamic solver enforcement complete after PR
-#72 merged as `ae8a5a3`, and PR-58 biological-law expansion complete in the
-current checkout with PR-59 selected:
+#72 merged as `ae8a5a3`, PR-58 biological-law expansion complete after PR #73
+merged as `68c715b`, and PR-59 final PRODUCT-001 integration complete in the
+current checkout:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -216,7 +217,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-59: final PRODUCT-001 integration**.
+Current next PR: **none selected; scoped queue complete through PR-59**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -391,9 +392,14 @@ and two materially different artificial configured benchmarks. It does not add
 production parameter records, case applicability, validation, growth,
 secretion, uptake, toxicity, or whole-fungus physiology.
 
-Recommended next task: PR-59 final PRODUCT-001 integration over implemented
-simulator outputs only. Do not add a new biological law, production constant,
-validation claim, or inferred mechanism.
+PR-59 integrates implemented simulator evidence into standard output schema
+`1.8.0`: explicit `process_rate.<process_id>` rows, namespaced persisted
+derived trajectories, dynamic thermodynamic binding/count/extrema fields, and
+report visibility. It does not add a biological law, production constant,
+solver behavior, validation claim, or inferred mechanism.
+
+Recommended next task: none in the user-scoped queue. Review, verify, and merge
+PR-59, then stop rather than selecting another roadmap item.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

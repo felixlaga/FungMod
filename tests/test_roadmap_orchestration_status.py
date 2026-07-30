@@ -138,11 +138,11 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-59: final PRODUCT-001 integration"
+    current_next = "none selected; scoped queue complete through PR-59"
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
     assert (
-        "The current next PR is PR-59 final PRODUCT-001 integration"
+        "No next PR\nis selected; the user-scoped queue is complete through PR-59"
         in roadmap
     )
     assert "The PR-31 slice should bridge" not in roadmap
@@ -214,7 +214,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-59: final PRODUCT-001 integration"
+    current_next = "none selected; scoped queue complete through PR-59"
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
         assert "Current next PR: **PR-03" not in text
@@ -270,6 +270,8 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-55" not in text
         assert "Current next PR: **PR-56" not in text
         assert "Current next PR: **PR-57" not in text
+        assert "Current next PR: **PR-58" not in text
+        assert "Current next PR: **PR-59" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -482,8 +484,9 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "PR-57 | Dynamic thermodynamic feasibility and solver-enforcement contract" in status
     assert "complete after PR #72 merged as `ae8a5a3` | Added optional explicit ideal-dilute" in status
     assert "PR-58 | Broader provenance-backed biological laws contract" in status
-    assert "complete in the current checkout | Added provenance-bound competitive" in status
+    assert "complete after PR #73 merged as `68c715b` | Added provenance-bound competitive" in status
     assert "PR-59 | Final PRODUCT-001 integration" in status
+    assert "complete in the current checkout | Added schema `1.8.0`" in status
     assert "PR-57 | Dynamic thermodynamic feasibility and solver-enforcement contract" in status
     assert "caller-supplied trust" in status
     assert "exact manifest authorship" in status
@@ -570,7 +573,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
-    current_next = "PR-59: final PRODUCT-001 integration"
+    current_next = "none selected; scoped queue complete through PR-59"
     for text in (status, next_steps, gate):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)

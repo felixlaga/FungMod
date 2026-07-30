@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "1.7.0"
+OUTPUT_SCHEMA_VERSION = "1.8.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -145,7 +145,7 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         primary_key=("case_id",),
     ),
     "time_series_long": _table(
-        "Long-format simulated and derived time-series observables.",
+        "Long-format simulated states, explicit per-process rates, and namespaced derived time-series observables.",
         (
             *COMMON_CASE_COLUMNS,
             *SAMPLE_COLUMNS,
@@ -153,11 +153,20 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("time_index", "Zero-based index in the simulated time grid.", semantic_type="integer"),
             _column("time", "Simulation time.", units_policy="time_units", semantic_type="number"),
             _column("time_units", "Units for the time column."),
-            _column("state", "State or derived observable name."),
-            _column("state_role", "Semantic role for the state or observable."),
+            _column(
+                "state",
+                "State or derived observable name; process rates use process_rate.<id> and persisted derived quantities use derived_quantity.<name>.",
+            ),
+            _column(
+                "state_role",
+                "Semantic role for the state or observable, including explicit process-rate and thermodynamic-derived roles.",
+            ),
             _column("value", "State or derived observable value.", units_policy="units", semantic_type="number"),
             _column("units", "Units for value."),
-            _column("source", "Whether the row is a simulated state, process rate, or derived observable."),
+            _column(
+                "source",
+                "Whether the row is a simulated state, explicit process rate, persisted simulation-derived quantity, or presentation-derived observable.",
+            ),
         ),
         primary_key=("case_id", "sample_id", "time_index", "state"),
         join_keys=("case_id", "sample_id"),
@@ -628,6 +637,24 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
                 semantic_type="boolean",
             ),
             _column(
+                "summary_has_dynamic_reaction_quotient",
+                "Whether the configured summary reported trajectory-derived reaction-quotient rows.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column(
+                "summary_has_redox_standard_energy",
+                "Whether a dynamic configured row used an explicit redox-potential standard-energy method.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column(
+                "summary_has_electron_balance_binding",
+                "Whether the configured summary reported explicit electron-balance binding for dynamic constraints.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column(
                 "summary_has_entropy_production_rate",
                 "Whether the configured summary reported entropy-production-rate rows.",
                 required=False,
@@ -636,6 +663,12 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column(
                 "summary_has_entropy_budget",
                 "Whether the configured summary reported an evaluated entropy budget.",
+                required=False,
+                semantic_type="boolean",
+            ),
+            _column(
+                "summary_has_solver_time_enforcement",
+                "Whether the configured summary reported solver-time thermodynamic enforcement.",
                 required=False,
                 semantic_type="boolean",
             ),
@@ -745,6 +778,49 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
                 "solver_time_enforcement",
                 "Solver-time enforcement status copied from thermodynamic_summary.csv when present.",
                 required=False,
+            ),
+            _column("constraint_id", "Dynamic constraint id copied from thermodynamic_summary.csv.", required=False),
+            _column("process_id", "Bound process id copied from thermodynamic_summary.csv.", required=False),
+            _column("reaction_id", "Bound reaction id copied from thermodynamic_summary.csv.", required=False),
+            _column(
+                "electron_balance_check_id",
+                "Bound passing electron-balance check id copied from thermodynamic_summary.csv.",
+                required=False,
+            ),
+            _column(
+                "standard_energy_method",
+                "Configured standard-energy method copied from thermodynamic_summary.csv.",
+                required=False,
+            ),
+            _column(
+                "recorded_evaluation_count",
+                "Returned-time-point dynamic evaluation count copied from thermodynamic_summary.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "recorded_unfavorable_count",
+                "Returned-time-point unfavorable evaluation count copied from thermodynamic_summary.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "recorded_blocked_count",
+                "Returned-time-point blocked-rate count copied from thermodynamic_summary.csv.",
+                required=False,
+                semantic_type="integer",
+            ),
+            _column(
+                "minimum_delta_gibbs",
+                "Minimum returned-time-point delta Gibbs copied from thermodynamic_summary.csv.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column(
+                "maximum_delta_gibbs",
+                "Maximum returned-time-point delta Gibbs copied from thermodynamic_summary.csv.",
+                required=False,
+                semantic_type="number",
             ),
             _column("supported_scope", "Supported-scope text copied from thermodynamic_summary.json.", required=False),
             _column(

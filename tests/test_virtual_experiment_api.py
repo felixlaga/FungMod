@@ -102,7 +102,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     output_manifest = _json_mapping(output_dir / "output_manifest.json")
     output_schema = _json_mapping(output_dir / "virtual_experiment_output_schema.json")
 
-    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.7.0"
+    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.8.0"
     assert output_schema["schema_version"] == OUTPUT_SCHEMA_VERSION
     assert "conservation_diagnostics.csv" in output_manifest["files"]
     assert "conservation_diagnostics" in output_manifest["tables"]
@@ -316,6 +316,14 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
         for row in dictionary_rows
     )
     assert any(
+        row["table"] == "thermodynamic_diagnostics" and row["column"] == "summary_has_dynamic_reaction_quotient"
+        for row in dictionary_rows
+    )
+    assert any(
+        row["table"] == "thermodynamic_diagnostics" and row["column"] == "recorded_blocked_count"
+        for row in dictionary_rows
+    )
+    assert any(
         row["table"] == "solver_diagnostics" and row["column"] == "interpretation_guardrail"
         for row in dictionary_rows
     )
@@ -486,8 +494,12 @@ def test_virtual_experiment_thermodynamic_diagnostics_copy_existing_sample_artif
         "status_counts": {"passed": 1},
         "severity_counts": {"info": 1},
         "has_reaction_quotient_gibbs": True,
+        "has_dynamic_reaction_quotient": True,
+        "has_redox_standard_energy": True,
+        "has_electron_balance_binding": True,
         "has_entropy_production_rate": True,
         "has_entropy_budget": True,
+        "has_solver_time_enforcement": True,
         "entropy_budget_scope": "Aggregate over explicit configured entropy rows.",
         "entropy_budget_units": "joule / second / kelvin",
         "entropy_budget_total": 0.1,
@@ -523,8 +535,59 @@ def test_virtual_experiment_thermodynamic_diagnostics_copy_existing_sample_artif
                 "entropy_equation": "entropy_production_rate = explicit configured metadata",
                 "dynamic_reaction_quotient": "explicit_parameter",
                 "activity_model": "caller_supplied_dimensionless_reaction_quotient",
-                "solver_time_enforcement": "not_evaluated",
+                "solver_time_enforcement": "block_unfavorable_forward_rate",
+                "constraint_id": "reaction_618_dynamic",
+                "process_id": "reaction_618",
+                "reaction_id": "sabiork_reaction_618",
+                "electron_balance_check_id": "reaction_618_electron_balance",
+                "standard_energy_method": "redox_potential",
+                "recorded_evaluation_count": "11",
+                "recorded_unfavorable_count": "3",
+                "recorded_blocked_count": "3",
+                "minimum_delta_gibbs": "-5000.0",
+                "maximum_delta_gibbs": "2500.0",
             }
+        ],
+    )
+    _write_csv(
+        sample_dir / "derived_quantities.csv",
+        [
+            {
+                "kind": "derived",
+                "name": "dynamic_thermodynamics.reaction_618_dynamic.reaction_quotient",
+                "index": "0",
+                "time": "0.0",
+                "time_units": "second",
+                "value": "0.25",
+                "units": "dimensionless",
+            },
+            {
+                "kind": "derived",
+                "name": "dynamic_thermodynamics.reaction_618_dynamic.delta_gibbs",
+                "index": "0",
+                "time": "0.0",
+                "time_units": "second",
+                "value": "-5000.0",
+                "units": "joule / mole",
+            },
+            {
+                "kind": "derived",
+                "name": "dynamic_thermodynamics.reaction_618_dynamic.rate_blocked",
+                "index": "0",
+                "time": "0.0",
+                "time_units": "second",
+                "value": "0.0",
+                "units": "dimensionless",
+            },
+            {
+                "kind": "derived",
+                "name": "dynamic_thermodynamics.reaction_618_dynamic.activity.cellobiose_concentration",
+                "index": "0",
+                "time": "0.0",
+                "time_units": "second",
+                "value": "1.0",
+                "units": "dimensionless",
+            },
         ],
     )
 
@@ -539,18 +602,56 @@ def test_virtual_experiment_thermodynamic_diagnostics_copy_existing_sample_artif
     assert row["thermodynamic_summary_csv_present"] == "true"
     assert row["summary_status_counts"] == '{"passed": 1}'
     assert row["summary_has_reaction_quotient_gibbs"] == "true"
+    assert row["summary_has_dynamic_reaction_quotient"] == "true"
+    assert row["summary_has_redox_standard_energy"] == "true"
+    assert row["summary_has_electron_balance_binding"] == "true"
     assert row["summary_has_entropy_production_rate"] == "true"
     assert row["summary_has_entropy_budget"] == "true"
+    assert row["summary_has_solver_time_enforcement"] == "true"
     assert row["entropy_budget_status"] == "non_negative"
     assert row["entropy_budget_negative_count"] == "0"
     assert row["gibbs_equation"] == "delta_g = delta_g_standard + R*T*ln(Q)"
-    assert row["solver_time_enforcement"] == "not_evaluated"
+    assert row["solver_time_enforcement"] == "block_unfavorable_forward_rate"
+    assert row["constraint_id"] == "reaction_618_dynamic"
+    assert row["process_id"] == "reaction_618"
+    assert row["reaction_id"] == "sabiork_reaction_618"
+    assert row["electron_balance_check_id"] == "reaction_618_electron_balance"
+    assert row["standard_energy_method"] == "redox_potential"
+    assert row["recorded_evaluation_count"] == "11"
+    assert row["recorded_unfavorable_count"] == "3"
+    assert row["recorded_blocked_count"] == "3"
+    assert row["minimum_delta_gibbs"] == "-5000.0"
+    assert row["maximum_delta_gibbs"] == "2500.0"
     assert row["allowed_use"] == "configured_metadata_inspection_only"
     assert (
         "Rows are copied from existing configured thermodynamic_summary artifacts only"
         in row["interpretation_guardrail"]
     )
-    assert "solver-time thermodynamic enforcement" in row["interpretation_guardrail"]
+    assert "does not independently infer or recompute" in row["interpretation_guardrail"]
+    assert "does not revalidate or enforce" in row["interpretation_guardrail"]
+
+    time_rows = result.time_series()
+    derived_by_state = {
+        candidate["state"]: candidate for candidate in time_rows if candidate["source"] == "simulation_derived_quantity"
+    }
+    assert (
+        derived_by_state["derived_quantity.dynamic_thermodynamics.reaction_618_dynamic.reaction_quotient"]["state_role"]
+        == "thermodynamic_reaction_quotient"
+    )
+    assert (
+        derived_by_state["derived_quantity.dynamic_thermodynamics.reaction_618_dynamic.delta_gibbs"]["state_role"]
+        == "thermodynamic_gibbs_energy"
+    )
+    assert (
+        derived_by_state["derived_quantity.dynamic_thermodynamics.reaction_618_dynamic.rate_blocked"]["state_role"]
+        == "thermodynamic_enforcement_flag"
+    )
+    assert (
+        derived_by_state[
+            "derived_quantity.dynamic_thermodynamics.reaction_618_dynamic.activity.cellobiose_concentration"
+        ]["state_role"]
+        == "thermodynamic_activity"
+    )
 
     report_path = result.write_report()
     report = report_path.read_text(encoding="utf-8")
@@ -560,10 +661,10 @@ def test_virtual_experiment_thermodynamic_diagnostics_copy_existing_sample_artif
     assert "configured-summary CSV present `true`" in report
     assert "allowed use `configured_metadata_inspection_only`" in report
     assert "Rows are copied from existing configured thermodynamic_summary artifacts only" in report
-    assert (
-        "do not infer activities, reaction quotients, concentrations, redox potentials, "
-        "electron balances, validation evidence, or solver-time thermodynamic enforcement"
-    ) in report
+    assert "do not independently infer, recompute, or revalidate activities" in report
+    assert "this report does not apply that enforcement" in report
+    assert "constraint `reaction_618_dynamic`" in report
+    assert "recorded blocked `3`" in report
 
 
 def test_virtual_experiment_solver_diagnostics_copy_existing_sample_artifacts_only(

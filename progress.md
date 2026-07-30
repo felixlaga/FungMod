@@ -26,13 +26,92 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-59 Final PRODUCT-001 Integration
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout for the final scoped integration of
+already implemented simulator evidence into standard researcher-facing
+outputs.
+
+Completed in this pass:
+
+- Bumped the additive standard output contract to schema version `1.8.0`.
+- Added explicit `process_rate.<process_id>` rows to
+  `time_series_long.csv`, preserving every process identity in multi-process
+  models while retaining the legacy `degradation_rate` and
+  `product_release_rate` presentation aliases.
+- Copied persisted `derived_quantities.csv` trajectories into namespaced
+  `derived_quantity.<name>` rows with explicit thermodynamic activity,
+  reaction-quotient, Gibbs-energy, and enforcement-flag roles.
+- Extended `thermodynamic_diagnostics.csv` with the configured dynamic-Q,
+  redox-energy, electron-balance, solver-enforcement, binding, evaluation
+  count, blocking count, and Gibbs-extrema evidence already written by PR-57.
+- Updated the Markdown/HTML report text and row detail rendering so it can
+  display copied dynamic thermodynamic evidence without claiming to infer,
+  recompute, revalidate, or apply enforcement.
+- Synchronized the active README, roadmap, status, next-step, validation-gate,
+  and machine-checkable status contracts. No further PR is selected for the
+  user-scoped queue after PR-59.
+
+Tests added or modified:
+
+- Extended virtual-experiment API tests for every newly copied thermodynamic
+  summary/row field and each derived-quantity semantic role.
+- Added a multi-process registry-chain test proving all process rates retain
+  explicit identity in the standard long table while legacy aliases remain.
+- Updated schema-version, report guardrail, and active-status contract tests.
+
+What did not change: no equation, modifier, process law, solver RHS behavior,
+thermodynamic evaluation, registry record, biological identity, parameter,
+validation dataset, calibration result, empirical comparison, or simulation
+authorization changed. Missing configured artifacts still produce no invented
+rows or values.
+
+Scientific behavior impact: none. This slice copies and labels evidence already
+persisted by configured simulation. It does not independently calculate or
+enforce thermodynamics and does not add a biological claim.
+
+Backward compatibility: existing columns and legacy rate aliases remain.
+Schema `1.8.0` adds rows and columns, so consumers that incorrectly assume
+fixed row counts should select by `state`, `state_role`, or `source`. New
+namespaces prevent collisions with simulated state names.
+
+Remaining ambiguity and risk: legacy `degradation_rate` and
+`product_release_rate` remain compatibility presentation aliases and cannot
+identify every process in a multi-process system; the new
+`process_rate.<process_id>` rows are authoritative for that purpose. Derived
+quantities are trusted only as copied simulation artifacts and are not
+recomputed by the PRODUCT table writer.
+
+Risk level: low-to-medium output-contract risk, bounded by an additive schema
+minor version, collision-resistant namespaces, retained legacy rows, focused
+multi-process/thermodynamic tests, and no numerical-behavior change.
+
+Recommended next task: none in the user-scoped queue. After PR-59 is reviewed,
+verified, and merged, stop rather than inventing another roadmap item.
+
+Verification:
+
+- Focused thermodynamic bridge and multi-process rate-identity tests:
+  `2 passed in 9.90s`.
+- Focused output, thermodynamic, and status regression initially reached
+  `90 passed, 2 failed in 21.17s`; both failures were stale status-text
+  assertions. The corrected status/API/report subset passed
+  `14 passed in 11.70s`.
+- Canonical pytest with coverage: `1216 passed in 452.84s`; total coverage
+  `83.95%`, above the required `80%`.
+- Ruff over `src tests`: passed.
+- Pyright with the venv interpreter: `0 errors, 0 warnings, 0 informations`.
+- `git diff --check`: passed.
+
 ## PR-58 Broader Provenance-Backed Biological Laws
 
 Date: 2026-07-30
 
-Status: `complete` in the current checkout for competitive and Haldane
-substrate-inhibition laws on explicitly matched homogeneous Michaelis-Menten
-processes.
+Status: `complete` after PR #73 merged as `68c715b` for competitive and
+Haldane substrate-inhibition laws on explicitly matched homogeneous
+Michaelis-Menten processes.
 
 Completed in this pass:
 

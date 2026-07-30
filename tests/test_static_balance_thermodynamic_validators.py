@@ -408,8 +408,8 @@ def test_configured_reaction_quotient_validator_writes_thermodynamic_summary(tmp
 
     assert "## Explicit thermodynamic diagnostics" in report
     assert "existing configured-output `thermodynamic_summary.json` and `thermodynamic_summary.csv`" in report
-    assert "do not infer activities, reaction quotients, concentrations" in report
-    assert "validation evidence, or solver-time thermodynamic enforcement" in report
+    assert "do not independently infer, recompute, or revalidate activities" in report
+    assert "this report does not apply that enforcement" in report
     assert "`reaction_quotient_thermodynamic_feasibility`" in report
     assert "delta_gibbs=-5000.0 joule / mole" in report
     assert "delta_g = delta_g_standard + R*T*ln(Q)" in report
