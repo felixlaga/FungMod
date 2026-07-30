@@ -26,6 +26,84 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PR-50 CURATION-001 Checksum-Loaded Written Source Authoring
+
+Date: 2026-07-30
+
+Status: `complete` in the current checkout for the bounded loaded-source
+authoring slice. PR-49 is `complete` after PR #64 merged as `bbe2ee6`.
+CURATION-001 remains `partial` for nonidentity conversion, non-parameter
+authoring, product-map destination ownership, and curator authentication.
+
+Completed in this pass:
+
+- Extended `author_parameter_record(...)` to accept either its existing
+  validated in-memory `CurationResult` or a public `LoadedCurationBundle`.
+- Re-loads the owned manifest through `load_curation_bundle(...)` at authoring
+  time and uses only the freshly reconstructed `CurationResult`. This rechecks
+  exact inventory, checksums, path/symlink containment, and deterministic
+  shared semantics after loading and before authoring.
+- Kept raw bundle and manifest paths unsupported at the authoring boundary so
+  callers cannot skip the explicit public loading step.
+- Preserved every PR-48 source, curator, frozen snapshot, ordered URL,
+  identity-only value/unit, closed provenance, storage-only allowed-use,
+  registry-context, selector, loader-fidelity, authoring-digest, and
+  no-mutation constraint.
+
+Tests added or modified:
+
+- `tests/test_parameter_record_authoring.py` proves loaded written input
+  authors the exact same deterministic result and digest as its in-memory
+  source, leaves the copied registry unchanged, and still rejects raw paths.
+- The same suite proves a bundle modified after loading is revalidated and
+  rejected at authoring time.
+- `tests/test_roadmap_orchestration_status.py` synchronizes PR-49 merge,
+  PR-50 completion and scope, remaining CURATION-001 limits, and the PR-51
+  follow-up.
+
+What did not change: no source value, converted value, target value, unit,
+parameter policy, registry record, registry version, package version,
+promotion classification, apply transaction, process law, solver, biology,
+validation data, calibration, empirical comparison, output table, or notebook
+behavior. No live source access occurs.
+
+Scientific behavior impact: none. Written-source authoring reconstructs the
+same administrative identity transcription already supported in memory. It
+does not infer or convert values, validate science, authorize simulation, or
+make a parameter transferable.
+
+Backward compatibility: additive accepted input type. Existing in-memory
+`CurationResult` callers retain their exact behavior. Raw paths continue to
+fail, now with an error that directs callers to the checksum-loaded bundle
+contract.
+
+Remaining ambiguity and risk: `LoadedCurationBundle` is not proof of curator
+identity; checksums prove internal consistency only. Nonidentity conversion
+requires an explicit versioned method registry, parseable units, dimensional
+compatibility, deterministic recomputation, and a closed rounding policy.
+Non-parameter authoring and product-map promotion remain unsupported.
+
+Risk level: low-to-medium administrative integrity. The only new path is
+reduced to the already validated in-memory result after a second public-loader
+pass and retains all downstream authoring validation and no-mutation behavior.
+
+Recommended next task: PR-51, a versioned nonidentity ParameterRecord
+conversion registry. Admit only explicit named conversions with parseable
+source/target units, compatible dimensions, deterministic recomputation from
+the source value, and an explicit rounding policy. Add no guessed conversion,
+registry mutation, validation claim, or broader record support.
+
+Verification:
+
+- Focused authoring, curation, and roadmap suites:
+  `162 passed in 105.19s`.
+- Ruff: `All checks passed!`.
+- Pyright: `0 errors, 0 warnings, 0 informations`.
+- Canonical pytest with coverage:
+  `1148 passed in 396.78s`; total coverage `84.10%`, above the required
+  `80.0%`.
+- `git diff --check`: passed.
+
 ## PR-49 CURATION-001 Reusable Public Curation-Bundle Loader
 
 Date: 2026-07-30

@@ -29,14 +29,17 @@ from fungal_model.api.curation import (
     CURATION_DECISION_ALLOWED_USE_PENDING_PROMOTION,
     CURATION_DECISION_ALLOWED_USE_REVIEW_ONLY,
     CURATION_SCHEMA_VERSION,
+    CurationError,
     CurationRecord,
     CurationResult,
     CurationWriteResult,
+    LoadedCurationBundle,
     curation_date_is_iso,
     curation_manifest_payload,
     curation_records_csv_payload,
     curation_records_payload,
     curation_source_provenance_missing,
+    load_curation_bundle,
     render_curation_report,
 )
 from fungal_model.registry.loaders import load_parameter_record_mapping, load_registry
@@ -298,24 +301,31 @@ class CuratorAuthoredParameterResult(CurationResult):
 
 
 def author_parameter_record(
-    curation_result: CurationResult,
+    curation_result: CurationResult | LoadedCurationBundle,
     *,
     source_record_id: str,
     parameter_record: Mapping[str, Any],
     registry_index: str | Path,
 ) -> CuratorAuthoredParameterResult:
-    """Build one production ParameterRecord without conversion or registry mutation."""
+    """Build one production ParameterRecord without conversion or registry mutation.
 
-    source = _accepted_source(curation_result, source_record_id)
+    A written source must first be represented by ``LoadedCurationBundle``.
+    Its manifest is reloaded at authoring time so checksum, inventory, path,
+    and shared semantic validation cannot be bypassed by mutating a previously
+    loaded in-memory view.
+    """
+
+    source_result = _authoring_source_result(curation_result)
+    source = _accepted_source(source_result, source_record_id)
     _validate_source_record(
         source,
-        source_query=curation_result.source_query,
-        source_snapshot_path=curation_result.source_snapshot_path,
+        source_query=source_result.source_query,
+        source_snapshot_path=source_result.source_snapshot_path,
     )
     result_provenance = _result_provenance(
-        source_query=curation_result.source_query,
-        source_snapshot_path=curation_result.source_snapshot_path,
-        proposal_limitations=curation_result.proposal_limitations,
+        source_query=source_result.source_query,
+        source_snapshot_path=source_result.source_snapshot_path,
+        proposal_limitations=source_result.proposal_limitations,
     )
     target = deepcopy(dict(parameter_record))
     _validate_target_schema(target, audit_required=False)
@@ -356,9 +366,9 @@ def author_parameter_record(
         target,
         curation,
         source_record_id=source_record_id,
-        source_query=curation_result.source_query,
-        source_snapshot_path=curation_result.source_snapshot_path,
-        proposal_limitations=curation_result.proposal_limitations,
+        source_query=source_result.source_query,
+        source_snapshot_path=source_result.source_snapshot_path,
+        proposal_limitations=source_result.proposal_limitations,
     )
     audit = provenance[PARAMETER_BRIDGE_PROVENANCE_KEY]
     assert isinstance(audit, dict)
@@ -366,9 +376,9 @@ def author_parameter_record(
     target["provenance"] = provenance
     authored = replace(authored, proposed_record=deepcopy(target))
     result = CuratorAuthoredParameterResult(
-        source_query=curation_result.source_query,
-        source_snapshot_path=curation_result.source_snapshot_path,
-        proposal_limitations=tuple(curation_result.proposal_limitations),
+        source_query=source_result.source_query,
+        source_snapshot_path=source_result.source_snapshot_path,
+        proposal_limitations=tuple(source_result.proposal_limitations),
         records=(authored,),
         source_record_id=source_record_id,
         authored_record_id=authored.record_id,
@@ -780,6 +790,24 @@ def _validate_result_provenance(
         raise ParameterRecordAuthoringError(
             "Authored result provenance disagrees with accepted curation evidence."
         )
+
+
+def _authoring_source_result(
+    value: CurationResult | LoadedCurationBundle,
+) -> CurationResult:
+    if isinstance(value, LoadedCurationBundle):
+        try:
+            return load_curation_bundle(value.manifest_path).result
+        except CurationError as exc:
+            raise ParameterRecordAuthoringError(
+                "Written curation source failed integrity revalidation before authoring."
+            ) from exc
+    if isinstance(value, CurationResult):
+        return value
+    raise ParameterRecordAuthoringError(
+        "author_parameter_record requires a validated in-memory CurationResult "
+        "or checksum-loaded LoadedCurationBundle."
+    )
 
 
 def _accepted_source(result: CurationResult, record_id: str) -> CurationRecord:

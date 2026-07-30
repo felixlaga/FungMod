@@ -130,13 +130,12 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     roadmap = _read(ACTIVE_ROADMAP)
 
     current_next = (
-        "PR-50: checksum-loaded written source input for identity-only "
-        "ParameterRecord authoring"
+        "PR-51: versioned nonidentity ParameterRecord conversion registry"
     )
     assert f"Current next PR: **{current_next}**" in status
     assert f"Current next PR: **{current_next}**" in next_steps
     assert (
-        "The current next PR is PR-50 checksum-loaded written source input for"
+        "The current next PR is PR-51 versioned nonidentity ParameterRecord conversion"
         in roadmap
     )
     assert "The PR-31 slice should bridge" not in roadmap
@@ -160,7 +159,8 @@ def test_active_docs_identify_current_next_pr_and_do_not_bind_old_progress() -> 
     assert "completed PR-47" in roadmap
     assert "completed PR-48" in roadmap
     assert "completed PR-49" in roadmap
-    assert "PR-50" in roadmap
+    assert "completed PR-50" in roadmap
+    assert "PR-51" in roadmap
     assert "branching, cycles, disconnected chains, and malformed topology" in roadmap
     assert "35 baseline nullable-member errors across 11" in roadmap
     assert "scientific modules using explicit contracts" in roadmap
@@ -201,8 +201,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     roadmap = _read(ACTIVE_ROADMAP)
 
     current_next = (
-        "PR-50: checksum-loaded written source input for identity-only "
-        "ParameterRecord authoring"
+        "PR-51: versioned nonidentity ParameterRecord conversion registry"
     )
     for text in (status, next_steps):
         assert f"Current next PR: **{current_next}**" in text
@@ -251,6 +250,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
         assert "Current next PR: **PR-47" not in text
         assert "Current next PR: **PR-48" not in text
         assert "Current next PR: **PR-49" not in text
+        assert "Current next PR: **PR-50" not in text
 
     for phase in ("PRODUCT-001", "THERMO-003", "BIO-003", "VALIDATION-DATA-001"):
         assert phase in status
@@ -442,8 +442,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     ) in status
     assert "complete after PR #63 merged as `764d1e4`; CURATION-001 remains partial" in status
     assert "PR-49 | CURATION-001 reusable public curation-bundle loader" in status
-    assert "complete in the current checkout for the bounded read-only loader scope" in status
+    assert "complete after PR #64 merged as `bbe2ee6`" in status
     assert "PR-50 | CURATION-001 checksum-loaded written source input" in status
+    assert "complete in the current checkout for the bounded loaded-source bridge scope" in status
+    assert "PR-51 | CURATION-001 versioned nonidentity ParameterRecord conversion registry" in status
     assert "exact storage-only policy blocks simulation in every mode" in status
     assert "closed exact per-mode `allowed_use` permissions" in status
     assert "intrinsic component-only scope" in status
@@ -502,8 +504,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     roadmap = _read(ACTIVE_ROADMAP)
 
     current_next = (
-        "PR-50: checksum-loaded written source input for identity-only "
-        "ParameterRecord authoring"
+        "PR-51: versioned nonidentity ParameterRecord conversion registry"
     )
     for text in (status, next_steps, gate):
         assert current_next in text
@@ -553,6 +554,7 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-47" not in _current_next_lines(text)
         assert "PR-48" not in _current_next_lines(text)
         assert "PR-49" not in _current_next_lines(text)
+        assert "PR-50" not in _current_next_lines(text)
 
     assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
     assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
@@ -569,7 +571,8 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "PR-45 CURATION-001 proposal-review and decision-bundle work is complete" in gate
     assert "PR-46 registry-promotion planning is complete" in gate
     assert "PR-48 identity-only PARAMETER authoring is complete" in gate
-    assert "selected PR-50\nfollow-up is a bounded written-source path" in gate
+    assert "PR-50 checksum-loaded\nwritten-source authoring is complete" in gate
+    assert "selected PR-51 follow-up is a versioned nonidentity" in gate
     assert "intentional plan\nschema `2.0.0`" in gate
     assert "CURATION-001 remains partial" in gate
     assert "PR-49 reusable public checksum-validated" in gate

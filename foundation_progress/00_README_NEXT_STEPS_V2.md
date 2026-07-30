@@ -3,8 +3,9 @@
 Use `ROADMAP_ORCHESTRATION_STATUS.md` for the current PR queue and phase
 status.
 
-Scoped status after PR-48 merged as PR #63 (`764d1e4`) and bounded PR-49
-public-loader completion in the current checkout, with PR-50 selected:
+Scoped status after PR-49 merged as PR #64 (`bbe2ee6`) and bounded PR-50
+written-source authoring completion in the current checkout, with PR-51
+selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -15,8 +16,9 @@ and cycles remain unsupported.
 CASE-001: complete once PR-02 is merged for the researcher-facing named API path.
 CURATION-001: partial after PR-47 transactional apply, completed PR-48
 PARAMETER-only identity authoring, and completed PR-49 reusable public
-curation-bundle loading; direct written specialized authoring, nonidentity
-conversions, and non-parameter source records remain unsupported.
+curation-bundle loading, and completed PR-50 checksum-loaded written-source
+authoring; nonidentity conversions and non-parameter source records remain
+unsupported.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
@@ -199,7 +201,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-50: checksum-loaded written source input for identity-only ParameterRecord authoring**.
+Current next PR: **PR-51: versioned nonidentity ParameterRecord conversion registry**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -303,11 +305,18 @@ that path. Checksums establish internal consistency only, not curator identity.
 It adds no registry mutation, scientific transformation, validation claim, or
 broader record support.
 
-Recommended next task: PR-50 checksum-loaded written source input for
-identity-only ParameterRecord authoring. Accept only a successfully loaded
-source result and preserve every PR-48 authoring constraint; add no
-nonidentity conversion, registry mutation, scientific-field inference,
-validation claim, or broader record support.
+The completed PR-50 extends `author_parameter_record(...)` to accept a
+`LoadedCurationBundle`. It reloads the owned manifest at call time before
+applying every existing identity-only, frozen-source, storage-only,
+registry-context, loader-fidelity, and no-mutation guardrail. Raw paths remain
+unsupported, and no scientific value, registry, validation status, or
+simulation authorization is changed.
+
+Recommended next task: PR-51 versioned nonidentity ParameterRecord conversion
+registry. Admit only explicit named conversions with parseable source/target
+units, compatible dimensionality, deterministic recomputation from the source
+value, and an explicit rounding policy; add no guessed conversion, registry
+mutation, validation claim, or broader record support.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

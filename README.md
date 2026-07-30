@@ -435,9 +435,12 @@ plan = plan_registry_promotion(
 )
 ```
 
-`author_parameter_record(...)` deliberately still accepts only a validated
-in-memory `CurationResult`; callers may inspect `load_curation_bundle(...).result`,
-but direct written-source input remains a separate follow-up contract. The
+`author_parameter_record(...)` accepts either a validated in-memory
+`CurationResult` or a `LoadedCurationBundle` returned by
+`load_curation_bundle(...)`. A loaded written source is reloaded from its owned
+manifest at authoring time before the existing identity, frozen-source,
+registry-context, loader-fidelity, storage-only, and no-mutation checks run.
+Raw paths remain unsupported so callers cannot bypass the public loader. The
 specialized result uses the existing deterministic, checksummed curation writer,
 and either that written bundle or the in-memory result is consumable by
 `plan_registry_promotion(...)` after authoring-digest, loader, registry-context,

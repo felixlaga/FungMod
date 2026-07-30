@@ -22,7 +22,7 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 Status: `deferred; blocked/partial` for ingestion.
 
-Current next PR: **PR-50: checksum-loaded written source input for identity-only ParameterRecord authoring**.
+Current next PR: **PR-51: versioned nonidentity ParameterRecord conversion registry**.
 
 This phase has a machine-checkable ingestion gate, but it does not yet have a
 source-backed real time-course dataset in the repository. Validation remains
@@ -47,17 +47,18 @@ PR #60 merged as `5ac7864`. PR-46 registry-promotion planning is complete after
 PR #61 merged as `2b6c639`. PR-47 transactional apply is complete after PR #62
 merged as `b1ebb860`. PR-48 identity-only PARAMETER authoring is complete
 after PR #63 merged as `764d1e4`. PR-49 reusable public checksum-validated
-curation-bundle loading is complete in the current checkout. It centralizes the
+curation-bundle loading is complete after PR #64 merged as `bbe2ee6`. It centralizes the
 owned manifest/schema, exact artifact inventory, declared checksums,
 path/symlink containment, and shared deterministic curation-artifact contract
-without registry mutation or scientific transformation. The selected PR-50
-follow-up is a bounded written-source path through that loaded result for the
-existing identity-only
-PARAMETER authoring bridge from explicit accepted curation evidence to a
-complete curator-authored production mapping and promotion plan. It does not
-perform nonidentity conversion, support other record types, mutate/apply a
-registry, ingest validation data, change
-scientific fields, authorize simulation automatically, or claim validation.
+without registry mutation or scientific transformation. PR-50 checksum-loaded
+written-source authoring is complete in the current checkout: the
+identity-only PARAMETER bridge accepts a `LoadedCurationBundle`, reloads it at
+call time, and preserves every existing source, registry, loader, policy, and
+no-mutation guardrail. The selected PR-51 follow-up is a versioned nonidentity
+ParameterRecord conversion registry with explicit parseable units,
+dimensional compatibility, deterministic recomputation, and a closed rounding
+policy. It does not support other record types, mutate/apply a registry, ingest
+validation data, authorize simulation automatically, or claim validation.
 The completed PR-47 work is bounded transactional
 administrative registry apply with exact digest confirmation, intentional plan
 schema `2.0.0`, durable curation audit provenance, strict next-patch versioning,
@@ -168,10 +169,10 @@ schema, or biology changes in this gate PR.
 
 ## Next Action
 
-After PR-49, take the bounded PR-50 checksum-loaded written source input for
-identity-only ParameterRecord authoring, preserving every PR-48 guardrail and
-adding no conversion, registry mutation, scientific transformation,
-validation claim, or broader record support. Continue building PRODUCT-001,
+After PR-50, take the bounded PR-51 versioned nonidentity ParameterRecord
+conversion registry with explicit unit parsing, dimensional compatibility,
+deterministic recomputation, and rounding policy, adding no guessed conversion,
+registry mutation, validation claim, or broader record support. Continue building PRODUCT-001,
 THERMO-003, and generic BIO-003 simulator capability.
 Later, find or obtain source-backed numeric time-course
 observations that satisfy the required evidence fields above. Then open a
