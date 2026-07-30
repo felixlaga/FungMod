@@ -69,9 +69,11 @@ written:
   relative to dynamic thermodynamic feasibility.
 ```
 
-The current next PR is PR-52 non-parameter curator-authored registry-record
-bridge after PR-51 completed its versioned nonidentity ParameterRecord
-conversion registry in the current checkout, PR-50 completed checksum-loaded
+The current next PR is PR-53 product-map registry destination and ownership
+contract after PR-52 completed its five-family index-backed non-parameter
+authoring bridge in the current checkout, PR-51 completed its versioned
+nonidentity ParameterRecord conversion registry after PR #66 merged as
+`bef938f`, PR-50 completed checksum-loaded
 written-source authoring after PR #65 merged as `933d2c8`, PR-49 public
 curation-bundle loading merged as PR #64
 (`bbe2ee6`), PR-48 identity-only
@@ -267,11 +269,16 @@ registry-context, loader-fidelity, and no-mutation guardrail. Raw paths remain
 unsupported. The completed PR-51 slice adds a public immutable versioned
 conversion registry and one named Pint method with explicit parseable distinct
 units, dimensional compatibility, deterministic recomputation, and
-12-decimal-place half-even rounding. Non-parameter records, validation,
-calibration, and simulation authorization remain unsupported, so CURATION-001
-remains partial. The recommended next slice is PR-52 non-parameter
-curator-authored registry-record bridging for the index-backed record families;
-product maps remain separate until destination ownership is defined.
+12-decimal-place half-even rounding. The completed PR-52 slice adds
+`author_registry_records(...)` for complete `fungi`, `substrates`,
+`enzyme_classes`, `process_compatibility`, and `case_templates` targets with
+accepted-source identity, reserved audit/digest evidence, exact
+production-loader fidelity, deterministic in-memory/written validation, and no
+authoring/planning mutation. CURATION-001 remains partial for product-map
+destination ownership and curator authentication/signatures. The recommended
+next slice is PR-53 product-map registry destination and ownership: define one
+production schema, loader, owner, and index-declared destination without
+inferring stoichiometry or authorizing simulation automatically.
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
 explicit artificial product-state `K_i`, proving the modifier runs outside the
@@ -466,11 +473,12 @@ PR-47 transactional apply completed after PR #62 merged as `b1ebb860`, PR-48
 identity-only PARAMETER authoring completed after PR #63 merged as `764d1e4`,
 PR-49 reusable public curation-bundle loading completed after PR #64 merged as
 `bbe2ee6`, PR-50 checksum-loaded written-source authoring completed after PR
-#65 merged as `933d2c8`, and PR-51 registered nonidentity conversion completed in
-the current checkout. The selected PR-52 slice is non-parameter
-curator-authored registry-record bridging for the index-backed families,
+#65 merged as `933d2c8`, PR-51 registered nonidentity conversion completed
+after PR #66 merged as `bef938f`, and PR-52 index-backed non-parameter
+authoring completed in the current checkout. The selected PR-53 slice defines
+product-map registry destination ownership and its production loader contract,
 rather than validation ingestion, digitization, fabricated validation data,
-calibration, empirical comparison, product-map destination invention,
+calibration, empirical comparison, inferred stoichiometry,
 registry apply, or automatic simulation authorization.
 
 Validation remains important, but it is now deliberately deferred behind core
@@ -1361,10 +1369,13 @@ copied registry only. PR-49 adds public checksum-validated loading and shared
 artifact reconstruction without mutation or curator authentication. PR-50
 accepts a revalidated loaded written source in the identity-only authoring
 bridge. PR-51 admits only one versioned registered, dimensionally compatible,
-deterministically recomputed nonidentity conversion policy. Product maps remain
-blocked pending a destination contract. CURATION-001 remains partial for
-non-parameter source records. The authored storage-only policy blocks
-simulation in every mode. This status does not claim scientific validation or
+deterministically recomputed nonidentity conversion policy. PR-52 admits
+complete curator-authored targets for the five index-backed non-parameter
+families through exact source identity, reserved integrity evidence, production
+loader fidelity, and promotion/apply revalidation. Product maps remain blocked
+pending their production schema, owner, loader, and index destination.
+CURATION-001 remains partial for that product-map contract and curator
+authentication/signatures. This status does not claim scientific validation or
 automatic simulation authorization.
 
 ## CURATION-001 acceptance criteria

@@ -605,6 +605,29 @@ def _review_record(
     return tuple(sorted(missing)), tuple(sorted(set(reasons))), provenance
 
 
+def validate_reviewable_source_record(
+    record_type: str,
+    proposed_record: Mapping[str, Any],
+    *,
+    source_snapshot_path: str,
+) -> Mapping[str, Any]:
+    """Revalidate one record through the source-proposal review contract."""
+
+    if record_type not in _RECORD_TYPES:
+        raise CurationError(f"Unsupported source proposal record type: {record_type!r}.")
+    missing_fields, reasons, provenance = _review_record(
+        record_type,
+        proposed_record,
+        source_snapshot_path=source_snapshot_path,
+    )
+    if missing_fields or reasons:
+        raise CurationError(
+            f"Source proposal record {proposed_record.get('record_id')!r} is not "
+            f"reviewable: {'; '.join(reasons)}"
+        )
+    return deepcopy(dict(provenance))
+
+
 def _source_provenance(record: Mapping[str, Any], *, source_snapshot_path: str) -> Mapping[str, Any]:
     nested = record.get("provenance")
     has_nested = isinstance(nested, Mapping)
@@ -1697,6 +1720,12 @@ def _canonicalize(value: Any, *, field_name: str | None = None) -> Any:
     return value
 
 
+def canonicalize_curation_artifact_value(value: Any) -> Any:
+    """Return the deterministic value form used by written curation artifacts."""
+
+    return _canonicalize(value)
+
+
 def _required_text(payload: Mapping[str, Any], field: str, *, scope: str) -> str:
     value = payload.get(field)
     if not isinstance(value, str) or not value.strip():
@@ -1746,6 +1775,7 @@ __all__ = [
     "CurationResult",
     "CurationWriteResult",
     "LoadedCurationBundle",
+    "canonicalize_curation_artifact_value",
     "curation_manifest_payload",
     "curation_records_csv_payload",
     "curation_records_payload",
@@ -1753,5 +1783,6 @@ __all__ = [
     "render_curation_records_csv",
     "render_curation_report",
     "review_source_proposal",
+    "validate_reviewable_source_record",
     "validate_curation_report_limitations",
 ]

@@ -5,8 +5,9 @@ status.
 
 Scoped status after PR-49 merged as PR #64 (`bbe2ee6`), PR-50 written-source
 authoring merged as PR #65 (`933d2c8`), and bounded
-PR-51 registered nonidentity conversion completion in the current checkout,
-with PR-52 selected:
+PR-51 registered nonidentity conversion merged as PR #66 (`bef938f`), and
+bounded PR-52 index-backed non-parameter authoring completion in the current
+checkout, with PR-53 selected:
 
 ```text
 SOURCE-002: complete for the offline notebook discovery/proposal workflow.
@@ -18,8 +19,9 @@ CASE-001: complete once PR-02 is merged for the researcher-facing named API path
 CURATION-001: partial after PR-47 transactional apply, completed PR-48
 PARAMETER-only identity authoring, and completed PR-49 reusable public
 curation-bundle loading, and completed PR-50 checksum-loaded written-source
-authoring, and completed PR-51 versioned nonidentity conversion; non-parameter
-source records remain unsupported.
+authoring, completed PR-51 versioned nonidentity conversion, and completed
+PR-52 authoring for the five index-backed non-parameter families; product maps
+and curator authentication/signatures remain unsupported.
 VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
 source-backed numeric time-course dataset satisfies the active gate.
 PRODUCT-001: partial after top-level environment_grid helper,
@@ -202,7 +204,7 @@ mechanism summaries, configured metadata, limitations, and final metrics
 without validation claims.
 ```
 
-Current next PR: **PR-52: non-parameter curator-authored registry-record bridge**.
+Current next PR: **PR-53: product-map registry destination and ownership contract**.
 
 The PR-03 gate document records that the existing Resa/Buckin and
 Ariaeenejad/Frontiers candidate reviews are blocked and that this repo still
@@ -296,7 +298,8 @@ The specialized result uses the existing checksummed curation writer and is
 consumable by `plan_registry_promotion(...)` after revalidation. It does not
 accept written source curation, infer or convert values, mutate/apply a
 registry, authorize simulation, or claim validation. CURATION-001 stays
-partial for nonidentity conversion and non-parameter source records.
+partial at that point for nonidentity conversion and non-parameter source
+records.
 
 The completed PR-49 adds top-level `load_curation_bundle(...)` and
 `LoadedCurationBundle`, verifies the owned manifest/schema, exact artifact
@@ -321,11 +324,18 @@ source/target units, compatible dimensionality, deterministic recomputation,
 12-decimal-place half-even rounding, and exact audit/digest-bound
 converted/target correspondence.
 
-Recommended next task: PR-52 non-parameter curator-authored registry-record
-bridge. Cover only index-backed record families with exact source identity,
-closed target schemas, owned destinations, loader/type fidelity, conservative
-policies, and no mutation. Keep product maps separate until their destination
-contract exists.
+The completed PR-52 adds `author_registry_records(...)` for accepted source
+records mapped to complete `fungi`, `substrates`, `enzyme_classes`,
+`process_compatibility`, and `case_templates` targets. It binds source and
+target identity, reserved audit/digest evidence, deterministic in-memory and
+written integrity, exact production-loader fidelity, and promotion/apply
+revalidation without mutating the production registry during authoring or
+planning.
+
+Recommended next task: PR-53 product-map registry destination and ownership
+contract. Define one production record schema, loader, owner, and
+index-declared destination before enabling curator-authored product-map
+promotion. Do not infer stoichiometry or authorize simulation automatically.
 
 Build-first work should now improve FungMod as a virtual-experiment engine:
 broader researcher-facing inputs, explicit exploratory priors, richer

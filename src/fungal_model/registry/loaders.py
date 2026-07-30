@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 import yaml
 
@@ -30,6 +30,15 @@ from fungal_model.registry.records import (
 from fungal_model.registry.store import FungModRegistry, RegistryValidationError
 
 T = TypeVar("T")
+RegistryRecordType = Literal[
+    "fungi",
+    "substrates",
+    "enzyme_classes",
+    "environments",
+    "parameter_records",
+    "process_compatibility",
+    "case_templates",
+]
 
 
 class RegistryLoadError(ValueError):
@@ -79,6 +88,44 @@ def load_parameter_record_mapping(data: Mapping[str, Any]) -> ParameterRecord:
     """Load one parameter mapping through the production registry factory."""
 
     return _parameter_record(data)
+
+
+def load_registry_record_mapping(
+    record_type: RegistryRecordType,
+    data: Mapping[str, Any],
+) -> (
+    FungusRecord
+    | SubstrateRecord
+    | EnzymeClassRecord
+    | EnvironmentRecord
+    | ParameterRecord
+    | ProcessCompatibilityRecord
+    | CaseTemplateRecord
+):
+    """Load and validate one mapping through its production registry factory."""
+
+    factories = {
+        "fungi": _fungus_record,
+        "substrates": _substrate_record,
+        "enzyme_classes": _enzyme_class_record,
+        "environments": _environment_record,
+        "parameter_records": _parameter_record,
+        "process_compatibility": _process_compatibility_record,
+        "case_templates": _case_template_record,
+    }
+    try:
+        factory = factories[record_type]
+    except KeyError as exc:  # pragma: no cover - static type callers are closed
+        raise RegistryLoadError(
+            f"Unsupported production registry record type: {record_type!r}."
+        ) from exc
+    record = factory(data)
+    validation = record.validate()
+    if not validation.passed:
+        raise RegistryLoadError(
+            f"Invalid {record_type} record {record.record_id!r}: {validation.details}"
+        )
+    return record
 
 
 def _load_records(

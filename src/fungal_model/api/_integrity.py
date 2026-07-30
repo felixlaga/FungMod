@@ -12,6 +12,7 @@ from typing import Any
 from fungal_model.provenance import (
     CURATION_AUDIT_PROVENANCE_KEY,
     PARAMETER_BRIDGE_PROVENANCE_KEY,
+    REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY,
     RESERVED_PROVENANCE_KEYS,
 )
 
@@ -150,6 +151,7 @@ def _field_path(parent: str, field: str) -> str:
 __all__ = [
     "CURATION_AUDIT_PROVENANCE_KEY",
     "PARAMETER_BRIDGE_PROVENANCE_KEY",
+    "REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY",
     "RESERVED_PROVENANCE_KEYS",
     "TreeIntegrityError",
     "canonicalize",
