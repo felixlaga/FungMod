@@ -12,7 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOKS = (
     ROOT / "notebooks" / "examples" / "20_zero_to_complete_virtual_experiment.ipynb",
     ROOT / "notebooks" / "examples" / "21_advanced_capabilities.ipynb",
+    ROOT / "notebooks" / "examples" / "22_five_fungal_beta_glucosidases.ipynb",
 )
+
+ENSEMBLE_NOTEBOOKS = frozenset(NOTEBOOKS[:2])
 
 
 def test_release_notebooks_are_deterministically_generated() -> None:
@@ -44,13 +47,42 @@ def test_release_notebook_contract(notebook_path: Path) -> None:
     assert notebook["nbformat"] == 4
     assert "import fungmod as fm" in code
     assert "FUNGMOD_NOTEBOOK_OUTPUT_ROOT" in code
-    assert "FUNGMOD_NOTEBOOK_SAMPLES" in code
+    if notebook_path in ENSEMBLE_NOTEBOOKS:
+        assert "FUNGMOD_NOTEBOOK_SAMPLES" in code
     assert "SimulationEngine" not in code
     assert "ReactionDiffusionEngine" not in code
     assert "solve_ivp" not in code
     assert "class " not in code
     assert "not empirical validation" in markdown.lower()
     assert "not whole-fungus" in markdown.lower() or "whole-fungus physiology" in markdown.lower()
+
+
+def test_fungal_beta_glucosidase_showcase_contract() -> None:
+    notebook_path = ROOT / "notebooks" / "examples" / "22_five_fungal_beta_glucosidases.ipynb"
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    code = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell.get("cell_type") == "code"
+    )
+    markdown = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell.get("cell_type") == "markdown"
+    ).lower()
+
+    assert "five_fungal_beta_glucosidases.yml" in code
+    assert "fm.run_configured_model(" in code
+    assert "competitive_inhibition" in code
+    assert "cellobiose_to_two_glucose" in code
+    assert "with_glucose_inhibition" in code
+    assert "without_glucose_inhibition" in code
+    assert "scenario_summary.csv" in code
+    assert "ranking_allowed" in code
+    assert "10.1002/bit.22885" in markdown
+    assert "purified enzymes" in markdown
+    assert "not a whole-fungus capability model" in code
+    assert "transglycosylation" in markdown
 
 
 @pytest.mark.parametrize("notebook_path", NOTEBOOKS, ids=lambda path: path.stem)

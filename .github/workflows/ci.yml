@@ -95,6 +95,17 @@ jobs:
           --output /tmp/fungmod-advanced-capabilities.ipynb
           --ExecutePreprocessor.timeout=300
 
+      - name: Execute five-fungal-enzyme showcase notebook
+        env:
+          FUNGMOD_NOTEBOOK_OUTPUT_ROOT: /tmp/fungmod-notebooks
+          MPLBACKEND: Agg
+        run: >-
+          jupyter nbconvert
+          --to notebook
+          --execute notebooks/examples/22_five_fungal_beta_glucosidases.ipynb
+          --output /tmp/fungmod-five-fungal-beta-glucosidases.ipynb
+          --ExecutePreprocessor.timeout=300
+
   package:
     runs-on: ubuntu-latest
 
