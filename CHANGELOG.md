@@ -2,6 +2,25 @@
 
 All notable public releases of FungMod are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Packaged, provenance-labelled parameter input for five purified fungal
+  beta-glucosidases reported on cellobiose at matched assay conditions.
+- A deterministic full notebook with configured dynamic glucose inhibition,
+  2:1 glucose stoichiometry, inhibition-free counterfactuals, scenario
+  summaries, figures, validators, diagnostics, and manifests.
+
+### Scientific scope
+
+- The new cases model purified enzymes labelled by fungal source, not
+  whole-fungus physiology.
+- Literature parameters remain separate from the explicit 10 nM showcase dose
+  and starting-concentration assumptions.
+- Transglycosylation, parameter uncertainty, empirical time-course validation,
+  model discrepancy, and organism ranking remain unavailable.
+
 ## [0.1.0] — 2026-07-30
 
 ### Added

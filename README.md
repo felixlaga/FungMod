@@ -90,12 +90,18 @@ basic kinetics layer:
   explicitly matched homogeneous Michaelis-Menten processes. These laws
   require explicit primary-source and maturity metadata, exact substrate and
   `K_m` ownership, positive unit-compatible `K_i`, and expose their assumptions
-  and limitations. The included cases are artificial software benchmarks, not
-  production parameter evidence or validation,
+  and limitations. Bundled framework cases remain artificial software benchmarks;
+  the five-enzyme showcase supplies separately labelled
+  literature-reported inputs without claiming production readiness or
+  validation,
 - compatibility checks for enzyme/substrate/bond/fungus pairings during model
   assembly,
 - a top-level notebook set that imports package code rather than redefining
   core model logic,
+- an in-depth configured-workflow notebook comparing five purified fungal
+  beta-glucosidases on cellobiose with matched literature parameters, dynamic
+  glucose inhibition, paired no-inhibition counterfactuals, provenance,
+  limitations, conservation, solver diagnostics, and ranking blocked,
 - a researcher-facing product-tour notebook for the public
   `virtual_experiment(...)` API and standard output tables,
 - a researcher-facing screen-comparison notebook that writes report artifacts
@@ -917,15 +923,20 @@ These researcher-facing notebooks are not empirical validation:
 - `19_solver_diagnostics_example.ipynb`
 - `20_zero_to_complete_virtual_experiment.ipynb`
 - `21_advanced_capabilities.ipynb`
+- `22_five_fungal_beta_glucosidases.ipynb`
 
-The two release notebooks provide complete public workflows. Notebook 20 moves
+The three release notebooks provide complete public workflows. Notebook 20 moves
 from installation and alias resolution through preflight, an exploratory
 environment screen, metrics, uncertainty, provenance, limitations, report
 writing, and manifest verification. Notebook 21 connects frozen source
 evidence, a Reaction 618 uncertainty screen, provenance-bound inhibition-law
 benchmarks, dynamic Gibbs enforcement, entropy/conservation/solver
-diagnostics, and advanced bundle verification. Their software benchmarks are
-not empirical validation or organism-specific biological evidence.
+diagnostics, and advanced bundle verification. Notebook 22 uses five
+literature-reported purified fungal beta-glucosidase parameter sets under one
+matched cellobiose scenario, with dynamic glucose inhibition and paired
+counterfactuals. Its source-organism labels are not whole-fungus models, its
+standardized enzyme dose is an explicit scenario assumption, and its
+conditional outcomes are not empirical validation or organism rankings.
 
 Notebook tests check that notebooks import the public `fungmod` or
 `fungal_model` namespace, avoid defining core

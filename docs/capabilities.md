@@ -24,7 +24,7 @@ This page separates implemented software from scientific maturity.
 | Linear, branching, and cyclic enzyme pathways | Implemented and software-verified | Broad provenance-backed pathway biology remains partial. |
 | Temperature, pH, oxygen, water-activity modifiers | Implemented when explicitly configured | No response is inferred from metadata alone. |
 | Reversible product inhibition | Implemented for explicit matched inputs | No toxicity, uptake, or whole-fungus inference. |
-| Competitive and Haldane substrate inhibition | Implemented with provenance/maturity contracts | Bundled values are artificial benchmarks. |
+| Competitive and Haldane substrate inhibition | Implemented with provenance/maturity contracts | Framework values are artificial; the five-enzyme showcase uses separately labelled literature-reported inputs but remains unvalidated. |
 | Dynamic single-process thermodynamic constraints | Implemented | Coupled-network optimization, reverse rates, and nonideal activities are unsupported. |
 | 1D reaction diffusion | Implemented initial finite-volume engine | No 2D/3D or porous morphology model. |
 

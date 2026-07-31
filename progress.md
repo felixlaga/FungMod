@@ -26,6 +26,74 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## SHOWCASE-001 Five Purified Fungal Beta-Glucosidases On Cellobiose
+
+Date: 2026-07-31
+
+Status: `complete` in the current checkout for one in-depth, installed-package
+notebook covering five literature-reported purified-enzyme source cases.
+
+Completed in this pass:
+
+- Added
+  `data/showcases/five_fungal_beta_glucosidases.yml` with five matched 50 °C,
+  pH 5 parameter rows attributed to Bohlin et al. (2010) through the open
+  Teugjas and Väljamäe (2013) Table 5 transcription.
+- Added the deterministic
+  `notebooks/examples/22_five_fungal_beta_glucosidases.ipynb`.
+- The notebook generates inspectable configured models for purified
+  beta-glucosidases sourced from *Aspergillus fumigatus*,
+  *Chaetomium globosum*, *Emericella nidulans*, *Neurospora crassa*, and
+  *Penicillium brasilianum* on dissolved cellobiose.
+- Every case uses the same generic homogeneous Michaelis-Menten process,
+  provenance-bound competitive glucose-inhibition modifier, explicit 2:1
+  glucose stoichiometry, assay context, 10 mM starting cellobiose, and
+  explicitly assumed 10 nM standardized enzyme dose.
+- Added matched no-inhibition counterfactuals, conditional trajectory and
+  threshold summaries, figures, validation/conservation/solver audits, normal
+  per-run manifests, and a cross-case showcase manifest.
+- Added docs and release-note coverage that distinguishes purified-enzyme
+  source labels from whole-fungus models and blocks organism ranking.
+
+Tests added or modified:
+
+- Added `tests/test_fungal_beta_glucosidase_showcase.py` for exact five-row
+  parameter transcription, source identity, units, maturity, stoichiometry,
+  scenario assumptions, and limitation wording.
+- Extended `tests/test_release_notebooks.py` for deterministic generation,
+  public configured-workflow use, full execution, counterfactual coverage,
+  provenance, and no-shortcut/no-whole-fungus guardrails.
+
+What did not change: no generic/core equation, solver, output schema,
+scientific-mode admission rule, production registry record, whole-fungus
+physiology, culture protocol, empirical time-course dataset, calibration, or
+validation claim was added.
+
+Scientific behavior impact: five new exploratory configured scenarios expose
+existing homogeneous Michaelis-Menten, competitive inhibition, and
+stoichiometric product behavior with literature-reported parameters.
+Transglycosylation, enzyme inactivation, preparation effects, secretion,
+uptake, growth, transport, and model discrepancy remain unrepresented.
+Parameter uncertainty remains explicit as unavailable.
+
+Backward compatibility: additive packaged data, notebook, tests, and
+documentation only; existing APIs, configs, registry resolution, output
+schemas, and numerical behavior are unchanged.
+
+Remaining ambiguity: the open transcription attributes the selected rows to
+the primary comparative study, but no uncertainty values were transcribed.
+Conditional scenario comparisons are allowed under the matched setup;
+organism or real-preparation ranking remains blocked.
+
+Risk level: low-to-moderate. Existing numerical laws are unchanged; the main
+risk is overinterpreting reduced purified-enzyme trajectories as organism
+performance, which the data, notebook, tests, and docs explicitly prohibit.
+
+Recommended next task: ingest empirical cellobiose/glucose time courses for
+one purified enzyme through the existing validation-data review workflow, or
+implement and source a generic transglycosylation mechanism before expanding
+the comparative claim.
+
 ## PUBLIC-RELEASE-001 Installable Package, Documentation, And Full Notebooks
 
 Date: 2026-07-30

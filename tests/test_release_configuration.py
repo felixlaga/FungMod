@@ -64,6 +64,7 @@ def test_documentation_covers_install_examples_capabilities_and_scope() -> None:
     assert "python -m pip install fungmod" in combined
     assert "20_zero_to_complete_virtual_experiment.ipynb" in combined
     assert "21_advanced_capabilities.ipynb" in combined
+    assert "22_five_fungal_beta_glucosidases.ipynb" in combined
     assert "not empirical validation" in combined.lower()
     assert "whole-fungus" in combined.lower()
     assert "coupled-network" in combined.lower()
@@ -94,6 +95,7 @@ def test_ci_builds_docs_notebooks_and_distribution() -> None:
     assert "scripts/build_release_notebooks.py --check" in commands
     assert "20_zero_to_complete_virtual_experiment.ipynb" in commands
     assert "21_advanced_capabilities.ipynb" in commands
+    assert "22_five_fungal_beta_glucosidases.ipynb" in commands
     assert "python -m build" in commands
     assert "python -m twine check dist/*" in commands
     assert "fungmod-wheel-smoke" in commands

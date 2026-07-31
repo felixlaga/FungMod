@@ -324,11 +324,14 @@ is selected; the user-scoped queue is complete through PR-59.
 PUBLIC-RELEASE-001 is complete in the current checkout as an explicitly
 user-directed release/readiness slice outside that numbered queue. It adds an
 installable `fungmod` distribution, immutable packaged registry/example
-assets, two full public-API notebooks, strict Read the Docs content, and
-release/package verification. Its advanced thermodynamic and inhibition
-examples use existing implemented behavior and explicit artificial
-framework-benchmark inputs only. It does not add biological records,
-mechanisms, empirical observations, calibration, or validation claims.
+assets, three full public-API notebooks, strict Read the Docs content, and
+release/package verification. Its advanced thermodynamic examples use existing
+implemented behavior and explicit artificial framework-benchmark inputs. The
+five-enzyme cellobiose showcase uses separately labelled literature-reported
+purified-enzyme parameters plus an explicit standardized-dose scenario,
+without adding whole-fungus physiology, a production registry record, a new
+mechanism, empirical observations, calibration, organism ranking, or
+validation claims.
 
 The completed PR-24 BIO-003 slice added a
 toy, framework-benchmark configured non-PET product-inhibition path with an
