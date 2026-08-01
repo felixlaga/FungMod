@@ -522,6 +522,17 @@ physiology, oxygen state, intracellular metabolism, regulation, morphology,
 toxicity, spatial secretion, empirical calibration, or whole-organism
 validation is implied.
 
+SPATIAL-ND-001 is complete for a bounded uniform Cartesian 2D/3D finite-volume
+engine. `UniformCartesianGrid`, `BoundaryConditionsND`, and
+`ReactionDiffusionEngineND` require sourced positive axis lengths, exact field
+shapes, explicit per-axis boundary pairs, nonnegative sourced diffusion
+coefficients, and local reaction outputs matching the full grid. No-flux
+conservation, a periodic discrete Fourier decay mode, 3D smoothing, and zero-
+diffusion local-reaction behavior are software-tested. This is not irregular
+geometry, advection, porous media, adaptive refinement, moving morphology,
+surface/volume coupling, empirical spatial calibration, or biological
+validation.
+
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
 machine-checkable `proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml`.

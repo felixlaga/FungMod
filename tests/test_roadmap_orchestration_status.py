@@ -398,6 +398,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "FungalCouplingModel" in status
     assert "WHOLE-FUNGUS-COUPLING-001" in next_steps
     assert "exploratory_software_tested" in progress
+    assert "SPATIAL-ND-001" in status
+    assert "ReactionDiffusionEngineND" in status
+    assert "SPATIAL-ND-001" in next_steps
+    assert "analytical discrete periodic Fourier-mode decay" in progress
     assert "Validation data is important, but it should not block PRODUCT-001" in _read(
         ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP_V2.md"
     )

@@ -26,6 +26,46 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## SPATIAL-ND-001 Uniform Cartesian 2D/3D Reaction-Diffusion
+
+Date: 2026-08-01
+
+Status: `complete` for the bounded uniform-grid numerical scope; broad spatial
+fungal morphology remains `partial`.
+
+Completed in this pass: added explicit 2D/3D Cartesian grids, per-axis no-flux,
+periodic, and fixed-value boundary pairs, finite-volume Laplacians and spatial
+integrals, plus a method-of-lines reaction-diffusion engine that reuses generic
+unit-aware local `Reaction` objects. Field shapes, boundary/diffusion mappings,
+axis provenance, coefficient units, nonnegativity, and local reaction output
+shapes all fail closed.
+
+Tests added: `tests/test_reaction_diffusion_nd.py` covers exact no-flux discrete
+conservation in 2D, an analytical discrete periodic Fourier-mode decay,
+3D conservation/smoothing, zero-diffusion agreement with independent local
+ODE behavior, and rejection of 4D/implicit-boundary configurations. Existing
+1D tests remain green.
+
+What did not change: no irregular/curvilinear mesh, advection, porous-medium
+closure, adaptive refinement, moving boundary, colony morphology, spatial
+secretion biology, empirical spatial dataset, calibration, or validation.
+
+Scientific behavior impact: callers can now run explicit uniform 2D and 3D
+reaction-diffusion software experiments; the new tests verify numerical
+contracts only and introduce no biological parameter or geometry claim.
+
+Backward compatibility: additive transport APIs; the 1D engine is unchanged.
+
+Remaining ambiguity: cell-centered fixed-value faces use the existing half-cell
+finite-volume convention; nonlinear stiffness and mesh-convergence adequacy
+remain case-specific responsibilities.
+
+Risk level: moderate numerical-use risk, contained by exact shapes, units,
+boundary declarations, conservation tests, and an analytical eigenmode test.
+
+Recommended next task: add mesh-refinement/convergence studies for a real
+spatial dataset before interpreting local gradients scientifically.
+
 ## WHOLE-FUNGUS-COUPLING-001 Minimal Well-Mixed Coupling
 
 Date: 2026-08-01

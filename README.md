@@ -71,7 +71,8 @@ basic kinetics layer:
   state counts, and process counts, with report/index visibility plus a
   standard virtual-experiment solver diagnostics table/accessor derived from
   existing per-sample configured solver diagnostics artifacts,
-- 1D finite-volume reaction-diffusion with explicit boundary conditions,
+- 1D plus uniform Cartesian 2D/3D finite-volume reaction-diffusion with explicit
+  per-axis boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - least-squares calibration utilities with train/validation residual reporting,
 - Monte Carlo uncertainty propagation and local sensitivity analysis,
@@ -215,7 +216,7 @@ basic kinetics layer:
 
 It does not yet implement coupled-network thermodynamic flux optimization,
 nonideal activity coefficients, reverse-rate thermodynamics, resolved
-intracellular metabolism, 2D/3D spatial models, publication-grade calibration
+intracellular metabolism, publication-grade calibration
 against curated biological datasets, or global uncertainty analysis. Those
 stages are documented in `progress.md` and should be added only after the
 current virtual-experiment layer has tests, provenance, and validation.
@@ -1215,7 +1216,8 @@ Current capability labels mean:
 - `unsupported`: the mechanism or workflow should fail explicitly or remain
   documented as future work.
 
-- Well-mixed ODE systems and an initial 1D reaction-diffusion engine are supported.
+- Well-mixed ODE systems, the original 1D engine, and explicit uniform Cartesian
+  2D/3D reaction-diffusion are supported.
 - Michaelis-Menten kinetics currently means homogeneous dissolved-substrate kinetics only.
 - PET surface hydrolysis currently uses a minimal equilibrium Langmuir coverage model with constant accessible surface area.
 - PET product release is represented as a lumped mass-equivalent hydrolysate in the Stage 4 example, not resolved MHET/BHET/TPA/EG chemistry.
@@ -1234,8 +1236,12 @@ Current capability labels mean:
   constant, tolerance, and provenance inputs are explicit. Coupled-network,
   reverse-rate, nonideal-activity, and electrochemical thermodynamics remain
   unsupported.
-- Spatial modelling is currently 1D finite-volume method-of-lines only.
-- Stage 8 diffusion fields are unit-aware, but geometry is a simple uniform 1D grid; 2D, variable geometry, and true volume/area coupling are not implemented.
+- `ReactionDiffusionEngineND` supports unit-aware uniform Cartesian 2D and 3D
+  method-of-lines models with explicit no-flux, periodic, or fixed-value
+  boundary pairs on each axis and local package `Reaction` reuse. It does not
+  implement irregular/curvilinear meshes, advection, porous-medium closures,
+  adaptive mesh refinement, moving colony boundaries, morphology, or true
+  surface/volume coupling.
 - PET is marked `partial`. Cellulose has narrow registry-backed exploratory
   BIO-001/BIO-002 surface and enzyme-chain paths, but the generic
   `CelluloseSubstrate` class remains Stage 9 placeholder metadata and is not a
