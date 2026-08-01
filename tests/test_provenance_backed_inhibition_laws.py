@@ -13,6 +13,7 @@ from fungal_model.entities import Environment
 from fungal_model.io import ProcessConfig
 from fungal_model.modifiers import (
     CompetitiveInhibitionModifier,
+    CoupledSubstrateProductInhibitionModifier,
     SubstrateInhibitionModifier,
 )
 from fungal_model.processes import (
@@ -28,6 +29,7 @@ SUBSTRATE_CONFIG = MODEL_CONFIGS / "toy_homogeneous_substrate_inhibition.yml"
 COMPETITIVE_SOURCE = "https://pubmed.ncbi.nlm.nih.gov/7985803/"
 SUBSTRATE_SOURCE = "https://doi.org/10.1016/j.biortech.2010.01.084"
 MATURITY = "literature_backed_software_tested"
+COUPLED_SOURCE = "https://doi.org/10.3390/catal12010080"
 
 
 def test_competitive_inhibition_matches_selected_rate_equation() -> None:
@@ -90,6 +92,67 @@ def test_haldane_substrate_inhibition_matches_selected_rate_equation() -> None:
     )
     assert 0.0 < activity.magnitude < 1.0
     assert modifier.assumptions[0].source == SUBSTRATE_SOURCE
+
+
+def test_coupled_substrate_product_inhibition_matches_published_equation() -> None:
+    modifier = CoupledSubstrateProductInhibitionModifier(
+        substrate_state="S",
+        product_state="P",
+        michaelis_constant_symbol="K_m",
+        substrate_inhibition_constant_symbol="K_i",
+        product_inhibition_constant_symbol="K_p",
+        substrate_units="millimolar",
+        product_units="millimolar",
+        primary_source=COUPLED_SOURCE,
+        maturity=MATURITY,
+    )
+    parameters = _parameters(
+        K_m=(43.0, "millimolar"),
+        K_i=(1088.0, "millimolar"),
+        K_p=(34.0, "millimolar"),
+    )
+
+    activity = modifier.activity(
+        parameters=parameters,
+        environment=Environment(name="published assay"),
+        state={"S": Q_(40.0, "millimolar"), "P": Q_(20.0, "millimolar")},
+    )
+
+    expected = (43.0 + 40.0) / (
+        43.0 * (1.0 + 20.0 / 34.0) ** 2
+        + 40.0 * (1.0 + 40.0 / 1088.0)
+    )
+    assert activity.magnitude == pytest.approx(expected)
+    assert 0.0 < activity.magnitude < 1.0
+    assert modifier.assumptions[0].source == COUPLED_SOURCE
+    assert "empirical kinetic form" in modifier.assumptions[0].known_limitations
+
+
+def test_coupled_substrate_product_inhibition_builds_only_as_explicit_law() -> None:
+    modifier = {
+        "type": "coupled_substrate_product_inhibition",
+        "substrate_state": "S",
+        "product_state": "P",
+        "michaelis_constant": "K_m",
+        "substrate_inhibition_constant": "K_i",
+        "product_inhibition_constant": "K_p",
+        "primary_source": COUPLED_SOURCE,
+        "maturity": MATURITY,
+    }
+    process = ProcessLibrary.default_foundation().build_processes(
+        ProcessBuildContext(state_units={"S": "millimolar", "P": "millimolar"}),
+        (_mm_process_config(modifier),),
+    )[0]
+
+    assert process.rate_modifiers[0].to_dict()["type"] == (
+        "coupled_substrate_product_inhibition"
+    )
+    assert {item.symbol for item in process.required_parameters} == {
+        "K_m",
+        "V_max",
+        "K_i",
+        "K_p",
+    }
 
 
 @pytest.mark.parametrize(

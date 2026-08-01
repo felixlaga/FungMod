@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from fungal_model.modifiers import (
     CompetitiveInhibitionModifier,
+    CoupledSubstrateProductInhibitionModifier,
     ProductInhibitionModifier,
     SubstrateInhibitionModifier,
 )
@@ -20,6 +21,7 @@ from fungal_model.processes.homogeneous import (
 from fungal_model.processes.rate_modifiers import (
     RateModifierProcess,
     competitive_inhibition_modifier_from_config,
+    coupled_substrate_product_inhibition_modifier_from_config,
     oxygen_modifier_from_config,
     ph_modifier_from_config,
     product_inhibition_modifier_from_config,
@@ -371,6 +373,11 @@ def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> 
             mapping,
             state_units=context.state_units,
         )
+    if modifier_type == "coupled_substrate_product_inhibition":
+        return coupled_substrate_product_inhibition_modifier_from_config(
+            mapping,
+            state_units=context.state_units,
+        )
     if modifier_type == "temperature_arrhenius_reference":
         return temperature_modifier_from_config(mapping)
     if modifier_type == "ph_gaussian":
@@ -387,21 +394,27 @@ def _validate_inhibition_modifier_compatibility(
     modifiers: tuple[Any, ...],
 ) -> None:
     mechanistic: list[
-        CompetitiveInhibitionModifier | SubstrateInhibitionModifier
+        CompetitiveInhibitionModifier
+        | CoupledSubstrateProductInhibitionModifier
+        | SubstrateInhibitionModifier
     ] = [
         modifier
         for modifier in modifiers
         if isinstance(
             modifier,
-            (CompetitiveInhibitionModifier, SubstrateInhibitionModifier),
+            (
+                CompetitiveInhibitionModifier,
+                CoupledSubstrateProductInhibitionModifier,
+                SubstrateInhibitionModifier,
+            ),
         )
     ]
     if not mechanistic:
         return
     if process.process_type != "homogeneous_michaelis_menten":
         raise ValueError(
-            "competitive_inhibition and substrate_inhibition modifiers require "
-            "a homogeneous_michaelis_menten base process."
+            "Mechanistic enzyme-inhibition modifiers require a "
+            "homogeneous_michaelis_menten base process."
         )
     if len(mechanistic) > 1:
         raise ValueError(

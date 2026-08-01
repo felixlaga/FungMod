@@ -275,7 +275,153 @@ class SubstrateInhibitionModifier:
         }
 
 
+@dataclass(frozen=True)
+class CoupledSubstrateProductInhibitionModifier:
+    """Published combined substrate and double product-inhibition correction."""
+
+    substrate_state: str
+    product_state: str
+    michaelis_constant_symbol: str
+    substrate_inhibition_constant_symbol: str
+    product_inhibition_constant_symbol: str
+    substrate_units: str
+    product_units: str
+    primary_source: str
+    maturity: str
+    name: str = "coupled_substrate_product_inhibition_modifier"
+
+    def __post_init__(self) -> None:
+        source, maturity = _law_metadata(
+            primary_source=self.primary_source,
+            maturity=self.maturity,
+        )
+        object.__setattr__(self, "primary_source", source)
+        object.__setattr__(self, "maturity", maturity)
+
+    @property
+    def assumptions(self) -> tuple[Assumption, ...]:
+        return (
+            Assumption(
+                name="coupled substrate and double product inhibition",
+                description=(
+                    "A homogeneous Michaelis-Menten base rate is multiplied by "
+                    "(K_m + S) / (K_m * (1 + P / K_p)^2 + S * (1 + S / K_i))."
+                ),
+                justification=(
+                    "This preserves the explicitly selected combined rate law without "
+                    "approximating it as independently composable modifiers."
+                ),
+                known_limitations=(
+                    "One substrate and one product state only. The squared product term "
+                    "is an empirical kinetic form for the sourced enzyme preparation; "
+                    "it does not establish elementary binding steps, transfer to other "
+                    "enzymes, transport, growth, or whole-organism physiology."
+                ),
+                source=self.primary_source,
+            ),
+        )
+
+    def activity(
+        self,
+        *,
+        parameters: ParameterSet,
+        environment: Environment,
+        state: Mapping[str, Quantity] | None = None,
+    ) -> Quantity:
+        del environment
+        if state is None:
+            raise ValueError(
+                "CoupledSubstrateProductInhibitionModifier requires solver state."
+            )
+        if self.substrate_state not in state or self.product_state not in state:
+            raise ValueError(
+                "CoupledSubstrateProductInhibitionModifier requires configured "
+                "substrate and product states."
+            )
+        substrate = assert_compatible(
+            state[self.substrate_state],
+            self.substrate_units,
+            name=self.substrate_state,
+        )
+        product = assert_compatible(
+            state[self.product_state],
+            self.product_units,
+            name=self.product_state,
+        )
+        km = parameters.require_quantity(
+            self.michaelis_constant_symbol,
+            self.substrate_units,
+        )
+        substrate_ki = parameters.require_quantity(
+            self.substrate_inhibition_constant_symbol,
+            self.substrate_units,
+        )
+        product_ki = parameters.require_quantity(
+            self.product_inhibition_constant_symbol,
+            self.product_units,
+        )
+        substrate_values = _nonnegative(substrate, name=self.substrate_state)
+        product_values = _nonnegative(product, name=self.product_state)
+        km_values = _positive(km, name=self.michaelis_constant_symbol)
+        substrate_ki_values = _positive(
+            substrate_ki,
+            name=self.substrate_inhibition_constant_symbol,
+        )
+        product_ki_values = _positive(
+            product_ki,
+            name=self.product_inhibition_constant_symbol,
+        )
+        activity = (km_values + substrate_values) / (
+            km_values * (1.0 + product_values / product_ki_values) ** 2
+            + substrate_values * (1.0 + substrate_values / substrate_ki_values)
+        )
+        return Q_(activity, "dimensionless")
+
+    def scale(
+        self,
+        *,
+        rate: Quantity,
+        parameters: ParameterSet,
+        environment: Environment,
+        state: Mapping[str, Quantity] | None = None,
+    ) -> Quantity:
+        return assert_compatible(
+            rate
+            * self.activity(
+                parameters=parameters,
+                environment=environment,
+                state=state,
+            ),
+            str(rate.units),
+            name="coupled-substrate-product-inhibition-scaled rate",
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "type": "coupled_substrate_product_inhibition",
+            "substrate_state": self.substrate_state,
+            "product_state": self.product_state,
+            "michaelis_constant_symbol": self.michaelis_constant_symbol,
+            "substrate_inhibition_constant_symbol": (
+                self.substrate_inhibition_constant_symbol
+            ),
+            "product_inhibition_constant_symbol": (
+                self.product_inhibition_constant_symbol
+            ),
+            "substrate_units": self.substrate_units,
+            "product_units": self.product_units,
+            "primary_source": self.primary_source,
+            "maturity": self.maturity,
+            "equation": (
+                "(K_m + S) / (K_m * (1 + P / K_p)^2 + "
+                "S * (1 + S / K_i))"
+            ),
+        }
+
+
 __all__ = [
     "CompetitiveInhibitionModifier",
+    "CoupledSubstrateProductInhibitionModifier",
     "SubstrateInhibitionModifier",
 ]

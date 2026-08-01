@@ -3,6 +3,7 @@
 from .base import EnvironmentalModifier, ModifierMetadata
 from .enzyme_inhibition import (
     CompetitiveInhibitionModifier,
+    CoupledSubstrateProductInhibitionModifier,
     SubstrateInhibitionModifier,
 )
 from .oxygen import OxygenModifier, oxygen_monod_assumption
@@ -14,6 +15,7 @@ from .water_activity import WaterActivityModifier, water_activity_threshold_assu
 __all__ = [
     "EnvironmentalModifier",
     "CompetitiveInhibitionModifier",
+    "CoupledSubstrateProductInhibitionModifier",
     "ModifierMetadata",
     "OxygenModifier",
     "PHModifier",

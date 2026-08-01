@@ -34,6 +34,7 @@ from .homogeneous import (
 from .rate_modifiers import (
     RateModifierProcess,
     competitive_inhibition_modifier_from_config,
+    coupled_substrate_product_inhibition_modifier_from_config,
     ph_modifier_from_config,
     product_inhibition_modifier_from_config,
     substrate_inhibition_modifier_from_config,
@@ -83,6 +84,7 @@ __all__ = [
     "ProductReleaseMap",
     "RateModifierProcess",
     "competitive_inhibition_modifier_from_config",
+    "coupled_substrate_product_inhibition_modifier_from_config",
     "StateVariableSpec",
     "SurfaceCatalysisFactory",
     "SurfaceCatalysisModel",

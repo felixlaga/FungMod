@@ -324,6 +324,35 @@ def _configured_process_modifier_row(
                 ),
             }
         )
+    elif modifier_type == "coupled_substrate_product_inhibition":
+        row.update(
+            {
+                "substrate_state": modifier.get("substrate_state", ""),
+                "product_state": modifier.get("product_state", ""),
+                "michaelis_constant": modifier.get(
+                    "michaelis_constant",
+                    modifier.get("michaelis_constant_symbol", ""),
+                ),
+                "substrate_inhibition_constant": modifier.get(
+                    "substrate_inhibition_constant",
+                    modifier.get("substrate_inhibition_constant_symbol", ""),
+                ),
+                "product_inhibition_constant": modifier.get(
+                    "product_inhibition_constant",
+                    modifier.get("product_inhibition_constant_symbol", ""),
+                ),
+                "primary_source": modifier.get("primary_source", ""),
+                "maturity": modifier.get("maturity", ""),
+                "equation": (
+                    "rate = Vmax*S / (Km*(1 + P/Kp)^2 + S*(1 + S/Ki))"
+                ),
+                "limitation": (
+                    "One explicitly matched homogeneous substrate and product "
+                    "state only; the squared product term is preparation-specific "
+                    "empirical kinetics, not an elementary-mechanism claim."
+                ),
+            }
+        )
     elif modifier_type == "temperature_arrhenius_reference":
         row.update(
             {

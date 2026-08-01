@@ -10,6 +10,7 @@ from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity
 from fungal_model.modifiers import (
     CompetitiveInhibitionModifier,
+    CoupledSubstrateProductInhibitionModifier,
     OxygenModifier,
     PHModifier,
     ProductInhibitionModifier,
@@ -242,6 +243,77 @@ def substrate_inhibition_modifier_from_config(
     )
 
 
+def coupled_substrate_product_inhibition_modifier_from_config(
+    modifier_config: Mapping[str, Any],
+    *,
+    state_units: Mapping[str, str],
+) -> CoupledSubstrateProductInhibitionModifier:
+    """Build the explicit combined substrate/product-inhibition modifier."""
+
+    modifier_type = "coupled_substrate_product_inhibition"
+    substrate_state = _required_text(
+        modifier_config,
+        "substrate_state",
+        field_name="substrate_state",
+        modifier_type=modifier_type,
+    )
+    product_state = _required_text(
+        modifier_config,
+        "product_state",
+        field_name="product_state",
+        modifier_type=modifier_type,
+    )
+    _require_state(
+        substrate_state,
+        state_units=state_units,
+        modifier_type=modifier_type,
+    )
+    _require_state(
+        product_state,
+        state_units=state_units,
+        modifier_type=modifier_type,
+    )
+    return CoupledSubstrateProductInhibitionModifier(
+        substrate_state=substrate_state,
+        product_state=product_state,
+        michaelis_constant_symbol=_required_symbol(
+            modifier_config,
+            "michaelis_constant",
+            "michaelis_constant_symbol",
+            field_name="michaelis_constant",
+            modifier_type=modifier_type,
+        ),
+        substrate_inhibition_constant_symbol=_required_symbol(
+            modifier_config,
+            "substrate_inhibition_constant",
+            "substrate_inhibition_constant_symbol",
+            field_name="substrate_inhibition_constant",
+            modifier_type=modifier_type,
+        ),
+        product_inhibition_constant_symbol=_required_symbol(
+            modifier_config,
+            "product_inhibition_constant",
+            "product_inhibition_constant_symbol",
+            field_name="product_inhibition_constant",
+            modifier_type=modifier_type,
+        ),
+        substrate_units=state_units[substrate_state],
+        product_units=state_units[product_state],
+        primary_source=_required_text(
+            modifier_config,
+            "primary_source",
+            field_name="primary_source",
+            modifier_type=modifier_type,
+        ),
+        maturity=_required_text(
+            modifier_config,
+            "maturity",
+            field_name="maturity",
+            modifier_type=modifier_type,
+        ),
+    )
+
+
 def temperature_modifier_from_config(modifier_config: Mapping[str, Any]) -> TemperatureModifier:
     """Build an Arrhenius temperature modifier from explicit config fields."""
 
@@ -375,6 +447,21 @@ def _required_state_variables(
                     )
                 )
                 existing.add(key)
+        elif isinstance(modifier, CoupledSubstrateProductInhibitionModifier):
+            key = (modifier.product_state, modifier.product_units)
+            if key not in existing:
+                specs.append(
+                    StateVariableSpec(
+                        modifier.product_state,
+                        modifier.product_units,
+                        role="inhibitor_product",
+                        description=(
+                            "Explicit product state for the provenance-bound "
+                            "combined substrate/product-inhibition law."
+                        ),
+                    )
+                )
+                existing.add(key)
     return tuple(specs)
 
 
@@ -391,6 +478,15 @@ def _modifier_limitations(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
         limitations.append(
             "Haldane substrate inhibition supports one explicitly matched homogeneous "
             "Michaelis-Menten substrate only and does not identify a molecular mechanism."
+        )
+    if any(
+        isinstance(modifier, CoupledSubstrateProductInhibitionModifier)
+        for modifier in modifiers
+    ):
+        limitations.append(
+            "Combined substrate/product inhibition supports one explicitly matched "
+            "homogeneous Michaelis-Menten substrate and one product state; its "
+            "squared product term is preparation-specific empirical kinetics."
         )
     if any(isinstance(modifier, TemperatureModifier) for modifier in modifiers):
         limitations.append(
@@ -439,6 +535,17 @@ def _modifier_failure_modes(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
                 "missing or negative substrate state",
                 "missing, non-positive, or unit-incompatible substrate inhibition constant",
                 "substrate inhibition attached to a non-Michaelis-Menten process",
+            )
+        )
+    if any(
+        isinstance(modifier, CoupledSubstrateProductInhibitionModifier)
+        for modifier in modifiers
+    ):
+        modes.extend(
+            (
+                "missing or negative coupled-inhibition substrate/product state",
+                "missing, non-positive, or unit-incompatible coupled-inhibition constants",
+                "coupled inhibition attached to a non-Michaelis-Menten process",
             )
         )
     if any(isinstance(modifier, TemperatureModifier) for modifier in modifiers):
@@ -515,6 +622,29 @@ def _required_parameters(
                 name="substrate inhibition constant",
                 description=(
                     "Positive K_i for the explicit Haldane substrate-inhibition law."
+                ),
+            )
+        elif isinstance(modifier, CoupledSubstrateProductInhibitionModifier):
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.substrate_inhibition_constant_symbol,
+                units=modifier.substrate_units,
+                name="substrate inhibition constant",
+                description=(
+                    "Positive K_i for the explicit combined substrate/product-"
+                    "inhibition law."
+                ),
+            )
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.product_inhibition_constant_symbol,
+                units=modifier.product_units,
+                name="product inhibition constant",
+                description=(
+                    "Positive K_p for the squared product term in the explicit "
+                    "combined inhibition law."
                 ),
             )
         elif isinstance(modifier, TemperatureModifier):
@@ -685,6 +815,7 @@ def _unique_assumptions(assumptions: list[Any]) -> tuple[Any, ...]:
 __all__ = [
     "RateModifierProcess",
     "competitive_inhibition_modifier_from_config",
+    "coupled_substrate_product_inhibition_modifier_from_config",
     "oxygen_modifier_from_config",
     "ph_modifier_from_config",
     "product_inhibition_modifier_from_config",
