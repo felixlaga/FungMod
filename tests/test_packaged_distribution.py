@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_distribution_alias_and_version_are_public() -> None:
-    assert fungmod.__version__ == fungal_model.__version__ == "0.1.0"
+    assert fungmod.__version__ == fungal_model.__version__ == "0.1.1"
     assert fungmod.virtual_experiment is fungal_model.virtual_experiment
     assert fungmod.default_registry_path is fungal_model.default_registry_path
 

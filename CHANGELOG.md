@@ -4,6 +4,8 @@ All notable public releases of FungMod are documented here.
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-08-01
+
 ### Added
 
 - Packaged, provenance-labelled parameter input for five purified fungal
@@ -47,4 +49,6 @@ All notable public releases of FungMod are documented here.
 - Existing exploratory ranges remain exploratory; they were not reclassified
   as calibration or validation evidence.
 
+[Unreleased]: https://github.com/felixlaga/FungMod/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/felixlaga/FungMod/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/felixlaga/FungMod/releases/tag/v0.1.0

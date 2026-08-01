@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.1 — 2026-08-01
+
 - Added a packaged literature-transcribed showcase input and a full notebook
   for five purified fungal beta-glucosidases acting on cellobiose.
 - The notebook uses one generic configured mechanism, dynamic glucose

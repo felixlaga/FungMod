@@ -15,7 +15,7 @@ def test_public_distribution_metadata_and_install_contract() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     assert project["name"] == "fungmod"
-    assert project["version"] == "0.1.0"
+    assert project["version"] == "0.1.1"
     assert project["requires-python"] == ">=3.11"
     assert project["license"] == "MIT"
     assert project["urls"]["Documentation"] == "https://fungmod.readthedocs.io/"

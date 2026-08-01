@@ -5,7 +5,7 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__ = version("fungmod")
 except PackageNotFoundError:  # pragma: no cover - editable tree before install
-    __version__ = "0.1.0"
+    __version__ = "0.1.1"
 
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.errors import (
