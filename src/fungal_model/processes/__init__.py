@@ -22,6 +22,7 @@ from .factories import (
     MassActionFactory,
     ProcessBuildContext,
     ProcessFactory,
+    SubstrateTransglycosylationFactory,
     SurfaceCatalysisFactory,
     default_foundation_factories,
 )
@@ -52,6 +53,11 @@ from .surface import (
     SurfaceCatalysisProcess,
     surface_catalysis_assumption,
     surface_catalysis_rate,
+)
+from .transglycosylation import (
+    TRANSGLYCOSYLATION_MATURITY,
+    SubstrateTransglycosylationProcess,
+    TransglycosylationBranch,
 )
 
 __all__ = [
@@ -86,10 +92,14 @@ __all__ = [
     "competitive_inhibition_modifier_from_config",
     "coupled_substrate_product_inhibition_modifier_from_config",
     "StateVariableSpec",
+    "SubstrateTransglycosylationFactory",
+    "SubstrateTransglycosylationProcess",
     "SurfaceCatalysisFactory",
     "SurfaceCatalysisModel",
     "SurfaceCatalysisProcess",
     "ValidityDomain",
+    "TRANSGLYCOSYLATION_MATURITY",
+    "TransglycosylationBranch",
     "default_foundation_factories",
     "homogeneous_process_assumption",
     "ph_modifier_from_config",

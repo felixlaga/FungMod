@@ -56,6 +56,7 @@ def test_default_foundation_library_registers_expected_factories() -> None:
         "first_order",
         "mass_action",
         "homogeneous_michaelis_menten",
+        "substrate_transglycosylation",
         "surface_catalysis",
     }
 

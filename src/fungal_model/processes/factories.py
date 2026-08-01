@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from fungal_model.modifiers import (
     CompetitiveInhibitionModifier,
@@ -36,6 +36,11 @@ from fungal_model.processes.surface import (
     ProductReleaseMap,
     SurfaceCatalysisModel,
     SurfaceCatalysisProcess,
+)
+from fungal_model.processes.transglycosylation import (
+    TRANSGLYCOSYLATION_MATURITY,
+    SubstrateTransglycosylationProcess,
+    TransglycosylationBranch,
 )
 
 
@@ -233,6 +238,110 @@ class HomogeneousMichaelisMentenFactory:
 
 
 @dataclass(frozen=True)
+class SubstrateTransglycosylationFactory:
+    """Build one explicit branch of the coupled substrate-transfer law."""
+
+    process_type: str = "substrate_transglycosylation"
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        missing = _missing_config_fields(process_config, ("id", "states", "parameters", "product_map"))
+        states = _mapping(getattr(process_config, "states", {}))
+        parameters = _mapping(getattr(process_config, "parameters", {}))
+        raw = _mapping(getattr(process_config, "raw", {}))
+        missing += _missing_mapping_fields(states, ("substrate", "enzyme"), prefix="states")
+        missing += _missing_mapping_fields(
+            parameters,
+            (
+                "hydrolysis_km",
+                "transglycosylation_km",
+                "hydrolysis_kcat",
+                "transglycosylation_kcat",
+                "rate_units",
+            ),
+            prefix="parameters",
+        )
+        missing += _missing_mapping_fields(
+            raw,
+            ("branch", "primary_source", "maturity"),
+            prefix="process",
+        )
+        missing += tuple(
+            f"state_units.{state}"
+            for state in (states.get("substrate"), states.get("enzyme"))
+            if state is not None and state not in context.state_units
+        )
+
+        product_map_id = getattr(process_config, "product_map", None)
+        if not isinstance(product_map_id, str) or not product_map_id:
+            missing += ("product_map",)
+        elif product_map_id not in context.product_maps:
+            missing += (f"product_maps.{product_map_id}",)
+        else:
+            missing += tuple(
+                f"state_units.{state}"
+                for state in sorted(context.product_maps[product_map_id].species)
+                if state not in context.state_units
+            )
+
+        incompatible: list[str] = []
+        branch = raw.get("branch")
+        if branch is not None and branch not in {"hydrolysis", "transglycosylation"}:
+            incompatible.append("process.branch")
+        source = raw.get("primary_source")
+        if source is not None and not str(source).strip():
+            incompatible.append("process.primary_source")
+        maturity = raw.get("maturity")
+        if maturity is not None and maturity != TRANSGLYCOSYLATION_MATURITY:
+            incompatible.append("process.maturity")
+        if getattr(process_config, "modifiers", ()):
+            incompatible.append("process.modifiers")
+        if isinstance(product_map_id, str) and product_map_id in context.product_maps and states.get("substrate"):
+            substrate = str(states["substrate"])
+            product_map = context.product_maps[product_map_id]
+            expected = 1.0 if branch == "hydrolysis" else 2.0 if branch == "transglycosylation" else None
+            if (
+                expected is not None
+                and (
+                    set(product_map.reactants) != {substrate}
+                    or float(product_map.reactants.get(substrate, 0.0)) != expected
+                )
+            ):
+                incompatible.append("product_map.reactants")
+            if not product_map.products:
+                incompatible.append("product_map.products")
+        return _decision(self, missing_fields=missing, incompatible_entities=incompatible)
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        _require_buildable(self.can_build(context, process_config))
+        states = _mapping(process_config.states)
+        parameters = _mapping(process_config.parameters)
+        raw = _mapping(process_config.raw)
+        substrate_state = str(states["substrate"])
+        enzyme_state = str(states["enzyme"])
+        product_map = context.product_maps[str(process_config.product_map)]
+        return SubstrateTransglycosylationProcess(
+            name=process_config.id,
+            branch=cast(TransglycosylationBranch, str(raw["branch"])),
+            substrate_state=substrate_state,
+            enzyme_state=enzyme_state,
+            substrate_units=context.state_units[substrate_state],
+            enzyme_units=context.state_units[enzyme_state],
+            rate_units=str(parameters["rate_units"]),
+            hydrolysis_km_symbol=str(parameters["hydrolysis_km"]),
+            transglycosylation_km_symbol=str(parameters["transglycosylation_km"]),
+            hydrolysis_kcat_symbol=str(parameters["hydrolysis_kcat"]),
+            transglycosylation_kcat_symbol=str(parameters["transglycosylation_kcat"]),
+            product_release_map=product_map,
+            primary_source=str(raw["primary_source"]),
+            maturity=str(raw["maturity"]),
+            notes=(
+                "Built from the generic coupled substrate-transglycosylation "
+                f"{raw['branch']} branch config."
+            ),
+        )
+
+
+@dataclass(frozen=True)
 class SurfaceCatalysisFactory:
     """Build generic surface-catalysis benchmark processes."""
 
@@ -305,6 +414,7 @@ def default_foundation_factories() -> tuple[ProcessFactory, ...]:
         FirstOrderFactory(),
         MassActionFactory(),
         HomogeneousMichaelisMentenFactory(),
+        SubstrateTransglycosylationFactory(),
         SurfaceCatalysisFactory(),
     )
 
@@ -478,6 +588,7 @@ __all__ = [
     "FirstOrderFactory",
     "HomogeneousMichaelisMentenFactory",
     "MassActionFactory",
+    "SubstrateTransglycosylationFactory",
     "ProcessBuildContext",
     "ProcessFactory",
     "SurfaceCatalysisFactory",

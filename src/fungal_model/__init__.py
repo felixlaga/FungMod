@@ -155,6 +155,10 @@ from fungal_model.processes import (
     SurfaceCatalysisFactory,
     SurfaceCatalysisModel,
     SurfaceCatalysisProcess,
+    SubstrateTransglycosylationFactory,
+    SubstrateTransglycosylationProcess,
+    TRANSGLYCOSYLATION_MATURITY,
+    TransglycosylationBranch,
     CompatibilityIssue,
 )
 from fungal_model.results import SimulationResult
@@ -313,6 +317,10 @@ __all__ = [
     "SurfaceCatalysisModel",
     "SurfaceCatalysisFactory",
     "SurfaceCatalysisProcess",
+    "SubstrateTransglycosylationFactory",
+    "SubstrateTransglycosylationProcess",
+    "TRANSGLYCOSYLATION_MATURITY",
+    "TransglycosylationBranch",
     "TemperatureModifier",
     "TimeConfig",
     "ValidityDomain",

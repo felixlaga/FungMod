@@ -238,6 +238,7 @@ def _configured_metadata(config: ModelConfig, result: SimulationResult) -> dict[
         "model_version": result.model_version,
         "state_count": len(result.states),
         "process_rate_count": len(result.process_rates),
+        "configured_process_laws": _configured_process_laws(config),
         "configured_process_modifiers": _configured_process_modifiers(config),
         "validation": _validation_summary(result),
     }
@@ -248,6 +249,40 @@ def _configured_process_modifiers(config: ModelConfig) -> list[dict[str, Any]]:
     for process in config.processes:
         for index, modifier in enumerate(process.modifiers):
             rows.append(_configured_process_modifier_row(process.id, index, modifier))
+    return rows
+
+
+def _configured_process_laws(config: ModelConfig) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for process in config.processes:
+        if process.process_type != "substrate_transglycosylation":
+            continue
+        raw = process.raw or {}
+        rows.append(
+            {
+                "process_id": process.id,
+                "type": process.process_type,
+                "branch": raw.get("branch", ""),
+                "substrate_state": process.states.get("substrate", ""),
+                "enzyme_state": process.states.get("enzyme", ""),
+                "hydrolysis_km": process.parameters.get("hydrolysis_km", ""),
+                "transglycosylation_km": process.parameters.get("transglycosylation_km", ""),
+                "hydrolysis_kcat": process.parameters.get("hydrolysis_kcat", ""),
+                "transglycosylation_kcat": process.parameters.get("transglycosylation_kcat", ""),
+                "primary_source": raw.get("primary_source", ""),
+                "maturity": raw.get("maturity", ""),
+                "equation": (
+                    "r_h = E*kcat_h*S/(Km_h + S + S^2/Km_t); "
+                    "r_t = E*kcat_t*(S^2/Km_t)/(Km_h + S + S^2/Km_t)"
+                ),
+                "limitation": (
+                    "Initial-rate homogeneous substrate-transfer law only; "
+                    "explicit branch product maps own stoichiometry. No transfer-product "
+                    "re-hydrolysis, multiple acceptors/products, transport, growth, or "
+                    "whole-fungus physiology."
+                ),
+            }
+        )
     return rows
 
 
