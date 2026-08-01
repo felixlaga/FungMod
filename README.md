@@ -79,7 +79,9 @@ basic kinetics layer:
 - 1D plus uniform Cartesian 2D/3D finite-volume reaction-diffusion with explicit
   per-axis boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
-- least-squares calibration utilities with train/validation residual reporting,
+- least-squares calibration utilities with train/validation residual reporting
+  plus a publication-oriented evidence audit that never authorizes a
+  publication claim,
 - Monte Carlo uncertainty propagation, local sensitivity analysis, and
   variance-based global sensitivity with first- and total-order indices,
 - process-centered assembly scaffolding with structured missing-process,
@@ -1258,7 +1260,12 @@ Current capability labels mean:
   remain Stage 9 placeholder metadata classes with unknown physical parameters
   and no default degradation model.
 - Universal substrate modules record bond classes, required enzyme classes, and product classes, but they do not implement substrate-specific kinetics, accessibility models, thermodynamic constraints, or assimilation evidence.
-- Calibration utilities are generic least-squares tools; no literature data are bundled and no parameters are calibrated by default.
+- Calibration utilities are generic least-squares tools; no parameters are
+  calibrated by default. `audit_calibration_evidence(...)` checks a completed
+  fit against caller-supplied provenance-bearing criteria and external-evidence
+  metadata, but `publication_claim_authorized` is always false. The bundled
+  same-source literature comparison is not a calibration or independent
+  validation dataset.
 - Monte Carlo, local sensitivity, and variance-based global sensitivity
   utilities require explicit provenance-bearing uncertainty or perturbation
   specifications. `global_sensitivity(...)` uses independent pick-freeze

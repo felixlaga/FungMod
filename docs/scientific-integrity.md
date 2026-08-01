@@ -40,6 +40,11 @@ They do not automatically represent:
 The output tables preserve source and interpretation fields so downstream
 plots can keep those distinctions.
 
+Variance-based global sensitivity indices are conditional on the exact input
+distributions supplied by the caller and currently assume independent inputs.
+Bootstrap intervals describe resampling variability of the estimator, not
+experimental uncertainty or biological confidence.
+
 ## Validation language
 
 Use these statements precisely:
@@ -52,6 +57,11 @@ Use these statements precisely:
 
 FungMod does not currently claim publication-grade validation for arbitrary
 fungus/substrate/environment predictions.
+
+The calibration evidence audit never authorizes a publication claim. Even when
+all declared machine checks pass, experimental independence, dataset adequacy,
+model applicability, external reproducibility, and peer review remain outside
+the software contract.
 
 ## Responsible notebook and report use
 

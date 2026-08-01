@@ -36,6 +36,41 @@
         - ConfiguredModelRunner
         - run_configured_model
 
+## Uncertainty and sensitivity
+
+::: fungal_model.uncertainty
+    options:
+      members:
+        - ParameterUncertaintySpec
+        - run_monte_carlo
+        - LocalSensitivitySpec
+        - local_sensitivity
+        - GlobalSensitivityResult
+        - global_sensitivity
+
+## Calibration and evidence auditing
+
+::: fungal_model.calibration
+    options:
+      members:
+        - FittableParameter
+        - LeastSquaresCalibrationResult
+        - fit_least_squares
+        - CalibrationEvidenceContext
+        - CalibrationAuditCriteria
+        - CalibrationEvidenceAudit
+        - audit_calibration_evidence
+
+## Spatial reaction diffusion
+
+::: fungal_model.transport
+    options:
+      members:
+        - ReactionDiffusionEngine1D
+        - UniformCartesianGrid
+        - BoundaryConditionsND
+        - ReactionDiffusionEngineND
+
 ## Source proposals
 
 ::: fungal_model.api.source_provider

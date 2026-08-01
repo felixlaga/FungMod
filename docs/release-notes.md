@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Added one provenance-matched, no-refit comparison with nine digitized
+  literature time-course observations; this is same-source consistency, not
+  independent validation.
+- Added a generic coupled hydrolysis/transglycosylation process and one
+  provenance-backed *Phanerochaete chrysosporium* BGL1B configuration.
+- Added a minimal exploratory well-mixed fungal-process coupling API, uniform
+  Cartesian 2D/3D reaction diffusion, and constant-coefficient nonideal
+  reversible thermodynamics.
+- Added variance-based independent-input global sensitivity with Saltelli
+  first-order and Jansen total-order estimators.
+- Added a publication-oriented calibration evidence audit whose software pass
+  never authorizes a publication claim.
+- Removed the tracked package-resource mirror; source distributions now stage
+  canonical data deterministically into wheels.
+
 ## 0.1.1 — 2026-08-01
 
 - Added a packaged literature-transcribed showcase input and a full notebook

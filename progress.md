@@ -26,6 +26,49 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CALIBRATION-EVIDENCE-001 Publication-Oriented Evidence Audit
+
+Date: 2026-08-01
+
+Status: `complete` for a bounded software audit; publication-grade biological
+calibration remains `blocked` on independent evidence and external review.
+
+Completed in this pass: added an audit over existing least-squares results with
+explicit analysis-plan, dataset, validation-relationship, residual-scale, and
+model evidence; provenance-bearing training-density, error-ratio, and residual-
+correlation criteria; rank, covariance, interval, and bound diagnostics; exact
+machine-readable blockers; and deterministic JSON/Markdown output. A software
+pass and publication authorization are separate fields, and authorization is
+always false.
+
+Tests added: `tests/test_calibration_evidence.py` verifies an artificial fit can
+pass the declared software criteria without authorizing publication, while
+reused training data, missing evidence, rank/covariance/interval failures, and
+unsourced criteria block or fail explicitly.
+
+What did not change: no parameter was fit to a bundled biological dataset, no
+default adequacy threshold was introduced, no source was labelled independent
+without evidence, and no publication, validation, or transferability claim was
+made.
+
+Scientific behavior impact: none on model equations or existing calibration;
+the additive audit makes the evidence boundary machine-readable.
+
+Backward compatibility: additive calibration API and documentation only.
+
+Remaining ambiguity: study-specific criteria and publication fitness require a
+prospective plan and external scientific judgement. The existing same-source
+time-course comparison lacks independent validation and experimental
+uncertainty.
+
+Risk level: low numerical risk and moderate interpretation risk, contained by
+explicit criteria, exact blockers, and a fixed false publication-authorization
+field.
+
+Recommended next task: acquire an independently sourced experiment with raw
+replicate observations and analytical uncertainty before fitting a biological
+case.
+
 ## UNCERTAINTY-GLOBAL-001 Variance-Based Global Sensitivity
 
 Date: 2026-08-01

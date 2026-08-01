@@ -69,7 +69,9 @@ written:
   dynamic-constraint binding;
 - UNCERTAINTY-GLOBAL-001 is complete for provenance-bound independent-input
   pick-freeze sampling, Saltelli first-order and Jansen total-order indices,
-  optional bootstrap intervals, and artificial analytical benchmarks.
+  optional bootstrap intervals, and artificial analytical benchmarks;
+- CALIBRATION-EVIDENCE-001 is complete for a publication-oriented software
+  audit against explicit sourced criteria; no publication claim is authorized.
 ```
 
 No next PR is selected. The user-scoped queue is complete through PR-59 after

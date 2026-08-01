@@ -74,6 +74,7 @@ nav:
       - Full example notebooks: notebooks.md
       - Configured models: configured-models.md
   - Capability map: capabilities.md
+  - Calibration evidence: calibration-evidence.md
   - Scientific integrity: scientific-integrity.md
   - API reference: api.md
   - Release notes: release-notes.md

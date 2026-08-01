@@ -553,6 +553,15 @@ equal-tailed row-bootstrap intervals. Estimates are not clipped, and any model
 failure aborts with its exact design row. Artificial Ishigami tests verify the
 software; they do not provide empirical uncertainty for a FungMod case.
 
+CALIBRATION-EVIDENCE-001 is complete for a bounded publication-oriented
+software audit. `audit_calibration_evidence(...)` evaluates an existing least-
+squares result against explicit sourced thresholds plus analysis-plan,
+dataset, validation-relationship, residual-scale, and model evidence. It also
+checks scaled train/validation error, lag-1 residual correlation, rank,
+covariance, intervals, and bound warnings. A pass means only that declared
+software criteria passed; publication authorization is fixed false, and the
+same-source bundled time course does not count as independent validation.
+
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
 machine-checkable `proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml`.
