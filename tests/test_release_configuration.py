@@ -19,8 +19,15 @@ def test_public_distribution_metadata_and_install_contract() -> None:
     assert project["requires-python"] == ">=3.11"
     assert project["license"] == "MIT"
     assert project["urls"]["Documentation"] == "https://fungmod.readthedocs.io/"
-    assert "fungal_model" in pyproject["tool"]["setuptools"]["package-data"]
-    assert "_resources/**/*.yml" in pyproject["tool"]["setuptools"]["package-data"]["fungal_model"]
+    assert pyproject["tool"]["setuptools"]["include-package-data"] is False
+    setup_py = (ROOT / "setup.py").read_text(encoding="utf-8")
+    manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+    assert "stage_packaged_resources" in setup_py
+    assert "graft data" in manifest
+    assert "graft data_registry" in manifest
+    assert not any(
+        path.is_file() for path in (ROOT / "src" / "fungal_model" / "_resources").rglob("*")
+    )
     assert (ROOT / "LICENSE").is_file()
     assert "python3 -m pip install fungmod" in readme
     assert "pip`, not npm" in readme
@@ -73,8 +80,10 @@ def test_documentation_covers_install_examples_capabilities_and_scope() -> None:
 def test_release_workflow_uses_pypi_trusted_publishing() -> None:
     workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8"))
     publish = workflow["jobs"]["publish"]
+    build_steps = "\n".join(str(step) for step in workflow["jobs"]["build"]["steps"])
     steps = "\n".join(str(step) for step in publish["steps"])
 
+    assert "scripts/check_built_distribution_resources.py dist/fungmod-*.whl" in build_steps
     assert publish["environment"]["name"] == "pypi"
     assert publish["environment"]["url"] == "https://pypi.org/p/fungmod"
     assert publish["permissions"]["id-token"] == "write"
@@ -97,5 +106,6 @@ def test_ci_builds_docs_notebooks_and_distribution() -> None:
     assert "21_advanced_capabilities.ipynb" in commands
     assert "22_five_fungal_beta_glucosidases.ipynb" in commands
     assert "python -m build" in commands
+    assert "scripts/check_built_distribution_resources.py dist/fungmod-*.whl" in commands
     assert "python -m twine check dist/*" in commands
     assert "fungmod-wheel-smoke" in commands

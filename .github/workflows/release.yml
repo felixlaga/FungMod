@@ -31,6 +31,9 @@ jobs:
       - name: Build wheel and source distribution
         run: python -m build
 
+      - name: Verify built wheel resource identity
+        run: python scripts/check_built_distribution_resources.py dist/fungmod-*.whl
+
       - name: Check distribution metadata
         run: python -m twine check dist/*
 

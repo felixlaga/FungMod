@@ -43,7 +43,7 @@ def test_quality_tool_configs_exist() -> None:
     assert "FD-005 Pyright optional-value baseline" in debt_register
     assert "Status: resolved in PR-41" in debt_register
     assert "FD-007 Wheel-packaged resource mirror" in debt_register
-    assert "Status: active and contained in PUBLIC-RELEASE-001" in debt_register
+    assert "Status: resolved on 2026-08-01" in debt_register
 
 
 def test_ci_runs_lint_typecheck_and_coverage() -> None:

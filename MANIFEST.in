@@ -1,0 +1,4 @@
+include setup.py
+include scripts/stage_packaged_resources.py
+graft data
+graft data_registry

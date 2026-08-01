@@ -10,6 +10,7 @@ from fungal_model.data import (
     load_experiment_dataset,
     validate_literature_dataset_metadata,
 )
+from fungal_model.resources import example_data_path
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,11 +82,10 @@ def test_alvarez_gonzalez_digitization_is_recomputable_from_recorded_pixels() ->
         assert point.value == pytest.approx(recomputed, abs=0.0006)
 
 
-def test_alvarez_gonzalez_dataset_is_packaged_without_drift() -> None:
-    resource_root = ROOT / "src" / "fungal_model" / "_resources" / "data"
+def test_alvarez_gonzalez_dataset_resolves_from_the_canonical_resource_contract() -> None:
     relative_yaml = DATASET.relative_to(ROOT / "data")
     csv_path = DATASET.parent / "alvarez_gonzalez_2022_figure_s1a_filled_squares.csv"
     relative_csv = csv_path.relative_to(ROOT / "data")
 
-    assert (resource_root / relative_yaml).read_bytes() == DATASET.read_bytes()
-    assert (resource_root / relative_csv).read_bytes() == csv_path.read_bytes()
+    assert example_data_path(relative_yaml).read_bytes() == DATASET.read_bytes()
+    assert example_data_path(relative_csv).read_bytes() == csv_path.read_bytes()

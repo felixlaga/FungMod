@@ -66,19 +66,10 @@ Repository = "https://github.com/felixlaga/FungMod"
 Releases = "https://github.com/felixlaga/FungMod/releases"
 
 [tool.setuptools]
-include-package-data = true
+include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-fungal_model = [
-    "_resources/**/*.csv",
-    "_resources/**/*.json",
-    "_resources/**/*.md",
-    "_resources/**/*.yml",
-    "_resources/**/*.yaml",
-]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

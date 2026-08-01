@@ -26,6 +26,49 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## FD-007 Canonical Build-Time Resource Staging
+
+Date: 2026-08-01
+
+Status: `complete`; the tracked wheel-resource mirror is removed.
+
+Completed in this pass:
+
+- Added a deterministic setuptools `build_py` hook that stages the canonical
+  repository `data/` and `data_registry/` trees into wheel `_resources/`.
+- Added source-distribution manifest entries so an sdist can build the same
+  wheel without a repository checkout.
+- Changed source/editable installs to resolve the canonical roots directly,
+  while installed wheels continue to use bounded package-owned paths.
+- Replaced source/mirror parity checks with clean temporary staging and exact
+  relative-path/SHA-256 comparison, then removed all 69 mirrored tracked files.
+
+Tests added or modified: release-configuration, packaged-distribution,
+literature-dataset, and architecture-debt tests now enforce the single-source
+layout. Distribution gates build an sdist and wheel, inspect packaged resource
+identity, and run the existing installed-wheel smoke outside the checkout.
+
+What did not change: no scientific record, parameter, model equation, solver,
+registry content, configured result, or public resource-helper signature
+changed.
+
+Scientific behavior impact: none; canonical and built resource bytes remain
+identical.
+
+Backward compatibility: public resource paths and writable-copy guidance are
+unchanged. Private source-tree paths under `src/fungal_model/_resources/` are
+removed; callers must use the documented helpers or canonical roots.
+
+Remaining ambiguity: reproducible archive timestamps still depend on the
+standard Python build frontend and its environment; resource content and paths
+are deterministic and identity-checked.
+
+Risk level: low scientific risk and moderate packaging risk, contained by
+sdist-to-wheel and isolated-wheel verification.
+
+Recommended next task: publish and install v0.1.1 from PyPI after the pending
+Trusted Publisher is registered.
+
 ## BIO-003 Coupled Substrate Transglycosylation
 
 Date: 2026-08-01

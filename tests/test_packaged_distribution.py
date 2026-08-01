@@ -28,7 +28,7 @@ def test_distribution_alias_and_version_are_public() -> None:
     assert fungmod.default_registry_path is fungal_model.default_registry_path
 
 
-def test_packaged_resources_match_repository_sources() -> None:
+def test_packaged_resources_stage_from_one_canonical_source() -> None:
     completed = subprocess.run(
         [sys.executable, "scripts/check_packaged_resources.py"],
         cwd=ROOT,
@@ -38,6 +38,10 @@ def test_packaged_resources_match_repository_sources() -> None:
     )
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert "without a tracked mirror" in completed.stdout
+    assert not any(
+        path.is_file() for path in (ROOT / "src" / "fungal_model" / "_resources").rglob("*")
+    )
 
 
 def test_packaged_resource_paths_are_bounded() -> None:
