@@ -1,0 +1,125 @@
+kind: model_config
+name: Alvarez-Gonzalez 2022 free beta-glucosidase no-calibration comparison
+mode: exploratory
+maturity: exploratory
+provenance:
+  source: https://doi.org/10.3390/catal12010080
+  measurement_method: Model 3 kinetic constants transcribed from Supplementary Table S3; Vmax derived from reported kcat and the Figure S1A enzyme concentration.
+  confidence_level: literature_reported_point_estimates
+  notes: Preparation- and assay-specific model for direct comparison to Supplementary Figure S1A filled squares; no parameters are fitted by FungMod.
+  validity_range: Commercial beta-glucosidase 1000 formulation, 50 C, pH 5.0, selected 20 g/L cellobiose batch assay.
+  units: not_applicable
+entities:
+  environment:
+    id: alvarez_gonzalez_2022_environment
+    path: data/environments/alvarez_gonzalez_2022_50c_ph5.yml
+    loader: environment
+  geometry:
+    id: alvarez_gonzalez_2022_geometry
+    path: data/geometries/alvarez_gonzalez_2022_well_mixed_20ml.yml
+    loader: well_mixed
+  product_maps:
+    - id: cellobiose_to_glucose
+      path: data/product_maps/alvarez_gonzalez_2022_cellobiose_to_glucose.yml
+      loader: stoichiometric
+parameters:
+  - id: alvarez_gonzalez_2022_model_3_parameters
+    parameters:
+      - name: Model 3 Michaelis constant for cellobiose
+        symbol: K_m_cellobiose_2022
+        value: 43.0
+        units: millimolar
+        uncertainty: null
+        source: https://doi.org/10.3390/catal12010080, Supplementary Table S3, Model 3
+        confidence_level: literature_reported_point_estimate
+        notes: The source provides a fitted point estimate without parameter uncertainty.
+        measurement_method: Integral kinetic-model fit reported by the source.
+        validity_range: Selected commercial free-enzyme preparation and assay conditions.
+      - name: Maximum volumetric cellobiose conversion rate
+        symbol: V_max_cellobiose_2022
+        value: 19.72544
+        units: millimolar / minute
+        uncertainty: null
+        source: https://doi.org/10.3390/catal12010080, Supplementary Table S3 and Figure S1A
+        confidence_level: derived_from_literature_point_estimates
+        notes: Derived exactly as 333.2 micromole/min/mg times 59.2 mg/L, converted to 19.72544 millimolar/minute; source parameter uncertainty is unavailable.
+        measurement_method: Deterministic unit conversion and multiplication of reported kcat and enzyme concentration.
+        validity_range: Figure S1A panel A 59.2 mg/L free-enzyme condition only.
+      - name: Model 3 substrate inhibition constant
+        symbol: K_i_cellobiose_2022
+        value: 1088.0
+        units: millimolar
+        uncertainty: null
+        source: https://doi.org/10.3390/catal12010080, Supplementary Table S3, Model 3
+        confidence_level: literature_reported_point_estimate
+        notes: The source provides a fitted point estimate without parameter uncertainty.
+        measurement_method: Integral kinetic-model fit reported by the source.
+        validity_range: Selected commercial free-enzyme preparation and assay conditions.
+      - name: Model 3 double competitive product inhibition constant
+        symbol: K_p_glucose_2022
+        value: 34.0
+        units: millimolar
+        uncertainty: null
+        source: https://doi.org/10.3390/catal12010080, Supplementary Table S3, Model 3
+        confidence_level: literature_reported_point_estimate
+        notes: The source provides a fitted point estimate without parameter uncertainty.
+        measurement_method: Integral kinetic-model fit reported by the source.
+        validity_range: Selected commercial free-enzyme preparation and assay conditions.
+processes:
+  - id: cellobiose_hydrolysis_model_3
+    process_type: homogeneous_michaelis_menten
+    states:
+      substrate: cellobiose_concentration
+      product: glucose_concentration
+    parameters:
+      km: K_m_cellobiose_2022
+      vmax: V_max_cellobiose_2022
+      rate_units: millimolar / minute
+    product_map: cellobiose_to_glucose
+    modifiers:
+      - type: coupled_substrate_product_inhibition
+        substrate_state: cellobiose_concentration
+        product_state: glucose_concentration
+        michaelis_constant: K_m_cellobiose_2022
+        substrate_inhibition_constant: K_i_cellobiose_2022
+        product_inhibition_constant: K_p_glucose_2022
+        primary_source: https://doi.org/10.3390/catal12010080
+        maturity: literature_backed_software_tested
+    assumptions:
+      - well-mixed homogeneous batch reactor with constant active free-enzyme concentration
+      - source Model 3 point estimates apply to the selected Figure S1A condition without refitting
+      - glucose concentration follows the explicit two-to-one hydrolysis stoichiometry from zero initial glucose
+initial_state:
+  states:
+    cellobiose_concentration:
+      value: 62.455
+      units: millimolar
+    glucose_concentration:
+      value: 0.0
+      units: millimolar
+time:
+  start:
+    value: 0.0
+    units: minute
+  stop:
+    value: 60.0
+    units: minute
+  points: 241
+validators:
+  - id: non_negative_states
+    validator_type: non_negative
+    species:
+      - cellobiose_concentration
+      - glucose_concentration
+  - id: glucose_equivalent_balance
+    validator_type: mass_balance
+    conserved_weights:
+      cellobiose_concentration: 2.0
+      glucose_concentration: 1.0
+outputs:
+  directory: outputs/alvarez_gonzalez_2022_free_beta_glucosidase_comparison
+  save:
+    - record
+    - validation_report
+  plots:
+    - state_trajectories

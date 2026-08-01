@@ -20,16 +20,18 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 ## Current Status
 
-Status: `partial`; first source-backed time course ingested, model comparison
-pending.
+Status: `complete` for the bounded first same-source, no-calibration comparison;
+not independent validation.
 
-Current next task: implement a provenance-matched configured model and write
-the observed-versus-predicted comparison bundle without calibration.
+Current next task: acquire an independent or held-out time course with defined
+experimental uncertainty before making any validation or generalization claim.
 
 This phase has a machine-checkable ingestion gate and now contains one
 source-backed, nine-point literature-raw cellobiose time course satisfying the
-evidence requirements below. It remains partial because no matched configured
-model, residual table, metrics bundle, or validation report has been produced.
+evidence requirements below. The exact published Model 3 inhibition law and
+point estimates now run through the generic configured workflow, and the
+comparison runner persists model, residual, metric, provenance, mapping,
+validation-report, and figure artifacts without fitting.
 The PR-31 work is complete after
 PR #46, PR-32 repository hygiene cleanup is complete after PR #47, PR-33
 chain-template explicit environment modifier assembly is complete after
@@ -192,24 +194,40 @@ record all of these fields before creating a literature dataset:
   model-comparison limits, and validation-claim limits.
 
 Every ingestion must add the appropriate literature dataset files and tests.
-Model-comparison artifacts remain a separate required slice before this phase
-can be complete for its stated scope.
+The first dataset's separately implemented comparison slice is described below.
 
-## Comparison Artifacts Not Added Yet
+## Comparison Artifacts
 
-The ingestion adds a literature metadata YAML and digitized observation CSV.
-It does not yet add:
+Run:
 
-- `model_comparison.csv`;
-- `residuals.csv`;
-- `validation_report.md`;
+```bash
+python scripts/run_literature_time_course_comparison.py \
+  --output-dir outputs/alvarez_gonzalez_2022_comparison
+```
 
-No scientific model, parameter, numerical method, runtime behavior, output
+The runner writes the configured model bundle and a comparison bundle containing
+`model_comparison.csv`, `residuals.csv`, `metrics.json`,
+`comparison_record.json`, `dataset_snapshot.json`, `observable_mapping.json`,
+`validation_report.json`, `validation_report.md`, and two figures.
+
+The configured model uses Supplementary Table S3 Model 3 exactly:
+
+```text
+r = Vmax*S / (Km*(1 + P/Kp)^2 + S*(1 + S/Ki))
+```
+
+with `Km=43.0 mM`, `Ki=1088.0 mM`, `Kp=34.0 mM`, and
+`Vmax=19.72544 mM/min`, the latter derived from the reported
+`kcat=333.2 micromole/min/mg` and `59.2 mg/L` dose. FungMod performs no
+parameter fitting. The nine-point RMSE is approximately `1.07877 mM`.
+
+The chi-square fields use the digitization-resolution values because those are
+the only uncertainty values available. They must not be interpreted as
+experimental goodness-of-fit statistics.
 
 ## Next Action
 
-Implement the exact published combined substrate/product-inhibition law with
-the source's fitted parameter values and explicit commercial-enzyme dose, then
-run a no-calibration comparison against the ingested series. Persist the
-comparison, residuals, metrics, provenance, limitations, and a report that does
-not generalize beyond this enzyme preparation and assay.
+Acquire an independent or held-out experiment with a stated uncertainty
+definition, replicate structure, and an organism/preparation identity if
+organism-level interpretation is intended. Do not generalize this same-source
+comparison beyond the selected commercial preparation and assay.

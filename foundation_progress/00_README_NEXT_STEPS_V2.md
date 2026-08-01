@@ -33,8 +33,8 @@ PR-52 authoring for the original five index-backed non-parameter families and
 PR-53 product-map storage/authoring, plus PR-54 caller-trusted Ed25519 curator
 authentication. Completion does not claim scientific validation or automatic
 simulation authorization.
-VALIDATION-DATA-001: partial after the first source-backed literature-raw
-cellobiose time course; provenance-matched model comparison remains pending.
+VALIDATION-DATA-001: complete for the bounded first same-source, no-calibration
+cellobiose comparison; independent validation remains unavailable.
 PRODUCT-001: partial after top-level environment_grid helper,
 assumption_summary.csv, modelability_items.csv, write_preflight_report, the
 scoped `DegradationScreenResult.write_report(...)` Markdown report writer, the
@@ -500,9 +500,11 @@ environment responses, hidden notebook science, schema changes, or
 solver/model behavior.
 
 VALIDATION-DATA-001 now has one evidence-gated, source-backed numeric time
-course. Its next bounded slice is the provenance-matched no-calibration model
-comparison; the two older incomplete candidate reviews remain data-free and
-blocked.
+course plus a provenance-matched no-calibration comparison using the source's
+published Model 3 point estimates. The comparison is not independent
+validation; its next evidence need is a held-out experiment with defined
+experimental uncertainty. The two older incomplete candidate reviews remain
+data-free and blocked.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the

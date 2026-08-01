@@ -900,6 +900,30 @@ or `run_configured_model`; or construct a low-level
 `SimulationEngine` or `ReactionDiffusionEngine1D`. Concrete `Process` classes
 no longer provide a process-to-`Reaction` adapter bridge.
 
+## Experimental time-course comparison
+
+FungMod includes a provenance-matched, no-calibration comparison against the
+nine-point cellobiose time course digitized from Alvarez-Gonzalez et al. (2022),
+Supplementary Figure S1A. Run it from a source checkout with:
+
+```bash
+python scripts/run_literature_time_course_comparison.py \
+  --output-dir outputs/alvarez_gonzalez_2022_comparison
+```
+
+The command writes the configured-model bundle plus machine-readable observed,
+predicted, and residual rows; metrics; the dataset snapshot; observable mapping;
+validation JSON/Markdown; and observed-versus-predicted and residual figures.
+The model uses the paper's Model 3 `K_m`, substrate-inhibition `K_i`, double
+competitive glucose-inhibition `K_p`, and the `V_max` derived from its reported
+`k_cat` and enzyme dose. FungMod does not refit those parameters. The resulting
+same-source RMSE is about 1.08 mM for the nine digitized observations.
+
+This is a preparation- and assay-specific consistency comparison, not
+independent validation. The source does not state the commercial formulation's
+organism, its parameter uncertainties are unavailable, and the stored 0.6 mM
+uncertainty is digitization resolution rather than experimental variability.
+
 ## Notebooks
 
 The `notebooks/examples/` folder contains software-test notebooks for

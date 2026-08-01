@@ -388,11 +388,11 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "uncertainty-band output ergonomics" in status
     assert "entropy-production-rate, and entropy-budget output inspection" in next_steps
     assert "Validation remains important" in status
-    assert "The first reviewed literature-raw time course is present" in status
+    assert "first same-source no-calibration comparison complete" in status
     assert "Validation data is important, but it should not block PRODUCT-001" in _read(
         ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP_V2.md"
     )
-    assert "VALIDATION-DATA-001: partial after the first source-backed" in next_steps
+    assert "VALIDATION-DATA-001: complete for the bounded first same-source" in next_steps
     assert "PR-08 | PRODUCT-001 virtual-experiment report writer" in status
     assert "PR-09 | PRODUCT-001 HTML report wrapper" in status
     assert "PR-10 | PRODUCT-001 report-folder index/navigation" in status
@@ -632,11 +632,11 @@ def test_validation_data_gate_tracks_ingestion_complete_and_comparison_pending()
         assert "PR-57" not in _current_next_lines(text)
         assert "PR-58" not in _current_next_lines(text)
 
-    assert "Current next task: implement a provenance-matched" in gate
+    assert "Current next task: acquire an independent or held-out" in gate
 
-    assert "VALIDATION-DATA-001 provenance-matched model comparison | dataset ingestion complete" in status
-    assert "VALIDATION-DATA-001: partial after the first source-backed" in next_steps
-    assert "Status: `partial`; first source-backed time course ingested" in gate
+    assert "VALIDATION-DATA-001 independent validation evidence | first same-source" in status
+    assert "VALIDATION-DATA-001: complete for the bounded first same-source" in next_steps
+    assert "Status: `complete` for the bounded first same-source" in gate
     assert "PR-36 configured-output solver diagnostics is complete after PR #51" in gate
     assert "PR-37 solver diagnostics visibility follow-up is complete after PR #52" in gate
     assert "PR-38\nsolver diagnostics example notebook is complete after PR #53" in gate
@@ -660,8 +660,8 @@ def test_validation_data_gate_tracks_ingestion_complete_and_comparison_pending()
     assert "PR-49 reusable public checksum-validated" in gate
     assert "Future validation-data additions must not ingest" in gate
     assert "unless the same evidence requirements are met" in gate
-    assert "Status: `complete`" not in gate
-    assert "not VALIDATION-DATA-001's comparison scope" in gate
+    assert "not independent validation" in gate
+    assert "first dataset's separately implemented comparison slice" in gate
     assert "VALIDATION-DATA-001" in gate
     assert "validation, calibration, or empirical comparison claims" in roadmap
     assert "it should not block PRODUCT-001" in _read(

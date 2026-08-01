@@ -26,6 +26,61 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## VALIDATION-DATA-001 Provenance-Matched Time-Course Comparison
+
+Date: 2026-08-01
+
+Status: `complete` for the bounded first same-source, no-calibration comparison;
+independent validation remains unavailable.
+
+Completed in this pass:
+
+- Added a configured Alvarez-Gonzalez 2022 cellobiose-hydrolysis case using the
+  paper's exact Model 3 combined substrate and double competitive product-
+  inhibition law and point estimates.
+- Derived `Vmax=19.72544 mM/min` transparently from the reported
+  `kcat=333.2 micromole/min/mg` and `59.2 mg/L` enzyme dose.
+- Added `scripts/run_literature_time_course_comparison.py`, which persists the
+  configured-model bundle and generic comparison artifacts including
+  `model_comparison.csv`, residuals, metrics, snapshots, mappings, validation
+  JSON/Markdown, and figures.
+- Compared without FungMod fitting: nine points, RMSE approximately
+  `1.07877 mM`, with glucose produced at explicit 2:1 stoichiometry.
+
+Tests added or modified:
+
+- Added `tests/test_literature_time_course_comparison.py` for exact source
+  parameters, no-calibration scope, executable installed-resource config,
+  numerical comparison, conservation, and complete persisted bundles.
+- Extended generic comparison tests for machine-readable comparison rows and
+  bounded Markdown validation reporting.
+- Updated active phase-status contracts.
+
+What did not change: no parameter fitting, independent validation, whole-fungus
+model, organism identity, source parameter uncertainty, or experimental error-
+bar interpretation was added.
+
+Scientific behavior impact: one new generic combined-inhibition modifier now
+supports the exact published denominator, and one source-specific exploratory
+configuration uses it. The model is limited to the selected commercial enzyme
+preparation and assay.
+
+Backward compatibility: additive modifier/configuration, output artifacts,
+script, documentation, and tests. Existing comparison artifacts remain and the
+new CSV/Markdown files are additive.
+
+Remaining ambiguity: the commercial formulation's organism and fitted-
+parameter uncertainties are unstated; plotted error bars are not defined. The
+0.6 mM values are digitization resolution only, so chi-square fields are not
+experimental goodness-of-fit evidence.
+
+Risk level: moderate scientific-interpretation risk, contained by exploratory
+maturity, explicit scope, no refitting, and validation disclaimers.
+
+Recommended next task: acquire an independent or held-out time course with
+defined experimental uncertainty before making validation or generalization
+claims.
+
 ## VALIDATION-DATA-001 First Literature Time Course Ingestion
 
 Date: 2026-08-01

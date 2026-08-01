@@ -1,0 +1,17 @@
+kind: environment
+name: Alvarez-Gonzalez 2022 free beta-glucosidase batch conditions
+provenance:
+  source: https://doi.org/10.3390/catal12010080
+  measurement_method: Conditions transcribed from Supplementary Figure S1 and Materials and Methods section 3.6.1.
+  confidence_level: literature_reported
+  notes: Constant 50 C, pH 5.0 sodium-citrate assay conditions for the selected batch time course.
+  validity_range: Selected free-enzyme cellobiose batch assay only.
+  units: not_applicable
+conditions:
+  temperature:
+    value: 323.15
+    units: kelvin
+  ph:
+    value: 5.0
+    units: dimensionless
+parameters: []
