@@ -63,6 +63,30 @@ def test_configured_model_result_compares_to_synthetic_dataset(tmp_path: Path) -
     assert all(validation.passed for validation in comparison.validation_results)
 
 
+def test_comparison_bundle_includes_machine_readable_rows_and_bounded_report(tmp_path: Path) -> None:
+    result = _result(times=[0.0, 1.0], values=[0.0, 1.0], units="kilogram")
+    dataset = _dataset(
+        points=[
+            MeasurementPoint(time=0.0, value=0.0, uncertainty=0.1),
+            MeasurementPoint(time=1.0, value=1.0, uncertainty=0.1),
+        ],
+    )
+    comparison = evaluate_model_against_dataset(
+        result=result,
+        dataset=dataset,
+        observable_mapping={"product_mass": "released_product_amount"},
+    )
+
+    comparison.save(tmp_path)
+
+    assert (tmp_path / "model_comparison.csv").read_text(encoding="utf-8") == (
+        tmp_path / "residuals.csv"
+    ).read_text(encoding="utf-8")
+    report = (tmp_path / "validation_report.md").read_text(encoding="utf-8")
+    assert "# Model-Dataset Comparison Report" in report
+    assert "does not by itself establish independent validation" in report
+
+
 def test_identity_mapping_exact_times_computes_residuals_and_metrics() -> None:
     result = _result(times=[0.0, 1.0, 2.0], values=[0.0, 1.0, 2.0], units="kilogram")
     dataset = _dataset(

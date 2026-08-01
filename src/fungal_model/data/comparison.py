@@ -136,6 +136,8 @@ class ModelDatasetComparison:
         _write_json(path / "metrics.json", self.metrics)
         _write_json(path / "validation_report.json", [validation.to_dict() for validation in self.validation_results])
         _write_residuals_csv(path / "residuals.csv", self.residuals)
+        _write_residuals_csv(path / "model_comparison.csv", self.residuals)
+        _write_validation_report(path / "validation_report.md", self)
         self.plot_observed_vs_predicted(figures / "observed_vs_predicted.png")
         self.plot_residuals(figures / "residuals.png")
 
@@ -470,6 +472,61 @@ def _write_residuals_csv(path: Path, residuals: Sequence[ResidualSeries]) -> Non
                         ),
                     }
                 )
+
+
+def _write_validation_report(path: Path, comparison: ModelDatasetComparison) -> None:
+    source = comparison.dataset_snapshot.get("source", {})
+    source_label = source.get("doi") or source.get("citation") or source.get("url") or "unavailable"
+    measurements = comparison.dataset_snapshot.get("measurements", [])
+    uncertainty_types = sorted(
+        {
+            str(measurement.get("uncertainty_type"))
+            for measurement in measurements
+            if measurement.get("uncertainty_type")
+        }
+    )
+    lines = [
+        "# Model-Dataset Comparison Report",
+        "",
+        f"- Dataset: `{comparison.dataset_id}`",
+        f"- Model: `{comparison.model_name}`",
+        f"- Dataset source: `{source_label}`",
+        "",
+        "## Metrics",
+        "",
+    ]
+    lines.extend(f"- `{name}`: {value:.12g}" for name, value in sorted(comparison.metrics.items()))
+    lines.extend(
+        [
+            "",
+            "## Observable Mapping",
+            "",
+        ]
+    )
+    lines.extend(
+        (
+            f"- `{mapping.dataset_measurement_id}` -> `{mapping.model_observable}` "
+            f"(`{mapping.observable_type}`, `{mapping.transform}`)"
+        )
+        for mapping in comparison.mappings
+    )
+    lines.extend(["", "## Validation Checks", ""])
+    lines.extend(
+        f"- {'PASS' if validation.passed else 'FAIL'} `{validation.name}`: {validation.message}"
+        for validation in comparison.validation_results
+    )
+    lines.extend(["", "## Interpretation Limits", ""])
+    if uncertainty_types:
+        lines.append(f"- Dataset uncertainty field(s): {'; '.join(uncertainty_types)}.")
+    lines.extend(
+        [
+            "- These metrics describe agreement for the explicit dataset, model, and mapping in this bundle.",
+            "- This report does not by itself establish independent validation, calibration, parameter independence, or biological generality.",
+            "- Read the dataset snapshot and model provenance before interpreting standardized residuals or goodness-of-fit metrics.",
+            "",
+        ]
+    )
+    path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def _pyplot() -> Any:
