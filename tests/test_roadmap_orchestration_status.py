@@ -378,7 +378,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "provenance/limitation decision summary" in status
     assert "decision-support table links" in next_steps
     assert "provenance/limitations report example-notebook slice" in next_steps
-    assert "VALIDATION-DATA-001 remains deferred and evidence-gated" in next_steps
+    assert "VALIDATION-DATA-001 now has one evidence-gated" in next_steps
     assert "has_entropy_production_rate" in next_steps
     assert "has_entropy_budget" in next_steps
     assert "entropy_budget_negative_count" in next_steps
@@ -388,11 +388,11 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "uncertainty-band output ergonomics" in status
     assert "entropy-production-rate, and entropy-budget output inspection" in next_steps
     assert "Validation remains important" in status
-    assert "Real observations are required for validation/calibration/comparison claims" in status
+    assert "The first reviewed literature-raw time course is present" in status
     assert "Validation data is important, but it should not block PRODUCT-001" in _read(
         ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP_V2.md"
     )
-    assert "VALIDATION-DATA-001: deferred; blocked/partial" in next_steps
+    assert "VALIDATION-DATA-001: partial after the first source-backed" in next_steps
     assert "PR-08 | PRODUCT-001 virtual-experiment report writer" in status
     assert "PR-09 | PRODUCT-001 HTML report wrapper" in status
     assert "PR-10 | PRODUCT-001 report-folder index/navigation" in status
@@ -500,7 +500,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "entropy_production_rate_timeseries.json" in _read(README)
     assert "no silent conversion" in status
     assert "The branch/cycle cases are artificial software fixtures" in status
-    assert "Future | VALIDATION-DATA-001" in status
+    assert "Current | VALIDATION-DATA-001" in status
 
 
 def test_active_docs_select_bio003_product_inhibition_without_overclaiming() -> None:
@@ -567,14 +567,14 @@ def test_final_goal_html_plan_records_pr_slices_and_notebook_candidates() -> Non
         assert phrase in html
 
 
-def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
+def test_validation_data_gate_tracks_ingestion_complete_and_comparison_pending() -> None:
     status = _read(STATUS_DOC)
     next_steps = _read(NEXT_STEPS)
     gate = _read(VALIDATION_GATE)
     roadmap = _read(ACTIVE_ROADMAP)
 
     current_next = "none selected; scoped queue complete through PR-59"
-    for text in (status, next_steps, gate):
+    for text in (status, next_steps):
         assert current_next in text
         assert "PR-03" not in _current_next_lines(text)
         assert "PR-04" not in _current_next_lines(text)
@@ -632,9 +632,11 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
         assert "PR-57" not in _current_next_lines(text)
         assert "PR-58" not in _current_next_lines(text)
 
-    assert "VALIDATION-DATA-001 first real time-course dataset and model comparison | deferred" in status
-    assert "VALIDATION-DATA-001: deferred; blocked/partial for ingestion" in next_steps
-    assert "Status: `deferred; blocked/partial` for ingestion." in gate
+    assert "Current next task: implement a provenance-matched" in gate
+
+    assert "VALIDATION-DATA-001 provenance-matched model comparison | dataset ingestion complete" in status
+    assert "VALIDATION-DATA-001: partial after the first source-backed" in next_steps
+    assert "Status: `partial`; first source-backed time course ingested" in gate
     assert "PR-36 configured-output solver diagnostics is complete after PR #51" in gate
     assert "PR-37 solver diagnostics visibility follow-up is complete after PR #52" in gate
     assert "PR-38\nsolver diagnostics example notebook is complete after PR #53" in gate
@@ -656,10 +658,10 @@ def test_validation_data_gate_stays_deferred_and_not_complete() -> None:
     assert "intentional plan\nschema `2.0.0`" in gate
     assert "CURATION-001 is complete for\nits defined review" in gate
     assert "PR-49 reusable public checksum-validated" in gate
-    assert "A future validation ingestion PR must not ingest" in gate
-    assert "fabricate data unless those evidence requirements are met" in gate
+    assert "Future validation-data additions must not ingest" in gate
+    assert "unless the same evidence requirements are met" in gate
     assert "Status: `complete`" not in gate
-    assert "does not complete" in gate
+    assert "not VALIDATION-DATA-001's comparison scope" in gate
     assert "VALIDATION-DATA-001" in gate
     assert "validation, calibration, or empirical comparison claims" in roadmap
     assert "it should not block PRODUCT-001" in _read(
@@ -695,8 +697,6 @@ def test_validation_data_gate_records_required_evidence_and_blockers() -> None:
         assert blocked_candidate_fact in gate
 
     for excluded_artifact in (
-        "raw_data.csv",
-        "curated_data.csv",
         "model_comparison.csv",
         "residuals.csv",
         "validation_report.md",

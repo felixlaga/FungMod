@@ -26,6 +26,57 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## VALIDATION-DATA-001 First Literature Time Course Ingestion
+
+Date: 2026-08-01
+
+Status: `partial`; first source-backed dataset ingested, provenance-matched
+model comparison pending.
+
+Completed in this pass:
+
+- Added a nine-point literature-raw cellobiose concentration time course from
+  Alvarez-Gonzalez et al. (2022), DOI `10.3390/catal12010080`, Supplementary
+  Figure S1A's 20 g/L filled-square free-enzyme series.
+- Recorded the source PDF checksum, exact figure/series, sampling times, assay
+  conditions, rendered axis calibration, marker-centre pixels, conversion,
+  extraction software/date, exclusions, and a conservative 0.6 mM
+  digitization-resolution estimate.
+- Kept the commercial preparation's organism unknown because the 2022 source
+  does not state it directly, and separated digitization error from unavailable
+  experimental uncertainty.
+- Updated the active data contract and validation status from blocked
+  ingestion to partial comparison work.
+
+Tests added or modified:
+
+- Added `tests/test_literature_time_course_dataset.py` for both literature and
+  runtime dataset schemas, exact observations, scope labels, reproducible pixel
+  conversion, and packaged-resource identity.
+- Updated literature-directory and active-status contract tests.
+
+What did not change: no process law, parameter, solver behavior, calibration,
+model comparison, residual table, validation report, organism identity, or
+whole-fungus claim was added.
+
+Scientific behavior impact: none. This is observation ingestion only. The
+dataset may support a bounded no-calibration comparison after the paper's
+combined inhibition law is implemented exactly.
+
+Backward compatibility: additive dataset, documentation, and tests only.
+
+Remaining ambiguity: source error bars are visible but their statistic is not
+defined, and the commercial formulation's biological source is unstated. The
+stored uncertainty is digitization resolution only.
+
+Risk level: moderate scientific-interpretation risk, contained by raw maturity,
+unknown organism metadata, explicit extraction provenance, and no validation
+claim.
+
+Recommended next task: implement the publication's exact combined substrate
+and double product-inhibition law, then generate a provenance-matched
+comparison bundle without fitting.
+
 ## SHOWCASE-001 Five Purified Fungal Beta-Glucosidases On Cellobiose
 
 Date: 2026-07-31

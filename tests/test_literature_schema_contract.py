@@ -20,7 +20,7 @@ FAKE_SCHEMA_EXAMPLE = (
 )
 
 
-def test_literature_schema_contract_exists_before_real_data() -> None:
+def test_literature_schema_contract_documents_real_data_requirements() -> None:
     readme = (LITERATURE_DIR / "README.md").read_text(encoding="utf-8")
 
     required_terms = (
@@ -46,17 +46,20 @@ def test_literature_schema_contract_exists_before_real_data() -> None:
     )
     for term in required_terms:
         assert term in readme
-    assert "No real literature data are included yet" in readme
+    assert "Current datasets" in readme
 
 
-def test_literature_directory_contains_no_real_data_yet() -> None:
+def test_literature_directory_contains_only_reviewed_dataset_files() -> None:
     data_files = [
         path
         for path in LITERATURE_DIR.rglob("*")
         if path.is_file() and path.name != "README.md"
     ]
 
-    assert data_files == []
+    assert sorted(path.name for path in data_files) == [
+        "alvarez_gonzalez_2022_figure_s1a_filled_squares.csv",
+        "alvarez_gonzalez_2022_free_beta_glucosidase.yml",
+    ]
 
 
 def test_valid_fake_literature_metadata_passes_schema() -> None:

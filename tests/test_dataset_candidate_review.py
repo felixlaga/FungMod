@@ -254,14 +254,17 @@ def test_candidate_review_directory_contains_only_review_files() -> None:
     ]
 
 
-def test_literature_directory_still_contains_no_real_data_files() -> None:
+def test_literature_directory_contains_only_the_reviewed_time_course() -> None:
     data_files = [
         path
         for path in LITERATURE_DIR.rglob("*")
         if path.is_file() and path.name != "README.md"
     ]
 
-    assert data_files == []
+    assert sorted(path.name for path in data_files) == [
+        "alvarez_gonzalez_2022_figure_s1a_filled_squares.csv",
+        "alvarez_gonzalez_2022_free_beta_glucosidase.yml",
+    ]
 
 
 def _fake_candidate_data() -> dict[str, Any]:

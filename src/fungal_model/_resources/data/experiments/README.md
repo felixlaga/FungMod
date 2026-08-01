@@ -3,9 +3,11 @@
 This folder contains dataset metadata and observation files for FungMod data
 infrastructure tests and, later, curated scientific datasets.
 
-No real literature data are included yet. Do not add empirical paper values
-until the literature extraction and provenance schemas are implemented and
-tested.
+The first literature-raw dataset is available under
+`literature/alvarez_gonzalez_2022_free_beta_glucosidase/`. New empirical paper
+values still require the tested literature extraction and provenance contract;
+the presence of one reviewed dataset is not blanket authorization to ingest
+unreviewed observations.
 
 ## Maturity Labels
 

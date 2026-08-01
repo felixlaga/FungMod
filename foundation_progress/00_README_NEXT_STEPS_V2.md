@@ -33,8 +33,8 @@ PR-52 authoring for the original five index-backed non-parameter families and
 PR-53 product-map storage/authoring, plus PR-54 caller-trusted Ed25519 curator
 authentication. Completion does not claim scientific validation or automatic
 simulation authorization.
-VALIDATION-DATA-001: deferred; blocked/partial for ingestion until a
-source-backed numeric time-course dataset satisfies the active gate.
+VALIDATION-DATA-001: partial after the first source-backed literature-raw
+cellobiose time course; provenance-matched model comparison remains pending.
 PRODUCT-001: partial after top-level environment_grid helper,
 assumption_summary.csv, modelability_items.csv, write_preflight_report, the
 scoped `DegradationScreenResult.write_report(...)` Markdown report writer, the
@@ -499,11 +499,10 @@ does not add validation data, calibration, empirical comparison, inferred
 environment responses, hidden notebook science, schema changes, or
 solver/model behavior.
 
-VALIDATION-DATA-001 remains deferred and evidence-gated. A validation
-ingestion PR should start only if source-backed numeric time-course
-observations satisfy the active gate; otherwise future makers should pick
-build-first simulator/output ergonomics slices rather than treating incomplete
-candidate reviews as data.
+VALIDATION-DATA-001 now has one evidence-gated, source-backed numeric time
+course. Its next bounded slice is the provenance-matched no-calibration model
+comparison; the two older incomplete candidate reviews remain data-free and
+blocked.
 
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the

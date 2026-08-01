@@ -20,15 +20,17 @@ Do not start with whole-fungus growth. Do not overclaim validation.
 
 ## Current Status
 
-Status: `deferred; blocked/partial` for ingestion.
+Status: `partial`; first source-backed time course ingested, model comparison
+pending.
 
-Current next PR: **none selected; scoped queue complete through PR-59**.
+Current next task: implement a provenance-matched configured model and write
+the observed-versus-predicted comparison bundle without calibration.
 
-This phase has a machine-checkable ingestion gate, but it does not yet have a
-source-backed real time-course dataset in the repository. Validation remains
-important, but it remains deferred until source-backed numeric observations
-satisfy the evidence requirements below and the simulator can produce mature
-enough degradation outputs for comparison. The PR-31 work is complete after
+This phase has a machine-checkable ingestion gate and now contains one
+source-backed, nine-point literature-raw cellobiose time course satisfying the
+evidence requirements below. It remains partial because no matched configured
+model, residual table, metrics bundle, or validation report has been produced.
+The PR-31 work is complete after
 PR #46, PR-32 repository hygiene cleanup is complete after PR #47, PR-33
 chain-template explicit environment modifier assembly is complete after
 PR #48, and PR-34 configured-output conservation/drift diagnostics is complete
@@ -88,9 +90,28 @@ It does not ingest validation data, change scientific fields, authorize
 simulation automatically, or claim validation. CURATION-001 is complete for
 its defined review, authoring, authentication, planning, and transactional
 apply workflow; that status does not complete scientific validation.
-A future validation ingestion PR must not ingest, digitize, or
-fabricate data unless those evidence requirements are met.
-This gate does not complete VALIDATION-DATA-001.
+Future validation-data additions must not ingest, digitize, or fabricate data
+unless the same evidence requirements are met. The first ingestion completes
+the dataset-acquisition slice, not VALIDATION-DATA-001's comparison scope.
+
+## Ingested Evidence
+
+The repository now includes:
+
+- `data/experiments/literature/alvarez_gonzalez_2022_free_beta_glucosidase/`
+- DOI `10.3390/catal12010080`;
+- Supplementary Figure S1A, filled-square 20 g/L cellobiose series;
+- nine points at the source-listed 0-60 minute sampling times;
+- explicit pixel-axis calibration, source-PDF checksum, extraction tool and
+  date, unit conversion, exclusions, and a 0.6 mM digitization-resolution
+  estimate;
+- explicit separation of digitization error from unavailable experimental
+  uncertainty.
+
+The source describes a purified commercial beta-glucosidase formulation. The
+2022 paper does not directly state its biological source organism, so the
+dataset deliberately leaves `system.organism` unknown. It is not a
+whole-fungus dataset and cannot validate organism-specific behavior.
 
 ## Candidate Evidence Checked
 
@@ -150,7 +171,7 @@ not digitize, ingest, or normalize this candidate until the time axis is
 resolved from source-backed evidence such as author-supplied raw data, an
 erratum, an unambiguous figure axis, or a machine-readable supplement.
 
-## Required Evidence Before Ingestion
+## Required Evidence For Every Ingestion
 
 A future real-data ingestion PR must add source-backed numeric observations and
 record all of these fields before creating a literature dataset:
@@ -170,33 +191,25 @@ record all of these fields before creating a literature dataset:
 - `explicit_limitations`: source limitations, extraction limitations,
   model-comparison limits, and validation-claim limits.
 
-The ingestion PR should then add the appropriate literature dataset files and
-model-comparison artifacts with tests. Until these fields are complete,
-VALIDATION-DATA-001 remains blocked/partial.
+Every ingestion must add the appropriate literature dataset files and tests.
+Model-comparison artifacts remain a separate required slice before this phase
+can be complete for its stated scope.
 
-## Files Not Added In This PR
+## Comparison Artifacts Not Added Yet
 
-This gate PR adds no real dataset or model-comparison output. In particular, it
-does not add:
+The ingestion adds a literature metadata YAML and digitized observation CSV.
+It does not yet add:
 
-- `raw_data.csv`;
-- `curated_data.csv`;
 - `model_comparison.csv`;
 - `residuals.csv`;
 - `validation_report.md`;
-- any other real observation table under `data/experiments/literature/`.
 
 No scientific model, parameter, numerical method, runtime behavior, output
-schema, or biology changes in this gate PR.
 
 ## Next Action
 
-After PR-56, take the bounded PR-57 dynamic thermodynamic feasibility and
-solver-enforcement contract. Require explicit provenance-bound activity or
-reaction-quotient data, redox/electron balance, and process/reaction ownership;
-do not infer chemistry or use silent fallback values. Continue building
-PRODUCT-001, THERMO-003, and generic BIO-003 simulator capability.
-Later, find or obtain source-backed numeric time-course
-observations that satisfy the required evidence fields above. Then open a
-separate ingestion PR for VALIDATION-DATA-001 with the dataset, comparison
-workflow, limitations, and tests.
+Implement the exact published combined substrate/product-inhibition law with
+the source's fitted parameter values and explicit commercial-enzyme dose, then
+run a no-calibration comparison against the ingested series. Persist the
+comparison, residuals, metrics, provenance, limitations, and a report that does
+not generalize beyond this enzyme preparation and assay.

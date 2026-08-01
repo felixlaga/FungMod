@@ -1,7 +1,16 @@
 # Literature Experiment Dataset Contract
 
-No real literature data are included yet. This folder is a schema contract and
-review checklist only.
+This folder contains provenance-complete literature datasets plus the schema
+contract and review checklist used before ingestion.
+
+Current datasets:
+
+- `alvarez_gonzalez_2022_free_beta_glucosidase/`: a nine-point digitization of
+  the 20 g/L cellobiose, 59.2 mg/L free-enzyme series from Supplementary Figure
+  S1A in Alvarez-Gonzalez et al. (2022). It is `literature_raw`, represents a
+  purified commercial enzyme formulation of unstated biological source, and is
+  suitable for bounded model comparison, not calibration or a general
+  validation claim.
 
 The machine-readable schema validation now exists in
 `fungal_model.data.validate_literature_dataset_metadata`. Every future
@@ -41,8 +50,7 @@ Synthetic fixtures belong under `data/experiments/synthetic/`.
 
 Adding a real paper dataset requires tests that load the dataset, verify the
 metadata above, validate units and CSV columns, and confirm preprocessing is
-tracked. Until those tests exist, this directory must contain no real paper
-YAML or CSV files.
+tracked.
 
 Fake metadata examples may live outside this directory, for example under
 `data/experiments/literature_schema_examples/`. Those examples are schema tests
