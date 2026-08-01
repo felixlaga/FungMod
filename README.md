@@ -52,6 +52,11 @@ basic kinetics layer:
   `delta_g_standard = -n*F*E_standard` inputs are supported; activity floors,
   standard concentration, temperature, gas/Faraday constants, tolerances, and
   provenance references are mandatory rather than inferred,
+- an opt-in low-level `NonidealReversibleThermodynamics` path with explicit
+  constant activity coefficients, nonideal activities, Gibbs/affinity and
+  equilibrium diagnostics, and a signed local-detailed-balance net rate that
+  can reverse a generic `Reaction`; no coefficient or activation model is
+  inferred,
 - configured thermodynamic JSON/CSV summary outputs for explicit Gibbs/entropy
   validation diagnostics, including an aggregate explicit entropy-rate budget
   and report/index visibility for existing summary artifacts plus a standard
@@ -215,8 +220,8 @@ basic kinetics layer:
   through the top-level `virtual_experiment(...)` API.
 
 It does not yet implement coupled-network thermodynamic flux optimization,
-nonideal activity coefficients, reverse-rate thermodynamics, resolved
-intracellular metabolism, publication-grade calibration
+state-dependent electrolyte/activity-coefficient models, resolved intracellular
+metabolism, publication-grade calibration
 against curated biological datasets, or global uncertainty analysis. Those
 stages are documented in `progress.md` and should be added only after the
 current virtual-experiment layer has tests, provenance, and validation.
@@ -1233,8 +1238,12 @@ Current capability labels mean:
 - Stage 7 oxygen handling is currently a validation check against available oxygen, not a coupled oxygen state in the ODE model.
 - Optional single-process dynamic Gibbs constraints can block unfavorable
   configured forward rates when all molar activity, reaction, electron/redox,
-  constant, tolerance, and provenance inputs are explicit. Coupled-network,
-  reverse-rate, nonideal-activity, and electrochemical thermodynamics remain
+  constant, tolerance, and provenance inputs are explicit. Separately, the
+  low-level `NonidealReversibleThermodynamics` API supports one reaction with
+  caller-supplied constant activity coefficients and a signed local-detailed-
+  balance reverse flux. Configured nonideal/reversible assembly, inferred or
+  state-dependent coefficient models, activation barriers, coupled-network
+  optimization, electrochemical gradients, and empirical validation remain
   unsupported.
 - `ReactionDiffusionEngineND` supports unit-aware uniform Cartesian 2D and 3D
   method-of-lines models with explicit no-flux, periodic, or fixed-value

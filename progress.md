@@ -26,6 +26,50 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## THERMO-003 Explicit Nonideal Reversible Flux
+
+Date: 2026-08-01
+
+Status: `complete` for one bounded low-level reaction contract; broad THERMO-003
+and configured nonideal/reversible assembly remain `partial`.
+
+Completed in this pass: added explicit constant activity-coefficient records,
+nonideal activity/Q/Gibbs/affinity/equilibrium diagnostics, and a signed local-
+detailed-balance rate wrapper using
+`r_reverse/r_forward = exp(delta_g/RT)`. Every participant requires exactly one
+positive sourced coefficient; standard Gibbs energy, temperature, gas constant,
+standard concentration, activity floor, equilibrium tolerance, and sources are
+all explicit.
+
+Tests added: `tests/test_nonideal_reversible_thermodynamics.py` verifies the
+exact `RT ln(gamma_product/gamma_reactant)` Gibbs shift, zero net flux at a
+nonideal equilibrium, forward and reverse directions, conservation and
+relaxation to equilibrium in the generic ODE engine, and failure on missing or
+nonpositive coefficients. Existing configured thermodynamic gates remain green.
+
+What did not change: configured thermodynamic assembly still uses its ideal-
+dilute forward-rate blocking contract. No activity coefficient is inferred;
+there is no Debye-Huckel/Davies/Pitzer model, state-dependent ionic strength,
+activation barrier, coupled-network optimization, electrochemical gradient,
+dynamic temperature, biological parameter, or empirical validation.
+
+Scientific behavior impact: callers can opt into a signed reversible rate for
+one reaction using their own sourced constant activity coefficients and one-way
+kinetic scale. Applicability to an empirical composite rate law is not assumed.
+
+Backward compatibility: additive low-level chemistry APIs; existing configured
+and low-level thermodynamic behavior is unchanged.
+
+Remaining ambiguity: local detailed balance constrains the reverse/forward
+ratio but does not determine the forward activation kinetics or prove an
+empirical composite law is elementary.
+
+Risk level: moderate scientific-use risk, contained by exact explicit inputs,
+provenance checks, no inference, equilibrium tests, and separate opt-in API.
+
+Recommended next task: add a configured schema only after a real reaction has
+sourced activity coefficients and defensible forward/reverse kinetic meaning.
+
 ## SPATIAL-ND-001 Uniform Cartesian 2D/3D Reaction-Diffusion
 
 Date: 2026-08-01

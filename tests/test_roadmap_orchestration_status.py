@@ -402,6 +402,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "ReactionDiffusionEngineND" in status
     assert "SPATIAL-ND-001" in next_steps
     assert "analytical discrete periodic Fourier-mode decay" in progress
+    assert "NonidealReversibleThermodynamics" in status
+    assert "r_reverse/r_forward = exp(delta_g/RT)" in status
+    assert "bounded low-level nonideal/reversible slice" in next_steps
+    assert "RT ln(gamma_product/gamma_reactant)" in progress
     assert "Validation data is important, but it should not block PRODUCT-001" in _read(
         ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP_V2.md"
     )

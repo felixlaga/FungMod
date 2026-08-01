@@ -533,6 +533,17 @@ geometry, advection, porous media, adaptive refinement, moving morphology,
 surface/volume coupling, empirical spatial calibration, or biological
 validation.
 
+THERMO-003 now also has a bounded low-level nonideal/reversible slice.
+`NonidealReversibleThermodynamics` requires explicit sourced constant activity
+coefficients for every participant and evaluates `a_i = gamma_i c_i/c_standard`,
+`delta_g = delta_g_standard + RT ln Q`, equilibrium, affinity, and the local-
+detailed-balance relation `r_reverse/r_forward = exp(delta_g/RT)`. Software
+tests cover the nonideal Gibbs shift, exact nonideal equilibrium, both flux
+directions, and closed-system relaxation. The configured workflow remains on
+its existing ideal forward-rate-blocking contract; no coefficient model,
+activation barrier, coupled-network optimizer, electrochemical gradient, or
+empirical validation is inferred.
+
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
 machine-checkable `proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml`.
