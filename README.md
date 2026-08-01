@@ -1037,6 +1037,32 @@ Internal software-test model-config shells include:
 All four load through `load_model_config`. They are framework benchmarks, not
 scientific biology or validation evidence.
 
+The installed data also includes a bounded, provenance-backed fungal-enzyme
+mechanism example:
+
+```python
+import fungmod as fm
+
+result = fm.run_configured_model(
+    fm.example_data_path(
+        "model_configs/phanerochaete_bgl1b_cellobiose_transglycosylation.yml"
+    ),
+    output_dir="outputs/bgl1b_transglycosylation",
+)
+```
+
+This config uses the hydrolysis and substrate-transglycosylation constants
+reported for recombinant intracellular BGL1B from *Phanerochaete
+chrysosporium*. Two generic process branches share the published kinetic
+denominator; explicit product maps distinguish one-cellobiose hydrolysis from
+two-cellobiose substrate transfer. `configured_metadata.json` records both
+branches, equations, source, maturity, and limitations.
+
+The enzyme dose and time grid are explicit exploratory scenario choices. The
+transfer product is an unresolved three-glucose-unit pool: no linkage is
+assigned, later product hydrolysis is omitted, and the output is not a
+whole-fungus, regulation, validation, or source-observation time course.
+
 Product maps live under `data/product_maps/` and are loaded through
 `load_product_map`. They carry configured state names and benchmark maturity
 metadata, so product release mappings do not have to be embedded in process

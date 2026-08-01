@@ -1,6 +1,6 @@
 # BIO-003: Generic Mechanism Expansion Through Process Laws
 
-Status: `partial/software-tested` for three bounded BIO-003 mechanism-family
+Status: `partial/software-tested` for four bounded BIO-003 mechanism-family
 targets.
 
 BIO-003 should expand biology through reusable process laws and modifiers, not
@@ -66,6 +66,50 @@ More than one mechanistic enzyme-inhibition modifier per process and
 composition with the older generic product-inhibition factor fail closed
 because no combined law has been implemented.
 
+## Provenance-backed substrate transglycosylation
+
+The fourth bounded target is:
+
+```text
+substrate_transglycosylation
+```
+
+Its machine-checkable proposal is:
+
+```text
+foundation_progress/proposals/BIO_003_SUBSTRATE_TRANSGLYCOSYLATION.yml
+```
+
+Two generic configured process branches share the retaining-glycosidase law:
+
+```text
+D   = Km_h + S + S^2/Km_t
+r_h = E*kcat_h*S/D
+r_t = E*kcat_t*(S^2/Km_t)/D
+```
+
+The hydrolysis branch must consume exactly one donor-substrate equivalent. The
+substrate-transfer branch must consume exactly two because the second substrate
+molecule is the acceptor. Explicit product maps own every product coefficient.
+Missing provenance, a maturity other than
+`literature_backed_software_tested`, invalid/nonfinite inputs, unsupported
+modifier composition, and branch/map mismatch fail closed.
+
+The selected law is supported by Kawai et al. (2004),
+`https://doi.org/10.1016/j.carres.2004.09.019`, which identified a fungal
+substrate-transglycosylation product and fitted the coupled kinetic scheme. The
+installed example
+`data/model_configs/phanerochaete_bgl1b_cellobiose_transglycosylation.yml`
+uses the four reported recombinant BGL1B cellobiose estimates from Tsukada et
+al. (2006), `https://doi.org/10.1007/s00253-006-0526-z`, including their
+reported uncertainties.
+
+The example's enzyme dose and time grid are exploratory scenario inputs. Its
+three-glucose-unit transfer-product pool deliberately leaves linkage identity
+unresolved and omits subsequent hydrolysis. It is purified recombinant-enzyme
+kinetics, not whole-fungus growth, secretion, uptake, regulation, validation,
+or a measured time course.
+
 ## Researcher-facing example coverage
 
 The scoped reversible-product-inhibition target now has a researcher-facing
@@ -103,6 +147,8 @@ This selected target does not permit:
 - whole-fungus toxicity, uptake, secretion, biomass, or physiology claims;
 - competitive or substrate-inhibition claims outside their explicit PR-58
   configuration contracts;
+- transfer to non-substrate acceptors, multiple product isomers, sequential
+  transfer, or transfer-product re-hydrolysis;
 - mixed, uncompetitive, irreversible, time-dependent, covalent, combined, or
   multi-product inhibition claims;
 - validation or calibration claims without real observations;
@@ -134,3 +180,10 @@ through materially different artificial configured benchmarks, primary source
 and maturity metadata are visible in outputs, and missing provenance,
 nonpositive parameters, base-law mismatch, and unsupported composition fail
 closed.
+
+The substrate-transglycosylation slice is complete for its scoped software
+contract when both branch equations and stoichiometric contributions are unit
+tested, the proposal passes BIO readiness, the source-parameter example runs
+from installed resources with conservation checks, and output metadata exposes
+branch, equation, source, maturity, assumptions, and limitations. This does not
+complete broad BIO-003 or establish empirical validation.

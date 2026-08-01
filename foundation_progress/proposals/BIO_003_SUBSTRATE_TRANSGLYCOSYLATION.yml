@@ -1,0 +1,102 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-003
+mechanism_id: substrate_transglycosylation
+general_process_family: generic coupled homogeneous hydrolysis and substrate-transglycosylation branches for retaining glycosidases
+mathematical_law: >
+  Two explicit process branches share D = Km_h + S + S^2/Km_t. Hydrolysis is
+  r_h = E*kcat_h*S/D and substrate transglycosylation is
+  r_t = E*kcat_t*(S^2/Km_t)/D. The second substrate molecule is the acceptor;
+  explicit product maps own one-substrate hydrolysis versus two-substrate
+  transfer stoichiometry.
+state_variables:
+  - name: substrate_pool
+    role: glycosyl donor and substrate-transfer acceptor
+    units: explicit amount or concentration units
+  - name: enzyme_pool
+    role: retaining glycosidase catalyst
+    units: explicit enzyme amount or concentration units
+  - name: hydrolysis_product_pool
+    role: explicit hydrolysis product
+    units: units compatible with substrate_pool
+  - name: transfer_product_pool
+    role: explicit or deliberately unresolved transfer-product pool
+    units: units compatible with substrate_pool
+parameters:
+  - symbol: K_m_h
+    meaning: positive hydrolysis Michaelis constant
+    units: units compatible with substrate_pool
+  - symbol: K_m_t
+    meaning: positive affinity parameter for the second substrate molecule acting as acceptor
+    units: units compatible with substrate_pool
+  - symbol: k_cat_h
+    meaning: nonnegative hydrolysis turnover coefficient
+    units: process rate units divided by enzyme_pool units
+  - symbol: k_cat_t
+    meaning: nonnegative substrate-transglycosylation turnover coefficient
+    units: process rate units divided by enzyme_pool units
+units:
+  substrate_policy: substrate_pool, K_m_h, and K_m_t must be compatible
+  enzyme_policy: enzyme_pool times either turnover coefficient must produce the configured process-rate units
+  activity_policy: each branch rate must be finite and nonnegative
+valid_substrate_classes:
+  - any explicitly configured soluble donor substrate that can also act as an acceptor under a source-supported retaining-glycosidase mechanism
+valid_enzyme_or_source_classes:
+  - any explicitly configured retaining glycosidase with evidence for the coupled substrate-transfer law
+environment_variables:
+  - name: none
+    required: false
+    notes: The initial-rate law does not infer temperature, pH, water activity, transport, or another environment response.
+output_curves:
+  - substrate trajectory
+  - hydrolysis product trajectory
+  - transfer product trajectory
+  - separate hydrolysis and substrate-transfer process rates
+summary_metrics:
+  - final substrate remaining
+  - final hydrolysis product
+  - final transfer product
+  - initial and maximum branch rates
+assumptions:
+  - Hydrolysis and transfer compete through one shared denominator.
+  - A second substrate molecule is the only modeled transfer acceptor.
+  - Product maps explicitly own branch stoichiometry and any unresolved product-pool scope.
+not_in_scope:
+  - Transfer to glucose, alcohols, phenolics, or other acceptor classes.
+  - Multiple linkage isomers, sequential transfer, transfer-product re-hydrolysis, or condensation.
+  - Transport, regulation, secretion, uptake, growth, biomass, morphology, or whole-organism physiology.
+  - Parameter inference, empirical validation, or applicability inferred only from the law citation.
+unknowns:
+  - Product linkage identities and secondary hydrolysis require case-specific evidence and separately implemented branches.
+  - Production parameter records and applicability require separate curation.
+suggested_experiments:
+  - Quantify donor loss, leaving-group release, and every transfer-product isomer over time across low and high donor concentrations.
+  - Report enzyme dose, pH, temperature, water activity, units, replicate structure, and uncertainty definitions.
+blocking_failure_modes:
+  - Missing primary source or exact literature-backed software-tested maturity.
+  - Missing, negative, nonfinite, or unit-incompatible state or parameter values.
+  - Unsupported rate-modifier composition.
+  - Hydrolysis map not consuming one donor or transfer map not consuming two donor equivalents.
+tests_required:
+  - Unit tests for both branch equations, zero-substrate behavior, units, and signed stoichiometric contributions.
+  - Configured fungal-enzyme example using directly reported kinetic constants and explicit exploratory scenario assumptions.
+  - Fail-closed tests for missing provenance, wrong maturity, modifiers, invalid parameters, and product-map mismatch.
+  - Output tests exposing branch, source, maturity, equation, assumptions, and limitations.
+limitations:
+  - Initial-rate well-mixed model only.
+  - Direct fungal evidence supports the selected law and one example parameter set, not universal glycosidase behavior.
+  - No independent time-course validation or whole-fungus applicability is claimed.
+demo_case:
+  case_id: CASE-002
+  purpose: Exercise both generic branches with one directly reported fungal beta-glucosidase parameter set and an explicit exploratory enzyme dose.
+  distinction: Source parameters are scientific evidence; the scenario dose and resulting trajectory are not source observations.
+data_dependencies:
+  - DATA-003
+validation_status: software_tested
+primary_provenance:
+  citation: Kawai et al. Kinetics of substrate transglycosylation by glycoside hydrolase family 3 glucan (1-3)-beta-glucosidase from the white-rot fungus Phanerochaete chrysosporium. Carbohydrate Research. 2004.
+  url: https://doi.org/10.1016/j.carres.2004.09.019
+  evidence_scope: Primary fungal study identifying the transfer product and supporting the coupled hydrolysis and substrate-transglycosylation law.
+example_parameter_provenance:
+  citation: Tsukada et al. Molecular cloning and characterization of two intracellular beta-glucosidases belonging to glycoside hydrolase family 1 from the basidiomycete Phanerochaete chrysosporium. Applied Microbiology and Biotechnology. 2006.
+  url: https://doi.org/10.1007/s00253-006-0526-z
+  evidence_scope: Primary recombinant-enzyme study reporting cellobiose hydrolysis and substrate-transglycosylation parameters for BGL1B.

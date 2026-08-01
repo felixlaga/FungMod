@@ -204,12 +204,17 @@ artifacts, report/index links, and the explicit header-only/no-metadata
 guardrail without solver behavior changes, numerical quality thresholds,
 validation/calibration evidence, thermodynamic enforcement, inferred
 scientific values, or biology claims.
-BIO-003: partial/software-tested for generic reversible product inhibition plus
-provenance-bound competitive and Haldane substrate inhibition. The PR-58 laws
-are limited to exactly matched homogeneous Michaelis-Menten processes and
-require explicit primary-source/maturity metadata and positive
-unit-compatible parameters. Their fixtures are artificial software evidence,
-not production applicability or validation.
+BIO-003: partial/software-tested for generic reversible product inhibition,
+provenance-bound competitive and Haldane substrate inhibition, and coupled
+substrate transglycosylation: four bounded mechanism targets. The PR-58
+inhibition laws are limited to exactly matched homogeneous Michaelis-Menten
+processes; their fixtures are artificial software evidence and are not production applicability or validation.
+The transglycosylation law requires explicit hydrolysis/transfer branches,
+shared source-backed parameters, primary-source/maturity metadata, and
+product-map-owned stoichiometry. Its installed fungal configuration is an
+exploratory source-parameter trajectory, not whole-fungus biology, product-
+identity evidence beyond the configured unresolved pool, empirical validation,
+or production applicability.
 The scoped reversible-product-inhibition target now has a public example
 notebook, `12_reversible_product_inhibition_example.ipynb`, that compares
 inhibited and uninhibited exploratory virtual experiments and inspects
@@ -518,5 +523,17 @@ covered by `notebooks/examples/12_reversible_product_inhibition_example.ipynb`;
 the non-PET configured benchmark is
 `data/model_configs/toy_surface_dummy_non_pet_product_inhibition.yml`. Broad
 BIO-003 remains partial.
+
+A later bounded BIO-003 slice implements coupled hydrolysis and substrate
+transglycosylation through the machine-checkable
+`proposals/BIO_003_SUBSTRATE_TRANSGLYCOSYLATION.yml` and installed
+`phanerochaete_bgl1b_cellobiose_transglycosylation.yml` configuration. It uses
+the exact shared-denominator branch law and published *Phanerochaete
+chrysosporium* BGL1B point estimates. The enzyme dose, time grid, and unresolved
+transfer-product pool are explicit FungMod exploratory choices; the result is
+not an observed source time course, whole-fungus physiology, calibration, or
+validation.
+coupled substrate transglycosylation therefore remains limited to this explicit
+software-tested scope.
 
 `old_progress/` is historical and non-binding.

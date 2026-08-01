@@ -389,6 +389,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "entropy-production-rate, and entropy-budget output inspection" in next_steps
     assert "Validation remains important" in status
     assert "first same-source no-calibration comparison complete" in status
+    assert "coupled substrate transglycosylation" in next_steps
+    assert "BIO_003_SUBSTRATE_TRANSGLYCOSYLATION.yml" in next_steps
+    assert "four bounded mechanism targets" in status
+    assert "phanerochaete_bgl1b_cellobiose_transglycosylation.yml" in status
     assert "Validation data is important, but it should not block PRODUCT-001" in _read(
         ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP_V2.md"
     )

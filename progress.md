@@ -26,6 +26,61 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## BIO-003 Coupled Substrate Transglycosylation
+
+Date: 2026-08-01
+
+Status: `complete` for the bounded coupled hydrolysis/substrate-
+transglycosylation process and one provenance-backed fungal enzyme
+configuration; broad BIO-003 remains `partial`.
+
+Completed in this pass:
+
+- Added a generic two-branch process law with the shared denominator
+  `Km_h + S + S^2/Km_t`, explicit enzyme state, and branch-specific turnover.
+- Made product maps own the distinct one-substrate hydrolysis and two-substrate
+  transfer stoichiometries; the core process contains no fungus, enzyme, or
+  substrate-specific branch.
+- Added a machine-checkable biology proposal and an installed
+  *Phanerochaete chrysosporium* BGL1B cellobiose configuration using published
+  hydrolysis and transglycosylation point estimates.
+- Exposed the configured law, equation, parameters, source, maturity, and
+  limitations in standard configured-output metadata.
+
+Tests added or modified:
+
+- Added unit, dimension, low/high-substrate, conservation, and failure-mode
+  tests for the generic process.
+- Added proposal, resource, exact-parameter, configured-run, metadata, and
+  glucose-equivalent balance tests for the fungal enzyme configuration.
+- Extended the process-factory library and active roadmap status contracts.
+
+What did not change: no transfer-product linkage was inferred, no transfer-
+product re-hydrolysis, multiple acceptors, whole-fungus growth, secretion,
+uptake, biomass, transport, regulation, calibration, empirical validation, or
+production applicability was added.
+
+Scientific behavior impact: source-backed initial-rate hydrolysis and
+substrate-transglycosylation branches can now compete in configured virtual
+experiments. The installed trajectory uses an explicit unresolved
+trisaccharide-equivalent pool and FungMod-selected enzyme dose/time grid, so it
+is exploratory rather than a reconstruction of a source observation.
+
+Backward compatibility: additive process type, configuration, product maps,
+metadata fields, documentation, and tests. Existing process behavior and
+output columns are unchanged.
+
+Remaining ambiguity: the selected point estimates do not establish transfer-
+product time-course behavior, product distribution, parameter uncertainty, or
+whole-organism applicability.
+
+Risk level: moderate scientific-interpretation risk, contained by a required
+primary source, fixed maturity label, explicit unresolved product pool, and
+failure-closed configuration checks.
+
+Recommended next task: find an independent transglycosylation product time
+course with defined analytical uncertainty before fitting or validation.
+
 ## VALIDATION-DATA-001 Provenance-Matched Time-Course Comparison
 
 Date: 2026-08-01
