@@ -26,6 +26,48 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## WHOLE-FUNGUS-COUPLING-001 Minimal Well-Mixed Coupling
+
+Date: 2026-08-01
+
+Status: `complete` for the bounded exploratory composition; organism-level
+fungal physiology remains `partial`.
+
+Completed in this pass: added `FungalCouplingModel`, which composes a caller-
+supplied sourced extracellular degradation reaction with existing secretion,
+enzyme decay, secretion cost, assimilable-product uptake, biomass-yield, and
+maintenance laws. Assembly requires a matching enzyme capability, exactly one
+matching assimilable-product record, complete sourced fungal parameters,
+non-overlapping additional parameters, distinct states, and the fixed
+`exploratory_software_tested` maturity.
+
+Tests added: `tests/test_fungal_coupling.py` covers the complete artificial
+trajectory, zero-biomass limiting case, missing enzyme capability, explicitly
+non-assimilable product, parameter collision, and false-maturity rejection.
+
+What did not change: no organism-specific parameter, production registry
+record, intracellular metabolic network, oxygen state, transporter, regulation,
+morphology, toxicity, spatial secretion, empirical calibration, or organism-
+level validation was added.
+
+Scientific behavior impact: existing minimal fungal rate laws can now run in a
+single explicit well-mixed system instead of requiring callers to hand-compose
+the reactions. All biological applicability still comes from caller-supplied
+evidence and parameters.
+
+Backward compatibility: additive public API only.
+
+Remaining ambiguity: the open-system mass not converted to biomass is not
+resolved into respiration products, and the lumped secretion-cost coefficient
+does not represent intracellular resource allocation.
+
+Risk level: moderate interpretation risk, contained by fixed exploratory
+maturity, exact capability gates, source checks, and artificial-only tests.
+
+Recommended next task: add a provenance-backed organism/culture dataset only
+after secretion, uptake, yield, maintenance, and oxygen measurements are all
+available for the same experimental system.
+
 ## FD-007 Canonical Build-Time Resource Staging
 
 Date: 2026-08-01

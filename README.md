@@ -37,7 +37,8 @@ basic kinetics layer:
 - a minimal heterogeneous PET surface-hydrolysis rate law,
 - Arrhenius temperature scaling with validity-range warnings,
 - Gaussian pH activity scaling with validity-range warnings,
-- minimal fungal metadata, enzyme secretion, enzyme decay, maintenance, and product-coupled biomass growth,
+- minimal fungal metadata, enzyme secretion, enzyme decay, maintenance, product-coupled biomass growth,
+  and an opt-in failure-closed well-mixed coupling to caller-supplied extracellular degradation reactions,
 - stoichiometric and thermodynamic metadata interfaces,
 - carbon conservation, oxygen limitation, and biomass-yield validation checks,
 - explicit reaction-quotient Gibbs feasibility and entropy-production
@@ -1220,7 +1221,12 @@ Current capability labels mean:
 - PET product release is represented as a lumped mass-equivalent hydrolysate in the Stage 4 example, not resolved MHET/BHET/TPA/EG chemistry.
 - Temperature scaling currently uses Arrhenius acceleration only; enzyme thermal deactivation is recorded as a limitation and is not implemented.
 - pH activity currently uses an empirical Gaussian profile; mechanistic ionization chemistry is not implemented.
-- Fungal growth currently uses a simple assimilable-product uptake law; oxygen, transporters, toxicity, regulation, and intracellular metabolism are not modelled.
+- `FungalCouplingModel` can compose explicit capability-matched extracellular
+  degradation, secretion, enzyme decay, secretion cost, assimilable-product
+  uptake, biomass yield, and maintenance in one well-mixed ODE system. It is an
+  `exploratory_software_tested` coupling, not an organism-specific whole-fungus
+  claim; oxygen, transporters, toxicity, regulation, morphology, and
+  intracellular metabolism are not modelled.
 - Enzyme production has an explicit active-biomass cost, but the cost parameter is lumped and must be sourced before scientific use.
 - Stage 7 oxygen handling is currently a validation check against available oxygen, not a coupled oxygen state in the ODE model.
 - Optional single-process dynamic Gibbs constraints can block unfavorable

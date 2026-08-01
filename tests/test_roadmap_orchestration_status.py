@@ -74,8 +74,8 @@ def test_pr48_parameter_authoring_contract_is_synchronized() -> None:
     status = _read(STATUS_DOC)
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
-    validation_gate = _read(VALIDATION_GATE)
     progress = _read(PROGRESS_LEDGER)
+    validation_gate = _read(VALIDATION_GATE)
 
     for text in (readme, status, next_steps, roadmap, progress):
         assert "plan_registry_promotion" in text
@@ -213,6 +213,7 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     status = _read(STATUS_DOC)
     next_steps = _read(NEXT_STEPS)
     roadmap = _read(ACTIVE_ROADMAP)
+    progress = _read(PROGRESS_LEDGER)
 
     current_next = "none selected; scoped queue complete through PR-59"
     for text in (status, next_steps):
@@ -393,6 +394,10 @@ def test_build_first_queue_defers_validation_without_deleting_it() -> None:
     assert "BIO_003_SUBSTRATE_TRANSGLYCOSYLATION.yml" in next_steps
     assert "four bounded mechanism targets" in status
     assert "phanerochaete_bgl1b_cellobiose_transglycosylation.yml" in status
+    assert "WHOLE-FUNGUS-COUPLING-001" in status
+    assert "FungalCouplingModel" in status
+    assert "WHOLE-FUNGUS-COUPLING-001" in next_steps
+    assert "exploratory_software_tested" in progress
     assert "Validation data is important, but it should not block PRODUCT-001" in _read(
         ROOT / "foundation_progress" / "FUNGMOD_NEXT_PHASES_ROADMAP_V2.md"
     )

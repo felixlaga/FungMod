@@ -75,7 +75,7 @@ from fungal_model.api import (
     curation_bundle_signature_path,
     virtual_experiment,
 )
-from fungal_model.fungi.base import Fungus
+from fungal_model.fungi import FUNGAL_COUPLING_MATURITY, FungalCouplingModel, Fungus
 from fungal_model.geometry import (
     Film1DGeometry,
     Geometry,
@@ -227,6 +227,8 @@ __all__ = [
     "example_data_path",
     "Film1DGeometry",
     "Fungus",
+    "FUNGAL_COUPLING_MATURITY",
+    "FungalCouplingModel",
     "Geometry",
     "GeometryLoaderRegistry",
     "FirstOrderDecayProcess",

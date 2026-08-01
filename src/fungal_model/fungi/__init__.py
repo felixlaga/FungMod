@@ -1,6 +1,7 @@
 """Fungal physiology interfaces."""
 
 from .base import Fungus, fungal_stage6_assumption, make_fungal_parameter_set
+from .coupling import FUNGAL_COUPLING_MATURITY, FungalCouplingModel
 from .enzyme_profile import (
     EnzymeCapability,
     EnzymeDecayRateLaw,
@@ -26,6 +27,8 @@ __all__ = [
     "EnzymeProductionCostRateLaw",
     "EnzymeProfile",
     "EnzymeSecretionRateLaw",
+    "FUNGAL_COUPLING_MATURITY",
+    "FungalCouplingModel",
     "Fungus",
     "ProductAssimilation",
     "ProductUptakeRateLaw",

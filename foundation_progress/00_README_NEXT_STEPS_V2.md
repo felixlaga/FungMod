@@ -511,6 +511,17 @@ validation; its next evidence need is a held-out experiment with defined
 experimental uncertainty. The two older incomplete candidate reviews remain
 data-free and blocked.
 
+WHOLE-FUNGUS-COUPLING-001 is complete for a bounded software-tested composition
+of existing minimal fungal laws. `FungalCouplingModel` joins a caller-supplied
+sourced extracellular degradation reaction to explicit, capability-matched
+secretion, enzyme decay, secretion cost, product assimilation, biomass yield,
+and maintenance. It fails on missing capability/assimilation evidence, unknown
+fungal parameters, overlapping parameter symbols, or unsupported maturity. Its
+tests are artificial and it remains exploratory: no organism-specific
+physiology, oxygen state, intracellular metabolism, regulation, morphology,
+toxicity, spatial secretion, empirical calibration, or whole-organism
+validation is implied.
+
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
 machine-checkable `proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml`.
