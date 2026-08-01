@@ -1,32 +1,77 @@
-# FungMod
+<p align="center">
+  <img src="https://raw.githubusercontent.com/felixlaga/FungMod/main/docs/assets/fungmod-hero.png" width="480" alt="FungMod mushrooms and mycelial network">
+</p>
 
-[![PyPI](https://img.shields.io/pypi/v/fungmod.svg)](https://pypi.org/project/fungmod/)
-[![Python](https://img.shields.io/pypi/pyversions/fungmod.svg)](https://pypi.org/project/fungmod/)
-[![Documentation](https://readthedocs.org/projects/fungmod/badge/?version=latest)](https://fungmod.readthedocs.io/)
-[![CI](https://github.com/felixlaga/FungMod/actions/workflows/ci.yml/badge.svg)](https://github.com/felixlaga/FungMod/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+<h1 align="center">FungMod</h1>
 
-Before changing the codebase, start with the root agent/developer contract and
-the active directive:
+<p align="center">
+  <strong>Mechanistic, uncertainty-aware virtual experiments for fungal and enzyme-mediated substrate degradation.</strong>
+</p>
 
-- `AGENTS.md`
-- `foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md`
-- `foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md`
+<p align="center">
+  <a href="https://pypi.org/project/fungmod/"><img src="https://img.shields.io/pypi/v/fungmod.svg" alt="PyPI"></a>
+  <a href="https://pypi.org/project/fungmod/"><img src="https://img.shields.io/pypi/pyversions/fungmod.svg" alt="Supported Python versions"></a>
+  <a href="https://fungmod.readthedocs.io/"><img src="https://readthedocs.org/projects/fungmod/badge/?version=latest" alt="Documentation"></a>
+  <a href="https://github.com/felixlaga/FungMod/actions/workflows/ci.yml"><img src="https://github.com/felixlaga/FungMod/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT license"></a>
+</p>
 
-Historical foundation-first plans are archived under `old_progress/`. They are
-useful context only and are non-binding. The active goal is now the
-virtual-experiment engine: simulate degradation dynamics over time without
-hiding assumptions, uncertainty, provenance, missing inputs, or unsupported
-biology.
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="https://fungmod.readthedocs.io/">Documentation</a> ·
+  <a href="#notebooks">Notebooks</a> ·
+  <a href="#scientific-philosophy">Scientific philosophy</a> ·
+  <a href="#current-limitations">Limitations</a>
+</p>
 
-FungMod is a scientific Python codebase for building a physically grounded
-fungal- and enzyme-mediated substrate-degradation virtual-experiment engine.
-The long-term target is a modular API that can simulate a fungus or enzyme
-source, substrate, environment, and parameter set without inventing biological
-facts.
+FungMod turns provenance-backed configurations into auditable simulations of
+substrate loss, product release, degradation rates, threshold times, and
+uncertainty. It combines registry-backed scientific inputs with generic ODE,
+kinetics, thermodynamics, transport, sensitivity, and reporting components.
 
-This repository currently implements the validated foundation plus the first
-basic kinetics layer:
+> **Scientific scope:** FungMod is an exploratory modelling engine, not a source
+> of invented biology. Missing inputs remain explicit, assumptions travel with
+> results, and software verification is never presented as empirical validation.
+
+## Quick Start
+
+Install the current release from PyPI:
+
+```bash
+python3 -m pip install fungmod
+```
+
+FungMod is a Python package, so it installs with `pip`, not npm. Both import
+namespaces are included:
+
+```python
+import fungmod
+import fungal_model
+
+print(fungmod.__version__)
+```
+
+Start with the [installation guide](https://fungmod.readthedocs.io/en/latest/install/),
+run a complete workflow in
+[`20_zero_to_complete_virtual_experiment.ipynb`](notebooks/examples/20_zero_to_complete_virtual_experiment.ipynb),
+or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
+
+## What FungMod Covers
+
+| Area | Implemented capability |
+| --- | --- |
+| Dynamics | Unit-aware ODE models and uniform Cartesian 1D/2D/3D reaction-diffusion |
+| Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
+| Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
+| Uncertainty | Monte Carlo propagation, local sensitivity, and variance-based global sensitivity |
+| Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
+| Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
+
+<details>
+<summary><strong>Full implemented-capability inventory</strong></summary>
+
+The detailed inventory below is intentionally explicit about the boundary of
+each implementation:
 
 - unit-aware parameters and parameter sets,
 - explicit assumptions and simulation records,
@@ -222,6 +267,8 @@ basic kinetics layer:
   cellulose-equivalent enzyme-chain virtual experiment from names and aliases
   through the top-level `virtual_experiment(...)` API.
 
+</details>
+
 It does not yet implement coupled-network thermodynamic flux optimization,
 state-dependent electrolyte/activity-coefficient models, resolved intracellular
 metabolism, or publication-grade calibration against curated independent
@@ -237,26 +284,20 @@ provenance-backed, maturity-labelled, covered by tests, and honest about
 assumptions and limitations. Unsupported, invented, silently guessed, or falsely
 validated biology is forbidden.
 
-## Install
+## Development
 
-```bash
-python3 -m pip install fungmod
-```
+Before changing the codebase, read the active source-of-truth chain:
 
-FungMod is a Python package, so it installs with `pip`, not npm. The
-distribution provides both the concise and original import namespaces:
+1. [`AGENTS.md`](AGENTS.md)
+2. [`foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md`](foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md)
+3. [`foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md`](foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md)
 
-```python
-import fungmod
-import fungal_model
-```
+Historical foundation-first plans under `old_progress/` are non-binding. The
+active goal is degradation dynamics over time without hiding assumptions,
+uncertainty, provenance, missing inputs, or unsupported biology.
 
-The wheel includes the immutable registry snapshot, frozen source evidence,
-and example configurations needed by the public examples. Full installation,
-notebook, and packaged-data guidance is available at
-[fungmod.readthedocs.io](https://fungmod.readthedocs.io/).
-
-For development:
+Install an editable checkout with the development, documentation, and notebook
+dependencies:
 
 ```bash
 python3 -m pip install -e ".[dev,docs,notebooks]"
@@ -294,6 +335,9 @@ The protected default branch should require pull requests, passing CI,
 up-to-date branches, no force pushes, and no unaudited direct bypass.
 
 ## Propose Source Records
+
+<details>
+<summary><strong>Open the advanced SABIO-RK curation and registry-promotion workflow</strong></summary>
 
 Researchers can create a review-only SABIO-RK registry proposal with one
 scientific identifier. SABIO-RK does not require an API key, so no credential
@@ -660,6 +704,8 @@ initial-state roles declare a
 `record_process_type` scope without claiming a kinetic owner. Missing,
 unauthorized, mode-ineligible, selector-incompatible, component-incompatible,
 or process-incompatible records are rejected without dynamic fallback.
+
+</details>
 
 ## Run A Virtual Experiment
 
