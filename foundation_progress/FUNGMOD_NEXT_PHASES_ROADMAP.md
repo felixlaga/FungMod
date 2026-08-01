@@ -66,7 +66,10 @@ written:
   provenance-backed pathway biology;
 - Phase 2 static balance checks are complete for scoped static metadata,
   validators, assembly-time checks, process-reaction binding, and explicit
-  dynamic-constraint binding.
+  dynamic-constraint binding;
+- UNCERTAINTY-GLOBAL-001 is complete for provenance-bound independent-input
+  pick-freeze sampling, Saltelli first-order and Jansen total-order indices,
+  optional bootstrap intervals, and artificial analytical benchmarks.
 ```
 
 No next PR is selected. The user-scoped queue is complete through PR-59 after

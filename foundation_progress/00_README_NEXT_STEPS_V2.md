@@ -544,6 +544,15 @@ its existing ideal forward-rate-blocking contract; no coefficient model,
 activation barrier, coupled-network optimizer, electrochemical gradient, or
 empirical validation is inferred.
 
+UNCERTAINTY-GLOBAL-001 is complete for bounded variance-based sensitivity of
+scalar outputs under independent, explicitly sourced input distributions.
+`global_sensitivity(...)` builds two independent designs plus parameter-wise
+pick-freeze hybrids, reports published Saltelli first-order and Jansen total-
+order estimators, records exact model-evaluation counts and seeds, and can add
+equal-tailed row-bootstrap intervals. Estimates are not clipped, and any model
+failure aborts with its exact design row. Artificial Ishigami tests verify the
+software; they do not provide empirical uncertainty for a FungMod case.
+
 The first BIO-003 target is generic reversible product inhibition. The
 mechanism is recorded in `BIO_003_GENERIC_PROCESS_LAWS.md` and the
 machine-checkable `proposals/BIO_003_REVERSIBLE_PRODUCT_INHIBITION.yml`.

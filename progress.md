@@ -26,6 +26,47 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## UNCERTAINTY-GLOBAL-001 Variance-Based Global Sensitivity
+
+Date: 2026-08-01
+
+Status: `complete` for independent provenance-bearing input distributions and
+one scalar unit-aware output; broader uncertainty analysis remains `partial`.
+
+Completed in this pass: added two-independent-matrix pick-freeze sampling,
+published Saltelli first-order and Jansen total-order estimators, optional
+equal-tailed row-bootstrap intervals, deterministic seed and exact model-
+evaluation reporting, total-order ranking, JSON export, unit checks, and exact
+design-row failure reporting. Finite-sample estimates remain un-clipped so
+convergence problems are not hidden.
+
+Tests added: `tests/test_global_sensitivity.py` checks the analytical Ishigami
+first- and total-order indices, bootstrap intervals, exact evaluation count,
+determinism, JSON export, zero-output-variance failure, exact model-failure
+location, duplicate-symbol rejection, and visible un-clipped estimates.
+
+What did not change: no empirical uncertainty distribution, biological
+parameter, calibration, validation dataset, posterior inference, correlated-
+input estimator, second-order index, quasi-random design, or surrogate model
+was added.
+
+Scientific behavior impact: callers can quantify variance contributions for a
+scalar prediction when they explicitly supply independent, sourced parameter
+distributions. The artificial benchmark verifies software behavior only.
+
+Backward compatibility: additive public uncertainty API only.
+
+Remaining ambiguity: convergence and sample-size adequacy are model-specific;
+reported bootstrap intervals quantify Monte Carlo resampling variability, not
+empirical parameter uncertainty or biological confidence.
+
+Risk level: moderate interpretation risk, contained by provenance validation,
+fail-closed evaluation, method citations, exact design metadata, and no
+clipping.
+
+Recommended next task: acquire a defensible joint empirical parameter
+distribution before interpreting global indices for a biological system.
+
 ## THERMO-003 Explicit Nonideal Reversible Flux
 
 Date: 2026-08-01

@@ -80,7 +80,8 @@ basic kinetics layer:
   per-axis boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
 - least-squares calibration utilities with train/validation residual reporting,
-- Monte Carlo uncertainty propagation and local sensitivity analysis,
+- Monte Carlo uncertainty propagation, local sensitivity analysis, and
+  variance-based global sensitivity with first- and total-order indices,
 - process-centered assembly scaffolding with structured missing-process,
   missing-parameter, and incompatible-unit reports,
 - a standardized result/export object that writes reports, CSV tables, logs,
@@ -221,10 +222,9 @@ basic kinetics layer:
 
 It does not yet implement coupled-network thermodynamic flux optimization,
 state-dependent electrolyte/activity-coefficient models, resolved intracellular
-metabolism, publication-grade calibration
-against curated biological datasets, or global uncertainty analysis. Those
-stages are documented in `progress.md` and should be added only after the
-current virtual-experiment layer has tests, provenance, and validation.
+metabolism, or publication-grade calibration against curated independent
+biological datasets. Those stages are documented in `progress.md` and should
+be added only with explicit evidence, provenance, tests, and validation.
 
 ## Scientific Philosophy
 
@@ -1259,7 +1259,14 @@ Current capability labels mean:
   and no default degradation model.
 - Universal substrate modules record bond classes, required enzyme classes, and product classes, but they do not implement substrate-specific kinetics, accessibility models, thermodynamic constraints, or assimilation evidence.
 - Calibration utilities are generic least-squares tools; no literature data are bundled and no parameters are calibrated by default.
-- Monte Carlo and local sensitivity utilities require explicit uncertainty/perturbation specifications; Bayesian calibration and global sensitivity are not implemented.
+- Monte Carlo, local sensitivity, and variance-based global sensitivity
+  utilities require explicit provenance-bearing uncertainty or perturbation
+  specifications. `global_sensitivity(...)` uses independent pick-freeze
+  designs, reports Saltelli first-order and Jansen total-order estimates, can
+  bootstrap intervals, records exact evaluation counts and seeds, fails on any
+  model-evaluation error, and does not clip finite-sample indices. Independent
+  inputs are required; correlated-input sensitivity and full Bayesian
+  calibration are not implemented.
 - `AssembledModel.run()` currently supports well-mixed process ODE execution;
   unsupported geometry fails before simulation.
 - The generic configured workflow currently supports foundation process
