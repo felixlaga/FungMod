@@ -13,6 +13,23 @@ All notable public releases of FungMod are documented here.
 - A deterministic full notebook with configured dynamic glucose inhibition,
   2:1 glucose stoichiometry, inhibition-free counterfactuals, scenario
   summaries, figures, validators, diagnostics, and manifests.
+- One provenance-matched, no-refit comparison with nine digitized literature
+  time-course observations.
+- A generic coupled hydrolysis/substrate-transglycosylation process and one
+  provenance-backed *Phanerochaete chrysosporium* BGL1B configuration.
+- A minimal exploratory well-mixed fungal-process coupling API.
+- Uniform Cartesian 2D/3D finite-volume reaction diffusion.
+- Constant-activity-coefficient nonideal reversible thermodynamics with local
+  detailed balance.
+- Independent-input variance-based global sensitivity with Saltelli
+  first-order and Jansen total-order estimators.
+- A publication-oriented calibration evidence audit whose software pass never
+  authorizes a publication claim.
+
+### Changed
+
+- Removed the tracked package-resource mirror. Source distributions now stage
+  canonical `data/` and `data_registry/` bytes deterministically into wheels.
 
 ### Scientific scope
 
@@ -20,8 +37,14 @@ All notable public releases of FungMod are documented here.
   whole-fungus physiology.
 - Literature parameters remain separate from the explicit 10 nM showcase dose
   and starting-concentration assumptions.
-- Transglycosylation, parameter uncertainty, empirical time-course validation,
-  model discrepancy, and organism ranking remain unavailable.
+- The time-course comparison uses source-model parameters and observations
+  from the same publication without refitting; it is not independent
+  validation, and digitization resolution is not experimental uncertainty.
+- The fungal coupling remains an artificial software-tested composition, not
+  organism-specific physiology or whole-organism validation.
+- Transglycosylation product identity/re-hydrolysis, empirical parameter
+  distributions, correlated-input sensitivity, publication-grade biological
+  calibration, model discrepancy, and organism ranking remain unavailable.
 
 ## [0.1.0] — 2026-07-30
 

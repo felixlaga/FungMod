@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.1.1 — 2026-08-01
+
+- Added a packaged literature-transcribed showcase input and a full notebook
+  for five purified fungal beta-glucosidases acting on cellobiose.
+- The notebook uses one generic configured mechanism, dynamic glucose
+  inhibition, explicit 2:1 glucose stoichiometry, paired no-inhibition
+  counterfactuals, standard output bundles, and a cross-case manifest.
+- The source-organism labels are not whole-fungus models. Parameter uncertainty
+  remains unknown, the standardized dose is an explicit scenario assumption,
+  and empirical validation and organism ranking remain unavailable.
 - Added one provenance-matched, no-refit comparison with nine digitized
   literature time-course observations; this is same-source consistency, not
   independent validation.
@@ -16,17 +26,6 @@
   never authorizes a publication claim.
 - Removed the tracked package-resource mirror; source distributions now stage
   canonical data deterministically into wheels.
-
-## 0.1.1 — 2026-08-01
-
-- Added a packaged literature-transcribed showcase input and a full notebook
-  for five purified fungal beta-glucosidases acting on cellobiose.
-- The notebook uses one generic configured mechanism, dynamic glucose
-  inhibition, explicit 2:1 glucose stoichiometry, paired no-inhibition
-  counterfactuals, standard output bundles, and a cross-case manifest.
-- The source-organism labels are not whole-fungus models. Parameter uncertainty
-  remains unknown, the standardized dose is an explicit scenario assumption,
-  and empirical validation and organism ranking remain unavailable.
 
 ## 0.1.0 — 2026-07-30
 
