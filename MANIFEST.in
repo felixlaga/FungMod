@@ -1,4 +1,14 @@
 include setup.py
 include scripts/stage_packaged_resources.py
+include CITATION.cff
+include codemeta.json
+include AUTHORS.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include CODE_OF_CONDUCT.md
+include SECURITY.md
+include SUPPORT.md
+include requirements-lock.txt
 graft data
 graft data_registry
+global-include py.typed

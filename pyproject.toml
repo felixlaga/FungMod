@@ -11,7 +11,10 @@ requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
-    { name = "FungMod contributors" }
+    { name = "Felix Laga", email = "felix.laga@yahoo.com" },
+]
+maintainers = [
+    { name = "Felix Laga", email = "felix.laga@yahoo.com" },
 ]
 keywords = [
     "fungal modelling",
@@ -67,6 +70,10 @@ Releases = "https://github.com/felixlaga/FungMod/releases"
 
 [tool.setuptools]
 include-package-data = false
+
+[tool.setuptools.package-data]
+fungmod = ["py.typed"]
+fungal_model = ["py.typed"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,0 +1,34 @@
+{
+  "title": "FungMod: traceable, uncertainty-aware virtual experiments for fungal and enzyme-mediated substrate degradation",
+  "description": "<p>FungMod is a registry-backed, uncertainty-aware, mechanistic virtual-experiment engine for fungal and enzyme-mediated substrate degradation. It connects explicit mechanisms and provenance-backed parameters to trajectories, summary metrics, uncertainty summaries, provenance, limitations, and suggested follow-up experiments, while keeping missing inputs explicit and never presenting software verification as empirical validation.</p>",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "MIT",
+  "keywords": [
+    "fungal modelling",
+    "enzyme kinetics",
+    "mechanistic modelling",
+    "scientific computing",
+    "virtual experiments",
+    "reproducibility"
+  ],
+  "creators": [
+    {
+      "name": "Laga, Felix",
+      "affiliation": "KU Leuven, Leuven, Belgium",
+      "orcid": "0009-0008-8141-8172"
+    }
+  ],
+  "related_identifiers": [
+    {
+      "relation": "isSupplementTo",
+      "identifier": "https://github.com/felixlaga/FungMod",
+      "scheme": "url"
+    },
+    {
+      "relation": "isIdenticalTo",
+      "identifier": "https://pypi.org/project/fungmod/",
+      "scheme": "url"
+    }
+  ]
+}

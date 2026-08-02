@@ -903,9 +903,16 @@ guardrail, see
 
 ## Public API
 
+`fungmod` is the canonical import namespace:
+
+```python
+import fungmod as fm
+```
+
 The stable API is intentionally generic-first. These names are supported from
-top-level `fungal_model` for researcher-facing virtual experiments, config
-loading, model assembly, execution, and result inspection:
+top-level `fungmod` (and, for backward compatibility, the identical
+`fungal_model`) for researcher-facing virtual experiments, config loading, model
+assembly, execution, and result inspection:
 
 - `VirtualExperiment`
 - `virtual_experiment`
@@ -942,10 +949,14 @@ loading, model assembly, execution, and result inspection:
 - `Parameter`
 - `ParameterSet`
 
-The same virtual-experiment names are also available from `fungal_model.api`.
-PET-specific convenience helpers are not part of the top-level public API.
-They live under `fungal_model.plugins.pet`, where plugin users can explicitly
-import `pet_substrate_loader_registry`, `PETSurfaceWorkflowConfig`, and
+The same virtual-experiment names are also available from `fungmod.api`
+(equivalently `fungal_model.api`). Advanced subpackages are reachable
+canonically through `fungmod`, for example `from fungmod import uncertainty,
+calibration, transport` or `import fungmod.uncertainty`. Both packages ship a
+`py.typed` marker, so type checkers see FungMod's annotations. PET-specific
+convenience helpers are not part of the top-level public API. They live under
+`fungmod.plugins.pet`, where plugin users can explicitly import
+`pet_substrate_loader_registry`, `PETSurfaceWorkflowConfig`, and
 `run_pet_surface_integration`.
 
 Former `process.as_reaction()` users should now choose one explicit path:
@@ -1253,6 +1264,45 @@ degradation record.
 The older PET convenience entry point now lives under
 `fungal_model.plugins.pet` and delegates to `run_configured_model`; the generic
 `fungal_model.workflows` package stays substrate-neutral.
+
+## Reproducibility
+
+Regenerate FungMod's headline artifacts deterministically with a single command
+from a checkout:
+
+```bash
+python scripts/reproduce.py          # full reproduction
+python scripts/reproduce.py --quick  # fast smoke
+# or: make reproduce
+```
+
+This rebuilds the Reaction 618 virtual experiment, the configured
+dynamic-thermodynamics showcase, and the same-source literature comparison under
+`outputs/reproduction/` with a machine-readable summary. For pinned
+dependencies use [`requirements-lock.txt`](requirements-lock.txt); for a fully
+isolated environment use the [`Dockerfile`](Dockerfile) (`make container`).
+
+## Community and Support
+
+- **Ask a question:** [GitHub Discussions](https://github.com/felixlaga/FungMod/discussions)
+  or an issue via the [issue chooser](https://github.com/felixlaga/FungMod/issues/new/choose)
+  (see [SUPPORT.md](SUPPORT.md)).
+- **Report a bug or request a feature:** the
+  [issue chooser](https://github.com/felixlaga/FungMod/issues/new/choose).
+- **Contribute:** [CONTRIBUTING.md](CONTRIBUTING.md) — including the
+  scientific-contribution rules — and the
+  [Code of Conduct](CODE_OF_CONDUCT.md).
+- **Report a vulnerability:** privately, per [SECURITY.md](SECURITY.md).
+
+## Citation
+
+If you use FungMod in your research, please cite it. The canonical,
+machine-readable citation is in [`CITATION.cff`](CITATION.cff); GitHub renders a
+"Cite this repository" button from it. Cite the version you used
+(`fungmod.__version__`) and, once available, the archived Zenodo DOI. See
+[`AUTHORS.md`](AUTHORS.md) for authors and CRediT roles, and the
+[citing guide](https://fungmod.readthedocs.io/citing/) for BibTeX export and DOI
+details.
 
 ## Current Limitations
 

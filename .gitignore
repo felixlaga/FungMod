@@ -17,6 +17,7 @@ src/*.egg-info/
 htmlcov/
 build/
 dist/
+site/
 outputs/
 notebooks/your-notebooks/
 notebooks/outputs/

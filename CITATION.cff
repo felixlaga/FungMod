@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use FungMod in your research, please cite it as below."
+title: "FungMod: traceable, uncertainty-aware virtual experiments for fungal and enzyme-mediated substrate degradation"
+abstract: >-
+  FungMod is a registry-backed, uncertainty-aware, mechanistic virtual-experiment
+  engine for fungal and enzyme-mediated substrate degradation. It connects
+  explicit mechanisms and provenance-backed parameters to trajectories, summary
+  metrics, uncertainty summaries, provenance, limitations, and suggested
+  follow-up experiments, while keeping missing inputs explicit and never
+  presenting software verification as empirical validation.
+type: software
+authors:
+  - family-names: Laga
+    given-names: Felix
+    orcid: "https://orcid.org/0009-0008-8141-8172"
+    affiliation: "KU Leuven, Leuven, Belgium"
+repository-code: "https://github.com/felixlaga/FungMod"
+url: "https://fungmod.readthedocs.io/"
+license: MIT
+version: 0.1.1
+date-released: "2026-08-01"
+keywords:
+  - fungal modelling
+  - enzyme kinetics
+  - mechanistic modelling
+  - scientific computing
+  - virtual experiments
+  - reproducibility
+# Once the release is archived on Zenodo, add the concept DOI here so every
+# citation resolves to the latest archived version:
+# doi: "10.5281/zenodo.XXXXXXX"

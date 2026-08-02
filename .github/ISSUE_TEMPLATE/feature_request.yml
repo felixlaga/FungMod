@@ -1,0 +1,40 @@
+name: Feature or mechanism request
+description: Suggest a capability, mechanism, parameter set, or dataset
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        FungMod is a scientific project. Requests that add or change science are
+        held to the integrity rules in
+        [AGENTS.md](https://github.com/felixlaga/FungMod/blob/main/AGENTS.md):
+        mechanisms must be explicit, provenance-backed, maturity-labelled,
+        tested, and honest about assumptions.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the scientific or software goal you cannot currently accomplish.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed capability
+      description: What should FungMod be able to do? Include the mechanism, API shape, or output you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Provenance (for scientific requests)
+      description: If this adds a mechanism, parameter, or dataset, cite the sources it would be backed by.
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

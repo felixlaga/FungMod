@@ -1,0 +1,68 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "identifier": "fungmod",
+  "name": "FungMod",
+  "description": "Traceable, unit-aware scientific modelling framework for fungal and enzyme-mediated substrate degradation. FungMod connects explicit mechanisms and provenance-backed parameters to trajectories, summary metrics, uncertainty summaries, provenance, limitations, and suggested follow-up experiments, while keeping missing inputs explicit and never presenting software verification as empirical validation.",
+  "codeRepository": "https://github.com/felixlaga/FungMod",
+  "url": "https://fungmod.readthedocs.io/",
+  "issueTracker": "https://github.com/felixlaga/FungMod/issues",
+  "programmingLanguage": "Python",
+  "runtimePlatform": "Python 3.11",
+  "operatingSystem": ["Linux", "macOS", "Windows"],
+  "license": "https://spdx.org/licenses/MIT",
+  "version": "0.1.1",
+  "softwareVersion": "0.1.1",
+  "dateModified": "2026-08-01",
+  "datePublished": "2026-07-30",
+  "developmentStatus": "active",
+  "applicationCategory": "Scientific/Engineering",
+  "keywords": [
+    "fungal modelling",
+    "enzyme kinetics",
+    "mechanistic modelling",
+    "scientific computing",
+    "virtual experiments",
+    "reproducibility"
+  ],
+  "softwareRequirements": [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pint>=0.23",
+    "matplotlib>=3.8",
+    "PyYAML>=6.0",
+    "cryptography>=42.0"
+  ],
+  "author": [
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0009-0008-8141-8172",
+      "givenName": "Felix",
+      "familyName": "Laga",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "KU Leuven, Leuven, Belgium"
+      }
+    }
+  ],
+  "contributor": [
+    {
+      "@type": "Role",
+      "roleName": [
+        "Conceptualization",
+        "Software",
+        "Methodology",
+        "Data curation",
+        "Validation",
+        "Writing – original draft"
+      ],
+      "contributor": {
+        "@type": "Person",
+        "@id": "https://orcid.org/0009-0008-8141-8172",
+        "givenName": "Felix",
+        "familyName": "Laga"
+      },
+      "@comment": "CRediT (Contributor Roles Taxonomy) roles. Add one Role block per contributor."
+    }
+  ]
+}

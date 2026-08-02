@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or usage help
+    url: https://github.com/felixlaga/FungMod/discussions
+    about: Ask how to do something with FungMod. If Discussions is disabled, use the "Question" issue template instead.
+  - name: Security vulnerability
+    url: https://github.com/felixlaga/FungMod/security/advisories/new
+    about: Report security issues privately. Please do not open a public issue.
