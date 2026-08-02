@@ -13,6 +13,10 @@ All notable public releases of FungMod are documented here.
 - Cross-engine trajectory checks: an independent reference SBML integrator and
   `cross_engine_trajectory_check`, confirming exported SBML reproduces FungMod's
   own solver trajectories to solver tolerance.
+- SED-ML Level 1 Version 4 simulation export (`fungmod.standards.to_sedml`) and
+  COMBINE archive (`.omex`) generation (`write_combine_archive`,
+  `model_config_to_combine_archive`) bundling the SBML model with its SED-ML
+  time course into one portable, byte-reproducible file.
 
 ### Scientific scope
 

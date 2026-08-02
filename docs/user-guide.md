@@ -202,13 +202,15 @@ docker run --rm -v "$PWD/outputs:/opt/fungmod/outputs" fungmod
 ## 10. Exporting to standards (SBML)
 
 FungMod can export its supported well-mixed kinetic models (first-order,
-mass action, and Michaelis-Menten) to **SBML** for use with other tools, and
-can verify the export with a cross-engine trajectory check:
+mass action, and Michaelis-Menten) to **SBML**, **SED-ML**, and **COMBINE
+archives** for use with other tools, and can verify the export with a
+cross-engine trajectory check:
 
 ```python
-from fungmod.standards import write_model_config_sbml, cross_engine_trajectory_check
+from fungmod.standards import write_model_config_sbml, model_config_to_combine_archive
 
 write_model_config_sbml("path/to/config.yml", "model.xml")
+model_config_to_combine_archive("path/to/config.yml", "experiment.omex")
 ```
 
 Install the extra with `pip install "fungmod[standards]"`. See

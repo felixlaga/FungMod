@@ -350,7 +350,7 @@ def write_sbml(
 
     text = to_sbml(model, initial_state=initial_state, model_id=model_id, model_name=model_name)
     destination = Path(path)
-    destination.write_text(text, encoding="utf-8")
+    destination.write_text(text, encoding="utf-8", newline="")
     return destination
 
 
@@ -382,7 +382,7 @@ def write_model_config_sbml(config_path: str | Path, path: str | Path) -> Path:
 
     text = model_config_to_sbml(config_path)
     destination = Path(path)
-    destination.write_text(text, encoding="utf-8")
+    destination.write_text(text, encoding="utf-8", newline="")
     return destination
 
 

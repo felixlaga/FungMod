@@ -59,6 +59,48 @@ To keep the exported model faithful, FungMod **refuses** to export (raising
 - a rate-modifier wrapper (competitive, substrate, or product inhibition);
 - a dynamic thermodynamic constraint that gates the rate at solver time.
 
+## SED-ML simulation export
+
+[SED-ML](https://sed-ml.org/) describes *how* to run a model. FungMod exports a
+**SED-ML Level 1 Version 4** uniform time course over an exported SBML model,
+reporting the time course of every species:
+
+```python
+from fungmod.standards import to_sbml, to_sedml
+from fungmod.core.units import Q_
+
+sbml = to_sbml(model, initial_state=initial_state, model_id="mm")
+sedml = to_sedml(sbml, output_end_time=Q_(120.0, "second"), number_of_steps=40)
+```
+
+The SED-ML references the SBML by a relative filename (default `model.xml`) and
+reads species targets from the SBML itself, so identifiers always match. The
+solver algorithm defaults to CVODE (`KISAO:0000019`).
+
+## COMBINE archive generation
+
+A [COMBINE archive](https://combinearchive.org/) (`.omex`) bundles the model and
+its simulation into one self-describing file (a ZIP with an OMEX `manifest.xml`).
+FungMod builds it with the standard library, so archives are portable and
+byte-reproducible:
+
+```python
+from fungmod.standards import write_combine_archive, model_config_to_combine_archive
+from fungmod.core.units import Q_
+
+write_combine_archive(
+    model, "experiment.omex",
+    initial_state=initial_state,
+    output_end_time=Q_(120.0, "second"), number_of_steps=40,
+)
+
+# Or straight from a config (time span defaults from the config):
+model_config_to_combine_archive("path/to/config.yml", "experiment.omex")
+```
+
+The archive contains `manifest.xml`, `model.xml` (SBML), and `simulation.sedml`
+(SED-ML, marked as the master file), and opens in any COMBINE-aware tool.
+
 ## Cross-engine trajectory checks
 
 An export is only trustworthy if an independent engine reproduces the same
@@ -94,6 +136,18 @@ subset of SBML that FungMod emits and raises on anything outside it.
         - write_model_config_sbml
         - SbmlExportError
         - SBML_EXPORTABLE_PROCESS_TYPES
+
+::: fungal_model.standards.sedml
+    options:
+      members:
+        - to_sedml
+        - DEFAULT_KISAO_ID
+
+::: fungal_model.standards.combine
+    options:
+      members:
+        - write_combine_archive
+        - model_config_to_combine_archive
 
 ::: fungal_model.standards.cross_engine
     options:

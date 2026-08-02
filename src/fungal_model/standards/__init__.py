@@ -12,6 +12,10 @@ Currently supported:
 
 from __future__ import annotations
 
+from fungal_model.standards.combine import (
+    model_config_to_combine_archive,
+    write_combine_archive,
+)
 from fungal_model.standards.cross_engine import (
     CrossEngineComparison,
     cross_engine_trajectory_check,
@@ -25,15 +29,20 @@ from fungal_model.standards.sbml import (
     write_model_config_sbml,
     write_sbml,
 )
+from fungal_model.standards.sedml import DEFAULT_KISAO_ID, to_sedml
 
 __all__ = [
+    "DEFAULT_KISAO_ID",
     "SBML_EXPORTABLE_PROCESS_TYPES",
     "CrossEngineComparison",
     "SbmlExportError",
     "cross_engine_trajectory_check",
+    "model_config_to_combine_archive",
     "model_config_to_sbml",
     "simulate_reference_sbml",
     "to_sbml",
+    "to_sedml",
+    "write_combine_archive",
     "write_model_config_sbml",
     "write_sbml",
 ]
