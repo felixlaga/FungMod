@@ -916,7 +916,7 @@ def _write_bundle(root: Path, result: CurationResult) -> None:
         paths["rejected_registry_records"],
         curation_records_payload("rejected", result.rejected_records, result),
     )
-    paths["curation_report"].write_text(render_curation_report(result), encoding="utf-8")
+    paths["curation_report"].write_text(render_curation_report(result), encoding="utf-8", newline="")
 
     checksums = {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
@@ -927,6 +927,7 @@ def _write_bundle(root: Path, result: CurationResult) -> None:
     paths["curation_manifest"].write_text(
         json.dumps(_canonicalize(manifest), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
+        newline="",
     )
 
 
@@ -1537,11 +1538,14 @@ def curation_records_payload(
 
 
 def _write_yaml(path: Path, payload: Mapping[str, Any]) -> None:
-    path.write_text(yaml.safe_dump(_canonicalize(payload), sort_keys=False), encoding="utf-8")
+    # newline="" avoids Windows \n->\r\n translation so bundle artifacts are
+    # byte-identical across platforms (their checksums and semantic re-derivation
+    # must match regardless of OS).
+    path.write_text(yaml.safe_dump(_canonicalize(payload), sort_keys=False), encoding="utf-8", newline="")
 
 
 def _write_csv(path: Path, records: Sequence[CurationRecord]) -> None:
-    path.write_text(render_curation_records_csv(records), encoding="utf-8")
+    path.write_text(render_curation_records_csv(records), encoding="utf-8", newline="")
 
 
 def render_curation_records_csv(records: Sequence[CurationRecord]) -> str:
