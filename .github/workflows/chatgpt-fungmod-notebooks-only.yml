@@ -1,0 +1,191 @@
+name: Temporary verified PyPI FungMod notebooks only
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/chatgpt-fungmod-notebooks-only.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FUNGMOD_RELEASE_SHA: a5d9dfe845b79b58c0f7aba9a81ff45ab4334b0c
+  FUNGMOD_VERSION: "0.1.1"
+  FUNGMOD_PYPI_WHEEL_SHA256: f16a654d4e635c2bef3b5f71ef26aa497c5a31a9922abdb6f8d2bc25fa3547b1
+
+jobs:
+  execute-pypi-notebooks:
+    name: Execute and preserve verified PyPI release notebooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out exact release notebook sources
+        uses: actions/checkout@v6
+        with:
+          ref: a5d9dfe845b79b58c0f7aba9a81ff45ab4334b0c
+          fetch-depth: 1
+
+      - name: Verify notebook source revision
+        run: test "$(git rev-parse HEAD)" = "${FUNGMOD_RELEASE_SHA}"
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Download, verify, and install the exact PyPI wheel
+        run: |
+          set -euo pipefail
+          python -m venv .venv-pypi
+          .venv-pypi/bin/python -m pip install --upgrade pip
+          mkdir -p fungmod-artifacts/dist fungmod-artifacts/environment
+          .venv-pypi/bin/python -m pip download --only-binary=:all: --no-deps \
+            --dest fungmod-artifacts/dist "fungmod==${FUNGMOD_VERSION}"
+          wheel_path="$(find fungmod-artifacts/dist -maxdepth 1 -name 'fungmod-*.whl' -print -quit)"
+          actual_sha="$(sha256sum "${wheel_path}" | awk '{print $1}')"
+          printf 'expected_sha256=%s\nactual_sha256=%s\nwheel=%s\n' \
+            "${FUNGMOD_PYPI_WHEEL_SHA256}" "${actual_sha}" "${wheel_path}" \
+            | tee fungmod-artifacts/environment/pypi-wheel-verification.txt
+          test "${actual_sha}" = "${FUNGMOD_PYPI_WHEEL_SHA256}"
+          .venv-pypi/bin/python -m pip install "${wheel_path}[notebooks]"
+
+      - name: Record and verify the runtime
+        run: |
+          set -euo pipefail
+          {
+            echo "release_notebook_sha=$(git rev-parse HEAD)"
+            .venv-pypi/bin/python --version
+            .venv-pypi/bin/python - <<'PY'
+          from pathlib import Path
+          import fungmod as fm
+          module_path = Path(fm.__file__).resolve()
+          print(f"fungmod_version={fm.__version__}")
+          print(f"fungmod_file={module_path}")
+          assert fm.__version__ == "0.1.1"
+          assert ".venv-pypi" in str(module_path)
+          PY
+          } | tee fungmod-artifacts/environment/execution.txt
+          .venv-pypi/bin/python -m pip freeze | sort > fungmod-artifacts/environment/pip-freeze.txt
+
+      - name: Execute the three release notebooks with 32 uncertainty samples
+        env:
+          FUNGMOD_NOTEBOOK_OUTPUT_ROOT: ${{ github.workspace }}/fungmod-artifacts/notebook-outputs
+          FUNGMOD_NOTEBOOK_SAMPLES: "32"
+          MPLBACKEND: Agg
+          PYTHONHASHSEED: "0"
+        run: |
+          set -euo pipefail
+          mkdir -p fungmod-artifacts/executed-notebooks
+          for notebook in \
+            20_zero_to_complete_virtual_experiment \
+            21_advanced_capabilities \
+            22_five_fungal_beta_glucosidases
+          do
+            .venv-pypi/bin/jupyter nbconvert \
+              --to notebook --execute "notebooks/examples/${notebook}.ipynb" \
+              --output "${GITHUB_WORKSPACE}/fungmod-artifacts/executed-notebooks/${notebook}.executed.ipynb" \
+              --ExecutePreprocessor.timeout=1200
+          done
+
+      - name: Render HTML and export every textual cell output
+        run: |
+          set -euo pipefail
+          mkdir -p fungmod-artifacts/executed-notebooks/html fungmod-artifacts/raw
+          for notebook in fungmod-artifacts/executed-notebooks/*.ipynb; do
+            .venv-pypi/bin/jupyter nbconvert --to html "$notebook" \
+              --output-dir fungmod-artifacts/executed-notebooks/html
+          done
+          .venv-pypi/bin/python - <<'PY'
+          import json
+          from pathlib import Path
+          import nbformat
+
+          root = Path("fungmod-artifacts")
+          rows = []
+          markdown = ["# Raw executed-notebook outputs\n"]
+          for path in sorted((root / "executed-notebooks").glob("*.ipynb")):
+              notebook = nbformat.read(path, as_version=4)
+              markdown.append(f"\n# {path.name}\n")
+              for index, cell in enumerate(notebook.cells):
+                  if cell.cell_type != "code":
+                      continue
+                  outputs = []
+                  for output in cell.get("outputs", []):
+                      kind = output.get("output_type", "unknown")
+                      item = {"output_type": kind}
+                      if kind == "stream":
+                          item["name"] = output.get("name")
+                          item["text"] = output.get("text", "")
+                      elif kind in {"execute_result", "display_data"}:
+                          data = output.get("data", {})
+                          item["execution_count"] = output.get("execution_count")
+                          item["text_plain"] = data.get("text/plain", "")
+                          if "application/json" in data:
+                              item["application_json"] = data["application/json"]
+                          item["embedded_mime_types"] = sorted(data)
+                      elif kind == "error":
+                          item["ename"] = output.get("ename")
+                          item["evalue"] = output.get("evalue")
+                          item["traceback"] = output.get("traceback", [])
+                      outputs.append(item)
+                  row = {
+                      "notebook": path.name,
+                      "cell_index": index,
+                      "cell_id": cell.get("id"),
+                      "execution_count": cell.get("execution_count"),
+                      "source": cell.get("source", ""),
+                      "outputs": outputs,
+                  }
+                  rows.append(row)
+                  markdown.append(f"\n## Code cell {index} ({cell.get('id', '')})\n")
+                  markdown.append("```python\n" + cell.get("source", "") + "\n```\n")
+                  if not outputs:
+                      markdown.append("_No textual output._\n")
+                  for number, item in enumerate(outputs, 1):
+                      markdown.append(f"\n### Output {number}: {item['output_type']}\n")
+                      if "text" in item:
+                          markdown.append("```text\n" + str(item["text"]) + "\n```\n")
+                      if "text_plain" in item:
+                          markdown.append("```text\n" + str(item["text_plain"]) + "\n```\n")
+                      if "application_json" in item:
+                          markdown.append("```json\n" + json.dumps(item["application_json"], indent=2, default=str) + "\n```\n")
+                      if item.get("embedded_mime_types"):
+                          markdown.append("Embedded MIME types: `" + "`, `".join(item["embedded_mime_types"]) + "`\n")
+                      if item.get("traceback"):
+                          markdown.append("```text\n" + "\n".join(item["traceback"]) + "\n```\n")
+          raw = root / "raw"
+          (raw / "notebook_cells_and_outputs.json").write_text(
+              json.dumps(rows, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+          )
+          (raw / "notebook_cells_and_outputs.jsonl").write_text(
+              "\n".join(json.dumps(row, ensure_ascii=False, default=str) for row in rows) + "\n",
+              encoding="utf-8",
+          )
+          (raw / "notebook_cells_and_outputs.md").write_text("".join(markdown), encoding="utf-8")
+          errors = [
+              output for row in rows for output in row["outputs"]
+              if output.get("output_type") == "error"
+          ]
+          assert not errors, errors
+          PY
+
+      - name: Inventory and hash the complete execution bundle
+        run: |
+          set -euo pipefail
+          cp notebooks/examples/20_zero_to_complete_virtual_experiment.ipynb fungmod-artifacts/executed-notebooks/
+          cp notebooks/examples/21_advanced_capabilities.ipynb fungmod-artifacts/executed-notebooks/
+          cp notebooks/examples/22_five_fungal_beta_glucosidases.ipynb fungmod-artifacts/executed-notebooks/
+          find fungmod-artifacts -type f -printf '%P\n' | LC_ALL=C sort > fungmod-artifacts/environment/file-inventory.txt
+          find fungmod-artifacts -type f ! -path '*/sha256sums.txt' -print0 \
+            | LC_ALL=C sort -z | xargs -0 sha256sum > fungmod-artifacts/environment/sha256sums.txt
+          du -ah fungmod-artifacts | sort -h > fungmod-artifacts/environment/sizes.txt
+
+      - name: Upload complete verified PyPI notebook execution
+        uses: actions/upload-artifact@v5
+        with:
+          name: fungmod-pypi-0.1.1-verified-notebook-execution
+          path: fungmod-artifacts/
+          if-no-files-found: error
+          retention-days: 2
