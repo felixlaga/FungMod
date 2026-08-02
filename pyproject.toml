@@ -51,6 +51,7 @@ dev = [
     "ruff>=0.8",
     "pyright>=1.1",
     "twine>=7.0",
+    "petab>=0.5",
 ]
 docs = [
     "mkdocs==1.6.1",
@@ -98,6 +99,7 @@ select = ["E4", "E7", "E9", "F"]
 # Optional-dependency tests import after pytest.importorskip, which is E402.
 "tests/test_standards_sbml.py" = ["E402"]
 "tests/test_standards_sedml_combine.py" = ["E402"]
+"tests/test_standards_petab.py" = ["E402"]
 
 [tool.coverage.run]
 source = ["fungal_model"]

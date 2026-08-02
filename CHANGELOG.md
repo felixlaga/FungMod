@@ -17,6 +17,11 @@ All notable public releases of FungMod are documented here.
   COMBINE archive (`.omex`) generation (`write_combine_archive`,
   `model_config_to_combine_archive`) bundling the SBML model with its SED-ML
   time course into one portable, byte-reproducible file.
+- PEtab export for calibration cases (`fungmod.standards.calibration_config_to_petab`):
+  writes a complete PEtab problem (SBML model, observable/measurement/condition/
+  parameter tables, and `problem.yaml`) from a calibration config, with
+  measurement values and times converted to the model's units. The result passes
+  `petab.lint_problem`.
 
 ### Scientific scope
 

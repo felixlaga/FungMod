@@ -21,6 +21,12 @@ from fungal_model.standards.cross_engine import (
     cross_engine_trajectory_check,
     simulate_reference_sbml,
 )
+from fungal_model.standards.petab import (
+    PETAB_FORMAT_VERSION,
+    PetabExport,
+    PetabExportError,
+    calibration_config_to_petab,
+)
 from fungal_model.standards.sbml import (
     SBML_EXPORTABLE_PROCESS_TYPES,
     SbmlExportError,
@@ -33,9 +39,13 @@ from fungal_model.standards.sedml import DEFAULT_KISAO_ID, to_sedml
 
 __all__ = [
     "DEFAULT_KISAO_ID",
+    "PETAB_FORMAT_VERSION",
     "SBML_EXPORTABLE_PROCESS_TYPES",
     "CrossEngineComparison",
+    "PetabExport",
+    "PetabExportError",
     "SbmlExportError",
+    "calibration_config_to_petab",
     "cross_engine_trajectory_check",
     "model_config_to_combine_archive",
     "model_config_to_sbml",

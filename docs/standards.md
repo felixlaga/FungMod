@@ -101,6 +101,32 @@ model_config_to_combine_archive("path/to/config.yml", "experiment.omex")
 The archive contains `manifest.xml`, `model.xml` (SBML), and `simulation.sedml`
 (SED-ML, marked as the master file), and opens in any COMBINE-aware tool.
 
+## PEtab (parameter estimation)
+
+[PEtab](https://petab.readthedocs.io/) is the community standard for specifying
+parameter-estimation problems. FungMod exports a **calibration case** — a
+calibration config (model + dataset + fittable parameters + observable mappings)
+— as a complete PEtab problem directory:
+
+```python
+from fungmod.standards import calibration_config_to_petab
+
+export = calibration_config_to_petab(
+    "data/calibration/synthetic/first_order_ab/calibration_config.yml",
+    "petab_problem/",
+)
+# export.problem_yaml, export.sbml_model, export.observables,
+# export.measurements, export.conditions, export.parameters
+```
+
+The mapping is direct: the model becomes `model.xml` (SBML); dataset
+measurements become the measurement table (with values and times converted to
+the model's species units and seconds); observable mappings become the
+observable table; fittable parameters and their bounds become the parameter
+table; and a `problem.yaml` links them. The files are written with the standard
+library, so only the `standards` extra (for the SBML model) is required. The
+result passes `petab.lint_problem`.
+
 ## Cross-engine trajectory checks
 
 An export is only trustworthy if an independent engine reproduces the same
@@ -148,6 +174,13 @@ subset of SBML that FungMod emits and raises on anything outside it.
       members:
         - write_combine_archive
         - model_config_to_combine_archive
+
+::: fungal_model.standards.petab
+    options:
+      members:
+        - calibration_config_to_petab
+        - PetabExport
+        - PetabExportError
 
 ::: fungal_model.standards.cross_engine
     options:
