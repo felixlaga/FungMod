@@ -688,9 +688,9 @@ def _apply_registry_promotion(
                     raise RegistryPromotionApplyError(
                         f"Staged promotion target is not a safe regular file: {relative_path}"
                     )
-                destination.write_text(content, encoding="utf-8")
+                destination.write_text(content, encoding="utf-8", newline="")
             staged_index_path = stage_root / current_index.path.relative_to(current_index.root)
-            staged_index_path.write_text(index_content, encoding="utf-8")
+            staged_index_path.write_text(index_content, encoding="utf-8", newline="")
 
             staged_index = _load_registry_index(staged_index_path)
             _validate_staged_apply(

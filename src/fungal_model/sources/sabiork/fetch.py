@@ -242,7 +242,7 @@ def fetch_and_save_export(
     _write_json(export_path, payload)
     derived_export = {
         "artifact_role": "derived_combined_export",
-        "path": str(export_path.relative_to(bundle_dir)),
+        "path": export_path.relative_to(bundle_dir).as_posix(),
         "sha256": _sha256_bytes(export_path.read_bytes()),
         "source_page_count": len(raw_pages),
     }
@@ -393,7 +393,7 @@ def _write_raw_page(
     return path, {
         "artifact_role": "raw_http_response",
         "page": page,
-        "path": str(path.relative_to(raw_dir.parent)),
+        "path": path.relative_to(raw_dir.parent).as_posix(),
         "sha256": _sha256_bytes(body),
         "size_bytes": len(body),
         "http_status": response.http_status,

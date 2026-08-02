@@ -647,7 +647,7 @@ def test_result_write_report_can_write_report_folder_index_over_existing_artifac
         output_dir=tmp_path / "indexed_report",
         quicklook=False,
     )
-    quicklook_path = Path(result.output_directory) / "figures" / "quicklook<summary>.png"
+    quicklook_path = Path(result.output_directory) / "figures" / "quicklook&summary.png"
     quicklook_path.parent.mkdir()
     quicklook_path.write_bytes(b"placeholder")
     result.quicklook_paths = (str(quicklook_path),)
@@ -672,7 +672,7 @@ def test_result_write_report_can_write_report_folder_index_over_existing_artifac
     assert 'href="../assumption_summary.csv"' in index
     assert 'href="../limitations_table.csv"' in index
     assert 'href="../provenance_table.csv"' in index
-    assert 'href="../figures/quicklook&lt;summary&gt;.png"' in index
+    assert 'href="../figures/quicklook&amp;summary.png"' in index
     assert "links existing output artifacts only" in index
     assert "validation, calibration, empirical comparison, or scientific interpretation" in index
     assert "empirically validated" not in index.lower()
@@ -709,7 +709,7 @@ def test_html_report_escapes_table_content_and_links_figures_deterministically(t
         ],
     )
     (table_dir / "output_manifest.json").write_text('{"kind": "test_manifest"}\n', encoding="utf-8")
-    figure_path = tmp_path / "figures" / "quicklook<1>.png"
+    figure_path = tmp_path / "figures" / "quicklook&1.png"
     figure_path.parent.mkdir()
     figure_path.write_bytes(b"placeholder")
 
@@ -742,13 +742,13 @@ def test_html_report_escapes_table_content_and_links_figures_deterministically(t
     assert "case_&lt;script&gt;alert(1)&lt;/script&gt;" in first_html
     assert "source &amp; enzyme" in first_html
     assert 'href="../tables/case_summary.csv"' in first_html
-    assert "quicklook&lt;1&gt;.png" in first_html
+    assert "quicklook&amp;1.png" in first_html
     assert "validation, calibration, or empirical comparison" in first_html
     assert 'href="virtual_experiment_report.md"' in first_index
     assert 'href="virtual_experiment_report.html"' in first_index
     assert 'href="../tables/output_manifest.json"' in first_index
     assert 'href="../tables/case_summary.csv"' in first_index
-    assert 'href="../figures/quicklook&lt;1&gt;.png"' in first_index
+    assert 'href="../figures/quicklook&amp;1.png"' in first_index
     assert "validation, calibration, empirical comparison, or scientific interpretation" in first_index
 
 

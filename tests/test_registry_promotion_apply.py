@@ -723,6 +723,8 @@ def test_unindexed_unsafe_registry_entries_are_rejected_before_staging(
     if unsafe_kind == "unindexed_symlink":
         unsafe.symlink_to(target)
     else:
+        if not hasattr(os, "mkfifo"):
+            pytest.skip("Named pipes (os.mkfifo) are not available on this platform.")
         os.mkfifo(unsafe)
 
     with pytest.raises(RegistryPromotionApplyError, match="unsafe (symlink|special entry)"):

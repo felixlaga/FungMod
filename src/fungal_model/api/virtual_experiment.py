@@ -390,7 +390,7 @@ class DegradationScreenResult:
         destination.parent.mkdir(parents=True, exist_ok=True)
         root = destination.parent
         files = sorted(
-            str(file_path.relative_to(root))
+            file_path.relative_to(root).as_posix()
             for file_path in root.rglob("*")
             if file_path.is_file() and file_path != destination
         )

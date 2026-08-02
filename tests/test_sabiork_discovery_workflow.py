@@ -62,7 +62,7 @@ def test_discovery_default_cache_finds_repo_frozen_snapshot() -> None:
     )
 
     assert discovery.reaction_records[0].entry_id == "35622"
-    assert "data/kinetic_records/sabiork" in discovery.source_snapshot_path
+    assert "data/kinetic_records/sabiork" in Path(discovery.source_snapshot_path).as_posix()
 
 
 def test_discovery_filters_by_human_names_and_reports_source_content() -> None:
