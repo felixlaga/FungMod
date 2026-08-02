@@ -43,11 +43,16 @@ _PREFIX = __name__ + "."
 
 
 class _SubmoduleForwarder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
-    """Map ``fungmod.<sub>`` imports onto ``fungal_model.<sub>``.
+    """Map every ``fungmod.<sub...>`` import onto ``fungal_model.<sub...>``.
 
-    Registered as a fallback meta-path finder so that ``import fungmod.<sub>``
-    statements resolve to the implementation subpackages without eagerly
-    importing every submodule at package load time.
+    Inserted at the front of ``sys.meta_path`` so it also intercepts *nested*
+    submodules (e.g. ``fungmod.core.units``). Without this, the default
+    path-based finder would build a nested submodule from the parent package's
+    path, producing a distinct module object with, for example, its own pint
+    unit registry — so ``fungmod.core.units`` and ``fungal_model.core.units``
+    would not share state. Mapping every level guarantees they are the same
+    object. ``fungmod`` has no real submodules of its own, so this never
+    shadows one.
     """
 
     def find_spec(self, fullname, path=None, target=None):  # noqa: ANN001, ARG002
@@ -66,7 +71,7 @@ class _SubmoduleForwarder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
         return None
 
 
-sys.meta_path.append(_SubmoduleForwarder())
+sys.meta_path.insert(0, _SubmoduleForwarder())
 
 
 def __getattr__(name: str) -> ModuleType:

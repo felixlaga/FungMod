@@ -62,12 +62,21 @@ def test_submodules_forward_to_implementation() -> None:
 
 
 def test_deep_submodule_forwarding() -> None:
-    # Nested imports resolve to the same implementation source. Python's
-    # path-based finder builds the grandchild from the parent's path, so this is
-    # a functional equivalence (same code) rather than object identity.
+    # Nested imports resolve to the *same object* as the implementation, so
+    # shared module state (e.g. a pint unit registry) is not duplicated.
     forwarded = importlib.import_module("fungmod.sources.sabiork")
     implementation = importlib.import_module("fungal_model.sources.sabiork")
-    assert forwarded.__file__ == implementation.__file__
+    assert forwarded is implementation
+
+
+def test_nested_submodule_shares_state_with_implementation() -> None:
+    # Regression: fungmod.core.units must be the same module (and pint registry)
+    # as fungal_model.core.units, or quantities cross a registry boundary.
+    import fungal_model.core.units as implementation_units
+    import fungmod.core.units as forwarded_units
+
+    assert forwarded_units is implementation_units
+    assert forwarded_units.ureg is implementation_units.ureg
 
 
 def test_missing_submodule_raises() -> None:

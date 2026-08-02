@@ -16,6 +16,14 @@ from fungal_model.standards.combine import (
     model_config_to_combine_archive,
     write_combine_archive,
 )
+from fungal_model.standards.biomodels import (
+    REACTION_618_ANNOTATIONS,
+    REACTION_618_MODEL_ID,
+    REACTION_618_MODEL_NAME,
+    BioModelsDeposit,
+    build_reaction_618_model,
+    write_biomodels_deposit,
+)
 from fungal_model.standards.cross_engine import (
     CrossEngineComparison,
     cross_engine_trajectory_check,
@@ -35,17 +43,25 @@ from fungal_model.standards.sbml import (
     write_model_config_sbml,
     write_sbml,
 )
+from fungal_model.standards.sbml import MiriamAnnotation
 from fungal_model.standards.sedml import DEFAULT_KISAO_ID, to_sedml
 
 __all__ = [
     "DEFAULT_KISAO_ID",
     "PETAB_FORMAT_VERSION",
+    "REACTION_618_ANNOTATIONS",
+    "REACTION_618_MODEL_ID",
+    "REACTION_618_MODEL_NAME",
     "SBML_EXPORTABLE_PROCESS_TYPES",
+    "BioModelsDeposit",
     "CrossEngineComparison",
+    "MiriamAnnotation",
     "PetabExport",
     "PetabExportError",
     "SbmlExportError",
+    "build_reaction_618_model",
     "calibration_config_to_petab",
+    "write_biomodels_deposit",
     "cross_engine_trajectory_check",
     "model_config_to_combine_archive",
     "model_config_to_sbml",

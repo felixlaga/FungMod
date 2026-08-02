@@ -127,6 +127,31 @@ table; and a `problem.yaml` links them. The files are written with the standard
 library, so only the `standards` extra (for the SBML model) is required. The
 result passes `petab.lint_problem`.
 
+## BioModels-ready deposit
+
+FungMod can produce a curated, annotated, submission-ready deposit for the
+SABIO-RK Reaction 618 β-glucosidase case (cellobiose → glucose):
+
+```python
+from fungmod.standards import write_biomodels_deposit
+
+deposit = write_biomodels_deposit("reaction_618_deposit/")
+# deposit.sbml_model, deposit.combine_archive, deposit.readme
+```
+
+The deposit contains an SBML model with **SBO** terms and **MIRIAM** annotations
+(ChEBI for cellobiose/glucose, EC 3.2.1.21 and UniProt Q8L7J2 for the enzyme,
+KEGG/MetaNetX for the reaction, NCBI Taxonomy for *Oryza sativa*, PubMed for the
+reference), a COMBINE archive bundling it with a SED-ML time course, and a
+`README.md` documenting provenance, the identifiers used, explicit modelling
+assumptions, and BioModels submission steps. Km and kcat are the curated
+SABIO-RK values; initial concentrations are explicit assumptions.
+
+SBO terms and MIRIAM annotations are also available for any export: pass
+`annotations=` (a mapping of element name → `MiriamAnnotation`) to
+[`to_sbml`](#api-reference), and SBO terms are added automatically by kinetic
+role.
+
 ## Cross-engine trajectory checks
 
 An export is only trustworthy if an independent engine reproduces the same
@@ -160,8 +185,17 @@ subset of SBML that FungMod emits and raises on anything outside it.
         - write_sbml
         - model_config_to_sbml
         - write_model_config_sbml
+        - MiriamAnnotation
         - SbmlExportError
         - SBML_EXPORTABLE_PROCESS_TYPES
+
+::: fungal_model.standards.biomodels
+    options:
+      members:
+        - write_biomodels_deposit
+        - build_reaction_618_model
+        - BioModelsDeposit
+        - REACTION_618_ANNOTATIONS
 
 ::: fungal_model.standards.sedml
     options:

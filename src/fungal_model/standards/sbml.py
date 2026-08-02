@@ -24,7 +24,8 @@ require. This convention is recorded in the model notes.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -67,6 +68,77 @@ def _to_float(value: Any) -> float:
     """Coerce a (possibly numpy/pint) real scalar to a Python float."""
 
     return float(value)
+
+
+@dataclass(frozen=True)
+class MiriamAnnotation:
+    """A MIRIAM annotation: a biology/model qualifier and identifier resources.
+
+    ``qualifier`` is a CURIE such as ``"bqbiol:is"``, ``"bqbiol:isVersionOf"``,
+    ``"bqbiol:hasTaxon"``, or ``"bqmodel:isDescribedBy"``. ``resources`` are
+    identifier URIs (typically ``https://identifiers.org/...``).
+    """
+
+    qualifier: str
+    resources: tuple[str, ...]
+
+
+# SBO terms for the kinetic laws FungMod exports (by process_type).
+_KINETIC_LAW_SBO = {
+    "homogeneous_michaelis_menten": 29,  # Henri-Michaelis-Menten rate law
+    "mass_action": 41,  # mass action rate law
+    "first_order_decay": 49,  # first-order irreversible mass action kinetics
+}
+_SBO_SIMPLE_CHEMICAL = 247
+_SBO_MACROMOLECULE = 252  # polypeptide chain (enzyme)
+_SBO_BIOCHEMICAL_REACTION = 176
+_SBO_ENZYMATIC_CATALYST = 460  # modifier role
+# SBO terms for kinetic parameters (by role).
+_SBO_KM = 27
+_SBO_VMAX = 186
+_SBO_KCAT = 25
+_SBO_KINETIC_CONSTANT = 9
+
+
+def _qualifier_terms(libsbml: Any, qualifier: str) -> tuple[int, int]:
+    """Map a qualifier CURIE to (qualifier-type, specific-qualifier) libsbml enums."""
+
+    biological = {
+        "bqbiol:is": libsbml.BQB_IS,
+        "bqbiol:isVersionOf": libsbml.BQB_IS_VERSION_OF,
+        "bqbiol:hasVersion": libsbml.BQB_HAS_VERSION,
+        "bqbiol:hasPart": libsbml.BQB_HAS_PART,
+        "bqbiol:isPartOf": libsbml.BQB_IS_PART_OF,
+        "bqbiol:hasTaxon": libsbml.BQB_HAS_TAXON,
+        "bqbiol:encodes": libsbml.BQB_ENCODES,
+        "bqbiol:occursIn": libsbml.BQB_OCCURS_IN,
+    }
+    model_level = {
+        "bqmodel:is": libsbml.BQM_IS,
+        "bqmodel:isDescribedBy": libsbml.BQM_IS_DESCRIBED_BY,
+        "bqmodel:isDerivedFrom": libsbml.BQM_IS_DERIVED_FROM,
+    }
+    if qualifier in biological:
+        return libsbml.BIOLOGICAL_QUALIFIER, biological[qualifier]
+    if qualifier in model_level:
+        return libsbml.MODEL_QUALIFIER, model_level[qualifier]
+    raise SbmlExportError(f"Unsupported MIRIAM qualifier {qualifier!r}.")
+
+
+def _apply_miriam(libsbml: Any, element: Any, annotations: Sequence[MiriamAnnotation]) -> None:
+    """Attach MIRIAM CVTerms to an SBML element (which must already have a metaid)."""
+
+    for annotation in annotations:
+        term = libsbml.CVTerm()
+        qualifier_type, specific = _qualifier_terms(libsbml, annotation.qualifier)
+        term.setQualifierType(qualifier_type)
+        if qualifier_type == libsbml.BIOLOGICAL_QUALIFIER:
+            term.setBiologicalQualifierType(specific)
+        else:
+            term.setModelQualifierType(specific)
+        for resource in annotation.resources:
+            term.addResource(resource)
+        element.addCVTerm(term)
 
 
 def _require_libsbml() -> Any:
@@ -217,12 +289,29 @@ def _reaction_spec(
     )
 
 
+def _parameter_sbo_terms(model: "AssembledModel") -> dict[str, int]:
+    """Map parameter symbols to SBO terms by their kinetic role."""
+
+    terms: dict[str, int] = {}
+    for process in model.processes:
+        if isinstance(process, HomogeneousMichaelisMentenProcess):
+            terms[process.km_symbol] = _SBO_KM
+            if process.vmax_symbol is not None:
+                terms[process.vmax_symbol] = _SBO_VMAX
+            if process.kcat_symbol is not None:
+                terms[process.kcat_symbol] = _SBO_KCAT
+        elif isinstance(process, (MassActionProcess, FirstOrderDecayProcess)):
+            terms[process.rate_constant_symbol] = _SBO_KINETIC_CONSTANT
+    return terms
+
+
 def to_sbml(
     model: "AssembledModel",
     *,
     initial_state: Mapping[str, Quantity],
     model_id: str = "fungmod_model",
     model_name: str | None = None,
+    annotations: Mapping[str, Sequence[MiriamAnnotation]] | None = None,
 ) -> str:
     """Export an assembled FungMod model to an SBML Level 3 Version 2 string.
 
@@ -251,11 +340,18 @@ def to_sbml(
             "avoid producing an SBML model that does not match FungMod's behaviour."
         )
 
+    annotations = annotations or {}
+    parameter_sbo = _parameter_sbo_terms(model)
+
     sid = _SIds()
     document = libsbml.SBMLDocument(3, 2)
     sbml_model = document.createModel()
-    sbml_model.setId(sid.reserve(_sanitize_model_id(model_id)))
+    model_sid = sid.reserve(_sanitize_model_id(model_id))
+    sbml_model.setId(model_sid)
+    sbml_model.setMetaId(f"meta_{model_sid}")
     sbml_model.setName(model_name or model_id)
+    if "model" in annotations:
+        _apply_miriam(libsbml, sbml_model, annotations["model"])
     sbml_model.setNotes(
         "<body xmlns='http://www.w3.org/1999/xhtml'><p>Exported from FungMod. "
         "Well-mixed model; species are represented as SBML amounts in a unit "
@@ -285,8 +381,10 @@ def to_sbml(
         if spec.name not in initial_state:
             raise SbmlExportError(f"Missing initial value for state variable {spec.name!r}.")
         value = initial_state[spec.name].to(spec.units)
+        species_id = sid.of(spec.name)
         species = sbml_model.createSpecies()
-        species.setId(sid.of(spec.name))
+        species.setId(species_id)
+        species.setMetaId(f"meta_{species_id}")
         species.setName(spec.name)
         species.setCompartment(compartment_id)
         species.setInitialAmount(_to_float(value.magnitude))
@@ -294,6 +392,9 @@ def to_sbml(
         species.setHasOnlySubstanceUnits(True)
         species.setBoundaryCondition(False)
         species.setConstant(False)
+        species.setSBOTerm(_SBO_MACROMOLECULE if spec.role == "enzyme" else _SBO_SIMPLE_CHEMICAL)
+        if spec.name in annotations:
+            _apply_miriam(libsbml, species, annotations[spec.name])
 
     for parameter in model.parameters:
         quantity = parameter.quantity
@@ -305,13 +406,18 @@ def to_sbml(
         sbml_parameter.setValue(_to_float(quantity.magnitude))
         sbml_parameter.setUnits(units.id_for(parameter.units))
         sbml_parameter.setConstant(True)
+        if parameter.symbol in parameter_sbo:
+            sbml_parameter.setSBOTerm(parameter_sbo[parameter.symbol])
 
     for index, process in enumerate(model.processes):
         reactants, products, modifiers, formula = _reaction_spec(process, sid)
+        reaction_id = sid.of(f"{process.name}__reaction_{index}")
         reaction = sbml_model.createReaction()
-        reaction.setId(sid.of(f"{process.name}__reaction_{index}"))
+        reaction.setId(reaction_id)
+        reaction.setMetaId(f"meta_{reaction_id}")
         reaction.setName(process.name)
         reaction.setReversible(False)
+        reaction.setSBOTerm(_SBO_BIOCHEMICAL_REACTION)
         for species_name, coefficient in reactants.items():
             reference = reaction.createReactant()
             reference.setSpecies(sid.of(species_name))
@@ -325,7 +431,13 @@ def to_sbml(
         for species_name in modifiers:
             reference = reaction.createModifier()
             reference.setSpecies(sid.of(species_name))
+            reference.setSBOTerm(_SBO_ENZYMATIC_CATALYST)
+        if process.name in annotations:
+            _apply_miriam(libsbml, reaction, annotations[process.name])
         kinetic_law = reaction.createKineticLaw()
+        law_sbo = _KINETIC_LAW_SBO.get(process.process_type)
+        if law_sbo is not None:
+            kinetic_law.setSBOTerm(law_sbo)
         math_ast = libsbml.parseL3Formula(formula)
         if math_ast is None:
             raise SbmlExportError(
@@ -345,10 +457,13 @@ def write_sbml(
     initial_state: Mapping[str, Quantity],
     model_id: str = "fungmod_model",
     model_name: str | None = None,
+    annotations: Mapping[str, Sequence[MiriamAnnotation]] | None = None,
 ) -> Path:
     """Export an assembled model to SBML and write it to ``path``."""
 
-    text = to_sbml(model, initial_state=initial_state, model_id=model_id, model_name=model_name)
+    text = to_sbml(
+        model, initial_state=initial_state, model_id=model_id, model_name=model_name, annotations=annotations
+    )
     destination = Path(path)
     destination.write_text(text, encoding="utf-8", newline="")
     return destination

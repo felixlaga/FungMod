@@ -22,6 +22,20 @@ All notable public releases of FungMod are documented here.
   parameter tables, and `problem.yaml`) from a calibration config, with
   measurement values and times converted to the model's units. The result passes
   `petab.lint_problem`.
+- SBO terms (added automatically by kinetic role) and MIRIAM annotation support
+  (`MiriamAnnotation`, `to_sbml(annotations=...)`) in the SBML export.
+- A BioModels-ready deposit for the SABIO-RK Reaction 618 β-glucosidase case
+  (`fungmod.standards.write_biomodels_deposit`): annotated SBML (ChEBI, EC,
+  UniProt, KEGG, MetaNetX, NCBI Taxonomy, PubMed), a COMBINE archive, and a
+  submission README. Curated Km/kcat; initial concentrations are explicit
+  assumptions.
+
+### Fixed
+
+- `fungmod.<subpackage>` nested imports (e.g. `fungmod.core.units`) now resolve
+  to the exact same module object as `fungal_model.<subpackage>`, so shared
+  state such as the pint unit registry is not duplicated across a registry
+  boundary.
 
 ### Scientific scope
 

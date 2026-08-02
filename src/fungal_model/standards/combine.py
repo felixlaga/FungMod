@@ -14,13 +14,13 @@ native dependency and is byte-reproducible (fixed entry order and timestamps).
 from __future__ import annotations
 
 import zipfile
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 from xml.sax.saxutils import quoteattr
 
 from fungal_model.core.units import Q_, Quantity
-from fungal_model.standards.sbml import to_sbml
+from fungal_model.standards.sbml import MiriamAnnotation, to_sbml
 from fungal_model.standards.sedml import to_sedml
 
 if TYPE_CHECKING:
@@ -79,6 +79,7 @@ def write_combine_archive(
     sedml_source: str = "simulation.sedml",
     model_id: str = "fungmod_model",
     model_name: str | None = None,
+    annotations: Mapping[str, Sequence[MiriamAnnotation]] | None = None,
 ) -> Path:
     """Write a COMBINE archive bundling the model's SBML and a SED-ML time course.
 
@@ -98,7 +99,9 @@ def write_combine_archive(
         The path to the written archive.
     """
 
-    sbml_text = to_sbml(model, initial_state=initial_state, model_id=model_id, model_name=model_name)
+    sbml_text = to_sbml(
+        model, initial_state=initial_state, model_id=model_id, model_name=model_name, annotations=annotations
+    )
     sedml_text = to_sedml(
         sbml_text,
         output_end_time=output_end_time,

@@ -100,6 +100,7 @@ select = ["E4", "E7", "E9", "F"]
 "tests/test_standards_sbml.py" = ["E402"]
 "tests/test_standards_sedml_combine.py" = ["E402"]
 "tests/test_standards_petab.py" = ["E402"]
+"tests/test_standards_biomodels.py" = ["E402"]
 
 [tool.coverage.run]
 source = ["fungal_model"]
