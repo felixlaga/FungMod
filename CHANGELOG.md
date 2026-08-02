@@ -4,6 +4,22 @@ All notable public releases of FungMod are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- SBML Level 3 export for the supported well-mixed kinetic processes
+  (first-order decay, mass action, and homogeneous Michaelis-Menten) via the
+  optional `standards` extra (`fungmod.standards.to_sbml`,
+  `model_config_to_sbml`, `write_sbml`).
+- Cross-engine trajectory checks: an independent reference SBML integrator and
+  `cross_engine_trajectory_check`, confirming exported SBML reproduces FungMod's
+  own solver trajectories to solver tolerance.
+
+### Scientific scope
+
+- SBML export refuses (rather than silently approximates) models with
+  unsupported processes, rate-modifier wrappers, or dynamic thermodynamic
+  constraints, so an exported model always matches FungMod's behaviour.
+
 ## [0.1.1] — 2026-08-01
 
 ### Added

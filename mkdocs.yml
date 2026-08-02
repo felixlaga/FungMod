@@ -75,6 +75,7 @@ nav:
       - Full example notebooks: notebooks.md
       - Configured models: configured-models.md
   - Capability map: capabilities.md
+  - Standards and interoperability: standards.md
   - Calibration evidence: calibration-evidence.md
   - Scientific integrity: scientific-integrity.md
   - Citing FungMod: citing.md
