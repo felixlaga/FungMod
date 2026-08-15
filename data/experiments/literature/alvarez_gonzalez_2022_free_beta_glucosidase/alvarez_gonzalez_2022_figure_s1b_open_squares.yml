@@ -1,0 +1,163 @@
+kind: experiment_dataset
+dataset_id: alvarez_gonzalez_2022_free_beta_glucosidase_cellobiose_70gl_panel_b_v1
+name: Alvarez-Gonzalez 2022 free beta-glucosidase cellobiose time course, Figure S1B 70 g/L series
+maturity: literature_raw
+
+source:
+  type: literature
+  citation: Alvarez-Gonzalez C, Santos VE, Ladero M, Bolivar JM. Immobilization-Stabilization of beta-Glucosidase for Implementation of Intensified Hydrolysis of Cellobiose in Continuous Flow Reactors. Catalysts. 2022;12(1):80.
+  doi: 10.3390/catal12010080
+  url: https://www.mdpi.com/2073-4344/12/1/80
+  authors:
+    - Celia Alvarez-Gonzalez
+    - Victoria E. Santos
+    - Miguel Ladero
+    - Juan M. Bolivar
+  year: 2022
+  figure_or_table: Supplementary Figure S1, panel B, open-square series
+  extraction_method: Raster figure digitization from the publisher supplementary PDF
+  extraction_tool: pypdfium2 5.12.1 render at scale 3, then a tolerant green mask, binary hole filling, 5x5 binary erosion, and connected-component centroids using scipy 1.17.1 and Pillow 12.2.0
+  extracted_by: Claude (Anthropic) for FungMod
+  extraction_date: 2026-08-15
+  raw_units:
+    time: minute
+    value: millimolar
+    uncertainty: millimolar
+  notes: >
+    The supplement is CC BY. This record covers the open-square 70 g/L series in
+    panel B only. It differs from the panel-A filled-square series in both
+    initial cellobiose concentration and enzyme loading, so it is the most
+    distant held-out condition available in this figure. It comes from the same
+    figure, laboratory, and publication and is not independent experimental
+    replication. The plotted means are used; the source does not define the
+    plotted error bars as SD, SE, or another statistic.
+
+system:
+  organism: null
+  enzyme: Commercial beta-glucosidase 1000 formulation donated by ASA Spezialenzyme GmbH
+  substrate: cellobiose
+  product: glucose
+  environment: 50 mM sodium citrate buffer at pH 5.0
+  geometry: well_mixed batch reactor
+  notes: The 2022 source does not directly state the biological source organism of the commercial formulation, so no organism label is assigned.
+
+conditions:
+  temperature:
+    value: 50.0
+    units: degree_Celsius
+  ph:
+    value: 5.0
+    units: dimensionless
+  volume:
+    value: 20.0
+    units: milliliter
+  agitation:
+    value: 120.0
+    units: revolutions_per_minute
+  nominal_initial_cellobiose:
+    value: 70.0
+    units: gram / liter
+  free_enzyme_concentration_as_printed:
+    value: 296.1
+    units: milligram / milliliter
+  sampling_times:
+    values: [0, 5, 10, 15, 20, 30, 40, 50, 60]
+    units: minute
+  notes: >
+    UNRESOLVED SOURCE INCONSISTENCY. The Figure S1 caption prints the panel-A
+    enzyme loading as 59.2 mg/L and the panel-B loading as 296.1 mg/mL. The
+    numeric ratio 296.1 / 59.2 is 5.002, which is consistent with a five-fold
+    enzyme loading and with a mg/L unit for panel B, but the printed unit
+    differs between the two panels by a factor of one thousand. This record
+    stores the caption value and unit verbatim as
+    free_enzyme_concentration_as_printed and does not silently correct it. Any
+    model comparison that depends on the panel-B enzyme concentration must state
+    which reading it assumes. The nominal 70 g/L corresponds to about 204.5 mM
+    at a cellobiose molar mass of 342.3 g/mol, which is lower than the digitized
+    t=0 value of 222.27 mM; the plotted observation is retained and the nominal
+    value is not substituted.
+
+measurements:
+  - id: cellobiose_concentration
+    measured_quantity: cellobiose concentration remaining
+    observable_type: state
+    data_file: alvarez_gonzalez_2022_figure_s1b_open_squares.csv
+    time_column: time_min
+    value_column: cellobiose_millimolar
+    uncertainty_column: digitization_uncertainty_millimolar
+    units:
+      time: minute
+      value: millimolar
+      uncertainty: millimolar
+    uncertainty_type: estimated digitization error, not experimental uncertainty
+    censoring: none
+    replicate_id_column: null
+    notes: Values are digitized plotted means. The uniform uncertainty is the extraction resolution only and must not be interpreted as biological or analytical variability.
+
+measurement_definitions:
+  measured_quantity: Cellobiose concentration remaining in the batch reactor
+  units: millimolar
+  uncertainty_definition: Uniform 0.6 mM estimated digitization error from approximately one rendered pixel on the calibrated y axis; experimental uncertainty is unavailable because the error-bar statistic is not defined in the source.
+  measurement_method: Source samples were acid-quenched and cellobiose was quantified by HPLC with a Rezex H+ column and refractive-index detection.
+
+preprocessing:
+  status: raw_figure_digitization
+  raw_data_available: false
+  steps:
+    - verified the publisher supplementary PDF SHA-256 against the value already recorded in this repository
+    - rendered supplementary PDF page 5 at scale 3 with pypdfium2 5.12.1 and confirmed the 1786 x 2526 pixel render size
+    - read the shared y-axis calibration from the rendered black plot frame at pixel row 724 for 0 mM and row 284 for 240 mM
+    - built a tolerant green mask, filled marker interiors, eroded with a 5x5 element to remove the plotted curve and error bars, and took connected-component centroids
+    - classified each marker as filled or open by testing whether its interior is exact green
+    - assigned the source-listed sampling times to the nine open-square markers in left-to-right column order
+    - converted marker-centre pixel rows to millimolar without smoothing, fitting, baseline correction, or normalization
+  unit_conversions:
+    - y_mM = (724 - y_pixel) * 240 / 440
+    - no conversion was applied to the source time values
+  excluded_points: []
+  notes: >
+    The extraction method was verified before this file was written by
+    re-extracting the previously committed Figure S1A filled-square series with
+    the same code path and confirming a worst absolute deviation of 0.2731 mM,
+    which is within the declared 0.6 mM digitization resolution.
+
+digitization:
+  software: pypdfium2 5.12.1, Pillow 12.2.0, scipy 1.17.1, numpy 2.4.6
+  source_page: Supplementary PDF page 5
+  source_series: Figure S1B open green squares
+  axis_calibration:
+    x_axis: Sampling times 0, 5, 10, 15, 20, 30, 40, 50, and 60 min from Methods section 3.6.1, assigned by left-to-right marker order
+    y_axis: 0 mM at rendered pixel row 724 and 240 mM at row 284, read from the plot frame and shared with panel A
+    rendered_page_size_pixels: 1786 x 2526
+    render_scale: 3
+  estimated_digitization_error:
+    value: 0.6
+    units: millimolar
+    basis: Approximately one rendered y pixel; the calibrated scale is 0.545 mM per pixel.
+  included_points: 9
+  excluded_points: []
+  exclusion_reason: No points excluded from the selected series.
+
+supplementary_data:
+  file_name: catalysts-1506763-supplementary.pdf
+  source_url_or_doi: https://mdpi-res.com/d_attachment/catalysts/catalysts-12-00080/article_deploy/catalysts-12-00080-s001.zip
+  checksum: sha256:212683610102dcf0a6200bdad715d2ffc95f5e7802b7f94d20f8330c34401b55
+  access_date: 2026-08-15
+  notes: The repository stores the extracted observations and provenance, not a duplicate of the publisher PDF. The checksum matched the value recorded for the earlier panel-A filled-square digitization, confirming identical source bytes.
+
+validation:
+  expected_columns:
+    - time_min
+    - cellobiose_millimolar
+    - digitization_uncertainty_millimolar
+    - marker_center_x_pixel
+    - marker_center_y_pixel
+  allow_missing_uncertainty: false
+
+notes: >
+  Literature-raw digitization intended as the most distant held-out condition
+  for out-of-sample model comparison, differing from the training series in both
+  initial substrate concentration and enzyme loading. Its usefulness is limited
+  by the unresolved caption unit inconsistency recorded under conditions.notes.
+  It describes a purified commercial enzyme formulation, not whole-fungus
+  physiology.

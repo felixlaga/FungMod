@@ -58,8 +58,47 @@ def test_literature_directory_contains_only_reviewed_dataset_files() -> None:
 
     assert sorted(path.name for path in data_files) == [
         "alvarez_gonzalez_2022_figure_s1a_filled_squares.csv",
+        "alvarez_gonzalez_2022_figure_s1a_open_squares.csv",
+        "alvarez_gonzalez_2022_figure_s1a_open_squares.yml",
+        "alvarez_gonzalez_2022_figure_s1b_filled_squares.csv",
+        "alvarez_gonzalez_2022_figure_s1b_filled_squares.yml",
+        "alvarez_gonzalez_2022_figure_s1b_open_squares.csv",
+        "alvarez_gonzalez_2022_figure_s1b_open_squares.yml",
         "alvarez_gonzalez_2022_free_beta_glucosidase.yml",
     ]
+
+
+def test_every_literature_dataset_file_passes_the_schema() -> None:
+    """No literature dataset may sit in the directory without passing the gate."""
+
+    dataset_files = sorted(LITERATURE_DIR.rglob("*.yml"))
+
+    assert dataset_files, "Expected at least one literature dataset."
+    for path in dataset_files:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        result = validate_literature_dataset_metadata(data)[0]
+        assert result.passed, f"{path.name} failed the literature schema: {result.details['issues']}"
+
+
+def test_held_out_series_record_their_shared_source_and_unresolved_units() -> None:
+    """The held-out series must not be presented as independent replication."""
+
+    held_out = {
+        "alvarez_gonzalez_2022_figure_s1a_open_squares.yml": False,
+        "alvarez_gonzalez_2022_figure_s1b_filled_squares.yml": True,
+        "alvarez_gonzalez_2022_figure_s1b_open_squares.yml": True,
+    }
+    for name, expects_unit_conflict in held_out.items():
+        data = yaml.safe_load((LITERATURE_DIR / "alvarez_gonzalez_2022_free_beta_glucosidase" / name).read_text(encoding="utf-8"))
+        assert "not independent experimental replication" in data["source"]["notes"]
+        assert data["maturity"] == "literature_raw"
+        if expects_unit_conflict:
+            # The panel-B caption prints mg/mL where panel A prints mg/L. The
+            # record must preserve the printed value rather than silently fixing it.
+            assert "UNRESOLVED SOURCE INCONSISTENCY" in data["conditions"]["notes"]
+            assert data["conditions"]["free_enzyme_concentration_as_printed"]["units"] == (
+                "milligram / milliliter"
+            )
 
 
 def test_valid_fake_literature_metadata_passes_schema() -> None:

@@ -5,12 +5,32 @@ contract and review checklist used before ingestion.
 
 Current datasets:
 
-- `alvarez_gonzalez_2022_free_beta_glucosidase/`: a nine-point digitization of
-  the 20 g/L cellobiose, 59.2 mg/L free-enzyme series from Supplementary Figure
-  S1A in Alvarez-Gonzalez et al. (2022). It is `literature_raw`, represents a
-  purified commercial enzyme formulation of unstated biological source, and is
-  suitable for bounded model comparison, not calibration or a general
+- `alvarez_gonzalez_2022_free_beta_glucosidase/`: four nine-point digitizations
+  of Supplementary Figure S1 in Alvarez-Gonzalez et al. (2022), covering both
+  panels and both cellobiose loadings. All four are `literature_raw`, represent
+  a purified commercial enzyme formulation of unstated biological source, and
+  are suitable for bounded model comparison, not calibration or a general
   validation claim.
+
+  - Figure S1A filled squares: 20 g/L cellobiose, 59.2 mg/L free enzyme. This is
+    the original series and the reference condition for the held-out study.
+  - Figure S1A open squares: 70 g/L cellobiose at the same enzyme loading.
+  - Figure S1B filled squares: 20 g/L cellobiose at the panel-B enzyme loading.
+  - Figure S1B open squares: 70 g/L cellobiose at the panel-B enzyme loading.
+
+  The three added series are held-out conditions for out-of-sample comparison.
+  Because all four come from one figure, one publication, and one laboratory,
+  agreement across them demonstrates transfer across experimental conditions and
+  must never be reported as independent experimental replication. The two
+  panel-B records preserve an unresolved source unit inconsistency: the Figure S1
+  caption prints the panel-A loading as 59.2 mg/L and the panel-B loading as
+  296.1 mg/mL. The printed value and unit are stored verbatim and are not
+  silently corrected.
+
+  `scripts/digitize_alvarez_gonzalez_2022_figure_s1.py` regenerates the three
+  added series. It verifies the supplementary PDF SHA-256 and refuses to write
+  anything unless it first reproduces the committed Figure S1A filled-square
+  series within the declared 0.6 mM digitization resolution.
 
 The machine-readable schema validation now exists in
 `fungal_model.data.validate_literature_dataset_metadata`. Every future

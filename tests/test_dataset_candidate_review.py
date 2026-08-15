@@ -255,6 +255,13 @@ def test_candidate_review_directory_contains_only_review_files() -> None:
 
 
 def test_literature_directory_contains_only_the_reviewed_time_course() -> None:
+    """Only reviewed Figure S1 series from the single ingested source may appear.
+
+    The three added series are additional conditions from the same figure of the
+    same publication, not a second source. Candidate sources that have not
+    cleared the schema gate must still stay out of this directory.
+    """
+
     data_files = [
         path
         for path in LITERATURE_DIR.rglob("*")
@@ -263,8 +270,16 @@ def test_literature_directory_contains_only_the_reviewed_time_course() -> None:
 
     assert sorted(path.name for path in data_files) == [
         "alvarez_gonzalez_2022_figure_s1a_filled_squares.csv",
+        "alvarez_gonzalez_2022_figure_s1a_open_squares.csv",
+        "alvarez_gonzalez_2022_figure_s1a_open_squares.yml",
+        "alvarez_gonzalez_2022_figure_s1b_filled_squares.csv",
+        "alvarez_gonzalez_2022_figure_s1b_filled_squares.yml",
+        "alvarez_gonzalez_2022_figure_s1b_open_squares.csv",
+        "alvarez_gonzalez_2022_figure_s1b_open_squares.yml",
         "alvarez_gonzalez_2022_free_beta_glucosidase.yml",
     ]
+    # Every ingested file must still trace to the one reviewed publication.
+    assert all(path.name.startswith("alvarez_gonzalez_2022") for path in data_files)
 
 
 def _fake_candidate_data() -> dict[str, Any]:
