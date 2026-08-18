@@ -6,6 +6,77 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Two further literature sources, taking the repository to three independent
+  sources, five series, and four enzyme preparations across three kinetic
+  regimes. `scripts/digitize_ariaeenejad_2020_figure_6.py` adds a 17-point,
+  380 h PersiBGL1 series (Ariaeenejad 2020, CC BY);
+  `scripts/digitize_cao_2015_figure_5a.py` adds two 6-point, 10 h series for
+  wild-type Bgl6 and mutant M3 at 10 % w/v cellobiose (Cao 2015, CC BY 4.0).
+  Both digitizers verify their axis calibration against values each source
+  states in prose, independently of the figure, and refuse to write otherwise.
+- `scripts/run_cross_source_structural_test.py`, which fits the shared rate-law
+  structure to every series with and without enzyme deactivation, and screens
+  each fit for identifiability by bound proximity and Jacobian conditioning.
+- The Ariaeenejad 2020 candidate review moves from blocked to
+  `approved_for_ingestion`, with a `resolution_review` block recording that the
+  time-axis conflict was resolved by the figure's own x-axis label. The original
+  blocked verdict is retained as the audit trail and marked superseded.
+
+### Findings
+
+- One rate-law structure is adequate across all three sources. Identified fits
+  reach 0.21 % to 6.29 % of series scale. One of five series, the Alvarez-Gonzalez
+  70 g/L condition, is flagged DEGENERATE when fitted alone because K_m runs to
+  its search bound: that condition is predictable from other data but not
+  identifiable from its own curve.
+- Enzyme deactivation is warranted for wild-type Bgl6 (fitted half-life 4.2 h in
+  a 10 h assay, 39 % RMSE reduction) but not for its engineered mutant M3, and
+  not for any Alvarez-Gonzalez series. The framework recovered this distinction
+  from progress curves alone; it is consistent with the source publication's own
+  point that M3 is the more robust variant.
+- The PersiBGL1 fit reproduces the observed plateau with a product-inhibition
+  constant near 34 mM, which contradicts that source's claim of a glucose
+  inhibition constant near 8.8 M. Recorded as an unexplained discrepancy.
+- Resa and Buckin (2011) is confirmed paywalled with no extractable observations
+  and remains blocked.
+
+- Three additional digitized series from Alvarez-Gonzalez et al. (2022)
+  Supplementary Figure S1, taking the repository from nine to thirty-six real
+  literature observations across all four series of that figure
+  (`scripts/digitize_alvarez_gonzalez_2022_figure_s1.py`). The script verifies
+  the supplementary PDF SHA-256 and refuses to write unless it first reproduces
+  the previously committed Figure S1A filled-square series within the declared
+  0.6 mM digitization resolution (achieved: 0.273 mM).
+- A held-out condition study (`scripts/run_alvarez_gonzalez_2022_holdout_prediction.py`)
+  predicting the three previously undigitized series from the publication's own
+  Model 3 parameters with no FungMod fit.
+- A two-stage calibration study
+  (`scripts/run_alvarez_gonzalez_2022_stage2_calibration.py`) fitting FungMod
+  parameters on one series and predicting the held-out conditions.
+- Configured calibration now accepts `literature_raw` and `literature_processed`
+  datasets in addition to `synthetic`, through an explicit
+  `CALIBRATABLE_DATASET_MATURITIES` allowlist. Toy, framework, calibrated, and
+  validated maturities still fail closed. A literature calibration records
+  `dataset_maturity` and carries parameter-estimation assumptions and a
+  non-validation warning instead of the synthetic-fixture wording.
+- Model parameters transfer across initial substrate concentration but not
+  across enzyme loading. Predicting the 70 g/L series at the training enzyme
+  loading, with no parameter changed, gives 1.28% relative RMSE. Both panel-B
+  series, at a nominal five-fold enzyme loading, show 9/9 positive residuals and
+  are not repaired by refitting.
+- A model-free comparison of the two panels gives an apparent enzyme scaling of
+  `[E]^0.28`, against the `V_max = k_cat * [E]` linearity the configured model
+  assumes. Recorded as an unsupported capability rather than tuned away.
+- The Figure S1 caption's panel-B unit (`296.1 mg/mL` against panel A's
+  `59.2 mg/L`) is refuted as printed by the data: it implies exhaustion of the
+  222 mM charge in about 0.19 s against 36.66 mM observed at 60 min. The mg/L
+  reading is adopted as an explicitly recorded assumption; the printed value and
+  unit are preserved verbatim in the dataset records.
+- In the four-parameter fit, the substrate-inhibition constant `K_i` is
+  unidentified from a single progress curve: its approximate 95% interval spans
+  negative values. Dropping it tightens the `V_max` standard error 2.5-fold and
+  improves held-out accuracy.
+
 - SBML Level 3 export for the supported well-mixed kinetic processes
   (first-order decay, mass action, and homogeneous Michaelis-Menten) via the
   optional `standards` extra (`fungmod.standards.to_sbml`,

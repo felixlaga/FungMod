@@ -1,0 +1,168 @@
+kind: experiment_dataset
+dataset_id: cao_2015_figure_5a_m3_cellobiose_10pct_v1
+name: Cao 2015 M3 cellobiose hydrolysis time course, Figure 5a
+maturity: literature_raw
+
+source:
+  type: literature
+  citation: Cao L-C, Wang Z-J, Ren G-H, Kong W, Li L, Xie W, Liu Y-H. Engineering a novel glucose-tolerant beta-glucosidase as supplementation to enhance the hydrolysis of sugarcane bagasse at high glucose concentration. Biotechnol Biofuels. 2015;8:202.
+  doi: 10.1186/s13068-015-0383-z
+  url: https://pmc.ncbi.nlm.nih.gov/articles/PMC4666061/
+  authors:
+    - Li-Chuang Cao
+    - Zhi-Jun Wang
+    - Guang-Hui Ren
+    - Wei Kong
+    - Li Li
+    - Wei Xie
+    - Yu-Huan Liu
+  year: 2015
+  figure_or_table: Figure 5, panel a, M3 series
+  extraction_method: Raster figure digitization from the publisher figure rendition
+  extraction_tool: Exact dark-marker mask, 3x3 binary erosion to remove the connecting curve and error-bar whiskers, connected-component centroids using scipy 1.17.1, Pillow 12.2.0, numpy 2.4.6
+  extracted_by: Claude (Anthropic) for FungMod
+  extraction_date: 2026-08-18
+  raw_units:
+    time: hour
+    value: percent
+    uncertainty: percent
+  notes: >
+    CC BY 4.0. FungMod's third literature source, contributing a very high
+    initial substrate charge of 10 % w/v cellobiose driven to near-complete
+    conversion. LOW SOURCE RESOLUTION: the publisher serves this figure at only
+    709 x 276 pixels, which is the largest rendition available, giving a
+    calibrated scale of 1.97 pixels per percentage point. This is a purified
+    recombinant enzyme, not whole-fungus physiology.
+
+system:
+  organism: null
+  enzyme: mutant M3, an engineered glucose-tolerant variant of Bgl6
+  substrate: cellobiose
+  product: glucose
+  environment: 100 mM phosphate buffer at pH 6.0
+  geometry: well_mixed batch reactor
+  notes: The enzyme is recombinant; the source assigns no producing organism for the assay preparation.
+
+conditions:
+  temperature:
+    value: 50.0
+    units: degree_Celsius
+  ph:
+    value: 6.0
+    units: dimensionless
+  nominal_initial_cellobiose_mass_fraction:
+    value: 10.0
+    units: percent
+  nominal_initial_cellobiose:
+    value: 292.141
+    units: millimolar
+  enzyme_to_substrate_ratio:
+    value: 5.0
+    units: milligram / gram
+  enzyme_concentration:
+    value: 0.5
+    units: milligram / milliliter
+  sampling_times:
+    values: [1.0, 2.0, 3.5, 5.0, 7.0, 10.0]
+    units: hour
+  notes: >
+    Conditions are transcribed from the Figure 5 caption and the Results text.
+    The initial cellobiose concentration is derived from the stated 10 % w/v at a
+    cellobiose molar mass of 342.30 g/mol; the source states the mass fraction,
+    not the molar concentration. The t = 0 origin is the assay definition rather
+    than a measured sample and is not included in the observation rows.
+
+measurements:
+  - id: cellobiose_concentration
+    measured_quantity: cellobiose concentration remaining
+    observable_type: state
+    data_file: cao_2015_figure_5a_m3.csv
+    time_column: time_h
+    value_column: cellobiose_millimolar
+    uncertainty_column: digitization_uncertainty_millimolar
+    units:
+      time: hour
+      value: millimolar
+      uncertainty: millimolar
+    uncertainty_type: estimated digitization error, not experimental uncertainty
+    censoring: none
+    replicate_id_column: null
+    notes: >
+      The source plots conversion percentage; the millimolar column is derived
+      from it by the exact relation recorded under preprocessing.unit_conversions.
+      The raw digitized conversion percentage is retained in the same CSV as
+      evidence. IMPORTANT: the source plots genuine experimental error bars,
+      described as the standard deviation of three experiments. Those error bars
+      were NOT extracted. The uncertainty recorded here is extraction resolution
+      only, and real experimental uncertainty remains available in the source.
+
+measurement_definitions:
+  measured_quantity: Cellobiose concentration remaining, derived from the plotted conversion percentage
+  units: millimolar
+  uncertainty_definition: Uniform 1.0 percentage point estimated digitization error, about two rendered pixels at the calibrated scale of 1.97 pixels per percentage point, converted to 2.921 mM at the 292.141 mM initial charge. This is extraction resolution, not the source's plotted standard deviation.
+  measurement_method: Conversion of cellobiose to glucose measured over a 10 h batch hydrolysis; the source reports means of three experiments.
+
+preprocessing:
+  status: raw_figure_digitization
+  raw_data_available: false
+  steps:
+    - verified the SHA-256 of the publisher figure rendition and its 709 x 276 pixel size
+    - masked dark pixels inside the panel-a plot interior and eroded with a 3x3 element to remove the connecting curve and the error-bar whiskers
+    - took connected-component centroids and paired them by sampling time
+    - assigned the higher-conversion marker at each time to M3 and the lower to Bgl6, which is unambiguous because the two series never cross in this panel
+    - read the axis calibration from the rendered tick marks
+    - converted marker rows to conversion percentage and then to millimolar without smoothing, fitting, or normalization
+  unit_conversions:
+    - conversion_percent = (229.0 - marker_center_y_pixel) / 1.970
+    - cellobiose_mM = 292.141 * (1 - conversion_percent / 100)
+    - digitization_uncertainty_millimolar = 292.141 * 1.0 / 100
+    - time_h = (marker_center_x_pixel - 40.0) / 27.42
+  excluded_points: []
+  notes: >
+    The calibration was verified against two conversions the source states in
+    prose independently of the figure: that M3 completely converted cellobiose
+    and that Bgl6 reached 80 % conversion. The digitization reproduced them as
+    97.60 % and 79.62 %. This series' final digitized value is 97.60 %.
+
+digitization:
+  software: Pillow 12.2.0, scipy 1.17.1, numpy 2.4.6
+  source_page: Figure 5 rendition served by the publisher
+  source_series: Figure 5a M3 markers
+  axis_calibration:
+    x_axis: Zero hours at pixel column 40.0 with 27.42 pixels per hour, read from the axis tick marks
+    y_axis: Zero percent at pixel row 229.0 with 1.970 pixels per percentage point, read from six axis tick marks
+    rendered_page_size_pixels: 709 x 276
+    render_scale: 1
+  estimated_digitization_error:
+    value: 1.0
+    units: percent
+    basis: About two rendered pixels at 1.97 pixels per percentage point. The publisher serves no higher-resolution rendition.
+  included_points: 6
+  excluded_points: []
+  exclusion_reason: No points excluded. The t = 0 origin is the assay definition rather than a measured sample.
+
+supplementary_data:
+  file_name: 13068_2015_383_Fig5_HTML.gif
+  source_url_or_doi: https://media.springernature.com/full/springer-static/image/art%3A10.1186%2Fs13068-015-0383-z/MediaObjects/13068_2015_383_Fig5_HTML.gif
+  checksum: sha256:f875db462491e496730d1aa7bcc5fe292a558426936810fdb391789efd647d06
+  access_date: 2026-08-18
+  notes: The repository stores the extracted observations and provenance, not a duplicate of the publisher figure.
+
+validation:
+  expected_columns:
+    - time_h
+    - conversion_percent
+    - cellobiose_millimolar
+    - digitization_uncertainty_percent
+    - digitization_uncertainty_millimolar
+    - marker_center_x_pixel
+    - marker_center_y_pixel
+  allow_missing_uncertainty: false
+
+notes: >
+  Literature-raw digitization supporting cross-source tests of model structure at
+  a very high initial substrate charge. The source states this series
+  completely converted cellobiose to glucose. Two limitations bound its use: the publisher's maximum figure
+  resolution is low, and the source's genuine standard-deviation error bars were
+  not extracted. It does not support transfer of fitted parameter values across
+  enzyme preparations.

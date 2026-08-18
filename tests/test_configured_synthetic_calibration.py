@@ -133,10 +133,13 @@ def test_calibration_without_split_makes_no_validation_claim(tmp_path: Path) -> 
     assert not result.split.has_holdout
 
 
-def test_configured_calibration_rejects_non_synthetic_dataset(tmp_path: Path) -> None:
-    dataset = replace(_generated_dataset(tmp_path), maturity="toy")
+@pytest.mark.parametrize("maturity", ["toy", "framework_benchmark", "calibrated", "validated"])
+def test_configured_calibration_rejects_uncalibratable_maturity(tmp_path: Path, maturity: str) -> None:
+    """Only synthetic and literature datasets may be fitted; everything else fails closed."""
 
-    with pytest.raises(ConfiguredCalibrationError, match="synthetic-only"):
+    dataset = replace(_generated_dataset(tmp_path), maturity=maturity)
+
+    with pytest.raises(ConfiguredCalibrationError, match="rejects dataset maturity"):
         calibrate_configured_model(
             model_config=MODEL_CONFIG,
             dataset=dataset,
@@ -145,6 +148,49 @@ def test_configured_calibration_rejects_non_synthetic_dataset(tmp_path: Path) ->
             initial_guess={"k_ab": 0.03},
             bounds={"k_ab": (0.0, 1.0)},
         )
+
+
+@pytest.mark.parametrize("maturity", ["literature_raw", "literature_processed"])
+def test_literature_calibration_is_labelled_as_estimation_not_validation(
+    tmp_path: Path, maturity: str
+) -> None:
+    """A literature fit must never inherit the synthetic fixture wording."""
+
+    dataset = replace(_generated_dataset(tmp_path), maturity=maturity)
+
+    result = calibrate_configured_model(
+        model_config=MODEL_CONFIG,
+        dataset=dataset,
+        parameter_symbols=["k_ab"],
+        observable_mapping=_mapping(),
+        initial_guess={"k_ab": 0.03},
+        bounds={"k_ab": (0.0, 1.0)},
+    )
+
+    assert result.dataset_maturity == maturity
+    assert result.to_dict()["dataset_maturity"] == maturity
+    assert any("parameter estimation, not validation" in item for item in result.assumptions)
+    assert any("not evidence of predictive validity" in item for item in result.warnings)
+    # The synthetic-fixture claims must not appear on a literature calibration.
+    assert not any("Synthetic-only calibration" in item for item in result.assumptions)
+    assert not any(
+        "No real fungal biology or literature data" in item for item in result.assumptions
+    )
+
+
+def test_synthetic_calibration_keeps_its_synthetic_labelling(tmp_path: Path) -> None:
+    result = calibrate_configured_model(
+        model_config=MODEL_CONFIG,
+        dataset=_generated_dataset(tmp_path),
+        parameter_symbols=["k_ab"],
+        observable_mapping=_mapping(),
+        initial_guess={"k_ab": 0.03},
+        bounds={"k_ab": (0.0, 1.0)},
+    )
+
+    assert result.dataset_maturity == "synthetic"
+    assert any("Synthetic-only calibration" in item for item in result.assumptions)
+    assert not any("parameter estimation, not validation" in item for item in result.assumptions)
 
 
 def test_configured_calibration_rejects_missing_parameter_symbols(tmp_path: Path) -> None:

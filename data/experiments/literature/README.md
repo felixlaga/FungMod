@@ -3,7 +3,7 @@
 This folder contains provenance-complete literature datasets plus the schema
 contract and review checklist used before ingestion.
 
-Current datasets:
+Current datasets (three independent sources, five series, four enzyme preparations):
 
 - `alvarez_gonzalez_2022_free_beta_glucosidase/`: four nine-point digitizations
   of Supplementary Figure S1 in Alvarez-Gonzalez et al. (2022), covering both
@@ -31,6 +31,31 @@ Current datasets:
   added series. It verifies the supplementary PDF SHA-256 and refuses to write
   anything unless it first reproduces the committed Figure S1A filled-square
   series within the declared 0.6 mM digitization resolution.
+
+
+- `ariaeenejad_2020_persibgl1_cellobiose/`: a seventeen-point digitization of
+  Figure 6 in Ariaeenejad et al. (2020), a 380 h cellobiose hydrolysis by the
+  metagenome-derived PersiBGL1 at 40 C and pH 8. `literature_raw`. This source
+  was previously blocked in `candidate_reviews/` on a time-axis conflict; the
+  block was lifted from the figure's own x-axis label, which prints the unit
+  directly. Two further source defects, a wrong y-axis unit and an anomalous
+  tick label, are recorded rather than silently corrected. Regenerate with
+  `scripts/digitize_ariaeenejad_2020_figure_6.py`.
+
+- `cao_2015_bgl6_cellobiose/`: two six-point digitizations of Figure 5a in Cao
+  et al. (2015), covering wild-type Bgl6 and the engineered mutant M3 hydrolysing
+  10 % w/v cellobiose at 50 C and pH 6. `literature_raw`, CC BY 4.0. Two
+  limitations are recorded: the publisher's largest figure rendition is only
+  709 x 276 px, and the source's genuine standard-deviation error bars were not
+  extracted, so the stored uncertainty is extraction resolution only. Regenerate
+  with `scripts/digitize_cao_2015_figure_5a.py`.
+
+Resa and Buckin (2011) remains blocked in `candidate_reviews/`: its full text is
+paywalled and no extractable observations were found.
+
+Because each source uses a different enzyme preparation, kinetic parameter
+values are never transferred between sources. Cross-source work tests whether
+one rate-law structure is adequate, not whether one parameter set is.
 
 The machine-readable schema validation now exists in
 `fungal_model.data.validate_literature_dataset_metadata`. Every future

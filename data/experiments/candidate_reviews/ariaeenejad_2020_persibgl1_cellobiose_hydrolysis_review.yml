@@ -1,7 +1,7 @@
 kind: dataset_candidate_review
 candidate_id: ariaeenejad_2020_persibgl1_cellobiose_hydrolysis
 name: Ariaeenejad 2020 PersiBGL1 cellobiose hydrolysis time-course candidate
-status: selected_for_schema_review
+status: approved_for_ingestion
 dataset_maturity: literature_raw
 source:
   type: literature
@@ -42,7 +42,12 @@ schema_gate:
 review:
   selected_by: FungMod REAL-002E alternate candidate search
   review_date: 2026-06-05
-  schema_result: blocked_time_axis_conflict
+  schema_result: passed
+  prior_schema_result: blocked_time_axis_conflict
+  schema_result_change_note: >
+    Originally blocked on the source time-axis conflict. Resolved on 2026-08-18
+    from the Figure 6 x-axis label, which prints the unit directly. See
+    resolution_review.
   decision_notes: Selected as a public open-access alternative because it identifies a specific cellobiose hydrolysis time-course figure and assay conditions. REAL-002F keeps it blocked from ingestion and digitization because source text conflicts on the Figure 6 time axis, no machine-readable observation table was found, Figure 6 has not been digitized, and uncertainty is not defined.
 schema_review:
   review_type: literature_metadata_pre_ingestion
@@ -129,10 +134,56 @@ digitization_review:
       - result text says glucose did not decrease significantly after 300 h
     minute_based_evidence:
       - result text says conversion reaches zero after 380 min
-  digitization_status: blocked_do_not_digitize
+  digitization_status: blocked_do_not_digitize_superseded_by_resolution_review
   experiment_dataset_decision: do_not_create
-  decision: blocked_time_axis_conflict_do_not_ingest
+  decision: blocked_time_axis_conflict_do_not_ingest_superseded_by_resolution_review
   decision_notes: The repository cannot safely digitize Figure 6 or create a literature_raw ExperimentDataset while the source text contains conflicting time-axis units. Choosing hours by majority evidence would be an inference, not source-resolved metadata.
   data_added: none
   next_action: Seek author-supplied raw data, an erratum, a figure image with unambiguous axis labels, or a different source with tabular or machine-readable time-course observations.
-notes: Candidate review only. This file intentionally contains no observations, measurement rows, CSV paths, extracted figure data, calibrated parameters, or validation claims.
+resolution_review:
+  review_type: figure_axis_label_time_unit_resolution
+  reviewed_by: Claude (Anthropic) for FungMod
+  review_date: 2026-08-18
+  supersedes: digitization_review
+  resolving_evidence:
+    - name: Figure 6 rendered x-axis label
+      source: Open-access article PDF page 11, rendered at scale 3
+      result: >
+        The x axis is printed as "Biodegradation period (h)" with tick labels 1,
+        24, 48, 72, 96, 120, 144, 168, 188, 212, 236, 260, 284, 308, 332, 356,
+        and 380. The axis itself states the unit, so the time base is hours.
+  time_axis_resolution: resolved_hours_from_figure_axis_label
+  resolution_rationale: >
+    The earlier gate recorded that choosing hours by majority of prose evidence
+    would be an inference rather than source-resolved metadata, and set the exit
+    condition as "a figure image with unambiguous axis labels". That exit
+    condition is now met. The axis label is a direct source statement of the
+    unit, not an inference across conflicting sentences, so the single "380 min"
+    in the Results text is recorded as a source typo.
+  additional_source_defects_recorded:
+    - >
+      Y-axis unit printed as "mmol/ml", which would be 15850 mM at the final
+      point. The Results state the final value twice, as "15.85 mM" and
+      "15.85 micromole/ml", which agree at 15.85 mM. The printed axis unit is
+      recorded as a typo for micromole/ml.
+    - >
+      Tick label 188 breaks an otherwise uniform 24 h spacing between 168 and
+      212 and is most likely a typo for 192. Times are stored exactly as printed.
+  calibration_verification: >
+    The digitization was verified against two values the source states in prose
+    independently of the figure, the first point at 0.44 micromole/ml and the
+    final point at 15.85 mM. The extraction reproduced them as 0.412 and 15.771,
+    deviations of 0.028 and 0.079 mM, inside the declared 0.10 mM resolution.
+  digitization_status: digitized
+  experiment_dataset_decision: created
+  decision: resolved_and_ingested
+  data_added: >
+    data/experiments/literature/ariaeenejad_2020_persibgl1_cellobiose/ with
+    seventeen digitized glucose observations and full provenance.
+  regenerated_by: scripts/digitize_ariaeenejad_2020_figure_6.py
+
+notes: >
+  Candidate review and its resolution. This file intentionally contains no
+  observations, measurement rows, CSV paths, extracted figure data, calibrated
+  parameters, or validation claims. The earlier blocked digitization_review is
+  retained as the audit trail and is superseded by resolution_review.

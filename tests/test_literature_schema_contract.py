@@ -49,14 +49,8 @@ def test_literature_schema_contract_documents_real_data_requirements() -> None:
     assert "Current datasets" in readme
 
 
-def test_literature_directory_contains_only_reviewed_dataset_files() -> None:
-    data_files = [
-        path
-        for path in LITERATURE_DIR.rglob("*")
-        if path.is_file() and path.name != "README.md"
-    ]
-
-    assert sorted(path.name for path in data_files) == [
+REVIEWED_SOURCES = {
+    "alvarez_gonzalez_2022_free_beta_glucosidase": [
         "alvarez_gonzalez_2022_figure_s1a_filled_squares.csv",
         "alvarez_gonzalez_2022_figure_s1a_open_squares.csv",
         "alvarez_gonzalez_2022_figure_s1a_open_squares.yml",
@@ -65,7 +59,36 @@ def test_literature_directory_contains_only_reviewed_dataset_files() -> None:
         "alvarez_gonzalez_2022_figure_s1b_open_squares.csv",
         "alvarez_gonzalez_2022_figure_s1b_open_squares.yml",
         "alvarez_gonzalez_2022_free_beta_glucosidase.yml",
-    ]
+    ],
+    "ariaeenejad_2020_persibgl1_cellobiose": [
+        "ariaeenejad_2020_figure_6_glucose.csv",
+        "ariaeenejad_2020_persibgl1_cellobiose.yml",
+    ],
+    "cao_2015_bgl6_cellobiose": [
+        "cao_2015_figure_5a_bgl6.csv",
+        "cao_2015_figure_5a_bgl6.yml",
+        "cao_2015_figure_5a_m3.csv",
+        "cao_2015_figure_5a_m3.yml",
+    ],
+}
+
+
+def test_literature_directory_contains_only_reviewed_dataset_files() -> None:
+    """Each literature source directory must hold exactly its reviewed files."""
+
+    directories = sorted(p.name for p in LITERATURE_DIR.iterdir() if p.is_dir())
+
+    assert directories == sorted(REVIEWED_SOURCES)
+    for name, expected in REVIEWED_SOURCES.items():
+        found = sorted(
+            path.name
+            for path in (LITERATURE_DIR / name).rglob("*")
+            if path.is_file() and path.name != "README.md"
+        )
+        assert found == sorted(expected), name
+
+    stray = [p.name for p in LITERATURE_DIR.iterdir() if p.is_file() and p.name != "README.md"]
+    assert stray == [], f"Unreviewed files at the literature root: {stray}"
 
 
 def test_every_literature_dataset_file_passes_the_schema() -> None:

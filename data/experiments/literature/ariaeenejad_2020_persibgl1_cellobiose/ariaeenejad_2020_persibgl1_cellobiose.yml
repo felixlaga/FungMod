@@ -1,0 +1,168 @@
+kind: experiment_dataset
+dataset_id: ariaeenejad_2020_persibgl1_cellobiose_1pct_v1
+name: Ariaeenejad 2020 PersiBGL1 cellobiose hydrolysis glucose time course
+maturity: literature_raw
+
+source:
+  type: literature
+  citation: Ariaeenejad S, Nooshi-Nedamani S, Rahban M, Kavousi K, Pirbalooti AG, Mirghaderi S, Mohammadi M, Mirzaei M, Salekdeh GH. A Novel High Glucose-Tolerant beta-Glucosidase Targeted Computational Approach for Metagenomic Screening. Front Bioeng Biotechnol. 2020;8:813.
+  doi: 10.3389/fbioe.2020.00813
+  url: https://www.frontiersin.org/journals/bioengineering-and-biotechnology/articles/10.3389/fbioe.2020.00813/full
+  authors:
+    - Shohreh Ariaeenejad
+    - Safura Nooshi-Nedamani
+    - Mahdie Rahban
+    - Kaveh Kavousi
+    - Atefeh Ghasemi Pirbalooti
+    - SeyedSoheil Mirghaderi
+    - Mahsa Mohammadi
+    - Mehdi Mirzaei
+    - Ghasem Hosseini Salekdeh
+  year: 2020
+  figure_or_table: Figure 6, bar series
+  extraction_method: Raster figure digitization from the open-access publisher PDF
+  extraction_tool: pypdfium2 5.12.1 render at scale 3, exact bar-colour mask, connected-component bar-top detection using scipy 1.17.1 and Pillow 12.2.0
+  extracted_by: Claude (Anthropic) for FungMod
+  extraction_date: 2026-08-18
+  raw_units:
+    time: hour
+    value: millimolar
+    uncertainty: millimolar
+  notes: >
+    Open-access Frontiers article, CC BY. This is FungMod's second literature
+    source and the first from a different laboratory, enzyme, and assay regime
+    than Alvarez-Gonzalez 2022. PersiBGL1 is a metagenome-derived beta-glucosidase
+    from a rumen sample. This is a purified recombinant enzyme, not whole-fungus
+    physiology.
+
+system:
+  organism: null
+  enzyme: PersiBGL1, a metagenome-derived recombinant beta-glucosidase from a rumen metagenome
+  substrate: cellobiose
+  product: glucose
+  environment: 50 mM phosphate buffer at pH 8.0
+  geometry: well_mixed batch incubation
+  notes: The enzyme is recombinant and metagenome-derived, so no source organism is assigned.
+
+conditions:
+  temperature:
+    value: 40.0
+    units: degree_Celsius
+  ph:
+    value: 8.0
+    units: dimensionless
+  nominal_initial_cellobiose_mass_fraction:
+    value: 1.0
+    units: percent
+  nominal_initial_cellobiose:
+    value: 29.214
+    units: millimolar
+  enzyme_to_substrate_ratio:
+    value: 1.0
+    units: milligram / gram
+  enzyme_mass_used:
+    value: 0.1
+    units: microgram
+  sampling_times:
+    values: [1, 24, 48, 72, 96, 120, 144, 168, 188, 212, 236, 260, 284, 308, 332, 356, 380]
+    units: hour
+  notes: >
+    RESOLVED SOURCE TIME-AXIS CONFLICT. The Results text states that "the rate of
+    conversion reaches to zero after 380 min", but the Methods state that samples
+    were "measured in 24-h time intervals ... until 380 h", the same Results
+    paragraph states "from 1 h (0.44 micromole/ml) to 380 h" and "did not decrease
+    significantly after 300 h", and the figure's own x axis is labelled
+    "Biodegradation period (h)". The axis label is treated as decisive and the
+    single "380 min" is recorded as a source typo. RECORDED TICK ANOMALY: the
+    printed tick sequence is 1, 24, 48, ..., 168, 188, 212, ..., 380; every
+    interval is 24 h except 168 to 188, which is 20 h. The label 188 is most
+    likely a typo for 192. Times are stored exactly as printed. The nominal
+    initial cellobiose is derived from the stated 1 % w/v at a cellobiose molar
+    mass of 342.30 g/mol and is not a source-stated concentration.
+
+measurements:
+  - id: glucose_concentration
+    measured_quantity: glucose liberated
+    observable_type: state
+    data_file: ariaeenejad_2020_figure_6_glucose.csv
+    time_column: time_h
+    value_column: glucose_millimolar
+    uncertainty_column: digitization_uncertainty_millimolar
+    units:
+      time: hour
+      value: millimolar
+      uncertainty: millimolar
+    uncertainty_type: estimated digitization error, not experimental uncertainty
+    censoring: none
+    replicate_id_column: null
+    notes: >
+      Bar heights digitized from Figure 6. The source defines no error bars on
+      this figure, so no experimental uncertainty is available. The recorded
+      uncertainty is extraction resolution only.
+
+measurement_definitions:
+  measured_quantity: Glucose liberated from cellobiose hydrolysis
+  units: millimolar
+  uncertainty_definition: Uniform 0.10 mM estimated digitization error, about three rendered pixels on the calibrated y axis at 32.75 px per millimolar. Experimental uncertainty is unavailable because the source figure carries no error bars.
+  measurement_method: Glucose oxidase-peroxidase method using 3,3',5,5'-tetramethylbenzidine, sampled at 24 h intervals.
+
+preprocessing:
+  status: raw_figure_digitization
+  raw_data_available: false
+  steps:
+    - rendered open-access PDF page 11 at scale 3 with pypdfium2 5.12.1 and confirmed the 1786 x 2339 pixel render size
+    - masked the exact bar fill colour RGB 91 156 214 and took connected-component bounding boxes
+    - read the y calibration from the rendered axis tick marks at 32.75 pixels per millimolar with zero at pixel row 806.5
+    - assigned the printed x-axis tick times to the seventeen bars in left-to-right order
+    - converted bar-top pixel rows to millimolar without smoothing, fitting, baseline correction, or normalization
+  unit_conversions:
+    - glucose_mM = (806.5 - bar_top_pixel_row) / 32.75
+    - the printed y-axis unit "mmol/ml" is treated as a typo for micromole/ml, which equals millimolar, because the Results state the final value twice as "15.85 mM" and "15.85 micromole/ml"
+    - no conversion was applied to the source time values
+  excluded_points: []
+  notes: >
+    The y calibration was verified against two values the source states in prose
+    independently of the figure: the first point at 0.44 micromole/ml and the
+    final point at 15.85 mM. The digitization reproduced them as 0.412 and 15.771,
+    deviations of 0.028 and 0.079 mM, both inside the declared resolution.
+
+digitization:
+  software: pypdfium2 5.12.1, Pillow 12.2.0, scipy 1.17.1, numpy 2.4.6
+  source_page: Open-access article PDF page 11
+  source_series: Figure 6 blue bars
+  axis_calibration:
+    x_axis: Tick labels 1, 24, 48, 72, 96, 120, 144, 168, 188, 212, 236, 260, 284, 308, 332, 356, 380 hours, assigned by left-to-right bar order
+    y_axis: Zero at rendered pixel row 806.5 with 32.75 pixels per millimolar, read from ten axis tick marks
+    rendered_page_size_pixels: 1786 x 2339
+    render_scale: 3
+  estimated_digitization_error:
+    value: 0.10
+    units: millimolar
+    basis: About three rendered pixels on the calibrated y axis; the scale is 0.0305 mM per pixel.
+  included_points: 17
+  excluded_points: []
+  exclusion_reason: No points excluded from the series.
+
+supplementary_data:
+  file_name: fbioe-08-00813.pdf
+  source_url_or_doi: https://doi.org/10.3389/fbioe.2020.00813
+  checksum: sha256:fe9a2bb3afa08de4136ff54d28a98f395681b34b89c1f5a2692ebbae557345ff
+  access_date: 2026-08-18
+  notes: The repository stores the extracted observations and provenance, not a duplicate of the publisher PDF.
+
+validation:
+  expected_columns:
+    - time_h
+    - glucose_millimolar
+    - digitization_uncertainty_millimolar
+    - bar_center_x_pixel
+    - bar_top_y_pixel
+  allow_missing_uncertainty: false
+
+notes: >
+  Literature-raw digitization from an independent laboratory, enzyme, buffer,
+  temperature, and timescale relative to the Alvarez-Gonzalez 2022 source. It
+  supports cross-source tests of model structure. It does not support transfer of
+  fitted parameter values, which are specific to an enzyme preparation and assay.
+  The 380 h timescale makes enzyme deactivation a plausible mechanism here, in
+  contrast to the 60 min Alvarez-Gonzalez assay where it was falsified.

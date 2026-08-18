@@ -96,10 +96,13 @@ def test_alternate_public_time_course_candidate_loads_without_observations() -> 
     review = load_dataset_candidate_review(ARIAEENEJAD_CANDIDATE)
 
     assert review.candidate_id == "ariaeenejad_2020_persibgl1_cellobiose_hydrolysis"
-    assert review.status == "selected_for_schema_review"
+    assert review.status == "approved_for_ingestion"
     assert review.dataset_maturity == "literature_raw"
     assert review.source["doi"] == "10.3389/fbioe.2020.00813"
-    assert review.review["schema_result"] == "blocked_time_axis_conflict"
+    # Originally blocked on the source time-axis conflict, resolved on
+    # 2026-08-18 from the Figure 6 axis label. The prior verdict is retained.
+    assert review.review["schema_result"] == "passed"
+    assert review.review["prior_schema_result"] == "blocked_time_axis_conflict"
     assert "glucose yield over time from cellobiose hydrolysis" in review.intended_use[
         "measured_quantities"
     ]
@@ -139,27 +142,52 @@ def test_alternate_public_candidate_requires_digitization_before_ingestion() -> 
     assert "measurements" not in access_review
 
 
-def test_alternate_public_candidate_digitization_review_blocks_time_axis_conflict() -> None:
+def test_alternate_public_candidate_retains_its_superseded_block_as_audit_trail() -> None:
+    """The original blocked verdict stays on file, explicitly superseded."""
+
     review = load_dataset_candidate_review(ARIAEENEJAD_CANDIDATE)
     digitization_review = review.raw["digitization_review"]
     conflict_summary = digitization_review["conflict_summary"]
 
-    assert digitization_review["decision"] == "blocked_time_axis_conflict_do_not_ingest"
+    assert digitization_review["decision"].endswith("_superseded_by_resolution_review")
+    assert digitization_review["digitization_status"].endswith("_superseded_by_resolution_review")
     assert digitization_review["time_axis_resolution"] == "unresolved_source_conflict"
-    assert digitization_review["digitization_status"] == "blocked_do_not_digitize"
-    assert digitization_review["experiment_dataset_decision"] == "do_not_create"
-    assert digitization_review["data_added"] == "none"
     assert "method says 24-h intervals until 380 h" in conflict_summary["hour_based_evidence"]
     assert "result text says conversion reaches zero after 380 min" in conflict_summary[
         "minute_based_evidence"
     ]
-    assert "observations" not in digitization_review
-    assert "measurements" not in digitization_review
-    assert "data_file" not in digitization_review
-    assert "csv_path" not in digitization_review
+    for section in (digitization_review, review.raw["resolution_review"]):
+        for forbidden in ("observations", "measurements", "data_file", "csv_path"):
+            assert forbidden not in section
 
 
-def test_known_real_candidate_reviews_are_blocked_and_data_free() -> None:
+def test_alternate_public_candidate_resolution_is_evidence_backed() -> None:
+    """The block may only be lifted by a direct source statement, not an inference."""
+
+    review = load_dataset_candidate_review(ARIAEENEJAD_CANDIDATE)
+    resolution = review.raw["resolution_review"]
+
+    assert resolution["decision"] == "resolved_and_ingested"
+    assert resolution["time_axis_resolution"] == "resolved_hours_from_figure_axis_label"
+    assert resolution["supersedes"] == "digitization_review"
+    assert resolution["digitization_status"] == "digitized"
+    assert resolution["experiment_dataset_decision"] == "created"
+    assert "Biodegradation period (h)" in resolution["resolving_evidence"][0]["result"]
+    # The exit condition the original gate itself set must be the one that was met.
+    assert "exit condition" in resolution["resolution_rationale"]
+    assert resolution["regenerated_by"] == "scripts/digitize_ariaeenejad_2020_figure_6.py"
+    # Other source defects found during resolution must be recorded, not silently fixed.
+    assert len(resolution["additional_source_defects_recorded"]) >= 2
+
+
+def test_known_real_candidate_reviews_are_data_free() -> None:
+    """Reviews never carry observations, whether blocked or resolved.
+
+    Resa and Buckin 2011 remains blocked: its full text is paywalled and no
+    extractable observations were found. Ariaeenejad 2020 has been resolved and
+    ingested. Neither review may contain data.
+    """
+
     reviews = [load_dataset_candidate_review(path) for path in REAL_CANDIDATES]
 
     assert {review.candidate_id for review in reviews} == {
@@ -167,10 +195,13 @@ def test_known_real_candidate_reviews_are_blocked_and_data_free() -> None:
         "ariaeenejad_2020_persibgl1_cellobiose_hydrolysis",
     }
 
+    by_id = {review.candidate_id: review for review in reviews}
+    assert by_id["resa_buckin_2011_cellobiose_hydrolysis"].review["schema_result"].startswith("blocked_")
+    assert by_id["ariaeenejad_2020_persibgl1_cellobiose_hydrolysis"].review["schema_result"] == "passed"
+
     decisions = []
     for review in reviews:
         assert review.validate().passed
-        assert review.review["schema_result"].startswith("blocked_")
         decisions.append(review.raw["schema_review"]["decision"])
         _assert_no_observation_payload_fields(review.raw)
 
@@ -254,32 +285,22 @@ def test_candidate_review_directory_contains_only_review_files() -> None:
     ]
 
 
-def test_literature_directory_contains_only_the_reviewed_time_course() -> None:
-    """Only reviewed Figure S1 series from the single ingested source may appear.
+def test_literature_directory_contains_only_reviewed_sources() -> None:
+    """Only sources that cleared the schema gate may appear.
 
-    The three added series are additional conditions from the same figure of the
-    same publication, not a second source. Candidate sources that have not
-    cleared the schema gate must still stay out of this directory.
+    Candidates still recorded as blocked in the candidate-review directory, such
+    as Resa and Buckin 2011, must stay out of the literature directory.
     """
 
-    data_files = [
-        path
-        for path in LITERATURE_DIR.rglob("*")
-        if path.is_file() and path.name != "README.md"
-    ]
+    directories = sorted(path.name for path in LITERATURE_DIR.iterdir() if path.is_dir())
 
-    assert sorted(path.name for path in data_files) == [
-        "alvarez_gonzalez_2022_figure_s1a_filled_squares.csv",
-        "alvarez_gonzalez_2022_figure_s1a_open_squares.csv",
-        "alvarez_gonzalez_2022_figure_s1a_open_squares.yml",
-        "alvarez_gonzalez_2022_figure_s1b_filled_squares.csv",
-        "alvarez_gonzalez_2022_figure_s1b_filled_squares.yml",
-        "alvarez_gonzalez_2022_figure_s1b_open_squares.csv",
-        "alvarez_gonzalez_2022_figure_s1b_open_squares.yml",
-        "alvarez_gonzalez_2022_free_beta_glucosidase.yml",
+    assert directories == [
+        "alvarez_gonzalez_2022_free_beta_glucosidase",
+        "ariaeenejad_2020_persibgl1_cellobiose",
+        "cao_2015_bgl6_cellobiose",
     ]
-    # Every ingested file must still trace to the one reviewed publication.
-    assert all(path.name.startswith("alvarez_gonzalez_2022") for path in data_files)
+    ingested = " ".join(directories)
+    assert "resa_buckin" not in ingested
 
 
 def _fake_candidate_data() -> dict[str, Any]:

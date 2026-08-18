@@ -1,4 +1,16 @@
-"""Synthetic-only calibration for configured FungMod models."""
+"""Least-squares calibration for configured FungMod models.
+
+Calibration accepts synthetic datasets and provenance-complete literature
+datasets. It refuses every other dataset maturity, including toy fixtures and
+datasets that already claim calibrated or validated status.
+
+Fitting literature data is a parameter-estimation step, not a validation claim.
+A literature calibration carries its own assumptions and warnings so that a
+saved bundle can never be mistaken for a synthetic software fixture or for
+evidence of predictive validity. Establishing validity remains the job of
+held-out comparison and `fungal_model.calibration.evidence`, which still fixes
+`publication_claim_authorized` to false.
+"""
 
 from __future__ import annotations
 
@@ -31,6 +43,56 @@ from fungal_model.io.model_config import load_model_config
 
 class ConfiguredCalibrationError(ValueError):
     """Raised when configured-model calibration cannot be run honestly."""
+
+
+#: Dataset maturities that may be fitted. Anything else fails closed: toy and
+#: framework fixtures are not evidence, and a dataset already labelled
+#: calibrated or validated must not be refitted under its existing label.
+CALIBRATABLE_DATASET_MATURITIES = frozenset(
+    {"synthetic", "literature_raw", "literature_processed"}
+)
+LITERATURE_DATASET_MATURITIES = frozenset({"literature_raw", "literature_processed"})
+
+
+def _calibration_provenance(maturity: str, dataset_id: str) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
+    """Return the calibration_source, assumptions, and warnings for one maturity.
+
+    The strings differ by maturity so that a saved bundle states what was
+    actually fitted. A literature calibration must never inherit the synthetic
+    fixture wording.
+    """
+
+    shared = (
+        "Source model config is copied into temporary files and is not mutated in place.",
+    )
+    if maturity in LITERATURE_DATASET_MATURITIES:
+        source = (
+            "Least-squares calibration against a literature dataset; parameter estimation only, "
+            f"not empirical validation. Dataset ID: {dataset_id}."
+        )
+        assumptions = (
+            "Literature calibration; fitting a published dataset is parameter estimation, not validation.",
+            *shared,
+            "Fitted values apply only to the preparation, assay, and conditions of the fitted dataset.",
+            "Residual scales come from the dataset's declared uncertainty, which for digitized "
+            "figures is extraction resolution rather than experimental uncertainty.",
+        )
+        warnings = (
+            "Parameters were fitted to literature observations. Agreement with the fitted data is "
+            "not evidence of predictive validity; use a held-out condition and the calibration "
+            "evidence audit before making any claim.",
+        )
+        return source, assumptions, warnings
+    source = (
+        "Synthetic-only least-squares calibration; not empirical validation. "
+        f"Dataset ID: {dataset_id}."
+    )
+    assumptions = (
+        "Synthetic-only calibration; not empirical validation.",
+        *shared,
+        "No real fungal biology or literature data are introduced by this calibration.",
+    )
+    return source, assumptions, ()
 
 
 @dataclass(frozen=True)
@@ -66,6 +128,7 @@ class CalibrationResult:
     """Report for a synthetic configured-model calibration."""
 
     dataset_id: str
+    dataset_maturity: str
     model_config: str
     parameter_symbols: tuple[str, ...]
     fitted_parameters: ParameterSet
@@ -87,6 +150,7 @@ class CalibrationResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "dataset_id": self.dataset_id,
+            "dataset_maturity": self.dataset_maturity,
             "model_config": self.model_config,
             "parameter_symbols": list(self.parameter_symbols),
             "fitted_parameters": self.fitted_parameters.to_dict(),
@@ -145,16 +209,16 @@ def calibrate_configured_model(
     split: Mapping[str, Any] | None = None,
     max_nfev: int | None = None,
 ) -> CalibrationResult:
-    """Fit configured-model parameters against a synthetic dataset only."""
+    """Fit configured-model parameters against a synthetic or literature dataset."""
 
     source_config_path = Path(model_config).expanduser().resolve()
     source_config_data = _load_yaml_mapping(source_config_path)
     run_config_data = _config_with_resolved_paths(source_config_data, source_config_path)
     dataset_obj = load_experiment_dataset(dataset) if isinstance(dataset, (str, Path)) else dataset
-    if dataset_obj.maturity != "synthetic":
+    if dataset_obj.maturity not in CALIBRATABLE_DATASET_MATURITIES:
         raise ConfiguredCalibrationError(
-            "Configured calibration is currently synthetic-only; received "
-            f"dataset maturity {dataset_obj.maturity!r}."
+            f"Configured calibration rejects dataset maturity {dataset_obj.maturity!r}. "
+            f"Allowed maturities are {sorted(CALIBRATABLE_DATASET_MATURITIES)}."
         )
     symbols = tuple(str(symbol) for symbol in parameter_symbols)
     if not symbols:
@@ -198,6 +262,9 @@ def calibrate_configured_model(
     )
     observations = _observations(train_dataset)
     residual_scales = _residual_scales(train_dataset)
+    calibration_source, maturity_assumptions, maturity_warnings = _calibration_provenance(
+        dataset_obj.maturity, dataset_obj.dataset_id
+    )
 
     def predict(parameters: ParameterSet) -> Mapping[str, Quantity]:
         result = _run_with_parameters(run_config_data, source_config_path, parameters, symbols)
@@ -215,10 +282,7 @@ def calibrate_configured_model(
         observations=observations,
         residual_scales=residual_scales,
         validation_indices=(),
-        calibration_source=(
-            "Synthetic-only least-squares calibration; not empirical validation. "
-            f"Dataset ID: {dataset_obj.dataset_id}."
-        ),
+        calibration_source=calibration_source,
         max_nfev=max_nfev,
     )
     final_result = _run_with_parameters(run_config_data, source_config_path, fit_result.fitted_parameters, symbols)
@@ -236,11 +300,12 @@ def calibrate_configured_model(
         if validation_dataset is not None
         else None
     )
-    warnings = list(fit_result.warnings)
+    warnings = [*fit_result.warnings, *maturity_warnings]
     if not calibration_split.has_validation:
         warnings.append("No independent validation split was supplied; no validation claim is made.")
     result = CalibrationResult(
         dataset_id=dataset_obj.dataset_id,
+        dataset_maturity=dataset_obj.maturity,
         model_config=str(source_config_path),
         parameter_symbols=symbols,
         fitted_parameters=fit_result.fitted_parameters,
@@ -257,11 +322,7 @@ def calibrate_configured_model(
             "covariance": fit_result.covariance,
             "confidence_intervals": fit_result.confidence_intervals,
         },
-        assumptions=(
-            "Synthetic-only calibration; not empirical validation.",
-            "Source model config is copied into temporary files and is not mutated in place.",
-            "No real fungal biology or literature data are introduced by this calibration.",
-        ),
+        assumptions=maturity_assumptions,
         warnings=tuple(warnings),
         validation_residuals=() if validation_comparison is None else validation_comparison.residuals,
         split=calibration_split,
