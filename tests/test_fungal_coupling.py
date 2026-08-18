@@ -6,6 +6,7 @@ import pytest
 from fungal_model.chemistry import Reaction
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.units import Q_
+from fungal_model.fungi.energetics import GibbsEnergyYieldBound, GrowthEnergeticsError
 from fungal_model.fungi import (
     EnzymeCapability,
     EnzymeProfile,
@@ -99,6 +100,7 @@ def _model(
     assimilable: bool = True,
     additional_parameters: ParameterSet | None = None,
     maturity: str = FUNGAL_COUPLING_MATURITY,
+    yield_bound: GibbsEnergyYieldBound | None = None,
 ) -> FungalCouplingModel:
     def degradation_rate(state, time, parameters):
         del time
@@ -132,6 +134,7 @@ def _model(
         enzyme_class=enzyme_class,
         coupling_source=SOURCE,
         maturity=maturity,
+        yield_bound=yield_bound,
     )
 
 
@@ -197,3 +200,49 @@ def _parameter(name: str, symbol: str, value: float, units: str) -> Parameter:
         notes="Artificial software benchmark value.",
         measurement_method="definition",
     )
+
+
+# --------------------------------------------------------------------------
+# Thermodynamic yield ceiling
+# --------------------------------------------------------------------------
+
+
+def _yield_bound(*, catabolic: float, anabolic: float) -> GibbsEnergyYieldBound:
+    return GibbsEnergyYieldBound(
+        catabolic_delta_gibbs=_parameter("catabolic Gibbs energy", "dG_cat", catabolic, "joule / kilogram"),
+        anabolic_delta_gibbs=_parameter("anabolic Gibbs energy", "dG_ana", anabolic, "joule / kilogram"),
+    )
+
+
+def test_coupling_without_a_yield_bound_is_unconstrained() -> None:
+    """The bound is opt-in, so existing configurations keep working."""
+
+    model = _model()
+
+    assert model.yield_bound is None
+    assert model.validate_yield_energetics() is None
+    model.validate()
+    assert model.to_dict()["yield_bound"] is None
+
+
+def test_coupling_accepts_a_yield_within_its_thermodynamic_ceiling() -> None:
+    # The fixture declares Y_B = 0.5; a ceiling of 2.0 admits it.
+    model = _model(yield_bound=_yield_bound(catabolic=-1.2e7, anabolic=6.0e6))
+
+    result = model.validate_yield_energetics()
+
+    assert result is not None and result.passed
+    model.validate()
+    assert model.to_dict()["yield_bound"]["maximum_yield"] == pytest.approx(2.0)
+
+
+def test_coupling_rejects_a_yield_that_would_create_free_energy() -> None:
+    """A configured yield above the ceiling must fail before the model can run."""
+
+    # Ceiling of 0.25 against the fixture's declared Y_B = 0.5.
+    model = _model(yield_bound=_yield_bound(catabolic=-1.5e6, anabolic=6.0e6))
+
+    with pytest.raises(GrowthEnergeticsError, match="create free energy"):
+        model.validate()
+    with pytest.raises(GrowthEnergeticsError):
+        model.reactions()

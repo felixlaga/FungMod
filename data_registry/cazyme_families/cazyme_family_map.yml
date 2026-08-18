@@ -1,0 +1,113 @@
+kind: fungmod_registry_records
+record_type: cazyme_family_map
+description: >
+  Mapping from CAZy families to FungMod enzyme-class identifiers. This table
+  answers "which enzymatic capabilities does this genome plausibly encode", and
+  nothing else. It never implies a rate, a kinetic constant, an expression
+  level, or that the enzyme is secreted under any particular condition.
+
+  Many CAZy families are polyspecific: family membership constrains the fold and
+  catalytic machinery, not the exact substrate. Every entry therefore declares a
+  specificity level, and a polyspecific assignment must be treated as a
+  candidate capability rather than a confirmed one.
+
+provenance:
+  sources:
+    - Drula E, Garron ML, Dogan S, Lombard V, Henrissat B, Terrapon N. The carbohydrate-active enzyme database: functions and literature. Nucleic Acids Res. 2022;50(D1):D571-D577. doi:10.1093/nar/gkab1045
+    - Zheng J, Ge Q, Yan Y, Zhang X, Huang L, Yin Y. dbCAN3: automated carbohydrate-active enzyme and substrate annotation. Nucleic Acids Res. 2023;51(W1):W115-W121. doi:10.1093/nar/gkad328
+    - Levasseur A, Drula E, Lombard V, Coutinho PM, Henrissat B. Expansion of the enzymatic repertoire of the CAZy database to integrate auxiliary redox enzymes. Biotechnol Biofuels. 2013;6:41. doi:10.1186/1754-6834-6-41
+  curated_by: Claude (Anthropic) for FungMod
+  curation_date: 2026-08-18
+  notes: >
+    Family-to-activity assignments are the dominant reported activities for each
+    family. They are curated metadata, not measurements. Where a family is known
+    to carry several distinct activities the entry is marked polyspecific.
+
+specificity_levels:
+  family_diagnostic: >
+    The family's reported activities are dominated by a single enzyme class, so
+    membership is strong evidence for that capability.
+  family_polyspecific: >
+    The family contains several distinct activities. Membership indicates a
+    candidate capability that requires further evidence before use.
+
+records:
+  # --- cellulose ---
+  - family: GH1
+    enzyme_class: beta_glucosidase
+    specificity: family_polyspecific
+    notes: Also contains beta-galactosidases, beta-mannosidases, and myrosinases.
+  - family: GH3
+    enzyme_class: beta_glucosidase
+    specificity: family_polyspecific
+    notes: Also contains beta-xylosidases and N-acetylglucosaminidases.
+  - family: GH5
+    enzyme_class: cellulase_generic
+    specificity: family_polyspecific
+    notes: One of the largest and most functionally diverse GH families; endoglucanase is common but far from exclusive.
+  - family: GH6
+    enzyme_class: cellobiohydrolase
+    specificity: family_diagnostic
+    notes: Cellobiohydrolase II and some endoglucanases; cellulose-active.
+  - family: GH7
+    enzyme_class: cellobiohydrolase
+    specificity: family_diagnostic
+    notes: Fungal cellobiohydrolase I and endoglucanase I; the principal fungal cellulose-degrading family.
+  - family: GH12
+    enzyme_class: cellulase_generic
+    specificity: family_diagnostic
+    notes: Endoglucanase.
+  - family: GH45
+    enzyme_class: cellulase_generic
+    specificity: family_diagnostic
+    notes: Endoglucanase.
+  - family: AA9
+    enzyme_class: lytic_polysaccharide_monooxygenase
+    specificity: family_diagnostic
+    notes: Cellulose-active LPMO, formerly GH61. Oxidative, not hydrolytic; requires an electron donor and oxygen or hydrogen peroxide.
+  - family: AA3
+    enzyme_class: cellobiose_dehydrogenase
+    specificity: family_polyspecific
+    notes: GMC oxidoreductase superfamily; includes cellobiose dehydrogenase, aryl-alcohol oxidase, and glucose oxidase.
+
+  # --- hemicellulose ---
+  - family: GH10
+    enzyme_class: endo_xylanase
+    specificity: family_diagnostic
+    notes: Endo-1,4-beta-xylanase, broader substrate tolerance than GH11.
+  - family: GH11
+    enzyme_class: endo_xylanase
+    specificity: family_diagnostic
+    notes: Endo-1,4-beta-xylanase, classically mono-specific.
+  - family: CE1
+    enzyme_class: acetyl_xylan_esterase
+    specificity: family_polyspecific
+    notes: Also contains feruloyl esterases.
+
+  # --- lignin ---
+  - family: AA1
+    enzyme_class: laccase
+    specificity: family_polyspecific
+    notes: Multicopper oxidase family; includes ferroxidases and laccase-like proteins. Laccase acts on lignin only indirectly and usually requires a mediator.
+  - family: AA2
+    enzyme_class: class_ii_peroxidase
+    specificity: family_polyspecific
+    notes: Class II peroxidases spanning lignin peroxidase, manganese peroxidase, and versatile peroxidase, whose activities differ substantially.
+
+  # --- other polysaccharides ---
+  - family: GH18
+    enzyme_class: chitinase
+    specificity: family_diagnostic
+    notes: Chitinase. Fungi carry these for cell-wall remodelling as well as for nutrition, so presence does not imply chitin degradation as a carbon source.
+  - family: GH13
+    enzyme_class: alpha_amylase
+    specificity: family_polyspecific
+    notes: Very large starch-active family with many distinct specificities.
+  - family: GH15
+    enzyme_class: glucoamylase
+    specificity: family_diagnostic
+    notes: Glucoamylase.
+  - family: PL1
+    enzyme_class: pectate_lyase
+    specificity: family_diagnostic
+    notes: Pectate and pectin lyase.

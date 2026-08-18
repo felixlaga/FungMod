@@ -1,5 +1,13 @@
 """Chemical reactions, stoichiometry, and thermodynamic interfaces."""
 
+from .haldane import (
+    DEFAULT_HALDANE_RELATIVE_TOLERANCE,
+    HaldaneError,
+    check_haldane_consistency,
+    equilibrium_constant_from_gibbs,
+    haldane_equilibrium_constant,
+    reverse_vmax_from_haldane,
+)
 from .nonideal_thermodynamics import (
     DETAILED_BALANCE_RATE_RATIO_SOURCE,
     IUPAC_ACTIVITY_COEFFICIENT_SOURCE,
@@ -28,6 +36,12 @@ from .thermodynamics import (
 )
 
 __all__ = [
+    "DEFAULT_HALDANE_RELATIVE_TOLERANCE",
+    "HaldaneError",
+    "check_haldane_consistency",
+    "equilibrium_constant_from_gibbs",
+    "haldane_equilibrium_constant",
+    "reverse_vmax_from_haldane",
     "CarbonContent",
     "charge_balance_residual",
     "DETAILED_BALANCE_RATE_RATIO_SOURCE",

@@ -7,8 +7,10 @@ from dataclasses import dataclass
 from fungal_model.chemistry.reactions import Reaction
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.provenance import ProvenanceError, has_text
+from fungal_model.core.validators import ValidationResult
 from fungal_model.core.simulation import SimulationEngine
 from fungal_model.fungi.base import Fungus
+from fungal_model.fungi.energetics import GibbsEnergyYieldBound
 from fungal_model.fungi.enzyme_profile import (
     EnzymeDecayRateLaw,
     EnzymeProductionCostRateLaw,
@@ -44,6 +46,11 @@ class FungalCouplingModel:
     enzyme_class: str
     coupling_source: str
     maturity: str = FUNGAL_COUPLING_MATURITY
+    #: Optional thermodynamic ceiling on the biomass yield. When supplied, a
+    #: configured yield that would create free energy is rejected before the
+    #: model can run. Thermodynamics constrains the yield; it never supplies a
+    #: rate, which depends on enzyme activation barriers instead.
+    yield_bound: GibbsEnergyYieldBound | None = None
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -120,8 +127,22 @@ class FungalCouplingModel:
         if not assimilations[0].assimilable:
             raise ValueError("The configured degradation product is explicitly non-assimilable.")
         self.parameters.validate(require_values=True)
+        self.validate_yield_energetics()
         for reaction in self.degradation_reactions:
             reaction.validate_provenance()
+
+    def validate_yield_energetics(self) -> ValidationResult | None:
+        """Reject a biomass yield that exceeds its thermodynamic ceiling.
+
+        Returns None when no bound is configured. Supplying a bound removes a
+        degree of freedom: the yield can no longer be fitted to any value the
+        data happens to prefer, only to a thermodynamically admissible one.
+        """
+
+        if self.yield_bound is None:
+            return None
+        declared = self.parameters.require_quantity("Y_B", "dimensionless")
+        return self.yield_bound.enforce_yield(declared, symbol="Y_B")
 
     def reactions(self) -> tuple[Reaction, ...]:
         """Return the complete coupled reaction set after validation."""
@@ -246,6 +267,7 @@ class FungalCouplingModel:
             "target_bond_type": self.target_bond_type,
             "enzyme_class": self.enzyme_class,
             "coupling_source": self.coupling_source,
+            "yield_bound": None if self.yield_bound is None else self.yield_bound.to_dict(),
             "states": {
                 "substrate": self.substrate_state,
                 "product": self.product_state,

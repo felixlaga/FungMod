@@ -6,6 +6,26 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- `fungal_model.chemistry.haldane`: Haldane relations tying reversible
+  Michaelis-Menten parameters to the equilibrium constant, with
+  `equilibrium_constant_from_gibbs`, `reverse_vmax_from_haldane`, and
+  `check_haldane_consistency`. Given a sourced standard Gibbs energy and three
+  measured parameters the fourth is determined rather than fitted, which removes
+  a degree of freedom exactly where kinetic data is scarce. Scoped to uni-uni
+  mechanisms; multi-substrate reactions are rejected, not approximated.
+- `fungal_model.fungi.energetics.GibbsEnergyYieldBound`: a thermodynamic ceiling
+  on biomass yield, `Y_max = |dG_catabolic| / dG_anabolic`. Wired into
+  `FungalCouplingModel` as an opt-in `yield_bound`, so a configured yield that
+  would create free energy is rejected before the model can run. Both Gibbs
+  energies must be sourced; the bound invents no energy value.
+- `fungal_model.capability`: genome-derived enzymatic capability resolution.
+  A curated, literature-sourced CAZy family to enzyme-class map
+  (`data_registry/cazyme_families/cazyme_family_map.yml`, 18 families), an
+  offline dbCAN `overview.txt` parser, and a resolver that separates capabilities
+  FungMod can model from capabilities the organism has but FungMod cannot, and
+  family-diagnostic assignments from family-polyspecific ones. Presence and
+  absence only: a test asserts the output carries no rate or kinetic constant.
+
 - Two further literature sources, taking the repository to three independent
   sources, five series, and four enzyme preparations across three kinetic
   regimes. `scripts/digitize_ariaeenejad_2020_figure_6.py` adds a 17-point,

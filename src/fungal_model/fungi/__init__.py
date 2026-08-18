@@ -2,6 +2,7 @@
 
 from .base import Fungus, fungal_stage6_assumption, make_fungal_parameter_set
 from .coupling import FUNGAL_COUPLING_MATURITY, FungalCouplingModel
+from .energetics import GibbsEnergyYieldBound, GrowthEnergeticsError
 from .enzyme_profile import (
     EnzymeCapability,
     EnzymeDecayRateLaw,
@@ -21,6 +22,8 @@ from .metabolism import (
 )
 
 __all__ = [
+    "GibbsEnergyYieldBound",
+    "GrowthEnergeticsError",
     "BiomassMaintenanceRateLaw",
     "EnzymeCapability",
     "EnzymeDecayRateLaw",

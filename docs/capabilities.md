@@ -28,6 +28,9 @@ This page separates implemented software from scientific maturity.
 | Coupled hydrolysis and substrate transglycosylation | Implemented as a generic process law with one provenance-backed fungal-enzyme configuration | The transfer-product pool is unresolved; no product-linkage assignment, re-hydrolysis, or whole-fungus claim is made. |
 | Minimal well-mixed fungal process coupling | Implemented and software-tested | Caller-supplied degradation, capability, assimilation, secretion, uptake, yield, and maintenance inputs remain exploratory; no organism-specific physiology or validation is bundled. |
 | Dynamic single-process thermodynamic constraints | Implemented | Configured enforcement remains ideal-dilute and forward-rate blocking. |
+| Haldane relations linking kinetic parameters to equilibrium | Implemented | Uni-uni reversible Michaelis-Menten only; multi-substrate reactions are rejected rather than approximated. Constrains parameters and detects thermodynamically impossible sets; supplies no rate. |
+| Gibbs-energy biomass yield ceiling | Implemented and wired into fungal coupling | An upper bound assuming reversible zero-dissipation growth, not an estimate. Both Gibbs energies must be sourced; the bound is opt-in and inverts no existing behaviour. |
+| Genome-derived enzymatic capability resolution | Implemented | CAZy family to enzyme-class join from an offline dbCAN annotation. Presence and absence only: no rate, kinetic constant, expression level, or secretion claim. Polyspecific families are reported separately from diagnostic ones. |
 | Constant-coefficient nonideal reversible thermodynamics | Implemented as a separate low-level API | Coefficients and the forward kinetic scale must be sourced; no electrolyte model or configured assembly is inferred. |
 | 1D and uniform Cartesian 2D/3D reaction diffusion | Implemented and software-tested | No irregular mesh, porous morphology, moving boundary, or empirical spatial validation. |
 
@@ -50,7 +53,16 @@ This page separates implemented software from scientific maturity.
 
 ## Not currently supported
 
-- complete arbitrary fungus/substrate/environment prediction;
+- complete arbitrary fungus/substrate/environment prediction. Capability
+  resolution now covers any organism with a CAZyme annotation, but capability is
+  not modellability: for a typical white-rot repertoire only two of ten resolved
+  enzyme classes currently have a registry record, and the rest are reported as
+  present-but-unmodellable rather than silently dropped;
+- any rate predicted from thermodynamics. Gibbs energy fixes direction,
+  equilibrium, parameter coupling, and a yield ceiling. It does not fix rate,
+  which depends on an enzyme's activation barrier: two enzymes catalysing one
+  reaction share an equilibrium constant exactly while differing in maximal rate
+  by orders of magnitude;
 - resolved whole-fungus secretion, uptake, regulation, transporters, toxicity,
   respiration, and intracellular metabolism;
 - publication-grade calibration and broad external validation;
