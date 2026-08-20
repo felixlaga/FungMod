@@ -1,0 +1,462 @@
+name: Temporary PyPI FungMod 0.1.1 analysis
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/chatgpt-fungmod-analysis.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FUNGMOD_RELEASE_SHA: a5d9dfe845b79b58c0f7aba9a81ff45ab4334b0c
+  FUNGMOD_VERSION: "0.1.1"
+  FUNGMOD_PYPI_WHEEL_SHA256: f16a654d4e635c2bef3b5f71ef26aa497c5a31a9922abdb6f8d2bc25fa3547b1
+
+jobs:
+  execute-pypi-package:
+    name: Execute PyPI wheel, notebooks, and bespoke sweeps
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out exact release notebook sources
+        uses: actions/checkout@v6
+        with:
+          ref: a5d9dfe845b79b58c0f7aba9a81ff45ab4334b0c
+          fetch-depth: 1
+
+      - name: Verify notebook-source revision
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          echo "expected_release_sha=${FUNGMOD_RELEASE_SHA}"
+          echo "actual_checkout_sha=${actual_sha}"
+          test "${actual_sha}" = "${FUNGMOD_RELEASE_SHA}"
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Download, hash-check, and install the literal PyPI wheel
+        run: |
+          set -euo pipefail
+          python -m venv .venv-pypi
+          .venv-pypi/bin/python -m pip install --upgrade pip
+          mkdir -p fungmod-artifacts/dist fungmod-artifacts/environment
+          .venv-pypi/bin/python -m pip download \
+            --only-binary=:all: \
+            --no-deps \
+            --dest fungmod-artifacts/dist \
+            "fungmod==${FUNGMOD_VERSION}"
+          wheel_path="$(find fungmod-artifacts/dist -maxdepth 1 -name 'fungmod-*.whl' -print -quit)"
+          actual_wheel_sha="$(sha256sum "${wheel_path}" | awk '{print $1}')"
+          printf 'expected_sha256=%s\nactual_sha256=%s\nwheel=%s\n' \
+            "${FUNGMOD_PYPI_WHEEL_SHA256}" "${actual_wheel_sha}" "${wheel_path}" \
+            | tee fungmod-artifacts/environment/pypi-wheel-verification.txt
+          test "${actual_wheel_sha}" = "${FUNGMOD_PYPI_WHEEL_SHA256}"
+          .venv-pypi/bin/python -m pip install "${wheel_path}[notebooks]"
+
+      - name: Verify imports come from the installed PyPI wheel
+        run: |
+          set -euo pipefail
+          mkdir -p fungmod-artifacts/environment
+          {
+            echo "release_notebook_sha=$(git rev-parse HEAD)"
+            echo "git_status=$(git status --porcelain=v1)"
+            .venv-pypi/bin/python --version
+            .venv-pypi/bin/python - <<'PY'
+          import json
+          from pathlib import Path
+          import fungmod as fm
+
+          module_path = Path(fm.__file__).resolve()
+          print(f"fungmod_version={fm.__version__}")
+          print(f"fungmod_file={module_path}")
+          assert fm.__version__ == "0.1.1"
+          assert ".venv-pypi" in str(module_path), module_path
+          print(json.dumps({"import_origin_verified": True}))
+          PY
+          } | tee fungmod-artifacts/environment/execution.txt
+          .venv-pypi/bin/python -m pip freeze | sort > fungmod-artifacts/environment/pip-freeze.txt
+
+      - name: Execute all three release-scale notebooks with 32 samples
+        env:
+          FUNGMOD_NOTEBOOK_OUTPUT_ROOT: ${{ github.workspace }}/fungmod-artifacts/notebook-outputs
+          FUNGMOD_NOTEBOOK_SAMPLES: "32"
+          MPLBACKEND: Agg
+          PYTHONHASHSEED: "0"
+        run: |
+          set -euo pipefail
+          mkdir -p fungmod-artifacts/executed-notebooks
+          .venv-pypi/bin/jupyter nbconvert \
+            --to notebook \
+            --execute notebooks/examples/20_zero_to_complete_virtual_experiment.ipynb \
+            --output "${GITHUB_WORKSPACE}/fungmod-artifacts/executed-notebooks/20_zero_to_complete_virtual_experiment.executed.ipynb" \
+            --ExecutePreprocessor.timeout=1200
+          .venv-pypi/bin/jupyter nbconvert \
+            --to notebook \
+            --execute notebooks/examples/21_advanced_capabilities.ipynb \
+            --output "${GITHUB_WORKSPACE}/fungmod-artifacts/executed-notebooks/21_advanced_capabilities.executed.ipynb" \
+            --ExecutePreprocessor.timeout=1200
+          .venv-pypi/bin/jupyter nbconvert \
+            --to notebook \
+            --execute notebooks/examples/22_five_fungal_beta_glucosidases.ipynb \
+            --output "${GITHUB_WORKSPACE}/fungmod-artifacts/executed-notebooks/22_five_fungal_beta_glucosidases.executed.ipynb" \
+            --ExecutePreprocessor.timeout=1200
+
+      - name: Run bespoke thermodynamic and product-feedback sweeps
+        env:
+          FUNGMOD_NOTEBOOK_OUTPUT_ROOT: ${{ github.workspace }}/fungmod-artifacts/notebook-outputs
+          MPLBACKEND: Agg
+          PYTHONHASHSEED: "0"
+        run: |
+          set -euo pipefail
+          .venv-pypi/bin/python - <<'PY'
+          from __future__ import annotations
+
+          import copy
+          import csv
+          import json
+          import math
+          from pathlib import Path
+
+          import numpy as np
+          import yaml
+
+          import fungmod as fm
+
+          artifact_root = Path("fungmod-artifacts").resolve()
+          custom_root = artifact_root / "custom-experiments"
+          custom_root.mkdir(parents=True, exist_ok=True)
+
+          thermo_root = custom_root / "thermodynamic_equilibrium_sweep"
+          thermo_configs = thermo_root / "generated_configs"
+          thermo_runs = thermo_root / "raw_runs"
+          thermo_configs.mkdir(parents=True, exist_ok=True)
+          thermo_runs.mkdir(parents=True, exist_ok=True)
+
+          base_thermo_path = fm.example_data_path(
+              "model_configs/showcase_dynamic_thermodynamics.yml"
+          )
+          base_thermo = yaml.safe_load(base_thermo_path.read_text(encoding="utf-8"))
+          gas_constant = float(
+              base_thermo["thermodynamic_constraints"][0]["gas_constant"]["value"]
+          )
+          temperature = float(
+              base_thermo["thermodynamic_constraints"][0]["temperature"]["value"]
+          )
+          dg_values = [-15000.0, -10000.0, -5000.0, 0.0, 5000.0, 10000.0, 15000.0]
+          thermo_rows = []
+
+          for dg_standard in dg_values:
+              config = copy.deepcopy(base_thermo)
+              label = f"dg_{int(dg_standard):+06d}_J_per_mol".replace("+", "plus_").replace("-", "minus_")
+              config["name"] = f"artificial thermodynamic equilibrium sweep {dg_standard:g} J/mol"
+              config["thermodynamic_constraints"][0]["standard_energy"][
+                  "standard_delta_gibbs"
+              ]["value"] = dg_standard
+              config["time"]["stop"]["value"] = 200.0
+              config["time"]["points"] = 401
+              config["provenance"]["notes"] += (
+                  " ChatGPT analysis sweep: standard Gibbs energy changed explicitly; "
+                  "all values remain artificial framework-benchmark inputs."
+              )
+
+              archived_config = thermo_configs / f"{label}.yml"
+              archived_config.write_text(
+                  yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
+              )
+              runtime_config = base_thermo_path.parent / f"__chatgpt_{label}.yml"
+              runtime_config.write_text(
+                  yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
+              )
+              try:
+                  run = fm.run_configured_model(
+                      runtime_config,
+                      output_dir=thermo_runs / label,
+                  )
+              finally:
+                  runtime_config.unlink(missing_ok=True)
+
+              time_seconds = np.asarray(run.time.to("second").magnitude, dtype=float)
+              substrate = np.asarray(
+                  run.state("dissolved_substrate_amount").to("millimolar").magnitude,
+                  dtype=float,
+              )
+              product = np.asarray(
+                  run.state("released_product_amount").to("millimolar").magnitude,
+                  dtype=float,
+              )
+              blocked_key = next(
+                  key for key in run.derived_quantities if key.endswith(".rate_blocked")
+              )
+              delta_g_key = next(
+                  key for key in run.derived_quantities if key.endswith(".delta_gibbs")
+              )
+              blocked = np.asarray(
+                  run.derived_quantities[blocked_key].magnitude, dtype=float
+              )
+              delta_g = np.asarray(
+                  run.derived_quantities[delta_g_key].to("joule / mole").magnitude,
+                  dtype=float,
+              )
+              first_block_indices = np.flatnonzero(blocked > 0.5)
+              equilibrium_constant = math.exp(-dg_standard / (gas_constant * temperature))
+              theoretical_product_fraction = equilibrium_constant / (
+                  1.0 + equilibrium_constant
+              )
+              total = substrate + product
+              final_product_fraction = float(product[-1] / total[-1])
+              thermo_rows.append(
+                  {
+                      "standard_delta_gibbs_J_per_mol": dg_standard,
+                      "equilibrium_constant": equilibrium_constant,
+                      "theoretical_product_fraction": theoretical_product_fraction,
+                      "simulated_final_product_fraction": final_product_fraction,
+                      "absolute_fraction_error": abs(
+                          final_product_fraction - theoretical_product_fraction
+                      ),
+                      "first_block_time_s": (
+                          None
+                          if first_block_indices.size == 0
+                          else float(time_seconds[first_block_indices[0]])
+                      ),
+                      "final_delta_gibbs_J_per_mol": float(delta_g[-1]),
+                      "max_mass_balance_error_mM": float(
+                          np.max(np.abs(total - total[0]))
+                      ),
+                      "solver_success": bool(run.solver_metadata["success"]),
+                  }
+              )
+
+          thermo_csv = thermo_root / "thermodynamic_equilibrium_sweep.csv"
+          with thermo_csv.open("w", newline="", encoding="utf-8") as handle:
+              writer = csv.DictWriter(handle, fieldnames=list(thermo_rows[0]))
+              writer.writeheader()
+              writer.writerows(thermo_rows)
+
+          feedback_root = custom_root / "initial_glucose_feedback_sweep"
+          feedback_configs = feedback_root / "generated_configs"
+          feedback_runs = feedback_root / "raw_runs"
+          feedback_configs.mkdir(parents=True, exist_ok=True)
+          feedback_runs.mkdir(parents=True, exist_ok=True)
+
+          generated_source = (
+              artifact_root
+              / "notebook-outputs"
+              / "22_five_fungal_beta_glucosidases"
+              / "generated_configs"
+          )
+          glucose_levels_mM = [0.0, 0.5, 1.0, 2.0, 5.0, 10.0]
+          feedback_rows = []
+
+          for source_config in sorted(
+              generated_source.glob("*__with_glucose_inhibition.yml")
+          ):
+              base_config = yaml.safe_load(source_config.read_text(encoding="utf-8"))
+              source_organism = base_config["name"].split(
+                  " purified beta-glucosidase", 1
+              )[0]
+              case_slug = source_config.name.split("__", 1)[0]
+              initial_substrate = float(
+                  base_config["initial_state"]["states"][
+                      "cellobiose_concentration"
+                  ]["value"]
+              )
+
+              for glucose_mM in glucose_levels_mM:
+                  config = copy.deepcopy(base_config)
+                  config["name"] += f"; initial glucose {glucose_mM:g} mM"
+                  config["initial_state"]["states"][
+                      "beta_D_glucose_concentration"
+                  ]["value"] = glucose_mM
+                  config["initial_state"]["states"][
+                      "beta_D_glucose_concentration"
+                  ]["source"] = (
+                      "Explicit ChatGPT analysis sweep input; not attributed to the paper."
+                  )
+                  config["provenance"]["notes"] += (
+                      f" Initial glucose was explicitly set to {glucose_mM:g} mM "
+                      "for a conditional product-feedback sensitivity sweep."
+                  )
+                  level_slug = str(glucose_mM).replace(".", "p")
+                  archived = feedback_configs / f"{case_slug}__glucose_{level_slug}_mM.yml"
+                  archived.write_text(
+                      yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
+                  )
+                  output = feedback_runs / case_slug / f"glucose_{level_slug}_mM"
+                  run = fm.run_configured_model(archived, output_dir=output)
+
+                  time_seconds = np.asarray(
+                      run.time.to("second").magnitude, dtype=float
+                  )
+                  substrate = np.asarray(
+                      run.state("cellobiose_concentration").to("millimolar").magnitude,
+                      dtype=float,
+                  )
+                  rate = np.asarray(
+                      run.rate("cellobiose_hydrolysis")
+                      .to("millimolar / second")
+                      .magnitude,
+                      dtype=float,
+                  )
+                  crossing = np.flatnonzero(substrate <= 0.5 * initial_substrate)
+                  feedback_rows.append(
+                      {
+                          "source_organism": source_organism,
+                          "initial_glucose_mM": glucose_mM,
+                          "initial_cellobiose_mM": initial_substrate,
+                          "final_cellobiose_mM": float(substrate[-1]),
+                          "final_conversion_percent": float(
+                              100.0 * (1.0 - substrate[-1] / initial_substrate)
+                          ),
+                          "t50_grid_s": (
+                              None
+                              if crossing.size == 0
+                              else float(time_seconds[crossing[0]])
+                          ),
+                          "initial_rate_mM_per_s": float(rate[0]),
+                          "final_rate_mM_per_s": float(rate[-1]),
+                          "solver_success": bool(run.solver_metadata["success"]),
+                      }
+                  )
+
+          feedback_csv = feedback_root / "initial_glucose_feedback_sweep.csv"
+          with feedback_csv.open("w", newline="", encoding="utf-8") as handle:
+              writer = csv.DictWriter(handle, fieldnames=list(feedback_rows[0]))
+              writer.writeheader()
+              writer.writerows(feedback_rows)
+
+          summary = {
+              "kind": "fungmod_chatgpt_bespoke_experiments",
+              "fungmod_version": fm.__version__,
+              "scientific_scope": (
+                  "Artificial thermodynamic framework benchmark plus conditional "
+                  "purified-enzyme sensitivity runs; not empirical validation or "
+                  "whole-fungus physiology."
+              ),
+              "thermodynamic_runs": len(thermo_rows),
+              "initial_glucose_feedback_runs": len(feedback_rows),
+              "thermodynamic_summary": str(thermo_csv.relative_to(artifact_root)),
+              "feedback_summary": str(feedback_csv.relative_to(artifact_root)),
+          }
+          (custom_root / "custom_experiments_manifest.json").write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(summary, indent=2))
+          PY
+
+      - name: Render notebooks and export every textual cell output
+        run: |
+          set -euo pipefail
+          mkdir -p fungmod-artifacts/executed-notebooks/html fungmod-artifacts/raw
+          for notebook in fungmod-artifacts/executed-notebooks/*.ipynb; do
+            .venv-pypi/bin/jupyter nbconvert \
+              --to html \
+              "$notebook" \
+              --output-dir fungmod-artifacts/executed-notebooks/html
+          done
+          .venv-pypi/bin/python - <<'PY'
+          import json
+          from pathlib import Path
+          import nbformat
+
+          root = Path("fungmod-artifacts")
+          executed = root / "executed-notebooks"
+          raw_dir = root / "raw"
+          raw_dir.mkdir(parents=True, exist_ok=True)
+          all_rows = []
+          markdown = ["# Raw executed-notebook outputs\n"]
+
+          for notebook_path in sorted(executed.glob("*.ipynb")):
+              notebook = nbformat.read(notebook_path, as_version=4)
+              markdown.append(f"\n# {notebook_path.name}\n")
+              for index, cell in enumerate(notebook.cells):
+                  if cell.cell_type != "code":
+                      continue
+                  outputs = []
+                  for output in cell.get("outputs", []):
+                      kind = output.get("output_type", "unknown")
+                      item = {"output_type": kind}
+                      if kind == "stream":
+                          item["name"] = output.get("name")
+                          item["text"] = output.get("text", "")
+                      elif kind in {"execute_result", "display_data"}:
+                          data = output.get("data", {})
+                          item["execution_count"] = output.get("execution_count")
+                          item["text_plain"] = data.get("text/plain", "")
+                          if "application/json" in data:
+                              item["application_json"] = data["application/json"]
+                          item["embedded_mime_types"] = sorted(data)
+                      elif kind == "error":
+                          item["ename"] = output.get("ename")
+                          item["evalue"] = output.get("evalue")
+                          item["traceback"] = output.get("traceback", [])
+                      outputs.append(item)
+
+                  row = {
+                      "notebook": notebook_path.name,
+                      "cell_index": index,
+                      "cell_id": cell.get("id"),
+                      "execution_count": cell.get("execution_count"),
+                      "source": cell.get("source", ""),
+                      "outputs": outputs,
+                  }
+                  all_rows.append(row)
+                  markdown.append(f"\n## Code cell {index} ({cell.get('id', '')})\n")
+                  markdown.append("```python\n" + cell.get("source", "") + "\n```\n")
+                  if not outputs:
+                      markdown.append("_No textual output._\n")
+                  for output_index, item in enumerate(outputs):
+                      markdown.append(f"\n### Output {output_index + 1}: {item['output_type']}\n")
+                      if "text" in item:
+                          markdown.append("```text\n" + str(item["text"]) + "\n```\n")
+                      if "text_plain" in item:
+                          markdown.append("```text\n" + str(item["text_plain"]) + "\n```\n")
+                      if "application_json" in item:
+                          markdown.append("```json\n" + json.dumps(item["application_json"], indent=2, default=str) + "\n```\n")
+                      if item.get("embedded_mime_types"):
+                          markdown.append(
+                              "Embedded MIME types: `"
+                              + "`, `".join(item["embedded_mime_types"])
+                              + "`\n"
+                          )
+                      if item.get("traceback"):
+                          markdown.append("```text\n" + "\n".join(item["traceback"]) + "\n```\n")
+
+          (raw_dir / "notebook_cells_and_outputs.json").write_text(
+              json.dumps(all_rows, indent=2, ensure_ascii=False, default=str),
+              encoding="utf-8",
+          )
+          (raw_dir / "notebook_cells_and_outputs.jsonl").write_text(
+              "\n".join(json.dumps(row, ensure_ascii=False, default=str) for row in all_rows) + "\n",
+              encoding="utf-8",
+          )
+          (raw_dir / "notebook_cells_and_outputs.md").write_text(
+              "".join(markdown), encoding="utf-8"
+          )
+          PY
+
+      - name: Inventory and hash the complete PyPI execution bundle
+        run: |
+          set -euo pipefail
+          cp notebooks/examples/20_zero_to_complete_virtual_experiment.ipynb fungmod-artifacts/executed-notebooks/
+          cp notebooks/examples/21_advanced_capabilities.ipynb fungmod-artifacts/executed-notebooks/
+          cp notebooks/examples/22_five_fungal_beta_glucosidases.ipynb fungmod-artifacts/executed-notebooks/
+          find fungmod-artifacts -type f -printf '%P\n' | LC_ALL=C sort > fungmod-artifacts/environment/file-inventory.txt
+          find fungmod-artifacts -type f ! -path '*/sha256sums.txt' -print0 \
+            | LC_ALL=C sort -z \
+            | xargs -0 sha256sum > fungmod-artifacts/environment/sha256sums.txt
+          du -ah fungmod-artifacts | sort -h > fungmod-artifacts/environment/sizes.txt
+
+      - name: Upload complete PyPI-wheel execution and bespoke experiments
+        uses: actions/upload-artifact@v5
+        with:
+          name: fungmod-pypi-0.1.1-notebooks-and-custom-sweeps
+          path: fungmod-artifacts/
+          if-no-files-found: error
+          retention-days: 2
