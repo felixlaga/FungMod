@@ -125,7 +125,7 @@ class CalibrationSplit:
 
 @dataclass(frozen=True)
 class CalibrationResult:
-    """Report for a synthetic configured-model calibration."""
+    """Report for an explicitly labelled synthetic or literature calibration."""
 
     dataset_id: str
     dataset_maturity: str
@@ -290,17 +290,25 @@ def calibrate_configured_model(
         result=final_result,
         dataset=train_dataset,
         observable_mapping=mappings,
+        fitted_parameter_count=len(symbols),
     )
     validation_comparison = (
         evaluate_model_against_dataset(
             result=final_result,
             dataset=validation_dataset,
             observable_mapping=mappings,
+            fitted_parameter_count=0,
         )
         if validation_dataset is not None
         else None
     )
     warnings = [*fit_result.warnings, *maturity_warnings]
+    unweighted = sorted(set(observations).difference(residual_scales))
+    if unweighted:
+        warnings.append(
+            f"Residual scales are unknown for {unweighted}; the objective uses raw observation units "
+            "for these measurements, not inferred uncertainties."
+        )
     if not calibration_split.has_validation:
         warnings.append("No independent validation split was supplied; no validation claim is made.")
     result = CalibrationResult(
@@ -360,10 +368,10 @@ def _parameters_with_initial_guess(
         symbol: replace(
             parameters.get(symbol),
             value=float(initial_guess[symbol]),
-            source=f"Synthetic calibration initial guess for {symbol}.",
+            source=f"Caller-supplied calibration initial guess for {symbol}.",
             confidence_level="testing",
-            notes=f"Initial guess for synthetic-only configured calibration of {symbol}.",
-            measurement_method="synthetic calibration initial guess",
+            notes=f"Optimizer initial guess for configured calibration of {symbol}; not an observation.",
+            measurement_method="caller-supplied calibration initial guess",
         )
         for symbol in symbols
     }
@@ -385,7 +393,7 @@ def _fittable_parameter(
         symbol=symbol,
         lower_bound=_bound_parameter(symbol=symbol, label="lower", value=float(lower), units=base.units),
         upper_bound=_bound_parameter(symbol=symbol, label="upper", value=float(upper), units=base.units),
-        notes="Configured synthetic calibration fittable parameter.",
+        notes="Configured calibration fittable parameter; dataset maturity is recorded in the result.",
     )
 
 
@@ -429,10 +437,10 @@ def _bound_parameter(*, symbol: str, label: str, value: float, units: str) -> Pa
         value=value,
         units=units,
         uncertainty=None,
-        source="User-provided or unbounded synthetic calibration optimizer bound.",
+        source="User-provided or unbounded calibration optimizer bound.",
         confidence_level="testing",
-        notes="Optimizer bound for synthetic-only configured calibration; not a physical constant.",
-        measurement_method="synthetic calibration configuration",
+        notes="Optimizer bound for configured calibration; not a physical constant.",
+        measurement_method="calibration configuration",
     )
 
 
@@ -522,9 +530,15 @@ def _observations(dataset: ExperimentDataset) -> dict[str, Quantity]:
 def _residual_scales(dataset: ExperimentDataset) -> dict[str, Quantity]:
     scales: dict[str, Quantity] = {}
     for series in dataset.measurements:
-        positive = [point.uncertainty for point in series.points if point.uncertainty is not None and point.uncertainty > 0]
-        if positive:
-            scales[series.measurement_id] = Q_(float(np.mean(positive)), series.value_units)
+        uncertainties = [point.uncertainty for point in series.points]
+        if all(value is None for value in uncertainties):
+            continue
+        if any(value is None or not np.isfinite(value) or value <= 0 for value in uncertainties):
+            raise ConfiguredCalibrationError(
+                f"Measurement {series.measurement_id!r} must supply finite positive uncertainty for every "
+                "point or leave all uncertainties unknown; partial weighting is not inferred."
+            )
+        scales[series.measurement_id] = Q_(np.asarray(uncertainties, dtype=float), series.value_units)
     return scales
 
 

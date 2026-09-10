@@ -31,6 +31,15 @@ The current PR queue and reconciled scoped phase status are tracked in
 
 # Current project status
 
+2026-09-11 reconciliation: seven literature series from three papers are now
+available, and configured literature calibration plus within-source holdout
+runners exist. The research-analysis correctness pass removed the pNPG-to-
+cellobiose constant substitution, repaired residual degrees of freedom and
+pointwise weighting, and replaced automatic mechanism verdicts with bounded
+fit diagnostics. Independent validation remains pending; see the current
+`progress.md` entry and `docs/calibration-evidence.md`. Older phase descriptions
+below do not override this scoped status.
+
 As of this roadmap, FungMod has:
 
 ```text

@@ -23,7 +23,7 @@ jobs:
           python -m pip install -e ".[dev,standards]"
 
       - name: Lint
-        run: python -m ruff check src tests
+        run: python -m ruff check src tests scripts/run_*.py
 
       - name: Type check
         run: python -m pyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"

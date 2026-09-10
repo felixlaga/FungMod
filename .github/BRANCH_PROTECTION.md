@@ -5,7 +5,7 @@ requests and the `CI / tests` workflow must pass before merge.
 
 The CI workflow currently blocks on:
 
-- `python -m ruff check src tests`
+- `python -m ruff check src tests scripts/run_*.py`
 - `python -m pyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`
 - `python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`
 

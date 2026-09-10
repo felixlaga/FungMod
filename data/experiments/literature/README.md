@@ -3,14 +3,14 @@
 This folder contains provenance-complete literature datasets plus the schema
 contract and review checklist used before ingestion.
 
-Current datasets (three independent sources, five series, four enzyme preparations):
+Current datasets (three independent sources, seven series, four enzyme preparations):
 
 - `alvarez_gonzalez_2022_free_beta_glucosidase/`: four nine-point digitizations
   of Supplementary Figure S1 in Alvarez-Gonzalez et al. (2022), covering both
   panels and both cellobiose loadings. All four are `literature_raw`, represent
   a purified commercial enzyme formulation of unstated biological source, and
-  are suitable for bounded model comparison, not calibration or a general
-  validation claim.
+  support bounded model comparison and explicitly labelled parameter estimation.
+  They do not establish a general validation claim.
 
   - Figure S1A filled squares: 20 g/L cellobiose, 59.2 mg/L free enzyme. This is
     the original series and the reference condition for the held-out study.
@@ -41,6 +41,11 @@ Current datasets (three independent sources, five series, four enzyme preparatio
   directly. Two further source defects, a wrong y-axis unit and an anomalous
   tick label, are recorded rather than silently corrected. Regenerate with
   `scripts/digitize_ariaeenejad_2020_figure_6.py`.
+
+  The paper's 1.25 mM Michaelis constant was measured using pNPG at pH 7;
+  it is not a matched cellobiose constant for this pH-8 time course. The
+  exploratory cross-source runner estimates cellobiose `K_m` from the curve
+  and reports that local fit diagnostics do not establish identifiability.
 
 - `cao_2015_bgl6_cellobiose/`: two six-point digitizations of Figure 5a in Cao
   et al. (2015), covering wild-type Bgl6 and the engineered mutant M3 hydrolysing

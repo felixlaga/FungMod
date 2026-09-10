@@ -47,8 +47,8 @@ This page separates implemented software from scientific maturity.
 | Synthetic-data utilities | Implemented for software tests | Synthetic data must never be presented as scientific evidence. |
 | First literature time-course comparison | Implemented for one same-source no-refit consistency check | The nine digitized observations and source-model parameters are not independent validation; digitization resolution is not experimental uncertainty. |
 | Held-out condition study across all four Figure S1 series | Implemented for one publication | Four series, 36 digitized observations, from one figure by one laboratory. Held-out agreement shows transfer across experimental conditions, not independent replication. |
-| Three independent literature sources, five series, four enzyme preparations | Implemented | Alvarez-Gonzalez 2022 (60 min), Ariaeenejad 2020 (380 h), Cao 2015 (10 h). Only the first carries a held-out condition; for the other two the cross-source test is structural adequacy under fitting, not predictive validation. |
-| Cross-source structural adequacy test with identifiability screening | Implemented | Flags bound-pinned parameters and ill-conditioned Jacobians, so a low RMSE reached by parameter compensation is not reported as success. One of five series is flagged degenerate. |
+| Three independent literature sources, seven series, four enzyme preparations | Implemented | Alvarez-Gonzalez 2022 (60 min), Ariaeenejad 2020 (380 h), Cao 2015 (10 h). Only the first supplies additional conditions for within-source prediction; the other two support exploratory fitting, not predictive validation. |
+| Cross-source exploratory fits with numerical diagnostics | Implemented | Fits five selected series and reports convergence attempts, bound proximity, and Jacobian conditioning for both candidate models. Local diagnostics do not establish identifiability, structural adequacy, or a biological mechanism. |
 | Monte Carlo, local, and global sensitivity | Implemented | Global indices assume independent explicit input distributions; no empirical biological distribution is supplied. |
 
 ## Not currently supported
@@ -70,27 +70,17 @@ This page separates implemented software from scientific maturity.
   those provides a single condition per enzyme, so the model can be fitted to
   them but not tested out-of-sample against them. Only Alvarez-Gonzalez 2022
   supplies a genuine held-out condition;
-- any reconciliation of the fitted PersiBGL1 product-inhibition constant
-  (about 34 mM) with that source's own claim of a glucose inhibition constant
-  near 8.8 M. The fit reproduces the observed plateau by strong product
-  inhibition, which contradicts the source's glucose-tolerance claim. The
-  discrepancy is recorded and unexplained;
-- transfer of homogeneous Michaelis-Menten parameters across enzyme loading. In
-  the one condition tested, a nominal five-fold increase in free beta-glucosidase
-  raised the observed initial rate only about 1.6-fold, an apparent scaling of
-  `[E]^0.28` rather than the linear `V_max = k_cat * [E]` the configured model
-  assumes. Refitting does not remove the discrepancy, so it is a structural gap
-  and not a parameter-estimation problem. Two candidate mechanisms were tested
-  and both failed, so neither is implemented
-  (`scripts/run_alvarez_gonzalez_2022_mechanism_hypotheses.py`):
-  first-order thermal deactivation is falsified, since the fitted half-life of
-  about 1189 min is negligible against a 60 min assay and every held-out
-  condition degrades; and a single sub-linear enzyme-scaling exponent is not
-  supported, since the two affected series imply exponents of 0.55 and 0.79 and
-  cross-prediction between them fails in one direction. Because the same figure
-  also prints inconsistent enzyme-concentration units, the panel-B enzyme
-  metadata is treated as insufficiently reliable for model comparison and those
-  series are excluded from validation claims;
+- transfer of pNPG assay constants to cellobiose. Earlier PersiBGL1 fit results
+  fixed a pNPG Michaelis constant and are superseded. The current study estimates
+  the unknown cellobiose constant and treats the fit as exploratory. Its
+  inhibition parameters cannot establish a contradiction with a different assay;
+- validated transfer across enzyme loading. The Alvarez-Gonzalez panel-B
+  predictions have unresolved residuals and depend on an assumed mg/L reading
+  of a caption printing mg/mL. Candidate deactivation and enzyme-scaling fits
+  are reported by `scripts/run_alvarez_gonzalez_2022_mechanism_hypotheses.py`, but
+  do not confirm or falsify either mechanism or uniquely attribute the residuals
+  to model structure. Additional observations and resolved assay metadata are
+  needed before making validation claims;
 - coupled-network thermodynamic flux optimization;
 - state-dependent electrolyte/activity-coefficient models;
 - correlated-input global sensitivity and Bayesian calibration;

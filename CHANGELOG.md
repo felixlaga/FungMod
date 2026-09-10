@@ -4,6 +4,22 @@ All notable public releases of FungMod are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Removed the pNPG Michaelis constant from the cellobiose cross-source fit;
+  the unknown cellobiose constant is estimated with explicit limitations.
+- Comparison statistics now require an explicit fitted-parameter count for
+  reduced chi-square and omit undefined values. Configured calibration records
+  the training count and preserves pointwise uncertainties instead of averaging.
+  Partial uncertainty fails explicitly; entirely unknown scales remain unweighted.
+- Research runners check solver/optimizer success and nested-model consistency,
+  verify reference trajectories against the configured package path, and report
+  descriptive results instead of automatic mechanism conclusions. Research
+  summary schemas are now `2.0.0`; regenerate historical study outputs.
+- Added warnings for approximate confidence intervals outside optimizer bounds,
+  reconciled literature-calibration guidance, and extended quality gates to
+  research runners. No new empirical validation or biological mechanism is claimed.
+
 ### Added
 
 - `fungal_model.chemistry.haldane`: Haldane relations tying reversible
@@ -27,7 +43,7 @@ All notable public releases of FungMod are documented here.
   absence only: a test asserts the output carries no rate or kinetic constant.
 
 - Two further literature sources, taking the repository to three independent
-  sources, five series, and four enzyme preparations across three kinetic
+  sources, seven series, and four enzyme preparations across three kinetic
   regimes. `scripts/digitize_ariaeenejad_2020_figure_6.py` adds a 17-point,
   380 h PersiBGL1 series (Ariaeenejad 2020, CC BY);
   `scripts/digitize_cao_2015_figure_5a.py` adds two 6-point, 10 h series for
@@ -35,8 +51,8 @@ All notable public releases of FungMod are documented here.
   Both digitizers verify their axis calibration against values each source
   states in prose, independently of the figure, and refuse to write otherwise.
 - `scripts/run_cross_source_structural_test.py`, which fits the shared rate-law
-  structure to every series with and without enzyme deactivation, and screens
-  each fit for identifiability by bound proximity and Jacobian conditioning.
+  structure to five selected series with and without enzyme deactivation, and
+  reports numerical diagnostics for both fits without asserting identifiability.
 - The Ariaeenejad 2020 candidate review moves from blocked to
   `approved_for_ingestion`, with a `resolution_review` block recording that the
   time-axis conflict was resolved by the figure's own x-axis label. The original
@@ -44,19 +60,11 @@ All notable public releases of FungMod are documented here.
 
 ### Findings
 
-- One rate-law structure is adequate across all three sources. Identified fits
-  reach 0.21 % to 6.29 % of series scale. One of five series, the Alvarez-Gonzalez
-  70 g/L condition, is flagged DEGENERATE when fitted alone because K_m runs to
-  its search bound: that condition is predictable from other data but not
-  identifiable from its own curve.
-- Enzyme deactivation is warranted for wild-type Bgl6 (fitted half-life 4.2 h in
-  a 10 h assay, 39 % RMSE reduction) but not for its engineered mutant M3, and
-  not for any Alvarez-Gonzalez series. The framework recovered this distinction
-  from progress curves alone; it is consistent with the source publication's own
-  point that M3 is the more robust variant.
-- The PersiBGL1 fit reproduces the observed plateau with a product-inhibition
-  constant near 34 mM, which contradicts that source's claim of a glucose
-  inhibition constant near 8.8 M. Recorded as an unexplained discrepancy.
+- Earlier cross-source structural-adequacy and deactivation-warranted claims
+  are superseded by the research-analysis corrections above. Training residuals
+  and local Jacobian diagnostics do not establish those conclusions. The
+  PersiBGL1 fit previously used a Michaelis constant from a different substrate;
+  regenerate results with the corrected exploratory parameterization.
 - Resa and Buckin (2011) is confirmed paywalled with no extractable observations
   and remains blocked.
 
@@ -79,11 +87,9 @@ All notable public releases of FungMod are documented here.
   validated maturities still fail closed. A literature calibration records
   `dataset_maturity` and carries parameter-estimation assumptions and a
   non-validation warning instead of the synthetic-fixture wording.
-- Model parameters transfer across initial substrate concentration but not
-  across enzyme loading. Predicting the 70 g/L series at the training enzyme
-  loading, with no parameter changed, gives 1.28% relative RMSE. Both panel-B
-  series, at a nominal five-fold enzyme loading, show 9/9 positive residuals and
-  are not repaired by refitting.
+- Within-source prediction residuals differ across substrate and nominal enzyme
+  loadings. They do not establish general parameter transferability or uniquely
+  attribute discrepancies to mechanism structure.
 - A model-free comparison of the two panels gives an apparent enzyme scaling of
   `[E]^0.28`, against the `V_max = k_cat * [E]` linearity the configured model
   assumes. Recorded as an unsupported capability rather than tuned away.
@@ -92,10 +98,10 @@ All notable public releases of FungMod are documented here.
   222 mM charge in about 0.19 s against 36.66 mM observed at 60 min. The mg/L
   reading is adopted as an explicitly recorded assumption; the printed value and
   unit are preserved verbatim in the dataset records.
-- In the four-parameter fit, the substrate-inhibition constant `K_i` is
-  unidentified from a single progress curve: its approximate 95% interval spans
-  negative values. Dropping it tightens the `V_max` standard error 2.5-fold and
-  improves held-out accuracy.
+- In the four-parameter fit, the approximate interval for positive `K_i` extends
+  outside its admissible range. This flags an unsuitable local interval or weak
+  identification, not a negative physical constant. Fixing it at the source's
+  point estimate is a conditional model choice, not new measurement evidence.
 
 - SBML Level 3 export for the supported well-mixed kinetic processes
   (first-order decay, mass action, and homogeneous Michaelis-Menten) via the

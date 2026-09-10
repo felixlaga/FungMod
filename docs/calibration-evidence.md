@@ -4,6 +4,35 @@ FungMod can fit explicit parameters with bounded least squares and can audit the
 result against a study's declared evidence criteria. It cannot decide that a
 calibration is publishable.
 
+Configured calibration accepts synthetic and provenance-complete literature
+datasets, with separate maturity and interpretation labels. It preserves each
+point's declared uncertainty. Partial, nonpositive, or nonfinite uncertainty
+is rejected; an entirely unknown series remains unweighted and is reported as
+such. Low-level residual utilities support scalar scales and observation-shaped
+arrays, including matching slices for training and validation.
+
+`evaluate_model_against_dataset(..., fitted_parameter_count=p)` reports residual
+degrees of freedom as `n - p`. Supply the number of parameters fitted using the
+observations being evaluated, or zero for predictions independent of those
+observations. An omitted count stays unknown. Reduced chi-square is omitted
+when the count is unknown, uncertainties are incomplete, or degrees of freedom
+are nonpositive. Configured calibration supplies the training count and zero
+for held-out observations. These arithmetic diagnostics do not establish an
+experimental noise model: digitization resolution is not replicate variance.
+
+Approximate normal confidence intervals are not clipped to optimizer bounds.
+An interval extending outside those bounds produces an explicit warning that
+the local approximation may be unsuitable.
+
+The research runners report descriptive residuals and convergence diagnostics.
+They do not declare a mechanism required or falsified from a training-error
+threshold. Cross-source summary schema `2.0.0` removes the previous
+`deactivation_warranted` and `identified_series` claims; its explicit
+`mechanism_conclusion` remains `not_established_by_training_fit`. The separate
+hypothesis runner uses schema `2.0.0` and reports
+`not_established_by_exploratory_comparison`. Earlier output folders are historical
+and should be regenerated before use with the corrected code.
+
 ## What the audit checks
 
 `audit_calibration_evidence(...)` evaluates:
@@ -101,10 +130,10 @@ software criteria. `publication_claim_authorized` is always `false`. Software
 cannot establish experimental independence, adequacy of the biological model,
 reproducibility by another group, peer review, or journal fitness.
 
-FungMod's bundled Alvarez-Gonzalez 2022 comparison cannot satisfy the default
-independent-validation requirement: it compares parameters and digitized
-observations from the same source without refitting, and its recorded
-digitization resolution is not experimental uncertainty.
+FungMod's bundled Alvarez-Gonzalez 2022 comparisons cannot satisfy the default
+independent-validation requirement: both the published-parameter comparison and
+the stage-2 fitted/held-out study use observations from the same source, and
+their recorded digitization resolution is not experimental uncertainty.
 
 Before making a scientific calibration claim, obtain at least an archived
 analysis plan, raw training and genuinely independent validation observations,

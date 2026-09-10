@@ -26,7 +26,7 @@ def test_quality_tool_configs_exist() -> None:
     assert "F" in pyproject["tool"]["ruff"]["lint"]["select"]
     assert pyproject["tool"]["coverage"]["run"]["source"] == ["fungal_model"]
     assert pyproject["tool"]["coverage"]["report"]["fail_under"] >= 80
-    assert pyright["include"] == ["src/fungal_model", "src/fungmod"]
+    assert pyright["include"] == ["src/fungal_model", "src/fungmod", "scripts/run_*.py"]
     assert pyright["typeCheckingMode"] == "basic"
     assert pyright["reportArgumentType"] is True
     assert pyright["reportAssignmentType"] is True
@@ -55,6 +55,7 @@ def test_ci_runs_lint_typecheck_and_coverage() -> None:
     )
 
     assert "python -m ruff check src tests" in commands
+    assert "python -m ruff check src tests scripts/run_*.py" in commands
     assert "python -m pyright" in commands
     assert "python -m pytest --cov=fungal_model" in commands
     assert "--cov-report=xml" in commands
@@ -81,3 +82,16 @@ def test_readme_states_ci_is_required_before_merging() -> None:
     assert "up-to-date branches" in readme
     assert "no force pushes" in readme
     assert "no unaudited direct bypass" in readme
+
+
+def test_research_guidance_matches_the_current_evidence_boundary() -> None:
+    calibration = (ROOT / "data/calibration/README.md").read_text(encoding="utf-8")
+    literature = (ROOT / "data/experiments/literature/README.md").read_text(encoding="utf-8")
+    evidence = (ROOT / "docs/calibration-evidence.md").read_text(encoding="utf-8")
+    assert "literature_raw" in calibration
+    assert "Real literature calibration is not allowed yet" not in calibration
+    assert "seven series" in literature
+    assert "pNPG" in literature
+    assert "fitted_parameter_count" in evidence
+    assert "2.0.0" in evidence
+    assert "not_established_by_training_fit" in evidence

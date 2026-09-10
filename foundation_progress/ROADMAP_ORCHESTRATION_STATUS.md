@@ -14,6 +14,13 @@ executable code and tests.
 
 ## Orchestrated PR Workflow
 
+Current research-evidence reconciliation (2026-09-11): literature calibration
+and seven source series exist. Research runners now report descriptive fits
+with convergence checks, explicit parameter applicability and corrected
+statistical metrics. Independent predictive validation is still pending. Older
+queue rows describing only the first no-calibration comparison are historical
+snapshots; use the latest `progress.md` entry for this scope.
+
 Use this workflow for each roadmap PR:
 
 1. Maker thread works in its own worktree and branch.

@@ -42,6 +42,66 @@ def line_predictor(x_values):
     return predict
 
 
+def test_pointwise_uncertainty_recovers_analytical_weighted_fit() -> None:
+    x = np.array([1.0, 2.0, 3.0])
+    y = np.array([1.0, 2.0, 12.0])
+    sigma = np.array([0.1, 0.2, 10.0])
+    base = ParameterSet([parameter(name="slope", symbol="k", value=2.0, units="1/second")])
+    spec = FittableParameter(
+        symbol="k",
+        lower_bound=parameter(name="low", symbol="low", value=0.0, units="1/second"),
+        upper_bound=parameter(name="high", symbol="high", value=10.0, units="1/second"),
+    )
+    fit = fit_least_squares(
+        base_parameters=base, fittable_parameters=[spec], predict=line_predictor(Q_(x, "second")),
+        observations={"y": Q_(y, "dimensionless")},
+        residual_scales={"y": Q_(sigma, "dimensionless")}, validation_indices=(),
+        calibration_source="Artificial heteroscedastic linear regression with known analytic optimum.",
+    )
+    assert fit.success
+    expected = np.sum(x * y / sigma**2) / np.sum(x**2 / sigma**2)
+    assert fit.fitted_parameters.get("k").value == pytest.approx(expected, rel=1e-6)
+    assert abs(expected - np.sum(x*y) / np.sum(x*x)) > 1.0
+
+
+def test_pointwise_scales_convert_units_and_follow_noncontiguous_split() -> None:
+    residuals = residuals_between(
+        predictions={"y": Q_([2.0, 4.0, 7.0], "kilogram")},
+        observations={"y": Q_([1.0, 2.0, 3.0], "kilogram")},
+        residual_scales={"y": Q_([100.0, 200.0, 400.0], "gram")}, indices=[2, 0],
+    )
+    np.testing.assert_allclose(residuals.flattened_scaled(), [10.0, 10.0])
+
+
+def test_normal_interval_outside_bounds_is_visible_and_warned() -> None:
+    from fungal_model.calibration.fitting import _covariance_and_intervals
+
+    parameters = ParameterSet([parameter(name="slope", symbol="k", value=0.1, units="1/second")])
+    spec = FittableParameter(
+        symbol="k",
+        lower_bound=parameter(name="low", symbol="low", value=0.0, units="1/second"),
+        upper_bound=parameter(name="high", symbol="high", value=1.0, units="1/second"),
+    )
+    covariance, intervals, warnings = _covariance_and_intervals(
+        jacobian=np.ones((3, 1)), residual_vector=np.array([2.0, -2.0, 0.0]),
+        fitted_vector=np.array([0.1]), fittable_parameters=[spec], fitted_parameters=parameters,
+    )
+    assert covariance["k"]["k"] == pytest.approx(4.0 / 3.0)
+    assert intervals["k"]["lower_95_approx"] < 0.0
+    assert intervals["k"]["upper_95_approx"] > 1.0
+    assert any("extends outside its optimizer bounds" in message for message in warnings)
+
+
+@pytest.mark.parametrize("scale", [[1.0], [[1.0, 2.0]], [1.0, 0.0], [1.0, float('nan')], float('inf')])
+def test_residual_scale_shape_and_finiteness_are_enforced(scale) -> None:
+    with pytest.raises(ValueError, match="Residual scale"):
+        residuals_between(
+            predictions={"y": Q_([1.0, 2.0], "second")},
+            observations={"y": Q_([0.0, 0.0], "second")},
+            residual_scales={"y": Q_(scale, "second")},
+        ).flattened_scaled()
+
+
 def test_least_squares_fit_recovers_slope_and_records_validation_split() -> None:
     x_values = Q_(np.linspace(0.0, 5.0, 6), "second")
     observations = {"y": Q_(2.0 * x_values.magnitude, "dimensionless")}

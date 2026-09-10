@@ -39,6 +39,8 @@ def test_configured_synthetic_calibration_recovers_first_order_rate(tmp_path: Pa
     assert result.fitted_parameters.get("k_ab").quantity.to("1 / second").magnitude == pytest.approx(0.1, rel=0.05)
     assert result.metrics["train_rmse"] < 0.003
     assert result.metrics["validation_rmse"] < 0.003
+    assert result.metrics["train_residual_degrees_of_freedom"] == result.metrics["train_n_points"] - 1
+    assert result.metrics["validation_residual_degrees_of_freedom"] == result.metrics["validation_n_points"]
     assert result.split is not None
     train_indices = set(result.split.train_indices["product_mass"])
     validation_indices = set(result.split.validation_indices["product_mass"])
@@ -72,6 +74,21 @@ def test_fitted_parameter_records_synthetic_only_provenance(tmp_path: Path) -> N
     assert dataset.dataset_id in provenance_text
     assert "least-squares" in provenance_text
     assert "not empirical validation" in provenance_text
+
+
+def test_configured_pointwise_uncertainty_is_not_averaged(tmp_path: Path) -> None:
+    from fungal_model.calibration.configured import _residual_scales
+    import numpy as np
+
+    dataset = _generated_dataset(tmp_path)
+    series = dataset.measurements[0]
+    uncertainties = [0.1 * (i + 1) for i in range(len(series.points))]
+    points = tuple(replace(point, uncertainty=scale) for point, scale in zip(series.points, uncertainties, strict=True))
+    weighted = replace(dataset, measurements=(replace(series, points=points),))
+    np.testing.assert_allclose(_residual_scales(weighted)[series.measurement_id].magnitude, uncertainties)
+    partial = replace(weighted, measurements=(replace(series, points=(replace(points[0], uncertainty=None), *points[1:])),))
+    with pytest.raises(ConfiguredCalibrationError, match="partial weighting"):
+        _residual_scales(partial)
 
 
 def test_calibration_output_bundle_is_inspectable(tmp_path: Path) -> None:

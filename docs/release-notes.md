@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Corrected comparison degrees of freedom and preserved pointwise calibration
+  uncertainty. Reduced chi-square now requires explicit `fitted_parameter_count`.
+- Removed a pNPG-to-cellobiose parameter substitution, added research-runner
+  convergence and reference-trajectory checks, and replaced automatic mechanism
+  verdicts with descriptive results. Research summaries use schema `2.0.0`;
+  regenerate earlier output folders. Independent biological validation remains
+  pending.
+
 ## 0.1.1 — 2026-08-01
 
 - Added a packaged literature-transcribed showcase input and a full notebook

@@ -103,11 +103,7 @@ class CalibrationResiduals:
             if scale is None:
                 pieces.append(residual_values.reshape(-1))
                 continue
-            scale_value = float(
-                assert_compatible(scale, str(residual.units), name=f"{species} residual scale").magnitude
-            )
-            if scale_value <= 0.0:
-                raise ValueError(f"Residual scale for {species} must be positive.")
+            scale_value = _scale_values(scale, residual, species)
             pieces.append((residual_values / scale_value).reshape(-1))
         if not pieces:
             return np.array([], dtype=float)
@@ -187,13 +183,18 @@ def residuals_between(
     label: str = "residuals",
     notes: str = "",
 ) -> CalibrationResiduals:
-    """Compute prediction-minus-observation residuals with unit checks."""
+    """Compute residuals, preserving scalar or observation-shaped uncertainty.
+
+    Array scales must match the full observation shape and are sliced with the
+    same indices as residuals. Implicit broadcasting of array scales is rejected.
+    """
 
     missing = set(observations).difference(predictions)
     if missing:
         raise KeyError(f"Predictions are missing observed species: {sorted(missing)}")
     selected = None if indices is None else tuple(int(index) for index in indices)
     residuals: dict[str, Quantity] = {}
+    selected_scales: dict[str, Quantity] = {}
     for species, observed in observations.items():
         observed_q = require_quantity(observed, name=f"observations[{species}]")
         predicted_q = assert_compatible(
@@ -202,6 +203,12 @@ def residuals_between(
             name=f"predictions[{species}]",
         )
         difference = predicted_q - observed_q
+        scale = (residual_scales or {}).get(species)
+        if scale is not None:
+            values = _scale_values(scale, observed_q, species)
+            if selected is not None and values.ndim != 0:
+                values = values[list(selected)]
+            selected_scales[species] = Q_(values, observed_q.units)
         if selected is not None:
             difference = Q_(np.asarray(difference.magnitude)[list(selected)], difference.units)
         residuals[species] = difference
@@ -209,9 +216,21 @@ def residuals_between(
         label=label,
         residuals=residuals,
         indices=selected,
-        residual_scales=residual_scales or {},
+        residual_scales=selected_scales,
         notes=notes,
     )
+
+
+def _scale_values(scale: Quantity, residual: Quantity, species: str) -> np.ndarray:
+    values = np.asarray(
+        assert_compatible(scale, str(residual.units), name=f"{species} residual scale").magnitude,
+        dtype=float,
+    )
+    if values.ndim != 0 and values.shape != np.shape(residual.magnitude):
+        raise ValueError(f"Residual scale for {species} must be scalar or match the observation shape.")
+    if not np.all(np.isfinite(values)) or np.any(values <= 0.0):
+        raise ValueError(f"Residual scale for {species} must be finite and positive.")
+    return values
 
 
 __all__ = [

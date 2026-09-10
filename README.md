@@ -315,7 +315,7 @@ CI is required before merging. The CI workflow installs `.[dev]` and runs the
 package-quality gates below:
 
 ```bash
-python -m ruff check src tests
+python -m ruff check src tests scripts/run_*.py
 python -m pyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"
 python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml
 python -m mkdocs build --strict
@@ -989,6 +989,25 @@ This is a preparation- and assay-specific consistency comparison, not
 independent validation. The source does not state the commercial formulation's
 organism, its parameter uncertainties are unavailable, and the stored 0.6 mM
 uncertainty is digitization resolution rather than experimental variability.
+
+The literature collection now contains seven series from three papers. The
+additional Alvarez-Gonzalez conditions support within-source comparisons;
+Ariaeenejad and Cao supply different enzyme preparations and are fitted
+separately. `scripts/run_alvarez_gonzalez_2022_stage2_calibration.py` estimates
+parameters from the reference series and predicts the other conditions.
+`scripts/run_cross_source_structural_test.py` reports exploratory training fits,
+convergence attempts, and numerical identifiability diagnostics. Its unknown
+cellobiose `K_m` is estimated from the relevant curve; the PersiBGL1 pNPG value
+is never substituted. Neither runner establishes independent validation.
+
+Model comparison reports reduced chi-square only when the caller supplies
+`fitted_parameter_count` and the residual degrees of freedom are positive.
+Configured calibration supplies the training parameter count and uses zero
+for observations held out from fitting. Pointwise uncertainties are preserved;
+partially missing or invalid uncertainty is rejected rather than averaged or
+filled in. Digitization resolution remains distinct from experimental noise.
+See [calibration evidence](docs/calibration-evidence.md) for the interpretation
+and remaining evidence requirements.
 
 ## Notebooks
 

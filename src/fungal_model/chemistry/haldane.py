@@ -34,7 +34,6 @@ different Haldane form; they are rejected rather than approximated.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 from typing import Any
 
 from fungal_model.core.units import Q_, Quantity, assert_compatible

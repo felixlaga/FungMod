@@ -7,7 +7,8 @@ ID, status, reason, risk, exit condition, removal milestone, and tests
 protecting the boundary. New foundation work should remove entries from this
 file, not normalize them.
 
-Current state: no active contained architecture-debt entries. `FD-007` was
+Current state: one active contained entry, `FD-008`, records existing exploratory
+research-runner duplication. `FD-007` was
 resolved on 2026-08-01 by deterministic build-time staging from the canonical
 resource roots. `FD-005` was resolved in PR-41 by enabling Pyright optional-member-access
 checking and narrowing nullable scientific values explicitly. `FD-006`
@@ -15,6 +16,36 @@ process-to-`Reaction` adapter debt was resolved in Phase 1 Task 4; retained
 `Reaction`, `SimulationEngine`, and `ReactionDiffusionEngine1D` APIs are
 intentional explicit low-level APIs, not native configured workflow
 dependencies.
+
+## FD-008 Exploratory research-runner rate-law duplication
+
+Status: contained on 2026-09-11
+
+Reason: the cross-source and mechanism-hypothesis research runners independently
+integrate the published inhibited progress-curve law to fit candidate extensions.
+They predate this containment entry and are not the public configured execution
+path. Their deactivation extensions are explicit study hypotheses rather than
+registered or validated biological mechanisms.
+
+Risk: a standalone study can drift from the package law or promote numerical
+fit quality to a mechanistic conclusion.
+
+Containment: complete substrate and product trajectories from the cross-source
+base law are compared to the current configured package model in tests. The
+hypothesis runner compares its full reference trajectory at runtime and in tests.
+Both runners reject solver/optimizer failure and protect the feasible nested
+base fit. Reports state that mechanisms and identifiability are not established
+by local training fits; the pNPG constant is not reused for cellobiose.
+
+Exit condition: source the intended extension for one assay and express both
+runners through a shared package/configured contract, retaining numerical parity
+and negative-path tests without claiming broader biological applicability.
+
+Removal milestone: the next bounded research-runner integration task, before
+promoting any candidate extension into the registry or public configured API.
+
+Tests protecting it: `tests/test_cross_source_structural_study.py` and
+`tests/test_research_runner_guardrails.py`.
 
 ## FD-007 Wheel-packaged resource mirror
 

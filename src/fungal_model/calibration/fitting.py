@@ -276,6 +276,12 @@ def _covariance_and_intervals(
             "units": parameter.units,
             "method": "linearized least-squares normal approximation",
         }
+        lower, upper = fittable_parameters[index].bounds_numeric(fitted_parameters)
+        if value - z_value * standard_error < lower or value + z_value * standard_error > upper:
+            warnings.append(
+                f"Approximate confidence interval for {symbol} extends outside its optimizer bounds; "
+                "the untruncated local normal approximation may be unsuitable."
+            )
     return covariance, intervals, warnings
 
 

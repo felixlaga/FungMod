@@ -203,8 +203,10 @@ def run(output_dir: Path) -> dict:
             bounds={s: BOUNDS[s] for s in symbols},
             output_dir=output_dir / label / "calibration",
         )
+        if not calibration.success:
+            raise RuntimeError(f"{label}: calibration did not converge; held-out predictions were not run.")
         fitted = {
-            symbol: float(calibration.fitted_parameters.get(symbol).value)
+            symbol: float(calibration.fitted_parameters.require_quantity(symbol).magnitude)
             for symbol in symbols
         }
         held = {h.key: _predict({**PUBLISHED, **fitted}, h) for h in HOLDOUTS}

@@ -185,8 +185,23 @@ def evaluate_model_against_dataset(
     result: SimulationResult,
     dataset: ExperimentDataset,
     observable_mapping: Sequence[ObservableMapping] | Mapping[str, str],
+    fitted_parameter_count: int | None = None,
 ) -> ModelDatasetComparison:
-    """Compare a model result against a dataset through explicit observable mappings."""
+    """Compare a model result against a dataset through explicit observable mappings.
+
+    ``fitted_parameter_count`` counts parameters estimated using these observations.
+    Supply zero for a prediction made without fitting these observations. Unknown
+    counts remain explicit: reduced chi-square is omitted unless this count is
+    supplied, all residual scales are available, and residual degrees of freedom
+    are positive. These statistics inherit the dataset's uncertainty meaning.
+    """
+
+    if fitted_parameter_count is not None and (
+        isinstance(fitted_parameter_count, bool)
+        or not isinstance(fitted_parameter_count, int)
+        or fitted_parameter_count < 0
+    ):
+        raise ModelDatasetComparisonError("fitted_parameter_count must be a nonnegative integer or None.")
 
     series_by_id = {series.measurement_id: series for series in dataset.measurements}
     mappings = _normalize_mappings(observable_mapping, series_by_id)
@@ -222,6 +237,8 @@ def evaluate_model_against_dataset(
             details={
                 "dataset_id": dataset.dataset_id,
                 "mappings": [mapping.to_dict() for mapping in mappings],
+                "fitted_parameter_count": fitted_parameter_count,
+                "reduced_chi_square_policy": "requires known fitted count and positive residual degrees of freedom",
             },
         ),
     )
@@ -230,7 +247,7 @@ def evaluate_model_against_dataset(
         model_name=result.name,
         mappings=mappings,
         residuals=tuple(residual_series),
-        metrics=_comparison_metrics(residual_series),
+        metrics=_comparison_metrics(residual_series, fitted_parameter_count=fitted_parameter_count),
         validation_results=tuple(validations),
         dataset_snapshot=dataset.to_dict(),
     )
@@ -392,7 +409,9 @@ def _residual_series(
     )
 
 
-def _comparison_metrics(residuals: Sequence[ResidualSeries]) -> dict[str, float]:
+def _comparison_metrics(
+    residuals: Sequence[ResidualSeries], *, fitted_parameter_count: int | None = None,
+) -> dict[str, float]:
     raw = np.asarray(
         [point.residual for series in residuals for point in series.points],
         dtype=float,
@@ -404,6 +423,9 @@ def _comparison_metrics(residuals: Sequence[ResidualSeries]) -> dict[str, float]
         "rmse": float(np.sqrt(np.mean(raw**2))),
         "mean_abs_residual": float(np.mean(np.abs(raw))),
     }
+    if fitted_parameter_count is not None:
+        metrics["fitted_parameter_count"] = float(fitted_parameter_count)
+        metrics["residual_degrees_of_freedom"] = float(raw.size - fitted_parameter_count)
     standardized = [
         point.standardized_residual
         for series in residuals
@@ -414,7 +436,8 @@ def _comparison_metrics(residuals: Sequence[ResidualSeries]) -> dict[str, float]
         standardized_values = np.asarray(standardized, dtype=float)
         chi_square = float(np.sum(standardized_values**2))
         metrics["chi_square"] = chi_square
-        metrics["reduced_chi_square"] = chi_square / max(1.0, float(raw.size - len(residuals)))
+        if fitted_parameter_count is not None and raw.size > fitted_parameter_count:
+            metrics["reduced_chi_square"] = chi_square / (raw.size - fitted_parameter_count)
     return metrics
 
 

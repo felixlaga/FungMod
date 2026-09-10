@@ -26,6 +26,109 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## RESEARCH-ANALYSIS-001 Correctness And Evidence Boundaries
+
+Date: 2026-09-11
+
+Status: complete for the confirmed software and reporting defects; final quality
+gate results are recorded below. Independent biological validation remains
+pending and was not replaced by software tests.
+
+Changed:
+
+- Removed the cross-source study's transfer of the PersiBGL1 pNPG `K_m` to
+  cellobiose. Cellobiose `K_m` is now an explicitly exploratory fitted parameter;
+  omitted substrate inhibition is an explicit hypothesis rather than a large
+  numerical stand-in constant.
+- Added an optional `fitted_parameter_count` to model/dataset comparison.
+  Reduced chi-square is emitted only with a known count, complete scales, and
+  positive `n - p`. Configured calibration passes the training parameter count
+  and zero for held-out observations. Missing counts remain unknown.
+- Preserved observation-shaped uncertainty through weighting, unit conversion,
+  and train/validation slicing. Partial or invalid uncertainty is rejected;
+  fully unknown uncertainty stays unweighted with a warning. Added warnings for
+  untruncated approximate intervals extending outside optimizer bounds.
+- Added deterministic multiple-start fitting to the cross-source runner,
+  including the feasible base model in extended-model optimization. Both
+  research hypothesis runners check convergence/integration and reference
+  trajectory consistency. They report descriptive residuals and numerical
+  diagnostics, not confirmation, falsification, or biological identifiability.
+- Blocked stage-2 held-out predictions after unsuccessful calibration. Removed
+  synthetic-only wording from shared caller-supplied initial guesses and bounds.
+- Reconciled the seven-series inventory, literature-calibration guidance,
+  superseded mechanism claims, active roadmap status, and output migration notes.
+  Lint and Pyright now include `scripts/run_*.py`; existing duplicate study rate
+  laws are explicitly contained as `FD-008`, with trajectory and failure tests.
+
+Tests added/modified: comparison tests cover explicit/unknown/exhausted degrees
+of freedom; calibration tests cover an analytical heteroscedastic fit, unit
+conversion and noncontiguous uncertainty slicing, invalid scales, unchanged
+untruncated intervals with warnings, and configured weighting. New
+`test_cross_source_structural_study.py` and `test_research_runner_guardrails.py`
+cover complete source-model trajectory parity, the pNPG exclusion, nested-fit
+regression, solver and optimizer failures, stage-2 failure gating, and bounded
+JSON conclusions. Quality-contract tests cover research-runner gates and
+documentation. Existing literature metadata tests remain active.
+
+Verification:
+
+- Focused scientific/runner/documentation regression group: 98 passed.
+- Final calibration and quality-contract tests, including the additional
+  interval regression: 20 passed.
+- `.venv/bin/python -m ruff check src tests scripts/run_*.py`: passed.
+- `.venv/bin/python -m pyright --pythonpath /Users/felix/Documents/GitHub/FungMod/.venv/bin/python`:
+  passed, zero errors/warnings.
+- `.venv/bin/python -m mkdocs build --strict --site-dir /tmp/fungmod-fixes/site`:
+  passed.
+- Cross-source, stage-2 calibration, and mechanism-hypothesis CLI runners:
+  passed with new outputs under `/tmp/fungmod-fixes/`. Regenerated stage-2
+  training degrees of freedom are 5 (four parameters) and 6 (three parameters);
+  corresponding reduced chi-square values are 0.0854527 and 0.0711714.
+- Packaged-resource staging identity and deterministic release-notebook checks:
+  passed.
+- `.venv/bin/python -m build --outdir /tmp/fungmod-fixes/dist` and
+  `.venv/bin/python -m twine check /tmp/fungmod-fixes/dist/*`: passed for the
+  wheel and source distribution. Built-wheel resource verification confirmed
+  82 canonical resources with identical bytes.
+- Installed the wheel without dependencies into `/tmp/fungmod-fixes/wheel-installed`
+  and ran Python from `/tmp` using that package plus existing environment
+  dependencies. Verified the wheel import path, corrected weighted residuals,
+  and a seeded two-sample registry virtual experiment outside the checkout.
+  This was not a fresh dependency-resolution test or a remote CI run.
+- Full-suite command:
+  `MPLCONFIGDIR=/tmp/fungmod-fixes/mpl XDG_CACHE_HOME=/tmp/fungmod-fixes/cache .venv/bin/python -m pytest -q --cov=fungal_model --cov-report=term --cov-report=json:/tmp/fungmod-fixes/coverage.json`.
+  Result: **1401 passed in 687.93 seconds; 84.46% coverage**, exceeding the 80%
+  gate. The additional interval regression added after this run's collection
+  passed in the final 20-test calibration/quality check above. No required
+  local command remained blocked. Full output: `/tmp/fungmod-fixes/full-tests.log`.
+
+What did not change: literature observations, source snapshots, production
+registry values, public configured kinetic laws, empirical validation status,
+and existing user-owned output folders. No new biological mechanism or dataset
+was added, and no scientific publication was performed.
+
+Scientific behavior impact: affected study parameter estimates and statistics
+change; heterogeneous uncertainty now changes calibration weights correctly.
+Base configured simulation equations are unchanged. Improved numerical fitting
+does not resolve the empirical panel-B discrepancy or establish a mechanism.
+
+Backward compatibility: existing comparison calls remain callable, but reduced
+chi-square now requires explicit degrees-of-freedom context. Partial uncertainty
+that previously inherited an average now fails. Research summaries use schema
+`2.0.0` and remove old mechanism/identifiability verdict fields; regenerate old
+study artifacts. Scalar low-level residual scales remain supported.
+
+Remaining ambiguity and risk: moderate numerical/interpretation risk from
+changed estimation and reporting semantics. Digitization resolution is not
+experimental uncertainty, source-unit ambiguities remain unresolved, local
+optimizer diagnostics do not prove identifiability, and arbitrary whole-fungus
+prediction remains unsupported. `FD-008` records remaining study-law duplication.
+
+Recommended next task: obtain preparation-matched raw replicate observations
+and analytical uncertainty for one enzyme/substrate system, predeclare fit and
+predictive criteria, and evaluate untouched conditions or independent experiments.
+Integrate any selected extension through the package under the biology rule.
+
 ## CALIBRATION-EVIDENCE-001 Publication-Oriented Evidence Audit
 
 Date: 2026-08-01

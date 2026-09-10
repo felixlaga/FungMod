@@ -38,6 +38,37 @@ SYNTHETIC_DATASET = (
 MODEL_CONFIGS = ROOT / "data" / "model_configs"
 
 
+@pytest.mark.parametrize("fitted_count", [None, 0, 4, 9, 10])
+def test_reduced_chi_square_uses_explicit_fit_degrees_of_freedom(fitted_count) -> None:
+    result = _result(times=list(range(9)), values=[0.0] * 9, units="kilogram")
+    dataset = _dataset(points=[MeasurementPoint(time=float(i), value=1.0, uncertainty=1.0) for i in range(9)])
+    comparison = evaluate_model_against_dataset(
+        result=result, dataset=dataset,
+        observable_mapping={"product_mass": "released_product_amount"},
+        fitted_parameter_count=fitted_count,
+    )
+    assert comparison.metrics["chi_square"] == 9
+    if fitted_count is None:
+        assert "residual_degrees_of_freedom" not in comparison.metrics
+    else:
+        assert comparison.metrics["residual_degrees_of_freedom"] == 9 - fitted_count
+    if fitted_count is None or fitted_count >= 9:
+        assert "reduced_chi_square" not in comparison.metrics
+    else:
+        assert comparison.metrics["reduced_chi_square"] == pytest.approx(9 / (9 - fitted_count))
+
+
+@pytest.mark.parametrize("fitted_count", [-1, 1.5, True])
+def test_comparison_rejects_invalid_fitted_parameter_counts(fitted_count) -> None:
+    with pytest.raises(ModelDatasetComparisonError, match="nonnegative integer"):
+        evaluate_model_against_dataset(
+            result=_result(times=[0.0, 1.0], values=[0.0, 1.0], units="kilogram"),
+            dataset=_dataset(points=[MeasurementPoint(time=1.0, value=1.0, uncertainty=1.0)]),
+            observable_mapping={"product_mass": "released_product_amount"},
+            fitted_parameter_count=fitted_count,
+        )
+
+
 def test_configured_model_result_compares_to_synthetic_dataset(tmp_path: Path) -> None:
     result = run_configured_model(
         MODEL_CONFIGS / "toy_homogeneous_ab.yml",

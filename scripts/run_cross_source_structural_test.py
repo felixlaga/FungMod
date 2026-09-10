@@ -14,15 +14,15 @@ product inhibition, optionally multiplied by first-order enzyme deactivation:
     v = V_max * exp(-k_d * t) * S / ( K_m * (1 + P/K_p)^2 + S * (1 + S/K_i) )
 
 For each series the script fits the structure with and without the deactivation
-term and reports whether the extra parameter is warranted. This is the same
-falsification protocol already applied to source 1, where deactivation was
-rejected on a 60 minute assay.
+term and reports training residuals and numerical diagnostics. A lower training
+error does not establish a mechanism or predictive validity.
 
 WHAT THIS IS AND IS NOT
 -----------------------
 Sources 2 and 3 each provide a single condition per enzyme, so for those the test
-is STRUCTURAL ADEQUACY under fitting, not held-out prediction. Only source 1
-carries a genuine within-source held-out condition. Kinetic parameters are
+is exploratory structural fitting, not held-out prediction. Although source 1
+has held-out conditions in a separate script, every series here is fitted.
+Kinetic parameters are
 specific to an enzyme preparation and assay and are never transferred between
 sources; each series gets its own values. Nothing here is independent
 experimental replication of any other series.
@@ -37,7 +37,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -46,9 +46,6 @@ from scipy.optimize import least_squares
 
 ROOT = Path(__file__).resolve().parents[1]
 LIT = ROOT / "data/experiments/literature"
-
-NO_SUBSTRATE_INHIBITION = 1.0e9  # K_i large enough to switch the term off
-
 
 @dataclass(frozen=True)
 class Series:
@@ -63,10 +60,8 @@ class Series:
     observable: str            # "substrate" or "product"
     initial_substrate_mM: float
     time_units: str
-    k_i_mM: float = NO_SUBSTRATE_INHIBITION
-    fixed_km_mM: float | None = None
+    k_i_mM: float | None  # None explicitly omits substrate inhibition as a model hypothesis.
     notes: str = ""
-    free_symbols: tuple[str, ...] = field(default=("V_max", "K_m", "K_p"))
 
 
 SERIES = (
@@ -97,13 +92,14 @@ SERIES = (
         csv_path=LIT / "ariaeenejad_2020_persibgl1_cellobiose/ariaeenejad_2020_figure_6_glucose.csv",
         time_column="time_h", value_column="glucose_millimolar",
         observable="product", initial_substrate_mM=29.214, time_units="hour",
-        fixed_km_mM=1.25,
+        k_i_mM=None,
         notes=(
-            "380 h assay. K_m is held at the source's own reported 1.25 mM because the "
-            "observable is product and the substrate stays far above K_m throughout, "
-            "leaving K_m unidentifiable from this curve."
+            "Cellobiose K_m is unknown and is estimated from this curve, with possible weak "
+            "identifiability. The paper's 1.25 mM K_m was measured with pNPG at pH 7, "
+            "not cellobiose at pH 8, and is not transferred. Source: "
+            "https://doi.org/10.3389/fbioe.2020.00813, enzyme assay and kinetic-parameter sections. "
+            "Omission of substrate inhibition is an explicit exploratory hypothesis."
         ),
-        free_symbols=("V_max", "K_p"),
     ),
     Series(
         key="cao_bgl6",
@@ -112,7 +108,8 @@ SERIES = (
         csv_path=LIT / "cao_2015_bgl6_cellobiose/cao_2015_figure_5a_bgl6.csv",
         time_column="time_h", value_column="cellobiose_millimolar",
         observable="substrate", initial_substrate_mM=292.141, time_units="hour",
-        notes="10 h assay at a very high substrate charge; plateaus near 80 % conversion.",
+        k_i_mM=None,
+        notes="10 h assay; omission of substrate inhibition is an explicit exploratory hypothesis.",
     ),
     Series(
         key="cao_m3",
@@ -121,7 +118,8 @@ SERIES = (
         csv_path=LIT / "cao_2015_bgl6_cellobiose/cao_2015_figure_5a_m3.csv",
         time_column="time_h", value_column="cellobiose_millimolar",
         observable="substrate", initial_substrate_mM=292.141, time_units="hour",
-        notes="10 h assay at a very high substrate charge; reaches near-complete conversion.",
+        k_i_mM=None,
+        notes="10 h assay; omission of substrate inhibition is an explicit exploratory hypothesis.",
     ),
 )
 
@@ -134,172 +132,184 @@ BOUNDS = {
 }
 
 
+class StudyError(ValueError):
+    """A numerical or data failure prevents an interpretable study result."""
+
+
 def load(series: Series) -> tuple[np.ndarray, np.ndarray]:
-    rows = list(csv.DictReader(series.csv_path.open(encoding="utf-8")))
+    with series.csv_path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
     times = np.array([float(row[series.time_column]) for row in rows])
     values = np.array([float(row[series.value_column]) for row in rows])
+    if not np.all(np.isfinite(values)) or np.any(values < 0):
+        raise StudyError(f"{series.key}: observations must be finite and nonnegative.")
     return times, values
 
 
 def simulate(series: Series, times: np.ndarray, parameters: dict[str, float]) -> np.ndarray:
-    v_max = parameters["V_max"]
-    k_m = parameters["K_m"]
-    k_p = parameters["K_p"]
-    k_d = parameters.get("k_d", 0.0)
-    k_i = series.k_i_mM
+    """Integrate the declared exploratory law; tests compare it to package trajectories."""
+
+    if (times.ndim != 1 or not times.size or not np.all(np.isfinite(times))
+            or times[0] < 0 or times[-1] <= 0 or np.any(np.diff(times) <= 0)):
+        raise StudyError("Times must be finite, increasing and nonnegative, with a positive endpoint.")
+    if series.observable not in {"substrate", "product"}:
+        raise StudyError(f"Unknown observable {series.observable!r}.")
+    v_max, k_m, k_p = (parameters[name] for name in ("V_max", "K_m", "K_p"))
+    k_d = parameters.get("k_d", 0.0)  # No decay in the declared base model.
+    if not all(np.isfinite(v) and v > 0 for v in (v_max, k_m, k_p, series.initial_substrate_mM)):
+        raise StudyError("Initial substrate and kinetic parameters must be finite and positive.")
+    if not np.isfinite(k_d) or k_d < 0:
+        raise StudyError("The decay rate must be finite and nonnegative.")
+    if series.k_i_mM is not None and (not np.isfinite(series.k_i_mM) or series.k_i_mM <= 0):
+        raise StudyError("Explicit substrate-inhibition constants must be finite and positive.")
 
     def rhs(time: float, state: np.ndarray) -> list[float]:
         substrate, product = max(float(state[0]), 0.0), max(float(state[1]), 0.0)
-        rate = (
-            v_max * np.exp(-k_d * time) * substrate
-            / (k_m * (1.0 + product / k_p) ** 2 + substrate * (1.0 + substrate / k_i))
-        )
+        inhibition = 0.0 if series.k_i_mM is None else substrate / series.k_i_mM
+        rate = (v_max * np.exp(-k_d * time) * substrate
+                / (k_m * (1.0 + product / k_p) ** 2 + substrate * (1.0 + inhibition)))
         return [-rate, 2.0 * rate]
 
     solution = solve_ivp(
         rhs, (0.0, float(times[-1])), [series.initial_substrate_mM, 0.0],
         t_eval=times, rtol=1.0e-10, atol=1.0e-12, method="LSODA",
     )
-    return solution.y[0] if series.observable == "substrate" else solution.y[1]
+    if not solution.success:
+        raise StudyError(f"{series.key}: integration failed: {solution.message}")
+    values = np.asarray(solution.y, dtype=float)
+    if values.shape != (2, len(times)) or not np.all(np.isfinite(values)):
+        raise StudyError(f"{series.key}: integration returned incomplete or nonfinite states.")
+    return values[0] if series.observable == "substrate" else values[1]
 
 
-def fit(series: Series, *, with_deactivation: bool) -> tuple[dict[str, float], float, int]:
-    times, observed = load(series)
-    symbols = list(series.free_symbols) + (["k_d"] if with_deactivation else [])
-
-    def unpack(vector: np.ndarray) -> dict[str, float]:
-        parameters = {"K_m": series.fixed_km_mM if series.fixed_km_mM is not None else START["K_m"]}
-        parameters.update({symbol: float(value) for symbol, value in zip(symbols, vector, strict=True)})
-        return parameters
-
-    def residual(vector: np.ndarray) -> np.ndarray:
-        return simulate(series, times, unpack(vector)) - observed
-
-    solution = least_squares(
-        residual,
-        [START[s] for s in symbols],
-        bounds=([BOUNDS[s][0] for s in symbols], [BOUNDS[s][1] for s in symbols]),
-        xtol=1.0e-14, ftol=1.0e-14, max_nfev=20000,
-    )
-    fitted = unpack(solution.x)
-    rmse = float(np.sqrt(np.mean(residual(solution.x) ** 2)))
-    pinned = _bound_pinned(symbols, solution.x)
-    condition = _condition_number(np.asarray(solution.jac, dtype=float))
-    return fitted, rmse, len(symbols), pinned, condition
-
-
-#: Search bounds span many orders of magnitude, so bound proximity is measured
-#: as a RELATIVE factor, not as a fraction of the linear span. A linear-span test
-#: would flag every small parameter as pinned to a tiny lower bound.
+# Numerical diagnostics only; neither threshold proves biological identifiability.
 BOUND_PROXIMITY_FACTOR = 1.05
-
-#: Jacobian condition number above which the fit is treated as unidentified.
 MAX_CONDITION_NUMBER = 1.0e8
 
 
 def _bound_pinned(symbols: list[str], vector: np.ndarray) -> list[str]:
-    """Return symbols that ran to a search bound instead of an interior optimum.
-
-    A low RMSE reached with a parameter pinned at its bound is a compensating
-    fit, not an identified one, and must not be reported as a success.
-    """
-
     pinned: list[str] = []
     for symbol, value in zip(symbols, vector, strict=True):
         low, high = BOUNDS[symbol]
         numeric = float(value)
-        if numeric >= high / BOUND_PROXIMITY_FACTOR or numeric <= low * BOUND_PROXIMITY_FACTOR:
+        near_lower = numeric <= low * BOUND_PROXIMITY_FACTOR if low > 0 else numeric <= 1.0e-10
+        if numeric >= high / BOUND_PROXIMITY_FACTOR or near_lower:
             pinned.append(symbol)
     return pinned
 
 
 def _condition_number(jacobian: np.ndarray) -> float:
-    """Return the Jacobian condition number, or infinity if it is rank deficient."""
-
-    if jacobian.size == 0:
+    if not jacobian.size or not np.all(np.isfinite(jacobian)):
         return float("inf")
     singular = np.linalg.svd(jacobian, compute_uv=False)
-    if singular.size == 0 or singular[-1] <= 0.0:
-        return float("inf")
-    return float(singular[0] / singular[-1])
+    return float("inf") if singular[-1] <= 0 else float(singular[0] / singular[-1])
+
+
+def fit(series: Series, *, with_deactivation: bool, base_fit: dict | None = None) -> dict:
+    """Retain the best converged deterministic start, including the nested base fit."""
+
+    times, observed = load(series)
+    symbols = ["V_max", "K_m", "K_p"] + (["k_d"] if with_deactivation else [])
+    starts = [dict(START), {**START, "V_max": 10.0, "K_m": 100.0, "K_p": 100.0}]
+    if with_deactivation:
+        if base_fit is None:
+            raise StudyError("The extended fit requires its converged base fit.")
+        starts = [{**base_fit["fitted"], "k_d": 0.0},
+                  {**base_fit["fitted"], "k_d": 1.0 / float(times[-1])}, *starts]
+    attempts: list[dict] = []
+    best = None
+    best_sse = float("inf")
+
+    def unpack(vector: np.ndarray) -> dict[str, float]:
+        return dict(zip(symbols, map(float, vector), strict=True))
+
+    def residual(vector: np.ndarray) -> np.ndarray:
+        return simulate(series, times, unpack(vector)) - observed
+
+    for start in starts:
+        solution = least_squares(
+            residual, [start[s] for s in symbols],
+            bounds=([BOUNDS[s][0] for s in symbols], [BOUNDS[s][1] for s in symbols]),
+            x_scale="jac", xtol=1.0e-10, ftol=1.0e-10, gtol=1.0e-10, max_nfev=20000,
+        )
+        valid = bool(solution.success and np.all(np.isfinite(solution.x))
+                     and np.all(np.isfinite(solution.fun)) and np.all(np.isfinite(solution.jac)))
+        sse = float(np.sum(solution.fun ** 2)) if valid else None
+        attempts.append({"start": {s: start[s] for s in symbols}, "success": valid,
+                         "message": str(solution.message), "nfev": int(solution.nfev), "sse": sse})
+        if sse is not None and sse < best_sse:
+            best, best_sse = solution, sse
+    if best is None:
+        raise StudyError(f"{series.key}: no optimizer start converged: {attempts}")
+    rmse = float(np.sqrt(best_sse / len(observed)))
+    if base_fit is not None and rmse > base_fit["rmse"] + 1.0e-8 * max(1.0, base_fit["rmse"]):
+        raise StudyError(f"{series.key}: extended fit is worse than its feasible nested base model.")
+    condition = _condition_number(np.asarray(best.jac, dtype=float))
+    pinned = _bound_pinned(symbols, best.x)
+    return {
+        "fitted": unpack(best.x), "rmse": rmse, "n_free": len(symbols),
+        "bound_pinned_symbols": pinned,
+        "jacobian_condition_number": condition if np.isfinite(condition) else None,
+        "jacobian_rank": int(np.linalg.matrix_rank(best.jac)),
+        "numerical_diagnostic_flags": (["parameter_at_search_bound"] if pinned else [])
+        + (["ill_conditioned_jacobian"] if condition >= MAX_CONDITION_NUMBER else []),
+        "identifiability": "not_established_by_local_optimizer_diagnostics",
+        "optimizer_attempts": attempts,
+    }
+
+
+def run(output_dir: Path) -> dict:
+    summary: dict = {
+        "schema_version": "2.0.0",
+        "structure": "v = V_max*exp(-k_d*t)*S / (K_m*(1+P/K_p)^2 + S*(1+S/K_i))",
+        "claim_boundary": (
+            "Every series here is fitted. These are exploratory training residuals, not held-out "
+            "predictions, independent validation, or evidence establishing a biological mechanism. "
+            "Parameters are not transferred between enzyme preparations or substrates."
+        ),
+        "numerical_policy": {
+            "bounds": BOUNDS, "bounds_meaning": "optimizer search choices, not biological ranges",
+            "condition_threshold": MAX_CONDITION_NUMBER,
+            "bound_proximity_factor": BOUND_PROXIMITY_FACTOR,
+            "extended_model_start": "includes the fitted base model with k_d=0",
+            "uncertainty": "unweighted training residuals; no empirical noise model or confidence claim",
+        },
+        "series": {},
+    }
+    for series in SERIES:
+        times, _ = load(series)
+        base = fit(series, with_deactivation=False)
+        deact = fit(series, with_deactivation=True, base_fit=base)
+        improvement = (base["rmse"] - deact["rmse"]) / base["rmse"] if base["rmse"] > 0 else None
+        half_life = float(np.log(2) / deact["fitted"]["k_d"]) if deact["fitted"]["k_d"] > 0 else None
+        if half_life is not None and not np.isfinite(half_life):
+            half_life = None
+        summary["series"][series.key] = {
+            "source": series.source, "enzyme": series.enzyme, "notes": series.notes,
+            "n_points": len(times), "timespan": float(times[-1]), "time_units": series.time_units,
+            "initial_substrate_mM": series.initial_substrate_mM, "observable": series.observable,
+            "fixed_substrate_inhibition_mM": series.k_i_mM,
+            "substrate_inhibition": "omitted_as_explicit_hypothesis" if series.k_i_mM is None else "source_point_estimate",
+            "base": base, "with_deactivation": deact,
+            "training_rmse_improvement_fraction": improvement,
+            "fitted_half_life": half_life,
+            "mechanism_conclusion": "not_established_by_training_fit",
+        }
+        print(f"{series.key:24s} base RMSE={base['rmse']:.4f}, extended RMSE={deact['rmse']:.4f} mM; "
+              "mechanism not established")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "cross_source_summary.json").write_text(
+        json.dumps(summary, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+    )
+    return summary
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=ROOT / "outputs/cross_source_structural_test")
     arguments = parser.parse_args()
-
-    summary: dict = {
-        "structure": "v = V_max*exp(-k_d*t)*S / (K_m*(1+P/K_p)^2 + S*(1+S/K_i))",
-        "claim_boundary": (
-            "Sources 2 and 3 provide one condition per enzyme, so for those this is structural "
-            "adequacy under fitting, not held-out prediction. Only source 1 carries a genuine "
-            "within-source held-out condition. Parameters are never transferred between sources."
-        ),
-        "series": {},
-    }
-
-    header = f"{'series':24s} {'regime':>10s} {'n':>3s} {'RMSE base':>10s} {'RMSE +k_d':>10s} {'scale%':>7s}  deactivation"
-    print(header)
-    print("-" * len(header))
-
-    for series in SERIES:
-        times, observed = load(series)
-        base, base_rmse, base_k, base_pinned, base_condition = fit(series, with_deactivation=False)
-        deact, deact_rmse, deact_k, _, _ = fit(series, with_deactivation=True)
-        identified = not base_pinned and base_condition < MAX_CONDITION_NUMBER
-        scale = float(np.max(np.abs(observed)))
-        improvement = (base_rmse - deact_rmse) / base_rmse if base_rmse > 0 else 0.0
-        half_life = float("inf") if deact["k_d"] <= 0 else float(np.log(2) / deact["k_d"])
-        span = float(times[-1])
-        # Warranted only if it cuts the error substantially AND acts on the assay timescale.
-        warranted = improvement > 0.25 and half_life < 3.0 * span
-        verdict = "REQUIRED" if warranted else "not warranted"
-        if base_pinned:
-            flag = "  <-- DEGENERATE: " + ",".join(base_pinned) + " at bound"
-        elif not identified:
-            flag = f"  <-- DEGENERATE: Jacobian cond {base_condition:.1e}"
-        else:
-            flag = ""
-        print(
-            f"{series.key:24s} {series.time_units[:4]+' '+str(int(span)):>10s} {len(times):3d} "
-            f"{base_rmse:10.4f} {deact_rmse:10.4f} {100*base_rmse/scale:6.2f}%  {verdict}"
-            + (f"  (t1/2 {half_life:.3g} {series.time_units})" if warranted else "")
-            + flag
-        )
-        summary["series"][series.key] = {
-            "source": series.source, "enzyme": series.enzyme, "notes": series.notes,
-            "n_points": len(times), "timespan": span, "time_units": series.time_units,
-            "initial_substrate_mM": series.initial_substrate_mM, "observable": series.observable,
-            "base": {"fitted": base, "rmse": base_rmse, "n_free": base_k,
-                     "relative_rmse_percent_of_scale": 100 * base_rmse / scale,
-                     "bound_pinned_symbols": base_pinned,
-                     "jacobian_condition_number": base_condition,
-                     "identified": bool(identified)},
-            "with_deactivation": {"fitted": deact, "rmse": deact_rmse, "n_free": deact_k,
-                                  "half_life": half_life, "improvement_fraction": improvement},
-            "deactivation_warranted": bool(warranted),
-        }
-
-    print()
-    print("Deactivation is judged warranted only when it cuts RMSE by more than 25 % AND the")
-    print("fitted half-life is shorter than three times the assay duration, so a fitted decay")
-    print("far slower than the experiment cannot count as an explanation.")
-    degenerate = [k for k, e in summary["series"].items() if not e["base"]["identified"]]
-    print()
-    if degenerate:
-        print(f"DEGENERATE FITS ({len(degenerate)} of {len(SERIES)}): " + ", ".join(degenerate))
-        print("A parameter pinned at its search bound has not been identified by the data.")
-        print("These series reach a low RMSE by parameter compensation and must NOT be")
-        print("reported as evidence that the structure works.")
-    summary["degenerate_series"] = degenerate
-    summary["identified_series"] = [k for k in summary["series"] if k not in degenerate]
-
-    arguments.output_dir.mkdir(parents=True, exist_ok=True)
-    (arguments.output_dir / "cross_source_summary.json").write_text(
-        json.dumps(summary, indent=2, default=str) + "\n", encoding="utf-8"
-    )
-    print(f"\nwrote {arguments.output_dir / 'cross_source_summary.json'}")
+    run(arguments.output_dir)
+    print(f"wrote {arguments.output_dir / 'cross_source_summary.json'}")
 
 
 if __name__ == "__main__":
