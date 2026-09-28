@@ -3,7 +3,24 @@
 This folder contains provenance-complete literature datasets plus the schema
 contract and review checklist used before ingestion.
 
-Current datasets (three independent sources, seven series, four enzyme preparations):
+Current datasets: three enzyme-hydrolysis sources (seven series, four enzyme
+preparations) plus one whole-culture source (six conditions, twelve biomass and
+substrate series). Distinct publications do not establish matched independent
+validation of any one model.
+
+- `gelain_2020_t_harzianum/`: six machine-readable batch conditions for
+  *Trichoderma harzianum* P49P11 from Gelain et al. (2020),
+  DOI `10.1016/j.cesx.2020.100085`, dataset `10.17632/shd3wcczsr.2`, CC BY 4.0.
+  Twelve biomass/substrate series contain 96 non-initial observations over
+  8–96 h. `literature_processed`: source duplicate means with unavailable
+  replicate errors, not raw replicate measurements. Initial-condition entries
+  and activity assays remain in `../source_intake/gelain_2020/recorded_values.csv`.
+  All six conditions were used for estimation in the original publication.
+  The source's separate validation conditions were not found as observation
+  workbooks in the deposited archive. Source `data.xlsx` files are simulations
+  and are excluded. Regenerate with
+  `python scripts/prepare_public_experimental_data.py`; verify with `--check`.
+  These data add no validated fungus model or inferred physiological parameters.
 
 - `alvarez_gonzalez_2022_free_beta_glucosidase/`: four nine-point digitizations
   of Supplementary Figure S1 in Alvarez-Gonzalez et al. (2022), covering both

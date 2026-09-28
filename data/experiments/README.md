@@ -1,5 +1,11 @@
 # Experiment Datasets
 
+Public source downloads and deterministic extracts are documented in
+`source_intake/README.md`. The Gelain 2020 culture datasets are available under
+`literature/gelain_2020_t_harzianum/`, with explicit missing uncertainty and
+initial-condition exclusions. Source intake may contain supporting evidence
+that has not been mapped to the simulation API.
+
 This folder contains dataset metadata and observation files for FungMod data
 infrastructure tests and, later, curated scientific datasets.
 
