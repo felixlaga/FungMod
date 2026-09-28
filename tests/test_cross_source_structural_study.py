@@ -61,7 +61,8 @@ def test_study_refuses_bad_solver_results(monkeypatch, failure) -> None:
         result.y = np.zeros((2, 1))
     if failure == "nonfinite":
         result.y[0, 0] = np.nan
-    monkeypatch.setattr(study, "solve_ivp", lambda *args, **kwargs: result)
+    from fungal_model.research import inhibited_progress
+    monkeypatch.setattr(inhibited_progress, "solve_ivp", lambda *args, **kwargs: result)
     with pytest.raises(study.StudyError, match="integration"):
         study.simulate(study.SERIES[0], np.array([0.0, 1.0]), {"V_max": 1.0, "K_m": 1.0, "K_p": 1.0})
 

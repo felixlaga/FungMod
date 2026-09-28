@@ -41,8 +41,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from scipy.integrate import solve_ivp
 from scipy.optimize import least_squares
+
+from fungal_model.core.units import Q_
+from fungal_model.research.inhibited_progress import ProgressIntegrationError, simulate_inhibited_progress
 
 ROOT = Path(__file__).resolve().parents[1]
 LIT = ROOT / "data/experiments/literature"
@@ -132,8 +134,7 @@ BOUNDS = {
 }
 
 
-class StudyError(ValueError):
-    """A numerical or data failure prevents an interpretable study result."""
+StudyError = ProgressIntegrationError
 
 
 def load(series: Series) -> tuple[np.ndarray, np.ndarray]:
@@ -147,39 +148,20 @@ def load(series: Series) -> tuple[np.ndarray, np.ndarray]:
 
 
 def simulate(series: Series, times: np.ndarray, parameters: dict[str, float]) -> np.ndarray:
-    """Integrate the declared exploratory law; tests compare it to package trajectories."""
-
-    if (times.ndim != 1 or not times.size or not np.all(np.isfinite(times))
-            or times[0] < 0 or times[-1] <= 0 or np.any(np.diff(times) <= 0)):
-        raise StudyError("Times must be finite, increasing and nonnegative, with a positive endpoint.")
+    """Adapt the source-specific data to the shared unit-aware study contract."""
     if series.observable not in {"substrate", "product"}:
         raise StudyError(f"Unknown observable {series.observable!r}.")
-    v_max, k_m, k_p = (parameters[name] for name in ("V_max", "K_m", "K_p"))
-    k_d = parameters.get("k_d", 0.0)  # No decay in the declared base model.
-    if not all(np.isfinite(v) and v > 0 for v in (v_max, k_m, k_p, series.initial_substrate_mM)):
-        raise StudyError("Initial substrate and kinetic parameters must be finite and positive.")
-    if not np.isfinite(k_d) or k_d < 0:
-        raise StudyError("The decay rate must be finite and nonnegative.")
-    if series.k_i_mM is not None and (not np.isfinite(series.k_i_mM) or series.k_i_mM <= 0):
-        raise StudyError("Explicit substrate-inhibition constants must be finite and positive.")
-
-    def rhs(time: float, state: np.ndarray) -> list[float]:
-        substrate, product = max(float(state[0]), 0.0), max(float(state[1]), 0.0)
-        inhibition = 0.0 if series.k_i_mM is None else substrate / series.k_i_mM
-        rate = (v_max * np.exp(-k_d * time) * substrate
-                / (k_m * (1.0 + product / k_p) ** 2 + substrate * (1.0 + inhibition)))
-        return [-rate, 2.0 * rate]
-
-    solution = solve_ivp(
-        rhs, (0.0, float(times[-1])), [series.initial_substrate_mM, 0.0],
-        t_eval=times, rtol=1.0e-10, atol=1.0e-12, method="LSODA",
+    trajectory = simulate_inhibited_progress(
+        times=Q_(times, series.time_units), initial_substrate=Q_(series.initial_substrate_mM, "millimolar"),
+        initial_product=Q_(0, "millimolar"), vmax=Q_(parameters["V_max"], f"millimolar/{series.time_units}"),
+        km=Q_(parameters["K_m"], "millimolar"), product_ki=Q_(parameters["K_p"], "millimolar"),
+        substrate_ki=None if series.k_i_mM is None else Q_(series.k_i_mM, "millimolar"),
+        decay_rate=Q_(parameters.get("k_d", 0.0), f"1/{series.time_units}"), product_stoichiometry=2.0,
+        source="https://doi.org/10.3390/catal12010080, supplementary Model 3 kinetic form",
+        hypothesis_source=f"Exploratory cross-source structural study; {series.source}. {series.notes} "
+        "Exponential activity loss is a fitted hypothesis, not established thermal deactivation.",
     )
-    if not solution.success:
-        raise StudyError(f"{series.key}: integration failed: {solution.message}")
-    values = np.asarray(solution.y, dtype=float)
-    if values.shape != (2, len(times)) or not np.all(np.isfinite(values)):
-        raise StudyError(f"{series.key}: integration returned incomplete or nonfinite states.")
-    return values[0] if series.observable == "substrate" else values[1]
+    return np.asarray(getattr(trajectory, series.observable).magnitude, dtype=float)
 
 
 # Numerical diagnostics only; neither threshold proves biological identifiability.
