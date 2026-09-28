@@ -208,6 +208,8 @@ def calibrate_configured_model(
     output_dir: str | Path | None = None,
     split: Mapping[str, Any] | None = None,
     max_nfev: int | None = None,
+    profile_grids: Mapping[str, Quantity] | None = None,
+    profile_source: str | None = None,
 ) -> CalibrationResult:
     """Fit configured-model parameters against a synthetic or literature dataset."""
 
@@ -311,6 +313,15 @@ def calibrate_configured_model(
         )
     if not calibration_split.has_validation:
         warnings.append("No independent validation split was supplied; no validation claim is made.")
+    profile_report = None
+    if profile_grids is not None:
+        from fungal_model.calibration.profile import profile_likelihood
+
+        profile_report = profile_likelihood(
+            result=fit_result, predict=predict, observations=observations,
+            residual_scales=residual_scales, grids=profile_grids,
+            source=profile_source or "", max_nfev=max_nfev,
+        ).to_dict()
     result = CalibrationResult(
         dataset_id=dataset_obj.dataset_id,
         dataset_maturity=dataset_obj.maturity,
@@ -329,6 +340,7 @@ def calibrate_configured_model(
             "jacobian_rank": fit_result.jacobian_rank,
             "covariance": fit_result.covariance,
             "confidence_intervals": fit_result.confidence_intervals,
+            "profile_likelihood": profile_report,
         },
         assumptions=maturity_assumptions,
         warnings=tuple(warnings),
@@ -538,7 +550,9 @@ def _residual_scales(dataset: ExperimentDataset) -> dict[str, Quantity]:
                 f"Measurement {series.measurement_id!r} must supply finite positive uncertainty for every "
                 "point or leave all uncertainties unknown; partial weighting is not inferred."
             )
-        scales[series.measurement_id] = Q_(np.asarray(uncertainties, dtype=float), series.value_units)
+        scales[series.measurement_id] = Q_(
+            np.asarray(uncertainties, dtype=float), series.uncertainty_units or series.value_units,
+        ).to(series.value_units)
     return scales
 
 

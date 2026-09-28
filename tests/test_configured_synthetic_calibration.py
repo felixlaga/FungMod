@@ -418,3 +418,30 @@ def _mapping() -> tuple[ObservableMapping, ...]:
             observable_type="state",
         ),
     )
+
+
+def test_configured_scales_use_declared_uncertainty_units():
+    from fungal_model.calibration.configured import _residual_scales
+    from fungal_model.data.loaders import load_experiment_dataset
+    from fungal_model.resources import example_data_path
+    import numpy as np
+    dataset = load_experiment_dataset(example_data_path('experiments/synthetic/first_order_ab/synthetic_first_order_ab.yml'))
+    series = dataset.measurements[0]
+    points = tuple(replace(p, uncertainty=1.0) for p in series.points)
+    dataset = replace(dataset, measurements=(replace(series, points=points, uncertainty_units='gram'),))
+    np.testing.assert_allclose(_residual_scales(dataset)['product_mass'].to('kilogram').magnitude, 0.001)
+
+
+def test_configured_profile_is_saved_with_training_only_objective(tmp_path):
+    from fungal_model.data.loaders import load_experiment_dataset
+    from fungal_model.resources import example_data_path
+    dataset = load_experiment_dataset(example_data_path('experiments/synthetic/first_order_ab/synthetic_first_order_ab.yml'))
+    result = calibrate_configured_model(model_config=MODEL_CONFIG, dataset=dataset,
+        parameter_symbols=['k_ab'], observable_mapping=_mapping(), initial_guess={'k_ab': 0.03},
+        bounds={'k_ab': (0, 1)}, split={'method': 'by_time', 'train_fraction': 0.7, 'validation_fraction': 0.3},
+        profile_grids={'k_ab': Q_([0.05, 0.1, 0.15], '1/second')},
+        profile_source='Artificial declared independent Gaussian observation noise', output_dir=tmp_path)
+    profile = result.optimizer_metadata['profile_likelihood']
+    assert profile['complete']
+    assert len(profile['profiles']['k_ab']) == 3
+    assert json.loads((tmp_path/'optimizer_metadata.json').read_text())['profile_likelihood'] == profile
