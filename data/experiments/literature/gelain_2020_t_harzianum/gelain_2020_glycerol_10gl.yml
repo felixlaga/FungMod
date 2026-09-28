@@ -1,0 +1,136 @@
+kind: experiment_dataset
+dataset_id: gelain_2020_glycerol_10gl_v1
+name: Gelain 2020 T. harzianum P49P11 on 10 g/L glycerol
+maturity: literature_processed
+source:
+  type: literature
+  citation: Gelain L, van der Wielen L, van Gulik WM, Pradella JGC, da Costa AC. Mathematical modelling
+    for the optimization of cellulase production using glycerol for cell growth and cellulose as the inducer
+    substrate. Chemical Engineering Science X 8 (2020), 100085.
+  doi: 10.1016/j.cesx.2020.100085
+  url: https://data.mendeley.com/datasets/shd3wcczsr/2
+  authors:
+  - Lucas Gelain
+  - Luuk van der Wielen
+  - Walter M. van Gulik
+  - Jose Geraldo da Cruz Pradella
+  - Aline Carvalho da Costa
+  year: 2020
+  figure_or_table: Deposited Glycerol model/10gL.xlsx, Plan1
+  extraction_method: Direct extraction of stored XLSX numeric cells; initial conditions separated
+  extraction_tool: scripts/prepare_public_experimental_data.py; Python XML/ZIP reader
+  extracted_by: Codex for FungMod
+  extraction_date: '2026-09-28'
+  raw_units:
+    time: h
+    biomass: g/L
+    substrate: g/L
+  notes: CC BY 4.0. Dataset DOI 10.17632/shd3wcczsr.2. Deposited Information.docx identifies the concentration-specific
+    workbooks as experimental and data.xlsx as simulation results.
+system:
+  organism: Trichoderma harzianum P49P11
+  enzyme: null
+  substrate: glycerol
+  product: null
+  environment: Controlled submerged batch culture
+  geometry: stirred bioreactor
+  notes: Whole culture; no enzyme concentration inferred.
+conditions:
+  temperature:
+    value: 29
+    units: degree_Celsius
+  ph:
+    value: 5
+    units: dimensionless
+  working_volume:
+    value: 1.9
+    units: liter
+  nominal_initial_substrate:
+    value: 10
+    units: gram / liter
+  source_initial_biomass:
+    value: 0.5
+    units: gram / liter
+  sampling_times:
+    values:
+    - 8
+    - 12
+    - 24
+    - 32
+    - 48
+    - 54
+    - 72
+    - 96
+    units: hour
+  notes: 'Methods 2.2: pH controlled at 5.0 +/- 0.5; oxygen maintained above 30%. Batch cultures performed
+    in duplicate with different inocula. Methods 2.3 omit 54 h, but all six source workbooks explicitly
+    contain it; retained without silently changing time.'
+measurements:
+- id: biomass
+  measured_quantity: biomass concentration
+  observable_type: state
+  data_file: gelain_2020_glycerol_10gl.csv
+  time_column: time_h
+  value_column: biomass_g_l
+  uncertainty_column: null
+  units:
+    time: hour
+    value: gram / liter
+    uncertainty: null
+  uncertainty_type: 'unknown: individual duplicates and SD not deposited'
+  censoring: unknown; recorded zeros retained
+  replicate_id_column: null
+  notes: Published duplicate means, not individual replicates. See source_row for cell traceability.
+- id: substrate
+  measured_quantity: glycerol concentration
+  observable_type: state
+  data_file: gelain_2020_glycerol_10gl.csv
+  time_column: time_h
+  value_column: substrate_g_l
+  uncertainty_column: null
+  units:
+    time: hour
+    value: gram / liter
+    uncertainty: null
+  uncertainty_type: 'unknown: individual duplicates and SD not deposited'
+  censoring: unknown; recorded zeros retained
+  replicate_id_column: null
+  notes: Published duplicate means, not individual replicates. See source_row for cell traceability.
+measurement_definitions:
+  measured_quantity: Culture biomass and remaining substrate concentration
+  units: gram / liter
+  uncertainty_definition: Unavailable in deposited experimental workbooks; paper uses duplicate means
+    and plots sample SD. No SD or replicate measurements invented.
+  measurement_method: 'Article Methods 2.3: glycerol by HPLC; cellulose and mycelium according to Ahamed
+    and Vermette (2009). Biomass/substrate separation and assay details require review before fitting.'
+preprocessing:
+  status: machine_readable_mean_extraction
+  raw_data_available: false
+  steps:
+  - Verify source SHA-256
+  - Read Plan1 stored cells without executing formulas
+  - Retain numeric values and time labels
+  - Separate t=0 source initial conditions
+  - Import only biomass and substrate into ExperimentDataset
+  unit_conversions:
+  - None; h to hour and g/L to gram / liter are unit-label expansions only
+  excluded_points:
+  - t=0 entries are source initial conditions, retained in source intake, not fitting observations
+  notes: No smoothing, error reconstruction, inferred replicates, or fitting. Activity values remain in
+    source intake in FPU/L and U/L, pending assay-specific observation operators. All six conditions were
+    used for estimation in the source publication; none is independent external validation.
+supplementary_data:
+  file_name: gelain_2020/originals/glycerol/10gL.xlsx
+  source_url_or_doi: https://doi.org/10.17632/shd3wcczsr.2
+  checksum: sha256:0bb41e980a99fcb91df55f26f7257c267ffef646ab75a8b8d586abebea69ac46
+  access_date: '2026-09-28'
+  notes: Original file preserved under data/experiments/source_intake; full archive and article also preserved.
+validation:
+  expected_columns:
+  - time_h
+  - source_row
+  - biomass_g_l
+  - substrate_g_l
+  allow_missing_uncertainty: true
+notes: Exploratory whole-culture data for one strain, not a validated fungal model. Cannot pass the independent
+  raw-replicate evidence gate. Source zeros are not assumed exact measurements.
