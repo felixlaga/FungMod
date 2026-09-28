@@ -43,10 +43,11 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-from scipy.integrate import solve_ivp
 from scipy.optimize import least_squares
 
 from fungal_model import run_configured_model
+from fungal_model.core.units import Q_
+from fungal_model.research.inhibited_progress import simulate_inhibited_progress
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET_DIR = ROOT / "data/experiments/literature/alvarez_gonzalez_2022_free_beta_glucosidase"
@@ -79,31 +80,17 @@ def load_series(key: str) -> tuple[np.ndarray, np.ndarray]:
     return times, values
 
 
-def _rhs(time: float, state: np.ndarray, vmax: float, km: float, kp: float, kd: float) -> list[float]:
-    substrate, product = max(float(state[0]), 0.0), max(float(state[1]), 0.0)
-    rate = (
-        vmax
-        * np.exp(-kd * time)
-        * substrate
-        / (km * (1.0 + product / kp) ** 2 + substrate * (1.0 + substrate / K_I))
-    )
-    return [-rate, 2.0 * rate]
-
-
 def simulate(initial: float, times: np.ndarray, vmax: float, km: float, kp: float, kd: float = 0.0) -> np.ndarray:
-    solution = solve_ivp(
-        _rhs,
-        (0.0, float(times[-1])),
-        [initial, 0.0],
-        args=(vmax, km, kp, kd),
-        t_eval=times,
-        rtol=1.0e-10,
-        atol=1.0e-12,
-        method="LSODA",
+    trajectory = simulate_inhibited_progress(
+        times=Q_(times, "minute"), initial_substrate=Q_(initial, "millimolar"),
+        initial_product=Q_(0, "millimolar"), vmax=Q_(vmax, "millimolar/minute"),
+        km=Q_(km, "millimolar"), product_ki=Q_(kp, "millimolar"), substrate_ki=Q_(K_I, "millimolar"),
+        decay_rate=Q_(kd, "1/minute"), product_stoichiometry=2.0,
+        source="https://doi.org/10.3390/catal12010080, supplementary Model 3 kinetic form",
+        hypothesis_source="Source-motivated exploratory exponential loss of enzyme activity; "
+        "the fitted decay does not establish thermal deactivation or resolve source-unit ambiguity.",
     )
-    if not solution.success or np.shape(solution.y) != (2, len(times)) or not np.all(np.isfinite(solution.y)):
-        raise RuntimeError(f"Hypothesis integration failed or returned incomplete states: {solution.message}")
-    return solution.y[0]
+    return np.asarray(trajectory.substrate.magnitude, dtype=float)
 
 
 def rmse(predicted: np.ndarray, observed: np.ndarray) -> float:
