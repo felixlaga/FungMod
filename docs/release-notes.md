@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Fixed mixed-unit SBML trajectories, preserved PEtab training/validation/holdout separation, and rejected missing or zero export noise scales. Packaged PEtab examples resolve outside the checkout. Regenerate older affected exports.
+- Fixed thermodynamic scalar typing and pinned the checked Pyright version for local/CI parity.
+- Consolidated exploratory inhibition runners through shared unit-aware package integration and the configured inhibition kernel (FD-008 resolved).
+- Added explicit-noise grid profile likelihood and checksum-bound frozen-prediction evaluation with raw replicate evidence. Independent empirical validation remains pending on suitable external data.
+- Corrected configured calibration when uncertainty units differ from observation units.
+
 - Corrected comparison degrees of freedom and preserved pointwise calibration
   uncertainty. Reduced chi-square now requires explicit `fitted_parameter_count`.
 - Removed a pNPG-to-cellobiose parameter substitution, added research-runner

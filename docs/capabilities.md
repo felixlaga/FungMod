@@ -2,6 +2,12 @@
 
 This page separates implemented software from scientific maturity.
 
+The [joint culture/activity benchmark](gelain-joint-benchmark.md) compares seven
+model/family combinations against 144 published means. It includes assay-specific
+observations, retained dry-mass hypotheses, explicit error assumptions and
+model-bound validation contracts. Better retrospective prediction does not
+resolve parameter identifiability or supply independent empirical evidence.
+
 ## Researcher-facing workflow
 
 | Capability | Status | Boundary |
@@ -48,6 +54,8 @@ This page separates implemented software from scientific maturity.
 | First literature time-course comparison | Implemented for one same-source no-refit consistency check | The nine digitized observations and source-model parameters are not independent validation; digitization resolution is not experimental uncertainty. |
 | Held-out condition study across all four Figure S1 series | Implemented for one publication | Four series, 36 digitized observations, from one figure by one laboratory. Held-out agreement shows transfer across experimental conditions, not independent replication. |
 | Three independent literature sources, seven series, four enzyme preparations | Implemented | Alvarez-Gonzalez 2022 (60 min), Ariaeenejad 2020 (380 h), Cao 2015 (10 h). Only the first supplies additional conditions for within-source prediction; the other two support exploratory fitting, not predictive validation. |
+| Whole-culture biomass/substrate benchmark | Six Gelain 2020 conditions; source-model projection and fitted effective growth/loss hypothesis | 96 non-initial observations for T. harzianum P49P11, six retrospective condition holdouts plus weighting sensitivity. Missing replicate errors, substantial cellulose prediction errors; no validated organism model. See [benchmark](gelain-culture-benchmark.md). |
+| Public secretome source intake | Novy 2021 workbook preserved | Endpoint normalized spectra for T. reesei QM6a support composition review, not absolute enzyme concentration, secretion rates or kinetic parameters. |
 | Cross-source exploratory fits with numerical diagnostics | Implemented | Fits five selected series and reports convergence attempts, bound proximity, and Jacobian conditioning for both candidate models. Local diagnostics do not establish identifiability, structural adequacy, or a biological mechanism. |
 | Monte Carlo, local, and global sensitivity | Implemented | Global indices assume independent explicit input distributions; no empirical biological distribution is supplied. |
 
@@ -90,3 +98,10 @@ This page separates implemented software from scientific maturity.
   lignocellulose.
 
 Unsupported scope should remain explicit in preflight, limitations, or errors.
+
+## Research reproducibility additions
+
+- SBML supports explicit numeric unit conversions; PEtab preserves split membership and rejects unknown noise scales.
+- Calibration supports grid profile likelihood under explicit independent Gaussian observation scales, with failures and local-optimum limitations reported.
+- Frozen-prediction evaluation checks artifact hashes, raw replicate means, supplied experimental uncertainty and sourced RMSE criteria without refitting. No independent empirical dataset is bundled, and publication authorization remains false.
+- Exploratory inhibition runners share package integration and the configured inhibition denominator; exponential activity loss remains a study hypothesis.

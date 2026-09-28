@@ -67,6 +67,24 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
 
+The [experimental-data and paper-readiness assessment](docs/paper-readiness.md)
+includes newly fetched *T. harzianum* culture measurements and *T. reesei*
+secretome data, their provenance, and the remaining validation requirements.
+These data do not make the existing fungal coupling an empirically validated
+organism model.
+
+The [bounded culture benchmark](docs/gelain-culture-benchmark.md) now reproduces
+the deposited Gelain biomass/substrate model and reports six retrospective
+condition holdouts for an effective growth/loss hypothesis. Prediction errors
+and missing measurement uncertainty remain explicit; this is exploratory evidence.
+
+The [joint culture/activity comparison](docs/gelain-joint-benchmark.md) extends
+that benchmark with 144 observations, seven model/family combinations, retained
+dry-mass hypotheses, covariance/censoring support, parameter diagnostics and
+33 whole-condition holdouts. Model-specific validation contracts freeze the
+parameters, observation mapping, scope and criteria. Missing empirical evidence
+still prevents promotion to a validated model.
+
 <details>
 <summary><strong>Full implemented-capability inventory</strong></summary>
 
@@ -1322,6 +1340,13 @@ machine-readable citation is in [`CITATION.cff`](CITATION.cff); GitHub renders a
 [`AUTHORS.md`](AUTHORS.md) for authors and CRediT roles, and the
 [citing guide](https://fungmod.readthedocs.io/citing/) for BibTeX export and DOI
 details.
+
+Research export and calibration hardening (2026-09-28): mixed-unit SBML exports
+preserve native trajectories; PEtab keeps validation/holdout rows outside fitting
+and rejects missing noise scales. Configured calibration offers optional
+profile-likelihood grids. An explicit frozen-prediction/raw-replicate evaluation
+workflow is documented in `docs/independent-validation.md`; independent biological
+validation still requires external data.
 
 ## Current Limitations
 
