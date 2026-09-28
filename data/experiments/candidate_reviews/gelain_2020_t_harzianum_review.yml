@@ -1,0 +1,34 @@
+kind: dataset_candidate_review
+candidate_id: gelain_2020_t_harzianum
+name: Gelain 2020 Trichoderma harzianum batch cultivation
+status: approved_for_ingestion
+dataset_maturity: literature_processed
+source:
+  type: literature
+  citation: Gelain L, van der Wielen L, van Gulik WM, Pradella JGC, da Costa AC. Mathematical modelling for the optimization of cellulase production using glycerol for cell growth and cellulose as the inducer substrate. Chemical Engineering Science X 8 (2020), 100085.
+  doi: 10.1016/j.cesx.2020.100085
+  url: https://data.mendeley.com/datasets/shd3wcczsr/2
+  authors: [Lucas Gelain, Luuk van der Wielen, Walter M. van Gulik, Jose Geraldo da Cruz Pradella, Aline Carvalho da Costa]
+  year: 2020
+  notes: Supplementary material version 2, DOI 10.17632/shd3wcczsr.2, CC BY 4.0.
+intended_use:
+  purpose: Import published batch means for a bounded strain-specific biomass and substrate comparison. Retain activity assays separately until their observation operators are implemented.
+  measured_quantities: [biomass concentration, substrate concentration]
+  model_targets: [biomass, substrate]
+  not_for:
+    - Independent replicate validation or uncertainty-weighted calibration without experimental errors
+    - Treating deposited simulation results as experimental evidence
+    - Conversion of filter-paper or beta-glucosidase activity into enzyme mass
+    - Whole-fungus generalization beyond the strain and cultivation conditions
+schema_gate:
+  requires_literature_schema: true
+  requires_units: true
+  requires_uncertainty: true
+  requires_preprocessing: true
+  requires_no_real_data_in_review: true
+review:
+  selected_by: Codex public experimental data search
+  review_date: 2026-09-28
+  schema_result: passed
+  decision_notes: Concentration-specific workbooks are identified as experimental in the deposited Information documents. Missing replicate errors must remain explicit. Exclude initial-condition rows from measurement series. Retain the additional sampling time in the workbooks with the discrepancy recorded.
+notes: Source means are eligible for exploratory comparison. The archive does not supply the individual duplicates, source validation-condition measurements, or their error arrays. Approval is for data ingestion only.

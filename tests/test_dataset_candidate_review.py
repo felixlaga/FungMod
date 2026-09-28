@@ -281,6 +281,7 @@ def test_candidate_review_directory_contains_only_review_files() -> None:
         "README.md",
         "ariaeenejad_2020_persibgl1_cellobiose_hydrolysis_review.yml",
         "fake_candidate_review.yml",
+        "gelain_2020_t_harzianum_review.yml",
         "resa_buckin_2011_cellobiose_hydrolysis_review.yml",
     ]
 
@@ -298,6 +299,7 @@ def test_literature_directory_contains_only_reviewed_sources() -> None:
         "alvarez_gonzalez_2022_free_beta_glucosidase",
         "ariaeenejad_2020_persibgl1_cellobiose",
         "cao_2015_bgl6_cellobiose",
+        "gelain_2020_t_harzianum",
     ]
     ingested = " ".join(directories)
     assert "resa_buckin" not in ingested
