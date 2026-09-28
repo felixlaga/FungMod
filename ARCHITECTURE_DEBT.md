@@ -7,8 +7,8 @@ ID, status, reason, risk, exit condition, removal milestone, and tests
 protecting the boundary. New foundation work should remove entries from this
 file, not normalize them.
 
-Current state: one active contained entry, `FD-008`, records existing exploratory
-research-runner duplication. `FD-007` was
+Current state: no active contained entries. `FD-008` was resolved by shared
+package integration on 2026-09-28. `FD-007` was
 resolved on 2026-08-01 by deterministic build-time staging from the canonical
 resource roots. `FD-005` was resolved in PR-41 by enabling Pyright optional-member-access
 checking and narrowing nullable scientific values explicitly. `FD-006`
@@ -19,7 +19,19 @@ dependencies.
 
 ## FD-008 Exploratory research-runner rate-law duplication
 
-Status: contained on 2026-09-11
+Status: resolved on 2026-09-28
+
+Resolution: both runners now use `research.inhibited_progress`, a unit-aware
+exploratory integration contract. The configured inhibition modifier and this
+contract share the numeric denominator in `kinetics._coupled_inhibition`.
+Sources and hypothesis rationale are required, stoichiometry is explicit,
+solver failure is rejected, and concentration/time units are converted before
+integration. Tests cover existing 2:1 source trajectories and an artificial 1:1
+conservation case with a different initial product and time/unit choices.
+The exponential activity-loss option remains a declared mathematical hypothesis;
+it is not promoted to a validated thermal mechanism or registry default.
+
+The original containment record follows for provenance.
 
 Reason: the cross-source and mechanism-hypothesis research runners independently
 integrate the published inhibited progress-curve law to fit candidate extensions.

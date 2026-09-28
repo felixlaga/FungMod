@@ -95,3 +95,14 @@ def test_research_guidance_matches_the_current_evidence_boundary() -> None:
     assert "fitted_parameter_count" in evidence
     assert "2.0.0" in evidence
     assert "not_established_by_training_fit" in evidence
+
+
+def test_research_improvement_contracts_are_documented():
+    config = tomllib.loads((ROOT/'pyproject.toml').read_text())
+    assert 'pyright==1.1.414' in config['project']['optional-dependencies']['dev']
+    standards = (ROOT/'docs/standards.md').read_text()
+    assert 'training rows only' in standards
+    assert 'explicit unit conversion factors' in standards
+    assert 'profile_likelihood' in (ROOT/'docs/calibration-evidence.md').read_text()
+    assert 'publication_claim_authorized' in (ROOT/'docs/independent-validation.md').read_text()
+    assert 'Status: resolved on 2026-09-28' in (ROOT/'ARCHITECTURE_DEBT.md').read_text()
