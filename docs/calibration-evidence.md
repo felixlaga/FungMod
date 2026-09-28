@@ -140,3 +140,44 @@ analysis plan, raw training and genuinely independent validation observations,
 exact culture and assay conditions, replicate structure, analytical uncertainty
 or a justified residual model, licenses, immutable model/data versions, and an
 external scientific review appropriate to the intended claim.
+
+## Profile likelihood
+
+`profile_likelihood(...)` supplements the local covariance approximation by
+fixing each selected parameter on an explicit unit-bearing grid and reoptimizing
+the remaining parameters. It records chi-square differences, nuisance estimates,
+optimizer failures, and cases where a profile improves the original optimum.
+This follows the profile construction in [Raue et al. (2009)](https://doi.org/10.1093/bioinformatics/btp358).
+
+The current implementation assumes independent Gaussian observations with fixed,
+explicit standard deviations. All observations need positive scales. Supply an
+analysis/noise-model source; digitization scales do not establish this noise
+model. The inputs must reproduce the original training objective. Failed points
+remain explicit with null costs. Finite grids and local optima do not establish
+global identifiability, and no confidence endpoints are inferred from a grid edge.
+
+Configured calibration accepts `profile_grids` and `profile_source` and saves
+the report inside `optimizer_metadata.json`. It profiles training observations
+only. For a fully artificial software example:
+
+```python
+from fungal_model.calibration import calibrate_configured_model
+from fungal_model.core.units import Q_
+from fungal_model.resources import example_data_path
+
+result = calibrate_configured_model(
+    model_config=example_data_path("model_configs/synthetic_first_order_calibration.yml"),
+    dataset=example_data_path("experiments/synthetic/first_order_ab/synthetic_first_order_ab.yml"),
+    parameter_symbols=["k_ab"],
+    observable_mapping={"product_mass": "released_product_amount"},
+    initial_guess={"k_ab": 0.03},
+    bounds={"k_ab": (0.0, 1.0)},
+    split={"method": "by_time", "train_fraction": 0.7, "validation_fraction": 0.3},
+    profile_grids={"k_ab": Q_([0.05, 0.1, 0.15], "1/second")},
+    profile_source="Artificial fixture with declared independent Gaussian test scales; no biological claim.",
+)
+print(result.optimizer_metadata["profile_likelihood"])
+```
+
+For new experimental evidence, use the separate
+[frozen-prediction validation workflow](independent-validation.md).

@@ -127,6 +127,24 @@ table; and a `problem.yaml` links them. The files are written with the standard
 library, so only the `standards` extra (for the SBML model) is required. The
 result passes `petab.lint_problem`.
 
+## Export correctness and migration
+
+SBML formulas contain explicit unit conversion factors. Parameter values and
+PEtab bounds remain in their original parameter units; species contributions
+also convert between compatible state units. Regenerate older exports that used
+mixed time or concentration units. The numeric amount-in-a-unit-compartment
+convention remains; this is not a new physical compartment model.
+
+PEtab `problem.yaml` includes **training rows only**. Validation and holdout rows
+are written to separate `validation_measurements.tsv` and
+`holdout_measurements.tsv` files, never referenced as fitting measurements.
+`export_metadata.json` records the split, row counts, and noise policy.
+
+Every observation requires a finite positive declared uncertainty. Unknown or
+zero uncertainty now fails before files are written; the old implicit `1.0`
+noise fallback is removed. Supplied scales and a normal-error export convention
+do not establish experimental variance or a scientifically justified likelihood.
+
 ## BioModels-ready deposit
 
 FungMod can produce a curated, annotated, submission-ready deposit for the
