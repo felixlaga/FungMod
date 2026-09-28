@@ -1,0 +1,561 @@
+{
+  "condition": "gelain_2020_glycerol_10gl",
+  "fit": {
+    "success": true,
+    "model": "retained",
+    "family": "glycerol",
+    "scenario": "primary",
+    "training_conditions": [
+      "gelain_2020_glycerol_5gl",
+      "gelain_2020_glycerol_20gl"
+    ],
+    "observables": [
+      "biomass",
+      "substrate"
+    ],
+    "observable_units": [
+      "gram/liter",
+      "gram/liter"
+    ],
+    "normalization": [
+      8.11221,
+      21.1525
+    ],
+    "normalization_is_measurement_sd": false,
+    "noise": {},
+    "measurement_uncertainty": null,
+    "parameter_count": 6,
+    "fixed_parameters": [
+      {
+        "symbol": "initial_retained_fraction",
+        "value": 0,
+        "units": "dimensionless",
+        "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+      }
+    ],
+    "starts": [
+      {
+        "start": 0,
+        "success": true,
+        "message": "`xtol` termination condition is satisfied.",
+        "objective": 0.23721157451226133,
+        "nfev": 52,
+        "optimality": 0.0014987387095263018,
+        "initial_parameters": [
+          {
+            "symbol": "mu",
+            "value": 0.0447213595499958,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "K",
+            "value": 0.31622776601683805,
+            "units": "gram/liter",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "Y",
+            "value": 0.10000000000000002,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "kd",
+            "value": 0.0022360679774997894,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "f_retained",
+            "value": 0.010000000000000005,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "k_clear",
+            "value": 0.0022360679774997894,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "initial_retained_fraction",
+            "value": 0.0,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+          }
+        ],
+        "parameters": [
+          {
+            "symbol": "mu",
+            "value": 0.21151874055561556,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "K",
+            "value": 1.2864420787074546,
+            "units": "gram/liter",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "Y",
+            "value": 0.751789829254083,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "kd",
+            "value": 0.07755003459851804,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "f_retained",
+            "value": 0.09299241526998402,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "k_clear",
+            "value": 0.0009450419573066102,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "initial_retained_fraction",
+            "value": 0.0,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+          }
+        ]
+      },
+      {
+        "start": 1,
+        "success": true,
+        "message": "`xtol` termination condition is satisfied.",
+        "objective": 0.23752447714625946,
+        "nfev": 30,
+        "optimality": 0.00163149811826695,
+        "initial_parameters": [
+          {
+            "symbol": "mu",
+            "value": 0.05635014282159935,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "K",
+            "value": 0.0018697213373768122,
+            "units": "gram/liter",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "Y",
+            "value": 0.04359371653681586,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "kd",
+            "value": 0.0009826214065273555,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "f_retained",
+            "value": 0.12857160150554037,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "k_clear",
+            "value": 0.00029014132741304595,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "initial_retained_fraction",
+            "value": 0.0,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+          }
+        ],
+        "parameters": [
+          {
+            "symbol": "mu",
+            "value": 0.20918718638399122,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "K",
+            "value": 1.303820707312299,
+            "units": "gram/liter",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "Y",
+            "value": 0.7415640253142693,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "kd",
+            "value": 0.07502767567073447,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "f_retained",
+            "value": 0.0877499038829285,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "k_clear",
+            "value": 6.738490158740921e-05,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "initial_retained_fraction",
+            "value": 0.0,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+          }
+        ]
+      },
+      {
+        "start": 2,
+        "success": true,
+        "message": "`xtol` termination condition is satisfied.",
+        "objective": 0.23753458388285953,
+        "nfev": 41,
+        "optimality": 0.0016763055351162542,
+        "initial_parameters": [
+          {
+            "symbol": "mu",
+            "value": 0.001410393721828745,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "K",
+            "value": 0.7788039568986463,
+            "units": "gram/liter",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "Y",
+            "value": 0.02555644501462087,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "kd",
+            "value": 1.0258775188733905e-05,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "f_retained",
+            "value": 0.033802193214624986,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "k_clear",
+            "value": 0.04815137834437853,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "initial_retained_fraction",
+            "value": 0.0,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+          }
+        ],
+        "parameters": [
+          {
+            "symbol": "mu",
+            "value": 0.20904621450511351,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "K",
+            "value": 1.300040006330584,
+            "units": "gram/liter",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "Y",
+            "value": 0.7411594223988937,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "kd",
+            "value": 0.0749532388382607,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "f_retained",
+            "value": 0.08762528584427204,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "k_clear",
+            "value": 3.789111107804407e-05,
+            "units": "1/hour",
+            "uncertainty": null,
+            "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+          },
+          {
+            "symbol": "initial_retained_fraction",
+            "value": 0.0,
+            "units": "dimensionless",
+            "uncertainty": null,
+            "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+          }
+        ]
+      }
+    ],
+    "hypothesis_source": "Hypothesis based on dry-mass assay: loss from growth-associated mass transfers fraction f_retained to measured retained dry mass, which clears at k_clear. These pools are not verified living/dead biomass.",
+    "confidence_intervals": null,
+    "maturity": "exploratory_software_tested",
+    "objective": 0.23721157451226133,
+    "best_start": 0,
+    "parameters": [
+      {
+        "symbol": "mu",
+        "value": 0.21151874055561556,
+        "units": "1/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "K",
+        "value": 1.2864420787074546,
+        "units": "gram/liter",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "Y",
+        "value": 0.751789829254083,
+        "units": "dimensionless",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "kd",
+        "value": 0.07755003459851804,
+        "units": "1/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "f_retained",
+        "value": 0.09299241526998402,
+        "units": "dimensionless",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "k_clear",
+        "value": 0.0009450419573066102,
+        "units": "1/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "initial_retained_fraction",
+        "value": 0.0,
+        "units": "dimensionless",
+        "uncertainty": null,
+        "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+      }
+    ],
+    "singular_values": [
+      4.8384092476636615,
+      1.7192092274067985,
+      0.27988602013814595,
+      0.19459112596285283,
+      0.08317157513283203,
+      0.0022946740777119016
+    ],
+    "practical_rank": 6,
+    "condition_number": 2108.5387657702595,
+    "near_bounds": [],
+    "local_parameter_tradeoff_matrix": [
+      [
+        1.0,
+        0.21124203029177266,
+        0.9000909257658194,
+        0.9347029787945744,
+        0.8252417514257491,
+        0.8137613891955423
+      ],
+      [
+        0.21124203029175886,
+        1.0000000000000002,
+        -0.08028788305783008,
+        -0.14054573731240375,
+        -0.15550692226593374,
+        -0.14268303661994858
+      ],
+      [
+        0.9000909257658224,
+        -0.08028788305781603,
+        1.0,
+        0.9271284460139768,
+        0.7174122582826006,
+        0.7165187343056338
+      ],
+      [
+        0.9347029787945792,
+        -0.14054573731238995,
+        0.9271284460139789,
+        1.0,
+        0.9085037289873155,
+        0.8911087830057742
+      ],
+      [
+        0.8252417514257552,
+        -0.15550692226592247,
+        0.7174122582826047,
+        0.9085037289873177,
+        1.0,
+        0.984077772114201
+      ],
+      [
+        0.8137613891955489,
+        -0.14268303661993748,
+        0.7165187343056381,
+        0.8911087830057767,
+        0.9840777721142013,
+        1.0
+      ]
+    ],
+    "tradeoff_symbols": [
+      "mu",
+      "K",
+      "Y",
+      "kd",
+      "f_retained",
+      "k_clear"
+    ],
+    "tradeoff_interpretation": "Local normalized sensitivity diagnostic, not empirical parameter covariance."
+  },
+  "plan_sha256": "867120730f815060778ca402bdd55a0b2d02fba1eb1769ad567d07cd42f77046",
+  "input_manifest_sha256": "16907dcad3842d360992c83beb17ed46fefff8a8e3083b8fa4e0f670adfafb54",
+  "software_manifest_sha256": "1f9c938bd60bf3ff54d7d9e866bcf0a8acbfcc98e267e0fac869c4b5b96a7360",
+  "times_h": [
+    8,
+    12,
+    24,
+    32,
+    48,
+    54,
+    72,
+    96
+  ],
+  "observables": [
+    "biomass",
+    "substrate"
+  ],
+  "units": [
+    "gram/liter",
+    "gram/liter"
+  ],
+  "predictions": [
+    [
+      1.2347554539759587,
+      8.425638702093316
+    ],
+    [
+      1.8891825211146385,
+      7.002366840236223
+    ],
+    [
+      4.2711419272949955,
+      0.37526307846076895
+    ],
+    [
+      2.8038627447403677,
+      0.002211870121675623
+    ],
+    [
+      1.3277199090499279,
+      2.3039097820422756e-05
+    ],
+    [
+      1.1015797429903549,
+      1.1542155686354493e-05
+    ],
+    [
+      0.8073883418975458,
+      4.798329275147085e-06
+    ],
+    [
+      0.7130042916298677,
+      3.75959765371716e-06
+    ]
+  ],
+  "solver": {
+    "method": "LSODA",
+    "rtol": 1e-08,
+    "atol_in_canonical_observable_units": 1e-10,
+    "nfev": 405,
+    "minimum_state": 3.75959765371716e-06,
+    "negative_roundoff_count": 0,
+    "success": true
+  },
+  "alternate_scaled_difference": 1.2837915545041047e-08,
+  "tighter_scaled_difference": 1.2764293952656718e-08
+}
