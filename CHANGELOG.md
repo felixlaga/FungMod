@@ -4,7 +4,29 @@ All notable public releases of FungMod are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Joint Gelain culture/activity benchmark with published-equation refits,
+  activity-driven hydrolysis and retained dry-mass alternatives, 33 condition
+  holdouts, explicit covariance sensitivity, profile loss and conditional
+  bootstrap. FPU and pNPG activity remain separate assay dimensions.
+- Generic sourced Gaussian covariance and single-response censoring, plus
+  frozen model/observation/scope/criteria contracts for independent validation.
+  Current culture models retain explicit missing-evidence status.
+
+- Added the bounded Gelain 2020 T. harzianum culture benchmark: unit-aware source
+  reproduction, an explicitly exploratory growth/loss model, six whole-condition
+  holdouts, weighting sensitivity, frozen artifacts and cross-solver checks.
+  Missing replicate uncertainty and substantial cellulose prediction errors
+  remain explicit; no validated organism model or registry promotion is claimed.
+
 ### Fixed
+
+- Fixed mixed-unit SBML trajectories, preserved PEtab training/validation/holdout separation, and rejected missing or zero export noise scales. Regenerate older affected exports.
+- Fixed thermodynamic scalar typing and pinned the checked Pyright version for local/CI parity.
+- Consolidated exploratory inhibition runners through shared unit-aware package integration and the configured inhibition kernel (FD-008 resolved).
+- Added explicit-noise grid profile likelihood and checksum-bound frozen-prediction evaluation with raw replicate evidence. Independent empirical validation remains pending on suitable external data.
+- Corrected configured calibration when uncertainty units differ from observation units.
 
 - Removed the pNPG Michaelis constant from the cellobiose cross-source fit;
   the unknown cellobiose constant is estimated with explicit limitations.

@@ -26,6 +26,419 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CULTURE-BENCHMARK-002 Joint Activity Models And Scoped Validation
+
+Date: 2026-09-28
+
+Status: the five requested software workstreams are implemented. Empirical model
+validation remains incomplete; scientific maturity is not promoted by fit quality.
+
+Changed:
+
+- Added source-scoped model comparison on all 144 non-initial Gelain means:
+  published equations refitted only on training conditions, activity-driven
+  hydrolysis alternatives and retained dry-mass observation hypotheses.
+- Kept FPU and pNPG activity in distinct assay dimensions. Removed one exact
+  latent-state scale symmetry from the published cellulose equations by an
+  algebraic coordinate change; shared the unchanged source mass-rate kernel
+  with v1. No unsupported viable/dead-cell or concentration output is emitted.
+- Added generic sourced Gaussian covariance and known single-component left
+  censoring, separately labelled assumed-covariance sensitivity, multi-start
+  fits, rank/bound diagnostics, nuisance-reoptimized profiles and conditional
+  bootstrap. Unknown SD, replicates and detection limits remain explicit.
+- Added frozen model/parameter/observation/scope/criteria contracts composing the
+  independent raw-replicate evaluator. Actual observation times and mappings
+  are checked. Synthetic tests and evidence declarations cannot promote status.
+- Added offline benchmark orchestration, input/implementation/result hashes,
+  preserved predictions before scoring, all failed attempts, signed residuals,
+  figures, direct dependency pins and per-model validation-readiness packets.
+- Added public documentation and the active roadmap update. Preserved the v1
+  results as a historical comparison rather than silently replacing them.
+
+Recorded scientific result:
+
+- 33 complete condition holdouts, 11 descriptive full fits, 132 starts; six
+  starts fail. All folds pass independent-solver and tolerance checks, with
+  maximum scaled solver difference 2.25e-7 (criterion 1e-5).
+- Published equations give the lowest primary holdout loss in both families.
+  Glycerol pooled biomass/substrate RMSE is 0.458/1.005 g/L. Cellulose pooled
+  biomass/substrate/activity RMSE is 0.762 g/L, 1.162 g/L, 83.8 FPU/L and
+  149.7 pNPG U/L. The difficult 30 g/L substrate holdout improves from v1's
+  7.4446 to 1.6207 g/L; at 24 h it predicts 16.9647 vs 15.7340 measured.
+- Cellulose published-model practical rank falls to 19/20 in one fold and
+  profile refitting lowers the descriptive objective from 0.19135 to 0.18980.
+  This model fails the predefined complexity screen despite better prediction.
+  Both hydrolysis candidates fail the primary per-observable worsening screen.
+- Profiles complete and both assumed-noise bootstraps converge on 20/20 draws.
+  These are conditional diagnostics, never empirical confidence/coverage claims.
+- Source activity differences reach 22.34 FPU/L and 19.65 pNPG U/L. Exact activity
+  parity is not established; mass projection and limiting cases are verified.
+
+Tests added/modified: generic non-biological covariance/censoring and scoped
+validation tests; culture limiting cases, assay units, source projection parity,
+synthetic recovery, measured-error fitting and preservation through profiles,
+serialized-noise rejection, bootstrap failure handling, immutable
+holdout predictions and malformed-input rejection. Existing v1 and source-intake
+regressions continue to verify their contracts.
+
+Commands/results (local; no hosted CI or publication claim):
+
+- `.venv/bin/python scripts/prepare_public_experimental_data.py --check`: all
+  19 extracts match checksum-pinned sources.
+- `.venv/bin/python scripts/run_gelain_2020_joint_benchmark.py --output
+  outputs/gelain-joint-v2-complete --workers 3`: completed; 33/33 numerically
+  checked folds, 11 full fits, all profiles and 40 conditional bootstrap refits.
+  Comparisons, profiles and bootstrap draws match the preceding independent
+  runs exactly. Final input, implementation and artifact hashes match.
+- `.venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing
+  --cov-report=xml`: 1,521 passed in 1,174.74 s; coverage 84.67%.
+- Final focused regression run on observation errors, joint models, scoped
+  validation, joint artifacts, v1, public data and independent validation:
+  96 passed. With `--cov-append`, reported coverage is 84.76% (80% gate).
+  This covers the final measured-error profile fix and the five artifact/noise
+  cases added after the full run began.
+- `pytest -q tests/test_packaged_distribution.py
+  tests/test_gelain_joint_artifacts.py`: 9 passed, including a new actual source
+  archive build, extraction, offline 19-file verification and runner CLI check.
+  Final collection is 1,527 tests: all are covered by the full and follow-up
+  runs. The workstream adds 49 cases and modifies the packaging regression file.
+- `.venv/bin/python -m ruff check src tests scripts/run_*.py`: passed.
+- `.venv/bin/python -m pyright --pythonpath .venv/bin/python`: zero errors.
+- `.venv/bin/python -m mkdocs build --strict`: passed.
+- `.venv/bin/python -m build --outdir /tmp/fungmod-joint-release-dist`:
+  wheel and source archive built. `python -m twine check` passed both.
+  `scripts/check_built_distribution_resources.py` verifies all 217 resources
+  exactly once and byte-identical to canonical data.
+- Fresh `/tmp/fungmod-joint-wheel` environment installed the final wheel and
+  executed from `/tmp`: all 144 observations available; 33 frozen predictions
+  and scores replay with maximum absolute difference zero; all artifact hashes,
+  11 readiness packets, final code hashes and error-model round trips verified.
+- `git diff --check`: passed.
+
+The source archive now includes both culture runners, the deterministic
+extractor and documentation. An initial no-isolation packaging test could not
+run because `wheel` was absent from the local interpreter; the test now uses
+the project's isolated PEP 517 build. Two simultaneous source builds briefly
+collided in setuptools' shared staging directory; the final release build ran
+sequentially and passed. A process-status diagnostic was initially sandbox-denied;
+its scoped read-only retry succeeded. No verification command remains blocked.
+
+Unchanged and compatibility: existing configured model APIs, registry contents,
+and scientific maturity labels are unchanged by this workstream. The v1 source
+kernel refactor preserves its predictions. New research APIs, error models and
+validation contracts are additive. Pre-existing uncommitted work is retained.
+No release, remote push, hosted CI or human review is claimed by this entry.
+
+Remaining ambiguities: no raw individual cultures, measured SD/covariance,
+known detection limits, matched independent experiment, prespecified biological
+acceptance criteria or independent domain review. Source inhibition switches
+and fixed-step output still differ numerically in the activities. Media
+co-substrates and retained-mass physiology are unresolved; no whole-fungus claim.
+Risk: moderate for interpreting the scientific models; contained and tested
+for software use. Recommended next task: reduce/constrain the cellulose model's
+unsupported parameters, preregister the reduced comparison and obtain matched
+independent cultures with raw replicates before attempting model validation.
+
+## CULTURE-BENCHMARK-001 Bounded Culture Model And Condition Holdouts
+
+Date: 2026-09-28
+
+Status: complete for the explicitly exploratory benchmark. Independent biological
+validation, empirical uncertainty and a full fungal organism model remain incomplete.
+
+Changed:
+
+- Added `research.gelain_culture`: unit/provenance-checked source X/S/A projection
+  and a four-parameter effective Monod growth/apparent-yield/biomass-loss hypothesis.
+  Equations live in package code, with source-specific logic outside generic/core.
+- Reproduced all six deposited source trajectories within 9.19e-7 g/L. Kept the
+  glycerol paper/deposited-code death-law discrepancy explicit: the retained tiny
+  Kd changes late biomass by about 0.815 g/L at 20 g/L glycerol.
+- Preserved two additional source simulation workbooks under a separate manifest
+  role. Deterministic extraction now produces sixteen files, including separate
+  source parameter/simulation references. None becomes experimental observations.
+- Added the fixed retrospective plan and offline runner. Six whole-condition
+  holdouts x two weighting choices, four starts per fit, plus two descriptive
+  all-condition fits: 56 optimizer starts, two unsuccessful starts retained.
+  Training-only normalization, frozen predictions before scoring, input/software
+  hashes, per-observable residuals, Jacobian/bound diagnostics and figures are
+  recorded under `data/benchmarks/gelain_2020/results/`.
+- Held-out primary biomass RMSE spans 0.8726–2.4796 g/L; substrate RMSE spans
+  0.8983–7.4446 g/L. Each improves on the weak constant-state comparator. The
+  cellulose 30 g/L substrate error changes to 3.4869 with equal-g/L weighting,
+  while biomass error worsens to 2.8906. This is material model/error-assumption
+  sensitivity, not a useful-accuracy or validation pass.
+- All twelve predictions passed DOP853 and tighter-LSODA verification (maximum
+  differences 2.06e-6 and 2.02e-6 g/L respectively). Software tolerances do not
+  define biological acceptance thresholds.
+- Found and inspected the author's thesis. Recovered dry-mass/acid-treatment
+  assay details and discussion of possible high-cellulose assay interference.
+  It reports 5/40 g/L cellulose trials during estimation before their use for
+  extrapolation; record that selection history, not blind source validation.
+  Stored URL/hash/page evidence in `thesis_review.json`, without redistributing
+  the full thesis. Individual duplicates, full SD arrays, detection limits and
+  omitted condition arrays were not recovered. No author was contacted.
+
+Unchanged and scientific behavior impact:
+
+- Existing fungal coupling, configured engine, registry, enzyme studies and
+  their numerical behavior are unchanged by this task. Earlier uncommitted
+  research-integrity and data-intake work was preserved.
+- This adds a source-scoped experimental hypothesis, not a mechanistic
+  intracellular/oxygen/hyphal model. No activity-to-enzyme conversion, viable
+  biomass assumption, physical carbon closure, confidence interval or registry
+  promotion is introduced. Loss weights are explicitly not measurement SD.
+- Backward compatibility is additive; existing public APIs/schemas are unchanged.
+  The new study/report schema is version 1. Broader generic applicability is not claimed.
+
+Tests added: 25 cases in `tests/test_gelain_culture_benchmark.py`, covering unit
+equivalence, analytical limits, apparent-yield conservation, invalid input and
+solver failures, all-source parity, explicit observation mapping, artificial
+fit recovery, reproducibility, all-start failure, training-only split isolation,
+freeze-before-score and recorded artifact/score integrity. Existing source-extraction
+tests now also verify simulation references separately from experiments.
+
+Commands/results:
+
+- `.venv/bin/python scripts/prepare_public_experimental_data.py --check`: 16
+  deterministic extracts verified against pinned original sources.
+- `MPLCONFIGDIR=/tmp/fungmod-mpl .venv/bin/python scripts/run_gelain_2020_culture_benchmark.py --output outputs/gelain-culture-benchmark-verified`:
+  all 12 retrospective folds and two descriptive fits completed; results copied
+  to the preserved snapshot. The first run gave the same scientific results.
+- `MPLCONFIGDIR=/tmp/fungmod-mpl .venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`:
+  **1,477 passed**, 475.97 s, **84.65%** coverage (80% required). This full run
+  preceded addition of the final artifact-replay test; the final focused run
+  below includes that additional test. Current collection is 1,478 tests.
+- `MPLCONFIGDIR=/tmp/fungmod-mpl .venv/bin/python -m pytest -q tests/test_gelain_culture_benchmark.py tests/test_public_experimental_data.py`:
+  **37 passed**, including artifact replay. No refitting is required in the
+  artifact regression; it recomputes predictions/scores and checks all hashes.
+- `.venv/bin/python -m ruff check src tests scripts/run_*.py`: passed.
+- `.venv/bin/python -m pyright --pythonpath .venv/bin/python`: 0 errors/warnings.
+- `MPLCONFIGDIR=/tmp/fungmod-mpl .venv/bin/python -m mkdocs build --strict`: passed.
+- `.venv/bin/python scripts/check_packaged_resources.py`, `.venv/bin/python -m build`
+  and `.venv/bin/python -m twine check dist/fungmod-0.1.1-py3-none-any.whl dist/fungmod-0.1.1.tar.gz`:
+  canonical staging, isolated wheel/sdist build and metadata validation passed.
+- Fresh `/tmp/fungmod-culture-wheel` venv installation from the wheel (with
+  dependencies resolved), followed by offline execution from `/tmp`: all six
+  packaged conditions, 12 predictions/scores and artifact hashes verified. New
+  NumPy 2.5.3/SciPy 1.18.1 reproduced stored scores exactly in this check;
+  benchmark fitting used NumPy 2.4.6/SciPy 1.17.1, Python 3.13.11.
+- Figure visually inspected: six panels, source means and holdout predictions,
+  readable units/legend and explicit unavailable uncertainty. Source equation
+  and thesis method/selection pages also visually checked.
+- A training-only optimizer pilot exhausted its 300-evaluation cap using default
+  finite differences; the explicit derivative step was fixed before holdout
+  scoring and recorded in the plan. Two capped starts remain in final results.
+- The initial thesis `curl -fL --max-time 50 https://research.tudelft.nl/files/69958981/PhD_Thesis_Lucas_Gelain.pdf`
+  returned HTTP 403. The public repository file download succeeded. The Mendeley
+  V1 web page and PDF web-reader fetches were unavailable; local V2/archive/PDF
+  inspection supplied the evidence. No quality gate remained blocked.
+
+Remaining ambiguities: domain review, assay bias/covariance, raw replicate
+variation, censoring, inoculum variability, physiology behind effective loss,
+cellulose accessibility/hydrolysis, and parameter identifiability without a
+defensible error model. Hosted CI and independent human reproduction were not
+performed. Changes remain local and uncommitted.
+
+Risk: moderate for scientific misuse; low compatibility risk. Numerical/source
+reproduction is strong, but substantial residuals prevent a predictive-biology
+claim. Recommended next task: obtain domain review and matched raw measurements,
+then predeclare a bounded lag/loss or hydrolysis comparison while retaining this
+baseline. Do not relabel these now-inspected six conditions as blind validation.
+
+## PUBLIC-DATA-001 Public Experiments And Paper Readiness
+
+Date: 2026-09-28
+
+Status: public source acquisition, reviewed extraction and local verification
+complete. No model was fitted or independently biologically validated here.
+
+Changed:
+
+- Fetched Gelain 2020 Mendeley V2 archive, its open-access article, and Novy
+  2021 Figshare secretome workbook/metadata. Preserved twelve source files
+  (about 2.4 MB), URLs, licensing and SHA-256 hashes in
+  `data/experiments/source_intake/manifest.json`.
+- Extracted 162 source entries from six experimental culture workbooks,
+  separating 144 published mean measurements from 18 initial conditions.
+  The archive's `data.xlsx` outputs are simulations and are excluded.
+- Added an ingestion review and six `literature_processed` datasets: twelve
+  biomass/substrate series, 96 observations, for T. harzianum P49P11. No
+  individual duplicates or SD arrays were available. Missing uncertainty is
+  explicit; 54 h source/Methods discrepancy and nonmonotone values remain.
+- Retained culture enzyme activities in FPU/L and U/L in source intake,
+  without inventing a conversion to enzyme concentrations. Extracted 232
+  populated secretome rows as normalized spectra, without turning endpoint
+  abundance into secretion rates. Recorded the source header/count discrepancy.
+- Added a deterministic, offline, checksum-verifying extraction script, tests,
+  documentation and a current paper/whole-fungus roadmap. Verified JOSS's
+  current public-history rule and GitHub repository creation date separately.
+
+Unchanged: this task alters no simulation equations, rate constants, registry
+biology, calibration results, prior evidence labels or public API. Earlier
+RESEARCH-INTEGRITY-002 changes remain in the working tree. No research outcome,
+human review, external replication, publication acceptance or organism-level
+validation is claimed. Nothing was committed or pushed in this data task.
+
+Tests added/modified: source SHA-256 failure; exact extract reproduction;
+dataset units/maturity/missing errors and initial-condition exclusion; source
+cell traceability and simulation exclusion; retained reversals/activity units;
+secretome endpoint boundary; review and documentation contracts; explicit
+reviewed-source allowlists updated.
+
+Commands and results:
+
+- `python scripts/prepare_public_experimental_data.py --check`: 14 extracts
+  reproduced from verified source bytes.
+- `pytest -q tests/test_public_experimental_data.py tests/test_literature_schema_contract.py tests/test_dataset_candidate_review.py tests/test_packaged_distribution.py tests/test_quality_config.py`:
+  59 passed. An earlier run found two expected explicit source-list failures;
+  the lists were updated after the new review/schema checks passed.
+- `pytest -q tests/test_phase1_documentation_sync.py tests/test_public_experimental_data.py`:
+  18 passed (overlaps the intake tests above).
+- `ruff check scripts/prepare_public_experimental_data.py tests/test_public_experimental_data.py tests/test_dataset_candidate_review.py tests/test_literature_schema_contract.py`:
+  passed.
+- `python scripts/check_packaged_resources.py`: passed.
+- `mkdocs build --strict --site-dir /tmp/fungmod-data-intake/site`: passed.
+- `python -m build --wheel --outdir /tmp/fungmod-data-intake/dist`: passed;
+  `twine check` passed. The first `--no-isolation` attempt could not build
+  because the environment lacked `wheel`; the normal isolated build resolved
+  that dependency and succeeded.
+- Installed the built wheel under `/tmp/fungmod-data-intake/installed` with
+  `pip --no-deps`, then loaded all six new datasets from `/tmp` with the wheel
+  first on PYTHONPATH: 96 observations and the source manifest verified. This
+  checks wheel contents using the existing scientific dependencies, not a
+  completely fresh dependency environment.
+- `git diff --check`: passed. The full numerical suite was not rerun for this
+  data/docs-only slice; preceding numerical quality results remain recorded
+  under RESEARCH-INTEGRITY-002. Hosted CI has not run on these uncommitted changes.
+
+Access limitations: ordinary Mendeley HTTP requests returned 403; its normal
+browser download succeeded. A further PeerJ 8792 supplementary dataset could
+not be fetched (direct requests 403, PMC browser challenge, Europe PMC
+supplementary endpoint 502). Its values were not ingested. Two exploratory
+file reads initially used nonexistent filenames and were corrected using
+repository file discovery; no required verification remains blocked.
+
+Scientific impact: additional empirical inputs, not changed predictions.
+Backward compatibility: existing APIs and datasets unchanged; distribution
+includes the new source/data assets. Risk: low software risk, moderate
+scientific interpretation risk due to missing errors and assay mapping.
+Remaining ambiguities: raw duplicate availability, source validation-condition
+data, source sampling/count discrepancies, assay observation operators and
+documented public-history start date. Recommended next task: one bounded
+T. harzianum culture benchmark with reviewed observation mapping, followed by
+replicate recovery and frozen predictive tests. See `docs/paper-readiness.md`.
+
+## RESEARCH-INTEGRITY-002 Export Fidelity And Research Diagnostics
+
+Date: 2026-09-28
+
+Status: software implementation and local quality gates complete.
+Independent empirical validation remains blocked on suitable external data.
+
+Changed:
+
+- Encoded explicit SBML numeric unit conversions for parameter/state expressions
+  and reaction contributions. Equivalent per-minute/per-second and molar/millimolar
+  inputs reproduce native trajectories; heterogeneous compatible state units
+  also preserve output magnitudes. Parameter records retain original units.
+- PEtab exports only training observations into the estimation problem, writes
+  validation and unused holdout observations separately, and records split/noise
+  policy metadata. Unknown/zero/nonfinite noise scales fail before writing.
+  Added bounds checks, collision-safe parameter identity mapping and packaged
+  example resolution outside the checkout.
+- Corrected three thermodynamic scalar conversions rejected by CI's Pyright
+  1.1.414 and pinned that checker version in the development dependencies.
+- Moved both exploratory research runners onto a shared unit-aware progress
+  integrator; its inhibition denominator is also used by the configured modifier.
+  Source/hypothesis rationale and stoichiometry are explicit. Exponential activity
+  loss remains an exploratory mathematical hypothesis. FD-008 is resolved for
+  duplication, without promoting the hypothesis into registered biology.
+- Added grid profile likelihood with fixed explicit Gaussian observation scales,
+  local nuisance-parameter reoptimization, failed-point records, and diagnostics
+  for a better optimum than the reference fit. Configured calibration profiles
+  training data only and saves reports in optimizer metadata. No automatic
+  confidence bounds or global identifiability verdicts are emitted.
+- Added checksum-bound prediction freezing and independent-data scoring without
+  refitting. The evidence gate requires sourced criteria, raw replicate means,
+  positive experimental uncertainty and preparation/independence declarations.
+  Synthetic tests require opt-in and cannot set empirical criteria met.
+- Corrected a related configured-calibration defect: uncertainty magnitudes now
+  use their declared uncertainty units before conversion to observation units.
+- Documented APIs, raw-replicate intake, boundaries, migration requirements and
+  capability status. No preparation-matched independent dataset was supplied.
+  A targeted lookup of the Alvarez-Gonzalez paper and its indexed supplements
+  found the published curves/parameter tables, but did not establish availability
+  of suitable independent raw replicates; no data were invented or relabelled.
+
+Tests added/modified: mixed-unit SBML trajectory parity; PEtab split/holdout,
+missing-noise, identifier collision and outside-checkout regressions; configured
+uncertainty-unit/profile integration; shared progress conservation for an
+artificial 1:1 system and existing 2:1 source parity; analytical/flat/failing
+profile curves; frozen-artifact, raw replicate, preparation and uncertainty
+validation failures; documentation and tooling contracts.
+
+Verification (artifacts under `/tmp/fungmod-improvements/`):
+
+- Focused standards/thermodynamics group: 47 passed.
+- Existing research-runner guardrails after consolidation: 13 passed.
+- Profiles/shared progress/provenance-backed inhibition: 28 passed.
+- Independent validation/configured calibration/standards integration: 45 passed.
+- Final PEtab/quality/independent validation follow-up: 28 passed.
+- Ruff and pinned Pyright: passed (zero type errors/warnings).
+- Strict MkDocs and deterministic release notebook checks: passed.
+- Wheel and source distribution build, Twine checks and canonical resource checks:
+  passed; wheel contains 82 exact canonical resources.
+- Final rebuilt-wheel smoke outside the checkout: passed. Imported the new APIs,
+  ran shared progress integration and exported the packaged PEtab example with
+  four training rows and separately preserved validation. This smoke used the
+  installed wheel plus existing dependencies, not fresh dependency resolution.
+- Full coverage command:
+  `MPLCONFIGDIR=/tmp/fungmod-improvements/mpl XDG_CACHE_HOME=/tmp/fungmod-improvements/cache .venv/bin/python -m pytest -q --cov=fungal_model --cov-report=term --cov-report=json:/tmp/fungmod-improvements/coverage.json`.
+  Result: **1438 passed in 756.26 seconds; 84.48% coverage**, above the 80% gate.
+  Three PEtab regressions added after collection passed in the final 28-test
+  follow-up; current collection contains 1441 tests. The last path/identifier
+  corrections were also verified in that fresh targeted run, pinned type check,
+  rebuilt wheel, and outside-checkout smoke. No full-suite failures or skips.
+- Final roadmap/instruction/documentation contracts: 21 passed.
+- Both cross-source and mechanism-hypothesis CLI runs: passed under the shared
+  integration contract; report outputs remain under the temporary artifact root.
+- A first targeted test command referenced nonexistent
+  `tests/test_enzyme_inhibition.py` and collected no tests; corrected to
+  `tests/test_provenance_backed_inhibition_laws.py`, which passed in the group above.
+- Optional process inspection with `ps` was unavailable (`zsh: operation not
+  permitted: ps`); test execution/output remained accessible through its existing
+  session and log. No required quality command is blocked.
+- An initial outside-checkout PEtab wheel smoke exposed a real path-resolution
+  failure. It was fixed and covered by a regression before rebuilding the wheel.
+
+What did not change: observations, source snapshots, production registry values,
+base configured kinetic equations, existing user-owned outputs, package release
+version, or empirical validation status. No commit/push or publication performed
+in this implementation pass.
+
+Scientific behavior impact: export trajectories now respect input units;
+PEtab no longer fits on validation/holdout responses; missing noise is explicit;
+calibration weights change correctly for differing uncertainty units. Native
+inhibition arithmetic is shared without changing the equation. New profiles and
+validation reports are conditional diagnostics, not new biological evidence.
+
+Backward compatibility: public entry points remain; PEtab adds separate tables
+and metadata and now rejects missing/zero uncertainty and invalid bounds.
+Affected old exports must be regenerated. Profile and frozen-prediction APIs
+are additive; optional profile metadata is added to calibration reports.
+
+Remaining ambiguity and risk: moderate numerical/export compatibility risk,
+contained by analytical, unit-invariance and failure-path tests. Independent
+preparation identity, experimental chronology and a justified noise model need
+external evidence. Profile grids use local optimization and cannot prove global
+identifiability. Frozen hashes prove artifact identity, not empirical truth.
+
+Recommended next task: supply an archived prospective plan and preparation-matched
+raw training/independent validation replicates with analytical uncertainty, then
+run the frozen-prediction workflow. Remote CI must run on the new changes after
+publication to the repository; only the equivalent local gates are verified here.
+
 ## RESEARCH-ANALYSIS-001 Correctness And Evidence Boundaries
 
 Date: 2026-09-11
