@@ -1,0 +1,1089 @@
+{
+  "success": true,
+  "model": "hydrolysis",
+  "family": "cellulose",
+  "scenario": "correlated_assumption",
+  "training_conditions": [
+    "gelain_2020_cellulose_10gl",
+    "gelain_2020_cellulose_20gl",
+    "gelain_2020_cellulose_30gl"
+  ],
+  "observables": [
+    "biomass",
+    "substrate",
+    "cellulase_activity",
+    "beta_glucosidase_activity"
+  ],
+  "observable_units": [
+    "gram/liter",
+    "gram/liter",
+    "gelain_fpu/liter",
+    "gelain_beta_u/liter"
+  ],
+  "normalization": [
+    9.40625525180876,
+    31.188432670702987,
+    887.6433209611139,
+    2150.797238431824
+  ],
+  "normalization_is_measurement_sd": false,
+  "noise": {
+    "gelain_2020_cellulose_10gl": {
+      "observables": [
+        "biomass",
+        "substrate",
+        "cellulase_activity",
+        "beta_glucosidase_activity"
+      ],
+      "units": [
+        "gram/liter",
+        "gram/liter",
+        "gelain_fpu/liter",
+        "gelain_beta_u/liter"
+      ],
+      "standard_deviations": [
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ]
+      ],
+      "correlation": [
+        [
+          1.0,
+          -0.5,
+          0.0,
+          0.0
+        ],
+        [
+          -0.5,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "left_limits": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "source": "Declared sensitivity assumption only: SD=10% of training maxima, biomass/substrate correlation=-0.5 from the sign suggested by mass-difference assays. Neither magnitude is measured; temporal errors assumed independent.",
+      "evidence": "assumed",
+      "detection_limit_source": null,
+      "temporal_independence_assumed": true,
+      "supports": "zero or one left-censored component per simultaneous row"
+    },
+    "gelain_2020_cellulose_20gl": {
+      "observables": [
+        "biomass",
+        "substrate",
+        "cellulase_activity",
+        "beta_glucosidase_activity"
+      ],
+      "units": [
+        "gram/liter",
+        "gram/liter",
+        "gelain_fpu/liter",
+        "gelain_beta_u/liter"
+      ],
+      "standard_deviations": [
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ]
+      ],
+      "correlation": [
+        [
+          1.0,
+          -0.5,
+          0.0,
+          0.0
+        ],
+        [
+          -0.5,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "left_limits": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "source": "Declared sensitivity assumption only: SD=10% of training maxima, biomass/substrate correlation=-0.5 from the sign suggested by mass-difference assays. Neither magnitude is measured; temporal errors assumed independent.",
+      "evidence": "assumed",
+      "detection_limit_source": null,
+      "temporal_independence_assumed": true,
+      "supports": "zero or one left-censored component per simultaneous row"
+    },
+    "gelain_2020_cellulose_30gl": {
+      "observables": [
+        "biomass",
+        "substrate",
+        "cellulase_activity",
+        "beta_glucosidase_activity"
+      ],
+      "units": [
+        "gram/liter",
+        "gram/liter",
+        "gelain_fpu/liter",
+        "gelain_beta_u/liter"
+      ],
+      "standard_deviations": [
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ],
+        [
+          0.940625525180876,
+          3.118843267070299,
+          88.76433209611139,
+          215.07972384318242
+        ]
+      ],
+      "correlation": [
+        [
+          1.0,
+          -0.5,
+          0.0,
+          0.0
+        ],
+        [
+          -0.5,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "left_limits": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "source": "Declared sensitivity assumption only: SD=10% of training maxima, biomass/substrate correlation=-0.5 from the sign suggested by mass-difference assays. Neither magnitude is measured; temporal errors assumed independent.",
+      "evidence": "assumed",
+      "detection_limit_source": null,
+      "temporal_independence_assumed": true,
+      "supports": "zero or one left-censored component per simultaneous row"
+    }
+  },
+  "measurement_uncertainty": [
+    "assumed"
+  ],
+  "parameter_count": 9,
+  "fixed_parameters": [],
+  "starts": [
+    {
+      "start": 0,
+      "success": true,
+      "message": "`ftol` termination condition is satisfied.",
+      "objective": 440.82630959255033,
+      "nfev": 24,
+      "optimality": 0.08985100514749386,
+      "initial_parameters": [
+        {
+          "symbol": "k_h",
+          "value": 0.0010000000000000002,
+          "units": "gram/gelain_fpu/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Kh",
+          "value": 0.31622776601683805,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Y",
+          "value": 0.10000000000000002,
+          "units": "dimensionless",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kd",
+          "value": 0.0022360679774997894,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "K_ind",
+          "value": 1.0000000000000004,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qF",
+          "value": 3.1622776601683795,
+          "units": "gelain_fpu/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kF",
+          "value": 0.00031622776601683783,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qB",
+          "value": 5.47722557505166,
+          "units": "gelain_beta_u/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kB",
+          "value": 0.00031622776601683783,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        }
+      ],
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "value": 0.018613487253616445,
+          "units": "gram/gelain_fpu/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Kh",
+          "value": 16.51959927618553,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Y",
+          "value": 0.5018922628417748,
+          "units": "dimensionless",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kd",
+          "value": 0.025115826570269915,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "K_ind",
+          "value": 0.010000000000000014,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qF",
+          "value": 5.1975603891714535,
+          "units": "gelain_fpu/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kF",
+          "value": 1.0000000000000023e-06,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qB",
+          "value": 12.445410492863676,
+          "units": "gelain_beta_u/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kB",
+          "value": 1.0000000000000023e-06,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        }
+      ]
+    },
+    {
+      "start": 1,
+      "success": true,
+      "message": "`ftol` termination condition is satisfied.",
+      "objective": 440.82437366991974,
+      "nfev": 31,
+      "optimality": 0.6590792122347617,
+      "initial_parameters": [
+        {
+          "symbol": "k_h",
+          "value": 0.0015221315443840983,
+          "units": "gram/gelain_fpu/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Kh",
+          "value": 0.0018697213373768122,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Y",
+          "value": 0.04359371653681586,
+          "units": "dimensionless",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kd",
+          "value": 0.0009826214065273555,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "K_ind",
+          "value": 12.857160150554048,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qF",
+          "value": 0.3600051510150399,
+          "units": "gelain_fpu/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kF",
+          "value": 1.6834595265057553e-06,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qB",
+          "value": 14.700784616093337,
+          "units": "gelain_beta_u/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kB",
+          "value": 1.0441216589933106e-05,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        }
+      ],
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "value": 0.018741951460228928,
+          "units": "gram/gelain_fpu/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Kh",
+          "value": 16.677373556628087,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Y",
+          "value": 0.5014635320687069,
+          "units": "dimensionless",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kd",
+          "value": 0.025068632535579716,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "K_ind",
+          "value": 0.010000000093368473,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qF",
+          "value": 5.191928716751944,
+          "units": "gelain_fpu/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kF",
+          "value": 1.000002305516534e-06,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qB",
+          "value": 12.433382287735597,
+          "units": "gelain_beta_u/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kB",
+          "value": 1.0000000004380464e-06,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        }
+      ]
+    },
+    {
+      "start": 2,
+      "success": true,
+      "message": "`ftol` termination condition is satisfied.",
+      "objective": 752.1642828712133,
+      "nfev": 45,
+      "optimality": 0.06415418655636113,
+      "initial_parameters": [
+        {
+          "symbol": "k_h",
+          "value": 1.033160013276423e-06,
+          "units": "gram/gelain_fpu/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Kh",
+          "value": 1.4493761141652508,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Y",
+          "value": 0.3693269817798193,
+          "units": "dimensionless",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kd",
+          "value": 0.0013530359834782485,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "K_ind",
+          "value": 88.81193503197782,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qF",
+          "value": 8.899386509405947,
+          "units": "gelain_fpu/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kF",
+          "value": 6.002868579716614e-06,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qB",
+          "value": 0.054265625329983906,
+          "units": "gelain_beta_u/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kB",
+          "value": 0.008246012087739287,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        }
+      ],
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "value": 0.0021436735782105185,
+          "units": "gram/gelain_fpu/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Kh",
+          "value": 10.870350582356206,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "Y",
+          "value": 0.07372238617576872,
+          "units": "dimensionless",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kd",
+          "value": 1.0000000000000016e-05,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "K_ind",
+          "value": 0.010000000000000014,
+          "units": "gram/liter",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qF",
+          "value": 36.20515907559799,
+          "units": "gelain_fpu/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kF",
+          "value": 0.057817143420516644,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "qB",
+          "value": 73.3998338972441,
+          "units": "gelain_beta_u/gram/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        },
+        {
+          "symbol": "kB",
+          "value": 0.046288438577529026,
+          "units": "1/hour",
+          "uncertainty": null,
+          "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+        }
+      ]
+    }
+  ],
+  "hypothesis_source": "Candidate extension grounded in extracellular cellulase action: bulk consumption=k_h*F*S/(Kh+S), growth=Y*consumption; S/(K_ind+S) induces activity production. F is assay activity; fitted k_h is preparation-specific, not a unit conversion. Soluble intermediates and medium co-substrates remain unresolved.",
+  "confidence_intervals": null,
+  "maturity": "exploratory_software_tested",
+  "objective": 440.82437366991974,
+  "best_start": 1,
+  "parameters": [
+    {
+      "symbol": "k_h",
+      "value": 0.018741951460228928,
+      "units": "gram/gelain_fpu/hour",
+      "uncertainty": null,
+      "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+    },
+    {
+      "symbol": "Kh",
+      "value": 16.677373556628087,
+      "units": "gram/liter",
+      "uncertainty": null,
+      "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+    },
+    {
+      "symbol": "Y",
+      "value": 0.5014635320687069,
+      "units": "dimensionless",
+      "uncertainty": null,
+      "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+    },
+    {
+      "symbol": "kd",
+      "value": 0.025068632535579716,
+      "units": "1/hour",
+      "uncertainty": null,
+      "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+    },
+    {
+      "symbol": "K_ind",
+      "value": 0.010000000093368473,
+      "units": "gram/liter",
+      "uncertainty": null,
+      "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+    },
+    {
+      "symbol": "qF",
+      "value": 5.191928716751944,
+      "units": "gelain_fpu/gram/hour",
+      "uncertainty": null,
+      "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+    },
+    {
+      "symbol": "kF",
+      "value": 1.000002305516534e-06,
+      "units": "1/hour",
+      "uncertainty": null,
+      "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+    },
+    {
+      "symbol": "qB",
+      "value": 12.433382287735597,
+      "units": "gelain_beta_u/gram/hour",
+      "uncertainty": null,
+      "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+    },
+    {
+      "symbol": "kB",
+      "value": 1.0000000004380464e-06,
+      "units": "1/hour",
+      "uncertainty": null,
+      "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+    }
+  ],
+  "singular_values": [
+    51.42092239972998,
+    43.95799295970809,
+    24.125880801794928,
+    18.955439418192036,
+    8.049458665480877,
+    2.122791011361664,
+    0.3729009657944336,
+    0.0006355336142896112,
+    0.0005408735121088839
+  ],
+  "practical_rank": 9,
+  "condition_number": 95070.14347816384,
+  "near_bounds": [
+    "K_ind",
+    "kF",
+    "kB"
+  ],
+  "local_parameter_tradeoff_matrix": [
+    [
+      1.0,
+      0.8674459422337664,
+      0.0020490862776141702,
+      -0.06987115293902307,
+      0.2990731296025494,
+      -0.3931324017528107,
+      -0.08167419914249917,
+      -0.2559940664147316,
+      0.08579086850997035
+    ],
+    [
+      0.8674459422334796,
+      1.0,
+      0.09519001770560886,
+      0.059817013371497356,
+      0.6957309093417968,
+      0.050594372224539906,
+      0.024829676045238017,
+      0.05506327467123141,
+      0.03175691044569084
+    ],
+    [
+      0.0020490862775287,
+      0.09519001770558695,
+      1.0000000000000002,
+      0.8203520106949308,
+      0.18005715479235637,
+      -0.1835034534417111,
+      0.027054619555347065,
+      -0.1897682289458147,
+      0.015977842347250432
+    ],
+    [
+      -0.06987115293911135,
+      0.05981701337147208,
+      0.8203520106949291,
+      0.9999999999999999,
+      0.18798776914581602,
+      -0.02982615975831607,
+      0.028285458620867704,
+      -0.03676017303782842,
+      0.01690993709119032
+    ],
+    [
+      0.29907312960212684,
+      0.6957309093417288,
+      0.18005715479236364,
+      0.18798776914583046,
+      1.0,
+      0.5467598469375932,
+      -0.15000889723670216,
+      0.5357146048145753,
+      -0.16328140519420828
+    ],
+    [
+      -0.393132401753422,
+      0.05059437222365758,
+      -0.1835034534419237,
+      -0.029826159758532814,
+      0.5467598469364431,
+      1.0,
+      0.33185351687171905,
+      0.6016428930722098,
+      -0.16828901651216707
+    ],
+    [
+      -0.0816741991430924,
+      0.02482967604384543,
+      0.027054619554994438,
+      0.02828545862049813,
+      -0.15000889723860325,
+      0.3318535168705871,
+      1.0,
+      -0.1670597238296478,
+      0.15947221114422544
+    ],
+    [
+      -0.2559940664145434,
+      0.05506327467214635,
+      -0.18976822894556883,
+      -0.03676017303756879,
+      0.5357146048158363,
+      0.6016428930735995,
+      -0.1670597238285442,
+      1.0,
+      0.33807598661119476
+    ],
+    [
+      0.08579086851071234,
+      0.031756910447303645,
+      0.015977842347664178,
+      0.016909937091616978,
+      -0.1632814051920773,
+      -0.16828901651096986,
+      0.15947221114418567,
+      0.3380759866124118,
+      1.0
+    ]
+  ],
+  "tradeoff_symbols": [
+    "k_h",
+    "Kh",
+    "Y",
+    "kd",
+    "K_ind",
+    "qF",
+    "kF",
+    "qB",
+    "kB"
+  ],
+  "tradeoff_interpretation": "Local normalized sensitivity diagnostic, not empirical parameter covariance."
+}
