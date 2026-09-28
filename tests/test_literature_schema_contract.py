@@ -51,17 +51,11 @@ def test_literature_schema_contract_documents_real_data_requirements() -> None:
 
 REVIEWED_SOURCES = {
     "gelain_2020_t_harzianum": [
-        "gelain_2020_glycerol_5gl.csv",
-        "gelain_2020_glycerol_5gl.yml",
-        "gelain_2020_glycerol_10gl.csv",
-        "gelain_2020_glycerol_10gl.yml",
-        "gelain_2020_glycerol_20gl.csv",
-        "gelain_2020_glycerol_20gl.yml",
-        "gelain_2020_cellulose_10gl.csv",
-        "gelain_2020_cellulose_10gl.yml",
-        "gelain_2020_cellulose_20gl.csv",
-        "gelain_2020_cellulose_20gl.yml"
-],
+        f"gelain_2020_{substrate}_{concentration}gl.{suffix}"
+        for substrate, concentrations in (("glycerol", (5, 10, 20)), ("cellulose", (10, 20, 30)))
+        for concentration in concentrations
+        for suffix in ("csv", "yml")
+    ],
     "alvarez_gonzalez_2022_free_beta_glucosidase": [
         "alvarez_gonzalez_2022_figure_s1a_filled_squares.csv",
         "alvarez_gonzalez_2022_figure_s1a_open_squares.csv",
