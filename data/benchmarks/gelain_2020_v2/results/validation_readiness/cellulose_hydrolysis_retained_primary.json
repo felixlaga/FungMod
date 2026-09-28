@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "model_id": "gelain_2020_cellulose_hydrolysis_retained",
+    "model_version": "culture-v2",
+    "equation_source": "Activity-driven hydrolysis with a retained dry-mass observation pool; both assumptions explicit, not inferred physiology.",
+    "equation_sha256": "5bd9e2566c9948d29c5e52452699386cbfc5a0377e2be823134b8009c052b9d7",
+    "parameters": [
+      {
+        "symbol": "k_h",
+        "value": 0.018092921027786084,
+        "units": "gram/gelain_fpu/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "Kh",
+        "value": 16.629646775982067,
+        "units": "gram/liter",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "Y",
+        "value": 0.3963730514019921,
+        "units": "dimensionless",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "kd",
+        "value": 0.02032002320680551,
+        "units": "1/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "K_ind",
+        "value": 0.010000000001094533,
+        "units": "gram/liter",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "qF",
+        "value": 6.060438280256826,
+        "units": "gelain_fpu/gram/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "kF",
+        "value": 1.0000007678064784e-06,
+        "units": "1/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "qB",
+        "value": 14.504053660043036,
+        "units": "gelain_beta_u/gram/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "kB",
+        "value": 1.000000228176784e-06,
+        "units": "1/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "f_retained",
+        "value": 0.9999298987909144,
+        "units": "dimensionless",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "k_clear",
+        "value": 0.35422285158638045,
+        "units": "1/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_cellulose_10gl, gelain_2020_cellulose_20gl, gelain_2020_cellulose_30gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "initial_retained_fraction",
+        "value": 0.0,
+        "units": "dimensionless",
+        "uncertainty": null,
+        "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+      }
+    ],
+    "observation_model": {
+      "biomass": "X+R dry mass",
+      "activity": "assay activity state, never enzyme concentration",
+      "units": {
+        "biomass": "gram/liter",
+        "substrate": "gram/liter",
+        "cellulase_activity": "gelain_fpu/liter",
+        "beta_glucosidase_activity": "gelain_beta_u/liter"
+      },
+      "initial_retained_mass": "Explicit fixed initialization, not a viability measurement",
+      "error_model": {},
+      "measurement_uncertainty": null,
+      "implementation_dependencies_sha256": {
+        "src/fungal_model/research/gelain_culture.py": "8adbdf5c582ee75f4cf10ea44d1c9dd69886a049112ecffd2b0c8808fa9b148b",
+        "src/fungal_model/research/gelain_joint.py": "794e463fbc6ab5e5a86f68c8cae1f710158879244592079839b7018815addf73"
+      }
+    },
+    "training_experiment_ids": [
+      "gelain_2020_cellulose_10gl",
+      "gelain_2020_cellulose_20gl",
+      "gelain_2020_cellulose_30gl"
+    ]
+  },
+  "model_sha256": "6c7eacf51042f45a2e4bef8ae3c031d9720d79982d7f755c10a2336d8ce9479b",
+  "scope": {
+    "categorical": {
+      "strain": "Trichoderma harzianum P49P11",
+      "substrate": "cellulose",
+      "reactor": "controlled stirred batch",
+      "medium": "Gelain 2020 Methods 2.2; includes peptone and inoculum carryover",
+      "oxygen": "maintained above 30%"
+    },
+    "numeric": {
+      "initial_substrate": {
+        "lower": 10.0,
+        "upper": 30.0,
+        "units": "gram / liter"
+      },
+      "temperature": {
+        "lower": 302.15,
+        "upper": 302.15,
+        "units": "kelvin"
+      },
+      "pH": {
+        "lower": 4.5,
+        "upper": 5.5,
+        "units": "dimensionless"
+      }
+    },
+    "observable_units": {
+      "biomass": "gram/liter",
+      "substrate": "gram/liter",
+      "cellulase_activity": "gelain_fpu/liter",
+      "beta_glucosidase_activity": "gelain_beta_u/liter"
+    },
+    "source": "Proposed Gelain culture domain, not a validated range",
+    "observation_time": {
+      "lower": 0.0,
+      "upper": 96.0,
+      "units": "hour"
+    }
+  },
+  "evidence_sources": {
+    "predeclared_acceptance_criteria": null,
+    "matched_independent_data": null,
+    "measurement_error_evidence": null,
+    "domain_review": null
+  },
+  "missing_requirements": [
+    "predeclared_acceptance_criteria",
+    "matched_independent_data",
+    "measurement_error_evidence",
+    "domain_review"
+  ],
+  "status": "awaiting_evidence",
+  "validated": false,
+  "publication_claim_authorized": false
+}
