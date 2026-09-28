@@ -1,0 +1,23 @@
+{
+  "frozen_predictions/gelain_2020_cellulose_10gl_equal_g_l.json": "ea94fa0ab4bda22024205617cf2d902acfca7aa672eb51404cef99bcf149c764",
+  "frozen_predictions/gelain_2020_cellulose_10gl_training_max.json": "a00ccf92d50ed09b99537f4fcb624a0ce1a90bd6dc0034a18f2a60c7518b7af3",
+  "frozen_predictions/gelain_2020_cellulose_20gl_equal_g_l.json": "4a997a8cbf96bd186edc6270010b40973d584f2f21ba1197fe3fd88967174dc1",
+  "frozen_predictions/gelain_2020_cellulose_20gl_training_max.json": "1a0a93629e86cb96a5e76c44998434460be06c88471b5e74d9249a5ae06ac29e",
+  "frozen_predictions/gelain_2020_cellulose_30gl_equal_g_l.json": "e7af2e0d1339137a489dc4e2e9252d74ccf554030d7cf7e55524d62f67c62992",
+  "frozen_predictions/gelain_2020_cellulose_30gl_training_max.json": "46311abf5597c233e208a807a9578a109d3f9aae36a24811399a04812d8dabf5",
+  "frozen_predictions/gelain_2020_glycerol_10gl_equal_g_l.json": "5dcb4b59982093b6153d7f3b13ab5addd2333f7d1be20714214e7d436a12f464",
+  "frozen_predictions/gelain_2020_glycerol_10gl_training_max.json": "2b7e6306adb593e1db0820150ed971aec45c1752308cea9424727857e125cca8",
+  "frozen_predictions/gelain_2020_glycerol_20gl_equal_g_l.json": "dc0171adf76bdd7f8805b813183a3f903ace53440048cedac409480591288a86",
+  "frozen_predictions/gelain_2020_glycerol_20gl_training_max.json": "6563c7978b42d63aed55bd360254ad97314c2a183dcbf099d3f3e76416fbd9b9",
+  "frozen_predictions/gelain_2020_glycerol_5gl_equal_g_l.json": "4e3f19bca60c8a426a3199f7920980f697ce0607fa1616655932d31743a44b75",
+  "frozen_predictions/gelain_2020_glycerol_5gl_training_max.json": "e751d611a7e2119de54f3a8e7077f6a8822c8693dc2da11fcd1033c7ac7355bf",
+  "holdouts.png": "744cdb84b65d06f0d021e6a2bab245c6e2b57edcbe3736290279f29287e8f54b",
+  "holdouts.svg": "058cf2d95fc194381fd6d95e1439ef014b9462190ea4ebaa60dccd8c77833991",
+  "inputs.json": "877c0fd138a5020969a93a487be2c06807cf9b0e3ef0deb9ccfa44d1792b9499",
+  "plan.json": "695da7fc35bf90c4a9cb78cce9c42bb06b5bf7eb51f4725f097d92724c1294cc",
+  "report.json": "ba686725bfcc6477888eb3666ea698600c7ec034fae02df11213359c7ac9928c",
+  "report.md": "f5976287305f991a6c4cad1ba8caa92972698c5f1f2389625027e1d2e982706d",
+  "residuals.csv": "bcf9154c3485c55ec1f1015beb17ffb0c0d7834459817b0e17f9d08f21558819",
+  "software.json": "b533e421cca7dc48799bdbe042b139f3c036e287061f9a215d84178a388bd971",
+  "source_parity.json": "017c0e98a7bab9a1cd2cb09962359b3c609847c0a203fce5593ddc7f771a0156"
+}
