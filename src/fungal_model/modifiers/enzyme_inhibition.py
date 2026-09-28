@@ -7,6 +7,7 @@ from typing import Mapping
 
 import numpy as np
 
+from fungal_model.kinetics._coupled_inhibition import coupled_inhibition_denominator
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible
@@ -372,8 +373,9 @@ class CoupledSubstrateProductInhibitionModifier:
             name=self.product_inhibition_constant_symbol,
         )
         activity = (km_values + substrate_values) / (
-            km_values * (1.0 + product_values / product_ki_values) ** 2
-            + substrate_values * (1.0 + substrate_values / substrate_ki_values)
+            coupled_inhibition_denominator(
+                substrate_values, product_values, km_values, substrate_ki_values, product_ki_values,
+            )
         )
         return Q_(activity, "dimensionless")
 
