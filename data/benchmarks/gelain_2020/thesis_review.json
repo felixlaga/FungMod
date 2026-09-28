@@ -1,0 +1,53 @@
+{
+  "reviewed_on": "2026-09-28",
+  "title": "Mathematical modelling of cellulase production and continuous production of enzymes under carbon-limited conditions by Trichoderma harzianum P49P11",
+  "author": "Lucas Gelain",
+  "year": 2020,
+  "doi": "10.4233/uuid:cf8840b6-c075-4e3e-af43-2b9fbc7ff0a1",
+  "url": "https://repository.tudelft.nl/file/File_eade97ab-3e4e-42fe-a285-6ded01b91107",
+  "bytes": 8082257,
+  "sha256": "00cc5caf68321db27a54b5e5a701a4cdcf9337ce4903d6d6f4822180bd132f07",
+  "redistribution": "PDF inspected locally; not bundled. No open-content license established for the complete thesis.",
+  "evidence": [
+    {
+      "printed_page": 25,
+      "pdf_page": 26,
+      "section": "2.2.3",
+      "finding": "Glycerol biomass uses dried pellet mass. Cellulose culture uses total dry mass and post-acid-treatment residue."
+    },
+    {
+      "printed_page": 28,
+      "pdf_page": 29,
+      "section": "2.3.2",
+      "finding": "Biomass inferred by mass difference. Possible incomplete digestion at high cellulose discussed; source reports 28 +/- 3 g/L cellulose at 24 h for the 40 g/L condition. This isolated value is not a recovered time-course SD array."
+    },
+    {
+      "printed_page": 38,
+      "pdf_page": 39,
+      "section": "2.3.6",
+      "finding": "5 and 40 g/L cellulose assays were tried in parameter estimation with poor fit, then used for extrapolation. Do not call these blind source validation."
+    },
+    {
+      "printed_page": 108,
+      "pdf_page": 109,
+      "section": "Supplementary material Chapter 2",
+      "finding": "MATLAB estimation example refers to the same three cellulose workbooks; no raw duplicate time-course arrays recovered."
+    }
+  ],
+  "visual_verification_pdf_pages": [
+    26,
+    39
+  ],
+  "remaining_unknown": [
+    "raw_duplicate_trajectories",
+    "complete_sd_arrays",
+    "detection_limits",
+    "source_validation_condition_numeric_arrays",
+    "biomass_substrate_error_covariance"
+  ],
+  "access_notes": [
+    "Initial research.tudelft.nl download returned HTTP 403; repository.tudelft.nl download succeeded.",
+    "Mendeley version 1 page could not be fetched with web tool; V2 archive already verified.",
+    "No author contacted."
+  ]
+}
