@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "model_id": "gelain_2020_glycerol_published",
+    "model_version": "culture-v2",
+    "equation_source": "Gelain Eqs 2-10, glycerol Eq 5 literal; cellulose normalized z=A/Amax eliminates its exact scale symmetry. All remaining constants estimated only from training data. KI absorbs source manually chosen 0.15 coefficient.",
+    "equation_sha256": "5bd9e2566c9948d29c5e52452699386cbfc5a0377e2be823134b8009c052b9d7",
+    "parameters": [
+      {
+        "symbol": "mu",
+        "value": 0.20409656191335368,
+        "units": "1/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_10gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "K",
+        "value": 0.8528589484919361,
+        "units": "gram/liter",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_10gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "Xmax",
+        "value": 17.359854248503407,
+        "units": "gram/liter",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_10gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "d",
+        "value": 0.04246668348181812,
+        "units": "1/hour",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_10gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      },
+      {
+        "symbol": "alpha",
+        "value": 0.3735230366804582,
+        "units": "liter/gram",
+        "uncertainty": null,
+        "source": "Training-only fit: gelain_2020_glycerol_5gl, gelain_2020_glycerol_10gl, gelain_2020_glycerol_20gl; Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter."
+      }
+    ],
+    "observation_model": {
+      "biomass": "X dry mass",
+      "activity": "assay activity state, never enzyme concentration",
+      "units": {
+        "biomass": "gram/liter",
+        "substrate": "gram/liter"
+      },
+      "initial_retained_mass": "Explicit fixed initialization, not a viability measurement",
+      "error_model": {},
+      "measurement_uncertainty": null,
+      "implementation_dependencies_sha256": {
+        "src/fungal_model/research/gelain_culture.py": "8adbdf5c582ee75f4cf10ea44d1c9dd69886a049112ecffd2b0c8808fa9b148b",
+        "src/fungal_model/research/gelain_joint.py": "794e463fbc6ab5e5a86f68c8cae1f710158879244592079839b7018815addf73"
+      }
+    },
+    "training_experiment_ids": [
+      "gelain_2020_glycerol_5gl",
+      "gelain_2020_glycerol_10gl",
+      "gelain_2020_glycerol_20gl"
+    ]
+  },
+  "model_sha256": "b6b93d602815368ce2be5e762d23e8d3912d143fa4394d1a684527fcb685bfcf",
+  "scope": {
+    "categorical": {
+      "strain": "Trichoderma harzianum P49P11",
+      "substrate": "glycerol",
+      "reactor": "controlled stirred batch",
+      "medium": "Gelain 2020 Methods 2.2; includes peptone and inoculum carryover",
+      "oxygen": "maintained above 30%"
+    },
+    "numeric": {
+      "initial_substrate": {
+        "lower": 5.0,
+        "upper": 20.0,
+        "units": "gram / liter"
+      },
+      "temperature": {
+        "lower": 302.15,
+        "upper": 302.15,
+        "units": "kelvin"
+      },
+      "pH": {
+        "lower": 4.5,
+        "upper": 5.5,
+        "units": "dimensionless"
+      }
+    },
+    "observable_units": {
+      "biomass": "gram/liter",
+      "substrate": "gram/liter"
+    },
+    "source": "Proposed Gelain culture domain, not a validated range",
+    "observation_time": {
+      "lower": 0.0,
+      "upper": 96.0,
+      "units": "hour"
+    }
+  },
+  "evidence_sources": {
+    "predeclared_acceptance_criteria": null,
+    "matched_independent_data": null,
+    "measurement_error_evidence": null,
+    "domain_review": null
+  },
+  "missing_requirements": [
+    "predeclared_acceptance_criteria",
+    "matched_independent_data",
+    "measurement_error_evidence",
+    "domain_review"
+  ],
+  "status": "awaiting_evidence",
+  "validated": false,
+  "publication_claim_authorized": false
+}
