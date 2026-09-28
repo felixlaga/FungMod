@@ -24,6 +24,7 @@ require. This convention is recorded in the model notes.
 from __future__ import annotations
 
 import re
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -305,6 +306,53 @@ def _parameter_sbo_terms(model: "AssembledModel") -> dict[str, int]:
     return terms
 
 
+def _scaled_expression(expression: str, source_units: str, target_units: str) -> str:
+    """Encode conversions in the math; SBML unit annotations never rescale values."""
+
+    factor = _to_float(Q_(1.0, source_units).to(target_units).magnitude)
+    if not math.isfinite(factor) or factor <= 0:
+        raise SbmlExportError("Unit conversion must have a finite positive scale.")
+    return expression if factor == 1.0 else f"({factor:.17g} * ({expression}))"
+
+
+def _converted_reaction_spec(process: Any, sid: _SIds, model: "AssembledModel"):
+    reactants, products, modifiers, formula = _reaction_spec(process, sid)
+    state_units = {spec.name: spec.units for spec in model.state_variables}
+    expressions = {
+        sid.of(spec.name): _scaled_expression(sid.of(spec.name), state_units[spec.name], spec.units)
+        for spec in process.state_variables
+    }
+    for requirement in process.required_parameters:
+        parameter = model.parameters.get(requirement.symbol)
+        if parameter.quantity is None:
+            raise SbmlExportError(f"Required parameter {requirement.symbol!r} is unknown.")
+        expressions[sid.of(requirement.symbol)] = _scaled_expression(
+            sid.of(requirement.symbol), parameter.units, requirement.units,
+        )
+    formula = re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*\b", lambda match: expressions.get(match[0], match[0]), formula)
+    if isinstance(process, FirstOrderDecayProcess):
+        expression_units = Q_(1, process.state_units).units / Q_(1, "second").units
+    elif isinstance(process, MassActionProcess):
+        expression_units = Q_(1, process.rate_constant_units).units
+        for name, order in process.reactants.items():
+            expression_units *= Q_(1, process.state_units[name]).units ** order
+    else:
+        expression_units = Q_(1, process.rate_units).units
+    # One reaction flux drives all participants. Convert its contribution for
+    # each state, including states stored in different compatible unit scales.
+    reference = next(iter(reactants or products))
+    flux_units = f"({state_units[reference]}) / second"
+    formula = _scaled_expression(formula, str(expression_units), flux_units)
+
+    def converted(coefficients):
+        return {
+            name: coefficient * _to_float(Q_(1, flux_units).to(f"({state_units[name]}) / second").magnitude)
+            for name, coefficient in coefficients.items()
+        }
+
+    return converted(reactants), converted(products), modifiers, formula
+
+
 def to_sbml(
     model: "AssembledModel",
     *,
@@ -410,7 +458,7 @@ def to_sbml(
             sbml_parameter.setSBOTerm(parameter_sbo[parameter.symbol])
 
     for index, process in enumerate(model.processes):
-        reactants, products, modifiers, formula = _reaction_spec(process, sid)
+        reactants, products, modifiers, formula = _converted_reaction_spec(process, sid, model)
         reaction_id = sid.of(f"{process.name}__reaction_{index}")
         reaction = sbml_model.createReaction()
         reaction.setId(reaction_id)

@@ -210,3 +210,32 @@ def test_exportable_process_types_are_stable() -> None:
         "mass_action",
         "homogeneous_michaelis_menten",
     )
+
+
+@pytest.mark.parametrize('builder,parameters', [
+    (_first_order, [('k', 3.0, '1/minute')]),
+    (_mass_action, [('k', 1.8, '1/minute')]),
+    (_mm_vmax, [('Km', 0.003, 'molar'), ('Vmax', 24.0, 'millimolar/minute')]),
+    (_mm_enzyme, [('Km', 0.003, 'molar'), ('kcat', 4.8e6, '1/minute')]),
+])
+def test_export_preserves_equivalent_parameter_units(builder, parameters):
+    original, initial = builder()
+    model = _model(original.processes[0], [_parameter(*p) for p in parameters])
+    comparison = cross_engine_trajectory_check(
+        model, initial_state=initial, times=Q_(np.linspace(0, 60, 21), 'second'),
+    )
+    assert comparison.agrees(atol=1e-5), comparison.max_absolute_difference
+
+
+def test_export_preserves_mass_action_with_different_species_units():
+    process = MassActionProcess(
+        name='unit-scaled conversion', reactants={'A': 1}, products={'B': 1},
+        state_units={'A': 'kilogram', 'B': 'gram'}, rate_constant_symbol='k',
+        rate_constant_units='1/minute', rate_units='kilogram/minute',
+    )
+    model = _model(process, [_parameter('k', 3, '1/minute')])
+    comparison = cross_engine_trajectory_check(
+        model, initial_state={'A': Q_(1, 'kilogram'), 'B': Q_(0, 'gram')},
+        times=Q_(np.linspace(0, 60, 21), 'second'),
+    )
+    assert comparison.agrees(atol=1e-4), comparison.max_absolute_difference
