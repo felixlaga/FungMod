@@ -30,6 +30,8 @@ from .residuals import (
 from .profile import ProfileLikelihoodResult, profile_likelihood
 from .independent import IndependentValidationPlan, evaluate_frozen_prediction, freeze_prediction
 from .observation_error import GaussianObservationError
+from .model_validation import (ModelScope, ScopeRange, model_identity, freeze_scoped_prediction,
+                               evaluate_scoped_prediction, validation_readiness)
 
 __all__ = [
     "APPROXIMATE_NORMAL_95_Z",
@@ -51,6 +53,12 @@ __all__ = [
     "evaluate_frozen_prediction",
     "freeze_prediction",
     "GaussianObservationError",
+    "ModelScope",
+    "ScopeRange",
+    "model_identity",
+    "freeze_scoped_prediction",
+    "evaluate_scoped_prediction",
+    "validation_readiness",
     "ValidationRelationship",
     "audit_calibration_evidence",
     "calibrate_configured_model",
