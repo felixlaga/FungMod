@@ -27,6 +27,7 @@ from .residuals import (
     residuals_between,
     sequential_train_validation_split,
 )
+from .profile import ProfileLikelihoodResult, profile_likelihood
 
 __all__ = [
     "APPROXIMATE_NORMAL_95_Z",
@@ -42,6 +43,8 @@ __all__ = [
     "DEFAULT_VALIDATION_FRACTION",
     "FittableParameter",
     "LeastSquaresCalibrationResult",
+    "ProfileLikelihoodResult",
+    "profile_likelihood",
     "ValidationRelationship",
     "audit_calibration_evidence",
     "calibrate_configured_model",
