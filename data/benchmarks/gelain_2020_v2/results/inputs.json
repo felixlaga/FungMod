@@ -1,0 +1,10 @@
+{
+  "data/benchmarks/gelain_2020_v2/plan.json": "867120730f815060778ca402bdd55a0b2d02fba1eb1769ad567d07cd42f77046",
+  "data/benchmarks/gelain_2020_v2/observations.json": "cc8cda93a4a1a07cc73cf0c104aeaf315770aa4399e65cb2f3473e97951b699c",
+  "data/benchmarks/gelain_2020_v2/source_parameters.json": "d4f49b7bac36aa0c649ba557e9d240e36dbc69d914b96517a6206261db148597",
+  "data/benchmarks/gelain_2020_v2/source_simulations.csv": "4e3860ba1cc87da0e5061d6b5b6cad6720931c84d51506f0c04d85ad84c54b56",
+  "data/experiments/source_intake/manifest.json": "bbbab73a97212ca8243f7dd04d73dfd7b427bb87d19716241546dd69b60de69c",
+  "scripts/prepare_public_experimental_data.py": "d8c52a300f8e0199f94fdadf7a54e8faf443811aa57553fbb548cdb7adcef86f",
+  "pyproject.toml": "e0c2e0eff82e229474bfe05c44a1fb0cc059814b2dcf88fa1259ca73b13b3d7d",
+  "scripts/run_gelain_2020_joint_benchmark.py": "e6632be56fbf21230b98a996f5ac6cc72d6bfbc2a5f83d050dde0b12d724f09d"
+}
