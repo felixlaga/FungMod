@@ -54,7 +54,9 @@ REVIEWED_SOURCES = {
         "gelain_2020_glycerol_5gl.csv",
         "gelain_2020_glycerol_5gl.yml",
         "gelain_2020_glycerol_10gl.csv",
-        "gelain_2020_glycerol_10gl.yml"
+        "gelain_2020_glycerol_10gl.yml",
+        "gelain_2020_glycerol_20gl.csv",
+        "gelain_2020_glycerol_20gl.yml"
 ],
     "alvarez_gonzalez_2022_free_beta_glucosidase": [
         "alvarez_gonzalez_2022_figure_s1a_filled_squares.csv",
