@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 
 import fungmod
@@ -20,6 +21,28 @@ from fungal_model.registry import load_registry
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_source_archive_contains_runnable_offline_culture_benchmarks(tmp_path: Path) -> None:
+    built = subprocess.run([sys.executable, "-m", "build", "--sdist", "--outdir", str(tmp_path/"dist")],
+                           cwd=ROOT, capture_output=True, text=True, check=False)
+    assert built.returncode == 0, built.stdout+built.stderr
+    archive_path = next((tmp_path/"dist").glob("*.tar.gz"))
+    with tarfile.open(archive_path) as archive:
+        archive.extractall(tmp_path/"source", filter="data")
+    checkout = next((tmp_path/"source").iterdir())
+    assert (checkout/"docs"/"gelain-joint-benchmark.md").read_bytes() == (ROOT/"docs"/"gelain-joint-benchmark.md").read_bytes()
+    for name in ("prepare_public_experimental_data.py", "run_gelain_2020_culture_benchmark.py",
+                 "run_gelain_2020_joint_benchmark.py"):
+        assert (checkout/"scripts"/name).read_bytes() == (ROOT/"scripts"/name).read_bytes()
+    extracted = subprocess.run([sys.executable, "scripts/prepare_public_experimental_data.py", "--check"],
+                               cwd=checkout, capture_output=True, text=True, check=False)
+    assert extracted.returncode == 0, extracted.stdout+extracted.stderr
+    assert "Verified 19 extracts" in extracted.stdout
+    help_text = subprocess.run([sys.executable, "scripts/run_gelain_2020_joint_benchmark.py", "--help"],
+                              cwd=checkout, capture_output=True, text=True, check=False)
+    assert help_text.returncode == 0, help_text.stdout+help_text.stderr
+    assert "--output" in help_text.stdout and "--workers" in help_text.stdout
 
 
 def test_distribution_alias_and_version_are_public() -> None:

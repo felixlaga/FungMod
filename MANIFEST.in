@@ -1,5 +1,8 @@
 include setup.py
 include scripts/stage_packaged_resources.py
+include scripts/prepare_public_experimental_data.py
+include scripts/run_gelain_2020_culture_benchmark.py
+include scripts/run_gelain_2020_joint_benchmark.py
 include CITATION.cff
 include codemeta.json
 include AUTHORS.md
@@ -9,6 +12,8 @@ include CODE_OF_CONDUCT.md
 include SECURITY.md
 include SUPPORT.md
 include requirements-lock.txt
+include mkdocs.yml
+graft docs
 graft data
 graft data_registry
 global-include py.typed
