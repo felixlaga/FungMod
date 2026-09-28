@@ -1,0 +1,56 @@
+[
+  {
+    "dose_g_l": 10,
+    "role": "source_simulation_not_measurement",
+    "max_absolute_difference": {
+      "biomass": 1.2927436898735323e-11,
+      "substrate": 2.105693397425057e-11,
+      "cellulase_activity": 4.320312996242137e-09,
+      "beta_glucosidase_activity": 3.9068526464097317
+    },
+    "units": {
+      "biomass": "gram/liter",
+      "substrate": "gram/liter",
+      "cellulase_activity": "gelain_fpu/liter",
+      "beta_glucosidase_activity": "gelain_beta_u/liter"
+    },
+    "activity_exact_parity_established": false,
+    "interpretation": "Activity discrepancy is retained. Discontinuous inhibition switches and the deposited fixed 1 h solver may contribute; exact source activity parity is not established."
+  },
+  {
+    "dose_g_l": 20,
+    "role": "source_simulation_not_measurement",
+    "max_absolute_difference": {
+      "biomass": 9.2192919964873e-12,
+      "substrate": 2.5213608978447155e-11,
+      "cellulase_activity": 3.9091699455734243,
+      "beta_glucosidase_activity": 19.65485363619871
+    },
+    "units": {
+      "biomass": "gram/liter",
+      "substrate": "gram/liter",
+      "cellulase_activity": "gelain_fpu/liter",
+      "beta_glucosidase_activity": "gelain_beta_u/liter"
+    },
+    "activity_exact_parity_established": false,
+    "interpretation": "Activity discrepancy is retained. Discontinuous inhibition switches and the deposited fixed 1 h solver may contribute; exact source activity parity is not established."
+  },
+  {
+    "dose_g_l": 30,
+    "role": "source_simulation_not_measurement",
+    "max_absolute_difference": {
+      "biomass": 9.285017199545109e-12,
+      "substrate": 2.8746782732014253e-11,
+      "cellulase_activity": 22.342996290930202,
+      "beta_glucosidase_activity": 11.222201788002053
+    },
+    "units": {
+      "biomass": "gram/liter",
+      "substrate": "gram/liter",
+      "cellulase_activity": "gelain_fpu/liter",
+      "beta_glucosidase_activity": "gelain_beta_u/liter"
+    },
+    "activity_exact_parity_established": false,
+    "interpretation": "Activity discrepancy is retained. Discontinuous inhibition switches and the deposited fixed 1 h solver may contribute; exact source activity parity is not established."
+  }
+]
