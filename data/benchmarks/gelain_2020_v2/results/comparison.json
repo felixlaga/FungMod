@@ -1,0 +1,318 @@
+[
+  {
+    "family": "glycerol",
+    "model": "effective",
+    "scenario": "primary",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 1.5439901335200288,
+      "substrate": 1.272198303697337
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.05708350734207546,
+      "substrate": 0.008647039312480407
+    },
+    "mean_normalized_mse": 0.032865273327277934,
+    "parameter_count": 4,
+    "practical_rank": 4,
+    "all_fits_full_local_rank": true,
+    "near_bounds_full_fit": [],
+    "validated": false,
+    "complexity_screen_passed": true,
+    "complexity_screen_reasons": [],
+    "screen_is_biological_validation": false
+  },
+  {
+    "family": "glycerol",
+    "model": "published",
+    "scenario": "primary",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 0.45826409364162135,
+      "substrate": 1.0047384732181175
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.00385013175760737,
+      "substrate": 0.008030430352738005
+    },
+    "mean_normalized_mse": 0.005940281055172688,
+    "parameter_count": 5,
+    "practical_rank": 5,
+    "all_fits_full_local_rank": true,
+    "near_bounds_full_fit": [],
+    "validated": false,
+    "complexity_screen_passed": true,
+    "complexity_screen_reasons": [],
+    "screen_is_biological_validation": false
+  },
+  {
+    "family": "glycerol",
+    "model": "retained",
+    "scenario": "primary",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 1.4577510828488334,
+      "substrate": 1.225724944798157
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.05045245189323411,
+      "substrate": 0.008037788782112197
+    },
+    "mean_normalized_mse": 0.029245120337673153,
+    "parameter_count": 6,
+    "practical_rank": 6,
+    "all_fits_full_local_rank": true,
+    "near_bounds_full_fit": [
+      "Y"
+    ],
+    "validated": false,
+    "complexity_screen_passed": true,
+    "complexity_screen_reasons": [],
+    "screen_is_biological_validation": false
+  },
+  {
+    "family": "cellulose",
+    "model": "effective",
+    "scenario": "primary",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 2.230692026281415,
+      "substrate": 2.8826665021270443,
+      "cellulase_activity": 394.0186569496278,
+      "beta_glucosidase_activity": 834.8558711488049
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.06642821240940751,
+      "substrate": 0.013684082883684709,
+      "cellulase_activity": 0.20549153708744594,
+      "beta_glucosidase_activity": 0.15238452108151163
+    },
+    "mean_normalized_mse": 0.10949708836551245,
+    "parameter_count": 8,
+    "practical_rank": 8,
+    "all_fits_full_local_rank": true,
+    "near_bounds_full_fit": [
+      "K"
+    ],
+    "validated": false,
+    "complexity_screen_passed": true,
+    "complexity_screen_reasons": [],
+    "screen_is_biological_validation": false
+  },
+  {
+    "family": "cellulose",
+    "model": "published",
+    "scenario": "primary",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 0.7616673104513142,
+      "substrate": 1.1615356667010583,
+      "cellulase_activity": 83.8219775297921,
+      "beta_glucosidase_activity": 149.72222920377163
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.007524446926717369,
+      "substrate": 0.002681636452996383,
+      "cellulase_activity": 0.009506595483200845,
+      "beta_glucosidase_activity": 0.005028534335344174
+    },
+    "mean_normalized_mse": 0.006185303299564693,
+    "parameter_count": 20,
+    "practical_rank": 19,
+    "all_fits_full_local_rank": false,
+    "near_bounds_full_fit": [],
+    "validated": false,
+    "complexity_screen_passed": false,
+    "complexity_screen_reasons": [
+      "Local sensitivity rank does not support all free parameters"
+    ],
+    "screen_is_biological_validation": false
+  },
+  {
+    "family": "cellulose",
+    "model": "hydrolysis",
+    "scenario": "primary",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 2.4926204823700355,
+      "substrate": 2.4645073702601037,
+      "cellulase_activity": 346.875957610776,
+      "beta_glucosidase_activity": 726.7244913327418
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.07855269804136202,
+      "substrate": 0.013236784768724003,
+      "cellulase_activity": 0.16033231910634058,
+      "beta_glucosidase_activity": 0.11519634272639268
+    },
+    "mean_normalized_mse": 0.09182953616070481,
+    "parameter_count": 9,
+    "practical_rank": 9,
+    "all_fits_full_local_rank": true,
+    "near_bounds_full_fit": [
+      "K_ind",
+      "kF",
+      "kB"
+    ],
+    "validated": false,
+    "complexity_screen_passed": false,
+    "complexity_screen_reasons": [
+      "At least one observable worsens beyond the predefined allowance"
+    ],
+    "screen_is_biological_validation": false
+  },
+  {
+    "family": "cellulose",
+    "model": "hydrolysis_retained",
+    "scenario": "primary",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 2.4890875859979147,
+      "substrate": 2.487496018590226,
+      "cellulase_activity": 350.1289866582141,
+      "beta_glucosidase_activity": 733.4771882516537
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.07832878572971962,
+      "substrate": 0.013423069205940254,
+      "cellulase_activity": 0.16355021136638073,
+      "beta_glucosidase_activity": 0.11733079505428197
+    },
+    "mean_normalized_mse": 0.09315821533908064,
+    "parameter_count": 11,
+    "practical_rank": 11,
+    "all_fits_full_local_rank": true,
+    "near_bounds_full_fit": [
+      "K_ind",
+      "kF",
+      "kB",
+      "f_retained"
+    ],
+    "validated": false,
+    "complexity_screen_passed": false,
+    "complexity_screen_reasons": [
+      "At least one observable worsens beyond the predefined allowance"
+    ],
+    "screen_is_biological_validation": false
+  },
+  {
+    "family": "cellulose",
+    "model": "effective",
+    "scenario": "correlated_assumption",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 2.4003764217388666,
+      "substrate": 2.8488523467362645,
+      "cellulase_activity": 396.66817302120916,
+      "beta_glucosidase_activity": 841.7536798514424
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.07895137885360907,
+      "substrate": 0.013400484452492506,
+      "cellulase_activity": 0.20825544119687833,
+      "beta_glucosidase_activity": 0.1549275328745134
+    },
+    "mean_normalized_mse": 0.11388370934437334,
+    "parameter_count": 8,
+    "practical_rank": 8,
+    "all_fits_full_local_rank": true,
+    "near_bounds_full_fit": [
+      "K"
+    ],
+    "validated": false,
+    "complexity_screen_passed": true,
+    "complexity_screen_reasons": [],
+    "screen_is_biological_validation": false
+  },
+  {
+    "family": "cellulose",
+    "model": "published",
+    "scenario": "correlated_assumption",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 0.8387680496105854,
+      "substrate": 1.2644777101103766,
+      "cellulase_activity": 95.26021905205789,
+      "beta_glucosidase_activity": 147.93850214885936
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.009501473103355402,
+      "substrate": 0.0033635825105881294,
+      "cellulase_activity": 0.01235932570138499,
+      "beta_glucosidase_activity": 0.004938521582458885
+    },
+    "mean_normalized_mse": 0.007540725724446851,
+    "parameter_count": 20,
+    "practical_rank": 18,
+    "all_fits_full_local_rank": false,
+    "near_bounds_full_fit": [],
+    "validated": false,
+    "complexity_screen_passed": false,
+    "complexity_screen_reasons": [
+      "Local sensitivity rank does not support all free parameters"
+    ],
+    "screen_is_biological_validation": false
+  },
+  {
+    "family": "cellulose",
+    "model": "hydrolysis",
+    "scenario": "correlated_assumption",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 2.5688892078845127,
+      "substrate": 2.39492905064334,
+      "cellulase_activity": 350.57730856704273,
+      "beta_glucosidase_activity": 735.8074442614927
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.08567564091654416,
+      "substrate": 0.012299600519128982,
+      "cellulase_activity": 0.16379093917872076,
+      "beta_glucosidase_activity": 0.11811279614373216
+    },
+    "mean_normalized_mse": 0.09496974418953151,
+    "parameter_count": 9,
+    "practical_rank": 9,
+    "all_fits_full_local_rank": true,
+    "near_bounds_full_fit": [
+      "K_ind",
+      "kF",
+      "kB"
+    ],
+    "validated": false,
+    "complexity_screen_passed": true,
+    "complexity_screen_reasons": [],
+    "screen_is_biological_validation": false
+  },
+  {
+    "family": "cellulose",
+    "model": "hydrolysis_retained",
+    "scenario": "correlated_assumption",
+    "complete": true,
+    "pooled_rmse": {
+      "biomass": 2.570704574772093,
+      "substrate": 2.430920109353025,
+      "cellulase_activity": 356.72220919799247,
+      "beta_glucosidase_activity": 748.8160505578151
+    },
+    "pooled_normalized_mse": {
+      "biomass": 0.08577624510853425,
+      "substrate": 0.012542802628106151,
+      "cellulase_activity": 0.16993079388316237,
+      "beta_glucosidase_activity": 0.1222861048254138
+    },
+    "mean_normalized_mse": 0.09763398661130415,
+    "parameter_count": 11,
+    "practical_rank": 11,
+    "all_fits_full_local_rank": true,
+    "near_bounds_full_fit": [
+      "K_ind",
+      "kB",
+      "f_retained"
+    ],
+    "validated": false,
+    "complexity_screen_passed": true,
+    "complexity_screen_reasons": [],
+    "screen_is_biological_validation": false
+  }
+]
