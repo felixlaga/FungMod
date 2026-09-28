@@ -1,0 +1,348 @@
+{
+  "heldout_condition": "gelain_2020_cellulose_20gl",
+  "fit": {
+    "parameters": [
+      {
+        "symbol": "mu",
+        "units": "1/hour",
+        "value": 0.16686384134696602
+      },
+      {
+        "symbol": "K",
+        "units": "gram/liter",
+        "value": 1.6562533754555955
+      },
+      {
+        "symbol": "Y",
+        "units": "dimensionless",
+        "value": 0.4786063333934034
+      },
+      {
+        "symbol": "kd",
+        "units": "1/hour",
+        "value": 0.025978225917797998
+      }
+    ],
+    "parameter_source": "Explicit exploratory search bounds, not measured strain constants. No source-fitted parameter is fixed or used as a start.",
+    "training_conditions": [
+      "gelain_2020_cellulose_10gl",
+      "gelain_2020_cellulose_30gl"
+    ],
+    "weighting": "training_max",
+    "normalization_g_l": [
+      9.40625525180876,
+      31.188432670702987
+    ],
+    "normalization_is_measurement_uncertainty": false,
+    "objective": 0.6827346858186303,
+    "best_start": 0,
+    "starts": [
+      {
+        "start": 0,
+        "success": true,
+        "message": "`ftol` termination condition is satisfied.",
+        "nfev": 23,
+        "objective": 0.6827346858186303,
+        "initial_parameters": [
+          {
+            "symbol": "mu",
+            "units": "1/hour",
+            "value": 0.0447213595499958
+          },
+          {
+            "symbol": "K",
+            "units": "gram/liter",
+            "value": 0.31622776601683805
+          },
+          {
+            "symbol": "Y",
+            "units": "dimensionless",
+            "value": 0.10000000000000002
+          },
+          {
+            "symbol": "kd",
+            "units": "1/hour",
+            "value": 0.0022360679774997894
+          }
+        ],
+        "parameters": [
+          {
+            "symbol": "mu",
+            "units": "1/hour",
+            "value": 0.16686384134696602
+          },
+          {
+            "symbol": "K",
+            "units": "gram/liter",
+            "value": 1.6562533754555955
+          },
+          {
+            "symbol": "Y",
+            "units": "dimensionless",
+            "value": 0.4786063333934034
+          },
+          {
+            "symbol": "kd",
+            "units": "1/hour",
+            "value": 0.025978225917797998
+          }
+        ]
+      },
+      {
+        "start": 1,
+        "success": true,
+        "message": "`xtol` termination condition is satisfied.",
+        "nfev": 29,
+        "objective": 0.8002088640517568,
+        "initial_parameters": [
+          {
+            "symbol": "mu",
+            "units": "1/hour",
+            "value": 0.0012632239814201732
+          },
+          {
+            "symbol": "K",
+            "units": "gram/liter",
+            "value": 0.006954844092730667
+          },
+          {
+            "symbol": "Y",
+            "units": "dimensionless",
+            "value": 0.03871692828909425
+          },
+          {
+            "symbol": "kd",
+            "units": "1/hour",
+            "value": 0.005102587247753547
+          }
+        ],
+        "parameters": [
+          {
+            "symbol": "mu",
+            "units": "1/hour",
+            "value": 0.2477262462049978
+          },
+          {
+            "symbol": "K",
+            "units": "gram/liter",
+            "value": 4.705848446538753
+          },
+          {
+            "symbol": "Y",
+            "units": "dimensionless",
+            "value": 0.43747543878483375
+          },
+          {
+            "symbol": "kd",
+            "units": "1/hour",
+            "value": 0.020617254116046792
+          }
+        ]
+      },
+      {
+        "start": 2,
+        "success": true,
+        "message": "`xtol` termination condition is satisfied.",
+        "nfev": 35,
+        "objective": 0.682734687046916,
+        "initial_parameters": [
+          {
+            "symbol": "mu",
+            "units": "1/hour",
+            "value": 0.48046740654217185
+          },
+          {
+            "symbol": "K",
+            "units": "gram/liter",
+            "value": 76.16958212892925
+          },
+          {
+            "symbol": "Y",
+            "units": "dimensionless",
+            "value": 0.08511438181501021
+          },
+          {
+            "symbol": "kd",
+            "units": "1/hour",
+            "value": 4.7530994476869405e-05
+          }
+        ],
+        "parameters": [
+          {
+            "symbol": "mu",
+            "units": "1/hour",
+            "value": 0.16686508211042836
+          },
+          {
+            "symbol": "K",
+            "units": "gram/liter",
+            "value": 1.6564177241442672
+          },
+          {
+            "symbol": "Y",
+            "units": "dimensionless",
+            "value": 0.4786107349812965
+          },
+          {
+            "symbol": "kd",
+            "units": "1/hour",
+            "value": 0.0259785449343358
+          }
+        ]
+      },
+      {
+        "start": 3,
+        "success": true,
+        "message": "`xtol` termination condition is satisfied.",
+        "nfev": 28,
+        "objective": 0.8002088640776184,
+        "initial_parameters": [
+          {
+            "symbol": "mu",
+            "units": "1/hour",
+            "value": 1.0553245091110723
+          },
+          {
+            "symbol": "K",
+            "units": "gram/liter",
+            "value": 0.06312714651087079
+          },
+          {
+            "symbol": "Y",
+            "units": "dimensionless",
+            "value": 0.012777990149650482
+          },
+          {
+            "symbol": "kd",
+            "units": "1/hour",
+            "value": 5.739706645915153e-05
+          }
+        ],
+        "parameters": [
+          {
+            "symbol": "mu",
+            "units": "1/hour",
+            "value": 0.24772694370493775
+          },
+          {
+            "symbol": "K",
+            "units": "gram/liter",
+            "value": 4.705897978523052
+          },
+          {
+            "symbol": "Y",
+            "units": "dimensionless",
+            "value": 0.43747471637286073
+          },
+          {
+            "symbol": "kd",
+            "units": "1/hour",
+            "value": 0.020617178787326013
+          }
+        ]
+      }
+    ],
+    "jacobian_rank": 4,
+    "jacobian_singular_values": [
+      4.137869655765213,
+      2.1656517137191718,
+      0.5636804735633099,
+      0.0654188356311864
+    ],
+    "jacobian_condition_number": 63.25196124084807,
+    "near_bounds": [],
+    "uncertainty": null,
+    "maturity": "exploratory_software_tested"
+  },
+  "plan_sha256": "695da7fc35bf90c4a9cb78cce9c42bb06b5bf7eb51f4725f097d92724c1294cc",
+  "input_hashes": {
+    "data/benchmarks/gelain_2020/plan.json": "695da7fc35bf90c4a9cb78cce9c42bb06b5bf7eb51f4725f097d92724c1294cc",
+    "data/benchmarks/gelain_2020/source_parameters.json": "d8a6fdb632c07bfd7862d3921149de25afbe8dd6aec3e1138f0d0cad76d8728f",
+    "data/benchmarks/gelain_2020/source_simulations.csv": "358a86dbc8cacc50186ca4ea7e2c6c4d9922a98f62d8584ba266a396cd946702",
+    "data/experiments/source_intake/manifest.json": "bbbab73a97212ca8243f7dd04d73dfd7b427bb87d19716241546dd69b60de69c",
+    "scripts/prepare_public_experimental_data.py": "32d84c6de61591a14adde4d69a2fe081820bf5df4b2d0177ccf7761e00383a61",
+    "scripts/run_gelain_2020_culture_benchmark.py": "fd604fc4f2c96be7077cc97ce8c6669a8a8904a32fab723f85e1f0ecde72b436",
+    "src/fungal_model/research/gelain_culture.py": "1df6633a77cfad346099cd6ba0f37024af1f7e21f076d3e5f7526c09c0b21ea4",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_10gl.csv": "f46d077a867ac9f93bba971fee7237fc7caeaa428c68d9df6938ff95768498e9",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_10gl.yml": "3493c4406cdbd85c53ca0dea5847f18faf47c4ab9f5f3a8bccadfbb747e9cd6f",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_20gl.csv": "ccd7250974e0b45aabf36d0068afcc5960fe0d01c3e2fc4cce2662d77ea3332c",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_20gl.yml": "abdda826247d691b7d209f6799256a5cce9acf9b1410e8bb3f20b4f9bb4ab3c3",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_30gl.csv": "6cfcb2b7d2796fbdacbbf32af0d7adc11b5a51881a4b19e815c235ee84a86aa4",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_30gl.yml": "38aecbbdd875d0ebc92fb9d859cfd162f4e6bb2299afca6ed5a9a8d46cc255a1",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_10gl.csv": "307e66b6bcb42b53a5b41427e60f822ae85783a18c55505ceec3ce528d707fce",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_10gl.yml": "249b97aec56622c8b1a90860e05797266b77cf39a82d4a7ad3b5081e747d6045",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_20gl.csv": "056258ac4068831fbdf98ca797a4ce6570dcf0b6131be3e4e4488d81d143cb75",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_20gl.yml": "dd07cfbb188062792fc698b78ae91e782ad2e116ba602d0887604e0e58995b9c",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_5gl.csv": "efd32f5a8cc8e5493aa47f4d5e112e4ceadc8014566320a386b2b448c22c3c69",
+    "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_5gl.yml": "826ed6fd92224ab808beeb4b6f72f25effae3b8d86c95bed93002002fb9bfbbc"
+  },
+  "software_manifest_sha256": "b533e421cca7dc48799bdbe042b139f3c036e287061f9a215d84178a388bd971",
+  "times_h": [
+    8.0,
+    12.0,
+    24.0,
+    32.0,
+    48.0,
+    54.0,
+    72.0,
+    96.0
+  ],
+  "predicted_biomass_substrate_g_l": [
+    [
+      1.1081295242060567,
+      18.21678458293781
+    ],
+    [
+      1.8369041084885562,
+      16.380866083573885
+    ],
+    [
+      7.252758091838803,
+      2.390662936302345
+    ],
+    [
+      6.847934519833533,
+      3.58354737871624e-05
+    ],
+    [
+      4.519032903607422,
+      -3.381328991517223e-12
+    ],
+    [
+      3.866805255771368,
+      -1.8021439503478073e-13
+    ],
+    [
+      2.422549746231769,
+      -2.05057326158807e-12
+    ],
+    [
+      1.2986732409269566,
+      -2.0505732615881053e-12
+    ]
+  ],
+  "solver": {
+    "method": "LSODA",
+    "rtol": 1e-08,
+    "atol_g_l": [
+      1e-10,
+      1e-10
+    ],
+    "nfev": 463,
+    "minimum_state_g_l": -3.381328991517223e-12,
+    "negative_roundoff_count": 4
+  },
+  "alternate_solver": {
+    "method": "DOP853",
+    "rtol": 1e-10,
+    "atol_g_l": [
+      1e-12,
+      1e-12
+    ],
+    "nfev": 950,
+    "minimum_state_g_l": -7.51626888851689e-13,
+    "negative_roundoff_count": 3
+  },
+  "alternate_solver_max_abs_difference_g_l": 1.524103853789427e-06,
+  "tolerance_convergence_max_abs_difference_g_l": 1.50546776200855e-06
+}
