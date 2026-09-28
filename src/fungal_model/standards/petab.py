@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import csv
 import io
+import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -48,6 +50,9 @@ class PetabExport:
     measurements: Path
     conditions: Path
     parameters: Path
+    validation_measurements: Path | None = None
+    holdout_measurements: Path | None = None
+    metadata: Path | None = None
 
 
 def _sanitize_id(name: str) -> str:
@@ -63,11 +68,11 @@ def _resolve(base: Path, value: str) -> Path:
     candidate = Path(value)
     if candidate.is_absolute() and candidate.exists():
         return candidate
-    for root in (Path.cwd(), base.parent):
+    for root in (base.parent, Path.cwd(), *base.parents):
         resolved = (root / value).resolve()
         if resolved.exists():
             return resolved
-    return candidate
+    raise PetabExportError(f"Cannot resolve referenced path {value!r} from {base}.")
 
 
 def _write_tsv(path: Path, header: list[str], rows: list[list[Any]]) -> None:
@@ -92,6 +97,10 @@ def calibration_config_to_petab(
         output_dir: Directory to write the PEtab problem into (created if needed).
         condition_id: Identifier for the single simulation condition.
 
+    Only training rows enter ``problem.yaml``. Validation and holdout rows are
+    written separately. Every observation requires finite positive uncertainty;
+    an unknown scale is never replaced by an implicit noise model.
+
     Returns:
         A :class:`PetabExport` with the written file paths.
 
@@ -101,6 +110,7 @@ def calibration_config_to_petab(
     """
 
     from fungal_model.data.loaders import load_experiment_dataset
+    from fungal_model.calibration.configured import _build_split
     from fungal_model.io.model_config import load_model_config
     from fungal_model.workflows.configured_inputs import ConfiguredInputLoader
     from fungal_model.workflows.configured_processes import ConfiguredProcessAssembler
@@ -126,19 +136,22 @@ def calibration_config_to_petab(
     assembled = ConfiguredProcessAssembler().assemble(model_config, inputs)
 
     sbml_text = to_sbml(assembled.model, initial_state=inputs.initial_state, model_id=model_config.name)
-    species_name_to_id, parameter_id_set = _sbml_symbol_maps(sbml_text)
+    exported_symbols = [p.symbol for p in assembled.model.parameters if p.quantity is not None]
+    species_name_to_id, parameter_ids = _sbml_symbol_maps(sbml_text, exported_symbols)
     state_units = {spec.name: spec.units for spec in assembled.model.state_variables}
 
     dataset = load_experiment_dataset(dataset_path)
     series_by_id = {series.measurement_id: series for series in dataset.measurements}
+    split = _build_split(dataset, config.get("split"))
 
     directory = Path(output_dir)
-    directory.mkdir(parents=True, exist_ok=True)
     sbml_path = directory / "model.xml"
-    sbml_path.write_text(sbml_text, encoding="utf-8", newline="")
 
     observable_rows: list[list[Any]] = []
     measurement_rows: list[list[Any]] = []
+    validation_rows: list[list[Any]] = []
+    holdout_rows: list[list[Any]] = []
+    seen_observables: set[str] = set()
     for mapping in observable_mapping:
         measurement_id = str(mapping["dataset_measurement_id"])
         model_observable = str(mapping["model_observable"])
@@ -163,36 +176,54 @@ def calibration_config_to_petab(
         species_id = species_name_to_id[model_observable]
         observable_units = state_units[model_observable]
         observable_id = _sanitize_id(f"observable_{measurement_id}")
+        if observable_id in seen_observables:
+            raise PetabExportError(f"Duplicate or colliding observable ID: {observable_id!r}.")
+        seen_observables.add(observable_id)
         observable_rows.append(
             [observable_id, measurement_id, species_id, "lin", f"noiseParameter1_{observable_id}", "normal"]
         )
 
         series = series_by_id[measurement_id]
         uncertainty_units = series.uncertainty_units or series.value_units
-        for point in series.points:
+        for index, point in enumerate(series.points):
             value = float(Q_(point.value, series.value_units).to(observable_units).magnitude)
             time = float(Q_(point.time, series.time_units).to("second").magnitude)
             if point.uncertainty is None:
-                noise = 1.0
+                raise PetabExportError(
+                    f"Measurement {measurement_id!r} point {index} has unknown uncertainty; "
+                    "supply an explicit observation noise scale before PEtab export."
+                )
             else:
                 noise = float(Q_(point.uncertainty, uncertainty_units).to(observable_units).magnitude)
-            measurement_rows.append([observable_id, condition_id, value, time, noise])
+            if not math.isfinite(noise) or noise <= 0:
+                raise PetabExportError(f"Measurement {measurement_id!r} uncertainty must be finite and positive.")
+            target = (measurement_rows if index in split.train_indices[measurement_id]
+                      else validation_rows if index in split.validation_indices[measurement_id]
+                      else holdout_rows)
+            target.append([observable_id, condition_id, value, time, noise])
 
     parameter_rows: list[list[Any]] = []
     for symbol in parameter_symbols:
-        parameter_id = _sanitize_id(symbol)
-        if parameter_id not in parameter_id_set:
+        if symbol not in parameter_ids:
             raise PetabExportError(f"Parameter {symbol!r} is not an exported SBML parameter.")
+        parameter_id = parameter_ids[symbol]
         if symbol not in bounds or len(bounds[symbol]) != 2:
             raise PetabExportError(f"calibration_config is missing [lower, upper] bounds for {symbol!r}.")
         lower, upper = (float(value) for value in bounds[symbol])
         nominal = float(initial_guess.get(symbol, (lower + upper) / 2.0))
+        if not all(math.isfinite(v) for v in (lower, upper, nominal)) or not lower < upper or not lower <= nominal <= upper:
+            raise PetabExportError(f"Parameter {symbol!r} requires finite ordered bounds containing its nominal value.")
         parameter_rows.append([parameter_id, symbol, "lin", lower, upper, nominal, 1])
 
     observables_path = directory / "observables.tsv"
     measurements_path = directory / "measurements.tsv"
     conditions_path = directory / "conditions.tsv"
     parameters_path = directory / "parameters.tsv"
+    validation_path = directory / "validation_measurements.tsv"
+    holdout_path = directory / "holdout_measurements.tsv"
+    metadata_path = directory / "export_metadata.json"
+    directory.mkdir(parents=True, exist_ok=True)
+    sbml_path.write_text(sbml_text, encoding="utf-8", newline="")
 
     _write_tsv(
         observables_path,
@@ -205,6 +236,17 @@ def calibration_config_to_petab(
         measurement_rows,
     )
     _write_tsv(conditions_path, ["conditionId", "conditionName"], [[condition_id, str(config.get("name", condition_id))]])
+    measurement_header = ["observableId", "simulationConditionId", "measurement", "time", "noiseParameters"]
+    _write_tsv(validation_path, measurement_header, validation_rows)
+    _write_tsv(holdout_path, measurement_header, holdout_rows)
+    metadata_path.write_text(json.dumps({
+        "schema_version": "1.0.0", "dataset_id": dataset.dataset_id,
+        "split": split.to_dict(), "training_rows": len(measurement_rows),
+        "validation_rows": len(validation_rows), "holdout_rows": len(holdout_rows),
+        "noise_policy": "explicit_positive_observation_scales",
+        "noise_interpretation": "Normal errors are assumed; supplied scales do not establish experimental variance.",
+        "validation_usage": "Separate tables are excluded from the estimation problem; do not refit on them.",
+    }, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     _write_tsv(
         parameters_path,
         ["parameterId", "parameterName", "parameterScale", "lowerBound", "upperBound", "nominalValue", "estimate"],
@@ -234,15 +276,18 @@ def calibration_config_to_petab(
         measurements=measurements_path,
         conditions=conditions_path,
         parameters=parameters_path,
+        validation_measurements=validation_path,
+        holdout_measurements=holdout_path,
+        metadata=metadata_path,
     )
 
 
-def _sbml_symbol_maps(sbml_text: str) -> tuple[dict[str, str], set[str]]:
-    """Return (species name->id, parameter ids) from the exported SBML.
+def _sbml_symbol_maps(sbml_text: str, parameter_symbols: list[str]) -> tuple[dict[str, str], dict[str, str]]:
+    """Return species and parameter symbol maps from the exported SBML.
 
     ``to_sbml`` sets each species/parameter *name* to the original FungMod name
-    and its *id* to the sanitized symbol. Observables map by species name (a
-    FungMod state name); parameters map by their sanitized-symbol id.
+    and its *id* to a unique sanitized symbol. Parameters follow the exporter's
+    ordered parameter list, including any SId collision suffixes.
     """
 
     try:
@@ -261,7 +306,8 @@ def _sbml_symbol_maps(sbml_text: str) -> tuple[dict[str, str], set[str]]:
         (model.getSpecies(i).getName() or model.getSpecies(i).getId()): model.getSpecies(i).getId()
         for i in range(model.getNumSpecies())
     }
-    parameter_ids = {model.getParameter(i).getId() for i in range(model.getNumParameters())}
+    parameter_ids = dict(zip(parameter_symbols,
+        [model.getParameter(i).getId() for i in range(model.getNumParameters())], strict=True))
     return species_name_to_id, parameter_ids
 
 
