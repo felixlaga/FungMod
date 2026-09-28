@@ -1,5 +1,9 @@
 # FungMod Roadmap Orchestration And Status
 
+2026-09-28: research integrity hardening and additive diagnostics are recorded in
+`progress.md` (RESEARCH-INTEGRITY-002). FD-008 is resolved for duplicated study
+equations. Independent empirical validation still requires suitable raw data.
+
 ## Purpose
 
 This is the durable repo-side handoff record for the orchestrated PR loop.

@@ -31,6 +31,35 @@ The current PR queue and reconciled scoped phase status are tracked in
 
 # Current project status
 
+2026-09-28: CULTURE-BENCHMARK-002 extends that study with all 144 post-initial
+observations, seven model/family combinations, 33 whole-condition holdouts,
+activity and retained dry-mass observation models, covariance/censoring support,
+profile loss, conditional bootstrap and scoped validation contracts. These
+five software development steps are implemented. Independent data, empirical
+error estimates, biological acceptance criteria and domain review remain open;
+the published cellulose model still has weakly constrained parameters. See
+`docs/gelain-joint-benchmark.md` for the implemented contract and evidence.
+
+2026-09-28: CULTURE-BENCHMARK-001 implements the bounded Gelain culture study,
+reproduces six source trajectories and tests six condition holdouts with two
+explicit weighting choices. The reduced growth/loss model has substantial
+cellulose error and weighting sensitivity. Source duplicate errors and omitted
+validation-condition arrays remain unavailable. Next: review observation mapping
+with a domain researcher and recover matched evidence before mechanism expansion;
+see `docs/gelain-culture-benchmark.md`. This is not whole-organism validation.
+
+2026-09-28: PUBLIC-DATA-001 fetches the Gelain 2020 whole-culture archive and
+Novy 2021 secretome workbook. Six culture conditions now provide twelve
+biomass/substrate series (96 non-initial observations). Source errors and
+individual replicates remain unavailable, so independent validation is still
+pending. The original next recommendation is implemented in CULTURE-BENCHMARK-001
+above; see `docs/paper-readiness.md` and `progress.md` for remaining work.
+
+2026-09-28: RESEARCH-INTEGRITY-002 adds unit-faithful SBML exports, split-preserving
+PEtab export, shared exploratory study integration, profile likelihood and a
+frozen-prediction/raw-replicate evaluation contract. These are software
+capabilities; independent empirical validation remains pending external data.
+
 2026-09-11 reconciliation: seven literature series from three papers are now
 available, and configured literature calibration plus within-source holdout
 runners exist. The research-analysis correctness pass removed the pNPG-to-
