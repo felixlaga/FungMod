@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "purpose": "Preserved public experimental source files; no simulation or validation authorization",
+  "sources": [
+    {
+      "id": "gelain_2020",
+      "doi": "10.17632/shd3wcczsr.2",
+      "article_doi": "10.1016/j.cesx.2020.100085",
+      "creator": "Lucas Gelain",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": "novy_2021",
+      "doi": "10.6084/m9.figshare.14490032.v1",
+      "article_doi": "10.1186/s13068-021-01955-5",
+      "creators": [
+        "Vera Novy",
+        "Fredrik Nielsen",
+        "Daniel Cullen",
+        "Grzegorz Sabat",
+        "Carl J. Houtman",
+        "Christopher G. Hunt"
+      ],
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  ],
+  "files": [
+    {
+      "path": "gelain_2020/supplementary_material.rar",
+      "url": "https://data.mendeley.com/public-files/datasets/shd3wcczsr/files/59f0f066-28b3-450e-9c97-d912c4424988/file_downloaded",
+      "license": "CC-BY-4.0",
+      "role": "source_archive",
+      "bytes": 333027,
+      "sha256": "5b960727a6b3df9973e690084c75d73cc1860f5c000b83fa6c15adf284278b0d",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/article.pdf",
+      "url": "https://repository.tudelft.nl/file/File_7e2cf84c-4eab-4f61-9713-3facacea35bc",
+      "license": "CC-BY-4.0",
+      "role": "article",
+      "bytes": 1886395,
+      "sha256": "38d90f4a90507bf1de76c316dd69a2532af8ffa944a7858ff8e72587a2b533aa",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "novy_2021/secretome.xlsx",
+      "url": "https://ndownloader.figshare.com/files/27743633",
+      "license": "CC BY + CC0 (repository label)",
+      "role": "secretome_source",
+      "bytes": 43295,
+      "sha256": "430683454b7dd1e8daaeebdf271344f11d78e258af84fb7b09a07bd469c1d005",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "novy_2021/repository_metadata.json",
+      "url": "https://api.figshare.com/v2/articles/14490032",
+      "license": "repository_metadata",
+      "role": "repository_metadata",
+      "bytes": 28858,
+      "sha256": "56566cdfa9082377bad36c58c19a43e885268c8f3cd8421be9fc1d0387a42aa6",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/originals/cellulose/10gL.xlsx",
+      "url": "https://doi.org/10.17632/shd3wcczsr.2",
+      "license": "CC-BY-4.0",
+      "role": "experimental_workbook",
+      "bytes": 11368,
+      "sha256": "142eb8649ccf08d4de1df9c6dbe69ca53d3887f7817b4b3b1979c144fcd483f7",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/originals/cellulose/20gL.xlsx",
+      "url": "https://doi.org/10.17632/shd3wcczsr.2",
+      "license": "CC-BY-4.0",
+      "role": "experimental_workbook",
+      "bytes": 11266,
+      "sha256": "ad722f2d071601e111379a56459c94738473ce639d75e2f19188dd1e1abd649f",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/originals/cellulose/30gL.xlsx",
+      "url": "https://doi.org/10.17632/shd3wcczsr.2",
+      "license": "CC-BY-4.0",
+      "role": "experimental_workbook",
+      "bytes": 11243,
+      "sha256": "c8a5cef153dfba6e22fac4c4202d96dbe3fc44386fb085b14ac3ff7f88c9d406",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/originals/cellulose/Information.docx",
+      "url": "https://doi.org/10.17632/shd3wcczsr.2",
+      "license": "CC-BY-4.0",
+      "role": "source_classification",
+      "bytes": 15218,
+      "sha256": "602035c7017616dd54799a792b15ef819ff768eb4e78d7744ccf97e914346679",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/originals/glycerol/10gL.xlsx",
+      "url": "https://doi.org/10.17632/shd3wcczsr.2",
+      "license": "CC-BY-4.0",
+      "role": "experimental_workbook",
+      "bytes": 10396,
+      "sha256": "0bb41e980a99fcb91df55f26f7257c267ffef646ab75a8b8d586abebea69ac46",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/originals/glycerol/20gL.xlsx",
+      "url": "https://doi.org/10.17632/shd3wcczsr.2",
+      "license": "CC-BY-4.0",
+      "role": "experimental_workbook",
+      "bytes": 10408,
+      "sha256": "a695bfcdb7cdb185a26c5c0345387dfb6dfec0f2cf76863b4a4dd5f89ab79cbe",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/originals/glycerol/5gL.xlsx",
+      "url": "https://doi.org/10.17632/shd3wcczsr.2",
+      "license": "CC-BY-4.0",
+      "role": "experimental_workbook",
+      "bytes": 10378,
+      "sha256": "91fa7da38fb55a34d88f6e4ea53a717e2c475d12dc711ebf8f50a992674668ee",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/originals/glycerol/Information.docx",
+      "url": "https://doi.org/10.17632/shd3wcczsr.2",
+      "license": "CC-BY-4.0",
+      "role": "source_classification",
+      "bytes": 14936,
+      "sha256": "c3319c40803a682bf9f065083def80dcd8d9ff93cf1f15fd6d8ef8788bba21c0",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/simulation_reference/glycerol.xlsx",
+      "url": "https://doi.org/10.17632/shd3wcczsr.2",
+      "license": "CC-BY-4.0",
+      "role": "simulation_reference_not_experimental",
+      "archive_member": "Supplementary material/Glycerol model/data.xlsx",
+      "bytes": 35411,
+      "sha256": "646e3d8052811d1a3baf296249d70b5e537fc600b4800566b094ed828f9ecd8a",
+      "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "url": "https://doi.org/10.17632/shd3wcczsr.2",
+      "license": "CC-BY-4.0",
+      "role": "simulation_reference_not_experimental",
+      "archive_member": "Supplementary material/Cellulose model/data.xlsx",
+      "bytes": 37264,
+      "sha256": "5a9c77bc3d45e2697627238b66e87b98f8cb3d97301ad8e6bb1a569366a223b7",
+      "retrieved_on": "2026-09-28"
+    }
+  ]
+}
