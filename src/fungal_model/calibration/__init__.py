@@ -28,6 +28,7 @@ from .residuals import (
     sequential_train_validation_split,
 )
 from .profile import ProfileLikelihoodResult, profile_likelihood
+from .independent import IndependentValidationPlan, evaluate_frozen_prediction, freeze_prediction
 
 __all__ = [
     "APPROXIMATE_NORMAL_95_Z",
@@ -45,6 +46,9 @@ __all__ = [
     "LeastSquaresCalibrationResult",
     "ProfileLikelihoodResult",
     "profile_likelihood",
+    "IndependentValidationPlan",
+    "evaluate_frozen_prediction",
+    "freeze_prediction",
     "ValidationRelationship",
     "audit_calibration_evidence",
     "calibrate_configured_model",
