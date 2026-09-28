@@ -1,0 +1,529 @@
+{
+  "schema_version": 2,
+  "benchmark_id": "gelain_2020_joint_culture_v2",
+  "source_doi": "10.17632/shd3wcczsr.2",
+  "article_doi": "10.1016/j.cesx.2020.100085",
+  "design_status": "Retrospective development comparison after inspection of v1 residuals. Never blind or independent validation.",
+  "models": {
+    "glycerol": {
+      "effective": {
+        "parameters": [
+          {
+            "symbol": "mu",
+            "lower": 0.001,
+            "upper": 2,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "K",
+            "lower": 0.001,
+            "upper": 100,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "Y",
+            "lower": 0.01,
+            "upper": 1,
+            "units": "dimensionless"
+          },
+          {
+            "symbol": "kd",
+            "lower": 1e-05,
+            "upper": 0.5,
+            "units": "1/hour"
+          }
+        ],
+        "fixed_parameters": []
+      },
+      "published": {
+        "parameters": [
+          {
+            "symbol": "mu",
+            "lower": 0.001,
+            "upper": 2,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "K",
+            "lower": 0.001,
+            "upper": 100,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "Xmax",
+            "lower": 1,
+            "upper": 200,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "d",
+            "lower": 1e-05,
+            "upper": 0.5,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "alpha",
+            "lower": 0.001,
+            "upper": 3,
+            "units": "liter/gram"
+          }
+        ],
+        "fixed_parameters": []
+      },
+      "retained": {
+        "parameters": [
+          {
+            "symbol": "mu",
+            "lower": 0.001,
+            "upper": 2,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "K",
+            "lower": 0.001,
+            "upper": 100,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "Y",
+            "lower": 0.01,
+            "upper": 1,
+            "units": "dimensionless"
+          },
+          {
+            "symbol": "kd",
+            "lower": 1e-05,
+            "upper": 0.5,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "f_retained",
+            "lower": 0.0001,
+            "upper": 1,
+            "units": "dimensionless"
+          },
+          {
+            "symbol": "k_clear",
+            "lower": 1e-05,
+            "upper": 0.5,
+            "units": "1/hour"
+          }
+        ],
+        "fixed_parameters": [
+          {
+            "symbol": "initial_retained_fraction",
+            "value": 0,
+            "units": "dimensionless",
+            "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+          }
+        ]
+      }
+    },
+    "cellulose": {
+      "effective": {
+        "parameters": [
+          {
+            "symbol": "mu",
+            "lower": 0.001,
+            "upper": 2,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "K",
+            "lower": 0.001,
+            "upper": 100,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "Y",
+            "lower": 0.01,
+            "upper": 1,
+            "units": "dimensionless"
+          },
+          {
+            "symbol": "kd",
+            "lower": 1e-05,
+            "upper": 0.5,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "qF",
+            "lower": 0.01,
+            "upper": 1000,
+            "units": "gelain_fpu/gram/hour"
+          },
+          {
+            "symbol": "kF",
+            "lower": 1e-06,
+            "upper": 0.1,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "qB",
+            "lower": 0.01,
+            "upper": 3000,
+            "units": "gelain_beta_u/gram/hour"
+          },
+          {
+            "symbol": "kB",
+            "lower": 1e-06,
+            "upper": 0.1,
+            "units": "1/hour"
+          }
+        ],
+        "fixed_parameters": []
+      },
+      "published": {
+        "parameters": [
+          {
+            "symbol": "mu",
+            "lower": 0.001,
+            "upper": 2,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "K",
+            "lower": 0.001,
+            "upper": 100,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "Xmax",
+            "lower": 1,
+            "upper": 200,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "d",
+            "lower": 1e-05,
+            "upper": 0.5,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "alpha",
+            "lower": 0.001,
+            "upper": 3,
+            "units": "liter/gram"
+          },
+          {
+            "symbol": "Kd",
+            "lower": 0.001,
+            "upper": 10,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "k_ind",
+            "lower": 0.0001,
+            "upper": 2,
+            "units": "liter/gram/hour"
+          },
+          {
+            "symbol": "Ke",
+            "lower": 0.01,
+            "upper": 100,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "kda",
+            "lower": 0.0001,
+            "upper": 1,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "b_ind",
+            "lower": 0.01,
+            "upper": 200,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "qF",
+            "lower": 0.01,
+            "upper": 1000,
+            "units": "gelain_fpu/liter/hour"
+          },
+          {
+            "symbol": "kF",
+            "lower": 1e-06,
+            "upper": 0.1,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "KI_F",
+            "lower": 0.01,
+            "upper": 10000,
+            "units": "(gram/liter)**2"
+          },
+          {
+            "symbol": "Fmax",
+            "lower": 10,
+            "upper": 30000,
+            "units": "gelain_fpu/liter"
+          },
+          {
+            "symbol": "SI_F",
+            "lower": 0.1,
+            "upper": 40,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "qB",
+            "lower": 0.01,
+            "upper": 3000,
+            "units": "gelain_beta_u/liter/hour"
+          },
+          {
+            "symbol": "kB",
+            "lower": 1e-06,
+            "upper": 0.1,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "KI_B",
+            "lower": 0.01,
+            "upper": 10000,
+            "units": "(gram/liter)**2"
+          },
+          {
+            "symbol": "Bmax",
+            "lower": 10,
+            "upper": 50000,
+            "units": "gelain_beta_u/liter"
+          },
+          {
+            "symbol": "SI_B",
+            "lower": 0.1,
+            "upper": 40,
+            "units": "gram/liter"
+          }
+        ],
+        "fixed_parameters": []
+      },
+      "hydrolysis": {
+        "parameters": [
+          {
+            "symbol": "k_h",
+            "lower": 1e-06,
+            "upper": 1,
+            "units": "gram/gelain_fpu/hour"
+          },
+          {
+            "symbol": "Kh",
+            "lower": 0.001,
+            "upper": 100,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "Y",
+            "lower": 0.01,
+            "upper": 1,
+            "units": "dimensionless"
+          },
+          {
+            "symbol": "kd",
+            "lower": 1e-05,
+            "upper": 0.5,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "K_ind",
+            "lower": 0.01,
+            "upper": 100,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "qF",
+            "lower": 0.01,
+            "upper": 1000,
+            "units": "gelain_fpu/gram/hour"
+          },
+          {
+            "symbol": "kF",
+            "lower": 1e-06,
+            "upper": 0.1,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "qB",
+            "lower": 0.01,
+            "upper": 3000,
+            "units": "gelain_beta_u/gram/hour"
+          },
+          {
+            "symbol": "kB",
+            "lower": 1e-06,
+            "upper": 0.1,
+            "units": "1/hour"
+          }
+        ],
+        "fixed_parameters": []
+      },
+      "hydrolysis_retained": {
+        "parameters": [
+          {
+            "symbol": "k_h",
+            "lower": 1e-06,
+            "upper": 1,
+            "units": "gram/gelain_fpu/hour"
+          },
+          {
+            "symbol": "Kh",
+            "lower": 0.001,
+            "upper": 100,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "Y",
+            "lower": 0.01,
+            "upper": 1,
+            "units": "dimensionless"
+          },
+          {
+            "symbol": "kd",
+            "lower": 1e-05,
+            "upper": 0.5,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "K_ind",
+            "lower": 0.01,
+            "upper": 100,
+            "units": "gram/liter"
+          },
+          {
+            "symbol": "qF",
+            "lower": 0.01,
+            "upper": 1000,
+            "units": "gelain_fpu/gram/hour"
+          },
+          {
+            "symbol": "kF",
+            "lower": 1e-06,
+            "upper": 0.1,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "qB",
+            "lower": 0.01,
+            "upper": 3000,
+            "units": "gelain_beta_u/gram/hour"
+          },
+          {
+            "symbol": "kB",
+            "lower": 1e-06,
+            "upper": 0.1,
+            "units": "1/hour"
+          },
+          {
+            "symbol": "f_retained",
+            "lower": 0.0001,
+            "upper": 1,
+            "units": "dimensionless"
+          },
+          {
+            "symbol": "k_clear",
+            "lower": 1e-05,
+            "upper": 0.5,
+            "units": "1/hour"
+          }
+        ],
+        "fixed_parameters": [
+          {
+            "symbol": "initial_retained_fraction",
+            "value": 0,
+            "units": "dimensionless",
+            "source": "Explicit initialization hypothesis: no retained pool at t=0; not a viable-biomass measurement."
+          }
+        ]
+      }
+    }
+  },
+  "parameter_source": "Explicit broad exploratory bounds specified before v2 fitting; no published all-condition fitted value initializes or fixes a free parameter.",
+  "hypotheses": {
+    "effective": "v1 Monod/apparent-yield/loss null model; cellulose adds constitutive activity production proportional to growth-associated mass.",
+    "published": "Gelain Eqs 2-10, glycerol Eq 5 literal; cellulose normalized z=A/Amax eliminates its exact scale symmetry. All remaining constants estimated only from training data. KI absorbs source manually chosen 0.15 coefficient.",
+    "retained": "Hypothesis based on dry-mass assay: loss from growth-associated mass transfers fraction f_retained to measured retained dry mass, which clears at k_clear. These pools are not verified living/dead biomass.",
+    "hydrolysis": "Candidate extension grounded in extracellular cellulase action: bulk consumption=k_h*F*S/(Kh+S), growth=Y*consumption; S/(K_ind+S) induces activity production. F is assay activity; fitted k_h is preparation-specific, not a unit conversion. Soluble intermediates and medium co-substrates remain unresolved.",
+    "hydrolysis_retained": "Activity-driven hydrolysis with a retained dry-mass observation pool; both assumptions explicit, not inferred physiology."
+  },
+  "seed": 20260928,
+  "starts": 3,
+  "max_nfev": 250,
+  "log_parameter_difference_step": 0.001,
+  "solver": {
+    "method": "LSODA",
+    "rtol": 1e-08,
+    "atol": 1e-10
+  },
+  "solver_check": {
+    "method": "DOP853",
+    "rtol": 1e-10,
+    "atol": 1e-12,
+    "maximum_scaled_difference": 1e-05
+  },
+  "scenarios": {
+    "primary": {
+      "loss": "training_max",
+      "rho_biomass_substrate": 0.0,
+      "error_evidence": null
+    },
+    "correlated_assumption": {
+      "loss": "gaussian",
+      "relative_sd_to_training_max": 0.1,
+      "rho_biomass_substrate": -0.5,
+      "error_evidence": "assumed",
+      "source": "Declared sensitivity assumption only: SD=10% of training maxima, biomass/substrate correlation=-0.5 from the sign suggested by mass-difference assays. Neither magnitude is measured; temporal errors assumed independent."
+    }
+  },
+  "comparisons": "Whole-condition holdouts within substrate; all-condition fits for diagnosis only; published constants used exclusively in separate source reproduction.",
+  "complexity_screen": {
+    "relative_singular_value_cutoff": 1e-06,
+    "minimum_relative_cv_improvement": 0.1,
+    "maximum_observable_worsening": 0.1,
+    "near_bound_log_fraction": 0.001,
+    "meaning": "Development triage only. A more complex model must improve pooled normalized held-condition error by 10% with no observable >10% worse, and have full practical local rank. No biological validation or statistical significance implied."
+  },
+  "profile": {
+    "factors": [
+      0.5,
+      1,
+      2
+    ],
+    "max_nfev": 100,
+    "meaning": "Nuisance-reoptimized profile loss, no confidence intervals for unknown errors."
+  },
+  "bootstrap": {
+    "samples": 20,
+    "minimum_successful": 12,
+    "max_nfev": 120,
+    "relative_sd_to_training_max": 0.1,
+    "quantiles": [
+      0.1,
+      0.9
+    ],
+    "meaning": "Parametric bootstrap conditional on assumed 10% scales and specified covariance, not an empirical confidence or validated prediction interval."
+  },
+  "validation_scope": {
+    "strain": "Trichoderma harzianum P49P11",
+    "reactor": "controlled stirred batch",
+    "temperature_C": [
+      29,
+      29
+    ],
+    "pH": [
+      4.5,
+      5.5
+    ],
+    "oxygen": "maintained above 30%",
+    "time_h": [
+      0,
+      96
+    ],
+    "medium": "Gelain 2020 Methods 2.2; includes peptone and inoculum carryover"
+  },
+  "acceptance_criteria": null,
+  "empirical_measurement_error": null,
+  "detection_limits": null,
+  "independent_validation_data": null,
+  "independent_domain_review": null,
+  "completion_rule": "Code and numerical verification can pass. Model validation requires matched independent data, declared acceptance criteria, uncertainty evidence and documented external review. Never infer these from benchmark fit quality."
+}

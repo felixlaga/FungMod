@@ -1,0 +1,148 @@
+{
+  "role": "software_parity_only_never_fit_initialization",
+  "source": "doi:10.17632/shd3wcczsr.2",
+  "coordinate_change": "z=A/Amax; k_ind=mue/Amax; b_ind=beta*Amax^2; q*=q*Amax; KI=ki/0.15",
+  "fixed_coefficient_source": "Gelain 2020 Eq 9-10 a=b=0.15 when S exceeds SI; manually chosen in source",
+  "parameters": [
+    {
+      "symbol": "mu",
+      "value": 0.48103826151816137,
+      "units": "1/hour",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "K",
+      "value": 6.02676679563637,
+      "units": "gram/liter",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "Xmax",
+      "value": 12.003684925035639,
+      "units": "gram/liter",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "d",
+      "value": 0.09462466689325198,
+      "units": "1/hour",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "Kd",
+      "value": 0.4352521782562008,
+      "units": "gram/liter",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "alpha",
+      "value": 0.06897901304069688,
+      "units": "liter/gram",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "k_ind",
+      "value": 0.0430560189792385,
+      "units": "liter/gram/hour",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "Ke",
+      "value": 2.8353562246655946,
+      "units": "gram/liter",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "kda",
+      "value": 0.38423845127248957,
+      "units": "1/hour",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "b_ind",
+      "value": 6.995899315888925,
+      "units": "gram/liter",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "qF",
+      "value": 135.3740521355104,
+      "units": "gelain_fpu/liter/hour",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "kF",
+      "value": 0.00200495381097704,
+      "units": "1/hour",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "KI_F",
+      "value": 12.748076323004305,
+      "units": "(gram/liter)**2",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "Fmax",
+      "value": 2513.7458035482646,
+      "units": "gelain_fpu/liter",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "SI_F",
+      "value": 10.0,
+      "units": "gram/liter",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "qB",
+      "value": 365.48079704474856,
+      "units": "gelain_beta_u/liter/hour",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "kB",
+      "value": 0.0010676780261796165,
+      "units": "1/hour",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "KI_B",
+      "value": 26.476774243695566,
+      "units": "(gram/liter)**2",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "Bmax",
+      "value": 5013.772258967479,
+      "units": "gelain_beta_u/liter",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    },
+    {
+      "symbol": "SI_B",
+      "value": 8.0,
+      "units": "gram/liter",
+      "uncertainty": null,
+      "source": "doi:10.17632/shd3wcczsr.2; ALL-condition published fit, transformed algebraically"
+    }
+  ]
+}

@@ -1,0 +1,704 @@
+[
+  {
+    "condition_id": "gelain_2020_glycerol_5gl",
+    "family": "glycerol",
+    "times_h": [
+      8,
+      12,
+      24,
+      32,
+      48,
+      54,
+      72,
+      96
+    ],
+    "initial": {
+      "biomass": {
+        "value": 0.5,
+        "units": "g/L",
+        "source_cell": "B2"
+      },
+      "substrate": {
+        "value": 5.0,
+        "units": "g/L",
+        "source_cell": "C2"
+      }
+    },
+    "observations": {
+      "biomass": {
+        "values": [
+          1.50479,
+          2.26624,
+          4.15024,
+          2.23641,
+          1.56177,
+          1.31129,
+          1.07746,
+          0.94881
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/glycerol/5gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7",
+          "B8",
+          "B9",
+          "B10"
+        ]
+      },
+      "substrate": {
+        "values": [
+          5.3805,
+          4.484,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/glycerol/5gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "C3",
+          "C4",
+          "C5",
+          "C6",
+          "C7",
+          "C8",
+          "C9",
+          "C10"
+        ]
+      }
+    },
+    "source": "doi:10.17632/shd3wcczsr.2; stored experimental duplicate means",
+    "maturity": "literature_processed",
+    "raw_replicates_available": false
+  },
+  {
+    "condition_id": "gelain_2020_glycerol_10gl",
+    "family": "glycerol",
+    "times_h": [
+      8,
+      12,
+      24,
+      32,
+      48,
+      54,
+      72,
+      96
+    ],
+    "initial": {
+      "biomass": {
+        "value": 0.5,
+        "units": "g/L",
+        "source_cell": "B2"
+      },
+      "substrate": {
+        "value": 10.0,
+        "units": "g/L",
+        "source_cell": "C2"
+      }
+    },
+    "observations": {
+      "biomass": {
+        "values": [
+          1.76857,
+          2.63525,
+          6.07954,
+          3.11577,
+          1.8761,
+          1.45167,
+          1.2717,
+          0.96368
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/glycerol/10gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7",
+          "B8",
+          "B9",
+          "B10"
+        ]
+      },
+      "substrate": {
+        "values": [
+          10.546,
+          9.9405,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/glycerol/10gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "C3",
+          "C4",
+          "C5",
+          "C6",
+          "C7",
+          "C8",
+          "C9",
+          "C10"
+        ]
+      }
+    },
+    "source": "doi:10.17632/shd3wcczsr.2; stored experimental duplicate means",
+    "maturity": "literature_processed",
+    "raw_replicates_available": false
+  },
+  {
+    "condition_id": "gelain_2020_glycerol_20gl",
+    "family": "glycerol",
+    "times_h": [
+      8,
+      12,
+      24,
+      32,
+      48,
+      54,
+      72,
+      96
+    ],
+    "initial": {
+      "biomass": {
+        "value": 0.5,
+        "units": "g/L",
+        "source_cell": "B2"
+      },
+      "substrate": {
+        "value": 20.0,
+        "units": "g/L",
+        "source_cell": "C2"
+      }
+    },
+    "observations": {
+      "biomass": {
+        "values": [
+          1.95445,
+          2.67041,
+          8.11221,
+          5.39385,
+          2.86518,
+          2.39327,
+          1.66435,
+          0.74282
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/glycerol/20gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7",
+          "B8",
+          "B9",
+          "B10"
+        ]
+      },
+      "substrate": {
+        "values": [
+          21.1525,
+          20.1995,
+          3.834,
+          0.229,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/glycerol/20gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "C3",
+          "C4",
+          "C5",
+          "C6",
+          "C7",
+          "C8",
+          "C9",
+          "C10"
+        ]
+      }
+    },
+    "source": "doi:10.17632/shd3wcczsr.2; stored experimental duplicate means",
+    "maturity": "literature_processed",
+    "raw_replicates_available": false
+  },
+  {
+    "condition_id": "gelain_2020_cellulose_10gl",
+    "family": "cellulose",
+    "times_h": [
+      8,
+      12,
+      24,
+      32,
+      48,
+      54,
+      72,
+      96
+    ],
+    "initial": {
+      "biomass": {
+        "value": 0.3990672957214788,
+        "units": "g/L",
+        "source_cell": "E2"
+      },
+      "substrate": {
+        "value": 10.0,
+        "units": "g/L",
+        "source_cell": "F2"
+      },
+      "cellulase_activity": {
+        "value": 0.0,
+        "units": "FPU/L",
+        "source_cell": "B2"
+      },
+      "beta_glucosidase_activity": {
+        "value": 0.0,
+        "units": "U/L",
+        "source_cell": "C2"
+      }
+    },
+    "observations": {
+      "biomass": {
+        "values": [
+          2.861740254941905,
+          3.665041890787295,
+          5.913493103187719,
+          4.739738476299145,
+          4.243537934501599,
+          3.5692922874279707,
+          2.6271713586585586,
+          2.1249852272536094
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/10gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "E3",
+          "E4",
+          "E5",
+          "E6",
+          "E7",
+          "E8",
+          "E9",
+          "E10"
+        ]
+      },
+      "substrate": {
+        "values": [
+          9.876727248621048,
+          9.219127032038841,
+          2.7353502101590594,
+          1.2601496784731454,
+          0.5342209822564191,
+          0.26861955108609203,
+          0.19742474929847192,
+          0.27489601807091035
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/10gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "F3",
+          "F4",
+          "F5",
+          "F6",
+          "F7",
+          "F8",
+          "F9",
+          "F10"
+        ]
+      },
+      "cellulase_activity": {
+        "values": [
+          0.0,
+          21.412016864121345,
+          422.0973470730104,
+          766.7136314433242,
+          818.9039361842179,
+          845.5658011681369,
+          887.6433209611139,
+          791.203710266842
+        ],
+        "units": "FPU/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/10gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7",
+          "B8",
+          "B9",
+          "B10"
+        ]
+      },
+      "beta_glucosidase_activity": {
+        "values": [
+          15.872852798553465,
+          53.35127804717679,
+          895.1467083093615,
+          1494.4111120243285,
+          1706.7683077175968,
+          1818.854277964987,
+          1893.2358017588563,
+          1636.0853127311582
+        ],
+        "units": "U/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/10gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "C3",
+          "C4",
+          "C5",
+          "C6",
+          "C7",
+          "C8",
+          "C9",
+          "C10"
+        ]
+      }
+    },
+    "source": "doi:10.17632/shd3wcczsr.2; stored experimental duplicate means",
+    "maturity": "literature_processed",
+    "raw_replicates_available": false
+  },
+  {
+    "condition_id": "gelain_2020_cellulose_20gl",
+    "family": "cellulose",
+    "times_h": [
+      8,
+      12,
+      24,
+      32,
+      48,
+      54,
+      72,
+      96
+    ],
+    "initial": {
+      "biomass": {
+        "value": 0.3990672957214788,
+        "units": "g/L",
+        "source_cell": "E2"
+      },
+      "substrate": {
+        "value": 20.0,
+        "units": "g/L",
+        "source_cell": "F2"
+      },
+      "cellulase_activity": {
+        "value": 0.0,
+        "units": "FPU/L",
+        "source_cell": "B2"
+      },
+      "beta_glucosidase_activity": {
+        "value": 0.0,
+        "units": "U/L",
+        "source_cell": "C2"
+      }
+    },
+    "observations": {
+      "biomass": {
+        "values": [
+          4.0002250233517245,
+          4.814712467452349,
+          8.219913529590286,
+          7.951744677367952,
+          4.131839147393322,
+          3.902723708971134,
+          3.024125516304073,
+          2.2692409022337583
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/20gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "E3",
+          "E4",
+          "E5",
+          "E6",
+          "E7",
+          "E8",
+          "E9",
+          "E10"
+        ]
+      },
+      "substrate": {
+        "values": [
+          19.973133273578657,
+          18.947457408916286,
+          8.023400382459453,
+          4.423403826799742,
+          1.4393416615428438,
+          0.9118836300307355,
+          0.45960424881688994,
+          0.22848613359859138
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/20gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "F3",
+          "F4",
+          "F5",
+          "F6",
+          "F7",
+          "F8",
+          "F9",
+          "F10"
+        ]
+      },
+      "cellulase_activity": {
+        "values": [
+          0.0,
+          0.0,
+          234.1939607717343,
+          429.8292287863691,
+          790.3711177545282,
+          842.7412414519945,
+          813.588355305991,
+          769.9579484749818
+        ],
+        "units": "FPU/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/20gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7",
+          "B8",
+          "B9",
+          "B10"
+        ]
+      },
+      "beta_glucosidase_activity": {
+        "values": [
+          11.835292183775794,
+          42.49712336648312,
+          482.3497986356539,
+          1107.606640913948,
+          1942.6522561025727,
+          2014.6708309361393,
+          2150.797238431824,
+          2001.9314539327693
+        ],
+        "units": "U/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/20gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "C3",
+          "C4",
+          "C5",
+          "C6",
+          "C7",
+          "C8",
+          "C9",
+          "C10"
+        ]
+      }
+    },
+    "source": "doi:10.17632/shd3wcczsr.2; stored experimental duplicate means",
+    "maturity": "literature_processed",
+    "raw_replicates_available": false
+  },
+  {
+    "condition_id": "gelain_2020_cellulose_30gl",
+    "family": "cellulose",
+    "times_h": [
+      8,
+      12,
+      24,
+      32,
+      48,
+      54,
+      72,
+      96
+    ],
+    "initial": {
+      "biomass": {
+        "value": 0.3990672957214788,
+        "units": "g/L",
+        "source_cell": "E2"
+      },
+      "substrate": {
+        "value": 30.0,
+        "units": "g/L",
+        "source_cell": "F2"
+      },
+      "cellulase_activity": {
+        "value": 0.0,
+        "units": "FPU/L",
+        "source_cell": "B2"
+      },
+      "beta_glucosidase_activity": {
+        "value": 0.0,
+        "units": "U/L",
+        "source_cell": "C2"
+      }
+    },
+    "observations": {
+      "biomass": {
+        "values": [
+          3.386259598851707,
+          4.569515420878874,
+          9.40625525180876,
+          9.359389267261477,
+          5.485934089879789,
+          4.391623867448644,
+          3.694769158253853,
+          3.0835877888364163
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/30gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "E3",
+          "E4",
+          "E5",
+          "E6",
+          "E7",
+          "E8",
+          "E9",
+          "E10"
+        ]
+      },
+      "substrate": {
+        "values": [
+          31.188432670702987,
+          28.988940995685873,
+          15.733988095896388,
+          7.872108338284392,
+          2.666776280212802,
+          1.6469777786999686,
+          0.812655179308664,
+          0.41352825991980907
+        ],
+        "units": "g/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/30gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "F3",
+          "F4",
+          "F5",
+          "F6",
+          "F7",
+          "F8",
+          "F9",
+          "F10"
+        ]
+      },
+      "cellulase_activity": {
+        "values": [
+          0.0,
+          0.0,
+          152.57859384708274,
+          343.4897531492801,
+          665.0016027125024,
+          745.1070257096395,
+          796.3737686604547,
+          754.6127961395241
+        ],
+        "units": "FPU/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/30gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7",
+          "B8",
+          "B9",
+          "B10"
+        ]
+      },
+      "beta_glucosidase_activity": {
+        "values": [
+          0.0,
+          12.040766006410783,
+          395.94805621763794,
+          713.5078491000247,
+          1538.8448261691465,
+          1976.4526999260297,
+          1929.399194542615,
+          1966.6926933508673
+        ],
+        "units": "U/L",
+        "uncertainty": null,
+        "censoring_limits": null,
+        "source_file": "gelain_2020/originals/cellulose/30gL.xlsx",
+        "source_sheet": "Plan1",
+        "source_cells": [
+          "C3",
+          "C4",
+          "C5",
+          "C6",
+          "C7",
+          "C8",
+          "C9",
+          "C10"
+        ]
+      }
+    },
+    "source": "doi:10.17632/shd3wcczsr.2; stored experimental duplicate means",
+    "maturity": "literature_processed",
+    "raw_replicates_available": false
+  }
+]
