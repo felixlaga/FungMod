@@ -36,6 +36,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import numpy as np
+
 from fungal_model.core.units import Q_, Quantity, assert_compatible
 from fungal_model.core.validators import ValidationResult
 
@@ -91,7 +93,7 @@ def haldane_equilibrium_constant(
     product = _positive(product_km, "product_km")
     ratio = (forward * product) / (reverse * substrate)
     dimensionless = ratio.to("dimensionless")
-    return float(dimensionless.magnitude)
+    return float(np.asarray(dimensionless.magnitude, dtype=float))
 
 
 def reverse_vmax_from_haldane(

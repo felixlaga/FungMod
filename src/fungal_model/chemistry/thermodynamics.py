@@ -294,7 +294,7 @@ class DynamicThermodynamicConstraint:
             name=self.faraday_constant.symbol,
         )
         delta_g = -(transfer_number * faraday * potential)
-        return float(delta_g.to("joule / mole").magnitude)
+        return float(np.asarray(delta_g.to("joule / mole").magnitude, dtype=float))
 
     def evaluate(
         self,

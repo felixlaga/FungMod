@@ -276,7 +276,7 @@ class NonidealReversibleThermodynamics:
         return net, replace(
             evaluation,
             forward_rate=float(rate.magnitude),
-            reverse_rate=float(reverse.magnitude),
+            reverse_rate=float(np.asarray(reverse.magnitude, dtype=float)),
             net_rate=float(net.magnitude),
             rate_units=str(rate.units),
         )
