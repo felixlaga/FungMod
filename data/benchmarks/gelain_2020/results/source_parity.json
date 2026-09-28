@@ -1,0 +1,56 @@
+[
+  {
+    "family": "glycerol",
+    "initial_substrate_g_l": 5,
+    "initial_biomass_g_l": 0.5,
+    "role": "software_parity_only",
+    "max_abs_difference_g_l": 8.793645545068784e-08,
+    "passed": true,
+    "paper_vs_deposited_max_biomass_difference_g_l": 2.2028512347560536e-10
+  },
+  {
+    "family": "glycerol",
+    "initial_substrate_g_l": 10,
+    "initial_biomass_g_l": 0.5,
+    "role": "software_parity_only",
+    "max_abs_difference_g_l": 1.9956243857421896e-07,
+    "passed": true,
+    "paper_vs_deposited_max_biomass_difference_g_l": 6.130589772501693e-07
+  },
+  {
+    "family": "glycerol",
+    "initial_substrate_g_l": 20,
+    "initial_biomass_g_l": 0.5,
+    "role": "software_parity_only",
+    "max_abs_difference_g_l": 9.180976658917928e-07,
+    "passed": true,
+    "paper_vs_deposited_max_biomass_difference_g_l": 0.8145341622155009
+  },
+  {
+    "family": "cellulose",
+    "initial_substrate_g_l": 10,
+    "initial_biomass_g_l": 0.4,
+    "role": "software_parity_only",
+    "max_abs_difference_g_l": 1.2013789962850296e-09,
+    "passed": true,
+    "paper_vs_deposited_max_biomass_difference_g_l": 0.0
+  },
+  {
+    "family": "cellulose",
+    "initial_substrate_g_l": 20,
+    "initial_biomass_g_l": 0.4,
+    "role": "software_parity_only",
+    "max_abs_difference_g_l": 1.6028387506139552e-09,
+    "passed": true,
+    "paper_vs_deposited_max_biomass_difference_g_l": 0.0
+  },
+  {
+    "family": "cellulose",
+    "initial_substrate_g_l": 30,
+    "initial_biomass_g_l": 0.4,
+    "role": "software_parity_only",
+    "max_abs_difference_g_l": 2.2465265203663876e-09,
+    "passed": true,
+    "paper_vs_deposited_max_biomass_difference_g_l": 0.0
+  }
+]
