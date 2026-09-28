@@ -1,0 +1,21 @@
+{
+  "data/benchmarks/gelain_2020/plan.json": "695da7fc35bf90c4a9cb78cce9c42bb06b5bf7eb51f4725f097d92724c1294cc",
+  "data/benchmarks/gelain_2020/source_parameters.json": "d8a6fdb632c07bfd7862d3921149de25afbe8dd6aec3e1138f0d0cad76d8728f",
+  "data/benchmarks/gelain_2020/source_simulations.csv": "358a86dbc8cacc50186ca4ea7e2c6c4d9922a98f62d8584ba266a396cd946702",
+  "data/experiments/source_intake/manifest.json": "bbbab73a97212ca8243f7dd04d73dfd7b427bb87d19716241546dd69b60de69c",
+  "scripts/prepare_public_experimental_data.py": "32d84c6de61591a14adde4d69a2fe081820bf5df4b2d0177ccf7761e00383a61",
+  "scripts/run_gelain_2020_culture_benchmark.py": "fd604fc4f2c96be7077cc97ce8c6669a8a8904a32fab723f85e1f0ecde72b436",
+  "src/fungal_model/research/gelain_culture.py": "1df6633a77cfad346099cd6ba0f37024af1f7e21f076d3e5f7526c09c0b21ea4",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_10gl.csv": "f46d077a867ac9f93bba971fee7237fc7caeaa428c68d9df6938ff95768498e9",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_10gl.yml": "3493c4406cdbd85c53ca0dea5847f18faf47c4ab9f5f3a8bccadfbb747e9cd6f",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_20gl.csv": "ccd7250974e0b45aabf36d0068afcc5960fe0d01c3e2fc4cce2662d77ea3332c",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_20gl.yml": "abdda826247d691b7d209f6799256a5cce9acf9b1410e8bb3f20b4f9bb4ab3c3",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_30gl.csv": "6cfcb2b7d2796fbdacbbf32af0d7adc11b5a51881a4b19e815c235ee84a86aa4",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_30gl.yml": "38aecbbdd875d0ebc92fb9d859cfd162f4e6bb2299afca6ed5a9a8d46cc255a1",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_10gl.csv": "307e66b6bcb42b53a5b41427e60f822ae85783a18c55505ceec3ce528d707fce",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_10gl.yml": "249b97aec56622c8b1a90860e05797266b77cf39a82d4a7ad3b5081e747d6045",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_20gl.csv": "056258ac4068831fbdf98ca797a4ce6570dcf0b6131be3e4e4488d81d143cb75",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_20gl.yml": "dd07cfbb188062792fc698b78ae91e782ad2e116ba602d0887604e0e58995b9c",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_5gl.csv": "efd32f5a8cc8e5493aa47f4d5e112e4ceadc8014566320a386b2b448c22c3c69",
+  "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_glycerol_5gl.yml": "826ed6fd92224ab808beeb4b6f72f25effae3b8d86c95bed93002002fb9bfbbc"
+}

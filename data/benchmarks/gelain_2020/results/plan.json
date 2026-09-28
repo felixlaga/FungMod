@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "gelain_2020_culture_v1",
+  "maturity": "exploratory_software_tested",
+  "design_status": "Retrospective source-informed design, fixed before new benchmark fits; not preregistered or blinded.",
+  "source_doi": "10.17632/shd3wcczsr.2",
+  "article_doi": "10.1016/j.cesx.2020.100085",
+  "model": "effective_monod_loss_v1",
+  "units": {
+    "time": "hour",
+    "concentration": "gram/liter"
+  },
+  "parameters": [
+    {
+      "symbol": "mu",
+      "units": "1/hour",
+      "lower": 0.001,
+      "upper": 2.0
+    },
+    {
+      "symbol": "K",
+      "units": "gram/liter",
+      "lower": 0.001,
+      "upper": 100.0
+    },
+    {
+      "symbol": "Y",
+      "units": "dimensionless",
+      "lower": 0.01,
+      "upper": 1.0
+    },
+    {
+      "symbol": "kd",
+      "units": "1/hour",
+      "lower": 1e-05,
+      "upper": 0.5
+    }
+  ],
+  "parameter_source": "Explicit exploratory search bounds, not measured strain constants. No source-fitted parameter is fixed or used as a start.",
+  "hypothesis": "Effective saturating substrate-limited biomass growth, constant apparent yield, and first-order loss of measured biomass; cellulose hydrolysis is unresolved.",
+  "seed": 1729,
+  "starts": 4,
+  "max_nfev": 300,
+  "primary_weighting": "training_max",
+  "sensitivity_weighting": "equal_g_l",
+  "split": "leave_one_entire_condition_out_within_each_substrate",
+  "initial_conditions": "Reported t=0 biomass and nominal substrate; initial values excluded from residuals.",
+  "mapping": "X is measured culture biomass, not viable or induced biomass; S is the reported bulk substrate assay.",
+  "error_model": null,
+  "uncertainty": "No replicate errors or censoring limits available; no likelihood, p-value, confidence interval, or biological acceptance threshold.",
+  "solver": {
+    "method": "LSODA",
+    "rtol": 1e-08,
+    "atol_g_l": 1e-10
+  },
+  "solver_check": {
+    "method": "DOP853",
+    "rtol": 1e-10,
+    "atol_g_l": 1e-12,
+    "max_abs_difference_g_l": 1e-05
+  },
+  "source_parity_max_abs_difference_g_l": 2e-06,
+  "comparators": [
+    "constant_initial_state",
+    "published_all_conditions_fit_descriptive_only"
+  ],
+  "scope": "T. harzianum P49P11, reported stirred batch medium, 29 C, pH 5 +/- 0.5, oxygen controlled >30%, 0-96 h. Separate substrate fits; no cross-strain or scale-up prediction.",
+  "log_parameter_difference_step": 0.0001,
+  "design_notes": "A training-only numerical pilot exhausted 300 evaluations with scipy default finite differences. Explicit 1e-4 relative differences in log parameters reduce ODE-solver derivative noise; no held-out scores were evaluated in that pilot."
+}
