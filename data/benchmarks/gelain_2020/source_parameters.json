@@ -1,0 +1,159 @@
+{
+  "glycerol": [
+    {
+      "symbol": "mu",
+      "value": 0.22684007577426935,
+      "units": "1/hour",
+      "source_file": "gelain_2020/simulation_reference/glycerol.xlsx",
+      "source_cell": "Parameters!A2",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "K",
+      "value": 2.0134212788372428,
+      "units": "gram/liter",
+      "source_file": "gelain_2020/simulation_reference/glycerol.xlsx",
+      "source_cell": "Parameters!A3",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "Xmax",
+      "value": 25.81526949566407,
+      "units": "gram/liter",
+      "source_file": "gelain_2020/simulation_reference/glycerol.xlsx",
+      "source_cell": "Parameters!A4",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "d",
+      "value": 0.039999718227110515,
+      "units": "1/hour",
+      "source_file": "gelain_2020/simulation_reference/glycerol.xlsx",
+      "source_cell": "Parameters!A5",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "Kd",
+      "value": 1.0327710167947122e-13,
+      "units": "gram/liter",
+      "source_file": "gelain_2020/simulation_reference/glycerol.xlsx",
+      "source_cell": "Parameters!A6",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "alpha",
+      "value": 0.38,
+      "units": "liter/gram",
+      "source_file": "gelain_2020/simulation_reference/glycerol.xlsx",
+      "source_cell": "Parameters!A7",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    }
+  ],
+  "cellulose": [
+    {
+      "symbol": "mu",
+      "value": 0.48103826151816137,
+      "units": "1/hour",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A2",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "K",
+      "value": 6.02676679563637,
+      "units": "gram/liter",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A3",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "Xmax",
+      "value": 12.003684925035639,
+      "units": "gram/liter",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A4",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "d",
+      "value": 0.09462466689325198,
+      "units": "1/hour",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A5",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "Kd",
+      "value": 0.4352521782562008,
+      "units": "gram/liter",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A6",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "alpha",
+      "value": 0.06897901304069688,
+      "units": "liter/gram",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A7",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "mue",
+      "value": 0.24812683013111633,
+      "units": "1/hour",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A11",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "Ke",
+      "value": 2.8353562246655946,
+      "units": "gram/liter",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A12",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "Amax",
+      "value": 5.762883703919827,
+      "units": "gram/liter",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A13",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "kda",
+      "value": 0.38423845127248957,
+      "units": "1/hour",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A14",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    },
+    {
+      "symbol": "beta",
+      "value": 0.21065115246985336,
+      "units": "liter/gram",
+      "source_file": "gelain_2020/simulation_reference/cellulose.xlsx",
+      "source_cell": "Parameters!A15",
+      "source": "doi:10.17632/shd3wcczsr.2; published fit to ALL available conditions",
+      "uncertainty": null
+    }
+  ]
+}
