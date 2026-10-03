@@ -80,6 +80,9 @@ nav:
   - Independent validation: independent-validation.md
   - Culture benchmark: gelain-culture-benchmark.md
   - Joint culture and activity benchmark: gelain-joint-benchmark.md
+  - Solver and thermodynamic audit: solver-thermodynamic-audit.md
+  - Growth and respiration benchmark: respiration-benchmark.md
+  - Integrated fungal digestion: degrading-culture.md
   - Experimental data and paper readiness: paper-readiness.md
   - Scientific integrity: scientific-integrity.md
   - Citing FungMod: citing.md
