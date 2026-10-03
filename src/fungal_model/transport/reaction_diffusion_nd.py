@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-from scipy.integrate import solve_ivp
+from fungal_model.core.numerics import solve_checked
+from fungal_model.transport._sparsity import cartesian_jacobian_sparsity
 
 from fungal_model import __version__
 from fungal_model.chemistry.reactions import Reaction
@@ -244,16 +245,12 @@ class ReactionDiffusionEngineND:
                 [np.asarray(derivatives[name].magnitude, dtype=float).reshape(-1) for name in names]
             )
 
-        solve_kwargs: dict[str, Any] = {
-            "method": settings.method,
-            "rtol": settings.rtol,
-            "atol": settings.atol,
-        }
-        if settings.max_step is not None:
-            solve_kwargs["max_step"] = float(
-                assert_compatible(settings.max_step, time_units, name="max_step").magnitude
-            )
-        solution = solve_ivp(rhs, span, y0, t_eval=evaluation_times, **solve_kwargs)
+        solve_kwargs = settings.scipy_options(self.field_units, time_units, cells=cells_per_field)
+        sparse_jacobian = settings.method in {"BDF", "Radau"} and not self.reactions
+        if sparse_jacobian:
+            solve_kwargs["jac_sparsity"] = cartesian_jacobian_sparsity(
+                self.grid.shape, len(names), local_reactions=False)
+        solution = solve_checked(rhs, span, y0, t_eval=evaluation_times, **solve_kwargs)
         fields = {
             name: Q_(
                 solution.y[index * cells_per_field : (index + 1) * cells_per_field].T.reshape(
@@ -288,6 +285,7 @@ class ReactionDiffusionEngineND:
             diffusion_symbols=dict(self.diffusion_symbols),
             model_version=self.model_version,
             solver_metadata={
+                "jacobian_structure": "cartesian_sparse" if sparse_jacobian else "backend_default",
                 "status": int(solution.status),
                 "nfev": int(solution.nfev),
                 "njev": None if solution.njev is None else int(solution.njev),
