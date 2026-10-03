@@ -78,12 +78,33 @@ the deposited Gelain biomass/substrate model and reports six retrospective
 condition holdouts for an effective growth/loss hypothesis. Prediction errors
 and missing measurement uncertainty remain explicit; this is exploratory evidence.
 
+The [growth and respiration extension](docs/respiration-benchmark.md) separates
+substrate maintenance from biomass synthesis and conserves atoms and charge.
+It includes opt-in oxygen/nitrogen-limited batch and chemostat dynamics. New
+*A. niger* data improve four-condition glucose-uptake holdout RMSE by 75% against
+a growth-only comparison, while a second study exposes substantial transfer
+errors. Dynamic kinetics remain exploratory; whole-fungus validation is open.
+
+The [integrated digestion extension](docs/degrading-culture.md) closes an
+explicit resource loop: secreted enzymes release nutrients, uptake supports
+growth and further secretion, and every pathway pays its carbon, nitrogen and
+oxygen costs. Inactivation retains the protein in the material balance. A new
+*A. niger* protein-output dataset tests carbon-source-dependent secretion;
+the coupled time courses and kinetic sensitivity envelope remain illustrative.
+
 The [joint culture/activity comparison](docs/gelain-joint-benchmark.md) extends
 that benchmark with 144 observations, seven model/family combinations, retained
 dry-mass hypotheses, covariance/censoring support, parameter diagnostics and
 33 whole-condition holdouts. Model-specific validation contracts freeze the
 parameters, observation mapping, scope and criteria. Missing empirical evidence
 still prevents promotion to a validated model.
+
+The [solver and thermodynamic audit](docs/solver-thermodynamic-audit.md) adds
+unit-bearing per-state error control, sparse spatial Jacobians and a closed
+detailed-balance reaction-network/equilibrium API with free-energy and entropy
+diagnostics. A four-solver replay of the existing 33 culture holdouts separates
+numerical error from model–data discrepancy; it does not establish biological
+validation or supply missing thermochemical measurements.
 
 <details>
 <summary><strong>Full implemented-capability inventory</strong></summary>
@@ -1378,6 +1399,10 @@ Current capability labels mean:
   intracellular metabolism are not modelled.
 - Enzyme production has an explicit active-biomass cost, but the cost parameter is lumped and must be sourced before scientific use.
 - Stage 7 oxygen handling is currently a validation check against available oxygen, not a coupled oxygen state in the ODE model.
+- Separately, `ResourceLimitedCulture` has an explicit dissolved-oxygen state,
+  gas transfer, nitrogen limitation and conserved growth/maintenance respiration.
+  It does not change Stage 7 or `FungalCouplingModel`; secretion, morphology,
+  regulation and starvation death are not integrated into this opt-in API.
 - Optional single-process dynamic Gibbs constraints can block unfavorable
   configured forward rates when all molar activity, reaction, electron/redox,
   constant, tolerance, and provenance inputs are explicit. Separately, the
