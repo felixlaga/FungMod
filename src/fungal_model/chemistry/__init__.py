@@ -1,5 +1,10 @@
 """Chemical reactions, stoichiometry, and thermodynamic interfaces."""
 
+from .detailed_balance import (
+    DetailedBalanceNetwork,
+    DetailedBalanceReaction,
+    DetailedBalanceTrajectory,
+)
 from .haldane import (
     DEFAULT_HALDANE_RELATIVE_TOLERANCE,
     HaldaneError,
@@ -46,6 +51,9 @@ from .thermodynamics import (
 )
 
 __all__ = [
+    "DetailedBalanceNetwork",
+    "DetailedBalanceReaction",
+    "DetailedBalanceTrajectory",
     "DEFAULT_HALDANE_RELATIVE_TOLERANCE",
     "HaldaneError",
     "check_haldane_consistency",
