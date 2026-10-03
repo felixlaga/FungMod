@@ -9,37 +9,13 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import numpy as np
-from scipy.integrate import solve_ivp
+from fungal_model.core.numerics import IntegrationError, SolverSettings, solve_checked
 
 from fungal_model import __version__
 from fungal_model.chemistry.reactions import Reaction
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
-
-
-@dataclass(frozen=True)
-class SolverSettings:
-    """Numerical solver settings that are recorded with every simulation."""
-
-    method: str = "LSODA"
-    rtol: float = 1e-8
-    atol: float = 1e-10
-    max_step: Quantity | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        max_step = None
-        if self.max_step is not None:
-            max_step = {
-                "value": float(self.max_step.magnitude),
-                "units": str(self.max_step.units),
-            }
-        return {
-            "method": self.method,
-            "rtol": self.rtol,
-            "atol": self.atol,
-            "max_step": max_step,
-        }
 
 
 def _quantity_array_summary(quantity: Quantity) -> dict[str, Any]:
@@ -256,16 +232,8 @@ class SimulationEngine:
                 for species in species_names
             ]
 
-        solve_kwargs: dict[str, Any] = {
-            "method": settings.method,
-            "rtol": settings.rtol,
-            "atol": settings.atol,
-        }
-        if settings.max_step is not None:
-            solve_kwargs["max_step"] = float(
-                assert_compatible(settings.max_step, time_units, name="max_step").magnitude
-            )
-        solution = solve_ivp(rhs, t_span_numeric, y0, t_eval=t_eval_numeric, **solve_kwargs)
+        solution = solve_checked(rhs, t_span_numeric, y0, t_eval=t_eval_numeric,
+                                 **settings.scipy_options(self.species_units, time_units))
 
         species = {
             species_name: Q_(solution.y[index], self.species_units[species_name])
@@ -304,6 +272,7 @@ class SimulationEngine:
 
 
 __all__ = [
+    "IntegrationError",
     "SimulationEngine",
     "SimulationRecord",
     "SimulationResult",
