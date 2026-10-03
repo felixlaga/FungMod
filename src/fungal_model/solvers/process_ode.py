@@ -7,13 +7,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from scipy.integrate import solve_ivp
+from fungal_model.core.numerics import solve_checked
 
 from fungal_model.chemistry.thermodynamics import (
     DynamicThermodynamicConstraint,
     DynamicThermodynamicEvaluation,
 )
-from fungal_model.core.simulation import SolverSettings
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.core.validators import ValidationResult
 from fungal_model.results import SimulationResult
@@ -84,16 +83,8 @@ class ProcessODESolver:
                 for name in state_names
             ]
 
-        solution = solve_ivp(
-            rhs,
-            t_span_numeric,
-            y0,
-            t_eval=t_eval_numeric,
-            method=settings.method,
-            rtol=settings.rtol,
-            atol=settings.atol,
-            **_optional_solver_kwargs(settings, time_units),
-        )
+        solution = solve_checked(rhs, t_span_numeric, y0, t_eval=t_eval_numeric,
+                                 **settings.scipy_options(state_units, time_units))
         states = {
             name: Q_(solution.y[index], state_units[name])
             for index, name in enumerate(state_names)
@@ -494,16 +485,6 @@ def _thermodynamic_validations(
             )
         )
     return tuple(validations)
-
-
-def _optional_solver_kwargs(settings: SolverSettings, time_units: str) -> dict[str, Any]:
-    if settings.max_step is None:
-        return {}
-    return {
-        "max_step": float(
-            assert_compatible(settings.max_step, time_units, name="max_step").magnitude
-        )
-    }
 
 
 __all__ = ["ProcessODESolver", "RunRequest"]
