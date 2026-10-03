@@ -6,6 +6,30 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Opt-in balanced secretion–digestion–growth feedback with seven dynamic pools,
+  explicit protein synthesis costs, chemically retained inactive protein,
+  substrate allocation and batch degradation thresholds. Illustrative kinetics
+  remain separate from measured total-protein output.
+- Checksummed Jørgensen 2009 primary data, entire-strain protein-output holdouts,
+  an offline coupled-culture runner and four plots, including a kinetic
+  sensitivity envelope. No whole-fungus validation or registry promotion.
+- Opt-in conserved growth/maintenance respiration with nitrogen/oxygen limitation,
+  gas transfer, batch/chemostat dynamics, open material balances and explicit
+  unmet-maintenance diagnostics. Complete sourced energies are required for entropy.
+- Two checksummed A. niger primary datasets, training-only Pirt holdouts,
+  external-regime challenges, error-corner sensitivity and four reproducible plots.
+  Inconsistent source cells remain quarantined; whole-fungus validation is open.
+
+- Unit-bearing per-state solver tolerances and first-step control across main
+  engines; sparse Cartesian Jacobians for supported local spatial dynamics.
+- Sourced closed detailed-balance reaction networks with analytic Jacobians,
+  independent free-energy equilibrium, conservation and entropy diagnostics.
+- Reproducible four-solver replay of 33 existing culture holdouts and plots;
+  explicit refinement resolves a BDF depletion failure without clipping.
+- Conservation-law macrochemical balance in `fungal_model.chemistry`: solves
+  overall exchange stoichiometry from element and charge conservation and forms
+  reaction energies and an entropy budget from sourced formation energies. A
+  constraint layer only; it predicts no rate or yield.
 - Joint Gelain culture/activity benchmark with published-equation refits,
   activity-driven hydrolysis and retained dry-mass alternatives, 33 condition
   holdouts, explicit covariance sensitivity, profile loss and conditional
@@ -22,6 +46,12 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- Analytic piecewise Jacobians for resource-limited and integrated cultures
+  prevent finite-difference perturbation overflow in non-feedback ledger states
+  during depletion. Rate laws and conservation equations are unchanged.
+- Incomplete/nonfinite main-engine integrations now raise `IntegrationError`
+  instead of returning partial trajectories. Invalid numerical controls reject.
+- Reversible net flux uses `expm1` to avoid cancellation near equilibrium.
 - Fixed mixed-unit SBML trajectories, preserved PEtab training/validation/holdout separation, and rejected missing or zero export noise scales. Regenerate older affected exports.
 - Fixed thermodynamic scalar typing and pinned the checked Pyright version for local/CI parity.
 - Consolidated exploratory inhibition runners through shared unit-aware package integration and the configured inhibition kernel (FD-008 resolved).
