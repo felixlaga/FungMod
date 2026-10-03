@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import numpy as np
-from scipy.integrate import solve_ivp
+from fungal_model.core.numerics import solve_checked
+from fungal_model.transport._sparsity import cartesian_jacobian_sparsity
 
 from fungal_model import __version__
 from fungal_model.chemistry.reactions import Reaction
@@ -320,16 +321,12 @@ class ReactionDiffusionEngine1D:
 
             return np.concatenate([derivative_arrays[name] for name in field_names])
 
-        solve_kwargs: dict[str, Any] = {
-            "method": settings.method,
-            "rtol": settings.rtol,
-            "atol": settings.atol,
-        }
-        if settings.max_step is not None:
-            solve_kwargs["max_step"] = float(
-                assert_compatible(settings.max_step, time_units, name="max_step").magnitude
-            )
-        solution = solve_ivp(rhs, t_span_numeric, y0, t_eval=t_eval_numeric, **solve_kwargs)
+        solve_kwargs = settings.scipy_options(self.field_units, time_units, cells=n)
+        sparse_jacobian = settings.method in {"BDF", "Radau"}
+        if sparse_jacobian:
+            solve_kwargs["jac_sparsity"] = cartesian_jacobian_sparsity(
+                (n,), len(field_names), local_reactions=bool(self.reactions))
+        solution = solve_checked(rhs, t_span_numeric, y0, t_eval=t_eval_numeric, **solve_kwargs)
 
         fields: dict[str, Quantity] = {}
         for index, name in enumerate(field_names):
@@ -362,6 +359,7 @@ class ReactionDiffusionEngine1D:
             diffusion_symbols=dict(self.diffusion_symbols),
             model_version=self.model_version,
             solver_metadata={
+                "jacobian_structure": "cartesian_sparse" if sparse_jacobian else "backend_default",
                 "status": int(solution.status),
                 "nfev": int(solution.nfev),
                 "njev": None if solution.njev is None else int(solution.njev),
