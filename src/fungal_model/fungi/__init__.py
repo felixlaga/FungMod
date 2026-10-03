@@ -14,6 +14,8 @@ from .enzyme_profile import (
     enzyme_secretion_rate,
 )
 from .growth import BiomassMaintenanceRateLaw, biomass_maintenance_rate
+from .degradation import DegradingCulture, DegradingCultureTrajectory, DEGRADING_CULTURE_MATURITY, secretion_allocation
+from .respiration import CultureTrajectory, ResourceLimitedCulture, RespiratoryGrowthModel, RESPIRATION_MATURITY
 from .metabolism import (
     ProductAssimilation,
     ProductUptakeRateLaw,
@@ -22,6 +24,14 @@ from .metabolism import (
 )
 
 __all__ = [
+    "DegradingCulture",
+    "DegradingCultureTrajectory",
+    "DEGRADING_CULTURE_MATURITY",
+    "secretion_allocation",
+    "CultureTrajectory",
+    "ResourceLimitedCulture",
+    "RespiratoryGrowthModel",
+    "RESPIRATION_MATURITY",
     "GibbsEnergyYieldBound",
     "GrowthEnergeticsError",
     "BiomassMaintenanceRateLaw",
