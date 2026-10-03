@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "path": "PMC4559092.xml",
+      "bytes": 109268,
+      "sha256": "05a71be802a5d8780cfade825162f5ffca8a723301b40a8da6e6ec2bea714157",
+      "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC4559092/fullTextXML",
+      "retrieved_on": "2026-10-03",
+      "role": "primary_article_xml"
+    },
+    {
+      "path": "PMC5773628.xml",
+      "bytes": 118681,
+      "sha256": "4cc97c1877f6472935d65a421877d323ec2b56a1c400dd1dbc0abe31819cf232",
+      "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC5773628/fullTextXML",
+      "retrieved_on": "2026-10-03",
+      "role": "primary_article_xml"
+    },
+    {
+      "path": "observations.json",
+      "bytes": 49803,
+      "sha256": "c4aea874ef25440faff68d5cce1b2519aebb1eceac4eed4a2456032aac8fc487",
+      "url": null,
+      "retrieved_on": null,
+      "role": "deterministic_table_extract"
+    }
+  ],
+  "license": "CC-BY-4.0",
+  "sources": {
+    "lameiras_2015": [
+      "PMC4559092",
+      "10.1007/s11306-015-0781-z"
+    ],
+    "lameiras_2017": [
+      "PMC5773628",
+      "10.1007/s00449-017-1854-3"
+    ]
+  },
+  "extractor": "scripts/prepare_respiration_data.py",
+  "unavailable_sources": [
+    "Springer supplemental DOCX download: URLError, nodename nor servname provided, or not known; Europe PMC supplementaryFiles endpoint: read timeout after 45 seconds. Unverified supplemental data are not included or inferred."
+  ]
+}

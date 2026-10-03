@@ -1,0 +1,1739 @@
+{
+  "schema_version": 1,
+  "organism": "Aspergillus niger NW185",
+  "license": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution": "Lameiras, Heijnen and van Gulik (2015); Lameiras, Ras, ten Pierick, Heijnen and van Gulik (2017).",
+  "transformations": "XML table extraction; mmol to mol and mCmol to Cmol scaled by 0.001; no numerical corrections.",
+  "rate_units": "mol species / (Cmol biomass * hour); biomass/TOC rates Cmol / (Cmol biomass * hour)",
+  "uncertainty": "Reported errors preserved. Their complete statistical interpretation and covariance are unavailable here; do not treat them as independent replicate SDs, weights, or confidence intervals.",
+  "lameiras_2015": {
+    "doi": "10.1007/s11306-015-0781-z",
+    "temperature_K": 303.15,
+    "pH": 3.0,
+    "basis": "Glucose-limited well-mixed chemostat; dissolved oxygen >50% air saturation.",
+    "biomass_composition": {
+      "C": 1.0,
+      "H": 1.8,
+      "N": 0.12,
+      "O": 0.6
+    },
+    "biomass_formula_mass_g_per_Cmol": {
+      "value": 27.3,
+      "reported_error": 0.2
+    },
+    "records": [
+      {
+        "id": "lameiras_2015_D0.043",
+        "dilution_per_h": 0.043,
+        "dilution": {
+          "value": 0.043,
+          "reported_error": 0.001,
+          "verbatim": "0.043 ± 0.001"
+        },
+        "biomass_gDW_kg_broth": {
+          "value": 3.02,
+          "reported_error": 0.03,
+          "verbatim": "3.02 ± 0.03"
+        },
+        "unreconciled": {
+          "biomass_rate": {
+            "value": 0.0429,
+            "reported_error": 0.012400000000000001,
+            "verbatim": "42.9 ± 12.4"
+          },
+          "substrate_uptake": {
+            "value": 0.014,
+            "reported_error": 0.0029,
+            "verbatim": "14.0 ± 2.9"
+          },
+          "oxygen_uptake": {
+            "value": 0.033100000000000004,
+            "reported_error": 0.02,
+            "verbatim": "33.1 ± 20.0"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.0351,
+            "reported_error": 0.0116,
+            "verbatim": "35.1 ± 11.6"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.005900000000000001,
+            "reported_error": 0.0027,
+            "verbatim": "5.9 ± 2.7"
+          }
+        },
+        "reconciled": {
+          "biomass_rate": {
+            "value": 0.0429,
+            "reported_error": 0.0035,
+            "verbatim": "42.9 ± 3.5"
+          },
+          "substrate_uptake": {
+            "value": 0.014199999999999999,
+            "reported_error": 0.0008,
+            "verbatim": "14.2 ± 0.8"
+          },
+          "oxygen_uptake": {
+            "value": 0.0353,
+            "reported_error": 0.0022,
+            "verbatim": "35.3 ± 2.2"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.0366,
+            "reported_error": 0.0023,
+            "verbatim": "36.6 ± 2.3"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.005900000000000001,
+            "reported_error": 0.0024,
+            "verbatim": "5.9 ± 2.4"
+          }
+        }
+      },
+      {
+        "id": "lameiras_2015_D0.089",
+        "dilution_per_h": 0.089,
+        "dilution": {
+          "value": 0.089,
+          "reported_error": 0.001,
+          "verbatim": "0.089 ± 0.001"
+        },
+        "biomass_gDW_kg_broth": {
+          "value": 3.25,
+          "reported_error": 0.04,
+          "verbatim": "3.25 ± 0.04"
+        },
+        "unreconciled": {
+          "biomass_rate": {
+            "value": 0.08945,
+            "reported_error": 0.028300000000000002,
+            "verbatim": "89.45 ± 28.3"
+          },
+          "substrate_uptake": {
+            "value": 0.027100000000000003,
+            "reported_error": 0.0060999999999999995,
+            "verbatim": "27.1 ± 6.1"
+          },
+          "oxygen_uptake": {
+            "value": 0.0544,
+            "reported_error": 0.0209,
+            "verbatim": "54.4 ± 20.9"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.06470000000000001,
+            "reported_error": 0.025,
+            "verbatim": "64.7 ± 25.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.008400000000000001,
+            "reported_error": 0.004200000000000001,
+            "verbatim": "8.4 ± 4.2"
+          }
+        },
+        "reconciled": {
+          "biomass_rate": {
+            "value": 0.0895,
+            "reported_error": 0.005200000000000001,
+            "verbatim": "89.5 ± 5.2"
+          },
+          "substrate_uptake": {
+            "value": 0.025500000000000002,
+            "reported_error": 0.0011,
+            "verbatim": "25.5 ± 1.1"
+          },
+          "oxygen_uptake": {
+            "value": 0.0528,
+            "reported_error": 0.0025,
+            "verbatim": "52.8 ± 2.5"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.0555,
+            "reported_error": 0.0026000000000000003,
+            "verbatim": "55.5 ± 2.6"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0081,
+            "reported_error": 0.0035,
+            "verbatim": "8.1 ± 3.5"
+          }
+        }
+      },
+      {
+        "id": "lameiras_2015_D0.134",
+        "dilution_per_h": 0.134,
+        "dilution": {
+          "value": 0.134,
+          "reported_error": 0.001,
+          "verbatim": "0.134 ± 0.001"
+        },
+        "biomass_gDW_kg_broth": {
+          "value": 3.38,
+          "reported_error": 0.03,
+          "verbatim": "3.38 ± 0.03"
+        },
+        "unreconciled": {
+          "biomass_rate": {
+            "value": 0.1335,
+            "reported_error": 0.0394,
+            "verbatim": "133.5 ± 39.4"
+          },
+          "substrate_uptake": {
+            "value": 0.0388,
+            "reported_error": 0.0081,
+            "verbatim": "38.8 ± 8.1"
+          },
+          "oxygen_uptake": {
+            "value": 0.078,
+            "reported_error": 0.022,
+            "verbatim": "78.0 ± 22.0"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.09190000000000001,
+            "reported_error": 0.0339,
+            "verbatim": "91.9 ± 33.9"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0075,
+            "reported_error": 0.0035,
+            "verbatim": "7.5 ± 3.5"
+          }
+        },
+        "reconciled": {
+          "biomass_rate": {
+            "value": 0.1335,
+            "reported_error": 0.005,
+            "verbatim": "133.5 ± 5.0"
+          },
+          "substrate_uptake": {
+            "value": 0.03723,
+            "reported_error": 0.001,
+            "verbatim": "37.23 ± 1.0"
+          },
+          "oxygen_uptake": {
+            "value": 0.0787,
+            "reported_error": 0.0028,
+            "verbatim": "78.7 ± 2.8"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.08259999999999999,
+            "reported_error": 0.0029,
+            "verbatim": "82.6 ± 2.9"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0073,
+            "reported_error": 0.0029,
+            "verbatim": "7.3 ± 2.9"
+          }
+        }
+      },
+      {
+        "id": "lameiras_2015_D0.205",
+        "dilution_per_h": 0.205,
+        "dilution": {
+          "value": 0.205,
+          "reported_error": 0.003,
+          "verbatim": "0.205 ± 0.003"
+        },
+        "biomass_gDW_kg_broth": {
+          "value": 3.45,
+          "reported_error": 0.05,
+          "verbatim": "3.45 ± 0.05"
+        },
+        "unreconciled": {
+          "biomass_rate": {
+            "value": 0.2053,
+            "reported_error": 0.0593,
+            "verbatim": "205.3 ± 59.3"
+          },
+          "substrate_uptake": {
+            "value": 0.0585,
+            "reported_error": 0.0119,
+            "verbatim": "58.5 ± 11.9"
+          },
+          "oxygen_uptake": {
+            "value": 0.1065,
+            "reported_error": 0.0267,
+            "verbatim": "106.5 ± 26.7"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.1346,
+            "reported_error": 0.0503,
+            "verbatim": "134.6 ± 50.3"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0109,
+            "reported_error": 0.005,
+            "verbatim": "10.9 ± 5.0"
+          }
+        },
+        "reconciled": {
+          "biomass_rate": {
+            "value": 0.2053,
+            "reported_error": 0.0067,
+            "verbatim": "205.3 ± 6.7"
+          },
+          "substrate_uptake": {
+            "value": 0.05296,
+            "reported_error": 0.0012,
+            "verbatim": "52.96 ± 1.2"
+          },
+          "oxygen_uptake": {
+            "value": 0.09640000000000001,
+            "reported_error": 0.0032,
+            "verbatim": "96.4 ± 3.2"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.1024,
+            "reported_error": 0.0033,
+            "verbatim": "102.4 ± 3.3"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0101,
+            "reported_error": 0.004,
+            "verbatim": "10.1 ± 4.0"
+          }
+        }
+      }
+    ],
+    "role": "Unreconciled rates for primary calibration/holdout; reconciled rates retained as reference only."
+  },
+  "lameiras_2017": {
+    "doi": "10.1007/s00449-017-1854-3",
+    "temperature_K": 303.15,
+    "pH": 2.5,
+    "single_substrate_batch": [
+      {
+        "substrate": "Glucose",
+        "respiratory_quotient": {
+          "value": 1.03,
+          "reported_error": 0.04,
+          "verbatim": "1.03 ± 0.04"
+        },
+        "carbon_recovery_percent": {
+          "value": 94.0,
+          "reported_error": 2.0,
+          "verbatim": "94 ± 2"
+        },
+        "redox_recovery_percent": {
+          "value": 94.0,
+          "reported_error": 2.0,
+          "verbatim": "94 ± 2"
+        },
+        "carbon_yield": {
+          "value": 0.68,
+          "reported_error": 0.03,
+          "verbatim": "0.68 ± 0.03"
+        },
+        "growth_rate": {
+          "value": 0.221,
+          "reported_error": 0.004,
+          "verbatim": "0.221 ± 0.004"
+        },
+        "substrate_uptake": {
+          "value": 0.054,
+          "reported_error": 0.001,
+          "verbatim": "0.054 ± 0.001"
+        },
+        "oxygen_uptake": {
+          "value": 0.101,
+          "reported_error": 0.003,
+          "verbatim": "0.101 ± 0.003"
+        },
+        "carbon_dioxide_release": {
+          "value": 0.104,
+          "reported_error": 0.003,
+          "verbatim": "0.104 ± 0.003"
+        }
+      },
+      {
+        "substrate": "Xylose",
+        "respiratory_quotient": {
+          "value": 1.02,
+          "reported_error": 0.07,
+          "verbatim": "1.02 ± 0.07"
+        },
+        "carbon_recovery_percent": {
+          "value": 87.0,
+          "reported_error": 2.0,
+          "verbatim": "87 ± 2"
+        },
+        "redox_recovery_percent": {
+          "value": 83.0,
+          "reported_error": 2.0,
+          "verbatim": "83 ± 2"
+        },
+        "carbon_yield": {
+          "value": 0.77,
+          "reported_error": 0.06,
+          "verbatim": "0.77 ± 0.06"
+        },
+        "growth_rate": {
+          "value": 0.149,
+          "reported_error": 0.007,
+          "verbatim": "0.149 ± 0.007"
+        },
+        "substrate_uptake": {
+          "value": 0.039,
+          "reported_error": 0.002,
+          "verbatim": "0.039 ± 0.002"
+        },
+        "oxygen_uptake": {
+          "value": 0.044,
+          "reported_error": 0.002,
+          "verbatim": "0.044 ± 0.002"
+        },
+        "carbon_dioxide_release": {
+          "value": 0.045,
+          "reported_error": 0.002,
+          "verbatim": "0.045 ± 0.002"
+        }
+      },
+      {
+        "substrate": "Arabinose",
+        "respiratory_quotient": {
+          "value": 1.01,
+          "reported_error": 0.04,
+          "verbatim": "1.01 ± 0.04"
+        },
+        "carbon_recovery_percent": {
+          "value": 98.0,
+          "reported_error": 3.0,
+          "verbatim": "98 ± 3"
+        },
+        "redox_recovery_percent": {
+          "value": 94.0,
+          "reported_error": 5.0,
+          "verbatim": "94 ± 5"
+        },
+        "carbon_yield": {
+          "value": 0.47,
+          "reported_error": 0.01,
+          "verbatim": "0.47 ± 0.01"
+        },
+        "growth_rate": {
+          "value": 0.097,
+          "reported_error": 0.001,
+          "verbatim": "0.097 ± 0.001"
+        },
+        "substrate_uptake": {
+          "value": 0.041,
+          "reported_error": 0.001,
+          "verbatim": "0.041 ± 0.001"
+        },
+        "oxygen_uptake": {
+          "value": 0.108,
+          "reported_error": 0.003,
+          "verbatim": "0.108 ± 0.003"
+        },
+        "carbon_dioxide_release": {
+          "value": 0.109,
+          "reported_error": 0.003,
+          "verbatim": "0.109 ± 0.003"
+        }
+      },
+      {
+        "substrate": "Gal acid",
+        "respiratory_quotient": {
+          "value": 1.53,
+          "reported_error": 0.07,
+          "verbatim": "1.53 ± 0.07"
+        },
+        "carbon_recovery_percent": {
+          "value": 93.0,
+          "reported_error": 4.0,
+          "verbatim": "93 ± 4"
+        },
+        "redox_recovery_percent": {
+          "value": 88.0,
+          "reported_error": 10.0,
+          "verbatim": "88 ± 10"
+        },
+        "carbon_yield": {
+          "value": 0.5,
+          "reported_error": 0.06,
+          "verbatim": "0.50 ± 0.06"
+        },
+        "growth_rate": {
+          "value": 0.092,
+          "reported_error": 0.005,
+          "verbatim": "0.092 ± 0.005"
+        },
+        "substrate_uptake": {
+          "value": 0.031,
+          "reported_error": 0.001,
+          "verbatim": "0.031 ± 0.001"
+        },
+        "oxygen_uptake": {
+          "value": 0.06,
+          "reported_error": 0.002,
+          "verbatim": "0.060 ± 0.002"
+        },
+        "carbon_dioxide_release": {
+          "value": 0.092,
+          "reported_error": 0.003,
+          "verbatim": "0.092 ± 0.003"
+        }
+      },
+      {
+        "substrate": "Mannose",
+        "respiratory_quotient": {
+          "value": 1.0,
+          "reported_error": 0.06,
+          "verbatim": "1.00 ± 0.06"
+        },
+        "carbon_recovery_percent": {
+          "value": 96.0,
+          "reported_error": 2.0,
+          "verbatim": "96 ± 2"
+        },
+        "redox_recovery_percent": {
+          "value": 92.0,
+          "reported_error": 2.0,
+          "verbatim": "92 ± 2"
+        },
+        "carbon_yield": {
+          "value": 0.68,
+          "reported_error": 0.03,
+          "verbatim": "0.68 ± 0.03"
+        },
+        "growth_rate": {
+          "value": 0.151,
+          "reported_error": 0.004,
+          "verbatim": "0.151 ± 0.004"
+        },
+        "substrate_uptake": {
+          "value": 0.037,
+          "reported_error": 0.001,
+          "verbatim": "0.037 ± 0.001"
+        },
+        "oxygen_uptake": {
+          "value": 0.072,
+          "reported_error": 0.003,
+          "verbatim": "0.072 ± 0.003"
+        },
+        "carbon_dioxide_release": {
+          "value": 0.072,
+          "reported_error": 0.003,
+          "verbatim": "0.072 ± 0.003"
+        }
+      },
+      {
+        "substrate": "Rhamnose",
+        "respiratory_quotient": {
+          "value": 0.79,
+          "reported_error": 0.05,
+          "verbatim": "0.79 ± 0.05"
+        },
+        "carbon_recovery_percent": {
+          "value": 101.0,
+          "reported_error": 5.0,
+          "verbatim": "101 ± 5"
+        },
+        "redox_recovery_percent": {
+          "value": 96.0,
+          "reported_error": 7.0,
+          "verbatim": "96 ± 7"
+        },
+        "carbon_yield": {
+          "value": 0.67,
+          "reported_error": 0.03,
+          "verbatim": "0.67 ± 0.03"
+        },
+        "growth_rate": {
+          "value": 0.116,
+          "reported_error": 0.003,
+          "verbatim": "0.116 ± 0.003"
+        },
+        "substrate_uptake": {
+          "value": 0.029,
+          "reported_error": 0.001,
+          "verbatim": "0.029 ± 0.001"
+        },
+        "oxygen_uptake": {
+          "value": 0.072,
+          "reported_error": 0.003,
+          "verbatim": "0.072 ± 0.003"
+        },
+        "carbon_dioxide_release": {
+          "value": 0.057,
+          "reported_error": 0.003,
+          "verbatim": "0.057 ± 0.003"
+        }
+      }
+    ],
+    "mixed_substrate_chemostat": [
+      {
+        "id": "lameiras_2017_mixed_D0.04",
+        "dilution_per_h": 0.04,
+        "biomass_gDW_L": {
+          "value": 4.3,
+          "reported_error": 0.13,
+          "verbatim": "4.30 ± 0.13"
+        },
+        "respiratory_quotient": {
+          "value": 1.03,
+          "reported_error": 0.04,
+          "verbatim": "1.03 ± 0.04"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.0030499999999999998,
+            "reported_error": 7.000000000000001e-05,
+            "verbatim": "3.05 ± 0.07"
+          },
+          "xylose_uptake": {
+            "value": 0.00367,
+            "reported_error": 8e-05,
+            "verbatim": "3.67 ± 0.08"
+          },
+          "arabinose_uptake": {
+            "value": 0.00367,
+            "reported_error": 8e-05,
+            "verbatim": "3.67 ± 0.08"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.0028,
+            "reported_error": 6e-05,
+            "verbatim": "2.80 ± 0.06"
+          },
+          "mannose_uptake": {
+            "value": 0.00331,
+            "reported_error": 7.000000000000001e-05,
+            "verbatim": "3.31 ± 0.07"
+          },
+          "rhamnose_uptake": {
+            "value": 0.00335,
+            "reported_error": 7.000000000000001e-05,
+            "verbatim": "3.35 ± 0.07"
+          },
+          "oxygen_uptake": {
+            "value": 0.0578,
+            "reported_error": 0.0021000000000000003,
+            "verbatim": "57.8 ± 2.1"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.0603,
+            "reported_error": 0.0021000000000000003,
+            "verbatim": "60.3 ± 2.1"
+          },
+          "biomass_rate": {
+            "value": 0.0425,
+            "reported_error": 0.0,
+            "verbatim": "42.5 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0089,
+            "reported_error": 0.0002,
+            "verbatim": "8.9 ± 0.2"
+          }
+        },
+        "quality_flags": []
+      },
+      {
+        "id": "lameiras_2017_mixed_D0.06",
+        "dilution_per_h": 0.06,
+        "biomass_gDW_L": {
+          "value": 4.92,
+          "reported_error": 0.06,
+          "verbatim": "4.92 ± 0.06"
+        },
+        "respiratory_quotient": {
+          "value": 1.04,
+          "reported_error": 0.04,
+          "verbatim": "1.04 ± 0.04"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.004,
+            "reported_error": 6e-05,
+            "verbatim": "4.00 ± 0.06"
+          },
+          "xylose_uptake": {
+            "value": 0.00481,
+            "reported_error": 7.000000000000001e-05,
+            "verbatim": "4.81 ± 0.07"
+          },
+          "arabinose_uptake": {
+            "value": 0.0048,
+            "reported_error": 7.000000000000001e-05,
+            "verbatim": "4.80 ± 0.07"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.00367,
+            "reported_error": 6e-05,
+            "verbatim": "3.67 ± 0.06"
+          },
+          "mannose_uptake": {
+            "value": 0.00434,
+            "reported_error": 7.000000000000001e-05,
+            "verbatim": "4.34 ± 0.07"
+          },
+          "rhamnose_uptake": {
+            "value": 0.00438,
+            "reported_error": 7.000000000000001e-05,
+            "verbatim": "4.38 ± 0.07"
+          },
+          "oxygen_uptake": {
+            "value": 0.0727,
+            "reported_error": 0.0017,
+            "verbatim": "72.7 ± 1.7"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.0761,
+            "reported_error": 0.0017,
+            "verbatim": "76.1 ± 1.7"
+          },
+          "biomass_rate": {
+            "value": 0.0591,
+            "reported_error": 0.0,
+            "verbatim": "59.1 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0111,
+            "reported_error": 0.0002,
+            "verbatim": "11.1 ± 0.2"
+          }
+        },
+        "quality_flags": []
+      },
+      {
+        "id": "lameiras_2017_mixed_D0.08",
+        "dilution_per_h": 0.08,
+        "biomass_gDW_L": {
+          "value": 5.03,
+          "reported_error": 0.07,
+          "verbatim": "5.03 ± 0.07"
+        },
+        "respiratory_quotient": {
+          "value": 1.07,
+          "reported_error": 0.04,
+          "verbatim": "1.07 ± 0.04"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.00514,
+            "reported_error": 8.999999999999999e-05,
+            "verbatim": "5.14 ± 0.09"
+          },
+          "xylose_uptake": {
+            "value": 0.00619,
+            "reported_error": 0.00011,
+            "verbatim": "6.19 ± 0.11"
+          },
+          "arabinose_uptake": {
+            "value": 0.0061600000000000005,
+            "reported_error": 0.00011,
+            "verbatim": "6.16 ± 0.11"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.0047,
+            "reported_error": 8e-05,
+            "verbatim": "4.70 ± 0.08"
+          },
+          "mannose_uptake": {
+            "value": 0.00558,
+            "reported_error": 1e-05,
+            "verbatim": "5.58 ± .010"
+          },
+          "rhamnose_uptake": {
+            "value": 0.00559,
+            "reported_error": 0.0001,
+            "verbatim": "5.59 ± 0.10"
+          },
+          "oxygen_uptake": {
+            "value": 0.09390000000000001,
+            "reported_error": 0.0026000000000000003,
+            "verbatim": "93.9 ± 2.6"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.0983,
+            "reported_error": 0.0026000000000000003,
+            "verbatim": "98.3 ± 2.6"
+          },
+          "biomass_rate": {
+            "value": 0.0766,
+            "reported_error": 0.0,
+            "verbatim": "76.6 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0129,
+            "reported_error": 0.0002,
+            "verbatim": "12.9 ± 0.2"
+          }
+        },
+        "quality_flags": []
+      },
+      {
+        "id": "lameiras_2017_mixed_D0.09",
+        "dilution_per_h": 0.09,
+        "biomass_gDW_L": {
+          "value": 5.42,
+          "reported_error": 0.14,
+          "verbatim": "5.42 ± 0.14"
+        },
+        "respiratory_quotient": {
+          "value": 1.09,
+          "reported_error": 0.04,
+          "verbatim": "1.09 ± 0.04"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.00522,
+            "reported_error": 8.999999999999999e-05,
+            "verbatim": "5.22 ± 0.09"
+          },
+          "xylose_uptake": {
+            "value": 0.0062699999999999995,
+            "reported_error": 0.00011,
+            "verbatim": "6.27 ± 0.11"
+          },
+          "arabinose_uptake": {
+            "value": 0.00621,
+            "reported_error": 0.00011,
+            "verbatim": "6.21 ± 0.11"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.00471,
+            "reported_error": 8.999999999999999e-05,
+            "verbatim": "4.71 ± 0.09"
+          },
+          "mannose_uptake": {
+            "value": 0.0056500000000000005,
+            "reported_error": 0.0001,
+            "verbatim": "5.65 ± 0.10"
+          },
+          "rhamnose_uptake": {
+            "value": 0.00557,
+            "reported_error": 0.0001,
+            "verbatim": "5.57 ± 0.10"
+          },
+          "oxygen_uptake": {
+            "value": 0.0852,
+            "reported_error": 0.0028,
+            "verbatim": "85.2 ± 2.8"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.08990000000000001,
+            "reported_error": 0.0028,
+            "verbatim": "89.9 ± 2.8"
+          },
+          "biomass_rate": {
+            "value": 0.0935,
+            "reported_error": 0.0,
+            "verbatim": "93.5 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.005900000000000001,
+            "reported_error": 0.0001,
+            "verbatim": "5.9 ± 0.1"
+          }
+        },
+        "quality_flags": []
+      },
+      {
+        "id": "lameiras_2017_mixed_D0.11",
+        "dilution_per_h": 0.11,
+        "biomass_gDW_L": {
+          "value": 5.15,
+          "reported_error": 0.11,
+          "verbatim": "5.15 ± 0.11"
+        },
+        "respiratory_quotient": {
+          "value": 1.1,
+          "reported_error": 0.04,
+          "verbatim": "1.10 ± 0.04"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.00662,
+            "reported_error": 0.00011,
+            "verbatim": "6.62 ± 0.11"
+          },
+          "xylose_uptake": {
+            "value": 0.00791,
+            "reported_error": 0.00013000000000000002,
+            "verbatim": "7.91 ± 0.13"
+          },
+          "arabinose_uptake": {
+            "value": 0.00756,
+            "reported_error": 0.00013000000000000002,
+            "verbatim": "7.56 ± 0.13"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.00583,
+            "reported_error": 0.0001,
+            "verbatim": "5.83 ± 0.10"
+          },
+          "mannose_uptake": {
+            "value": 0.00717,
+            "reported_error": 0.00012,
+            "verbatim": "7.17 ± 0.12"
+          },
+          "rhamnose_uptake": {
+            "value": 0.006070000000000001,
+            "reported_error": 0.00011,
+            "verbatim": "6.07 ± 0.11"
+          },
+          "oxygen_uptake": {
+            "value": 0.09709999999999999,
+            "reported_error": 0.0029,
+            "verbatim": "97.1 ± 2.9"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.1034,
+            "reported_error": 0.0029,
+            "verbatim": "103.4 ± 2.9"
+          },
+          "biomass_rate": {
+            "value": 0.1097,
+            "reported_error": 0.0,
+            "verbatim": "109.7 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0183,
+            "reported_error": 0.0005,
+            "verbatim": "18.3 ± 0.5"
+          }
+        },
+        "quality_flags": []
+      },
+      {
+        "id": "lameiras_2017_mixed_D0.13",
+        "dilution_per_h": 0.13,
+        "biomass_gDW_L": {
+          "value": 4.63,
+          "reported_error": 0.16,
+          "verbatim": "4.63 ± 0.16"
+        },
+        "respiratory_quotient": {
+          "value": 1.11,
+          "reported_error": 0.04,
+          "verbatim": "1.11 ± 0.04"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.00708,
+            "reported_error": 8.999999999999999e-05,
+            "verbatim": "7.08 ± 0.09"
+          },
+          "xylose_uptake": {
+            "value": 0.008230000000000001,
+            "reported_error": 0.00011,
+            "verbatim": "8.23 ± 0.11"
+          },
+          "arabinose_uptake": {
+            "value": 0.00754,
+            "reported_error": 0.0001,
+            "verbatim": "7.54 ± 0.10"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.00643,
+            "reported_error": 0.0001,
+            "verbatim": "6.43 ± 0.10"
+          },
+          "mannose_uptake": {
+            "value": 0.00766,
+            "reported_error": 0.0001,
+            "verbatim": "7.66 ± 0.10"
+          },
+          "rhamnose_uptake": {
+            "value": 0.00375,
+            "reported_error": 8.999999999999999e-05,
+            "verbatim": "3.75 ± 0.09"
+          },
+          "oxygen_uptake": {
+            "value": 0.0781,
+            "reported_error": 0.0011,
+            "verbatim": "78.1 ± 1.1"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.08650000000000001,
+            "reported_error": 0.0012,
+            "verbatim": "86.5 ± 1.2"
+          },
+          "biomass_rate": {
+            "value": 0.1274,
+            "reported_error": 0.0,
+            "verbatim": "127.4 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.014400000000000001,
+            "reported_error": 0.0008,
+            "verbatim": "14.4 ± 0.8"
+          }
+        },
+        "quality_flags": []
+      },
+      {
+        "id": "lameiras_2017_mixed_D0.14",
+        "dilution_per_h": 0.14,
+        "biomass_gDW_L": {
+          "value": 4.63,
+          "reported_error": 0.29,
+          "verbatim": "4.63 ± 0.29"
+        },
+        "respiratory_quotient": {
+          "value": 1.14,
+          "reported_error": 0.04,
+          "verbatim": "1.14 ± 0.04"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.00878,
+            "reported_error": 0.00017,
+            "verbatim": "8.78 ± 0.17"
+          },
+          "xylose_uptake": {
+            "value": 0.01009,
+            "reported_error": 0.0002,
+            "verbatim": "10.09 ± 0.20"
+          },
+          "arabinose_uptake": {
+            "value": 0.00925,
+            "reported_error": 0.00017999999999999998,
+            "verbatim": "9.25 ± 0.18"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.0074600000000000005,
+            "reported_error": 0.00015,
+            "verbatim": "7.46 ± 0.15"
+          },
+          "mannose_uptake": {
+            "value": 0.0095,
+            "reported_error": 0.00017999999999999998,
+            "verbatim": "9.50 ± 0.18"
+          },
+          "rhamnose_uptake": {
+            "value": 0.0032400000000000003,
+            "reported_error": 0.00013000000000000002,
+            "verbatim": "3.24 ± 0.13"
+          },
+          "oxygen_uptake": {
+            "value": 0.0933,
+            "reported_error": 0.0036000000000000003,
+            "verbatim": "93.3 ± 3.6"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.1038,
+            "reported_error": 0.0037,
+            "verbatim": "103.8 ± 3.7"
+          },
+          "biomass_rate": {
+            "value": 0.1439,
+            "reported_error": 0.0,
+            "verbatim": "143.9 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0229,
+            "reported_error": 0.0012,
+            "verbatim": "22.9 ± 1.2"
+          }
+        },
+        "quality_flags": []
+      },
+      {
+        "id": "lameiras_2017_mixed_D0.16",
+        "dilution_per_h": 0.16,
+        "biomass_gDW_L": {
+          "value": 4.48,
+          "reported_error": 0.3,
+          "verbatim": "4.48 ± 0.30"
+        },
+        "respiratory_quotient": {
+          "value": 1.18,
+          "reported_error": 0.04,
+          "verbatim": "1.18 ± 0.04"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.010320000000000001,
+            "reported_error": 0.00021,
+            "verbatim": "10.32 ± 0.21"
+          },
+          "xylose_uptake": {
+            "value": 0.01132,
+            "reported_error": 0.00025,
+            "verbatim": "11.32 ± 0.25"
+          },
+          "arabinose_uptake": {
+            "value": 0.009380000000000001,
+            "reported_error": 0.0002,
+            "verbatim": "9.38 ± 0.20"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.00825,
+            "reported_error": 0.00017999999999999998,
+            "verbatim": "8.25 ± 0.18"
+          },
+          "mannose_uptake": {
+            "value": 0.01105,
+            "reported_error": 0.00022,
+            "verbatim": "11.05 ± 0.22"
+          },
+          "rhamnose_uptake": {
+            "value": 0.00283,
+            "reported_error": 0.00014000000000000001,
+            "verbatim": "2.83 ± 0.14"
+          },
+          "oxygen_uptake": {
+            "value": 0.095,
+            "reported_error": 0.0038,
+            "verbatim": "95.0 ± 3.8"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.0037,
+            "reported_error": 0.0039,
+            "verbatim": "3.7 ± 3.9"
+          },
+          "biomass_rate": {
+            "value": 0.15969999999999998,
+            "reported_error": 0.0,
+            "verbatim": "159.7 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0012,
+            "reported_error": 0.0019,
+            "verbatim": "1.2 ± 1.9"
+          }
+        },
+        "quality_flags": [
+          "Published CO2 3.7 +/- 3.9 contradicts the reported RQ and O2; TOC 1.2 +/- 1.9 is also suspicious. Preserve verbatim, quarantine both from quantitative scoring until primary supplemental verification."
+        ]
+      },
+      {
+        "id": "lameiras_2017_mixed_D0.17",
+        "dilution_per_h": 0.17,
+        "biomass_gDW_L": {
+          "value": 4.44,
+          "reported_error": 0.14,
+          "verbatim": "4.44 ± 0.14"
+        },
+        "respiratory_quotient": {
+          "value": 1.19,
+          "reported_error": 0.04,
+          "verbatim": "1.19 ± 0.04"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.012660000000000001,
+            "reported_error": 0.0003,
+            "verbatim": "12.66 ± 0.30"
+          },
+          "xylose_uptake": {
+            "value": 0.01141,
+            "reported_error": 0.00039000000000000005,
+            "verbatim": "11.41 ± 0.39"
+          },
+          "arabinose_uptake": {
+            "value": 0.0085,
+            "reported_error": 0.00025,
+            "verbatim": "8.50 ± 0.25"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.00856,
+            "reported_error": 0.00024,
+            "verbatim": "8.56 ± 0.24"
+          },
+          "mannose_uptake": {
+            "value": 0.01348,
+            "reported_error": 0.00032,
+            "verbatim": "13.48 ± 0.32"
+          },
+          "rhamnose_uptake": {
+            "value": 0.00175,
+            "reported_error": 0.00035,
+            "verbatim": "1.75 ± 0.35"
+          },
+          "oxygen_uptake": {
+            "value": 0.0993,
+            "reported_error": 0.0037,
+            "verbatim": "99.3 ± 3.7"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.11259999999999999,
+            "reported_error": 0.0039,
+            "verbatim": "112.6 ± 3.9"
+          },
+          "biomass_rate": {
+            "value": 0.17200000000000001,
+            "reported_error": 0.0,
+            "verbatim": "172.0 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0337,
+            "reported_error": 0.0036000000000000003,
+            "verbatim": "33.7 ± 3.6"
+          }
+        },
+        "quality_flags": []
+      },
+      {
+        "id": "lameiras_2017_mixed_D0.19",
+        "dilution_per_h": 0.19,
+        "biomass_gDW_L": {
+          "value": 2.66,
+          "reported_error": 0.017,
+          "verbatim": "2.66 ± .017"
+        },
+        "respiratory_quotient": {
+          "value": 1.2,
+          "reported_error": 0.05,
+          "verbatim": "1.20 ± 0.05"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.02281,
+            "reported_error": 0.0011200000000000001,
+            "verbatim": "22.81 ± 1.12"
+          },
+          "xylose_uptake": {
+            "value": 0.01253,
+            "reported_error": 0.00126,
+            "verbatim": "12.53 ± 1.26"
+          },
+          "arabinose_uptake": {
+            "value": 0.005980000000000001,
+            "reported_error": 0.00051,
+            "verbatim": "5.98 ± 0.51"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.0079,
+            "reported_error": 0.00061,
+            "verbatim": "7.90 ± 0.61"
+          },
+          "mannose_uptake": {
+            "value": 0.02174,
+            "reported_error": 0.0011200000000000001,
+            "verbatim": "21.74 ± 1.12"
+          },
+          "rhamnose_uptake": {
+            "value": 0.00211,
+            "reported_error": 0.00071,
+            "verbatim": "2.11 ± 0.71"
+          },
+          "oxygen_uptake": {
+            "value": 0.12940000000000002,
+            "reported_error": 0.0075,
+            "verbatim": "129.4 ± 7.5"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.1438,
+            "reported_error": 0.008,
+            "verbatim": "143.8 ± 8.0"
+          },
+          "biomass_rate": {
+            "value": 0.19380000000000003,
+            "reported_error": 0.0,
+            "verbatim": "193.8 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.0824,
+            "reported_error": 0.012,
+            "verbatim": "82.4 ± 12.0"
+          }
+        },
+        "quality_flags": []
+      },
+      {
+        "id": "lameiras_2017_mixed_D0.21",
+        "dilution_per_h": 0.21,
+        "biomass_gDW_L": {
+          "value": 2.01,
+          "reported_error": 0.14,
+          "verbatim": "2.01 ± 0.14"
+        },
+        "respiratory_quotient": {
+          "value": 1.16,
+          "reported_error": 0.04,
+          "verbatim": "1.16 ± 0.04"
+        },
+        "reconciled": {
+          "glucose_uptake": {
+            "value": 0.03139,
+            "reported_error": 0.00192,
+            "verbatim": "31.39 ± 1.92"
+          },
+          "xylose_uptake": {
+            "value": 0.01572,
+            "reported_error": 0.00217,
+            "verbatim": "15.72 ± 2.17"
+          },
+          "arabinose_uptake": {
+            "value": 0.005900000000000001,
+            "reported_error": 0.00076,
+            "verbatim": "5.90 ± 0.76"
+          },
+          "galacturonic_acid_uptake": {
+            "value": 0.00221,
+            "reported_error": 0.00107,
+            "verbatim": "2.21 ± 1.07"
+          },
+          "mannose_uptake": {
+            "value": 0.0256,
+            "reported_error": 0.00185,
+            "verbatim": "25.60 ± 1.85"
+          },
+          "rhamnose_uptake": {
+            "value": 0.0039700000000000004,
+            "reported_error": 0.0010600000000000002,
+            "verbatim": "3.97 ± 1.06"
+          },
+          "oxygen_uptake": {
+            "value": 0.1345,
+            "reported_error": 0.0092,
+            "verbatim": "134.5 ± 9.2"
+          },
+          "carbon_dioxide_release": {
+            "value": 0.1441,
+            "reported_error": 0.0094,
+            "verbatim": "144.1 ± 9.4"
+          },
+          "biomass_rate": {
+            "value": 0.2092,
+            "reported_error": 0.0,
+            "verbatim": "209.2 ± 0.0"
+          },
+          "unresolved_organic_carbon_release": {
+            "value": 0.1338,
+            "reported_error": 0.020399999999999998,
+            "verbatim": "133.8 ± 20.4"
+          }
+        },
+        "quality_flags": []
+      }
+    ],
+    "role": "External regime challenge and missing-mechanism diagnostics only. Conversion rates are reconciled using conservation and are not independent validation of elemental conservation.",
+    "dependence": "Same laboratory/strain; sequential mixed-substrate dilution conditions share a culture. This is not an independent laboratory or replicated longitudinal validation."
+  },
+  "raw_tables": {
+    "lameiras_2015": {
+      "Tab1": [
+        [
+          "Dilution rate (h−1)",
+          "0.043 ± 0.001",
+          "0.089 ± 0.001",
+          "0.134 ± 0.001",
+          "0.205 ± 0.003"
+        ],
+        [
+          "Effluent flow rate (mL/h)",
+          "193",
+          "402",
+          "599",
+          "922"
+        ],
+        [
+          "Residence time (h)",
+          "23.30",
+          "11.18",
+          "7.49",
+          "4.87"
+        ],
+        [
+          "Biomass concentration (gDW/Kgbroth)",
+          "3.02 ± 0.03",
+          "3.25 ± 0.04",
+          "3.38 ± 0.03",
+          "3.45 ± 0.05"
+        ],
+        [
+          "Morphology (100× amplification)",
+          "",
+          "",
+          "",
+          ""
+        ]
+      ],
+      "Tab2": [
+        [
+          "Dilution rate (h−1)",
+          "0.043",
+          "0.089",
+          "0.134",
+          "0.205"
+        ],
+        [
+          "Unreconciled",
+          "Reconciled",
+          "Unreconciled",
+          "Reconciled",
+          "Unreconciled",
+          "Reconciled",
+          "Unreconciled",
+          "Reconciled"
+        ],
+        [
+          "Carbon recovery (%)",
+          "101 ± 11",
+          "–",
+          "97 ± 13",
+          "–",
+          "98 ± 12",
+          "–",
+          "95 ± 12",
+          "–"
+        ],
+        [
+          "Redox recovery (%)",
+          "99 ± 6",
+          "–",
+          "97 ± 4",
+          "–",
+          "95 ± 3",
+          "–",
+          "92 ± 3",
+          "–"
+        ],
+        [
+          "qx (mCmol/h)/Cmol)",
+          "42.9 ± 12.4",
+          "42.9 ± 3.5",
+          "89.45 ± 28.3",
+          "89.5 ± 5.2",
+          "133.5 ± 39.4",
+          "133.5 ± 5.0",
+          "205.3 ± 59.3",
+          "205.3 ± 6.7"
+        ],
+        [
+          "qS (mmol/h)/Cmol",
+          "14.0 ± 2.9",
+          "14.2 ± 0.8",
+          "27.1 ± 6.1",
+          "25.5 ± 1.1",
+          "38.8 ± 8.1",
+          "37.23 ± 1.0",
+          "58.5 ± 11.9",
+          "52.96 ± 1.2"
+        ],
+        [
+          "\\documentclass[12pt]{minimal} \\usepackage{amsmath} \\usepackage{wasysym} \\usepackage{amsfonts} \\usepackage{amssymb} \\usepackage{amsbsy} \\usepackage{mathrsfs} \\usepackage{upgreek} \\setlength{\\oddsidemargin}{-69pt} \\begin{document}$${\\text{q}}_{{{\\text{o}}_{2} }}$$\\end{document}qo2 (mmol/h)/Cmol",
+          "33.1 ± 20.0",
+          "35.3 ± 2.2",
+          "54.4 ± 20.9",
+          "52.8 ± 2.5",
+          "78.0 ± 22.0",
+          "78.7 ± 2.8",
+          "106.5 ± 26.7",
+          "96.4 ± 3.2"
+        ],
+        [
+          "\\documentclass[12pt]{minimal} \\usepackage{amsmath} \\usepackage{wasysym} \\usepackage{amsfonts} \\usepackage{amssymb} \\usepackage{amsbsy} \\usepackage{mathrsfs} \\usepackage{upgreek} \\setlength{\\oddsidemargin}{-69pt} \\begin{document}$${\\text{q}}_{{{\\text{co}}_{2} }}$$\\end{document}qco2 (mmol/h)/Cmol",
+          "35.1 ± 11.6",
+          "36.6 ± 2.3",
+          "64.7 ± 25.0",
+          "55.5 ± 2.6",
+          "91.9 ± 33.9",
+          "82.6 ± 2.9",
+          "134.6 ± 50.3",
+          "102.4 ± 3.3"
+        ],
+        [
+          "qTOC (mCmol/h)/Cmol)",
+          "5.9 ± 2.7",
+          "5.9 ± 2.4",
+          "8.4 ± 4.2",
+          "8.1 ± 3.5",
+          "7.5 ± 3.5",
+          "7.3 ± 2.9",
+          "10.9 ± 5.0",
+          "10.1 ± 4.0"
+        ]
+      ]
+    },
+    "lameiras_2017": {
+      "Tab1": [
+        [
+          "Carbon source",
+          "RQ respiratory quotient",
+          "Carbon balance (%)",
+          "Degree of reduction balance (%)",
+          "Y X/S Biomass yield (CmolX/CmolS )",
+          "μ max max. growth rate (h−1)",
+          "q S max max.substrate uptake rate (molS h−1)/CmolX)",
+          "q O max max.o2 uptake rate (molO2h−1)/(CmolX)",
+          "q c max max.CO2 production rate (molCO2h−1)/CmolX)"
+        ],
+        [
+          "Glucose",
+          "1.03 ± 0.04",
+          "94 ± 2",
+          "94 ± 2",
+          "0.68 ± 0.03",
+          "0.221 ± 0.004",
+          "0.054 ± 0.001",
+          "0.101 ± 0.003",
+          "0.104 ± 0.003"
+        ],
+        [
+          "Xylose",
+          "1.02 ± 0.07",
+          "87 ± 2",
+          "83 ± 2",
+          "0.77 ± 0.06",
+          "0.149 ± 0.007",
+          "0.039 ± 0.002",
+          "0.044 ± 0.002",
+          "0.045 ± 0.002"
+        ],
+        [
+          "Arabinose",
+          "1.01 ± 0.04",
+          "98 ± 3",
+          "94 ± 5",
+          "0.47 ± 0.01",
+          "0.097 ± 0.001",
+          "0.041 ± 0.001",
+          "0.108 ± 0.003",
+          "0.109 ± 0.003"
+        ],
+        [
+          "Gal acid",
+          "1.53 ± 0.07",
+          "93 ± 4",
+          "88 ± 10",
+          "0.50 ± 0.06",
+          "0.092 ± 0.005",
+          "0.031 ± 0.001",
+          "0.060 ± 0.002",
+          "0.092 ± 0.003"
+        ],
+        [
+          "Mannose",
+          "1.00 ± 0.06",
+          "96 ± 2",
+          "92 ± 2",
+          "0.68 ± 0.03",
+          "0.151 ± 0.004",
+          "0.037 ± 0.001",
+          "0.072 ± 0.003",
+          "0.072 ± 0.003"
+        ],
+        [
+          "Rhamnose",
+          "0.79 ± 0.05",
+          "101 ± 5",
+          "96 ± 7",
+          "0.67 ± 0.03",
+          "0.116 ± 0.003",
+          "0.029 ± 0.001",
+          "0.072 ± 0.003",
+          "0.057 ± 0.003"
+        ]
+      ],
+      "Tab2": [
+        [
+          "Dilution rate (h−1)",
+          "0.04",
+          "0.06",
+          "0.08",
+          "0.09",
+          "0.11",
+          "0.13",
+          "0.14",
+          "0.16",
+          "0.17",
+          "0.19",
+          "0.21"
+        ],
+        [
+          "Biomass concentration (g DW/L broth)",
+          "4.30 ± 0.13",
+          "4.92 ± 0.06",
+          "5.03 ± 0.07",
+          "5.42 ± 0.14",
+          "5.15 ± 0.11",
+          "4.63 ± 0.16",
+          "4.63 ± 0.29",
+          "4.48 ± 0.30",
+          "4.44 ± 0.14",
+          "2.66 ± .017",
+          "2.01 ± 0.14"
+        ],
+        [
+          "RQ",
+          "1.03 ± 0.04",
+          "1.04 ± 0.04",
+          "1.07 ± 0.04",
+          "1.09 ± 0.04",
+          "1.10 ± 0.04",
+          "1.11 ± 0.04",
+          "1.14 ± 0.04",
+          "1.18 ± 0.04",
+          "1.19 ± 0.04",
+          "1.20 ± 0.05",
+          "1.16 ± 0.04"
+        ],
+        [
+          "Carbon balance (%)",
+          "92 ± 2",
+          "95 ± 1",
+          "94 ± 1",
+          "91 ± 2",
+          "92 ± 1",
+          "89 ± 2",
+          "92 ± 2",
+          "93 ± 3",
+          "98 ± 1",
+          "97 ± 2",
+          "99 ± 1"
+        ],
+        [
+          "Degree of reduction recovery (%)",
+          "86 ± 3",
+          "93 ± 2",
+          "88 ± 2",
+          "83 ± 3",
+          "87 ± 2",
+          "83 ± 2",
+          "87 ± 5",
+          "90 ± 3",
+          "97 ± 2",
+          "98 ± 2",
+          "102 ± 2"
+        ],
+        [
+          "q Glucose (mmol h−1)/CmolX",
+          "3.05 ± 0.07",
+          "4.00 ± 0.06",
+          "5.14 ± 0.09",
+          "5.22 ± 0.09",
+          "6.62 ± 0.11",
+          "7.08 ± 0.09",
+          "8.78 ± 0.17",
+          "10.32 ± 0.21",
+          "12.66 ± 0.30",
+          "22.81 ± 1.12",
+          "31.39 ± 1.92"
+        ],
+        [
+          "q Xylose (mmol h−1)/CmolX",
+          "3.67 ± 0.08",
+          "4.81 ± 0.07",
+          "6.19 ± 0.11",
+          "6.27 ± 0.11",
+          "7.91 ± 0.13",
+          "8.23 ± 0.11",
+          "10.09 ± 0.20",
+          "11.32 ± 0.25",
+          "11.41 ± 0.39",
+          "12.53 ± 1.26",
+          "15.72 ± 2.17"
+        ],
+        [
+          "q Arabinose (mmol h−1)/CmolX",
+          "3.67 ± 0.08",
+          "4.80 ± 0.07",
+          "6.16 ± 0.11",
+          "6.21 ± 0.11",
+          "7.56 ± 0.13",
+          "7.54 ± 0.10",
+          "9.25 ± 0.18",
+          "9.38 ± 0.20",
+          "8.50 ± 0.25",
+          "5.98 ± 0.51",
+          "5.90 ± 0.76"
+        ],
+        [
+          "q Gal acid (mmol h−1)/CmolX",
+          "2.80 ± 0.06",
+          "3.67 ± 0.06",
+          "4.70 ± 0.08",
+          "4.71 ± 0.09",
+          "5.83 ± 0.10",
+          "6.43 ± 0.10",
+          "7.46 ± 0.15",
+          "8.25 ± 0.18",
+          "8.56 ± 0.24",
+          "7.90 ± 0.61",
+          "2.21 ± 1.07"
+        ],
+        [
+          "q Mannose (mmol h−1)/CmolX",
+          "3.31 ± 0.07",
+          "4.34 ± 0.07",
+          "5.58 ± .010",
+          "5.65 ± 0.10",
+          "7.17 ± 0.12",
+          "7.66 ± 0.10",
+          "9.50 ± 0.18",
+          "11.05 ± 0.22",
+          "13.48 ± 0.32",
+          "21.74 ± 1.12",
+          "25.60 ± 1.85"
+        ],
+        [
+          "q Rhamnose (mmol h−1)/CmolX",
+          "3.35 ± 0.07",
+          "4.38 ± 0.07",
+          "5.59 ± 0.10",
+          "5.57 ± 0.10",
+          "6.07 ± 0.11",
+          "3.75 ± 0.09",
+          "3.24 ± 0.13",
+          "2.83 ± 0.14",
+          "1.75 ± 0.35",
+          "2.11 ± 0.71",
+          "3.97 ± 1.06"
+        ],
+        [
+          "qO2 (mmol h−1)/CmolX",
+          "57.8 ± 2.1",
+          "72.7 ± 1.7",
+          "93.9 ± 2.6",
+          "85.2 ± 2.8",
+          "97.1 ± 2.9",
+          "78.1 ± 1.1",
+          "93.3 ± 3.6",
+          "95.0 ± 3.8",
+          "99.3 ± 3.7",
+          "129.4 ± 7.5",
+          "134.5 ± 9.2"
+        ],
+        [
+          "qCO2 (mmol h−1)/CmolX",
+          "60.3 ± 2.1",
+          "76.1 ± 1.7",
+          "98.3 ± 2.6",
+          "89.9 ± 2.8",
+          "103.4 ± 2.9",
+          "86.5 ± 1.2",
+          "103.8 ± 3.7",
+          "3.7 ± 3.9",
+          "112.6 ± 3.9",
+          "143.8 ± 8.0",
+          "144.1 ± 9.4"
+        ],
+        [
+          "q X (mmol h−1)/CmolX",
+          "42.5 ± 0.0",
+          "59.1 ± 0.0",
+          "76.6 ± 0.0",
+          "93.5 ± 0.0",
+          "109.7 ± 0.0",
+          "127.4 ± 0.0",
+          "143.9 ± 0.0",
+          "159.7 ± 0.0",
+          "172.0 ± 0.0",
+          "193.8 ± 0.0",
+          "209.2 ± 0.0"
+        ],
+        [
+          "q TOC (mmol h−1)/CmolX",
+          "8.9 ± 0.2",
+          "11.1 ± 0.2",
+          "12.9 ± 0.2",
+          "5.9 ± 0.1",
+          "18.3 ± 0.5",
+          "14.4 ± 0.8",
+          "22.9 ± 1.2",
+          "1.2 ± 1.9",
+          "33.7 ± 3.6",
+          "82.4 ± 12.0",
+          "133.8 ± 20.4"
+        ]
+      ]
+    }
+  }
+}
