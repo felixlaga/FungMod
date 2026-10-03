@@ -272,7 +272,9 @@ class NonidealReversibleThermodynamics:
             raise ValueError("forward_rate must be a finite nonnegative scalar quantity.")
         evaluation = self.evaluate(state)
         reverse = rate * evaluation.reverse_to_forward_ratio
-        net = rate - reverse
+        rt = (_finite_value(self.gas_constant, "joule / mole / kelvin")
+              * evaluation.temperature_kelvin)
+        net = rate * (-np.expm1(evaluation.delta_gibbs / rt))
         return net, replace(
             evaluation,
             forward_rate=float(rate.magnitude),

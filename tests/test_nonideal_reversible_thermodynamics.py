@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from dataclasses import replace
 
 from fungal_model.chemistry import (
     DETAILED_BALANCE_RATE_RATIO_SOURCE,
@@ -18,6 +19,15 @@ from fungal_model.core.units import Q_
 
 
 SOURCE = f"{IUPAC_ACTIVITY_COEFFICIENT_SOURCE}; {DETAILED_BALANCE_RATE_RATIO_SOURCE}"
+
+
+def test_near_equilibrium_flux_does_not_cancel_to_zero():
+    model = replace(_thermodynamics(), standard_delta_gibbs=_parameter(
+        "tiny artificial affinity", "delta_g_0", -1e-15, "joule/mole"))
+    net, evaluation = model.net_rate(Q_(1, "mole/liter/second"),
+                                     {"A": Q_(1, "mole/liter"), "B": Q_(1, "mole/liter")})
+    assert evaluation.reverse_to_forward_ratio == 1  # ordinary subtraction would lose the flux
+    assert net.magnitude == pytest.approx(1e-15/(8.31446261815324*298.15), rel=1e-12, abs=0)
 
 
 def test_explicit_nonideal_coefficients_shift_gibbs_by_rt_log_gamma_ratio() -> None:
