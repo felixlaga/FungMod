@@ -31,6 +31,47 @@ The current PR queue and reconciled scoped phase status are tracked in
 
 # Current project status
 
+2026-10-03: DIGESTION-001 couples explicitly balanced protein secretion,
+extracellular hydrolysis and enzyme inactivation to conserved resource-limited
+physiology. Seven pools share one post-maintenance substrate budget, with
+analytic Jacobians, open-system ledgers, thresholds and explicit sensitivity.
+A new primary Table 1 supports two retrospective entire-strain holdout folds
+for total protein output. It does not calibrate active enzyme abundance or
+validate full-culture dynamics. See `docs/degrading-culture.md`.
+Next: recover matched time-course biomass, nutrients, gas and absolute active
+protein data (Pakula 2016 is a candidate), resolve observation mappings and
+induction/storage before adding hyphal tips and spatial geometry. Existing
+Cartesian transport is not yet a moving fungal morphology model.
+
+2026-10-03: RESPIRATION-001 adds opt-in conserved biomass synthesis and substrate
+maintenance, oxygen/nitrogen-limited batch/chemostat dynamics, explicit gas and
+reservoir exchanges, and unavailable-energy/unsupported-viability boundaries.
+Two new primary A. niger articles support a four-condition unreconciled-rate
+holdout and separately labelled external/mixed-substrate challenges. Maintenance
+improves within-study uptake prediction, but external gas prediction remains
+poor. This is a bounded physiological component, not an empirically validated
+whole fungus or automatic secretion coupling. See `docs/respiration-benchmark.md`.
+Next: matched dynamic resource/respiration/secretion data, resolved organic-carbon
+composition, uncertainty and regulatory uptake before integrating morphology.
+
+2026-10-03: SOLVER-THERMO-002 adds shared state-specific numerical controls,
+explicit integration failures, sparse spatial Jacobians, and a coupled closed
+ideal-dilute detailed-balance network with independent free-energy equilibrium.
+A four-solver replay of 33 frozen Gelain holdouts resolves one BDF depletion
+failure but leaves the substantially larger model-data discrepancy explicit.
+This is numerical/physical-law verification, not biological validation or a
+thermodynamic culture model. See `docs/solver-thermodynamic-audit.md` and
+`progress.md`; matched thermochemistry, raw replicates and reduced model
+identifiability remain next research requirements.
+
+2026-10-03: THERMO-BASE-001 adds a low-level conservation-law macrochemical
+balance and entropy budget in `fungal_model.chemistry`. It solves overall
+exchange stoichiometry from element and charge conservation and forms reaction
+energies and entropy production from sourced formation energies. It is a
+constraint layer only: no rate, yield estimate, organism record, or configured
+coupling is added. Next: opt-in coupling into the whole-fungus model; see
+`progress.md`.
+
 2026-09-28: CULTURE-BENCHMARK-002 extends that study with all 144 post-initial
 observations, seven model/family combinations, 33 whole-condition holdouts,
 activity and retained dry-mass observation models, covariance/censoring support,
