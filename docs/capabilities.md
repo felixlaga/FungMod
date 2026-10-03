@@ -25,6 +25,8 @@ resolve parameter identifiability or supply independent empirical evidence.
 | Capability | Status | Boundary |
 | --- | --- | --- |
 | Well-mixed process ODEs | Implemented | Unsupported geometry fails before execution. |
+| Per-state numerical tolerances and sparse spatial Jacobians | Implemented across main engines and joint culture research API | Explicit units and complete state coverage; failed/incomplete runs reject; local numerical error control is not measurement uncertainty. See [audit](solver-thermodynamic-audit.md). |
+| Coupled detailed-balance networks and free-energy equilibrium | Implemented and software-tested | Closed ideal-dilute fixed-volume isothermal elementary mass action; sourced formation energies and kinetics required. Zero-concentration entropy diagnostics are unavailable; no organism validation. |
 | First-order, mass-action, homogeneous Michaelis-Menten | Implemented | Homogeneous Michaelis-Menten is dissolved-substrate kinetics. |
 | Surface adsorption/catalysis | Implemented, generic framework | Substrate-specific accessibility and morphology remain scoped. |
 | Linear, branching, and cyclic enzyme pathways | Implemented and software-verified | Broad provenance-backed pathway biology remains partial. |
@@ -33,9 +35,12 @@ resolve parameter identifiability or supply independent empirical evidence.
 | Competitive and Haldane substrate inhibition | Implemented with provenance/maturity contracts | Framework values are artificial; the five-enzyme showcase uses separately labelled literature-reported inputs but remains unvalidated. |
 | Coupled hydrolysis and substrate transglycosylation | Implemented as a generic process law with one provenance-backed fungal-enzyme configuration | The transfer-product pool is unresolved; no product-linkage assignment, re-hydrolysis, or whole-fungus claim is made. |
 | Minimal well-mixed fungal process coupling | Implemented and software-tested | Caller-supplied degradation, capability, assimilation, secretion, uptake, yield, and maintenance inputs remain exploratory; no organism-specific physiology or validation is bundled. |
+| Conserved growth and substrate maintenance respiration | Opt-in advanced API, software-tested | Balanced growth/maintenance pathways, oxygen/nitrogen-limited batch/chemostat dynamics, gas transfer and open exchange ledger. Missing kinetic parameters remain explicit; no death or regulation. See [new-data comparison](respiration-benchmark.md). |
+| Conserved secretion–digestion–growth feedback | Opt-in advanced API, software-tested | Seven pools share balanced growth, maintenance, protein synthesis, hydrolysis and inactivation. Explicit allocation, chemistry, kinetic parameters, analytic Jacobians and batch thresholds. No empirically validated whole fungus, default parameters, dynamic regulation or spatial morphology. See [integrated model](degrading-culture.md). |
 | Dynamic single-process thermodynamic constraints | Implemented | Configured enforcement remains ideal-dilute and forward-rate blocking. |
 | Haldane relations linking kinetic parameters to equilibrium | Implemented | Uni-uni reversible Michaelis-Menten only; multi-substrate reactions are rejected rather than approximated. Constrains parameters and detects thermodynamically impossible sets; supplies no rate. |
 | Gibbs-energy biomass yield ceiling | Implemented and wired into fungal coupling | An upper bound assuming reversible zero-dissipation growth, not an estimate. Both Gibbs energies must be sourced; the bound is opt-in and inverts no existing behaviour. |
+| Conservation-law macrochemical balance and entropy budget | Implemented and software-tested as a low-level chemistry API | Solves the unfixed coefficients of an overall conversion from element and charge conservation, then forms reaction Gibbs energy, enthalpy, entropy production, and the heat/matter entropy split from sourced formation energies. Underdetermined or inconsistent balances fail closed. Compositions, formation energies, yield or dissipation, and the extent rate are caller inputs; energies are used as given for their declared conditions. No rate, no yield estimate, no extremal entropy principle, and no coupling into configured or whole-fungus models yet. |
 | Genome-derived enzymatic capability resolution | Implemented | CAZy family to enzyme-class join from an offline dbCAN annotation. Presence and absence only: no rate, kinetic constant, expression level, or secretion claim. Polyspecific families are reported separately from diagnostic ones. |
 | Constant-coefficient nonideal reversible thermodynamics | Implemented as a separate low-level API | Coefficients and the forward kinetic scale must be sourced; no electrolyte model or configured assembly is inferred. |
 | 1D and uniform Cartesian 2D/3D reaction diffusion | Implemented and software-tested | No irregular mesh, porous morphology, moving boundary, or empirical spatial validation. |
@@ -56,6 +61,8 @@ resolve parameter identifiability or supply independent empirical evidence.
 | Three independent literature sources, seven series, four enzyme preparations | Implemented | Alvarez-Gonzalez 2022 (60 min), Ariaeenejad 2020 (380 h), Cao 2015 (10 h). Only the first supplies additional conditions for within-source prediction; the other two support exploratory fitting, not predictive validation. |
 | Whole-culture biomass/substrate benchmark | Six Gelain 2020 conditions; source-model projection and fitted effective growth/loss hypothesis | 96 non-initial observations for T. harzianum P49P11, six retrospective condition holdouts plus weighting sensitivity. Missing replicate errors, substantial cellulose prediction errors; no validated organism model. See [benchmark](gelain-culture-benchmark.md). |
 | Public secretome source intake | Novy 2021 workbook preserved | Endpoint normalized spectra for T. reesei QM6a support composition review, not absolute enzyme concentration, secretion rates or kinetic parameters. |
+| A. niger growth/respiration source intake and holdouts | Two primary articles preserved and checksummed | Four unreconciled chemostat conditions support bounded exchange-rate holdouts; six single-substrate and eleven mixed-substrate conditions provide separately labelled references/gap diagnostics. External batch transfer fails; reconciled rates do not independently validate conservation. |
+| A. niger extracellular protein output | One additional primary article, four group means and reported SDs | Entire-strain holdouts compare pooled versus carbon-source-dependent ratios at a supplied growth rate. Sequential substrate conditions share cultures. Total protein is not active enzyme; component evidence does not calibrate the integrated degradation model. |
 | Cross-source exploratory fits with numerical diagnostics | Implemented | Fits five selected series and reports convergence attempts, bound proximity, and Jacobian conditioning for both candidate models. Local diagnostics do not establish identifiability, structural adequacy, or a biological mechanism. |
 | Monte Carlo, local, and global sensitivity | Implemented | Global indices assume independent explicit input distributions; no empirical biological distribution is supplied. |
 
@@ -71,8 +78,10 @@ resolve parameter identifiability or supply independent empirical evidence.
   which depends on an enzyme's activation barrier: two enzymes catalysing one
   reaction share an equilibrium constant exactly while differing in maximal rate
   by orders of magnitude;
-- resolved whole-fungus secretion, uptake, regulation, transporters, toxicity,
-  respiration, and intracellular metabolism;
+- an integrated whole-fungus model of secretion, uptake, regulation, transporters,
+  toxicity, respiration and intracellular metabolism. The new opt-in
+  macrochemical APIs now couple growth, respiration, secretion and hydrolysis,
+  but lack validated regulatory, intracellular and spatial physiology;
 - publication-grade calibration and broad external validation;
 - predictive validation on the second and third literature sources. Each of
   those provides a single condition per enzyme, so the model can be fitted to
