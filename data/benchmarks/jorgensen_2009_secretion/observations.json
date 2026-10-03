@@ -1,0 +1,344 @@
+{
+  "schema_version": 1,
+  "doi": "10.1186/1471-2164-10-44",
+  "organism": "Aspergillus niger",
+  "attribution": "Jorgensen, Goosen, van den Hondel, Ram and Iversen (2009), BMC Genomics 10:44, Table 1.",
+  "license": "CC-BY-2.0",
+  "license_url": "https://creativecommons.org/licenses/by/2.0/",
+  "conditions": {
+    "temperature_K": 303.15,
+    "pH": 3.0,
+    "nominal_dilution_per_h": 0.16,
+    "dissolved_oxygen": ">40% air saturation",
+    "morphology": "Dispersed filamentous hyphae"
+  },
+  "uncertainty": "Reported SD of triplicate independent steady-state measurements, not SEM or confidence intervals. Raw replicates and cross-condition covariances are unavailable.",
+  "dependence": "Three cultures per strain; xylose then maltose sequentially in each culture. Four group means summarize 12 steady states in six culture runs, not 12 independent culture runs.",
+  "role": "Retrospective strain-held-out test of total extracellular protein output conditional on supplied growth rate and carbon source. Not validation of enzyme activity, secretion dynamics or whole-culture degradation.",
+  "limitations": [
+    "One growth rate cannot identify growth-associated versus non-growth-associated secretion.",
+    "Protein mass is not catalytic activity. Protein composition, active fraction and biosynthetic yield are unresolved.",
+    "Net extracellular protein output need not equal biosynthesis if unmeasured degradation/retention occurs.",
+    "Residual maltose is in glucose equivalents; no conversion to maltose concentration is silently applied.",
+    "Published significance markers are preserved; no significance test is rerun from group means."
+  ],
+  "transformations": "Table 1 XML text to numeric means and SDs. Blank carbon-source cells inherit preceding source. Growth rate 0.16/h is nominal dilution from Methods; no reported units are changed.",
+  "records": [
+    {
+      "id": "jorgensen_2009_AB94-85_xylose",
+      "strain": "AB94-85",
+      "carbon_source": "xylose",
+      "growth_rate_per_h": 0.16,
+      "replicates": 3,
+      "biomass_gDW_kg": {
+        "value": 4.06,
+        "sd": 0.07,
+        "verbatim": "4.06 ± 0.07",
+        "published_significance_marker": null
+      },
+      "residual_substrate_uM": {
+        "value": 233.0,
+        "sd": 6.0,
+        "verbatim": "233 ± 6",
+        "published_significance_marker": null
+      },
+      "biomass_yield_gDW_g_substrate": {
+        "value": 0.54,
+        "sd": 0.02,
+        "verbatim": "0.54 ± 0.02",
+        "published_significance_marker": null
+      },
+      "biomass_yield_gDW_g_carbon": {
+        "value": 1.35,
+        "sd": 0.04,
+        "verbatim": "1.35 ± 0.04",
+        "published_significance_marker": null
+      },
+      "carbon_dioxide_mmol_gDW_h": {
+        "value": 3.4,
+        "sd": 0.11,
+        "verbatim": "3.40 ± 0.11",
+        "published_significance_marker": null
+      },
+      "oxygen_mmol_gDW_h": {
+        "value": 3.36,
+        "sd": 0.14,
+        "verbatim": "3.36 ± 0.14",
+        "published_significance_marker": null
+      },
+      "respiratory_quotient": {
+        "value": 1.01,
+        "sd": 0.02,
+        "verbatim": "1.01 ± 0.02",
+        "published_significance_marker": null
+      },
+      "extracellular_protein_mg_gDW_h": {
+        "value": 0.68,
+        "sd": 0.01,
+        "verbatim": "0.68 ± 0.01",
+        "published_significance_marker": null
+      },
+      "carbon_recovery_percent": {
+        "value": 98.0,
+        "sd": 2.0,
+        "verbatim": "98 ± 2",
+        "published_significance_marker": null
+      }
+    },
+    {
+      "id": "jorgensen_2009_ABGT1026_xylose",
+      "strain": "ABGT1026",
+      "carbon_source": "xylose",
+      "growth_rate_per_h": 0.16,
+      "replicates": 3,
+      "biomass_gDW_kg": {
+        "value": 3.96,
+        "sd": 0.07,
+        "verbatim": "3.96 ± 0.07",
+        "published_significance_marker": null
+      },
+      "residual_substrate_uM": {
+        "value": 256.0,
+        "sd": 18.0,
+        "verbatim": "256 ± 18",
+        "published_significance_marker": null
+      },
+      "biomass_yield_gDW_g_substrate": {
+        "value": 0.53,
+        "sd": 0.01,
+        "verbatim": "0.53 ± 0.01",
+        "published_significance_marker": null
+      },
+      "biomass_yield_gDW_g_carbon": {
+        "value": 1.32,
+        "sd": 0.03,
+        "verbatim": "1.32 ± 0.03",
+        "published_significance_marker": null
+      },
+      "carbon_dioxide_mmol_gDW_h": {
+        "value": 3.41,
+        "sd": 0.1,
+        "verbatim": "3.41 ± 0.10",
+        "published_significance_marker": null
+      },
+      "oxygen_mmol_gDW_h": {
+        "value": 3.42,
+        "sd": 0.1,
+        "verbatim": "3.42 ± 0.10",
+        "published_significance_marker": null
+      },
+      "respiratory_quotient": {
+        "value": 1.0,
+        "sd": 0.01,
+        "verbatim": "1.00 ± 0.01",
+        "published_significance_marker": null
+      },
+      "extracellular_protein_mg_gDW_h": {
+        "value": 0.72,
+        "sd": 0.02,
+        "verbatim": "0.72 ± 0.02",
+        "published_significance_marker": null
+      },
+      "carbon_recovery_percent": {
+        "value": 101.0,
+        "sd": 3.0,
+        "verbatim": "101 ± 3",
+        "published_significance_marker": null
+      }
+    },
+    {
+      "id": "jorgensen_2009_AB94-85_maltose",
+      "strain": "AB94-85",
+      "carbon_source": "maltose",
+      "growth_rate_per_h": 0.16,
+      "replicates": 3,
+      "biomass_gDW_kg": {
+        "value": 3.68,
+        "sd": 0.08,
+        "verbatim": "3.68 ± 0.08*",
+        "published_significance_marker": "*"
+      },
+      "residual_substrate_uM": {
+        "value": 160.0,
+        "sd": 5.0,
+        "verbatim": "160 ± 5",
+        "published_significance_marker": null
+      },
+      "biomass_yield_gDW_g_substrate": {
+        "value": 0.52,
+        "sd": 0.01,
+        "verbatim": "0.52 ± 0.01",
+        "published_significance_marker": null
+      },
+      "biomass_yield_gDW_g_carbon": {
+        "value": 1.23,
+        "sd": 0.03,
+        "verbatim": "1.23 ± 0.03*",
+        "published_significance_marker": "*"
+      },
+      "carbon_dioxide_mmol_gDW_h": {
+        "value": 2.92,
+        "sd": 0.05,
+        "verbatim": "2.92 ± 0.05*",
+        "published_significance_marker": "*"
+      },
+      "oxygen_mmol_gDW_h": {
+        "value": 3.38,
+        "sd": 0.14,
+        "verbatim": "3.38 ± 0.14",
+        "published_significance_marker": null
+      },
+      "respiratory_quotient": {
+        "value": 0.87,
+        "sd": 0.05,
+        "verbatim": "0.87 ± 0.05*",
+        "published_significance_marker": "*"
+      },
+      "extracellular_protein_mg_gDW_h": {
+        "value": 1.98,
+        "sd": 0.28,
+        "verbatim": "1.98 ± 0.28*",
+        "published_significance_marker": "*"
+      },
+      "carbon_recovery_percent": {
+        "value": 101.0,
+        "sd": 1.0,
+        "verbatim": "101 ± 1",
+        "published_significance_marker": null
+      }
+    },
+    {
+      "id": "jorgensen_2009_ABGT1026_maltose",
+      "strain": "ABGT1026",
+      "carbon_source": "maltose",
+      "growth_rate_per_h": 0.16,
+      "replicates": 3,
+      "biomass_gDW_kg": {
+        "value": 3.68,
+        "sd": 0.12,
+        "verbatim": "3.68 ± 0.12*",
+        "published_significance_marker": "*"
+      },
+      "residual_substrate_uM": {
+        "value": 158.0,
+        "sd": 24.0,
+        "verbatim": "158 ± 24",
+        "published_significance_marker": null
+      },
+      "biomass_yield_gDW_g_substrate": {
+        "value": 0.52,
+        "sd": 0.02,
+        "verbatim": "0.52 ± 0.02",
+        "published_significance_marker": null
+      },
+      "biomass_yield_gDW_g_carbon": {
+        "value": 1.23,
+        "sd": 0.04,
+        "verbatim": "1.23 ± 0.04*",
+        "published_significance_marker": "*"
+      },
+      "carbon_dioxide_mmol_gDW_h": {
+        "value": 2.84,
+        "sd": 0.17,
+        "verbatim": "2.84 ± 0.17*",
+        "published_significance_marker": "*"
+      },
+      "oxygen_mmol_gDW_h": {
+        "value": 3.57,
+        "sd": 0.27,
+        "verbatim": "3.57 ± 0.27",
+        "published_significance_marker": null
+      },
+      "respiratory_quotient": {
+        "value": 0.8,
+        "sd": 0.1,
+        "verbatim": "0.80 ± 0.10*",
+        "published_significance_marker": "*"
+      },
+      "extracellular_protein_mg_gDW_h": {
+        "value": 1.69,
+        "sd": 0.24,
+        "verbatim": "1.69 ± 0.24*",
+        "published_significance_marker": "*"
+      },
+      "carbon_recovery_percent": {
+        "value": 97.0,
+        "sd": 2.0,
+        "verbatim": "97 ± 2",
+        "published_significance_marker": null
+      }
+    }
+  ],
+  "raw_table": [
+    [
+      "C-source",
+      "Strain",
+      "Cbiomass(gDW kg-1)",
+      "Cxylose/maltose †(μM)",
+      "Yx/s(gDW gsubstrate-1)",
+      "Yx/C(gDWgcarbon-1)",
+      "qCO2(mmol g-1 h-1)",
+      "qO2(mmol g-1h-1)",
+      "RQ",
+      "qprotein-EC(mg g-1 h-1)",
+      "C-recovery(%)"
+    ],
+    [
+      "Xylose",
+      "AB94-85",
+      "4.06 ± 0.07",
+      "233 ± 6",
+      "0.54 ± 0.02",
+      "1.35 ± 0.04",
+      "3.40 ± 0.11",
+      "3.36 ± 0.14",
+      "1.01 ± 0.02",
+      "0.68 ± 0.01",
+      "98 ± 2"
+    ],
+    [
+      "",
+      "ABGT1026",
+      "3.96 ± 0.07",
+      "256 ± 18",
+      "0.53 ± 0.01",
+      "1.32 ± 0.03",
+      "3.41 ± 0.10",
+      "3.42 ± 0.10",
+      "1.00 ± 0.01",
+      "0.72 ± 0.02",
+      "101 ± 3"
+    ],
+    [
+      "Maltose",
+      "AB94-85",
+      "3.68 ± 0.08*",
+      "160 ± 5",
+      "0.52 ± 0.01",
+      "1.23 ± 0.03*",
+      "2.92 ± 0.05*",
+      "3.38 ± 0.14",
+      "0.87 ± 0.05*",
+      "1.98 ± 0.28*",
+      "101 ± 1"
+    ],
+    [
+      "",
+      "ABGT1026",
+      "3.68 ± 0.12*",
+      "158 ± 24",
+      "0.52 ± 0.02",
+      "1.23 ± 0.04*",
+      "2.84 ± 0.17*",
+      "3.57 ± 0.27",
+      "0.80 ± 0.10*",
+      "1.69 ± 0.24*",
+      "97 ± 2"
+    ]
+  ],
+  "table_footnotes": [
+    "Steady state results of chemostat cultures with xylose or maltose as growth-limiting substrates. Standard deviations ( ± ) are given for mean values of triplicate independent steady state results. Cbiomass, dryweight biomass concentration; Cxylose/maltose, concentration of substrate (NB: maltose as glucose equivalents); Yxs, growth yield on substrate; YxC, growth yield on substrate carbon; qCO2, specific carbon dioxide evolution rate; qO2, specific oxygen consumption rate; RQ, respiratory quotient calculated as the ratio of CO2 production and O2 consumption rates; qprotein-EC, specific production rate of extracellular protein; C-recovery, carbon recovery. Two-tailed t-tests were used to evaluate significance (p < 0.05) of differences in each column (except substrate concentration and carbon recovery).",
+    "* results are significantly different from unmarked results in the same column.",
+    "† substrate concentration on maltose is given as concentration of glucose released into filtrate after incubation with α-glucosidase."
+  ]
+}

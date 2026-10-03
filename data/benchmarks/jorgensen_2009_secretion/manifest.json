@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "doi": "10.1186/1471-2164-10-44",
+  "license": "CC-BY-2.0",
+  "retrieved_on": "2026-10-03",
+  "files": [
+    {
+      "path": "PMC2639373.xml",
+      "bytes": 184085,
+      "sha256": "3cb587fbc657660316ee76250142414c133558c45a05a53a0b6bcf296414a1be",
+      "role": "primary_article_xml"
+    },
+    {
+      "path": "observations.json",
+      "bytes": 10954,
+      "sha256": "eaf65115770370400112ef1c20de68a481350010b794c5036041c9a417b22250",
+      "role": "deterministic_table_extract"
+    }
+  ],
+  "extractor": "scripts/prepare_secretion_data.py",
+  "primary_xml_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC2639373/fullTextXML"
+}
