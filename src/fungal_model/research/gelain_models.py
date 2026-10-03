@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 import numpy as np
-from scipy.integrate import solve_ivp
+from fungal_model.core.numerics import IntegrationError, SolverSettings, solve_checked
 
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.provenance import has_text
@@ -106,7 +106,8 @@ class CultureModelPrediction:
 
 
 def _integrate(model: str, family: str, times: np.ndarray, initial: np.ndarray, p: Mapping[str, float], *,
-               method: str, rtol: float, atol: float) -> tuple[np.ndarray, np.ndarray | None, dict]:
+               method: str, rtol: float, atol: float,
+               solver_settings: SolverSettings | None = None) -> tuple[np.ndarray, np.ndarray | None, dict]:
     """Canonical numeric kernel shared by public simulation and calibration."""
     if method not in {"LSODA", "DOP853", "Radau", "BDF"} or not 0 < rtol < 1 or not 0 < atol < 1:
         raise CultureBenchmarkError("Explicit supported solver and finite positive tolerances are required.")
@@ -165,24 +166,47 @@ def _integrate(model: str, family: str, times: np.ndarray, initial: np.ndarray, 
             rates += [p["qF"]*x*induction - p["kF"]*f, p["qB"]*x*induction - p["kB"]*b]
         return rates
 
-    solution = solve_ivp(rhs, (0.0, float(times[-1])), y0, t_eval=times, method=method, rtol=rtol, atol=atol)
+    state_units = {"biomass": "gram/liter", "substrate": "gram/liter"}
+    if retained:
+        state_units["retained_mass"] = "gram/liter"
+    elif model == "published" and cellulose:
+        state_units["induction"] = "dimensionless"
+    if cellulose:
+        state_units.update({k: OBSERVABLE_UNITS[k] for k in ("cellulase_activity", "beta_glucosidase_activity")})
+    settings = solver_settings or SolverSettings(method=method, rtol=rtol, atol=atol)
+    options = settings.scipy_options(state_units, "hour")
+    absolute = np.broadcast_to(np.asarray(options["atol"], dtype=float), (len(y0),))
+    try:
+        solution = solve_checked(rhs, (0.0, float(times[-1])), y0, t_eval=times, **options)
+    except IntegrationError as error:
+        raise CultureBenchmarkError(str(error)) from error
     state = np.asarray(solution.y, dtype=float)
     if not solution.success or state.shape != (len(y0), len(times)) or not np.all(np.isfinite(state)):
         raise CultureBenchmarkError(f"Invalid/incomplete culture integration: {solution.message}")
-    if np.any(state < -10*atol):
-        raise CultureBenchmarkError("Materially negative culture states.")
+    if np.any(state < -10*absolute[:, None]):
+        raise CultureBenchmarkError(f"Materially negative culture states: minimum={state.min():.6g}.")
     mass = state[0] + state[2] if retained else state[0]
     columns = [mass, state[1]] + ([state[activity_offset], state[activity_offset+1]] if cellulose else [])
     return np.column_stack(columns), state[2] if retained else None, {
-        "method": method, "rtol": rtol, "atol_in_canonical_observable_units": atol,
+        "method": settings.method, "rtol": settings.rtol, "atol_in_canonical_observable_units": (
+            atol if solver_settings is None else absolute.tolist()),
+        **({"settings": settings.to_dict(), "state_order": list(state_units)} if solver_settings is not None else {}),
         "nfev": int(solution.nfev), "minimum_state": float(state.min()),
         "negative_roundoff_count": int(np.sum(state < 0)), "success": True}
 
 
 def simulate_candidate(design: CultureDesign, initial_activities: Mapping[str, Quantity], parameters: ParameterSet, *,
                        model: str, hypothesis_source: str, method: str = "LSODA", rtol: float = 1e-8,
-                       atol: float = 1e-10) -> CultureModelPrediction:
-    """Predict dry mass and assay activities; no viable-biomass output is emitted."""
+                       atol: float = 1e-10, solver_settings: SolverSettings | None = None) -> CultureModelPrediction:
+    """Predict dry mass and assay activities; no viable-biomass output is emitted.
+
+    Optional SolverSettings supplies named unit-bearing tolerances and step
+    controls. It cannot be combined with nondefault legacy solver arguments.
+    State names are biomass, substrate, optional retained_mass or dimensionless
+    induction, and the two named activities (when present).
+    """
+    if solver_settings is not None and (method, rtol, atol) != ("LSODA", 1e-8, 1e-10):
+        raise CultureBenchmarkError("Use solver_settings or legacy method/rtol/atol, not both.")
     if not has_text(hypothesis_source):
         raise CultureBenchmarkError("Explicit model-hypothesis provenance is required.")
     units = parameter_units(model, design.family)
@@ -213,7 +237,7 @@ def simulate_candidate(design: CultureDesign, initial_activities: Mapping[str, Q
             raise CultureBenchmarkError("Initial activity exceeds the source capacity.")
     times = np.asarray(design.times.to("hour").magnitude)
     values, retained, solver = _integrate(model, design.family, times, np.asarray(initial), p,
-                                        method=method, rtol=rtol, atol=atol)
+                                        method=method, rtol=rtol, atol=atol, solver_settings=solver_settings)
     return CultureModelPrediction(Q_(times, "hour"), {k: Q_(values[:, i], OBSERVABLE_UNITS[k]) for i, k in enumerate(names)},
                                   Q_(retained, "gram/liter") if retained is not None else None,
                                   model, hypothesis_source, solver)
