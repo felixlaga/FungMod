@@ -26,6 +26,435 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## DIGESTION-001 Conserved Secretion And Extracellular Digestion
+
+Date: 2026-10-03
+
+Status: implemented for the explicitly exploratory coupled mechanism and bounded
+protein-output comparison. Full fungal physiology and organism validation remain open.
+
+Changed:
+
+- Added `fungi/degradation.py`: seven chemically declared pools couple growth,
+  substrate maintenance, protein synthesis, extracellular hydrolysis and
+  inactivation. Growth and secretion share one post-maintenance uptake budget.
+  Active/inactive protein preserves atoms/charge, and all feed, respiratory and
+  reservoir exchanges have integrated ledgers. Batch degradation thresholds
+  reject flowing cultures and retain unreached values as null. Formula-mass
+  allocation conversion requires explicit yields and an observation mapping.
+- Added analytic piecewise Jacobians to the integrated model and existing
+  resource-limited respiration. A 33-point parameter sweep initially failed
+  with `IntegrationError: RHS returned invalid shape or nonfinite derivatives
+  at time 46.118755793777986.` SciPy BDF finite-difference Jacobian perturbations
+  overflowed in non-feedback ledger states. Analytic derivatives eliminate the
+  unnecessary perturbations; tolerances and biology were not altered to hide
+  the failure. The failed preview folder is retained separately from completed
+  results. Independent finite differences verify the full augmented Jacobians.
+- Added `research/secretion_benchmark.py`, an explicit illustrative chemical
+  assembly, offline extraction and benchmark scripts, plus four reproducible
+  plots. The new Jorgensen 2009 primary XML (doi:10.1186/1471-2164-10-44,
+  CC-BY-2.0) and all Table 1 rows retain hashes, original values, SDs, units,
+  footnotes, sequential-culture dependence and provenance.
+- Updated README, capability boundaries, active roadmap, changelog, package
+  manifest and MkDocs navigation. Detailed mechanism, limits, commands and
+  compatibility are in `docs/degrading-culture.md`.
+
+Results:
+
+- Holding out each entire strain, including both carbon conditions, gives
+  protein-output RMSE 0.586931 for a pooled effective ratio versus 0.207002
+  mg/(g dry biomass h) for carbon-source-dependent ratios (64.7% reduction).
+  Nominal growth 0.16/h and carbon-source identity are supplied predictors.
+  Four group means summarize 12 steady states in six culture runs. Only two
+  strain folds exist; the more flexible comparator has two coefficients versus
+  one and one training mean per carbon per fold. Neither the growth-associated
+  mechanism nor a non-growth intercept is identified. SDs are retained, not
+  treated as confidence intervals or independent likelihood weights.
+- Four illustrative coupled scenarios close the open atom/charge ledger to
+  3.35e-15 mol/L; maximum BDF/tighter-Radau pool difference is 3.01e-10 mol/L.
+  Software tests also cover LSODA and DOP853. Zero secretion with no initial
+  active enzyme gives no polymer conversion. Oxygen/nitrogen limitation can
+  leave released sugar unused while extracellular hydrolysis continues.
+- The allocation sweep covers 33 fractions. More secretion speeds digestion
+  but reduces final biomass under these assumptions. Nine explicit catalytic
+  capacity/inactivation combinations give 90% removal times 5.02–46.56 h.
+  These are illustrative sensitivity results, not empirical forecasts, a
+  confidence interval, fitted kinetics or a demonstrated biological optimum.
+- Completed artifacts: `outputs/degrading-culture-2026-10-03-final/`.
+  All four plots were visually inspected. All 191 source hashes and nine
+  artifact hashes match the completed run. Output directories are ignored;
+  primary sources, code and reproducible extraction are packaged.
+
+Scientific behavior impact: new opt-in balanced secretion/hydrolysis feedback.
+Growth, maintenance, uptake and gas-transfer laws in the existing respiration
+API remain mathematically unchanged. Analytic Jacobians change step choices
+and roundoff; diagnostics add a Jacobian field. No unsupported energy or
+viability output is introduced. Complete common-state formation energies and
+activities remain mandatory before reporting physiological entropy/free energy.
+
+Unchanged: existing configured VirtualExperiment behavior, registry defaults,
+prior source calibrations, public scalar solver controls, remote Git state and
+published packages. No organism-specific branch was added to generic/core
+modules. No total-protein/FPU/transcript-to-active-enzyme conversion is inferred.
+No new living-fungus model is automatically constructed from entity metadata.
+
+Tests added: `tests/test_degrading_culture.py`,
+`tests/test_secretion_benchmark.py`, `tests/test_degrading_culture_benchmark.py`.
+They cover resource starvation, one shared uptake budget, balanced pathways,
+materially different polyester/nitrate chemistry, enzyme-only catalysis,
+no-bootstrap behavior, analytic decay/dilution, solver agreement, reduction to
+prior respiration, derivative checks, threshold and unit/provenance failures,
+source fidelity/tampering, whole-strain leakage, the entire allocation and
+kinetic sweep, and preservation of existing evidence. 44 tests added in total.
+
+Commands and results:
+
+- Focused pytest on the three new files plus `tests/test_respiration.py`:
+  82 passed in 5.67 s.
+- Full `pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml`:
+  1696 passed in 506.74 s; total coverage 85.26% (80% gate passed).
+- `ruff check src tests scripts/prepare_secretion_data.py scripts/run_degrading_culture_benchmark.py`:
+  passed. `pyright --pythonpath .venv/bin/python`: zero errors/warnings.
+  `git diff --check`: passed.
+- `prepare_secretion_data.py --check`: two source/extract checksums passed.
+  `prepare_respiration_data.py --check`: three passed.
+  `prepare_public_experimental_data.py --check`: 19 extracts verified.
+- `run_degrading_culture_benchmark.py --output outputs/degrading-culture-2026-10-03-final`:
+  completed all four figures, trajectories, sweep, holdouts and manifests.
+- `mkdocs build --strict`: passed. `check_packaged_resources.py`: passed.
+- `python -m build --outdir /private/tmp/fungmod-digestion-dist`: wheel and
+  sdist passed; `twine check` passed both. Built-wheel resource check: 226
+  canonical resources present once with identical bytes. The new extractor,
+  runner, documentation and primary XML are also present once in the sdist.
+- Installed the wheel with `--no-deps --ignore-installed --target` into a fresh
+  temporary directory. From `/private/tmp`, isolated `python -I` imported that
+  installation, checked the packaged primary-data hashes, ran the empirical
+  holdouts and a coupled BDF simulation with conserved exchange: passed.
+  Pip disabled its unwritable user cache automatically; installation succeeded.
+
+Remaining ambiguities: net extracellular protein versus biosynthesis, active
+fraction and composition, synthesis yield, kinetic capacities/affinities,
+induction/repression, storage, adsorption, pH, organic-product secretion,
+death/recycling, hyphal geometry and thermochemistry. No new quality gate is
+blocked. Software risk: moderate for new coupled API; organism-level scientific
+extrapolation risk: high until matched data and independent validation exist.
+Recommended next task: recover matched dynamic cultivation/protein-composition
+supplements (Pakula 2016 is a candidate), resolve active-protein observation
+mapping and induction/storage, then connect hyphal tips/branching to spatial
+transport with measured geometry. The Pakula paper motivates protein cost but
+is not numerical validation in this batch.
+
+## RESPIRATION-001 Conserved Physiology And New Primary Data
+
+Date: 2026-10-03
+
+Status: implemented for the bounded growth/respiration component and new-data
+comparison. Full-fungus prediction and broad empirical validation remain open.
+
+Changed:
+
+- Added `fungi/respiration.py`: sourced growth and non-growth substrate
+  maintenance pathways solved from atom/charge conservation, a resource-limited
+  batch/chemostat model, dissolved oxygen/gas transfer, nitrogen limitation,
+  explicit reservoirs, integrated boundary/reaction ledgers and unmet
+  maintenance diagnostics. Complete sourced energies are mandatory for an
+  entropy budget, and negative entropy in an operating pathway rejects.
+- Added `research/respiration_benchmark.py` for training-only nonnegative Pirt
+  fitting, checksum-bound data loading and study-specific glucose/ammonium
+  assembly. No organism-specific logic was added to generic/core modules.
+- Retrieved two CC-BY primary XML articles for A. niger NW185 (Lameiras 2015,
+  doi:10.1007/s11306-015-0781-z; Lameiras et al. 2017,
+  doi:10.1007/s00449-017-1854-3). Preserved source hashes, roles, quoted errors,
+  unit transformations, attribution and suspicious cells. Added deterministic
+  offline extraction/checking and an offline four-figure benchmark runner.
+- Documented mechanism assumptions, commands, API, results, compatibility and
+  next experiments in `docs/respiration-benchmark.md`; updated capability,
+  roadmap, changelog, navigation and source-distribution packaging.
+
+Results:
+
+- Four retrospective leave-one-dilution-out fits use only unreconciled 2015
+  glucose uptake; oxygen/CO2 are never fitted. Nominal growth mu = dilution is
+  an explicit predictor. RMSE improves from 1.556 to 0.386 (glucose, 75.2%),
+  21.524 to 16.464 (oxygen, 23.5%) and 12.995 to 8.563 (CO2, 34.1%), all in
+  mmol/(Cmol biomass h). The comparator is an explicit growth-only hypothesis,
+  not every existing FungMod model. Four conditions are not twelve independent
+  experiments, and holdouts within one paper are not independent laboratories.
+- All-condition point calibration gives Y = 3.655858 Cmol biomass/mol glucose
+  and m = 2.391421 mmol glucose/(Cmol biomass h). Across 256 plus/minus
+  reported-error corners, 96 fits reach m = 0 and 16 require oxygen production
+  or carbon fixation in growth. Those 16 remain flagged; the aerobic subset
+  has Y 2.851637–5.654259 and m 0–15.074991 in the stated units. This is an
+  assumption sensitivity envelope, not a confidence interval or posterior.
+- Frozen transfer to the 2017 glucose batch reference overpredicts uptake
+  16.4%, oxygen 41.4%, CO2 50.1%. Different pH/regime and possible biomass
+  composition changes remain confounded. Rates were reconciled, so this does
+  not independently test conservation. Six single-substrate and eleven
+  mixed-substrate conditions are preserved for clearly labelled challenges.
+- Published CO2 and TOC cells at 2017 dilution 0.16/h are retained verbatim and
+  quarantined from scoring. Supplemental verification remains unavailable:
+  Springer download returned `URLError: nodename nor servname provided, or not
+  known`; Europe PMC supplementaryFiles timed out after 45 seconds. The two
+  primary XML downloads and their usable tables succeeded; no omitted digits
+  or supplemental measurements were guessed.
+- Three explicitly illustrative dynamic scenarios exercise aerated growth,
+  low oxygen transfer and nitrogen limitation. Maximum open atom/charge
+  residual is 6.22e-16 mol/L and maximum Radau/BDF pool disagreement is
+  3.24e-10 mol/L. Unmet maintenance after depletion is visible; no survival,
+  dormancy or death output is inferred. Kinetic affinities/capacities, transfer
+  and initial states are assumptions, not experimental trajectories.
+
+Tests added: `test_respiration.py`, `test_respiration_benchmark.py`. Current
+focused run: 52 passed. Coverage includes four integrators, conservation,
+analytic sterile chemostat/gas transfer, washout, depletion, limiting resources,
+charged ammonium and materially different ethanol/nitrate chemistry, unit and
+source guards, entropy requirements, exact source extraction and tamper checks,
+holdout/gas/reconciled-data leakage prevention, sensitivity and artifact preservation.
+
+Commands/results (local verification, not hosted CI):
+
+- `.venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing
+  --cov-report=xml`: 1,649 passed in 505.81 s; 85.01% coverage.
+- Final `.venv/bin/python -m pytest -q tests/test_respiration.py
+  tests/test_respiration_benchmark.py --cov=fungal_model --cov-append
+  --cov-report=term --cov-report=xml`: 52 passed in 5.18 s; 85.12% coverage.
+  This includes the final maintenance-demand guard and three added runner tests.
+  Final collection is 1,652 tests; all are covered by full and final focused runs.
+- `.venv/bin/python -m ruff check src tests scripts/run_*.py
+  scripts/prepare_respiration_data.py`: passed. Initial semicolon-style findings
+  were corrected. `.venv/bin/python -m pyright --pythonpath .venv/bin/python`:
+  zero errors; optional parameter-value and Pint addition typing were narrowed
+  without disabling checks.
+- `.venv/bin/python scripts/prepare_respiration_data.py --check`: three
+  source/extract hashes and exact extraction pass.
+  `.venv/bin/python scripts/prepare_public_experimental_data.py --check`:
+  all 19 historical extracts still match.
+- `.venv/bin/python -m mkdocs build --strict`: passed.
+- `MPLCONFIGDIR=/private/tmp/fungmod-mpl .venv/bin/python
+  scripts/run_respiration_benchmark.py --output
+  outputs/respiration-expansion-2026-10-03-final`: complete. All four figures
+  inspected; final figures are byte-identical to the inspected images. Final
+  input/implementation/artifact hashes independently verified. Earlier output
+  bundles remain preserved; the final bundle is the report reference.
+- `.venv/bin/python -m build --outdir /private/tmp/fungmod-respiration-dist`:
+  wheel and sdist built. `python -m twine check` passed both archives.
+  `scripts/check_built_distribution_resources.py` verifies 222 canonical
+  resources exactly once and byte-identical in the new wheel.
+- Installed-wheel smoke in `/private/tmp/fungmod-respiration-wheel`, with
+  `--ignore-installed --no-deps` and execution from `/private/tmp` with `-I`:
+  isolated package/resource paths, all source hashes, Pirt calibration,
+  respiration, Radau dynamics and open conservation pass.
+- `git diff --check`: passed. No verification command remains blocked.
+  Only the optional supplemental-data downloads failed for the exact reasons
+  above; their unverified contents remain unused.
+
+Scientific behavior impact: new explicit two-pathway physiology and operating
+conditions, with conditional empirical exchange-rate testing. Rates are not
+inferred from free energy. No fungal thermochemical values, unidentified TOC
+chemistry, replicate errors or regulation parameters are invented.
+
+Backward compatibility/unchanged: additive advanced API; previous solver,
+thermodynamic, macrochemical and benchmark work is preserved. Existing fungal
+coupling, active-to-inactive maintenance, registry, configured workflow defaults
+and numerical outputs are not replaced. No registry promotion, release, commit
+or push. Automatic secretion integration would require consistent chemical
+bookkeeping to avoid counting carbon/energy twice.
+
+Remaining ambiguity/risk: moderate scientific-interpretation risk; low API
+compatibility risk because opt-in. Four conditions cannot identify full
+physiology. Carbon secretion, composition changes, mixed-substrate regulation,
+starvation/death, morphology and spatial enzyme–resource coupling remain open.
+Recommended next task: obtain matched dynamic sugar/biomass/N/O2/CO2/TOC data,
+biomass composition and viable biomass with raw replicate covariance, then
+identify uptake/regulatory and secretion mechanisms before whole-fungus integration.
+
+## SOLVER-THERMO-002 Coupled Free Energy And Numerical Accuracy
+
+Date: 2026-10-03
+
+Status: complete for this bounded solver/thermodynamic expansion and data replay.
+Perfect, organism-general or empirically validated prediction remains unestablished.
+
+Changed:
+
+- Added shared numerical contracts in `core/numerics.py`: explicit per-state
+  unit-bearing absolute tolerances, first/max-step control, validation and
+  rejection of incomplete/nonfinite integrations. Existing SolverSettings import
+  paths remain available. Main reaction, native process and 1D/2D/3D engines use
+  the shared boundary; joint culture models accept the same optional controls.
+- Added sparse Cartesian Jacobian structure for BDF/Radau on cell-local 1D
+  reaction/diffusion and pure ND diffusion. Arbitrary field-wide ND reactions
+  retain dense differentiation because their locality cannot be inferred.
+- Added `DetailedBalanceNetwork`, `DetailedBalanceReaction` and
+  `DetailedBalanceTrajectory` over the pre-existing macrochemical balance work.
+  Explicit formation chemical potentials determine every reverse scale, enforce
+  cycle consistency, and produce free-energy/entropy diagnostics. Element and
+  charge conservation are mandatory. An analytic Jacobian supports stiff
+  integration; a separate convex free-energy stationarity solve finds positive
+  equilibrium while preserving all stoichiometric conservation laws.
+- Fixed near-equilibrium cancellation in the existing reversible rate with
+  `expm1`. Added the offline `run_solver_thermodynamic_audit.py` runner and
+  documented its API, compatibility, evidence limits and results in
+  `docs/solver-thermodynamic-audit.md`.
+
+Results:
+
+- Reused 144 reviewed Gelain measurements and all 33 frozen retrospective
+  condition/model/scenario holdouts. No parameters were refitted. 264 scored
+  integration attempts retain the initial failures and explicit refinements.
+- One initial BDF run failed the existing negativity guard at depletion
+  (-4.80e-11 g/L). Explicit substrate atol 1e-14 g/L and max step 0.1 h reduce
+  this to -2.48e-15 g/L without clipping or weakening the guard. All 132 refined
+  four-solver runs pass. Maximum training-scaled solver disagreement is
+  5.114e-9, versus substantial measured model-data errors; maximum difference
+  from historical frozen predictions is 2.249e-7.
+- Best existing primary published-equation model pooled biomass/substrate RMSE
+  remains 0.4583/1.0047 g/L (glycerol), 0.7617/1.1615 g/L (cellulose); cellulose
+  activities are 83.82 FPU/L and 149.72 pNPG U/L. Numerical improvement does not
+  materially improve biological prediction in these cases.
+- The separately labelled artificial closed cycle conserves elements to
+  2.7e-15 mol/L and reaches the independently solved equilibrium (scaled
+  residual 1.95e-16), with decreasing free energy and positive entropy production.
+  It is software verification, never experimental evidence.
+- Local output bundles under `outputs/solver-thermodynamic-audit-2026-10-03*`
+  contain four inspected figures, prediction/diagnostic JSON, a thermodynamic
+  CSV, software versions, input/implementation hashes and artifact checksums.
+
+Tests added/modified: `test_solver_numerics.py`, `test_detailed_balance_network.py`,
+`test_solver_audit.py`, and `test_nonideal_reversible_thermodynamics.py`. Coverage
+includes analytic trajectories, a charged nonlinear catalyst reaction, independent
+finite-difference gradients/Jacobians, equilibrium, zero-concentration limits,
+trace-state accuracy, sparse spatial conservation, invalid inputs and solver
+failure, real depletion, and held-out evidence guards. Pre-existing macrochemical
+work and its tests were preserved.
+
+Commands/results (local, not hosted CI):
+
+- `.venv/bin/python -m pytest --cov=fungal_model --cov-report=term-missing
+  --cov-report=xml`: 1,594 passed in 524.91 s; 84.82% coverage.
+- Final focused run of the four files above plus `test_gelain_joint.py` and
+  `test_gelain_joint_artifacts.py`, with `--cov-append`: 78 passed; 85.05%
+  coverage. This covers the later research controls and six added tests;
+  collection is 1,600 tests, all covered by full and final focused runs.
+- `.venv/bin/python -m ruff check src tests scripts/run_*.py`: passed.
+- `.venv/bin/python -m pyright --pythonpath .venv/bin/python`: zero errors.
+- `.venv/bin/python -m mkdocs build --strict`: passed.
+- `.venv/bin/python scripts/prepare_public_experimental_data.py --check`:
+  all 19 extracts match checksum-pinned sources.
+- `.venv/bin/python scripts/run_solver_thermodynamic_audit.py --output
+  outputs/solver-thermodynamic-audit-2026-10-03-verified`: completed; plots inspected;
+  all input, final implementation and artifact hashes verified. All four plots
+  are byte-identical to the inspected figures.
+- `.venv/bin/python -m build --outdir /private/tmp/fungmod-solver-dist`:
+  wheel and sdist built; Twine passed both; resource check verifies all 217
+  canonical resources exactly once and byte-identical. The installed wheel in
+  `/private/tmp/fungmod-solver-wheel`, executed from `/private/tmp` with `-I`,
+  passes network integration/equilibrium, named tolerances and entropy checks.
+  An initial install saw the same version in inherited site packages and skipped;
+  an explicit `--ignore-installed --no-deps` install and import-path assertion
+  verified the actual built wheel.
+- Final post-cleanup numerical/spatial regression: 37 passed.
+- `git diff --check`: passed. No verification command remains blocked.
+
+An initial test invocation named nonexistent `tests/test_simulation.py` and ran
+no tests; actual engine tests and the full suite subsequently passed. The first
+uniform-tolerance audit intentionally stopped at the BDF negativity failure;
+its cause and both control settings are retained above and in the final runner.
+A SciPy callable-Jacobian type-stub mismatch was resolved with a local annotation,
+not by removing the Jacobian or suppressing the repository type checker.
+
+Scientific behavior impact: additive closed ideal-dilute fixed-volume isothermal
+mass-action thermodynamics plus more explicit numerical control. No thermochemical
+parameters, fungal mechanism, heat/gas state, registry data, culture equation,
+empirical uncertainty or biological maturity was inferred or changed. Existing
+successful scalar-setting runs and import paths remain compatible. Failed partial
+main-engine results now raise IntegrationError; invalid/sub-machine numerical
+controls reject. The old v1 culture and inhibition research equations are unchanged.
+
+Remaining ambiguities: missing matched formation energies, gas exchange,
+calorimetry, raw culture replicates and independent validation; weakly identified
+cellulose model parameters. Equilibrium requires a strictly positive initial
+class; entropy at zero concentrations is unavailable. Nonideal, open-culture,
+variable-temperature and spatial thermodynamic coupling are not implemented by
+this network API. No extremal entropy principle supplies biological kinetics.
+
+Risk: moderate (stricter numerical failure semantics; potential interpretation
+of artificial physics tests as biology). Recommended next task: source matched
+thermochemistry and gas/heat measurements, constrain a reduced culture model,
+and preregister an independent raw-replicate comparison before increasing its
+biological claims. No commit, push, release or deployment was requested/performed.
+
+## THERMO-BASE-001 Conservation-Law Macrochemical Balance And Entropy Budget
+
+Date: 2026-10-03
+
+Status: `complete` for one bounded low-level chemistry contract. Coupling it
+into configured or whole-fungus models, and any yield estimate, are `not started`.
+
+Motivation: a user-directed step toward organism-general modelling by working at
+the level every organism shares. Element conservation, charge conservation, and
+the second law hold for any fungus without organism-specific measurement, so
+they are implemented as a constraint layer beneath the kinetic process laws.
+
+Changed:
+
+- Added `src/fungal_model/chemistry/macrochemistry.py` with
+  `MacrochemicalSpecies`, `MacrochemicalBalance`, `MacrochemicalSolution`,
+  `MacrochemicalEntropyBudget`, and `MacrochemicalBalanceError`, exported from
+  `fungal_model.chemistry`.
+- `MacrochemicalBalance.solve(...)` solves every unfixed signed coefficient of
+  an overall conversion from the element-plus-charge conservation matrix. It
+  fails closed when conservation leaves degrees of freedom (reporting how many
+  more coefficients must be fixed) or cannot be satisfied (reporting residuals).
+- A solution forms the reaction Gibbs energy and enthalpy from sourced
+  formation energies, and an entropy budget at a caller-supplied extent rate
+  and temperature: `sigma = -delta_r G * rate / T`, split exactly into entropy
+  exported as heat and entropy change of exchanged matter when enthalpies exist.
+- `solve_for_reaction_gibbs(...)` solves the one extra coefficient that gives a
+  stated sourced reaction Gibbs energy: zero is the reversible limit (a yield
+  ceiling derived from formation energies), a negative target is a stated
+  dissipation.
+- A solution converts to `StoichiometricReactionMetadata`, so the existing
+  static element and charge validators accept solved reactions unchanged.
+- Added the capability row in `docs/capabilities.md`.
+
+What did not change: no existing process law, solver, configured workflow,
+registry record, output schema, `GibbsEnergyYieldBound`, or `FungalCouplingModel`
+behaviour. No formation energy, biomass composition, yield, dissipation value,
+or organism record was added. No rate is derived from thermodynamics and no
+extremal principle such as maximum entropy production is used. Formation
+energies are combined as given for their declared conditions with no activity,
+concentration, pH, ionic-strength, or temperature correction.
+
+Tests added: `tests/test_macrochemical_balance.py` (16 cases) covers complete
+oxidation from conservation alone, a materially different charged inorganic
+redox reaction, artificial growth exchange stoichiometry, acceptance by the
+existing static validators, underdetermined and inconsistent balances, unknown
+or scale-free fixed coefficients, missing provenance, hand-checked reaction
+energies, missing conditions or formation energies, the entropy-budget identity
+and units, second-law violation flagging, reversible-limit and stated-dissipation
+solves, and fixed maturity. Biomass composition and all energies in the tests
+are labelled artificial.
+
+Scientific behavior impact: additive only. Callers can derive oxygen, carbon
+dioxide, water, and nitrogen exchange for a stated yield instead of leaving the
+unassimilated mass unresolved, and can check a conversion against the second law.
+
+Backward compatibility: additive public chemistry API; nothing existing changes.
+
+Remaining ambiguities: biomass elemental composition and formation energy are
+organism- and condition-dependent inputs that must be sourced per case. Standard
+formation energies differ from in-culture values; no transformation is applied.
+The rank test uses NumPy's default singular-value tolerance.
+
+Risk level: low for software; moderate interpretation risk if a solved balance
+is read as a prediction, contained by fixed exploratory maturity, mandatory
+sources, fail-closed solving, and artificial-only tests.
+
+Recommended next task: wire the balance into `FungalCouplingModel` as an opt-in
+so uptake resolves oxygen demand and carbon dioxide, water, and heat release as
+explicit states, with the yield ceiling derived from sourced formation energies.
+
 ## CULTURE-BENCHMARK-002 Joint Activity Models And Scoped Validation
 
 Date: 2026-09-28
