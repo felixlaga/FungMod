@@ -3,6 +3,11 @@ include scripts/stage_packaged_resources.py
 include scripts/prepare_public_experimental_data.py
 include scripts/run_gelain_2020_culture_benchmark.py
 include scripts/run_gelain_2020_joint_benchmark.py
+include scripts/run_solver_thermodynamic_audit.py
+include scripts/prepare_respiration_data.py
+include scripts/run_respiration_benchmark.py
+include scripts/prepare_secretion_data.py
+include scripts/run_degrading_culture_benchmark.py
 include CITATION.cff
 include codemeta.json
 include AUTHORS.md
