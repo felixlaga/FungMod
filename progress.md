@@ -102,8 +102,13 @@ pint 0.25.3, libsbml 5.21.2):
 - `pyright`: 0 errors.
 - `mkdocs build --strict`: passed.
 - `pytest tests/test_compiled_process_models.py`: 32 passed.
-- `pytest` (full suite): running at the time of this entry's first commit;
-  the result is recorded in the follow-up ledger update below this line.
+- `pytest` (full suite): 1717 passed, 11 failed in 18m44s. The 11 failures
+  are exactly the pre-existing set recorded in STATE-2026-10-04 (ten SBML
+  cross-engine/BioModels tests under libsbml 5.21, one frozen Gelain holdout
+  replay at 4.4e-6 against the 2e-6 gate under scipy 1.17); the count rises
+  from 1685 to 1717 passed by the 32 new tests. Hosted CI on the PR head
+  reproduces the same 11/1717 on ubuntu for Python 3.11 and 3.12, and
+  `main`'s own CI is red with the same SBML failures.
 
 Scientific behavior impact: none intended; the compiled path is verified to
 reproduce the unit-aware path bit-for-bit on every packaged config, and the
