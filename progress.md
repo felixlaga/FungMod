@@ -26,6 +26,53 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## STATE-2026-10-04 Verified State Assessment And Next-Step Sequence
+
+Date: 2026-10-04
+
+Status: `complete` for the documentation task. No code, data, registry, or
+scientific behavior changed.
+
+Changed:
+
+- Added `foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`: the
+  verified state of the repository on `main` at `50f8496`, the measured
+  registry coverage, a solver/engine inventory with per-RHS timings, the gaps
+  to a validated whole-fungus model, and an ordered next-step sequence.
+- Added the assessment to the `AGENTS.md` active source-of-truth order after
+  the roadmap, and a dated status note at the top of the roadmap status list.
+
+Not changed:
+
+- Source code, tests, registry records, configs, notebooks, benchmarks.
+
+Verification recorded in the assessment (venv on Python 3.11, numpy 2.4.6,
+scipy 1.17.1, pint 0.25.3, libsbml 5.21.2):
+
+- `ruff check src tests scripts/run_*.py`: passed.
+- `pyright`: 0 errors.
+- `pytest`: 1685 passed, 11 failed in 18m41s. The failures are dependency and
+  test-order sensitivity, not model defects: nine SBML cross-engine/unit tests
+  pass in isolation and fail only in the full run; the BioModels round-trip
+  fails under libsbml 5.21; one frozen Gelain holdout replays to 4.4e-6
+  relative difference against the 2e-6 gate under scipy 1.17.
+- Registry enumeration: 27 combinations, 3 runnable in exploratory mode, 0 in
+  scientific mode; 0 shipped case templates bind an environment response law.
+- Timing: `SimulationEngine` and `ProcessODESolver` cost about 0.5 ms per
+  right-hand-side evaluation against 16 us for the same model in plain numpy;
+  the 1D reaction-diffusion engine spends 66 ms per evaluation at 200 cells;
+  the public Reaction 618 ensemble costs about 0.8 s per sample.
+
+Scientific behavior impact: none. Backward compatibility: none.
+
+Risk: low (documentation only).
+
+Recommended next task: CORE-001, a compiled well-mixed model core with
+build-time unit resolution, a stoichiometric matrix probed from
+`Process.contributions`, numeric rate kernels for every shipped process, an
+explicit recorded fallback for processes without kernels, and parity tests
+against the unit-aware path.
+
 ## DIGESTION-001 Conserved Secretion And Extracellular Digestion
 
 Date: 2026-10-03

@@ -1,0 +1,225 @@
+# FungMod: verified state, gaps to "full fungus", and next steps
+
+Assessment date: 2026-10-04. Everything below was checked against code, tests and
+measurements on the current `main` (commit 50f8496), not against roadmap text.
+
+## 1. Verdict
+
+FungMod is a well-engineered, honest *framework* with very little *fungus* in it.
+About four fifths of the code is registry, curation, provenance, output-table and
+report infrastructure. The mechanistic core is small, and the whole-organism
+physiology that exists lives in three separate opt-in classes that the
+researcher-facing `VirtualExperiment` API cannot reach. The shipped registry
+contains no real fungus. In `scientific` mode, zero cases are runnable.
+
+A top-tier biology or computational-biology journal publishes a validated
+biological result, not a framework. The project's own `docs/paper-readiness.md`
+correctly targets JOSS (a software journal). Reaching Nature Methods, Nature
+Computational Science, Cell Systems or Molecular Systems Biology requires at
+least one prospectively validated prediction on real fungi. That requires
+first fixing the solver layer, then binding physiology to the registry, then a
+wet-lab collaboration.
+
+## 2. What it can do today (verified)
+
+Quality gates on this checkout: ruff clean, pyright clean (0 errors),
+pytest 1685 passed / 11 failed in 18m41s on Python 3.11, numpy 2.4.6, scipy 1.17.1, libsbml 5.21.2.
+The 11 failures are dependency-version and test-order sensitivity, not
+model bugs. Nine SBML cross-engine/unit tests pass in isolation but fail in
+the full run; the BioModels round-trip test fails even alone (libsbml 5.21
+SWIG returns an opaque enum from `getType()` that the reference AST
+evaluator in `standards/cross_engine.py` cannot compare); one frozen Gelain
+holdout replays to 4.4e-6 relative difference against a 2e-6 gate under
+scipy 1.17 (the lock file pins 1.18, CI installs unpinned, and libsbml is
+not pinned at all). Four curator-authoring tests take ~110 s each.
+
+| Measured fact | Value |
+| --- | --- |
+| Source lines | 62.7k (tests 38.9k, 1266 test functions) |
+| Infrastructure packages (api, screening, data, workflows, sources, registry, io, standards, calibration) | ~40k lines |
+| Mechanism/physics packages (processes, kinetics, solvers, fungi, chemistry, transport, geometry, modifiers) | ~12k lines |
+| Registry fungus records | 3: one toy, two "enzyme-source pseudo-records". No real organism. |
+| Registry substrates / enzyme classes / environments | 3 / 3 / 3 |
+| Fungus x substrate x environment combinations | 27 |
+| Runnable in `exploratory` mode | 3 (one of them the toy) |
+| Runnable in `scientific` mode | 0 |
+| Shipped case templates with any environment response law bound | 0 (temperature/pH grids are metadata only) |
+| Parameter records | 24: 12 exploratory priors, 6 toy, 4 literature-processed, 2 literature ranges |
+
+Implemented and software-tested mechanisms:
+
+- Enzyme-only soluble kinetics: first-order, mass action, homogeneous
+  Michaelis-Menten, competitive / Haldane / product inhibition,
+  transglycosylation branch, linear/branching/cyclic enzyme chains.
+- Surface catalysis: equilibrium Langmuir coverage times constant accessible
+  area. No surface erosion, no enzyme depletion by binding, no crystallinity.
+- Environment modifiers: Arrhenius, Gaussian pH, Monod oxygen, water-activity
+  threshold. Implemented, but bound to nothing shipped. No thermal
+  inactivation of enzymes.
+- Thermodynamics: macrochemical element/charge balance, Gibbs yield ceiling,
+  single-reaction feasibility blocking, closed detailed-balance network with
+  equilibrium solver, Haldane relations. All constraint layers; no rate.
+- Whole-fungus physiology (three separate opt-in classes, none registry-bound):
+  `FungalCouplingModel` (secretion/decay/uptake/maintenance, kg + mol/L mix),
+  `ResourceLimitedCulture` (Pirt growth + maintenance, O2/N limitation, gas
+  transfer, chemostat), `DegradingCulture` (7 pools, costed secretion,
+  hydrolysis, inactivation, analytic Jacobian).
+- Spatial: uniform Cartesian 1D/2D/3D reaction-diffusion on fixed grids. No
+  hyphae, tips, branching, or moving boundaries.
+- Uncertainty: Monte Carlo, local sensitivity, Saltelli/Jansen global
+  sensitivity (independent inputs only). No Bayesian calibration.
+- Calibration: least squares, grid profile likelihood, frozen-prediction
+  evaluation contract, SBML/PEtab/COMBINE export.
+- Data: 7 beta-glucosidase progress curves from 3 papers (digitized), Gelain
+  2020 T. harzianum cultures (6 conditions, 144 means, no replicates),
+  Lameiras 2015/2017 A. niger chemostat rates, Jorgensen 2009 protein output
+  (4 means), Novy 2021 T. reesei secretome (composition only).
+
+Every empirical comparison is retrospective. The best-scoring culture model in
+the Gelain benchmark is a refit of Gelain's own published equations.
+
+## 3. The solver problem, concretely
+
+The feeling that the solvers are "all over the place" is accurate. There are
+three incompatible model representations and at least seven integration paths.
+
+| Path | Model representation | Reachable from VirtualExperiment? | Jacobian | Per-RHS cost (measured) |
+| --- | --- | --- | --- | --- |
+| `solvers/process_ode.py` ProcessODESolver | `Process.rate()` + `contributions()` on dicts of pint Quantities | Yes (only path that is) | finite difference | ~0.5 ms vs 16 us numpy (~30x) |
+| `core/simulation.py` SimulationEngine | `Reaction` callables on pint dicts | No | finite difference | same pattern |
+| `transport/reaction_diffusion.py` 1D | `Reaction`, Python loop over cells, pint per cell | No | sparse pattern only | 200 cells: 3.9 s for 59 RHS evals (66 ms each) |
+| `transport/reaction_diffusion_nd.py` 2D/3D | `Reaction` on whole-field Quantities | No | sparse pattern (pure diffusion only) | pint per RHS |
+| `fungi/respiration.py` ResourceLimitedCulture.simulate | hand-written numpy kernel | No | analytic | fast |
+| `fungi/degradation.py` DegradingCulture.simulate | hand-written numpy kernel, N @ v + boundary | No | analytic | 19 states, 3205 evals in 0.5 s |
+| `chemistry/detailed_balance.py` | hand-written numpy kernel | No | analytic | fast |
+| `research/gelain_*.py`, `inhibited_progress.py`, `standards/cross_engine.py` | ad hoc `solve_ivp` calls | No | none | n/a |
+
+Consequences:
+
+- The only path a researcher can reach costs 0.8 s per sample for a
+  three-state Michaelis-Menten model (writing a full bundle per sample). A
+  1000-sample ensemble over a 4x4 environment grid is about 3.5 hours for the
+  simplest possible case. Bayesian calibration, which needs 10^4 to 10^6
+  solves, is out of reach on this path.
+- The spatial engines evaluate pint arithmetic inside the RHS. A 50x50 grid is
+  minutes per solve. Hyphal morphology models need thousands of solves.
+- The physiology that actually makes it a fungus model is unreachable from the
+  registry, the configured workflow, modelability preflight, the output tables,
+  the ensemble machinery and the sensitivity tools. `grep` confirms only
+  `io/yaml_loader.py` imports `fungal_model.fungi`, and only for metadata.
+- Units are resolved per RHS call rather than once at build time. Each engine
+  has its own tolerance semantics, negativity policy and result object.
+- Only the hand-written kernels have analytic Jacobians; the generic paths do
+  not, so stiff problems are slow or fail (the audit's BDF depletion failure).
+
+The good news is that `DegradingCulture` already contains the right design:
+a stoichiometric matrix, a numpy rate vector, boundary terms, an analytic
+Jacobian and a conservation ledger. It just is not generic.
+
+## 4. Gaps to "full fungus modelling" at a top-journal standard
+
+1. **No organism.** The registry has no fungus record with secretion, uptake,
+   yield, maintenance or growth-response parameters. The "fungi" are enzyme
+   sources.
+2. **Environment does nothing.** Temperature and pH grids are metadata in every
+   shipped case. There is no cardinal-temperature or pH growth-response model
+   with sourced parameters, and no thermal inactivation.
+3. **Physiology is triplicated and isolated.** Three whole-fungus models, three
+   unit conventions, none composable with the enzyme processes or reachable
+   from the public API.
+4. **Solid substrates are placeholders.** Cellulose, lignin, starch and chitin
+   classes carry unknown metadata and no accessibility, crystallinity, erosion
+   or lignin-shielding model. The only solid case is a generic exploratory
+   film.
+5. **No spatial fungus.** Fixed-grid reaction-diffusion is not a mycelium.
+   Tip extension, branching, anastomosis, translocation and colony-boundary
+   coupling do not exist.
+6. **All validation is retrospective.** No replicate-level data, no measured
+   error model, no prospective held-out experiment, no cross-species transfer
+   test. The project's own evaluator keeps `publication_claim_authorized`
+   false, correctly.
+7. **No Bayesian inference.** Profile likelihood exists; posterior sampling,
+   proper error models and identifiability-aware model selection do not.
+8. **Scale.** The public path cannot run the ensemble sizes the central-goal
+   document promises in acceptable time.
+
+## 5. Next steps, in order
+
+### Step 1. One compiled model core (prerequisite for everything else)
+
+Replace the three representations with one intermediate representation that
+every front end compiles to and every engine consumes:
+
+- Ordered state vector with units resolved once at build time.
+- Stoichiometric matrix N (states x processes) and a numpy rate vector
+  v(t, y, p), so dy/dt = N v + boundary(t, y).
+- Optional analytic or autodiff Jacobian, conservation matrix, and a single
+  `SimulationResult`.
+- `Process`, `Reaction`, the three physiology classes and the Gelain research
+  models become builders that emit this IR. `SimulationEngine` is retired.
+- Spatial engines apply the same IR per cell with vectorized rates and a
+  diffusion operator, no Python loop over cells.
+- Units are checked at compile time; the RHS is pure numpy.
+
+Target: the Reaction 618 case drops from ~0.8 s to a few ms per sample, and the
+7-pool culture model becomes a registered process family rather than a
+special class. Keep the existing tests as the parity oracle.
+
+### Step 2. Put a real fungus in the registry
+
+Promote the `DegradingCulture` physiology into registry-driven process
+templates with parameter roles, and author records for the three organisms the
+data already cover: T. harzianum (Gelain), A. niger (Lameiras, Jorgensen),
+T. reesei (Novy composition, Pakula 2016 time courses as the next intake).
+Definition of done: at least one organism x substrate case runs in
+`scientific` mode through `VirtualExperiment`, with biomass, enzyme, substrate
+and product trajectories in `time_series_long.csv`.
+
+### Step 3. Make environment grids mean something
+
+Bind cardinal-temperature (Rosso-type) and pH growth-response laws with
+sourced parameters for those organisms, plus enzyme thermal inactivation.
+Without this, the central promise "how does pH or temperature change
+degradation dynamics" is unfulfillable.
+
+### Step 4. Identifiability and Bayesian calibration on the fast core
+
+With a compiled core and Jacobians, add posterior sampling (MCMC or
+simulation-based inference) with explicit measurement-error models and
+replicate-level data. Recover raw replicates for Gelain and Pakula first. Report
+which parameters the data identify and which the model must leave as ranges.
+
+### Step 5. The scientific result (this is the paper)
+
+Pick one question and design the experiment before touching the code again.
+Candidates, in rising ambition:
+
+- Cross-species transfer: calibrate secretion/growth physiology on A. niger
+  and T. reesei, predict T. harzianum degradation time courses without refit.
+- Prospective prediction: predict mass-loss and product-release curves for a
+  fungus x substrate x temperature set that no training data cover, then run
+  those cultures with a collaborating lab and score against the frozen
+  prediction.
+- Closed-loop experimental design: show that the model's suggested experiments
+  reduce predictive uncertainty more than a naive design, measured in the lab.
+
+Any of these needs a wet-lab partner and a preregistered analysis plan. The
+existing frozen-prediction contract is the right tool for it. Without new
+experiments the ceiling is a methods or software paper.
+
+### Step 6. Spatial mycelium (the "full fungus" step, after 1 to 5)
+
+Hyphal tip extension and branching with local uptake and secretion, coupled to
+the compiled reaction-diffusion core, validated against colony-expansion and
+microscopy data. This is a multi-year programme on its own and should not start
+until a well-mixed organism model is predictive.
+
+## 6. What to stop doing
+
+- Stop adding output-table, report and diagnostics ergonomics. Thirty files per
+  run is already more than any reviewer will read.
+- Stop adding opt-in physics layers (nonideal thermodynamics, entropy budgets)
+  until a case needs them for a prediction.
+- Stop adding single-condition enzyme digitizations; they cannot be tested
+  out of sample.
+- Do not add a fourth whole-fungus class before the three are unified.

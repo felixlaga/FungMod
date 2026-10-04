@@ -31,6 +31,17 @@ The current PR queue and reconciled scoped phase status are tracked in
 
 # Current project status
 
+2026-10-04: a verified state assessment and ordered next-step sequence is
+recorded in `FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`. It measured the
+shipped registry (3 of 27 fungus/substrate/environment combinations runnable
+in exploratory mode, none in scientific mode, no environment response law
+bound), inventoried seven integration paths over three model representations,
+and timed the public path at roughly thirty times a plain numpy right-hand
+side. The sequence it sets is: one compiled model core, a real organism in
+the registry, bound environment response laws, Bayesian calibration on raw
+replicates, a preregistered wet-lab prediction, and only then spatial
+mycelium. Phase text below predates that assessment and does not override it.
+
 2026-10-03: DIGESTION-001 couples explicitly balanced protein secretion,
 extracellular hydrolysis and enzyme inactivation to conserved resource-limited
 physiology. Seven pools share one post-maintenance substrate budget, with
