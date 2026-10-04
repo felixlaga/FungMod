@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 
 from fungal_model.core.assumptions import Assumption
+from fungal_model.core.kernels import KernelContext, RateKernel, magnitude_in
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.kinetics.langmuir import langmuir_surface_coverage
@@ -429,6 +430,57 @@ class SurfaceCatalysisProcess(Process):
             substrate_amount=substrate,
             rate_units=self.rate_units,
         )
+
+    def compile_rate(self, context: KernelContext) -> RateKernel | None:
+        enzyme_index, to_enzyme = context.state_slot(self.enzyme_state, self.enzyme_units)
+        substrate_index, to_substrate = context.state_slot(self.substrate_state, self.substrate_units)
+        adsorption_units = f"1 / ({self.enzyme_units})"
+        adsorption_constant = context.parameter(self.adsorption_model.adsorption_symbol, adsorption_units)
+        area = magnitude_in(
+            self.accessible_surface_model.accessible_area(context.parameters),
+            "meter ** 2",
+            name="accessible_surface_area",
+        )
+        rate_constant = magnitude_in(
+            self.catalytic_model.rate_constant(context.parameters),
+            f"{self.rate_units} / meter ** 2",
+            name="surface_catalysis_rate_constant",
+        )
+        if area < 0:
+            raise ValueError("accessible_surface_area must be non-negative.")
+        if rate_constant < 0:
+            raise ValueError("surface_catalysis_rate_constant must be non-negative.")
+        if adsorption_constant < 0:
+            raise ValueError("adsorption_equilibrium_constant must be non-negative.")
+        strength_scale = float(
+            assert_compatible(
+                Q_(1.0, adsorption_units) * Q_(1.0, self.enzyme_units),
+                "dimensionless",
+                name="K_ads * free_enzyme",
+            ).magnitude
+        )
+        rate_scale = float(
+            assert_compatible(
+                Q_(1.0, f"{self.rate_units} / meter ** 2") * Q_(1.0, "meter ** 2"),
+                self.rate_units,
+                name="surface catalysis rate",
+            ).magnitude
+        )
+
+        def kernel(time: float, state: np.ndarray) -> float:
+            del time
+            enzyme = state[enzyme_index] * to_enzyme
+            if enzyme < 0:
+                raise ValueError("free_enzyme must be non-negative.")
+            substrate = state[substrate_index] * to_substrate
+            strength = (adsorption_constant * enzyme) * strength_scale
+            coverage = strength / (1.0 + strength)
+            rate = (rate_constant * coverage) * area
+            if substrate <= 0:
+                rate = rate * 0.0
+            return rate * rate_scale
+
+        return kernel
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")

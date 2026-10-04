@@ -9,6 +9,7 @@ import numpy as np
 
 from fungal_model.kinetics._coupled_inhibition import coupled_inhibition_denominator
 from fungal_model.core.assumptions import Assumption
+from fungal_model.core.kernels import KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible
 from fungal_model.entities.environment import Environment
@@ -42,6 +43,18 @@ def _positive(quantity: Quantity, *, name: str) -> np.ndarray:
     if not np.isfinite(values).all() or np.any(values <= 0.0):
         raise ValueError(f"{name} must be finite and positive.")
     return values
+
+
+def _nonnegative_scalar(value: float, *, name: str) -> float:
+    if not np.isfinite(value) or value < 0.0:
+        raise ValueError(f"{name} must be finite and nonnegative.")
+    return value
+
+
+def _positive_scalar(value: float, *, name: str) -> float:
+    if not np.isfinite(value) or value <= 0.0:
+        raise ValueError(f"{name} must be finite and positive.")
+    return value
 
 
 @dataclass(frozen=True)
@@ -149,6 +162,24 @@ class CompetitiveInhibitionModifier:
             str(rate.units),
             name="competitive-inhibition-scaled rate",
         )
+
+    def compile_activity(self, context: KernelContext) -> RateKernel | None:
+        substrate_index, to_substrate = context.state_slot(self.substrate_state, self.substrate_units)
+        inhibitor_index, to_inhibitor = context.state_slot(self.inhibitor_state, self.inhibitor_units)
+        km = _positive_scalar(context.parameter(self.michaelis_constant_symbol, self.substrate_units),
+                              name=self.michaelis_constant_symbol)
+        ki = _positive_scalar(context.parameter(self.inhibition_constant_symbol, self.inhibitor_units),
+                              name=self.inhibition_constant_symbol)
+        substrate_name, inhibitor_name = self.substrate_state, self.inhibitor_state
+
+        def kernel(time: float, state: np.ndarray) -> float:
+            del time
+            substrate = _nonnegative_scalar(state[substrate_index] * to_substrate, name=substrate_name)
+            inhibitor = _nonnegative_scalar(state[inhibitor_index] * to_inhibitor, name=inhibitor_name)
+            ratio = inhibitor / ki
+            return (km + substrate) / (km * (1.0 + ratio) + substrate)
+
+        return kernel
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -261,6 +292,21 @@ class SubstrateInhibitionModifier:
             str(rate.units),
             name="substrate-inhibition-scaled rate",
         )
+
+    def compile_activity(self, context: KernelContext) -> RateKernel | None:
+        substrate_index, to_substrate = context.state_slot(self.substrate_state, self.substrate_units)
+        km = _positive_scalar(context.parameter(self.michaelis_constant_symbol, self.substrate_units),
+                              name=self.michaelis_constant_symbol)
+        ki = _positive_scalar(context.parameter(self.inhibition_constant_symbol, self.substrate_units),
+                              name=self.inhibition_constant_symbol)
+        substrate_name = self.substrate_state
+
+        def kernel(time: float, state: np.ndarray) -> float:
+            del time
+            substrate = _nonnegative_scalar(state[substrate_index] * to_substrate, name=substrate_name)
+            return (km + substrate) / (km + substrate + substrate**2 / ki)
+
+        return kernel
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -397,6 +443,29 @@ class CoupledSubstrateProductInhibitionModifier:
             str(rate.units),
             name="coupled-substrate-product-inhibition-scaled rate",
         )
+
+    def compile_activity(self, context: KernelContext) -> RateKernel | None:
+        substrate_index, to_substrate = context.state_slot(self.substrate_state, self.substrate_units)
+        product_index, to_product = context.state_slot(self.product_state, self.product_units)
+        km = _positive_scalar(context.parameter(self.michaelis_constant_symbol, self.substrate_units),
+                              name=self.michaelis_constant_symbol)
+        substrate_ki = _positive_scalar(
+            context.parameter(self.substrate_inhibition_constant_symbol, self.substrate_units),
+            name=self.substrate_inhibition_constant_symbol,
+        )
+        product_ki = _positive_scalar(
+            context.parameter(self.product_inhibition_constant_symbol, self.product_units),
+            name=self.product_inhibition_constant_symbol,
+        )
+        substrate_name, product_name = self.substrate_state, self.product_state
+
+        def kernel(time: float, state: np.ndarray) -> float:
+            del time
+            substrate = _nonnegative_scalar(state[substrate_index] * to_substrate, name=substrate_name)
+            product = _nonnegative_scalar(state[product_index] * to_product, name=product_name)
+            return (km + substrate) / coupled_inhibition_denominator(substrate, product, km, substrate_ki, product_ki)
+
+        return kernel
 
     def to_dict(self) -> dict[str, object]:
         return {

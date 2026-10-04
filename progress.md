@@ -26,6 +26,112 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CORE-001 Compiled Well-Mixed Process Core
+
+Date: 2026-10-04
+
+Status: `complete` for the well-mixed `Process` path (step 1, first slice).
+The legacy `Reaction` engine, the spatial engines, the physiology classes and
+the research models remain on their own integrators (`FD-009`).
+
+Changed:
+
+- Added `core/kernels.py`: `KernelContext` (state index, state units, time
+  unit, parameters, environment, geometry; build-time conversion factors and
+  parameter values) and the `RateKernel` contract.
+- Added `solvers/compiled.py`: `compile_assembled_model` builds
+  `dy/dt = N v(t, y)` on plain floats. `N` is probed from
+  `Process.contributions` at three rates and must be linear in the rate; each
+  column already carries the rate-unit to state-unit-per-time conversion.
+  Kernel kinds `numeric`, `numeric_thermodynamic`, `quantity_wrapped` and
+  `quantity_wrapped_thermodynamic` are recorded per process in
+  `CompiledModel.summary()`.
+- Added `Process.compile_rate(context)` (default `None`) and numeric kernels on
+  `FirstOrderDecayProcess`, `MassActionProcess`,
+  `HomogeneousMichaelisMentenProcess`, `SurfaceCatalysisProcess`,
+  `SubstrateTransglycosylationProcess` and `RateModifierProcess` (which also
+  gained a `rate_units` property). Kernels reproduce the unit-aware arithmetic
+  in the same operation order and raise the same errors for negative states.
+- Added `compile_activity(context)` on all eight modifiers. Product,
+  competitive, Haldane and coupled inhibition compile to float algebra;
+  temperature, pH, oxygen and water activity fold to a constant through the
+  modifier's own `activity` (`modifiers.base.constant_activity_kernel`).
+- Added `DynamicThermodynamicConstraint.compile_feasibility(context)`, a float
+  mirror of `evaluate`, so thermodynamic blocking stays numeric at solver time.
+- `ProcessODESolver.run` compiles once per run and integrates the compiled
+  right-hand side; `ProcessODESolver.compile(request)` exposes the compiled
+  model; `solver_metadata["kernel"]` records the kernel summary. Process-rate
+  trajectories at returned time points reuse the kernels; constrained
+  processes are still re-evaluated through the unit-aware `enforce` so the
+  recorded activities, quotients and Gibbs energies are unchanged.
+- Documentation: `docs/compiled-core.md` (nav under Core concepts), capability
+  map row, README limitation bullet, `CHANGELOG.md`, `ARCHITECTURE_DEBT.md`
+  `FD-009`.
+
+Not changed:
+
+- Rate laws, parameters, registry records, configs, notebooks, output
+  schemas, validators, `SolverSettings`, `solve_checked`, tolerances, failure
+  semantics, clipping policy (none), thermodynamic diagnostics, the legacy
+  `SimulationEngine`, the spatial engines, the physiology classes, research
+  models, calibration or validation behavior.
+
+Tests added:
+
+- `tests/test_compiled_process_models.py` (32 tests): compiled right-hand side
+  and trajectories equal the unit-aware reference on every packaged model
+  config with identical `nfev`; every kernel matches its process rate
+  pointwise; kernel kinds and numeric thermodynamic enforcement are recorded;
+  all shipped process types compile numerically (architecture-debt boundary);
+  a process without a kernel uses the recorded wrapped path and matches the
+  numeric path to 1e-12; nonlinear contributions and unknown states are
+  rejected; mixed units (micromolar states, per-minute constant, hour time
+  grid) resolve at build time and match the closed form; environment
+  modifiers fold to constants that match the reference and still warn
+  outside their source range; negative states raise the same error text;
+  `KernelContext` and constraint-process checks.
+
+Commands run and results (venv, Python 3.11, numpy 2.4.6, scipy 1.17.1,
+pint 0.25.3, libsbml 5.21.2):
+
+- Parity script over all ten `data/model_configs/*.yml`: maximum relative
+  right-hand-side difference 0, maximum relative trajectory difference 0,
+  identical `nfev`; compiled versus unit-aware solve times 19/252, 5/198,
+  8/478, 1.5/27, 1.4/39, 1.8/65, 1.6/51, 0.6/3.5, 0.8/17, 0.6/3.6 ms.
+- `ruff check src tests scripts/run_*.py`: passed.
+- `pyright`: 0 errors.
+- `mkdocs build --strict`: passed.
+- `pytest tests/test_compiled_process_models.py`: 32 passed.
+- `pytest` (full suite): running at the time of this entry's first commit;
+  the result is recorded in the follow-up ledger update below this line.
+
+Scientific behavior impact: none intended; the compiled path is verified to
+reproduce the unit-aware path bit-for-bit on every packaged config, and the
+same stiff-solver finite-difference Jacobian is used. Two observable
+non-scientific differences: environment-range warnings fire once per run, and
+`solver_metadata` gains a `kernel` entry.
+
+Backward compatibility: public APIs unchanged; `_state_units` in
+`solvers/process_ode.py` is now an alias of `solvers.compiled.resolve_state_units`;
+third-party `Process` subclasses without `compile_rate` keep working through
+the recorded wrapped path.
+
+Measured public-path effect: a configured run's integration is now a few
+milliseconds; the remaining ~0.6 s per ensemble sample is per-sample bundle
+writing, chiefly three matplotlib figures per sample in
+`SimulationResult.save`. That is a screening output-policy question, not a
+solver one, and was left unchanged here.
+
+Risk: low for numerics (exact parity, same backend, same tolerances);
+moderate for maintenance because each new process must ship a kernel or
+accept the recorded slow path, which the boundary test makes visible.
+
+Recommended next task: CORE-002, express `Reaction` rate laws and the
+`FungalCouplingModel` physiology as processes or builders that emit the
+compiled representation, add an optional analytic Jacobian hook to
+`compile_rate`, then move the spatial engines onto compiled per-cell kernels;
+afterwards reduce per-sample figure output in registry ensembles.
+
 ## STATE-2026-10-04 Verified State Assessment And Next-Step Sequence
 
 Date: 2026-10-04

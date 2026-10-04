@@ -9,8 +9,9 @@ from typing import cast
 import numpy as np
 
 from fungal_model.core.assumptions import Assumption
+from fungal_model.core.kernels import KernelContext, RateKernel, conversion_factor
 from fungal_model.core.parameters import ParameterSet
-from fungal_model.core.units import Quantity, assert_compatible, require_quantity
+from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.kinetics.michaelis_menten import (
     enzyme_explicit_michaelis_menten_rate,
     michaelis_menten_rate,
@@ -112,6 +113,21 @@ class FirstOrderDecayProcess(Process):
         rate = parameters.require_quantity(self.rate_constant_symbol, "1 / second") * substrate
         return assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
 
+    def compile_rate(self, context: KernelContext) -> RateKernel | None:
+        index, to_state = context.state_slot(self.substrate_state, self.state_units)
+        rate_constant = context.parameter(self.rate_constant_symbol, "1 / second")
+        scale = conversion_factor(f"{self.state_units} / second", self.rate_units, name=f"{self.name} rate")
+        substrate_name = self.substrate_state
+
+        def kernel(time: float, state: np.ndarray) -> float:
+            del time
+            substrate = state[index] * to_state
+            if substrate < 0:
+                raise ValueError(f"{substrate_name} must be non-negative.")
+            return (rate_constant * substrate) * scale
+
+        return kernel
+
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
         contributions: dict[str, Quantity] = {self.substrate_state: cast(Quantity, -value)}
@@ -198,6 +214,29 @@ class MassActionProcess(Process):
             _ensure_non_negative(quantity, species)
             rate *= quantity ** float(order)
         return assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
+
+    def compile_rate(self, context: KernelContext) -> RateKernel | None:
+        rate_constant = context.parameter(self.rate_constant_symbol, self.rate_constant_units)
+        slots = tuple(
+            (species, *context.state_slot(species, self.state_units[species]), float(order))
+            for species, order in self.reactants.items()
+        )
+        probe = Q_(1.0, self.rate_constant_units)
+        for species, order in self.reactants.items():
+            probe = probe * Q_(1.0, self.state_units[species]) ** float(order)
+        scale = float(assert_compatible(probe, self.rate_units, name=f"{self.name} rate").magnitude)
+
+        def kernel(time: float, state: np.ndarray) -> float:
+            del time
+            rate = rate_constant
+            for species, index, to_state, order in slots:
+                quantity = state[index] * to_state
+                if quantity < 0:
+                    raise ValueError(f"{species} must be non-negative.")
+                rate *= quantity ** order
+            return rate * scale
+
+        return kernel
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
@@ -326,6 +365,52 @@ class HomogeneousMichaelisMentenProcess(Process):
             km=km,
             rate_units=self.rate_units,
         )
+
+    def compile_rate(self, context: KernelContext) -> RateKernel | None:
+        substrate_index, to_substrate = context.state_slot(self.substrate_state, self.substrate_units)
+        km = context.parameter(self.km_symbol, self.substrate_units)
+        if km <= 0:
+            raise ValueError("km must be positive for Michaelis-Menten kinetics.")
+        if self.vmax_symbol is not None:
+            vmax = context.parameter(self.vmax_symbol, self.rate_units)
+            if vmax < 0:
+                raise ValueError("vmax must be non-negative for Michaelis-Menten kinetics.")
+
+            def vmax_kernel(time: float, state: np.ndarray) -> float:
+                del time
+                substrate = state[substrate_index] * to_substrate
+                if substrate < 0:
+                    raise ValueError("substrate must be non-negative for Michaelis-Menten kinetics.")
+                return vmax * (substrate / (km + substrate))
+
+            return vmax_kernel
+        assert self.enzyme_state is not None
+        assert self.enzyme_units is not None
+        assert self.kcat_symbol is not None
+        enzyme_index, to_enzyme = context.state_slot(self.enzyme_state, self.enzyme_units)
+        kcat_units = f"{self.rate_units} / ({self.enzyme_units})"
+        kcat = context.parameter(self.kcat_symbol, kcat_units)
+        if kcat < 0:
+            raise ValueError("kcat must be non-negative for Michaelis-Menten kinetics.")
+        scale = float(
+            assert_compatible(
+                Q_(1.0, kcat_units) * Q_(1.0, self.enzyme_units),
+                self.rate_units,
+                name=f"{self.name} rate",
+            ).magnitude
+        )
+
+        def enzyme_kernel(time: float, state: np.ndarray) -> float:
+            del time
+            substrate = state[substrate_index] * to_substrate
+            enzyme = state[enzyme_index] * to_enzyme
+            if enzyme < 0:
+                raise ValueError("enzyme must be non-negative for Michaelis-Menten kinetics.")
+            if substrate < 0:
+                raise ValueError("substrate must be non-negative for Michaelis-Menten kinetics.")
+            return ((kcat * enzyme) * (substrate / (km + substrate))) * scale
+
+        return enzyme_kernel
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")

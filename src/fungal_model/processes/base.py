@@ -14,6 +14,7 @@ from typing import Any
 
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.errors import InvalidMechanismError
+from fungal_model.core.kernels import KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity
 
@@ -188,6 +189,20 @@ class Process:
 
         del rate
         raise NotImplementedError(f"Process {self.name!r} has no contribution implementation.")
+
+    def compile_rate(self, context: KernelContext) -> RateKernel | None:
+        """Return a numeric kernel reproducing :meth:`rate`, or ``None``.
+
+        A kernel receives the integration time and the numeric state vector
+        described by ``context`` and returns the rate in this process's own
+        rate units. It must raise the same errors as :meth:`rate` for invalid
+        states. ``None`` means no kernel is offered; the compiled solver then
+        evaluates :meth:`rate` on a reconstructed unit-bearing state and
+        records that explicitly.
+        """
+
+        del context
+        return None
 
     def to_dict(self) -> dict[str, Any]:
         return {

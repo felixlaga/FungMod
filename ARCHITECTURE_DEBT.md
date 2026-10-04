@@ -7,7 +7,7 @@ ID, status, reason, risk, exit condition, removal milestone, and tests
 protecting the boundary. New foundation work should remove entries from this
 file, not normalize them.
 
-Current state: no active contained entries. `FD-008` was resolved by shared
+Current state: one active contained entry, `FD-009`. `FD-008` was resolved by shared
 package integration on 2026-09-28. `FD-007` was
 resolved on 2026-08-01 by deterministic build-time staging from the canonical
 resource roots. `FD-005` was resolved in PR-41 by enabling Pyright optional-member-access
@@ -16,6 +16,44 @@ process-to-`Reaction` adapter debt was resolved in Phase 1 Task 4; retained
 `Reaction`, `SimulationEngine`, and `ReactionDiffusionEngine1D` APIs are
 intentional explicit low-level APIs, not native configured workflow
 dependencies.
+
+## FD-009 Model representations and engines outside the compiled core
+
+Status: active, contained since 2026-10-04 (CORE-001)
+
+Reason: `ProcessODESolver` now compiles `Process` models to a numeric
+stoichiometric right-hand side with build-time unit resolution. Four other
+integration paths still own their own right-hand sides: the legacy
+`Reaction`/`SimulationEngine` engine, the 1D and N-D reaction-diffusion
+engines (which evaluate `Reaction` rate laws on unit-bearing quantities per
+cell or per field), the opt-in physiology classes (`FungalCouplingModel`,
+`ResourceLimitedCulture`, `DegradingCulture`) and the research culture models.
+They predate the compiled core and are not reachable from the registry-backed
+`VirtualExperiment` path.
+
+Risk: scientific logic can drift between representations; the physiology
+needed for a whole-fungus case cannot be registered as processes; spatial
+runs stay too slow for calibration; a process without a numeric kernel could
+silently keep the slow path.
+
+Containment: every shipped process and modifier compiles to a numeric kernel
+and `tests/test_compiled_process_models.py` fails if one falls back; the
+fallback path is recorded in `solver_metadata["kernel"]`, never silent; the
+compiled path is tested for identical trajectories and evaluation counts
+against the unit-aware evaluation on every packaged config.
+
+Exit condition: `Reaction` rate laws and the physiology classes are expressed
+as processes (or builders) that emit the compiled representation; the spatial
+engines apply compiled kernels per cell with vectorized diffusion; the legacy
+`SimulationEngine` is retired; compiled models can supply a Jacobian.
+
+Removal milestone: completion of step 1 in
+`foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`, before step 2
+registers organism physiology.
+
+Tests protecting it: `tests/test_compiled_process_models.py`
+(`test_shipped_process_types_all_compile_to_numeric_kernels`,
+`test_process_without_kernel_uses_recorded_quantity_wrapped_path_exactly`).
 
 ## FD-008 Exploratory research-runner rate-law duplication
 

@@ -1440,7 +1440,11 @@ Current capability labels mean:
   inputs are required; correlated-input sensitivity and full Bayesian
   calibration are not implemented.
 - `AssembledModel.run()` currently supports well-mixed process ODE execution;
-  unsupported geometry fails before simulation.
+  unsupported geometry fails before simulation. The run compiles the model to a
+  numeric stoichiometric right-hand side with units resolved at build time and
+  records every process's kernel kind in `solver_metadata["kernel"]`
+  (`docs/compiled-core.md`). The legacy `SimulationEngine`, the spatial engines
+  and the opt-in physiology classes are not on the compiled core yet.
 - The generic configured workflow currently supports foundation process
   factories and well-mixed execution; unsupported process types and geometry
   fail before simulation.

@@ -8,6 +8,7 @@ from typing import Mapping
 import numpy as np
 
 from fungal_model.core.assumptions import Assumption
+from fungal_model.core.kernels import KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible
 from fungal_model.entities.environment import Environment
@@ -69,6 +70,21 @@ class ProductInhibitionModifier:
             str(rate.units),
             name="product-inhibition-scaled rate",
         )
+
+    def compile_activity(self, context: KernelContext) -> RateKernel | None:
+        index, to_product = context.state_slot(self.product_state, self.product_units)
+        inhibition = context.parameter(self.inhibition_constant_symbol, self.product_units)
+        if inhibition <= 0:
+            raise ValueError("Product inhibition constant must be positive.")
+
+        def kernel(time: float, state: np.ndarray) -> float:
+            del time
+            product = state[index] * to_product
+            if product < 0:
+                raise ValueError("Product concentration/amount must be non-negative.")
+            return 1.0 / (1.0 + product / inhibition)
+
+        return kernel
 
     def to_dict(self) -> dict[str, object]:
         return {
