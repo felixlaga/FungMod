@@ -208,10 +208,18 @@ uptake and product inhibition (`M2`) improves the pooled error by 23.4
 percent but worsens biomass by 31 percent, not supported under the declared
 rule; conversion-dependent accessibility [@kadam2004] (`M3`) worsens the
 pooled error by 7.9 percent with its exponent driven to the lower bound,
-not supported. Every fit has full practical rank. Stage B (posterior
-sampling of each addition, identifiability of the added parameters,
-posterior predictive coverage) is *pending*; its results will be recorded
-under the same plan digest chain.
+not supported. Every fit has full practical rank. Stage B sampled one
+all-condition posterior per addition (24 or 28 walkers, 8000 steps, the
+noise multiplier sampled jointly). None of the three chains met the
+declared convergence rule at that length, so the plan labels their verdicts
+provisional. Under those labels no addition restores adequacy (every
+multiplier interval excludes 1.0 and overlaps the baseline's 2.25); only the
+induction memory constant of `M1` is weakly identified, while the four
+constants of `M2` are prior dominated or bounded on one side and the
+exponent of `M3` is bounded above only, driven towards the baseline;
+posterior predictive coverage with measurement noise is 91 to 95 of 96
+observations. The stated misfit is not explained by any of the three
+declared mechanisms.
 
 ## Cross-solver reproduction
 
@@ -265,6 +273,8 @@ attached.
 - The least-squares optimiser's stopping rule is now known to stop above
   the minimum on this problem; the tightened rule and its re-run are
   pending.
+- The stage B chains did not reach the declared convergence rule within the
+  plan's compute cap; their verdicts are provisional.
 - Software verification (parity tests, reference simulators, cross-solver
   agreement) is not empirical validation, and this paper makes no
   predictive biological claim.
