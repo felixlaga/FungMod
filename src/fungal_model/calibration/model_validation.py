@@ -152,7 +152,7 @@ def freeze_scoped_prediction(*, result: SimulationResult, training_dataset: Expe
     prediction_hash = freeze_prediction(result=result, training_dataset=training_dataset,
                                         model_source=binding, path=output_dir/"prediction.json")
     bundle = {**contract, "prediction_sha256": prediction_hash, "contract_sha256": binding}
-    (output_dir/"contract.json").write_text(json.dumps(bundle, indent=2, allow_nan=False)+"\n")
+    (output_dir/"contract.json").write_text(json.dumps(bundle, indent=2, allow_nan=False)+"\n", encoding="utf-8")
     return bundle
 
 
@@ -164,13 +164,13 @@ def evaluate_scoped_prediction(*, bundle_dir: Path, dataset: ExperimentDataset, 
     """Compute bounded evidence status from verified inputs, never from a status flag."""
     if not has_text(domain_review_source):
         raise ValueError("Documented external domain review is required for scoped empirical evidence.")
-    bundle = json.loads((bundle_dir/"contract.json").read_text())
+    bundle = json.loads((bundle_dir/"contract.json").read_text(encoding="utf-8"))
     contract = {k:bundle[k] for k in ("schema_version", "identity", "scope", "maximum_rmse", "observable_mapping")}
     if scientific_digest(contract) != bundle["contract_sha256"]:
         raise ValueError("Model/scope/criteria contract was changed after freezing.")
     if [m.to_dict() for m in observable_mapping] != bundle["observable_mapping"]:
         raise ValueError("Observation mapping differs from the frozen model contract.")
-    prediction = json.loads((bundle_dir/"prediction.json").read_text())
+    prediction = json.loads((bundle_dir/"prediction.json").read_text(encoding="utf-8"))
     if (prediction["model_source"] != bundle["contract_sha256"]
             or plan.prediction_sha256 != bundle["prediction_sha256"]):
         raise ValueError("Prediction and validation plan are not bound to this exact model contract.")
@@ -206,7 +206,7 @@ def evaluate_scoped_prediction(*, bundle_dir: Path, dataset: ExperimentDataset, 
         "publication_claim_authorized": False}
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
-        with (output_dir/"model_validation.json").open("x") as handle:
+        with (output_dir/"model_validation.json").open("x", encoding="utf-8") as handle:
             json.dump(record, handle, indent=2, allow_nan=False)
             handle.write("\n")
     return record

@@ -186,6 +186,18 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- The cross-engine reference simulator compiles kinetic laws from their L3
+  infix text instead of libSBML `ASTNode` objects, so SBML round-trip and
+  trajectory checks no longer fail once `libsedml` has been imported in the
+  same process (SWIG proxy registry clash). Unsupported constructs still raise
+  `SbmlExportError`, now at compile time.
+- Repository data and documentation are read as UTF-8 explicitly; Windows
+  no longer decodes `±` and non-ASCII text with cp1252. Frozen-artifact
+  manifest paths compare as POSIX on every platform.
+- The Gelain joint holdout replay test propagates the prediction tolerance
+  into its score comparison instead of using a fixed 1e-6 absolute tolerance
+  that activity predictions of order 1e3 U/L could not meet under current
+  SciPy. Frozen artifacts are unchanged.
 - Analytic piecewise Jacobians for resource-limited and integrated cultures
   prevent finite-difference perturbation overflow in non-feedback ledger states
   during depletion. Rate laws and conservation equations are unchanged.

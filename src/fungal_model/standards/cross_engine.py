@@ -21,10 +21,11 @@ verification aid, not a general-purpose SBML simulator.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import re
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -35,39 +36,172 @@ if TYPE_CHECKING:
     from fungal_model.processes.assembly import AssembledModel
 
 
-def _evaluate_ast(node: Any, environment: Mapping[str, float], libsbml: Any) -> float:
-    """Evaluate a libsbml math AST over a variable environment."""
+KineticFormula = Callable[[Mapping[str, float]], float]
+"""A compiled kinetic law: maps a symbol environment to a rate."""
 
-    node_type = node.getType()
-    if node_type == libsbml.AST_INTEGER:
-        return float(node.getInteger())
-    if node_type in (libsbml.AST_REAL, libsbml.AST_REAL_E, libsbml.AST_RATIONAL):
-        return float(node.getReal())
-    if node_type == libsbml.AST_NAME:
-        name = node.getName()
-        try:
-            return float(environment[name])
-        except KeyError as exc:
-            raise SbmlExportError(f"Unknown symbol {name!r} in kinetic law.") from exc
-    if node_type == libsbml.AST_PLUS:
-        return float(sum(_evaluate_ast(node.getChild(i), environment, libsbml) for i in range(node.getNumChildren())))
-    if node_type == libsbml.AST_MINUS:
-        if node.getNumChildren() == 1:
-            return -_evaluate_ast(node.getChild(0), environment, libsbml)
-        return _evaluate_ast(node.getChild(0), environment, libsbml) - _evaluate_ast(node.getChild(1), environment, libsbml)
-    if node_type == libsbml.AST_TIMES:
-        product = 1.0
-        for index in range(node.getNumChildren()):
-            product *= _evaluate_ast(node.getChild(index), environment, libsbml)
-        return product
-    if node_type == libsbml.AST_DIVIDE:
-        return _evaluate_ast(node.getChild(0), environment, libsbml) / _evaluate_ast(node.getChild(1), environment, libsbml)
-    if node_type in (libsbml.AST_POWER, libsbml.AST_FUNCTION_POWER):
-        return _evaluate_ast(node.getChild(0), environment, libsbml) ** _evaluate_ast(node.getChild(1), environment, libsbml)
-    raise SbmlExportError(
-        f"Kinetic law contains an unsupported operation for the reference simulator: "
-        f"{libsbml.formulaToL3String(node)}"
+_NUMBER = re.compile(r"(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?")
+_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_OPERATORS = frozenset("+-*/^(),")
+
+
+def _unsupported(formula: str, detail: str) -> SbmlExportError:
+    return SbmlExportError(
+        "Kinetic law contains an unsupported operation for the reference simulator: "
+        f"{formula} ({detail})"
     )
+
+
+def _tokenize(formula: str) -> list[tuple[str, str]]:
+    tokens: list[tuple[str, str]] = []
+    position = 0
+    while position < len(formula):
+        character = formula[position]
+        if character.isspace():
+            position += 1
+            continue
+        if character in _OPERATORS:
+            tokens.append(("operator", character))
+            position += 1
+            continue
+        for kind, pattern in (("number", _NUMBER), ("name", _NAME)):
+            match = pattern.match(formula, position)
+            if match is not None:
+                tokens.append((kind, match.group(0)))
+                position = match.end()
+                break
+        else:
+            raise _unsupported(formula, f"unrecognised text {formula[position:position + 12]!r}")
+    return tokens
+
+
+def _binary(operator: str, left: KineticFormula, right: KineticFormula) -> KineticFormula:
+    if operator == "+":
+        return lambda environment: left(environment) + right(environment)
+    if operator == "-":
+        return lambda environment: left(environment) - right(environment)
+    if operator == "*":
+        return lambda environment: left(environment) * right(environment)
+    if operator == "/":
+        return lambda environment: left(environment) / right(environment)
+    return lambda environment: left(environment) ** right(environment)
+
+
+class _FormulaParser:
+    """Recursive-descent parser for the L3 infix subset FungMod emits.
+
+    Grammar (``^`` binds tighter than unary minus and is right-associative,
+    matching libSBML's L3 infix rules)::
+
+        expression := term (("+" | "-") term)*
+        term       := unary (("*" | "/") unary)*
+        unary      := ("+" | "-") unary | power
+        power      := atom ("^" unary)?
+        atom       := NUMBER | NAME | "pow" "(" expression "," expression ")"
+                    | "(" expression ")"
+    """
+
+    def __init__(self, formula: str, symbols: Collection[str]) -> None:
+        self.formula = formula
+        self.symbols = frozenset(symbols)
+        self.tokens = _tokenize(formula)
+        self.position = 0
+
+    def parse(self) -> KineticFormula:
+        if not self.tokens:
+            raise _unsupported(self.formula, "empty formula")
+        result = self._expression()
+        if self.position != len(self.tokens):
+            raise _unsupported(self.formula, f"unexpected {self.tokens[self.position][1]!r}")
+        return result
+
+    def _peek(self, *operators: str) -> str | None:
+        if self.position < len(self.tokens):
+            kind, value = self.tokens[self.position]
+            if kind == "operator" and value in operators:
+                return value
+        return None
+
+    def _expect(self, operator: str) -> None:
+        if self._peek(operator) is None:
+            raise _unsupported(self.formula, f"expected {operator!r}")
+        self.position += 1
+
+    def _expression(self) -> KineticFormula:
+        result = self._term()
+        while (operator := self._peek("+", "-")) is not None:
+            self.position += 1
+            result = _binary(operator, result, self._term())
+        return result
+
+    def _term(self) -> KineticFormula:
+        result = self._unary()
+        while (operator := self._peek("*", "/")) is not None:
+            self.position += 1
+            result = _binary(operator, result, self._unary())
+        return result
+
+    def _unary(self) -> KineticFormula:
+        operator = self._peek("+", "-")
+        if operator is None:
+            return self._power()
+        self.position += 1
+        operand = self._unary()
+        if operator == "+":
+            return operand
+        return lambda environment: -operand(environment)
+
+    def _power(self) -> KineticFormula:
+        base = self._atom()
+        if self._peek("^") is None:
+            return base
+        self.position += 1
+        return _binary("^", base, self._unary())
+
+    def _atom(self) -> KineticFormula:
+        if self.position >= len(self.tokens):
+            raise _unsupported(self.formula, "incomplete expression")
+        kind, value = self.tokens[self.position]
+        self.position += 1
+        if kind == "number":
+            constant = float(value)
+            return lambda _environment: constant
+        if kind == "name":
+            if self._peek("(") is not None:
+                if value != "pow":
+                    raise _unsupported(self.formula, f"function {value!r}")
+                self.position += 1
+                base = self._expression()
+                self._expect(",")
+                exponent = self._expression()
+                self._expect(")")
+                return _binary("^", base, exponent)
+            if value not in self.symbols:
+                raise SbmlExportError(f"Unknown symbol {value!r} in kinetic law.")
+            name = value
+            return lambda environment: float(environment[name])
+        if kind == "operator" and value == "(":
+            inner = self._expression()
+            self._expect(")")
+            return inner
+        raise _unsupported(self.formula, f"unexpected {value!r}")
+
+
+def compile_kinetic_formula(formula: str, symbols: Collection[str]) -> KineticFormula:
+    """Compile an L3 infix kinetic law into a callable over a symbol environment.
+
+    Only the subset FungMod emits is accepted: numbers, the given ``symbols``,
+    ``+ - * /``, ``^`` and ``pow(base, exponent)``. Anything else raises
+    :class:`~fungal_model.standards.sbml.SbmlExportError` at compile time, so a
+    wrong rate can never be integrated silently.
+
+    The reference simulator works from the formula *text* rather than from
+    libSBML ``ASTNode`` objects on purpose. SWIG keeps one proxy registry per
+    process, so once ``libsedml`` has been imported (for example by a SED-ML
+    export in the same session), kinetic-law nodes come back wrapped by its
+    classes and libSBML's ``AST_*`` type constants no longer match them.
+    """
+
+    return _FormulaParser(formula, symbols).parse()
 
 
 def simulate_reference_sbml(
@@ -134,7 +268,8 @@ def simulate_reference_sbml(
             raise SbmlExportError(f"Reference simulator requires constant parameters; {parameter.getId()!r} is not.")
         parameters[parameter.getId()] = parameter.getValue()
 
-    reactions = []
+    symbols = set(parameters) | set(species_ids)
+    reactions: list[tuple[KineticFormula, dict[str, float]]] = []
     for i in range(model.getNumReactions()):
         reaction = model.getReaction(i)
         kinetic_law = reaction.getKineticLaw()
@@ -151,15 +286,18 @@ def simulate_reference_sbml(
             stoichiometry[reference.getSpecies()] = (
                 stoichiometry.get(reference.getSpecies(), 0.0) + reference.getStoichiometry()
             )
-        reactions.append((kinetic_law.getMath(), stoichiometry))
+        formula = libsbml.formulaToL3String(kinetic_law.getMath())
+        if not formula:
+            raise SbmlExportError(f"Reaction {reaction.getId()!r} has an unreadable kinetic law.")
+        reactions.append((compile_kinetic_formula(formula, symbols), stoichiometry))
 
     def rhs(_t: float, y: np.ndarray) -> np.ndarray:
         environment: dict[str, float] = dict(parameters)
         for species_id in species_ids:
             environment[species_id] = y[index[species_id]]
         derivatives = np.zeros_like(y)
-        for math_ast, stoichiometry in reactions:
-            rate = _evaluate_ast(math_ast, environment, libsbml)
+        for rate_of, stoichiometry in reactions:
+            rate = rate_of(environment)
             for species_id, coefficient in stoichiometry.items():
                 derivatives[index[species_id]] += coefficient * rate
         return derivatives
