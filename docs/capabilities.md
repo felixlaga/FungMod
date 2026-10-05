@@ -114,6 +114,7 @@ Unsupported scope should remain explicit in preflight, limitations, or errors.
 ## Research reproducibility additions
 
 - SBML supports explicit numeric unit conversions; PEtab preserves split membership and rejects unknown noise scales.
+- SBML export covers proportional synthesis, parameter-bound stoichiometric coefficients (as separate reactions) and assay-activity units (as named dimensionless definitions); `conditions_to_petab` exports multi-condition problems from assembled models, and `fungal_model.standards.copasi` reproduces them in COPASI with the column weights corrected to `1/sigma^2`.
 - Calibration supports grid profile likelihood under explicit independent Gaussian observation scales, with failures and local-optimum limitations reported.
 - Frozen-prediction evaluation checks artifact hashes, raw replicate means, supplied experimental uncertainty and sourced RMSE criteria without refitting. No independent empirical dataset is bundled, and publication authorization remains false.
 - Exploratory inhibition runners share package integration and the configured inhibition denominator; exponential activity loss remains a study hypothesis.

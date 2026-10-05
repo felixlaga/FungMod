@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version2/core" level="3" version="2">
+  <model metaid="meta_gelain_2020_cellulose_hydrolysis_candidate" id="gelain_2020_cellulose_hydrolysis_candidate" name="gelain_2020_cellulose_hydrolysis_candidate" timeUnits="unit_0">
+    <notes>
+      <body xmlns="http://www.w3.org/1999/xhtml">
+        <p>Exported from FungMod. Well-mixed model; species are represented as SBML amounts in a unit (size 1) compartment so the kinetic law reproduces FungMod&apos;s rate law exactly.</p>
+        <p>Assay-activity base units without an SI representation are written as named dimensionless unit definitions; the kinetic laws carry every numeric conversion explicitly and no SI equivalent is implied: filter_paper_unit, beta_glucosidase_assay_unit.</p>
+      </body>
+    </notes>
+    <listOfUnitDefinitions>
+      <unitDefinition id="unit_0" name="second">
+        <listOfUnits>
+          <unit kind="second" exponent="1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="unit_1" name="gram / liter">
+        <listOfUnits>
+          <unit kind="kilogram" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="metre" exponent="-3" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="unit_2" name="filter_paper_unit / liter">
+        <listOfUnits>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="1000"/>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="metre" exponent="-3" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="unit_3" name="beta_glucosidase_assay_unit / liter">
+        <listOfUnits>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="1000"/>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="metre" exponent="-3" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="unit_4" name="gram / filter_paper_unit / hour">
+        <listOfUnits>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="2.77777777777778e-07"/>
+          <unit kind="kilogram" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="dimensionless" exponent="-1" scale="0" multiplier="1"/>
+          <unit kind="second" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="unit_5" name="dimensionless">
+        <listOfUnits>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="unit_6" name="1 / hour">
+        <listOfUnits>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="0.000277777777777778"/>
+          <unit kind="second" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="unit_7" name="filter_paper_unit / gram / hour">
+        <listOfUnits>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="0.277777777777778"/>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="kilogram" exponent="-1" scale="0" multiplier="1"/>
+          <unit kind="second" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="unit_8" name="beta_glucosidase_assay_unit / gram / hour">
+        <listOfUnits>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="0.277777777777778"/>
+          <unit kind="dimensionless" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="kilogram" exponent="-1" scale="0" multiplier="1"/>
+          <unit kind="second" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+    </listOfUnitDefinitions>
+    <listOfCompartments>
+      <compartment id="compartment" spatialDimensions="3" size="1" constant="true"/>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species metaid="meta_cellulose_concentration" sboTerm="SBO:0000247" id="cellulose_concentration" name="cellulose_concentration" compartment="compartment" initialAmount="10" substanceUnits="unit_1" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_cellulase_activity" sboTerm="SBO:0000252" id="cellulase_activity" name="cellulase_activity" compartment="compartment" initialAmount="0" substanceUnits="unit_2" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_biomass_dry_mass_concentration" sboTerm="SBO:0000247" id="biomass_dry_mass_concentration" name="biomass_dry_mass_concentration" compartment="compartment" initialAmount="0.399067295721479" substanceUnits="unit_1" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_consumed_cellulose_not_retained_as_biomass" sboTerm="SBO:0000247" id="consumed_cellulose_not_retained_as_biomass" name="consumed_cellulose_not_retained_as_biomass" compartment="compartment" initialAmount="0" substanceUnits="unit_1" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_biomass_dry_mass_lost" sboTerm="SBO:0000247" id="biomass_dry_mass_lost" name="biomass_dry_mass_lost" compartment="compartment" initialAmount="0" substanceUnits="unit_1" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+      <species metaid="meta_beta_glucosidase_activity" sboTerm="SBO:0000247" id="beta_glucosidase_activity" name="beta_glucosidase_activity" compartment="compartment" initialAmount="0" substanceUnits="unit_3" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
+    </listOfSpecies>
+    <listOfParameters>
+      <parameter sboTerm="SBO:0000025" id="gelain_hydrolysis_k_h" name="gelain_hydrolysis_k_h" value="0.0126817768982733" units="unit_4" constant="true"/>
+      <parameter sboTerm="SBO:0000027" id="gelain_hydrolysis_Kh" name="gelain_hydrolysis_Kh" value="10.5319974525124" units="unit_1" constant="true"/>
+      <parameter id="gelain_hydrolysis_Y" name="gelain_hydrolysis_Y" value="0.371701352854374" units="unit_5" constant="true"/>
+      <parameter sboTerm="SBO:0000009" id="gelain_hydrolysis_kd" name="gelain_hydrolysis_kd" value="0.0179200397624115" units="unit_6" constant="true"/>
+      <parameter id="gelain_hydrolysis_K_ind" name="gelain_hydrolysis_K_ind" value="0.0100875670167932" units="unit_1" constant="true"/>
+      <parameter id="gelain_hydrolysis_qF" name="gelain_hydrolysis_qF" value="6.88366129038644" units="unit_7" constant="true"/>
+      <parameter sboTerm="SBO:0000009" id="gelain_hydrolysis_kF" name="gelain_hydrolysis_kF" value="3.90391812341789e-05" units="unit_6" constant="true"/>
+      <parameter id="gelain_hydrolysis_qB" name="gelain_hydrolysis_qB" value="15.9925269264189" units="unit_8" constant="true"/>
+      <parameter sboTerm="SBO:0000009" id="gelain_hydrolysis_kB" name="gelain_hydrolysis_kB" value="1.24273576098419e-06" units="unit_6" constant="true"/>
+      <parameter id="gelain_2020_cellulose_initial_biomass" name="gelain_2020_cellulose_initial_biomass" value="0.399067295721479" units="unit_1" constant="true"/>
+      <parameter id="gelain_2020_cellulose_initial_loading" name="gelain_2020_cellulose_initial_loading" value="10" units="unit_1" constant="true"/>
+      <parameter id="gelain_2020_cellulose_initial_cellulase_activity" name="gelain_2020_cellulose_initial_cellulase_activity" value="0" units="unit_2" constant="true"/>
+      <parameter id="gelain_2020_cellulose_initial_beta_glucosidase_activity" name="gelain_2020_cellulose_initial_beta_glucosidase_activity" value="0" units="unit_3" constant="true"/>
+    </listOfParameters>
+    <listOfReactions>
+      <reaction metaid="meta_cellulase_limited_cellulose_consumption__reaction_0" sboTerm="SBO:0000176" id="cellulase_limited_cellulose_consumption__reaction_0" name="cellulase_limited_cellulose_consumption" reversible="false">
+        <listOfReactants>
+          <speciesReference species="cellulose_concentration" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfModifiers>
+          <modifierSpeciesReference sboTerm="SBO:0000460" species="cellulase_activity"/>
+        </listOfModifiers>
+        <kineticLaw sboTerm="SBO:0000029">
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.000277777777777778 </cn>
+              <apply>
+                <divide/>
+                <apply>
+                  <times/>
+                  <ci> gelain_hydrolysis_k_h </ci>
+                  <ci> cellulase_activity </ci>
+                  <ci> cellulose_concentration </ci>
+                </apply>
+                <apply>
+                  <plus/>
+                  <ci> gelain_hydrolysis_Kh </ci>
+                  <ci> cellulose_concentration </ci>
+                </apply>
+              </apply>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction metaid="meta_cellulase_limited_cellulose_consumption__biomass_dry_mass_concentration__reaction_0" sboTerm="SBO:0000176" id="cellulase_limited_cellulose_consumption__biomass_dry_mass_concentration__reaction_0" name="cellulase_limited_cellulose_consumption -&gt; biomass_dry_mass_concentration" reversible="false">
+        <listOfProducts>
+          <speciesReference species="biomass_dry_mass_concentration" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <listOfModifiers>
+          <modifierSpeciesReference sboTerm="SBO:0000460" species="cellulose_concentration"/>
+          <modifierSpeciesReference sboTerm="SBO:0000460" species="cellulase_activity"/>
+        </listOfModifiers>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.000277777777777778 </cn>
+              <ci> gelain_hydrolysis_Y </ci>
+              <apply>
+                <divide/>
+                <apply>
+                  <times/>
+                  <ci> gelain_hydrolysis_k_h </ci>
+                  <ci> cellulase_activity </ci>
+                  <ci> cellulose_concentration </ci>
+                </apply>
+                <apply>
+                  <plus/>
+                  <ci> gelain_hydrolysis_Kh </ci>
+                  <ci> cellulose_concentration </ci>
+                </apply>
+              </apply>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction metaid="meta_cellulase_limited_cellulose_consumption__consumed_cellulose_not_retained_as_biomass__reaction_0" sboTerm="SBO:0000176" id="cellulase_limited_cellulose_consumption__consumed_cellulose_not_retained_as_biomass__reaction_0" name="cellulase_limited_cellulose_consumption -&gt; consumed_cellulose_not_retained_as_biomass" reversible="false">
+        <listOfProducts>
+          <speciesReference species="consumed_cellulose_not_retained_as_biomass" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <listOfModifiers>
+          <modifierSpeciesReference sboTerm="SBO:0000460" species="cellulose_concentration"/>
+          <modifierSpeciesReference sboTerm="SBO:0000460" species="cellulase_activity"/>
+        </listOfModifiers>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.000277777777777778 </cn>
+              <apply>
+                <minus/>
+                <cn type="integer"> 1 </cn>
+                <ci> gelain_hydrolysis_Y </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <apply>
+                  <times/>
+                  <ci> gelain_hydrolysis_k_h </ci>
+                  <ci> cellulase_activity </ci>
+                  <ci> cellulose_concentration </ci>
+                </apply>
+                <apply>
+                  <plus/>
+                  <ci> gelain_hydrolysis_Kh </ci>
+                  <ci> cellulose_concentration </ci>
+                </apply>
+              </apply>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction metaid="meta_biomass_loss__reaction_1" sboTerm="SBO:0000176" id="biomass_loss__reaction_1" name="biomass_loss" reversible="false">
+        <listOfReactants>
+          <speciesReference species="biomass_dry_mass_concentration" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="biomass_dry_mass_lost" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <kineticLaw sboTerm="SBO:0000049">
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.000277777777777778 </cn>
+              <ci> gelain_hydrolysis_kd </ci>
+              <ci> biomass_dry_mass_concentration </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction metaid="meta_cellulase_synthesis__reaction_2" sboTerm="SBO:0000176" id="cellulase_synthesis__reaction_2" name="cellulase_synthesis" reversible="false">
+        <listOfProducts>
+          <speciesReference species="cellulase_activity" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <listOfModifiers>
+          <modifierSpeciesReference sboTerm="SBO:0000460" species="biomass_dry_mass_concentration"/>
+          <modifierSpeciesReference sboTerm="SBO:0000460" species="cellulose_concentration"/>
+        </listOfModifiers>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.000277777777777778 </cn>
+              <apply>
+                <divide/>
+                <apply>
+                  <times/>
+                  <ci> gelain_hydrolysis_qF </ci>
+                  <ci> biomass_dry_mass_concentration </ci>
+                  <ci> cellulose_concentration </ci>
+                </apply>
+                <apply>
+                  <plus/>
+                  <ci> gelain_hydrolysis_K_ind </ci>
+                  <ci> cellulose_concentration </ci>
+                </apply>
+              </apply>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction metaid="meta_cellulase_loss__reaction_3" sboTerm="SBO:0000176" id="cellulase_loss__reaction_3" name="cellulase_loss" reversible="false">
+        <listOfReactants>
+          <speciesReference species="cellulase_activity" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <kineticLaw sboTerm="SBO:0000049">
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.000277777777777778 </cn>
+              <ci> gelain_hydrolysis_kF </ci>
+              <ci> cellulase_activity </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction metaid="meta_beta_glucosidase_synthesis__reaction_4" sboTerm="SBO:0000176" id="beta_glucosidase_synthesis__reaction_4" name="beta_glucosidase_synthesis" reversible="false">
+        <listOfProducts>
+          <speciesReference species="beta_glucosidase_activity" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <listOfModifiers>
+          <modifierSpeciesReference sboTerm="SBO:0000460" species="biomass_dry_mass_concentration"/>
+          <modifierSpeciesReference sboTerm="SBO:0000460" species="cellulose_concentration"/>
+        </listOfModifiers>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.000277777777777778 </cn>
+              <apply>
+                <divide/>
+                <apply>
+                  <times/>
+                  <ci> gelain_hydrolysis_qB </ci>
+                  <ci> biomass_dry_mass_concentration </ci>
+                  <ci> cellulose_concentration </ci>
+                </apply>
+                <apply>
+                  <plus/>
+                  <ci> gelain_hydrolysis_K_ind </ci>
+                  <ci> cellulose_concentration </ci>
+                </apply>
+              </apply>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction metaid="meta_beta_glucosidase_loss__reaction_5" sboTerm="SBO:0000176" id="beta_glucosidase_loss__reaction_5" name="beta_glucosidase_loss" reversible="false">
+        <listOfReactants>
+          <speciesReference species="beta_glucosidase_activity" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <kineticLaw sboTerm="SBO:0000049">
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <times/>
+              <cn> 0.000277777777777778 </cn>
+              <ci> gelain_hydrolysis_kB </ci>
+              <ci> beta_glucosidase_activity </ci>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+    </listOfReactions>
+  </model>
+</sbml>

@@ -280,6 +280,7 @@ def _product_map_specs(
             "products": products["coefficients"],
             "parameter_roles": tuple((*reactants["roles"], *products["roles"])),
             "coefficient_provenance": {**reactants["provenance"], **products["provenance"]},
+            "coefficient_bindings": dict(products["bindings"]),
         }
     return specs
 
@@ -299,6 +300,7 @@ def _coefficients(
     coefficients: dict[str, float] = {}
     roles: list[str] = []
     provenance: dict[str, str] = {}
+    bindings: dict[str, dict[str, Any]] = {}
     for role, raw_coefficient in value.items():
         state_name = _template_state(template, str(role))
         if isinstance(raw_coefficient, Mapping):
@@ -324,6 +326,10 @@ def _coefficients(
                 f"{'1 - ' if field == 'complement_of_parameter_role' else ''}{record.parameter_symbol} "
                 f"from registry parameter record {record.record_id} (role {parameter_role})"
             )
+            bindings[state_name] = {
+                "parameter_symbol": record.parameter_symbol,
+                "complement": field == "complement_of_parameter_role",
+            }
         else:
             try:
                 numeric = float(raw_coefficient)
@@ -339,7 +345,7 @@ def _coefficients(
                 f"non-negative coefficient; got {numeric!r}."
             )
         coefficients[state_name] = numeric
-    return {"coefficients": coefficients, "roles": roles, "provenance": provenance}
+    return {"coefficients": coefficients, "roles": roles, "provenance": provenance, "bindings": bindings}
 
 
 def _process_template_specs(
@@ -689,6 +695,9 @@ def _entities(
                     "notes": spec["notes"],
                     "reactants": dict(spec["reactants"]),
                     "products": dict(spec["products"]),
+                    "coefficient_bindings": {
+                        state: dict(binding) for state, binding in spec["coefficient_bindings"].items()
+                    },
                 },
             }
             for spec in product_maps.values()

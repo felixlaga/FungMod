@@ -15,6 +15,13 @@ The files are written with the standard library, so producing a PEtab problem
 needs no PEtab dependency (only the ``standards`` extra's libsbml, for the SBML
 model). Units are converted so measurement values and times match the SBML
 model's species units and seconds.
+
+:func:`conditions_to_petab` exports a multi-condition estimation problem from
+assembled models directly: one shared SBML model, a condition table that sets
+the species whose initial values differ between conditions, an observable per
+measured state with its declared noise scale, and a parameter table with the
+caller's bounds. It is the path for registry cases whose conditions are built
+by a config factory rather than described by a single calibration config.
 """
 
 from __future__ import annotations
@@ -23,14 +30,20 @@ import csv
 import io
 import json
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
-from fungal_model.core.units import Q_
+import numpy as np
+
+from fungal_model.core.units import Q_, Quantity
 from fungal_model.standards.sbml import SbmlExportError, to_sbml
+
+if TYPE_CHECKING:
+    from fungal_model.processes.assembly import AssembledModel
 
 PETAB_FORMAT_VERSION = 1
 
@@ -282,6 +295,319 @@ def calibration_config_to_petab(
     )
 
 
+@dataclass(frozen=True)
+class PetabObservable:
+    """One observable measured as one model state, reported in ``units``."""
+
+    observable: str
+    state: str
+    units: str
+
+    def __post_init__(self) -> None:
+        if not str(self.observable).strip() or not str(self.state).strip():
+            raise PetabExportError("A PEtab observable needs an observable name and a state name.")
+        Q_(1.0, self.units)
+
+
+@dataclass(frozen=True)
+class PetabParameter:
+    """An estimated parameter: FungMod symbol, bounds and nominal value in its model units."""
+
+    symbol: str
+    lower: float
+    upper: float
+    nominal: float
+    scale: str = "log10"
+    name: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.scale not in {"lin", "log", "log10"}:
+            raise PetabExportError(f"Parameter {self.symbol!r}: unsupported PEtab scale {self.scale!r}.")
+        values = (float(self.lower), float(self.upper), float(self.nominal))
+        if not all(math.isfinite(v) for v in values) or not values[0] < values[1] or not values[0] <= values[2] <= values[1]:
+            raise PetabExportError(
+                f"Parameter {self.symbol!r} requires finite ordered bounds containing its nominal value."
+            )
+        if self.scale != "lin" and values[0] <= 0:
+            raise PetabExportError(f"Parameter {self.symbol!r}: a log scale needs a positive lower bound.")
+
+
+@dataclass(frozen=True)
+class PetabCondition:
+    """Observations of one condition and the assembled model that predicts them.
+
+    ``times`` are in ``time_units``; ``observed`` has one column per observable
+    (in the observable's declared units, ``nan`` where not measured); ``noise``
+    holds the standard deviation of each observation, either one value per
+    observable or one per observed value.
+    """
+
+    condition_id: str
+    model: "AssembledModel"
+    initial_state: Mapping[str, Quantity]
+    time_units: str
+    times: np.ndarray
+    observed: np.ndarray
+    noise: np.ndarray
+    name: str | None = None
+
+    def __post_init__(self) -> None:
+        if not str(self.condition_id).strip():
+            raise PetabExportError("A PEtab condition needs an identifier.")
+        times = np.asarray(self.times, dtype=float)
+        observed = np.asarray(self.observed, dtype=float)
+        noise = np.asarray(self.noise, dtype=float)
+        if times.ndim != 1 or not times.size or not np.all(np.isfinite(times)):
+            raise PetabExportError(f"{self.condition_id}: times must be a finite one-dimensional array.")
+        if observed.ndim != 2 or observed.shape[0] != times.size:
+            raise PetabExportError(f"{self.condition_id}: observed must have shape (times, observables).")
+        if noise.ndim == 1:
+            noise = np.broadcast_to(noise, observed.shape)
+        if noise.shape != observed.shape:
+            raise PetabExportError(f"{self.condition_id}: noise must have one value per observable or per observation.")
+        Q_(1.0, self.time_units).to("second")
+        object.__setattr__(self, "times", times)
+        object.__setattr__(self, "observed", observed)
+        object.__setattr__(self, "noise", np.array(noise, dtype=float))
+
+
+def conditions_to_petab(
+    conditions: Sequence[PetabCondition],
+    *,
+    observables: Sequence[PetabObservable],
+    parameters: Sequence[PetabParameter],
+    output_dir: str | Path,
+    model_id: str = "fungmod_model",
+    fixed_parameters: Sequence[PetabParameter] = (),
+) -> PetabExport:
+    """Export a multi-condition estimation problem as a PEtab directory.
+
+    Every condition must assemble to the same model structure (species,
+    parameters and reactions); only initial states may differ, and the species
+    whose initial values differ become columns of the condition table. Each
+    observed value needs a finite positive noise standard deviation; when a
+    noise scale is constant for an observable it is written into the observable
+    table's ``noiseFormula`` as a number (which every PEtab consumer, including
+    COPASI's importer, honours), otherwise per-row ``noiseParameters`` are used.
+
+    Raises:
+        PetabExportError: If the conditions disagree in structure, an observable
+            is not a model state, a parameter is not exported to SBML, or a
+            noise scale is missing or non-positive.
+    """
+
+    if not conditions:
+        raise PetabExportError("At least one condition is required.")
+    if not observables:
+        raise PetabExportError("At least one observable is required.")
+    if not parameters:
+        raise PetabExportError("At least one estimated parameter is required.")
+    ids = [condition.condition_id for condition in conditions]
+    if len(set(ids)) != len(ids):
+        raise PetabExportError("Condition identifiers must be unique.")
+    for condition in conditions:
+        if condition.observed.shape[1] != len(observables):
+            raise PetabExportError(
+                f"{condition.condition_id}: observed has {condition.observed.shape[1]} columns for "
+                f"{len(observables)} observables."
+            )
+
+    reference = conditions[0]
+    sbml_text = to_sbml(reference.model, initial_state=reference.initial_state, model_id=model_id, names_as_ids=True)
+    signature, _ = _sbml_structure(sbml_text)
+    parameter_values: list[dict[str, float]] = []
+    for condition in conditions:
+        other = to_sbml(condition.model, initial_state=condition.initial_state, model_id=model_id, names_as_ids=True)
+        other_signature, values = _sbml_structure(other)
+        if other_signature != signature:
+            raise PetabExportError(
+                f"Condition {condition.condition_id!r} assembles to a different model than "
+                f"{reference.condition_id!r}; PEtab conditions may differ only in initial states and parameter values."
+            )
+        parameter_values.append(values)
+    exported_symbols = [p.symbol for p in reference.model.parameters if p.quantity is not None]
+    species_name_to_id, parameter_ids = _sbml_symbol_maps(sbml_text, exported_symbols)
+    state_units = {spec.name: spec.units for spec in reference.model.state_variables}
+
+    # Species whose initial value, and parameters whose value, differ between
+    # conditions become condition columns; everything else stays in the model.
+    varying: list[str] = []
+    for name in state_units:
+        values = [float(condition.initial_state[name].to(state_units[name]).magnitude) for condition in conditions]
+        if any(not math.isclose(value, values[0], rel_tol=1e-12, abs_tol=0.0) for value in values):
+            varying.append(name)
+    varying_parameters: list[str] = []
+    for parameter_id in parameter_values[0]:
+        values = [entry[parameter_id] for entry in parameter_values]
+        if any(not math.isclose(value, values[0], rel_tol=1e-12, abs_tol=0.0) for value in values):
+            varying_parameters.append(parameter_id)
+    estimated_ids = {parameter_ids[spec.symbol] for spec in parameters if spec.symbol in parameter_ids}
+    clash = sorted(estimated_ids.intersection(varying_parameters))
+    if clash:
+        raise PetabExportError(
+            "An estimated parameter cannot also take condition-specific values: " + ", ".join(clash) + "."
+        )
+
+    observable_rows: list[list[Any]] = []
+    observable_ids: list[str] = []
+    factors: list[float] = []
+    for mapping in observables:
+        if mapping.state not in species_name_to_id:
+            raise PetabExportError(f"Observable {mapping.observable!r}: state {mapping.state!r} is not an exported SBML species.")
+        observable_id = _sanitize_id(f"observable_{mapping.observable}")
+        if observable_id in observable_ids:
+            raise PetabExportError(f"Duplicate or colliding observable ID: {observable_id!r}.")
+        factor = float(Q_(1.0, state_units[mapping.state]).to(mapping.units).magnitude)
+        species_id = species_name_to_id[mapping.state]
+        formula = species_id if factor == 1.0 else f"{factor:.17g} * {species_id}"
+        observable_ids.append(observable_id)
+        factors.append(factor)
+        observable_rows.append([observable_id, mapping.observable, formula, "lin", None, "normal"])
+
+    measurement_rows: list[list[Any]] = []
+    noise_values: list[set[float]] = [set() for _ in observables]
+    for condition in conditions:
+        for row, time in enumerate(condition.times):
+            seconds = float(Q_(float(time), condition.time_units).to("second").magnitude)
+            for column, observable_id in enumerate(observable_ids):
+                value = float(condition.observed[row, column])
+                if not math.isfinite(value):
+                    continue
+                noise = float(condition.noise[row, column])
+                if not math.isfinite(noise) or noise <= 0.0:
+                    raise PetabExportError(
+                        f"{condition.condition_id}: observable {observables[column].observable!r} at time {time} "
+                        "needs a finite positive noise standard deviation."
+                    )
+                noise_values[column].add(noise)
+                measurement_rows.append([observable_id, condition.condition_id, value, seconds, noise])
+    if not measurement_rows:
+        raise PetabExportError("No finite observations to export.")
+    constant_noise = [len(values) == 1 for values in noise_values]
+    for column, (row, constant) in enumerate(zip(observable_rows, constant_noise, strict=True)):
+        row[4] = f"{next(iter(noise_values[column])):.17g}" if constant else f"noiseParameter1_{observable_ids[column]}"
+    if all(constant_noise):
+        measurement_rows = [row[:4] for row in measurement_rows]
+
+    parameter_rows: list[list[Any]] = []
+    seen_parameters: set[str] = set()
+    for estimate, group in ((1, parameters), (0, fixed_parameters)):
+        for spec in group:
+            if spec.symbol not in parameter_ids:
+                raise PetabExportError(f"Parameter {spec.symbol!r} is not an exported SBML parameter.")
+            if spec.symbol in seen_parameters:
+                raise PetabExportError(f"Parameter {spec.symbol!r} is listed twice.")
+            seen_parameters.add(spec.symbol)
+            parameter_rows.append(
+                [parameter_ids[spec.symbol], spec.name or spec.symbol, spec.scale, float(spec.lower), float(spec.upper), float(spec.nominal), estimate]
+            )
+
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    sbml_path = directory / "model.xml"
+    sbml_path.write_text(sbml_text, encoding="utf-8", newline="")
+    observables_path = directory / "observables.tsv"
+    measurements_path = directory / "measurements.tsv"
+    conditions_path = directory / "conditions.tsv"
+    parameters_path = directory / "parameters.tsv"
+    metadata_path = directory / "export_metadata.json"
+
+    _write_tsv(
+        observables_path,
+        ["observableId", "observableName", "observableFormula", "observableTransformation", "noiseFormula", "noiseDistribution"],
+        observable_rows,
+    )
+    measurement_header = ["observableId", "simulationConditionId", "measurement", "time"]
+    if not all(constant_noise):
+        measurement_header.append("noiseParameters")
+    _write_tsv(measurements_path, measurement_header, measurement_rows)
+    condition_columns = [species_name_to_id[name] for name in varying] + varying_parameters
+    _write_tsv(
+        conditions_path,
+        ["conditionId", "conditionName", *condition_columns],
+        [
+            [
+                condition.condition_id,
+                condition.name or condition.condition_id,
+                *[float(condition.initial_state[name].to(state_units[name]).magnitude) for name in varying],
+                *[values[parameter_id] for parameter_id in varying_parameters],
+            ]
+            for condition, values in zip(conditions, parameter_values, strict=True)
+        ],
+    )
+    _write_tsv(
+        parameters_path,
+        ["parameterId", "parameterName", "parameterScale", "lowerBound", "upperBound", "nominalValue", "estimate"],
+        parameter_rows,
+    )
+    metadata_path.write_text(json.dumps({
+        "schema_version": "1.0.0",
+        "model_id": model_id,
+        "conditions": ids,
+        "condition_species_columns": {species_name_to_id[name]: name for name in varying},
+        "condition_parameter_columns": varying_parameters,
+        "observables": {
+            observable_id: {"state": mapping.state, "units": mapping.units, "state_to_observable_factor": factor}
+            for observable_id, mapping, factor in zip(observable_ids, observables, factors, strict=True)
+        },
+        "measurement_rows": len(measurement_rows),
+        "time_units": "second",
+        "noise_policy": "explicit_positive_observation_scales",
+        "noise_interpretation": "Normal errors are assumed; supplied scales do not establish experimental variance.",
+        "parameter_scale_note": "Bounds and nominal values are on the linear scale in each parameter's model units.",
+    }, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+
+    problem = {
+        "format_version": PETAB_FORMAT_VERSION,
+        "parameter_file": parameters_path.name,
+        "problems": [
+            {
+                "sbml_files": [sbml_path.name],
+                "condition_files": [conditions_path.name],
+                "observable_files": [observables_path.name],
+                "measurement_files": [measurements_path.name],
+            }
+        ],
+    }
+    problem_yaml = directory / "problem.yaml"
+    problem_yaml.write_text(yaml.safe_dump(problem, sort_keys=False), encoding="utf-8", newline="")
+    return PetabExport(
+        directory=directory,
+        problem_yaml=problem_yaml,
+        sbml_model=sbml_path,
+        observables=observables_path,
+        measurements=measurements_path,
+        conditions=conditions_path,
+        parameters=parameters_path,
+        metadata=metadata_path,
+    )
+
+
+def _sbml_structure(sbml_text: str) -> tuple[str, dict[str, float]]:
+    """The SBML text with every species initial amount and parameter value zeroed, plus the parameter values."""
+
+    try:
+        import libsbml
+    except ModuleNotFoundError as exc:  # pragma: no cover - exercised via error path
+        raise PetabExportError(
+            "PEtab export requires the optional 'standards' dependency. "
+            "Install it with: pip install fungmod[standards]"
+        ) from exc
+
+    document = libsbml.readSBMLFromString(sbml_text)
+    model = document.getModel()
+    if model is None:
+        raise PetabExportError("Could not parse the exported SBML model for PEtab export.")
+    values: dict[str, float] = {}
+    for i in range(model.getNumParameters()):
+        parameter = model.getParameter(i)
+        values[parameter.getId()] = float(parameter.getValue())
+        parameter.setValue(0.0)
+    for i in range(model.getNumSpecies()):
+        model.getSpecies(i).setInitialAmount(0.0)
+    return libsbml.writeSBMLToString(document), values
+
+
 def _sbml_symbol_maps(sbml_text: str, parameter_symbols: list[str]) -> tuple[dict[str, str], dict[str, str]]:
     """Return species and parameter symbol maps from the exported SBML.
 
@@ -311,4 +637,13 @@ def _sbml_symbol_maps(sbml_text: str, parameter_symbols: list[str]) -> tuple[dic
     return species_name_to_id, parameter_ids
 
 
-__all__ = ["PETAB_FORMAT_VERSION", "PetabExport", "PetabExportError", "calibration_config_to_petab"]
+__all__ = [
+    "PETAB_FORMAT_VERSION",
+    "PetabCondition",
+    "PetabExport",
+    "PetabExportError",
+    "PetabObservable",
+    "PetabParameter",
+    "calibration_config_to_petab",
+    "conditions_to_petab",
+]

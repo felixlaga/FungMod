@@ -18,6 +18,10 @@ ureg = pint.UnitRegistry(autoconvert_offset_to_baseunit=True)
 # as an explicit, sourced parameter rather than as a unit conversion.
 ureg.define("filter_paper_unit = [filter_paper_cellulase_activity] = FPU")
 ureg.define("beta_glucosidase_assay_unit = [beta_glucosidase_assay_activity] = BGU")
+# Base units FungMod defines outside the SI. Exporters to formats without an
+# extensible unit system (SBML) consult this tuple to represent them explicitly
+# rather than failing or guessing an SI equivalent.
+ASSAY_BASE_UNITS: tuple[str, ...] = ("filter_paper_unit", "beta_glucosidase_assay_unit")
 Q_: Any = ureg.Quantity
 if TYPE_CHECKING:
     Quantity: TypeAlias = pint.Quantity[Any]

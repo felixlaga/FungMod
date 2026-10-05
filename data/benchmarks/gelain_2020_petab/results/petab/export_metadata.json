@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0.0",
+  "model_id": "gelain_2020_cellulose_hydrolysis_candidate",
+  "conditions": [
+    "gelain_2020_cellulose_10gl",
+    "gelain_2020_cellulose_20gl",
+    "gelain_2020_cellulose_30gl"
+  ],
+  "condition_species_columns": {
+    "cellulose_concentration": "cellulose_concentration"
+  },
+  "condition_parameter_columns": [
+    "gelain_2020_cellulose_initial_loading"
+  ],
+  "observables": {
+    "observable_biomass": {
+      "state": "biomass_dry_mass_concentration",
+      "units": "gram / liter",
+      "state_to_observable_factor": 1.0
+    },
+    "observable_substrate": {
+      "state": "cellulose_concentration",
+      "units": "gram / liter",
+      "state_to_observable_factor": 1.0
+    },
+    "observable_cellulase_activity": {
+      "state": "cellulase_activity",
+      "units": "filter_paper_unit / liter",
+      "state_to_observable_factor": 1.0
+    },
+    "observable_beta_glucosidase_activity": {
+      "state": "beta_glucosidase_activity",
+      "units": "beta_glucosidase_assay_unit / liter",
+      "state_to_observable_factor": 1.0
+    }
+  },
+  "measurement_rows": 96,
+  "time_units": "second",
+  "noise_policy": "explicit_positive_observation_scales",
+  "noise_interpretation": "Normal errors are assumed; supplied scales do not establish experimental variance.",
+  "parameter_scale_note": "Bounds and nominal values are on the linear scale in each parameter's model units."
+}

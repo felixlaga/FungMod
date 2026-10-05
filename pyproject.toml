@@ -66,6 +66,11 @@ standards = [
     "python-libsbml>=5.20",
     "python-libsedml>=2.0",
 ]
+copasi = [
+    "python-copasi>=4.45",
+    "copasi-basico>=0.80",
+    "copasi-petab-importer>=1.0",
+]
 
 [project.urls]
 Documentation = "https://fungmod.readthedocs.io/"

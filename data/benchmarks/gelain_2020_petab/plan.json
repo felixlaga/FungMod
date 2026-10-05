@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "gelain_2020_petab_cross_solver_v1",
+  "status": "plan frozen 2026-10-05 before any COPASI import, simulation or fit",
+  "design_status": "Retrospective cross-solver check of a fit that already informed development. It validates no biology, predicts nothing new and is never blind or independent.",
+  "question": "Does an independent simulator and optimiser (COPASI) reproduce FungMod's all-condition least-squares optimum of the registry hydrolysis candidate on the Gelain 2020 cellulose loadings when both work on the same PEtab problem?",
+  "problem": {
+    "model": "M0_baseline of the model-criticism plan: the registry case trichoderma_harzianum_p49p11 x cellulose_celufloc_200 (six generic processes) at the three environments of the Bayesian study plan",
+    "conditions": [
+      "gelain_2020_cellulose_10gl",
+      "gelain_2020_cellulose_20gl",
+      "gelain_2020_cellulose_30gl"
+    ],
+    "observables": [
+      "biomass",
+      "substrate",
+      "cellulase_activity",
+      "beta_glucosidase_activity"
+    ],
+    "observations": 96,
+    "objective": "sum over the 96 measurements of ((simulation - measurement) / sigma)^2 with sigma = each observable's maximum over the three loadings; this is twice the stage A 'primary' least-squares cost of the criticism plan, so FungMod's optimum is already recorded",
+    "parameters": "the nine registry symbols gelain_hydrolysis_* with the criticism plan's M0 bounds, PEtab scale log10; nominal values are the stage A M0 primary all-condition fit",
+    "export": "fungal_model.standards.conditions_to_petab: PEtab v1 with one SBML L3V2 model whose parameter-bound yield coefficients are separate reactions and whose assay-activity units are named dimensionless unit definitions; the cellulose loading is a condition-table column"
+  },
+  "sources": {
+    "criticism_plan": {
+      "path": "data/benchmarks/gelain_2020_criticism/plan.json",
+      "sha256": "6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86"
+    },
+    "bayesian_plan": {
+      "path": "data/benchmarks/gelain_2020_bayesian/plan.json",
+      "sha256": "9574fccc809cc2a49aab2ebc9cbc8cd087d0064d26582da287915cbbce32f01a"
+    },
+    "observations": {
+      "path": "data/benchmarks/gelain_2020_v2/observations.json",
+      "sha256": "cc8cda93a4a1a07cc73cf0c104aeaf315770aa4399e65cb2f3473e97951b699c"
+    },
+    "reference_fit": {
+      "path": "data/benchmarks/gelain_2020_criticism/results/stage_a/M0_baseline/full_fit_primary.json",
+      "sha256": "7877ba476f65319841072184f73ea8e47cf0dd6f33a3f86f4899ca96e12879f3",
+      "note": "FungMod's optimum: scipy least_squares in log space, five starts, cost 2.0153313279533793 (objective 4.0306626559067586)"
+    }
+  },
+  "copasi": {
+    "importer": "copasi-petab-importer (PEtabConverter) into a COPASI file; basico drives COPASI",
+    "weight_correction": "COPASI weights a dependent column by a multiplier of the squared residual and the importer stores sigma there; the runner rewrites every weight to 1/sigma^2 and switches off per-experiment weight normalisation before any evaluation, and records both values",
+    "integrator": {
+      "method": "Deterministic (LSODA)",
+      "relative_tolerance": 1e-09,
+      "absolute_tolerance": 1e-12
+    },
+    "method": "Levenberg - Marquardt",
+    "parameter_space": "linear (the importer ignores the PEtab log10 scale); the optimum is the same point",
+    "local_fit": "one Levenberg-Marquardt run from the nominal (FungMod) values",
+    "random_starts": 10,
+    "seed": 20261005,
+    "start_distribution": "log-uniform within the bounds, drawn by numpy default_rng(seed)",
+    "objective_evaluation": "every optimum is re-evaluated with COPASI time courses on the PEtab objective; COPASI's internal objective is recorded alongside"
+  },
+  "gates": {
+    "simulation_agreement": {
+      "max_abs_difference_over_sigma": 0.0001,
+      "objective_relative_difference": 1e-05,
+      "meaning": "at the nominal values COPASI's time courses and FungMod's compiled-core predictions differ by less than 1e-4 of each observable's sigma at every measurement, and the two objectives agree to 1e-5"
+    },
+    "optimum_agreement": {
+      "objective_relative_difference": 0.001,
+      "meaning": "COPASI's best objective over the local fit and the random starts is within 0.1 percent of FungMod's; lower by more than that is a FungMod optimiser shortfall and is reported as such"
+    },
+    "parameter_report": "the relative difference of every parameter between COPASI's best optimum and FungMod's reference is reported, not gated: stage A found two weakly determined directions (condition number 4.8e4) along which equally good optima differ"
+  },
+  "outcomes": {
+    "reproduced": "both gates pass",
+    "copasi_improves": "COPASI finds an objective lower than FungMod's by more than the optimum tolerance; reported as a FungMod optimiser shortfall with the parameter values",
+    "not_reproduced": "any other failure, reported with the numbers"
+  },
+  "claims_excluded": [
+    "biological validation",
+    "blind or independent prediction",
+    "that the optimum is unique or the parameters identified (see the criticism and Bayesian studies)",
+    "any statement about models other than M0_baseline"
+  ],
+  "amendments": [],
+  "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason, recorded before the affected run; the ledger records the file's sha256 at freezing and after each amendment"
+}

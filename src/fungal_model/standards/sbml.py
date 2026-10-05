@@ -30,12 +30,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from fungal_model.core.units import Q_, Quantity
+from fungal_model.core.units import ASSAY_BASE_UNITS, Q_, Quantity
 from fungal_model.processes.homogeneous import (
     FirstOrderDecayProcess,
     HomogeneousMichaelisMentenProcess,
     MassActionProcess,
 )
+from fungal_model.processes.physiology import ProportionalSynthesisProcess
 
 if TYPE_CHECKING:
     from fungal_model.processes.assembly import AssembledModel
@@ -44,6 +45,7 @@ SBML_EXPORTABLE_PROCESS_TYPES: tuple[str, ...] = (
     "first_order_decay",
     "mass_action",
     "homogeneous_michaelis_menten",
+    "proportional_synthesis",
 )
 
 # pint base-unit name -> SBML UnitKind name. Populated lazily from libsbml so the
@@ -195,6 +197,7 @@ class _UnitDefinitions:
         self._sids = sids
         self._by_unit: dict[str, str] = {}
         self._counter = 0
+        self.non_si_base_units: list[str] = []
 
     def id_for(self, unit_str: str) -> str:
         key = str(unit_str)
@@ -218,6 +221,16 @@ class _UnitDefinitions:
                 self._add_unit(definition, libsbml.UNIT_KIND_DIMENSIONLESS, 1.0, multiplier)
             for name, exponent in exponents.items():
                 kind_name = _PINT_BASE_TO_SBML_KIND.get(name)
+                if kind_name is None and name in ASSAY_BASE_UNITS:
+                    # SBML has no extensible unit system. An assay-activity base
+                    # unit is written as a dimensionless factor whose unit
+                    # definition keeps the FungMod unit string as its name; the
+                    # kinetic laws carry every numeric conversion explicitly, so
+                    # no SI equivalent is implied. The model notes list them.
+                    if name not in self.non_si_base_units:
+                        self.non_si_base_units.append(name)
+                    self._add_unit(definition, libsbml.UNIT_KIND_DIMENSIONLESS, exponent, 1.0)
+                    continue
                 if kind_name is None:
                     raise SbmlExportError(
                         f"Cannot represent unit {key!r} in SBML: unsupported base unit {name!r}."
@@ -276,6 +289,20 @@ def _reaction_spec(
         formula = f"{kcat_id} * {enzyme_id} * {substrate_id} / ({km_id} + {substrate_id})"
         return reactants, products, (process.enzyme_state,), formula
 
+    if isinstance(process, ProportionalSynthesisProcess):
+        products = {process.product_state: 1.0}
+        law_species: list[str] = [process.producer_state]
+        formula = f"{sid.of(process.specific_rate_symbol)} * {sid.of(process.producer_state)}"
+        if process.induced:
+            assert process.inducer_state is not None
+            assert process.induction_half_saturation_symbol is not None
+            inducer_id = sid.of(process.inducer_state)
+            half_id = sid.of(process.induction_half_saturation_symbol)
+            formula = f"{formula} * {inducer_id} / ({half_id} + {inducer_id})"
+            if process.inducer_state != process.producer_state:
+                law_species.append(process.inducer_state)
+        return {}, products, tuple(law_species), formula
+
     if hasattr(process, "base_process"):
         modifiers = getattr(process, "rate_modifiers", ())
         names = ", ".join(type(modifier).__name__ for modifier in modifiers) or "unknown"
@@ -315,8 +342,79 @@ def _scaled_expression(expression: str, source_units: str, target_units: str) ->
     return expression if factor == 1.0 else f"({factor:.17g} * ({expression}))"
 
 
-def _converted_reaction_spec(process: Any, sid: _SIds, model: "AssembledModel"):
+@dataclass(frozen=True)
+class _ReactionSpec:
+    """One SBML reaction derived from a FungMod process."""
+
+    reactants: dict[str, float]
+    products: dict[str, float]
+    modifiers: tuple[str, ...]
+    formula: str
+    suffix: str = ""
+    kinetic_law_sbo: bool = True
+
+
+def _bound_coefficient_specs(process: Any, sid: _SIds, model: "AssembledModel") -> list[_ReactionSpec]:
+    """Split parameter-bound product coefficients into reactions of their own.
+
+    A product coefficient bound to a parameter ``Y`` (or ``1 - Y``) is written
+    as a separate reaction whose kinetic law is ``Y * rate`` (or
+    ``(1 - Y) * rate``), so the exported model keeps the dependence on ``Y``
+    instead of freezing the numeric coefficient into the stoichiometry. The
+    numeric coefficient must agree with the parameter's current value; the
+    export is refused otherwise.
+    """
+
     reactants, products, modifiers, formula = _reaction_spec(process, sid)
+    bindings = dict(getattr(process, "product_coefficient_bindings", {}) or {})
+    main = _ReactionSpec(
+        dict(reactants),
+        {state: coefficient for state, coefficient in products.items() if state not in bindings},
+        tuple(modifiers),
+        formula,
+    )
+    if not bindings:
+        return [main]
+    law_species = tuple(dict.fromkeys((*reactants, *modifiers)))
+    specs = [main]
+    for state, binding in bindings.items():
+        try:
+            parameter = model.parameters.get(binding.parameter_symbol)
+        except KeyError as exc:
+            raise SbmlExportError(
+                f"Process {process.name!r} binds the coefficient of {state!r} to parameter "
+                f"{binding.parameter_symbol!r}, which the model does not carry."
+            ) from exc
+        if parameter.quantity is None:
+            raise SbmlExportError(
+                f"Bound coefficient parameter {binding.parameter_symbol!r} is unknown; a value is required."
+            )
+        if parameter.quantity.dimensionality != Q_(1.0, "dimensionless").dimensionality:
+            raise SbmlExportError(
+                f"Bound coefficient parameter {binding.parameter_symbol!r} must be dimensionless; "
+                f"got units {parameter.units!r}."
+            )
+        expected = binding.value(_to_float(parameter.quantity.to("dimensionless").magnitude))
+        actual = float(products[state])
+        if not math.isclose(expected, actual, rel_tol=1e-9, abs_tol=1e-12):
+            raise SbmlExportError(
+                f"Process {process.name!r} coefficient of {state!r} is {actual!r} but its binding "
+                f"{binding.describe()} evaluates to {expected!r}; refusing to export an inconsistent model."
+            )
+        symbol_id = sid.of(binding.parameter_symbol)
+        factor = f"(1 - {symbol_id})" if binding.complement else symbol_id
+        specs.append(
+            _ReactionSpec({}, {state: 1.0}, law_species, f"{factor} * ({formula})", suffix=f"__{state}", kinetic_law_sbo=False)
+        )
+    return specs
+
+
+def _converted_reaction_specs(process: Any, sid: _SIds, model: "AssembledModel") -> list[_ReactionSpec]:
+    return [_converted_reaction_spec(process, sid, model, spec) for spec in _bound_coefficient_specs(process, sid, model)]
+
+
+def _converted_reaction_spec(process: Any, sid: _SIds, model: "AssembledModel", spec: _ReactionSpec) -> _ReactionSpec:
+    reactants, products, modifiers, formula = spec.reactants, spec.products, spec.modifiers, spec.formula
     state_units = {spec.name: spec.units for spec in model.state_variables}
     expressions = {
         sid.of(spec.name): _scaled_expression(sid.of(spec.name), state_units[spec.name], spec.units)
@@ -350,7 +448,9 @@ def _converted_reaction_spec(process: Any, sid: _SIds, model: "AssembledModel"):
             for name, coefficient in coefficients.items()
         }
 
-    return converted(reactants), converted(products), modifiers, formula
+    return _ReactionSpec(
+        converted(reactants), converted(products), modifiers, formula, suffix=spec.suffix, kinetic_law_sbo=spec.kinetic_law_sbo
+    )
 
 
 def to_sbml(
@@ -360,6 +460,7 @@ def to_sbml(
     model_id: str = "fungmod_model",
     model_name: str | None = None,
     annotations: Mapping[str, Sequence[MiriamAnnotation]] | None = None,
+    names_as_ids: bool = False,
 ) -> str:
     """Export an assembled FungMod model to an SBML Level 3 Version 2 string.
 
@@ -369,6 +470,18 @@ def to_sbml(
         initial_state: Initial value (a pint quantity) for every state variable.
         model_id: SBML model identifier.
         model_name: Human-readable model name (defaults to ``model_id``).
+        annotations: MIRIAM annotations keyed by ``"model"``, state name or
+            process name.
+        names_as_ids: Write each parameter's SBML ``name`` as its identifier
+            (the FungMod symbol) instead of its descriptive name, for tools
+            that address model entities by name.
+
+    Product coefficients bound to a parameter (``ProductReleaseMap``
+    ``coefficient_bindings``) are written as separate reactions whose kinetic
+    law multiplies the process rate by the parameter, so the dependence stays
+    live in the exported model. Assay-activity base units, which SBML cannot
+    express, are written as named dimensionless unit definitions and listed in
+    the model notes.
 
     Returns:
         The SBML document serialized as an XML string.
@@ -400,13 +513,6 @@ def to_sbml(
     sbml_model.setName(model_name or model_id)
     if "model" in annotations:
         _apply_miriam(libsbml, sbml_model, annotations["model"])
-    sbml_model.setNotes(
-        "<body xmlns='http://www.w3.org/1999/xhtml'><p>Exported from FungMod. "
-        "Well-mixed model; species are represented as SBML amounts in a unit "
-        "(size 1) compartment so the kinetic law reproduces FungMod's rate law "
-        "exactly.</p></body>"
-    )
-
     units = _UnitDefinitions(libsbml, sbml_model, sid)
     sbml_model.setTimeUnits(units.id_for("second"))
 
@@ -450,7 +556,7 @@ def to_sbml(
             continue
         sbml_parameter = sbml_model.createParameter()
         sbml_parameter.setId(sid.of(parameter.symbol))
-        sbml_parameter.setName(parameter.name or parameter.symbol)
+        sbml_parameter.setName(sid.of(parameter.symbol) if names_as_ids else (parameter.name or parameter.symbol))
         sbml_parameter.setValue(_to_float(quantity.magnitude))
         sbml_parameter.setUnits(units.id_for(parameter.units))
         sbml_parameter.setConstant(True)
@@ -458,41 +564,57 @@ def to_sbml(
             sbml_parameter.setSBOTerm(parameter_sbo[parameter.symbol])
 
     for index, process in enumerate(model.processes):
-        reactants, products, modifiers, formula = _converted_reaction_spec(process, sid, model)
-        reaction_id = sid.of(f"{process.name}__reaction_{index}")
-        reaction = sbml_model.createReaction()
-        reaction.setId(reaction_id)
-        reaction.setMetaId(f"meta_{reaction_id}")
-        reaction.setName(process.name)
-        reaction.setReversible(False)
-        reaction.setSBOTerm(_SBO_BIOCHEMICAL_REACTION)
-        for species_name, coefficient in reactants.items():
-            reference = reaction.createReactant()
-            reference.setSpecies(sid.of(species_name))
-            reference.setStoichiometry(float(coefficient))
-            reference.setConstant(True)
-        for species_name, coefficient in products.items():
-            reference = reaction.createProduct()
-            reference.setSpecies(sid.of(species_name))
-            reference.setStoichiometry(float(coefficient))
-            reference.setConstant(True)
-        for species_name in modifiers:
-            reference = reaction.createModifier()
-            reference.setSpecies(sid.of(species_name))
-            reference.setSBOTerm(_SBO_ENZYMATIC_CATALYST)
-        if process.name in annotations:
-            _apply_miriam(libsbml, reaction, annotations[process.name])
-        kinetic_law = reaction.createKineticLaw()
-        law_sbo = _KINETIC_LAW_SBO.get(process.process_type)
-        if law_sbo is not None:
-            kinetic_law.setSBOTerm(law_sbo)
-        math_ast = libsbml.parseL3Formula(formula)
-        if math_ast is None:
-            raise SbmlExportError(
-                f"Failed to parse kinetic law for {process.name!r}: "
-                f"{libsbml.getLastParseL3Error()} (formula: {formula})"
-            )
-        kinetic_law.setMath(math_ast)
+        for spec in _converted_reaction_specs(process, sid, model):
+            reaction_id = sid.of(f"{process.name}{spec.suffix}__reaction_{index}")
+            reaction = sbml_model.createReaction()
+            reaction.setId(reaction_id)
+            reaction.setMetaId(f"meta_{reaction_id}")
+            reaction.setName(process.name + spec.suffix.replace("__", " -> ", 1))
+            reaction.setReversible(False)
+            reaction.setSBOTerm(_SBO_BIOCHEMICAL_REACTION)
+            for species_name, coefficient in spec.reactants.items():
+                reference = reaction.createReactant()
+                reference.setSpecies(sid.of(species_name))
+                reference.setStoichiometry(float(coefficient))
+                reference.setConstant(True)
+            for species_name, coefficient in spec.products.items():
+                reference = reaction.createProduct()
+                reference.setSpecies(sid.of(species_name))
+                reference.setStoichiometry(float(coefficient))
+                reference.setConstant(True)
+            for species_name in spec.modifiers:
+                reference = reaction.createModifier()
+                reference.setSpecies(sid.of(species_name))
+                reference.setSBOTerm(_SBO_ENZYMATIC_CATALYST)
+            if process.name in annotations and not spec.suffix:
+                _apply_miriam(libsbml, reaction, annotations[process.name])
+            kinetic_law = reaction.createKineticLaw()
+            law_sbo = _KINETIC_LAW_SBO.get(process.process_type) if spec.kinetic_law_sbo else None
+            if law_sbo is not None:
+                kinetic_law.setSBOTerm(law_sbo)
+            math_ast = libsbml.parseL3Formula(spec.formula)
+            if math_ast is None:
+                raise SbmlExportError(
+                    f"Failed to parse kinetic law for {process.name!r}: "
+                    f"{libsbml.getLastParseL3Error()} (formula: {spec.formula})"
+                )
+            kinetic_law.setMath(math_ast)
+
+    notes = (
+        "<body xmlns='http://www.w3.org/1999/xhtml'><p>Exported from FungMod. "
+        "Well-mixed model; species are represented as SBML amounts in a unit "
+        "(size 1) compartment so the kinetic law reproduces FungMod's rate law "
+        "exactly.</p>"
+    )
+    if units.non_si_base_units:
+        notes += (
+            "<p>Assay-activity base units without an SI representation are written as "
+            "named dimensionless unit definitions; the kinetic laws carry every numeric "
+            "conversion explicitly and no SI equivalent is implied: "
+            + ", ".join(units.non_si_base_units)
+            + ".</p>"
+        )
+    sbml_model.setNotes(notes + "</body>")
 
     _raise_on_sbml_errors(libsbml, document)
     return libsbml.writeSBMLToString(document)

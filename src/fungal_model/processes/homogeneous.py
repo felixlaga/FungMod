@@ -16,6 +16,7 @@ from fungal_model.kinetics.michaelis_menten import (
     enzyme_explicit_michaelis_menten_rate,
     michaelis_menten_rate,
 )
+from fungal_model.processes.surface import CoefficientBinding
 from fungal_model.processes.base import (
     ParameterRequirement,
     Process,
@@ -260,6 +261,7 @@ class HomogeneousMichaelisMentenProcess(Process):
     enzyme_units: str | None
     kcat_symbol: str | None
     product_coefficients: dict[str, float]
+    product_coefficient_bindings: dict[str, CoefficientBinding]
 
     def __init__(
         self,
@@ -275,6 +277,7 @@ class HomogeneousMichaelisMentenProcess(Process):
         enzyme_units: str | None = None,
         kcat_symbol: str | None = None,
         product_coefficients: Mapping[str, float] | None = None,
+        product_coefficient_bindings: Mapping[str, CoefficientBinding] | None = None,
         source: str = "Generic homogeneous Michaelis-Menten process.",
         notes: str = "",
     ) -> None:
@@ -283,6 +286,14 @@ class HomogeneousMichaelisMentenProcess(Process):
                 "Provide either vmax_symbol, or both enzyme_state and kcat_symbol."
             )
         coefficients = _product_coefficients(product_state=product_state, product_coefficients=product_coefficients)
+        bindings = {str(state): binding for state, binding in (product_coefficient_bindings or {}).items()}
+        unknown = sorted(set(bindings) - set(coefficients))
+        if unknown:
+            raise ValueError(
+                "Product coefficient bindings must name product states of the process; unknown: "
+                + ", ".join(unknown)
+                + "."
+            )
         required_states = [StateVariableSpec(substrate_state, substrate_units, role="substrate")]
         changed_states = [StateVariableSpec(substrate_state, substrate_units, role="reactant")]
         changed_states.extend(
@@ -332,6 +343,7 @@ class HomogeneousMichaelisMentenProcess(Process):
         object.__setattr__(self, "enzyme_units", enzyme_units)
         object.__setattr__(self, "kcat_symbol", kcat_symbol)
         object.__setattr__(self, "product_coefficients", coefficients)
+        object.__setattr__(self, "product_coefficient_bindings", bindings)
 
     def rate(
         self,

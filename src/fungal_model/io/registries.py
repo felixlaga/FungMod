@@ -21,7 +21,7 @@ from fungal_model.core.validators import (
     validate_reaction_quotient_gibbs_feasibility,
 )
 from fungal_model.geometry import Film1DGeometry, WellMixedGeometry
-from fungal_model.processes import ProductReleaseMap
+from fungal_model.processes import CoefficientBinding, ProductReleaseMap
 from fungal_model.substrates.base import (
     CompletenessLevel,
     DegradationModelPreference,
@@ -240,6 +240,9 @@ def load_one_to_one_product_map(data: Mapping[str, Any]) -> ProductReleaseMap:
 
 def load_stoichiometric_product_map(data: Mapping[str, Any]) -> ProductReleaseMap:
     provenance = data.get("provenance", {})
+    raw_bindings = data.get("coefficient_bindings", {}) or {}
+    if not isinstance(raw_bindings, Mapping):
+        raise ValueError("product map coefficient_bindings must be a mapping of state to binding.")
     return ProductReleaseMap(
         reactants={str(name): float(value) for name, value in data["reactants"].items()},
         products={str(name): float(value) for name, value in data["products"].items()},
@@ -247,6 +250,10 @@ def load_stoichiometric_product_map(data: Mapping[str, Any]) -> ProductReleaseMa
         name=None if data.get("name") is None else str(data["name"]),
         maturity=None if data.get("maturity") is None else str(data["maturity"]),
         source=provenance.get("source"),
+        coefficient_bindings={
+            str(state): CoefficientBinding.from_dict(_mapping(binding, field_name=f"coefficient_bindings.{state}"))
+            for state, binding in raw_bindings.items()
+        },
     )
 
 
