@@ -100,7 +100,44 @@ installation; the run checkpoints and resumes. A per-observable sensitivity
 variant (`plan_per_observable_scales.json`, `--plan`, results in
 `results_per_observable_scales/`) is recorded alongside it; see below.
 
-RESULTS_TABLE_PLACEHOLDER
+## Results of the primary study
+
+Chain: 24 walkers x 24000 steps, burn-in 4000 (20000 post-burn-in steps), mean
+acceptance 0.32, integrated autocorrelation times 227 to 339 steps, effective
+sample sizes 1414 to 2119; converged by the declared rule (every estimate from
+a chain longer than 50 tau, every effective sample size at least 100). Of
+576024 likelihood evaluations, 159794 had a non-finite log posterior, almost
+all of them proposals outside the prior box, which the three constants pinned
+at a bound make frequent.
+
+| Symbol | Class | Posterior median | 95 percent credible interval | Prior box | Units | Point value inside |
+| --- | --- | --- | --- | --- | --- | --- |
+| `k_h` | `identified` | 0.0185 | [0.00714, 0.0639] | [1e-06, 1] | gram / filter_paper_unit / hour | yes |
+| `Kh` | `bounded_below_only` | 18.4 | [4.26, 81.9] | [0.001, 100] | gram / liter | yes |
+| `Y` | `identified` | 0.478 | [0.328, 0.648] | [0.01, 1] | dimensionless | yes |
+| `kd` | `identified` | 0.0237 | [0.0114, 0.0392] | [1e-05, 0.5] | 1 / hour | yes |
+| `K_ind` | `bounded_above_only` | 0.0188 | [0.0103, 0.12] | [0.01, 100] | gram / liter | no |
+| `qF` | `identified` | 5.61 | [4.2, 7.94] | [0.01, 1e+03] | filter_paper_unit / gram / hour | yes |
+| `kF` | `bounded_above_only` | 5.33e-05 | [1.21e-06, 0.004] | [1e-06, 0.1] | 1 / hour | no |
+| `qB` | `identified` | 13.3 | [9.9, 18.7] | [0.01, 3e+03] | beta_glucosidase_assay_unit / gram / hour | yes |
+| `kB` | `bounded_above_only` | 4.16e-05 | [1.21e-06, 0.0028] | [1e-06, 0.1] | 1 / hour | no |
+
+The shared noise multiplier has posterior median 2.25 (95 percent interval 1.95
+to 2.63): the residuals are about 2.2 times the assumed 10 percent level, so
+every interval above is wider than the assumed error model alone would give.
+Five of the nine constants are identified (`k_h`, `Y`, `kd`, `qF` and `qB`);
+`Kh` is bounded below only (the data cannot separate hydrolysis saturation
+above the measured loadings from first-order kinetics, so the half-saturation
+constant has a lower limit and no upper one inside the box); `K_ind`, `kF` and
+`kB` are bounded above only (induction is effectively saturated and the two
+activity-loss rates are effectively zero over 96 hours, so the data give upper
+limits only). Six of the nine frozen least-squares point values lie inside
+their credible intervals; the frozen values of `K_ind`, `kF` and `kB` sit
+exactly on the lower prior bound, just below the lower end of their intervals.
+The finite-difference Fisher information at the best sample has practical rank
+8 of 9 with condition number 8.7e+06; its least constrained direction is
+dominated by `kB` and `kF`. The posterior predictive bands (400 draws, 0
+failed) are stored in the artifact for every observable and loading.
 
 The registry records keep their frozen least-squares point values; their
 provenance now names this artifact, the credible interval and the verdict, so

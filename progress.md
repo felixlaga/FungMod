@@ -79,8 +79,13 @@ Changed:
   checkpoint and resume), `scripts/record_gelain_bayesian_verdicts.py` and
   `data/benchmarks/gelain_2020_bayesian/` (primary plan, per-observable
   variant plan, README, `results/`, `results_per_observable_scales/`).
-  Primary study numbers: pending the running shared-multiplier chain (24
-  walkers x 20000 steps); filled in by the artifact commit.
+  Primary study (24 walkers x 24000 steps, burn-in 4000, converged by the
+  declared rule: autocorrelation times 227 to 339 steps against 20000 post-
+  burn-in steps, effective sample sizes 1414 to 2119): five of nine constants
+  identified (k_h, Y, kd, qF, qB), Kh bounded below only, K_ind, kF, kB bounded
+  above only; shared noise multiplier 2.25 (1.95 to 2.63), so the residuals are
+  about 2.2 times the assumed level; six of nine frozen point values lie inside
+  their credible intervals.
 - Per-observable sensitivity variant (40 walkers x 6000 steps, burn-in 1500,
   not converged by the declared rule, cited by nothing): with independent
   multipliers the sampler leaves the least-squares region, inflates the
@@ -125,9 +130,28 @@ map, end-to-end study with checkpoint and resume, frozen primary artifact
 consistent with its inputs and the registry provenance, variant artifact
 labelled and uncited); `tests/test_dataset_candidate_review.py` listing.
 
-Commands run and results: pending the artifact commit.
+Commands run and results: `python scripts/run_gelain_2020_bayesian_calibration.py
+--output <dir> --processes 4 --checkpoint-every 500` (primary: 24 walkers x
+24000 steps, resumed twice from its checkpoint, converged; the per-observable
+variant with `--plan data/benchmarks/gelain_2020_bayesian/plan_per_observable_scales.json`,
+40 x 6000, not converged); `python scripts/record_gelain_bayesian_verdicts.py`
+(nine records updated); `ruff check src tests scripts/run_*.py
+scripts/record_gelain_bayesian_verdicts.py` passed; `pyright` on the changed
+modules, scripts and tests: 0 errors; `mkdocs build --strict` passed;
+`pytest tests/test_gelain_bayesian_study.py tests/test_bayesian_calibration.py
+tests/test_organism_registry_case.py`: 29 passed; the 28 test modules that use
+the screening, calibration and candidate-review packages: 404 passed; the full
+`pytest` run and full `pyright` were still running at this commit and are
+reported in the pull request.
 
-Scientific behavior impact: pending the artifact commit.
+Scientific behavior impact: no scientific-mode output changes; no registry
+value changes. The repository now states, with a recorded artifact, which of
+the nine T. harzianum hydrolysis-candidate constants the Gelain duplicate means
+identify under the declared error model (k_h, Y, kd, qF, qB), which are one-
+sided (Kh below; K_ind, kF, kB above) and that the assumed 10 percent error
+understates the residuals by a factor of about 2.2. These are conditional
+statements, labelled as such in the registry provenance and the artifact's
+claim boundary.
 
 Backward-compatibility impact: `fungal_model.calibration.bayesian` replaces a
 placeholder, so nothing depended on it; `fungal_model.screening` gains

@@ -675,6 +675,27 @@ records:
           - kB
       validation_status: retrospective_development_fit_not_validated
       uncertainty: unknown_no_measurement_sd_no_confidence_interval
+      bayesian_identifiability:
+        artifact: data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json
+        artifact_sha256: 57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97
+        benchmark_id: gelain_2020_cellulose_bayesian_v1
+        class: identified
+        posterior_median: 0.018476226110659022
+        credible_interval:
+          - 0.0071351293725260435
+          - 0.06394507058416628
+        credible_mass: 0.95
+        units: gram / filter_paper_unit / hour
+        point_value_inside_credible_interval: true
+        converged: true
+        error_model_evidence: assumed, estimated_from_residuals
+        meaning: >-
+          Posterior credible interval and identifiability class from the recorded
+          ensemble-sampling study, conditional on the declared log-uniform prior box and
+          an assumed error model with one estimated shared scale multiplier; the data
+          constrain both sides. The exact point value above is unchanged
+          and lies inside this interval; a class other than identified means the
+          constant should be read as this range.
     parameter_symbol: gelain_hydrolysis_k_h
     process_type: culture_physiology
     enzyme_class: cellulase_total_filter_paper_activity
@@ -728,6 +749,27 @@ records:
           - kB
       validation_status: retrospective_development_fit_not_validated
       uncertainty: unknown_no_measurement_sd_no_confidence_interval
+      bayesian_identifiability:
+        artifact: data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json
+        artifact_sha256: 57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97
+        benchmark_id: gelain_2020_cellulose_bayesian_v1
+        class: bounded_below_only
+        posterior_median: 18.37239048933094
+        credible_interval:
+          - 4.261882568528427
+          - 81.9018264275508
+        credible_mass: 0.95
+        units: gram / liter
+        point_value_inside_credible_interval: true
+        converged: true
+        error_model_evidence: assumed, estimated_from_residuals
+        meaning: >-
+          Posterior credible interval and identifiability class from the recorded
+          ensemble-sampling study, conditional on the declared log-uniform prior box and
+          an assumed error model with one estimated shared scale multiplier; the data
+          constrain a lower limit only; the upper end is the prior bound. The exact point value above is unchanged
+          and lies inside this interval; a class other than identified means the
+          constant should be read as this range.
     parameter_symbol: gelain_hydrolysis_Kh
     process_type: culture_physiology
     enzyme_class: cellulase_total_filter_paper_activity
@@ -781,6 +823,27 @@ records:
           - kB
       validation_status: retrospective_development_fit_not_validated
       uncertainty: unknown_no_measurement_sd_no_confidence_interval
+      bayesian_identifiability:
+        artifact: data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json
+        artifact_sha256: 57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97
+        benchmark_id: gelain_2020_cellulose_bayesian_v1
+        class: identified
+        posterior_median: 0.4783191612971676
+        credible_interval:
+          - 0.3284949055642446
+          - 0.6479711566564031
+        credible_mass: 0.95
+        units: dimensionless
+        point_value_inside_credible_interval: true
+        converged: true
+        error_model_evidence: assumed, estimated_from_residuals
+        meaning: >-
+          Posterior credible interval and identifiability class from the recorded
+          ensemble-sampling study, conditional on the declared log-uniform prior box and
+          an assumed error model with one estimated shared scale multiplier; the data
+          constrain both sides. The exact point value above is unchanged
+          and lies inside this interval; a class other than identified means the
+          constant should be read as this range.
     parameter_symbol: gelain_hydrolysis_Y
     process_type: culture_physiology
     enzyme_class: cellulase_total_filter_paper_activity
@@ -834,6 +897,27 @@ records:
           - kB
       validation_status: retrospective_development_fit_not_validated
       uncertainty: unknown_no_measurement_sd_no_confidence_interval
+      bayesian_identifiability:
+        artifact: data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json
+        artifact_sha256: 57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97
+        benchmark_id: gelain_2020_cellulose_bayesian_v1
+        class: identified
+        posterior_median: 0.023654947525446328
+        credible_interval:
+          - 0.01137290052157135
+          - 0.03919532659523753
+        credible_mass: 0.95
+        units: 1 / hour
+        point_value_inside_credible_interval: true
+        converged: true
+        error_model_evidence: assumed, estimated_from_residuals
+        meaning: >-
+          Posterior credible interval and identifiability class from the recorded
+          ensemble-sampling study, conditional on the declared log-uniform prior box and
+          an assumed error model with one estimated shared scale multiplier; the data
+          constrain both sides. The exact point value above is unchanged
+          and lies inside this interval; a class other than identified means the
+          constant should be read as this range.
     parameter_symbol: gelain_hydrolysis_kd
     process_type: culture_physiology
     enzyme_class: cellulase_total_filter_paper_activity
@@ -887,6 +971,27 @@ records:
           - kB
       validation_status: retrospective_development_fit_not_validated
       uncertainty: unknown_no_measurement_sd_no_confidence_interval
+      bayesian_identifiability:
+        artifact: data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json
+        artifact_sha256: 57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97
+        benchmark_id: gelain_2020_cellulose_bayesian_v1
+        class: bounded_above_only
+        posterior_median: 0.018797864817447673
+        credible_interval:
+          - 0.010256653529210026
+          - 0.12002852758476364
+        credible_mass: 0.95
+        units: gram / liter
+        point_value_inside_credible_interval: false
+        converged: true
+        error_model_evidence: assumed, estimated_from_residuals
+        meaning: >-
+          Posterior credible interval and identifiability class from the recorded
+          ensemble-sampling study, conditional on the declared log-uniform prior box and
+          an assumed error model with one estimated shared scale multiplier; the data
+          constrain an upper limit only; the lower end is the prior bound. The exact point value above is unchanged
+          and lies outside this interval; a class other than identified means the
+          constant should be read as this range.
     parameter_symbol: gelain_hydrolysis_K_ind
     process_type: culture_physiology
     enzyme_class: cellulase_total_filter_paper_activity
@@ -940,6 +1045,27 @@ records:
           - kB
       validation_status: retrospective_development_fit_not_validated
       uncertainty: unknown_no_measurement_sd_no_confidence_interval
+      bayesian_identifiability:
+        artifact: data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json
+        artifact_sha256: 57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97
+        benchmark_id: gelain_2020_cellulose_bayesian_v1
+        class: identified
+        posterior_median: 5.605804599446812
+        credible_interval:
+          - 4.2009282801681795
+          - 7.935138063633917
+        credible_mass: 0.95
+        units: filter_paper_unit / gram / hour
+        point_value_inside_credible_interval: true
+        converged: true
+        error_model_evidence: assumed, estimated_from_residuals
+        meaning: >-
+          Posterior credible interval and identifiability class from the recorded
+          ensemble-sampling study, conditional on the declared log-uniform prior box and
+          an assumed error model with one estimated shared scale multiplier; the data
+          constrain both sides. The exact point value above is unchanged
+          and lies inside this interval; a class other than identified means the
+          constant should be read as this range.
     parameter_symbol: gelain_hydrolysis_qF
     process_type: culture_physiology
     enzyme_class: cellulase_total_filter_paper_activity
@@ -993,6 +1119,27 @@ records:
           - kB
       validation_status: retrospective_development_fit_not_validated
       uncertainty: unknown_no_measurement_sd_no_confidence_interval
+      bayesian_identifiability:
+        artifact: data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json
+        artifact_sha256: 57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97
+        benchmark_id: gelain_2020_cellulose_bayesian_v1
+        class: bounded_above_only
+        posterior_median: 5.330996338160259e-05
+        credible_interval:
+          - 1.205598439896961e-06
+          - 0.0040040627906382615
+        credible_mass: 0.95
+        units: 1 / hour
+        point_value_inside_credible_interval: false
+        converged: true
+        error_model_evidence: assumed, estimated_from_residuals
+        meaning: >-
+          Posterior credible interval and identifiability class from the recorded
+          ensemble-sampling study, conditional on the declared log-uniform prior box and
+          an assumed error model with one estimated shared scale multiplier; the data
+          constrain an upper limit only; the lower end is the prior bound. The exact point value above is unchanged
+          and lies outside this interval; a class other than identified means the
+          constant should be read as this range.
     parameter_symbol: gelain_hydrolysis_kF
     process_type: culture_physiology
     enzyme_class: cellulase_total_filter_paper_activity
@@ -1046,6 +1193,27 @@ records:
           - kB
       validation_status: retrospective_development_fit_not_validated
       uncertainty: unknown_no_measurement_sd_no_confidence_interval
+      bayesian_identifiability:
+        artifact: data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json
+        artifact_sha256: 57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97
+        benchmark_id: gelain_2020_cellulose_bayesian_v1
+        class: identified
+        posterior_median: 13.286370773285507
+        credible_interval:
+          - 9.898645267163243
+          - 18.694538221009157
+        credible_mass: 0.95
+        units: beta_glucosidase_assay_unit / gram / hour
+        point_value_inside_credible_interval: true
+        converged: true
+        error_model_evidence: assumed, estimated_from_residuals
+        meaning: >-
+          Posterior credible interval and identifiability class from the recorded
+          ensemble-sampling study, conditional on the declared log-uniform prior box and
+          an assumed error model with one estimated shared scale multiplier; the data
+          constrain both sides. The exact point value above is unchanged
+          and lies inside this interval; a class other than identified means the
+          constant should be read as this range.
     parameter_symbol: gelain_hydrolysis_qB
     process_type: culture_physiology
     enzyme_class: cellulase_total_filter_paper_activity
@@ -1099,6 +1267,27 @@ records:
           - kB
       validation_status: retrospective_development_fit_not_validated
       uncertainty: unknown_no_measurement_sd_no_confidence_interval
+      bayesian_identifiability:
+        artifact: data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json
+        artifact_sha256: 57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97
+        benchmark_id: gelain_2020_cellulose_bayesian_v1
+        class: bounded_above_only
+        posterior_median: 4.160535969731653e-05
+        credible_interval:
+          - 1.2085217207108753e-06
+          - 0.0028035159098377164
+        credible_mass: 0.95
+        units: 1 / hour
+        point_value_inside_credible_interval: false
+        converged: true
+        error_model_evidence: assumed, estimated_from_residuals
+        meaning: >-
+          Posterior credible interval and identifiability class from the recorded
+          ensemble-sampling study, conditional on the declared log-uniform prior box and
+          an assumed error model with one estimated shared scale multiplier; the data
+          constrain an upper limit only; the lower end is the prior bound. The exact point value above is unchanged
+          and lies outside this interval; a class other than identified means the
+          constant should be read as this range.
     parameter_symbol: gelain_hydrolysis_kB
     process_type: culture_physiology
     enzyme_class: cellulase_total_filter_paper_activity

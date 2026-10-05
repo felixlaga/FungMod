@@ -230,7 +230,7 @@ predictive bands, pooled replicate deviations) with a predictor that rebuilds
 a registry case per candidate. The recorded study
 (`data/benchmarks/gelain_2020_bayesian/`) samples the nine T. harzianum
 hydrolysis-candidate constants over the three Gelain loadings.
-Its verdicts are pending the running chain. Not done: replicate recovery (the Gelain deposit holds
+Converged by the declared rule (24 walkers x 24000 steps), it identifies five of the nine constants (k_h, Y, kd, qF, qB), bounds Kh from below only and K_ind, kF, kB from above only, and estimates a shared noise multiplier of about 2.2; the nine registry records cite it in their provenance without changing their point values. Not done: replicate recovery (the Gelain deposit holds
 duplicate means only; Pakula 2016 could not be retrieved under the network
 policy and is a candidate review), so the error model is an assumption whose
 overall level is estimated from the residuals; Jacobians and parameter

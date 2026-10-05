@@ -36,7 +36,7 @@ core. Explicit priors, explicit Gaussian error models with an estimated noise
 multiplier, the Goodman-Weare ensemble sampler, autocorrelation diagnostics,
 declared-threshold identifiability classes, local Fisher information and
 posterior predictive bands exist and are tested; a registry-case predictor
-rebuilds the case per candidate. The primary study's verdicts are pending its running chain. The error model remains
+rebuilds the case per candidate. The recorded T. harzianum study identifies five of its nine constants (k_h, Y, kd, qF, qB) and leaves four as one-sided ranges (Kh bounded below; K_ind, kF, kB bounded above), with a shared noise multiplier of about 2.2 saying the assumed error understates the residuals. The error model remains
 an assumption because no replicate-level data exist: the Gelain deposit holds
 duplicate means only and Pakula 2016 could not be retrieved under the network
 policy, so it is a candidate review. A per-observable multiplier variant shows
