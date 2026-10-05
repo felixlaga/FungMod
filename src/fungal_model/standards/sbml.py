@@ -266,13 +266,13 @@ def _reaction_spec(
         reactants = {species: float(order) for species, order in process.reactants.items()}
         products = {species: float(coeff) for species, coeff in process.products.items()}
         factors = [sid.of(process.rate_constant_symbol)]
-        for species, order in process.reactants.items():
+        for species, order in (*process.reactants.items(), *process.catalysts.items()):
             species_id = sid.of(species)
             if float(order) == 1.0:
                 factors.append(species_id)
             else:
                 factors.append(f"pow({species_id}, {float(order):g})")
-        return reactants, products, (), " * ".join(factors)
+        return reactants, products, tuple(process.catalysts), " * ".join(factors)
 
     if isinstance(process, HomogeneousMichaelisMentenProcess):
         reactants = {process.substrate_state: 1.0}
@@ -432,7 +432,7 @@ def _converted_reaction_spec(process: Any, sid: _SIds, model: "AssembledModel", 
         expression_units = Q_(1, process.state_units).units / Q_(1, "second").units
     elif isinstance(process, MassActionProcess):
         expression_units = Q_(1, process.rate_constant_units).units
-        for name, order in process.reactants.items():
+        for name, order in (*process.reactants.items(), *process.catalysts.items()):
             expression_units *= Q_(1, process.state_units[name]).units ** order
     else:
         expression_units = Q_(1, process.rate_units).units

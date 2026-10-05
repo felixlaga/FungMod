@@ -139,10 +139,16 @@ class FirstOrderDecayProcess(Process):
 
 @dataclass(frozen=True, init=False)
 class MassActionProcess(Process):
-    """Generic homogeneous mass-action process."""
+    """Generic homogeneous mass-action process, ``k * prod(S_i^order_i)``.
+
+    ``catalysts`` are species that enter the rate law with the given order but
+    are not consumed (SBML modifiers); a catalyst may also be a product, which
+    is autocatalysis, but never a reactant.
+    """
 
     reactants: dict[str, float]
     products: dict[str, float]
+    catalysts: dict[str, float]
     state_units: dict[str, str]
     rate_constant_symbol: str
     rate_constant_units: str
@@ -158,10 +164,16 @@ class MassActionProcess(Process):
         rate_constant_symbol: str,
         rate_constant_units: str,
         rate_units: str,
+        catalysts: Mapping[str, float] | None = None,
         source: str = "Generic mass-action homogeneous process.",
         notes: str = "",
     ) -> None:
-        all_species = set(reactants) | set(products)
+        catalysed = {str(species): float(order) for species, order in (catalysts or {}).items()}
+        overlap = sorted(set(catalysed).intersection(reactants))
+        if overlap:
+            raise ValueError(f"Catalysts cannot also be reactants (they are not consumed): {overlap}")
+        changed_species = tuple(dict.fromkeys((*reactants, *products)))
+        all_species = set(changed_species) | set(catalysed)
         missing_units = all_species.difference(state_units)
         if missing_units:
             raise ValueError(f"Missing state units for species: {sorted(missing_units)}")
@@ -169,13 +181,13 @@ class MassActionProcess(Process):
             self,
             name=name,
             process_type="mass_action",
-            required_state_variables=tuple(
-                StateVariableSpec(species, state_units[species], role="reactant")
-                for species in reactants
+            required_state_variables=(
+                *(StateVariableSpec(species, state_units[species], role="reactant") for species in reactants),
+                *(StateVariableSpec(species, state_units[species], role="catalyst") for species in catalysed),
             ),
             changed_state_variables=tuple(
                 StateVariableSpec(species, state_units[species])
-                for species in all_species
+                for species in changed_species
             ),
             required_parameters=(
                 ParameterRequirement(
@@ -195,6 +207,7 @@ class MassActionProcess(Process):
         )
         object.__setattr__(self, "reactants", dict(reactants))
         object.__setattr__(self, "products", dict(products))
+        object.__setattr__(self, "catalysts", catalysed)
         object.__setattr__(self, "state_units", dict(state_units))
         object.__setattr__(self, "rate_constant_symbol", rate_constant_symbol)
         object.__setattr__(self, "rate_constant_units", rate_constant_units)
@@ -210,20 +223,26 @@ class MassActionProcess(Process):
     ) -> Quantity:
         del time, environment, geometry
         rate = parameters.require_quantity(self.rate_constant_symbol, self.rate_constant_units)
-        for species, order in self.reactants.items():
+        for species, order in self._rate_orders().items():
             quantity = assert_compatible(state[species], self.state_units[species], name=species)
             _ensure_non_negative(quantity, species)
             rate *= quantity ** float(order)
         return assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
 
+    def _rate_orders(self) -> dict[str, float]:
+        """Reaction orders of every species in the rate law: reactants first, then catalysts."""
+
+        return {**self.reactants, **self.catalysts}
+
     def compile_rate(self, context: KernelContext) -> RateKernel | None:
         rate_constant = context.parameter(self.rate_constant_symbol, self.rate_constant_units)
+        orders = self._rate_orders()
         slots = tuple(
             (species, *context.state_slot(species, self.state_units[species]), float(order))
-            for species, order in self.reactants.items()
+            for species, order in orders.items()
         )
         probe = Q_(1.0, self.rate_constant_units)
-        for species, order in self.reactants.items():
+        for species, order in orders.items():
             probe = probe * Q_(1.0, self.state_units[species]) ** float(order)
         scale = float(assert_compatible(probe, self.rate_units, name=f"{self.name} rate").magnitude)
 

@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from fungal_model.chemistry.reactions import Reaction
-from fungal_model.core.parameters import ParameterSet
-from fungal_model.core.provenance import ProvenanceError, has_text
+from fungal_model.core.numerics import SolverSettings
+from fungal_model.core.parameters import Parameter, ParameterSet
+from fungal_model.core.provenance import ConfidenceLevel, ProvenanceError, has_text
+from fungal_model.core.units import Quantity
 from fungal_model.core.validators import ValidationResult
 from fungal_model.core.simulation import SimulationEngine
+from fungal_model.processes.base import Process
+from fungal_model.processes.homogeneous import FirstOrderDecayProcess, MassActionProcess
+from fungal_model.processes.physiology import ProportionalSynthesisProcess
 from fungal_model.fungi.base import Fungus
 from fungal_model.fungi.energetics import GibbsEnergyYieldBound
 from fungal_model.fungi.enzyme_profile import (
@@ -19,8 +26,28 @@ from fungal_model.fungi.enzyme_profile import (
 from fungal_model.fungi.growth import BiomassMaintenanceRateLaw
 from fungal_model.fungi.metabolism import ProductUptakeRateLaw, biomass_yield_coefficient
 
+if TYPE_CHECKING:
+    from fungal_model.results import SimulationResult
+
 
 FUNGAL_COUPLING_MATURITY = "exploratory_software_tested"
+SECRETION_COST_RATE_SYMBOL = "alpha_E_c_E"
+ENZYME_UNITS = "mole / liter"
+BIOMASS_UNITS = "kilogram"
+ENZYME_RATE_UNITS = "mole / liter / second"
+BIOMASS_RATE_UNITS = "kilogram / second"
+_CONFIDENCE_ORDER: tuple[ConfidenceLevel, ...] = ("unknown", "low", "medium", "high")
+
+
+def _combined_confidence(*levels: ConfidenceLevel) -> ConfidenceLevel:
+    """The weaker of the input confidence levels; ``testing`` only when every input is ``testing``."""
+
+    if all(level == "testing" for level in levels):
+        return "testing"
+    ranked: list[ConfidenceLevel] = [level for level in levels if level in _CONFIDENCE_ORDER]
+    if not ranked:
+        return "unknown"
+    return min(ranked, key=_CONFIDENCE_ORDER.index)
 
 
 @dataclass(frozen=True)
@@ -148,11 +175,7 @@ class FungalCouplingModel:
         """Return the complete coupled reaction set after validation."""
 
         self.validate()
-        assimilation = next(
-            item
-            for item in self.fungus.uptake_capabilities
-            if item.product.casefold() == self.product_name.casefold()
-        )
+        assimilation = self._assimilation()
         secretion = EnzymeSecretionRateLaw(
             active_biomass=self.active_biomass_state,
             secretion_symbol="alpha_E",
@@ -240,8 +263,154 @@ class FungalCouplingModel:
         )
         return (*self.degradation_reactions, *coupled)
 
+    def _assimilation(self):
+        return next(
+            item
+            for item in self.fungus.uptake_capabilities
+            if item.product.casefold() == self.product_name.casefold()
+        )
+
+    def compiled_processes(self, degradation: Sequence[Process]) -> tuple[Process, ...]:
+        """The coupling as generic processes for the compiled process core.
+
+        ``degradation`` supplies the extracellular degradation as processes
+        (``reactions()`` takes ``Reaction`` objects whose Python rate laws
+        cannot be compiled); together they must change the configured
+        substrate and product states, as the reactions must. Secretion is
+        producer-proportional synthesis, decay first-order, the secretion cost
+        and maintenance are first-order conversions of active into inactive
+        biomass, and uptake is mass action in the product catalysed by active
+        biomass with the declared yield. The secretion cost uses the derived
+        rate constant ``alpha_E * c_E`` (see ``compiled_parameters``).
+        """
+
+        self.validate()
+        if not degradation:
+            raise ValueError("Fungal coupling requires at least one extracellular degradation process.")
+        changed_species = set().union(
+            *(set(spec.name for spec in process.changed_state_variables) for process in degradation)
+        )
+        missing = {self.substrate_state, self.product_state}.difference(changed_species)
+        if missing:
+            raise ValueError(
+                "Fungal coupling degradation processes must change the configured "
+                f"substrate and product states; missing {sorted(missing)}."
+            )
+        biomass_units = {self.active_biomass_state: BIOMASS_UNITS, self.inactive_biomass_state: BIOMASS_UNITS}
+        yield_value = biomass_yield_coefficient(parameters=self.parameters, yield_symbol="Y_B")
+        coupled: tuple[Process, ...] = (
+            ProportionalSynthesisProcess(
+                name="fungal extracellular enzyme secretion",
+                producer_state=self.active_biomass_state,
+                producer_units=BIOMASS_UNITS,
+                product_state=self.enzyme_state,
+                product_units=ENZYME_UNITS,
+                rate_units=ENZYME_RATE_UNITS,
+                specific_rate_symbol="alpha_E",
+                source=self.coupling_source,
+                notes="Constitutive secretion proportional to active biomass.",
+            ),
+            FirstOrderDecayProcess(
+                name="extracellular enzyme decay",
+                substrate_state=self.enzyme_state,
+                rate_constant_symbol="delta_E",
+                state_units=ENZYME_UNITS,
+                rate_units=ENZYME_RATE_UNITS,
+                source=self.coupling_source,
+                notes="First-order loss of extracellular enzyme; the material is not tracked.",
+            ),
+            MassActionProcess(
+                name="enzyme secretion active biomass cost",
+                reactants={self.active_biomass_state: 1.0},
+                products={self.inactive_biomass_state: 1.0},
+                state_units=biomass_units,
+                rate_constant_symbol=SECRETION_COST_RATE_SYMBOL,
+                rate_constant_units="1 / second",
+                rate_units=BIOMASS_RATE_UNITS,
+                source=self.coupling_source,
+                notes="Active biomass lost per enzyme secreted: rate constant alpha_E times c_E.",
+            ),
+            MassActionProcess(
+                name="assimilable degradation-product uptake",
+                reactants={self.product_state: 1.0},
+                products={self.active_biomass_state: yield_value},
+                catalysts={self.active_biomass_state: 1.0},
+                state_units={self.product_state: BIOMASS_UNITS, self.active_biomass_state: BIOMASS_UNITS},
+                rate_constant_symbol="q_product",
+                rate_constant_units="1 / kilogram / second",
+                rate_units=BIOMASS_RATE_UNITS,
+                source=self.coupling_source,
+                notes=(
+                    "Unassimilated product mass is an explicit open-system loss; "
+                    "respiration and intracellular metabolism are unresolved."
+                ),
+            ),
+            MassActionProcess(
+                name="active biomass maintenance loss",
+                reactants={self.active_biomass_state: 1.0},
+                products={self.inactive_biomass_state: 1.0},
+                state_units=biomass_units,
+                rate_constant_symbol="m_B",
+                rate_constant_units="1 / second",
+                rate_units=BIOMASS_RATE_UNITS,
+                source=self.coupling_source,
+                notes="First-order conversion of active into inactive biomass.",
+            ),
+        )
+        return (*degradation, *coupled)
+
+    def compiled_parameters(self) -> ParameterSet:
+        """The union of fungal and extracellular parameters plus the derived secretion-cost rate constant."""
+
+        parameters = self.parameters
+        if SECRETION_COST_RATE_SYMBOL in parameters:
+            raise ValueError(f"Parameter symbol {SECRETION_COST_RATE_SYMBOL!r} is reserved for the derived secretion cost.")
+        secretion = parameters.get("alpha_E")
+        cost = parameters.get("c_E")
+        product = parameters.require_quantity("alpha_E", "mole / liter / kilogram / second") * parameters.require_quantity(
+            "c_E", "kilogram / (mole / liter)"
+        )
+        derived = Parameter(
+            "enzyme secretion cost rate constant (alpha_E times c_E)",
+            SECRETION_COST_RATE_SYMBOL,
+            product.to("1 / second"),
+            "1 / second",
+            None,
+            f"Derived from {secretion.symbol} ({secretion.source}) and {cost.symbol} ({cost.source}).",
+            _combined_confidence(secretion.confidence_level, cost.confidence_level),
+            "Product of the secretion coefficient and the secretion cost, so that the active-biomass cost of "
+            "secretion is one mass-action process on the compiled core. Not an independent parameter.",
+        )
+        return ParameterSet((*parameters, derived))
+
+    def simulate_compiled(
+        self,
+        *,
+        degradation: Sequence[Process],
+        initial_state: Mapping[str, Quantity],
+        t_span: tuple[Quantity, Quantity],
+        t_eval: Quantity | None = None,
+        solver_settings: SolverSettings | None = None,
+    ) -> SimulationResult:
+        """Integrate ``compiled_processes(degradation)`` on the compiled process core."""
+
+        from fungal_model.processes.assembly import ModelBuilder
+        from fungal_model.processes.registry import ProcessRegistry
+        from fungal_model.solvers.process_ode import ProcessODESolver, RunRequest
+
+        processes = self.compiled_processes(degradation)
+        model = ModelBuilder(
+            process_library=ProcessRegistry(processes),
+            requested_processes=tuple(process.name for process in processes),
+            parameters=self.compiled_parameters(),
+            solver_settings=solver_settings or SolverSettings(),
+        ).assemble()
+        return ProcessODESolver(model).run(
+            RunRequest(initial_state=initial_state, t_span=t_span, t_eval=t_eval, name="fungal_coupling", label="exploratory")
+        )
+
     def build_engine(self) -> SimulationEngine:
-        """Build a well-mixed engine for the explicit exploratory coupling."""
+        """Build a well-mixed engine for the explicit exploratory coupling (legacy ``Reaction`` path)."""
 
         return SimulationEngine(
             reactions=self.reactions(),
@@ -283,4 +452,4 @@ class FungalCouplingModel:
         }
 
 
-__all__ = ["FUNGAL_COUPLING_MATURITY", "FungalCouplingModel"]
+__all__ = ["FUNGAL_COUPLING_MATURITY", "SECRETION_COST_RATE_SYMBOL", "FungalCouplingModel"]

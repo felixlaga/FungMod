@@ -176,7 +176,11 @@ class MassActionFactory:
             ("rate_constant", "rate_constant_units", "rate_units"),
             prefix="parameters",
         )
-        species = set(_mapping(states.get("reactants", {}))) | set(_mapping(states.get("products", {})))
+        species = (
+            set(_mapping(states.get("reactants", {})))
+            | set(_mapping(states.get("products", {})))
+            | set(_mapping(states.get("catalysts", {})))
+        )
         missing += tuple(
             f"state_units.{state}"
             for state in sorted(species)
@@ -188,11 +192,13 @@ class MassActionFactory:
         _require_buildable(self.can_build(context, process_config))
         states = _mapping(process_config.states)
         parameters = _mapping(process_config.parameters)
-        species = set(states["reactants"]) | set(states["products"])
+        catalysts = _mapping(states.get("catalysts", {}))
+        species = set(states["reactants"]) | set(states["products"]) | set(catalysts)
         process = MassActionProcess(
             name=process_config.id,
             reactants={str(name): float(value) for name, value in states["reactants"].items()},
             products={str(name): float(value) for name, value in states["products"].items()},
+            catalysts={str(name): float(value) for name, value in catalysts.items()},
             state_units={str(name): context.state_units[str(name)] for name in species},
             rate_constant_symbol=str(parameters["rate_constant"]),
             rate_constant_units=str(parameters["rate_constant_units"]),

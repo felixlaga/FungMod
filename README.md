@@ -188,9 +188,10 @@ each implementation:
   maintenance demand, capped maintenance, costed secretion sharing the
   post-maintenance budget) and the chemostat exchanges (dilution, gas
   transfer) as generic processes with numeric kernels, factories and config
-  support; `ResourceLimitedCulture` and `DegradingCulture` run on the compiled
-  core through `simulate_compiled` with parity against their native
-  right-hand side (`docs/compiled-core.md`),
+  support; `ResourceLimitedCulture`, `DegradingCulture` and
+  `FungalCouplingModel` run on the compiled core through `simulate_compiled`
+  with parity against their native right-hand sides (`docs/compiled-core.md`);
+  `mass_action` processes accept catalysts (exported to SBML as modifiers),
 - a first registry case with an active environment response: *P. chrysosporium*
   BGL1A on cellobiose over pH 4 to 8 (SABIO-RK entry 38522, Tsukada 2008),
   exploratory mode only, with `environment_effect_status: active_response_model`

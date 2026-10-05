@@ -64,8 +64,9 @@ stoichiometric right-hand side with build-time unit resolution. Other
 integration paths still own their own right-hand sides: the legacy
 `Reaction`/`SimulationEngine` engine, the 1D and N-D reaction-diffusion
 engines (which evaluate `Reaction` rate laws on unit-bearing quantities per
-cell or per field), the opt-in `FungalCouplingModel` (built on the legacy
-engine), the research culture models, and the native `simulate` of
+cell or per field), the research culture models, the legacy
+`reactions()`/`build_engine()` path of `FungalCouplingModel` (kept for
+caller-supplied `Reaction` rate laws), and the native `simulate` of
 `ResourceLimitedCulture` and `DegradingCulture`, which the classes keep for
 its analytic piecewise Jacobian. They predate the compiled core and are not
 reachable from the registry-backed `VirtualExperiment` path.
@@ -97,7 +98,12 @@ tests pin the compiled trajectories, extents, boundary ledgers and process
 rates to the native `simulate` to 1e-7 relative and 1e-11 mol/L absolute at
 tight tolerances. The classes keep `simulate` because its analytic piecewise
 Jacobian is the one thing the compiled core cannot yet provide; both paths
-name their engine in the trajectory diagnostics.
+name their engine in the trajectory diagnostics. `FungalCouplingModel`
+composes `mass_action` (extended with catalysts), `first_order_decay` and
+`proportional_synthesis` processes in `compiled_processes(degradation)` and
+runs them through `simulate_compiled`, pinned to its legacy engine by
+`tests/test_coupling_compiled.py`; the degradation must be supplied as
+processes because a `Reaction`'s Python rate law cannot be compiled.
 
 Containment: every shipped process and modifier compiles to a numeric kernel
 and `tests/test_compiled_process_models.py` fails if one falls back; the
@@ -123,7 +129,9 @@ Tests protecting it: `tests/test_compiled_process_models.py`
 (`test_configured_model_reproduces_the_frozen_research_candidate`),
 `tests/test_culture_processes.py`
 (`test_resource_limited_culture_compiled_path_matches_the_native_right_hand_side`,
-`test_degrading_culture_compiled_path_matches_the_native_right_hand_side`).
+`test_degrading_culture_compiled_path_matches_the_native_right_hand_side`),
+`tests/test_coupling_compiled.py`
+(`test_coupling_compiled_path_matches_the_legacy_engine`).
 
 ## FD-008 Exploratory research-runner rate-law duplication
 

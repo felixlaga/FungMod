@@ -124,15 +124,27 @@ return the same trajectory types as `simulate`; the parity tests agree to
 `diagnostics["engine"]`. The five types are not SBML-exportable yet; the
 exporter refuses them explicitly rather than guessing a kinetic law.
 
+`FungalCouplingModel`, the third opt-in whole-fungus class, composes
+`mass_action` (now with catalysts: species that enter the rate law without
+being consumed, exported to SBML as modifiers), `first_order_decay` and
+`proportional_synthesis` processes through `compiled_processes(degradation)`,
+where the caller supplies the extracellular degradation as processes;
+`simulate_compiled` runs them on the compiled core and the parity test pins
+the result to the legacy `build_engine().simulate` to 1e-7 relative. The
+secretion cost needs one derived rate constant (`alpha_E_c_E`, the product
+of the secretion coefficient and the secretion cost), carried by
+`compiled_parameters` with its provenance.
+
 ## What is not on the compiled core yet
 
 - The legacy `Reaction`/`SimulationEngine` path, the 1D and N-D
-  reaction-diffusion engines, the opt-in `FungalCouplingModel` (built on the
-  legacy engine) and the research culture models still integrate their own
-  right-hand sides. `ResourceLimitedCulture.simulate` and
+  reaction-diffusion engines and the research culture models still integrate
+  their own right-hand sides. `ResourceLimitedCulture.simulate` and
   `DegradingCulture.simulate` keep their native right-hand side for its
-  analytic piecewise Jacobian; `simulate_compiled` is the compiled path. They
-  are tracked as `FD-009` in `ARCHITECTURE_DEBT.md`.
+  analytic piecewise Jacobian, and `FungalCouplingModel.reactions()` keeps
+  `Reaction` objects for caller-supplied Python rate laws, which cannot be
+  compiled; `simulate_compiled` is the compiled path of all three classes.
+  They are tracked as `FD-009` in `ARCHITECTURE_DEBT.md`.
 - No analytic Jacobian is generated for compiled models; stiff methods use the
   backend's finite differences, recorded as
   `"jacobian": "finite_difference_by_backend"`.
