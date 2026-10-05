@@ -26,6 +26,53 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CRIT-001 Gelain Model-Criticism Study: Plan Frozen
+
+Date: 2026-10-05
+
+Status: plan frozen, nothing run. This is step 5 item 2 of the software-paper
+plan. No fit, sample or score exists under it.
+
+Changed:
+
+- `data/benchmarks/gelain_2020_criticism/plan.json` (SHA-256
+  `8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e`): four models
+  (M0 registry baseline; M1 induction state; M2 soluble product pool with
+  Monod uptake, product inhibition and an explicit unmeasured initial soluble
+  carbon; M3 conversion-dependent accessibility after Kadam 2004), every
+  parameter with bounds, units and role, the shared assumed error model with
+  one sampled noise multiplier, stage A least-squares whole-condition holdouts
+  with the v2 complexity screen and profiles, stage B posterior sampling with
+  the BAYES-001 identifiability thresholds and posterior predictive coverage,
+  decision rules R1 to R4, a four-word outcome vocabulary, excluded claims and
+  an amendment rule.
+- `data/benchmarks/gelain_2020_criticism/README.md`: what the plan is and is
+  not, and what each model needs before it can run.
+- `tests/test_gelain_criticism_plan.py`: pins the digest, the data digests,
+  the parameter counts (9, 10, 13, 10), positivity of every bound, the
+  flagging of every added parameter, the decision rules and the claim
+  boundaries, and that no results directory exists yet.
+
+Not changed: every model, process, registry record, benchmark result and
+frozen artifact.
+
+Tests: five new plan-contract tests. Commands: `pytest
+tests/test_gelain_criticism_plan.py tests/test_repository_hygiene.py
+tests/test_quality_config.py` (see the PR for the result).
+
+Scientific impact: none yet; the plan commits the study to its decision rules
+before data are touched. Backward compatibility: unaffected.
+
+Ambiguities: M2's initial soluble carbon `P0` is an explicit unknown standing
+in for inoculum and medium carry-over that the deposit does not measure; M3
+needs a new generic modifier before it can run; stage B holdout posteriors are
+capped by compute and may be reported as not run. Risk: low.
+
+Next task: after the PR chain and #82 are on `main`, implement the M1 and M2
+case-template variants (exploratory maturity), the generic conversion
+reactivity modifier for M3, a posterior predictive coverage utility and the
+study runner, then run stage A.
+
 ## PAPER-001 Software-Paper Plan Without A Wet Lab
 
 Date: 2026-10-05

@@ -1,0 +1,489 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "gelain_2020_model_criticism_v1",
+  "status": "plan frozen; no fit, sample or score has been run under it",
+  "frozen_on": "2026-10-05",
+  "design_status": "Retrospective model criticism on published duplicate means that have already informed earlier model development (v1, v2 and BAYES-001). Nothing here is blind, independent or a validation of biology.",
+  "question": "Which explicit mechanism, added to the registry hydrolysis candidate, reduces the biomass/cellulose misfit found in BAYES-001 on whole-condition holdouts, and which of its parameters do these data identify?",
+  "data": {
+    "source": "data/benchmarks/gelain_2020_v2/observations.json",
+    "source_sha256": "cc8cda93a4a1a07cc73cf0c104aeaf315770aa4399e65cb2f3473e97951b699c",
+    "source_doi": "10.17632/shd3wcczsr.2",
+    "article_doi": "10.1016/j.cesx.2020.100085",
+    "conditions": [
+      "gelain_2020_cellulose_10gl",
+      "gelain_2020_cellulose_20gl",
+      "gelain_2020_cellulose_30gl"
+    ],
+    "observables": [
+      "biomass",
+      "substrate",
+      "cellulase_activity",
+      "beta_glucosidase_activity"
+    ],
+    "observations": 96,
+    "replicates": "duplicate means only; no raw replicates, no measured SD",
+    "glycerol_conditions": "excluded: no hydrolysis, so they cannot discriminate the mechanisms below"
+  },
+  "baseline_provenance": {
+    "v2_plan_sha256": "867120730f815060778ca402bdd55a0b2d02fba1eb1769ad567d07cd42f77046",
+    "bayesian_plan_sha256": "9574fccc809cc2a49aab2ebc9cbc8cd087d0064d26582da287915cbbce32f01a",
+    "baseline_case": "trichoderma_harzianum_p49p11 x cellulose_celufloc_200 (data_registry/case_templates/case_templates.yml)",
+    "misfit_evidence": "BAYES-001: shared noise multiplier 2.25 [1.95, 2.63] at the assumed 10% error; the per-observable variant inflates biomass error 5.4x"
+  },
+  "shared_structure": {
+    "error_model": "Gaussian, SD = 0.1 x per-observable maximum over the three loadings, rho(biomass, substrate) = -0.5, temporal independence assumed, evidence assumed; one shared log-uniform noise multiplier in [0.1, 10] estimated with the parameters",
+    "priors": "log-uniform between the declared bounds for every free parameter",
+    "initial_conditions": "recorded t = 0 values per loading (biomass 0.3990672957214788 g/L, cellulose 10/20/30 g/L, activities 0), unchanged for every model",
+    "solver": {
+      "engine": "compiled core via ConfiguredConditionPredictor",
+      "method": "LSODA",
+      "rtol": 1e-08,
+      "atol": 1e-10
+    },
+    "solver_check": {
+      "method": "DOP853",
+      "rtol": 1e-10,
+      "atol": 1e-12,
+      "maximum_scaled_difference": 1e-05
+    }
+  },
+  "models": {
+    "M0_baseline": {
+      "mechanism": "Registry hydrolysis candidate unchanged: consumption = k_h F S/(Kh+S) with explicit yield split; first-order biomass loss; activities produced qX S/(K_ind+S) and lost first-order.",
+      "composition": "existing case template trichoderma_harzianum_p49p11 (six generic processes)",
+      "known_defect": "growth cannot start before filter-paper activity appears (dX/dt(0) = -kd X0) although biomass rises by 8 h",
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "lower": 1e-06,
+          "upper": 1.0,
+          "units": "gram/gelain_fpu/hour",
+          "role": "hydrolysis_capacity"
+        },
+        {
+          "symbol": "Kh",
+          "lower": 0.001,
+          "upper": 100.0,
+          "units": "gram/liter",
+          "role": "hydrolysis_half_saturation"
+        },
+        {
+          "symbol": "Y",
+          "lower": 0.01,
+          "upper": 1.0,
+          "units": "dimensionless",
+          "role": "biomass_yield"
+        },
+        {
+          "symbol": "kd",
+          "lower": 1e-05,
+          "upper": 0.5,
+          "units": "1/hour",
+          "role": "biomass_loss_rate"
+        },
+        {
+          "symbol": "K_ind",
+          "lower": 0.01,
+          "upper": 100.0,
+          "units": "gram/liter",
+          "role": "induction_half_saturation"
+        },
+        {
+          "symbol": "qF",
+          "lower": 0.01,
+          "upper": 1000.0,
+          "units": "gelain_fpu/gram/hour",
+          "role": "cellulase_specific_production_rate"
+        },
+        {
+          "symbol": "kF",
+          "lower": 1e-06,
+          "upper": 0.1,
+          "units": "1/hour",
+          "role": "cellulase_loss_rate"
+        },
+        {
+          "symbol": "qB",
+          "lower": 0.01,
+          "upper": 3000.0,
+          "units": "gelain_beta_u/gram/hour",
+          "role": "beta_glucosidase_specific_production_rate"
+        },
+        {
+          "symbol": "kB",
+          "lower": 1e-06,
+          "upper": 0.1,
+          "units": "1/hour",
+          "role": "beta_glucosidase_loss_rate"
+        }
+      ],
+      "new_code_required": false
+    },
+    "M1_induction_state": {
+      "mechanism": "Enzyme synthesis follows an induced-biomass state z instead of instantaneous biomass: dz/dt = X S/(K_ind+S) - kz_loss z; dF/dt = qF z - kF F; dB/dt = qB z - kB B. Everything else as M0.",
+      "composition": "proportional_synthesis (producer biomass, inducer substrate, product induced_pool) + first_order loss of induced_pool + two proportional_synthesis processes with producer induced_pool and no inducer",
+      "fixed_parameters": [
+        {
+          "symbol": "k_z",
+          "value": 1.0,
+          "units": "1/hour",
+          "reason": "the scale of z is not separately identifiable from qF and qB; z is defined as induced biomass equivalent"
+        }
+      ],
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "lower": 1e-06,
+          "upper": 1.0,
+          "units": "gram/gelain_fpu/hour",
+          "role": "hydrolysis_capacity"
+        },
+        {
+          "symbol": "Kh",
+          "lower": 0.001,
+          "upper": 100.0,
+          "units": "gram/liter",
+          "role": "hydrolysis_half_saturation"
+        },
+        {
+          "symbol": "Y",
+          "lower": 0.01,
+          "upper": 1.0,
+          "units": "dimensionless",
+          "role": "biomass_yield"
+        },
+        {
+          "symbol": "kd",
+          "lower": 1e-05,
+          "upper": 0.5,
+          "units": "1/hour",
+          "role": "biomass_loss_rate"
+        },
+        {
+          "symbol": "K_ind",
+          "lower": 0.01,
+          "upper": 100.0,
+          "units": "gram/liter",
+          "role": "induction_half_saturation"
+        },
+        {
+          "symbol": "qF",
+          "lower": 0.01,
+          "upper": 1000.0,
+          "units": "gelain_fpu/gram/hour",
+          "role": "cellulase_specific_production_rate"
+        },
+        {
+          "symbol": "kF",
+          "lower": 1e-06,
+          "upper": 0.1,
+          "units": "1/hour",
+          "role": "cellulase_loss_rate"
+        },
+        {
+          "symbol": "qB",
+          "lower": 0.01,
+          "upper": 3000.0,
+          "units": "gelain_beta_u/gram/hour",
+          "role": "beta_glucosidase_specific_production_rate"
+        },
+        {
+          "symbol": "kB",
+          "lower": 1e-06,
+          "upper": 0.1,
+          "units": "1/hour",
+          "role": "beta_glucosidase_loss_rate"
+        },
+        {
+          "symbol": "kz_loss",
+          "lower": 0.0001,
+          "upper": 1.0,
+          "units": "1/hour",
+          "role": "induction_state_loss_rate",
+          "new": true,
+          "meaning": "memory time constant of the induced state; small values delay and smooth activity production"
+        }
+      ],
+      "expected_symmetries": "kz_loss trades against qF and qB when the induction phase is short relative to sampling",
+      "new_code_required": false
+    },
+    "M2_soluble_product_pool": {
+      "mechanism": "Hydrolysis releases a soluble product pool P that is taken up by Monod growth and inhibits hydrolysis: consumption = k_h F S/(Kh+S) / (1 + P/Ki) -> P; uptake = (mu/Y) X P/(Ks+P) -> Y X + (1-Y) ledger; P(0) = P0 stands for soluble carbon carried in by inoculum and medium and is not measured. Biomass loss and activity production as M0 (induction by cellulose S).",
+      "composition": "homogeneous_michaelis_menten (enzyme-explicit, product soluble_product, product_inhibition modifier) + homogeneous_michaelis_menten (enzyme-explicit with biomass as the catalyst state, substrate soluble_product, yield product map) + the M0 loss and synthesis processes",
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "lower": 1e-06,
+          "upper": 1.0,
+          "units": "gram/gelain_fpu/hour",
+          "role": "hydrolysis_capacity"
+        },
+        {
+          "symbol": "Kh",
+          "lower": 0.001,
+          "upper": 100.0,
+          "units": "gram/liter",
+          "role": "hydrolysis_half_saturation"
+        },
+        {
+          "symbol": "Y",
+          "lower": 0.01,
+          "upper": 1.0,
+          "units": "dimensionless",
+          "role": "biomass_yield"
+        },
+        {
+          "symbol": "kd",
+          "lower": 1e-05,
+          "upper": 0.5,
+          "units": "1/hour",
+          "role": "biomass_loss_rate"
+        },
+        {
+          "symbol": "K_ind",
+          "lower": 0.01,
+          "upper": 100.0,
+          "units": "gram/liter",
+          "role": "induction_half_saturation"
+        },
+        {
+          "symbol": "qF",
+          "lower": 0.01,
+          "upper": 1000.0,
+          "units": "gelain_fpu/gram/hour",
+          "role": "cellulase_specific_production_rate"
+        },
+        {
+          "symbol": "kF",
+          "lower": 1e-06,
+          "upper": 0.1,
+          "units": "1/hour",
+          "role": "cellulase_loss_rate"
+        },
+        {
+          "symbol": "qB",
+          "lower": 0.01,
+          "upper": 3000.0,
+          "units": "gelain_beta_u/gram/hour",
+          "role": "beta_glucosidase_specific_production_rate"
+        },
+        {
+          "symbol": "kB",
+          "lower": 1e-06,
+          "upper": 0.1,
+          "units": "1/hour",
+          "role": "beta_glucosidase_loss_rate"
+        },
+        {
+          "symbol": "mu",
+          "lower": 0.001,
+          "upper": 2.0,
+          "units": "1/hour",
+          "role": "maximum_specific_growth_rate",
+          "new": true,
+          "meaning": "Monod growth on the soluble pool"
+        },
+        {
+          "symbol": "Ks",
+          "lower": 0.001,
+          "upper": 10.0,
+          "units": "gram/liter",
+          "role": "uptake_half_saturation",
+          "new": true,
+          "meaning": "Monod half-saturation of the soluble pool"
+        },
+        {
+          "symbol": "Ki",
+          "lower": 0.01,
+          "upper": 100.0,
+          "units": "gram/liter",
+          "role": "product_inhibition_constant",
+          "new": true,
+          "meaning": "soluble product inhibition of hydrolysis; the upper bound makes inhibition negligible"
+        },
+        {
+          "symbol": "P0",
+          "lower": 0.001,
+          "upper": 3.0,
+          "units": "gram/liter",
+          "role": "initial_soluble_product",
+          "new": true,
+          "meaning": "unmeasured initial soluble carbon; an explicit unknown, not a measured initial condition"
+        }
+      ],
+      "expected_symmetries": "mu and Ks are jointly constrained only while P is near Ks; P0 trades against mu for the first 8 h; Ki is bounded below only if hydrolysis never saturates in P",
+      "new_code_required": false,
+      "template_note": "requires a new exploratory case template variant with a soluble_product state; the registry fungus record is unchanged"
+    },
+    "M3_conversion_dependent_accessibility": {
+      "mechanism": "Hydrolysis slows with conversion independent of enzyme activity: consumption = k_h F S/(Kh+S) (S/S0)^n, the substrate reactivity factor of Kadam, Rydholm and McMillan (2004, Biotechnol. Prog. 20:698-705, doi:10.1021/bp034316x) generalised by an exponent. Everything else as M0.",
+      "composition": "M0 plus a generic conversion-reactivity rate modifier on the hydrolysis process",
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "lower": 1e-06,
+          "upper": 1.0,
+          "units": "gram/gelain_fpu/hour",
+          "role": "hydrolysis_capacity"
+        },
+        {
+          "symbol": "Kh",
+          "lower": 0.001,
+          "upper": 100.0,
+          "units": "gram/liter",
+          "role": "hydrolysis_half_saturation"
+        },
+        {
+          "symbol": "Y",
+          "lower": 0.01,
+          "upper": 1.0,
+          "units": "dimensionless",
+          "role": "biomass_yield"
+        },
+        {
+          "symbol": "kd",
+          "lower": 1e-05,
+          "upper": 0.5,
+          "units": "1/hour",
+          "role": "biomass_loss_rate"
+        },
+        {
+          "symbol": "K_ind",
+          "lower": 0.01,
+          "upper": 100.0,
+          "units": "gram/liter",
+          "role": "induction_half_saturation"
+        },
+        {
+          "symbol": "qF",
+          "lower": 0.01,
+          "upper": 1000.0,
+          "units": "gelain_fpu/gram/hour",
+          "role": "cellulase_specific_production_rate"
+        },
+        {
+          "symbol": "kF",
+          "lower": 1e-06,
+          "upper": 0.1,
+          "units": "1/hour",
+          "role": "cellulase_loss_rate"
+        },
+        {
+          "symbol": "qB",
+          "lower": 0.01,
+          "upper": 3000.0,
+          "units": "gelain_beta_u/gram/hour",
+          "role": "beta_glucosidase_specific_production_rate"
+        },
+        {
+          "symbol": "kB",
+          "lower": 1e-06,
+          "upper": 0.1,
+          "units": "1/hour",
+          "role": "beta_glucosidase_loss_rate"
+        },
+        {
+          "symbol": "n",
+          "lower": 0.05,
+          "upper": 3.0,
+          "units": "dimensionless",
+          "role": "reactivity_exponent",
+          "new": true,
+          "meaning": "n = 1 is the Kadam form; n -> 0 recovers M0"
+        }
+      ],
+      "new_code_required": true,
+      "new_code": "one generic rate modifier (reactivity = (S/S0)^n) with provenance, a non-cellulose test case, and compiled-core kernel; implemented only after this plan is frozen and before any fit"
+    }
+  },
+  "excluded_mechanisms": {
+    "maintenance": "a Pirt maintenance term needs the soluble pool of M2 to draw from; it is deferred to a follow-up plan rather than mixed into M2 so that M2 tests one addition",
+    "published_gelain_equations": "already compared in v2 (20 parameters, rank 19/20); not a mechanism addition",
+    "oxygen_nutrient_pH_morphology": "not represented and not measured in the deposit"
+  },
+  "stage_A_least_squares": {
+    "purpose": "whole-condition holdout comparison and complexity screen, as in v2",
+    "folds": "each cellulose loading held out once, training on the other two (3 folds per model) plus one all-condition fit per model",
+    "scenarios": [
+      "primary (training_max loss)",
+      "correlated_assumption (Gaussian, 10% of training maxima, rho = -0.5)"
+    ],
+    "starts": 5,
+    "max_nfev": 250,
+    "seed": 20261006,
+    "screen": {
+      "reference": "M0_baseline",
+      "minimum_relative_cv_improvement": 0.1,
+      "maximum_observable_worsening": 0.1,
+      "full_practical_rank_required": true,
+      "relative_singular_value_cutoff": 1e-06,
+      "near_bound_log_fraction": 0.001
+    },
+    "profiles": "nuisance-reoptimised profile loss at fitted value x {0.5, 1, 2} for every parameter of every model that passes the screen"
+  },
+  "stage_B_posterior": {
+    "purpose": "adequacy, identifiability and posterior predictive coverage on all three loadings",
+    "runs": "one all-condition posterior per model (M0 may reuse BAYES-001's frozen chain)",
+    "sampler": {
+      "walkers": 24,
+      "steps": 8000,
+      "burn_in": 2000,
+      "stretch_scale": 2.0,
+      "seed": 20261006,
+      "initial_spread_fraction_of_prior_width": 0.05,
+      "initial_center": "stage A all-condition fit"
+    },
+    "convergence_rule": "every autocorrelation time reliable (chain > 50 tau) and every ESS >= 100; a chain that misses it is reported as not converged and its verdicts are labelled provisional",
+    "identifiability": {
+      "identified_max_width_fraction": 0.25,
+      "weak_max_width_fraction": 0.75,
+      "bound_contact_fraction": 0.02,
+      "credible_mass": 0.95
+    },
+    "posterior_predictive": {
+      "draws": 400,
+      "quantiles": [
+        0.05,
+        0.5,
+        0.95
+      ],
+      "coverage": "fraction of the 96 observations inside the 5-95% band with the estimated measurement noise included"
+    },
+    "holdout_posteriors": "only for models that pass the stage A screen, one posterior per fold; skipped with a stated reason if the compute cap is hit",
+    "compute_cap": "2 h wall-clock per chain on the development container; chains are checkpointed and resumable"
+  },
+  "decision_rules": {
+    "R1_holdout_support": "passes the stage A screen against M0 in the primary scenario",
+    "R2_adequacy": "the 95% interval of the shared noise multiplier contains 1.0 (adequate at the assumed 10% error); otherwise report the multiplier as the inadequacy factor",
+    "R3_identification": "every added parameter is classified identified or weakly identified; a mechanism whose added parameters are all bounded on one side only or prior dominated is 'improves fit but unidentified' even if R1 passes",
+    "R4_coverage": "reported, not thresholded",
+    "outcome_vocabulary": [
+      "supported (R1 and R3)",
+      "improves fit but unidentified (R1, not R3)",
+      "not supported (fails R1)",
+      "not run (reason stated)"
+    ],
+    "ties": "if two mechanisms are supported, the one with fewer added parameters is preferred; both are reported"
+  },
+  "reporting": {
+    "per_model": [
+      "holdout normalized MSE per observable and pooled",
+      "screen verdict",
+      "profile verdicts",
+      "noise multiplier posterior",
+      "identifiability class per parameter",
+      "posterior predictive coverage",
+      "failed starts and non-converged chains"
+    ],
+    "must_report_failures": true,
+    "claims_excluded": [
+      "biological validation",
+      "blind or independent prediction",
+      "transfer to other strains, substrates or conditions",
+      "promotion of any constant beyond retrospective fit"
+    ]
+  },
+  "amendments": [],
+  "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason, recorded before the affected fit is run; the ledger records the file's sha256 at freezing and after each amendment"
+}
