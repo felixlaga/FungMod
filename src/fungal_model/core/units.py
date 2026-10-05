@@ -12,6 +12,12 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 import pint
 
 ureg = pint.UnitRegistry(autoconvert_offset_to_baseunit=True)
+# Enzyme-activity assay units are independent base dimensions. An assay unit
+# cannot be converted to mass, molarity, or another assay without a
+# preparation-specific specific-activity measurement, which must enter a model
+# as an explicit, sourced parameter rather than as a unit conversion.
+ureg.define("filter_paper_unit = [filter_paper_cellulase_activity] = FPU")
+ureg.define("beta_glucosidase_assay_unit = [beta_glucosidase_assay_activity] = BGU")
 Q_: Any = ureg.Quantity
 if TYPE_CHECKING:
     Quantity: TypeAlias = pint.Quantity[Any]

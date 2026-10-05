@@ -95,3 +95,177 @@ records:
         confidence_level: literature_curated
         notes: SABIO-RK assay pH.
     notes: Assay conditions for first real kinetic pilot.
+
+  - record_id: gelain_2020_cellulose_batch_10gl
+    name: Gelain 2020 T. harzianum batch culture on 10 g/L cellulose (29 C, pH 5)
+    display_name: Gelain 2020 cellulose 10 g/L batch condition
+    aliases:
+      - gelain 2020 cellulose 10 g/L
+      - cellulose 10 g/L batch 29C pH5
+    maturity: literature_processed
+    provenance:
+      source: >-
+        Gelain 2020 Methods 2.2 (doi:10.1016/j.cesx.2020.100085) and the deposited
+        cellulose 10 g/L experimental workbook (doi:10.17632/shd3wcczsr.2;
+        gelain_2020/originals/cellulose/10gL.xlsx, sha256 142eb8649ccf08d4de1df9c6dbe69ca53d3887f7817b4b3b1979c144fcd483f7).
+      confidence_level: literature_curated
+      environment_effect_status: metadata_only
+      notes: >-
+        Culture-condition record for one batch condition. Temperature and pH are
+        controlled set points; no temperature or pH response law is applied to the
+        kinetics in this record.
+    conditions:
+      temperature:
+        kind: exact
+        value: 302.15
+        units: kelvin
+        source: Gelain 2020 Methods 2.2; temperature controlled at 29 C.
+        confidence_level: literature_curated
+        notes: Converted from the reported 29 C set point.
+      ph:
+        kind: exact
+        value: 5.0
+        units: dimensionless
+        source: Gelain 2020 Methods 2.2; pH controlled at 5.0 +/- 0.5 with NH4OH and H2SO4.
+        confidence_level: literature_curated
+        notes: Reported control band is +/- 0.5 pH units.
+      oxygen_concentration:
+        kind: unknown
+        units: percent
+        source: Gelain 2020 Methods 2.2.
+        confidence_level: literature_curated
+        notes: Dissolved oxygen was kept above 30 percent of air saturation by airflow (0.48-0.7 vvm) and stirring (200-300 rpm); the absolute concentration was not reported.
+      initial_cellulose_loading:
+        kind: exact
+        value: 10.0
+        units: gram / liter
+        source: Gelain 2020 Methods 2.2 and deposited workbook cell F2.
+        confidence_level: literature_curated
+        notes: Nominal initial cellulose loading of this batch condition.
+      working_volume:
+        kind: exact
+        value: 1.9
+        units: liter
+        source: Gelain 2020 Methods 2.2.
+        confidence_level: literature_curated
+        notes: Working volume of the 3 L stirred bioreactor.
+    notes: >-
+      Submerged batch culture of T. harzianum P49P11 in Mandels medium with 1 g/L
+      peptone, 29 C, pH 5.0, dissolved oxygen above 30 percent, 10 g/L Celufloc 200
+      cellulose, duplicate cultures with different inocula, sampled 8-96 h.
+
+  - record_id: gelain_2020_cellulose_batch_20gl
+    name: Gelain 2020 T. harzianum batch culture on 20 g/L cellulose (29 C, pH 5)
+    display_name: Gelain 2020 cellulose 20 g/L batch condition
+    aliases:
+      - gelain 2020 cellulose 20 g/L
+      - cellulose 20 g/L batch 29C pH5
+    maturity: literature_processed
+    provenance:
+      source: >-
+        Gelain 2020 Methods 2.2 (doi:10.1016/j.cesx.2020.100085) and the deposited
+        cellulose 20 g/L experimental workbook (doi:10.17632/shd3wcczsr.2;
+        gelain_2020/originals/cellulose/20gL.xlsx, sha256 ad722f2d071601e111379a56459c94738473ce639d75e2f19188dd1e1abd649f).
+      confidence_level: literature_curated
+      environment_effect_status: metadata_only
+      notes: >-
+        Culture-condition record for one batch condition. Temperature and pH are
+        controlled set points; no temperature or pH response law is applied to the
+        kinetics in this record.
+    conditions:
+      temperature:
+        kind: exact
+        value: 302.15
+        units: kelvin
+        source: Gelain 2020 Methods 2.2; temperature controlled at 29 C.
+        confidence_level: literature_curated
+        notes: Converted from the reported 29 C set point.
+      ph:
+        kind: exact
+        value: 5.0
+        units: dimensionless
+        source: Gelain 2020 Methods 2.2; pH controlled at 5.0 +/- 0.5 with NH4OH and H2SO4.
+        confidence_level: literature_curated
+        notes: Reported control band is +/- 0.5 pH units.
+      oxygen_concentration:
+        kind: unknown
+        units: percent
+        source: Gelain 2020 Methods 2.2.
+        confidence_level: literature_curated
+        notes: Dissolved oxygen was kept above 30 percent of air saturation by airflow (0.48-0.7 vvm) and stirring (200-300 rpm); the absolute concentration was not reported.
+      initial_cellulose_loading:
+        kind: exact
+        value: 20.0
+        units: gram / liter
+        source: Gelain 2020 Methods 2.2 and deposited workbook cell F2.
+        confidence_level: literature_curated
+        notes: Nominal initial cellulose loading of this batch condition.
+      working_volume:
+        kind: exact
+        value: 1.9
+        units: liter
+        source: Gelain 2020 Methods 2.2.
+        confidence_level: literature_curated
+        notes: Working volume of the 3 L stirred bioreactor.
+    notes: >-
+      Submerged batch culture of T. harzianum P49P11 in Mandels medium with 1 g/L
+      peptone, 29 C, pH 5.0, dissolved oxygen above 30 percent, 20 g/L Celufloc 200
+      cellulose, duplicate cultures with different inocula, sampled 8-96 h.
+
+  - record_id: gelain_2020_cellulose_batch_30gl
+    name: Gelain 2020 T. harzianum batch culture on 30 g/L cellulose (29 C, pH 5)
+    display_name: Gelain 2020 cellulose 30 g/L batch condition
+    aliases:
+      - gelain 2020 cellulose 30 g/L
+      - cellulose 30 g/L batch 29C pH5
+    maturity: literature_processed
+    provenance:
+      source: >-
+        Gelain 2020 Methods 2.2 (doi:10.1016/j.cesx.2020.100085) and the deposited
+        cellulose 30 g/L experimental workbook (doi:10.17632/shd3wcczsr.2;
+        gelain_2020/originals/cellulose/30gL.xlsx, sha256 c8a5cef153dfba6e22fac4c4202d96dbe3fc44386fb085b14ac3ff7f88c9d406).
+      confidence_level: literature_curated
+      environment_effect_status: metadata_only
+      notes: >-
+        Culture-condition record for one batch condition. Temperature and pH are
+        controlled set points; no temperature or pH response law is applied to the
+        kinetics in this record.
+    conditions:
+      temperature:
+        kind: exact
+        value: 302.15
+        units: kelvin
+        source: Gelain 2020 Methods 2.2; temperature controlled at 29 C.
+        confidence_level: literature_curated
+        notes: Converted from the reported 29 C set point.
+      ph:
+        kind: exact
+        value: 5.0
+        units: dimensionless
+        source: Gelain 2020 Methods 2.2; pH controlled at 5.0 +/- 0.5 with NH4OH and H2SO4.
+        confidence_level: literature_curated
+        notes: Reported control band is +/- 0.5 pH units.
+      oxygen_concentration:
+        kind: unknown
+        units: percent
+        source: Gelain 2020 Methods 2.2.
+        confidence_level: literature_curated
+        notes: Dissolved oxygen was kept above 30 percent of air saturation by airflow (0.48-0.7 vvm) and stirring (200-300 rpm); the absolute concentration was not reported.
+      initial_cellulose_loading:
+        kind: exact
+        value: 30.0
+        units: gram / liter
+        source: Gelain 2020 Methods 2.2 and deposited workbook cell F2.
+        confidence_level: literature_curated
+        notes: Nominal initial cellulose loading of this batch condition.
+      working_volume:
+        kind: exact
+        value: 1.9
+        units: liter
+        source: Gelain 2020 Methods 2.2.
+        confidence_level: literature_curated
+        notes: Working volume of the 3 L stirred bioreactor.
+    notes: >-
+      Submerged batch culture of T. harzianum P49P11 in Mandels medium with 1 g/L
+      peptone, 29 C, pH 5.0, dissolved oxygen above 30 percent, 30 g/L Celufloc 200
+      cellulose, duplicate cultures with different inocula, sampled 8-96 h.

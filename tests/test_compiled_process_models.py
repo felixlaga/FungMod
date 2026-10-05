@@ -39,6 +39,7 @@ from fungal_model.solvers.compiled import (
     KERNEL_NUMERIC_THERMODYNAMIC,
     KERNEL_QUANTITY_WRAPPED,
     MODEL_REPRESENTATION,
+    NEGATIVE_STATE_POLICY,
     NUMERIC_KERNEL_KINDS,
     CompiledModel,
     resolve_state_units,
@@ -52,6 +53,7 @@ SHIPPED_PROCESS_TYPES = {
     "first_order_decay",
     "mass_action",
     "homogeneous_michaelis_menten",
+    "proportional_synthesis",
     "surface_catalysis",
     "substrate_transglycosylation",
 }
@@ -442,18 +444,37 @@ def test_environment_validity_warnings_still_surface_from_a_compiled_run() -> No
         ProcessODESolver(model).run(request)
 
 
-def test_negative_states_raise_the_unit_aware_errors() -> None:
+def test_negative_trial_states_are_projected_for_rate_evaluation_only() -> None:
+    """Solver trial iterates below zero evaluate at max(state, 0); the public rate API stays strict."""
+
     model, request = _configured(ROOT / "data" / "model_configs" / "toy_homogeneous_ab.yml")
     compiled = ProcessODESolver(model).compile(request)
     _, _, span, _, y0 = _numeric_request(model, request)
     negative = y0.copy()
-    negative[0] = -1.0
+    negative[0] = -1.0e-12
     reference = _reference_rhs(model, compiled)
-    with pytest.raises(ValueError) as reference_error:
+    with pytest.raises(ValueError, match="must be non-negative"):
         reference(span[0], negative)
-    with pytest.raises(ValueError) as compiled_error:
-        compiled.rhs(span[0], negative)
-    assert str(compiled_error.value) == str(reference_error.value)
+    projected = np.maximum(negative, 0.0)
+    np.testing.assert_array_equal(compiled.rhs(span[0], negative), reference(span[0], projected))
+    np.testing.assert_array_equal(compiled.rhs(span[0], negative), compiled.rhs(span[0], projected))
+    assert compiled.summary()["negative_state_policy"] == NEGATIVE_STATE_POLICY
+
+
+def test_substrate_depletion_integrates_without_clipping_the_trajectory() -> None:
+    """A first-order pool decaying over many lifetimes must integrate to completion."""
+
+    model, request = _configured(ROOT / "data" / "model_configs" / "toy_homogeneous_ab.yml")
+    long_request = RunRequest(
+        initial_state=request.initial_state,
+        t_span=(request.t_span[0], Q_(400.0, "second")),
+        t_eval=Q_(np.linspace(0.0, 400.0, 41), "second"),
+    )
+    result = ProcessODESolver(model).run(long_request)
+    source = np.asarray(result.states["dissolved_substrate_amount"].magnitude, dtype=float)
+    assert source[-1] < 1e-15
+    assert source.min() > -1e-9, "accepted trajectory must not be materially negative"
+    assert result.solver_metadata["kernel"]["negative_state_policy"] == NEGATIVE_STATE_POLICY
 
 
 def test_kernel_context_rejects_unknown_states_and_incompatible_units() -> None:

@@ -22,6 +22,7 @@ from .factories import (
     MassActionFactory,
     ProcessBuildContext,
     ProcessFactory,
+    ProportionalSynthesisFactory,
     SubstrateTransglycosylationFactory,
     SurfaceCatalysisFactory,
     default_foundation_factories,
@@ -31,6 +32,11 @@ from .homogeneous import (
     HomogeneousMichaelisMentenProcess,
     MassActionProcess,
     homogeneous_process_assumption,
+)
+from .physiology import (
+    PROPORTIONAL_SYNTHESIS_PROCESS_TYPE,
+    ProportionalSynthesisProcess,
+    proportional_synthesis_assumption,
 )
 from .rate_modifiers import (
     RateModifierProcess,
@@ -88,6 +94,9 @@ __all__ = [
     "ProcessMatch",
     "ProcessRegistry",
     "ProductReleaseMap",
+    "PROPORTIONAL_SYNTHESIS_PROCESS_TYPE",
+    "ProportionalSynthesisFactory",
+    "ProportionalSynthesisProcess",
     "RateModifierProcess",
     "competitive_inhibition_modifier_from_config",
     "coupled_substrate_product_inhibition_modifier_from_config",
@@ -103,6 +112,7 @@ __all__ = [
     "default_foundation_factories",
     "homogeneous_process_assumption",
     "ph_modifier_from_config",
+    "proportional_synthesis_assumption",
     "product_inhibition_modifier_from_config",
     "substrate_inhibition_modifier_from_config",
     "surface_catalysis_assumption",

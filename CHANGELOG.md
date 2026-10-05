@@ -6,6 +6,28 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- First whole-organism registry case: *Trichoderma harzianum* P49P11 on
+  Celufloc 200 cellulose (Gelain 2020) runs in `scientific` mode through
+  `VirtualExperiment` with biomass, filter-paper and beta-glucosidase activity,
+  cellulose and two closure-ledger trajectories. Fungus, enzyme-class,
+  substrate, three culture-condition, compatibility and template records plus
+  nine `calibrated` parameter records (artifact path, SHA-256, training
+  conditions, rank diagnostics and at-bound flags) and four deposited initial
+  conditions (`docs/organism-physiology.md`).
+- `culture_physiology` case-template family
+  (`fungal_model.screening.culture_physiology`): generic multi-process
+  assembly with `biomass` and indexed `ledger_*` state roles, product-map
+  coefficients bound to parameter roles (`parameter_role`,
+  `complement_of_parameter_role`), a build-time closure check and fail-closed
+  role accounting; registered as a `scientific`/`toy` assembler.
+- `proportional_synthesis` process (`ProportionalSynthesisProcess`,
+  `ProportionalSynthesisFactory`): producer-proportional formation of a
+  product pool with optional saturable induction, compiled to a numeric
+  kernel, with a non-biological toy config
+  (`data/model_configs/toy_proportional_synthesis_dissolved.yml`).
+- Assay-activity base units in the core registry: `filter_paper_unit` (`FPU`)
+  and `beta_glucosidase_assay_unit` (`BGU`); the Gelain research units
+  `gelain_fpu`/`gelain_beta_u` are now aliases of them.
 - Compiled well-mixed model core (`fungal_model.solvers.compile_assembled_model`):
   units resolve once at build time, stoichiometry is probed from
   `Process.contributions` and checked for linearity, and every shipped process
@@ -55,6 +77,18 @@ All notable public releases of FungMod are documented here.
 
 ### Changed
 
+- Compiled models evaluate every rate at `max(state, 0)` (recorded as
+  `negative_state_policy` in `solver_metadata["kernel"]`) so that a pool can be
+  consumed to depletion without the solver's trial iterates raising; the
+  integrated trajectory is never clipped and the `non_negative` validator still
+  reports accepted states below tolerance. Process rates recorded at output
+  points use the same projection. The unit-aware `Process.rate` API stays
+  strict for caller-supplied negative states.
+- Modelability no longer marks a case underparameterized because an organism
+  carries an enzyme class that does not target the requested substrate; such
+  classes are reported as known, unused items when another class reaches a
+  compatible process. Registry compatibility selection skips enzyme classes
+  without a compatibility record instead of raising.
 - `ProcessODESolver` integrates the compiled right-hand side. Environment-only
   rate modifiers are evaluated once per run, so their source-range warnings fire
   once rather than at every right-hand-side evaluation. `_record_process_rates`

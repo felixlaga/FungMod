@@ -128,6 +128,11 @@ def assess_modelability(
     incompatible: list[ReportItem] = []
     candidate_processes: list[str] = []
     compatibility_records: list[ProcessCompatibilityRecord] = []
+    # Enzyme classes of the fungus that do not act on this substrate. They are
+    # blocking only when no enzyme class of the fungus reaches a compatible
+    # process; an organism with several enzyme classes is otherwise expected to
+    # carry classes that target other substrates.
+    unmatched_enzyme_classes: list[ReportItem] = []
 
     for enzyme_class_id in fungus.enzyme_classes:
         try:
@@ -143,7 +148,7 @@ def assess_modelability(
             )
             continue
         if substrate.substrate_class not in enzyme_class.compatible_substrate_classes:
-            incompatible.append(
+            unmatched_enzyme_classes.append(
                 _item(
                     "enzyme_substrate_match",
                     enzyme_class.record_id,
@@ -157,7 +162,7 @@ def assess_modelability(
             continue
         shared_bonds = set(substrate.bond_classes).intersection(enzyme_class.target_bond_classes)
         if not shared_bonds:
-            incompatible.append(
+            unmatched_enzyme_classes.append(
                 _item(
                     "enzyme_bond_match",
                     enzyme_class.record_id,
@@ -228,6 +233,19 @@ def assess_modelability(
                             },
                         )
                     )
+
+    if compatibility_records:
+        known.extend(
+            _item(
+                item.item_type,
+                item.item_id,
+                f"{item.message} It is not used for process selection in this case.",
+                {**item.details, "used_for_process_selection": False},
+            )
+            for item in unmatched_enzyme_classes
+        )
+    else:
+        incompatible.extend(unmatched_enzyme_classes)
 
     selected_required_parameters: tuple[str, ...] = ()
     selected_processes: tuple[str, ...] = tuple(record.process_type for record in compatibility_records)

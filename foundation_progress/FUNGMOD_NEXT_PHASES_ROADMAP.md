@@ -31,6 +31,17 @@ The current PR queue and reconciled scoped phase status are tracked in
 
 # Current project status
 
+2026-10-05: ORG-001 puts the first real organism in the registry. T. harzianum
+P49P11 on Celufloc 200 cellulose runs in `scientific` mode through
+`VirtualExperiment` for three culture loadings, composed from generic process
+laws by a `culture_physiology` template and bound to nine `calibrated`
+constants from the recorded retrospective Gelain hydrolysis fit; the registry
+composition reproduces the research implementation. It is exact and
+implemented, not validated: three constants sit at fitting bounds, there is no
+measured product pool, and the resource-limited, maintenance and costed
+secretion closures of `DegradingCulture` are still unregistered because no
+organism parameterizes them. Step 3 (bound environment response laws) is next.
+
 2026-10-04: a verified state assessment and ordered next-step sequence is
 recorded in `FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`. It measured the
 shipped registry (3 of 27 fungus/substrate/environment combinations runnable

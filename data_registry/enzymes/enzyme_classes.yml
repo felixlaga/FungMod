@@ -54,3 +54,35 @@ records:
     compatible_processes:
       - homogeneous_michaelis_menten
     notes: First real enzyme-class registry record for soluble beta-glucoside hydrolysis; not full cellulose degradation.
+
+  - record_id: cellulase_total_filter_paper_activity
+    name: Total cellulase (filter-paper activity)
+    display_name: filter-paper cellulase activity
+    aliases:
+      - FPase
+      - filter paper activity
+      - total cellulase activity
+    maturity: literature_metadata
+    provenance:
+      source: >-
+        Ghose TK (1987) Measurement of cellulase activities. Pure and Applied
+        Chemistry 59, 257-268 (filter-paper assay), as applied in Gelain 2020
+        Methods 2.3 (doi:10.1016/j.cesx.2020.100085).
+      confidence_level: literature_curated
+      notes: >-
+        Assay-defined capability pool, not a single enzyme. One filter paper unit
+        (FPU) is the standardized saccharifying activity of a preparation on
+        filter paper and reflects the combined action of endoglucanases
+        (EC 3.2.1.4), cellobiohydrolases (EC 3.2.1.91) and beta-glucosidases
+        (EC 3.2.1.21). FPU does not convert to protein mass or molarity.
+    target_bond_classes:
+      - beta_1_4_glycosidic
+    compatible_substrate_classes:
+      - cellulose_particulate
+    compatible_processes:
+      - culture_physiology
+    notes: >-
+      Total cellulase activity measured by the filter-paper assay and carried in
+      the registry as the filter_paper_unit assay dimension. Preparation-specific
+      effective constants that use this pool are not universal cellulose rate
+      constants.

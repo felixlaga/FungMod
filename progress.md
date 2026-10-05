@@ -93,6 +93,166 @@ Ambiguities: none known. Risk: low.
 Next task: merge this into `main`, bring `main` into the PR chain (#77 to #80)
 so every job re-runs green, then merge the chain in order.
 
+## ORG-001 First Whole-Organism Registry Case
+
+Date: 2026-10-05
+
+Status: `complete` for step 2's definition of done with one stated deviation
+(no measured product pool; see "Scientific behavior impact"). The remaining
+`DegradingCulture` closures (resource-limited growth, maintenance, costed
+secretion) and the A. niger / T. reesei organism records are `blocked` on data,
+not on code, and are recorded below.
+
+Changed:
+
+- Added `processes/physiology.py`: `ProportionalSynthesisProcess`
+  (`process_type: proportional_synthesis`), producer-proportional formation of
+  one product pool with optional saturable induction
+  (`rate = q P` or `q P I / (K_I + I)`), product-only contributions, numeric
+  kernel, and `ProportionalSynthesisFactory` registered in
+  `default_foundation_factories()`. Tested on dissolved millimolar chemistry
+  and on assay-activity units.
+- Added assay-activity base dimensions to `core/units.py`:
+  `filter_paper_unit` (`FPU`) and `beta_glucosidase_assay_unit` (`BGU`), not
+  convertible to mass, molarity or each other. `research/gelain_models.py`
+  now defines `gelain_fpu` and `gelain_beta_u` as aliases of them.
+- Added `screening/culture_physiology.py`: the `culture_physiology` template
+  family. A template declares state roles (`substrate`, `biomass`, `enzyme`,
+  indexed `enzyme_*` and `ledger_*`), ordered generic process templates with
+  state-role and parameter-role bindings, stoichiometric product maps whose
+  coefficients may reference a parameter role or its complement, a closure
+  ledger checked at build time, state identities and inline entities. Fail
+  closed on unused or unresolved roles, unregistered process types,
+  unbalanced product maps and undeclared identities. Registered as a
+  `scientific`/`toy` assembler in `screening/case_builder.py`.
+- `registry/records.py`: `biomass` added to the allowed case-template state
+  roles; `ledger_*` added to the indexed-role pattern.
+- `screening/modelability.py`: enzyme classes of a fungus that do not target
+  the requested substrate are reported as known, unused items when another
+  class reaches a compatible process; they block only when no class does.
+  `select_registry_case_compatibility` skips classes without a compatibility
+  record instead of raising.
+- `solvers/compiled.py` and `solvers/process_ode.py`: rates are evaluated at
+  `max(state, 0)` (`NEGATIVE_STATE_POLICY`, recorded in
+  `solver_metadata["kernel"]`) both in the right-hand side and when recording
+  process rates at output points. The integrated trajectory is never clipped;
+  the `non_negative` validator reports accepted states below tolerance. The
+  unit-aware `Process.rate` stays strict. Without this, the generic
+  Michaelis-Menten law could not be integrated to substrate depletion: the
+  solver's trial iterates near zero raised inside the right-hand side.
+- `api/result_tables.py`: mechanism, maturity and limitation text for
+  `culture_physiology` cases (`software_tested_retrospectively_calibrated_unvalidated`,
+  `retrospective_calibration` limitation rows).
+- Registry records (`data_registry/`): fungus `trichoderma_harzianum_p49p11`
+  (strain, DOIs, two enzyme classes, no invented physiology field); enzyme
+  class `cellulase_total_filter_paper_activity` (Ghose 1987 assay pool);
+  substrate `cellulose_celufloc_200` (`cellulose_particulate`, explicit unknown
+  surface area and crystallinity, no product); environments
+  `gelain_2020_cellulose_batch_{10,20,30}gl` (302.15 K, pH 5.0, dissolved
+  oxygen unknown above 30 percent, loading, 1.9 L); compatibility
+  `trichoderma_harzianum_cellulose_culture_physiology` (13 roles); template
+  `trichoderma_harzianum_cellulose_culture_template` (six processes, dry-mass
+  closure ledger, suggested experiments); nine `calibrated` parameter records
+  copied at full precision from
+  `data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json`
+  (SHA-256 recorded, training conditions, rank 9/9, condition number,
+  at-bound flags for `K_ind`, `kF`, `kB`) with explicit
+  `allowed_use: scientific_or_exploratory_when_all_other_inputs_are_valid`;
+  five `literature_processed` initial-condition records from the deposited
+  workbooks (initial biomass, loading per condition, zero initial activities).
+- Added `data/model_configs/toy_proportional_synthesis_dissolved.yml`
+  (non-biological toy exercising the new process through the configured
+  workflow and the compiled-core parity tests).
+- Docs: `docs/organism-physiology.md` (new, in nav), `docs/compiled-core.md`
+  (negative-state policy), `docs/capabilities.md`, `README.md`,
+  `data_registry/README.md`, `CHANGELOG.md`, `ARCHITECTURE_DEBT.md` (FD-009
+  narrowed), roadmap and state-document status notes.
+
+Not changed: every other registry record, config, notebook, output schema
+version, validator, `SolverSettings`, tolerances, the legacy engines, the
+physiology classes, the research models' equations and frozen artifacts, the
+Gelain joint comparison, calibration and validation behavior. No fitted value
+was re-estimated; the registry copies the frozen artifact.
+
+Tests added or modified:
+
+- `tests/test_organism_registry_case.py` (new): organism record and sourced
+  capabilities; calibrated records equal the frozen artifact bit for bit with
+  matching units and the recorded SHA-256; all three conditions modelable in
+  scientific mode through the cellulase class only; the configured model
+  reproduces `research.gelain_models.simulate_candidate(model="hydrolysis")`
+  for all three loadings (`rtol 1e-6`, scaled `atol 1e-7`) with a closed
+  dry-mass ledger and near-complete cellulose consumption; the public
+  `VirtualExperiment` scientific run writes biomass, two enzyme-activity,
+  substrate and ledger roles, computed 10/50/90 percent threshold times,
+  the retrospective-calibration limitation and the `scientific_exact_unvalidated`
+  run label; exploratory mode samples nothing on exact records; withdrawing
+  one calibrated record fails closed at preflight, builder and public API;
+  unused or unresolved template roles are rejected.
+- `tests/test_proportional_synthesis_process.py` (new): closed-form law,
+  constitutive form, partial-induction and distinct-state rejection,
+  negative-state and invalid-constant errors, compiled kernel parity across
+  mixed units, analytic solve, factory decisions, toy config analytic check.
+- `tests/test_compiled_process_models.py`: `proportional_synthesis` added to
+  the shipped numeric-kernel set; the negative-state test now asserts the
+  projection policy (compiled RHS at a negative trial state equals the
+  reference at the projected state; the unit-aware reference still raises) and
+  a new depletion test integrates a first-order pool over many lifetimes.
+- `tests/test_modelability_report.py`: multi-enzyme-class fungus stays
+  modelable with the non-targeting class reported as unused.
+- `tests/test_registry_case_builder.py`, `tests/test_process_factory_library.py`:
+  assembler and factory sets extended.
+
+Commands run and results:
+
+- `ruff check src tests scripts/run_*.py`: passed.
+- `pyright`: 0 errors.
+- `mkdocs build --strict`: passed.
+- Targeted: `pytest tests/test_proportional_synthesis_process.py tests/test_organism_registry_case.py tests/test_modelability_report.py tests/test_registry_case_builder.py tests/test_compiled_process_models.py tests/test_process_factory_library.py`: 120 passed.
+- Registry/screening/API/maturity/guardrail subset (29 modules): 548 passed,
+  1 failed (`test_gelain_joint_artifacts.py::test_every_frozen_holdout_replays_with_training_only_scales_and_matching_scores`,
+  the pre-existing scipy 1.17 replay drift of 4.43e-6 against the 2e-6 gate
+  recorded under CORE-001; unchanged by this work).
+- Full `pytest`: 1738 passed, 11 failed in 13m05s (Python 3.11, numpy 2.4.6,
+  scipy 1.17.1, libsbml 5.21.2). The 11 failures are exactly the pre-existing
+  set recorded under CORE-001 (ten SBML cross-engine/BioModels tests under
+  python-libsbml 5.21 and the Gelain holdout replay drift); the 21 added tests
+  all pass.
+- Public path timing: the three-condition scientific `VirtualExperiment` run,
+  tables, quick-look plots and report complete in about 5.5 s.
+
+Scientific behavior impact: a new organism case becomes runnable in
+`scientific` mode; its trajectories equal the frozen research candidate.
+No existing config changes numerically: the non-negative projection only
+affects right-hand-side evaluations at trial states below zero, which no
+packaged config reaches (parity tests still report identical trajectories and
+evaluation counts). Deviation from the step-2 wording: the Gelain data hold no
+measured product, so the case tracks consumed cellulose not retained as
+biomass as an explicit closure ledger rather than a product pool; output
+tables mark product metrics `not_applicable`.
+
+Backward compatibility: public APIs are additive. `CASE_TEMPLATE_ALLOWED_STATE_ROLES`
+gains `biomass`; modelability reports for multi-class fungi change from
+`underparameterized` to the status of the targeting class (no shipped fungus
+had more than one class). Compiled RHS behaviour at negative trial states
+changes from raising to projecting; the `solver_metadata["kernel"]` summary
+gains `negative_state_policy`. The `gelain_fpu`/`gelain_beta_u` units keep
+their non-convertibility and now also convert 1:1 to `FPU`/`BGU`.
+
+Remaining ambiguities and risk: moderate. The calibrated constants are a
+retrospective fit that failed the comparison's observable-worsening screen in
+the primary scenario and has three constants at bounds; the registry says so
+on every record, but a reader of `time_series_long.csv` alone sees exact
+trajectories. The `culture_physiology` family has one real template; its
+contract will move when a second organism arrives. Environment records carry
+temperature and pH as metadata only.
+
+Recommended next task: step 3 of the state document, bind cardinal-temperature
+and pH response laws to this organism's processes with sourced parameters and
+enzyme thermal inactivation; in parallel, intake Pakula 2016 (T. reesei time
+courses) and resolve A. niger enzyme-class evidence so a second organism can be
+registered, then promote the Pirt/Monod closures as processes against it.
+
 ## CORE-001 Compiled Well-Mixed Process Core
 
 Date: 2026-10-04

@@ -183,3 +183,58 @@ records:
     product_map_required: true
     case_template_id: sabiork_reaction_618_homogeneous_mm_template
     notes: First non-toy homogeneous enzyme-kinetics compatibility record.
+
+  - record_id: trichoderma_harzianum_cellulose_culture_physiology
+    name: T. harzianum P49P11 on particulate cellulose, culture physiology (Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod retrospective all-condition fit of the hydrolysis candidate to the
+        Gelain 2020 cellulose cultures (gelain_2020_joint_culture_v2, scenario
+        primary), bound to the registry through this record.
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: >-
+        Compatibility for the first whole-organism registry case. It composes
+        generic process laws (homogeneous Michaelis-Menten conversion with an
+        explicit yield, first-order loss, proportional induced synthesis) through
+        the culture_physiology case template; it adds no organism-specific code.
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    required_bond_classes:
+      - beta_1_4_glycosidic
+    process_type: culture_physiology
+    required_parameters:
+      - gelain_hydrolysis_k_h
+      - gelain_hydrolysis_Kh
+      - gelain_hydrolysis_Y
+      - gelain_hydrolysis_kd
+      - gelain_hydrolysis_K_ind
+      - gelain_hydrolysis_qF
+      - gelain_hydrolysis_kF
+      - gelain_hydrolysis_qB
+      - gelain_hydrolysis_kB
+      - gelain_2020_cellulose_initial_biomass
+      - gelain_2020_cellulose_initial_loading
+      - gelain_2020_cellulose_initial_cellulase_activity
+      - gelain_2020_cellulose_initial_beta_glucosidase_activity
+    parameter_roles:
+      hydrolysis_capacity: gelain_hydrolysis_k_h
+      hydrolysis_half_saturation: gelain_hydrolysis_Kh
+      biomass_yield: gelain_hydrolysis_Y
+      biomass_loss_rate: gelain_hydrolysis_kd
+      induction_half_saturation: gelain_hydrolysis_K_ind
+      cellulase_specific_production_rate: gelain_hydrolysis_qF
+      cellulase_loss_rate: gelain_hydrolysis_kF
+      beta_glucosidase_specific_production_rate: gelain_hydrolysis_qB
+      beta_glucosidase_loss_rate: gelain_hydrolysis_kB
+      initial_biomass: gelain_2020_cellulose_initial_biomass
+      initial_substrate: gelain_2020_cellulose_initial_loading
+      initial_cellulase_activity: gelain_2020_cellulose_initial_cellulase_activity
+      initial_beta_glucosidase_activity: gelain_2020_cellulose_initial_beta_glucosidase_activity
+    product_map_required: true
+    case_template_id: trichoderma_harzianum_cellulose_culture_template
+    notes: >-
+      Culture-physiology compatibility for T. harzianum P49P11 on particulate
+      cellulose. Every role resolves to an exact registry record: nine
+      retrospectively calibrated constants and four deposited initial conditions.
+      The case is exact and implemented, not experimentally validated.

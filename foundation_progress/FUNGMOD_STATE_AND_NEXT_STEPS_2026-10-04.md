@@ -175,6 +175,19 @@ Definition of done: at least one organism x substrate case runs in
 `scientific` mode through `VirtualExperiment`, with biomass, enzyme, substrate
 and product trajectories in `time_series_long.csv`.
 
+Status 2026-10-05 (ORG-001): done for T. harzianum P49P11 on Celufloc 200
+cellulose, with one deviation. The registry case composes generic process laws
+(`culture_physiology` template, new `proportional_synthesis` process) and binds
+the nine constants of the frozen Gelain hydrolysis candidate as `calibrated`
+records; it reproduces the research implementation and runs in `scientific`
+mode for all three cellulose loadings. The deviation: the data hold no measured
+product, so the case has no product pool; consumed cellulose not retained as
+biomass is an explicit closure ledger. Not done: the Pirt/Monod resource-limited
+growth, maintenance and costed-secretion closures of `DegradingCulture` are not
+registered (no organism parameterizes them), and A. niger and T. reesei have no
+registry records because the data carry no enzyme-class evidence (A. niger) or
+no time courses (T. reesei). See `progress.md` ORG-001.
+
 ### Step 3. Make environment grids mean something
 
 Bind cardinal-temperature (Rosso-type) and pH growth-response laws with

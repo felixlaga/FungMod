@@ -627,3 +627,293 @@ records:
     notes: >
       Template describes a reusable extracellular enzyme chain assembled from
       generic surface catalysis and homogeneous Michaelis-Menten process laws.
+
+  - record_id: trichoderma_harzianum_cellulose_culture_template
+    case_template_id: trichoderma_harzianum_cellulose_culture_template
+    name: T. harzianum P49P11 cellulose batch culture physiology template (Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod culture_physiology template for the Gelain 2020 T. harzianum P49P11
+        cellulose cultures (doi:10.1016/j.cesx.2020.100085; data doi:10.17632/shd3wcczsr.2),
+        composing the retrospectively calibrated hydrolysis candidate from generic process laws.
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: >-
+        Assembly metadata only. Rate laws come from the generic process factories,
+        constants from the bound registry parameter records.
+    schema_version: "1"
+    process_type: culture_physiology
+    state_roles:
+      substrate: cellulose_concentration
+      biomass: biomass_dry_mass_concentration
+      enzyme: cellulase_activity
+      enzyme_beta_glucosidase: beta_glucosidase_activity
+      ledger_unassimilated_substrate: consumed_cellulose_not_retained_as_biomass
+      ledger_biomass_loss: biomass_dry_mass_lost
+    initial_state_mapping:
+      substrate:
+        parameter_role: initial_substrate
+        units_from_role: initial_substrate
+      biomass:
+        parameter_role: initial_biomass
+        units_from_role: initial_biomass
+      enzyme:
+        parameter_role: initial_cellulase_activity
+        units_from_role: initial_cellulase_activity
+      enzyme_beta_glucosidase:
+        parameter_role: initial_beta_glucosidase_activity
+        units_from_role: initial_beta_glucosidase_activity
+      ledger_unassimilated_substrate:
+        value: 0.0
+        units: gram / liter
+      ledger_biomass_loss:
+        value: 0.0
+        units: gram / liter
+    product_map: {}
+    stoichiometric_yields: {}
+    time_grid:
+      start: 0.0
+      stop: 96.0
+      points: 97
+      units: hour
+    observable_roles:
+      - substrate
+      - biomass
+      - enzyme
+      - enzyme_beta_glucosidase
+      - ledger_unassimilated_substrate
+      - ledger_biomass_loss
+      - degradation_rate
+    output_state_roles:
+      substrate: cellulose_concentration
+      biomass: biomass_dry_mass_concentration
+      enzyme: cellulase_activity
+      enzyme_beta_glucosidase: beta_glucosidase_activity
+      ledger_unassimilated_substrate: consumed_cellulose_not_retained_as_biomass
+      ledger_biomass_loss: biomass_dry_mass_lost
+    process_state_metadata:
+      config_name: "T. harzianum P49P11 batch culture on Celufloc 200 cellulose, Gelain 2020 hydrolysis candidate ({fungus_id} on {substrate_id})"
+      config_mode: scientific
+      config_maturity: scientific
+      parameter_set_id: trichoderma_harzianum_cellulose_hydrolysis_candidate_parameters
+      public_path: true
+      geometry:
+        kind: geometry
+        name: Gelain 2020 stirred-tank batch culture, 1.9 L working volume
+        geometry_type: well_mixed
+        provenance:
+          source: Gelain 2020 Methods 2.2 (doi:10.1016/j.cesx.2020.100085).
+          measurement_method: reported reactor operating condition
+          confidence_level: literature_curated
+          notes: 3 L stirred bioreactor (BioFlo 115) with 1.9 L working volume, 200-300 rpm, 0.48-0.7 vvm; treated as well mixed with no spatial gradients.
+          validity_range: Gelain 2020 batch cultures only
+          units: not_applicable
+        volume:
+          value: 1.9
+          units: liter
+        parameters: []
+      entities:
+        substrates:
+          - id: cellulose_celufloc_200
+            loader: generic_solid
+            data:
+              kind: substrate
+              name: Cellulose (Celufloc 200)
+              substrate_type: generic_solid
+              chemical_class: cellulose_particulate
+              physical_state: solid_polymer
+              bond_types:
+                - beta_1_4_glycosidic
+              accessible_bonds:
+                - beta_1_4_glycosidic
+              required_enzyme_classes:
+                - cellulase_total_filter_paper_activity
+              degradation_products: []
+              completeness: partial
+              default_degradation_model: unknown
+              water_activity_dependence: unknown
+              provenance:
+                source: Gelain 2020 Methods 2.2 (doi:10.1016/j.cesx.2020.100085); Celufloc 200, Celuflok Ind. Com., Brazil.
+                confidence_level: literature_curated
+                notes: Particulate cellulose represented as a bulk mass concentration; particle size, crystallinity and surface area were not reported and are not modelled.
+              parameters: []
+        enzymes:
+          - id: cellulase_total_filter_paper_activity
+            data:
+              kind: enzyme
+              name: Total cellulase filter-paper activity of T. harzianum P49P11
+              enzyme_class: cellulase_total_filter_paper_activity
+              target_bond_types:
+                - beta_1_4_glycosidic
+              target_substrate_classes:
+                - cellulose_particulate
+              target_substrate_names:
+                - Cellulose (Celufloc 200)
+              validity_labels:
+                - literature_metadata
+                - assay_activity_pool
+              provenance:
+                source: Ghose 1987 filter-paper assay as applied in Gelain 2020 Methods 2.3.
+                measurement_method: filter-paper activity assay (FPU per litre of culture)
+                confidence_level: literature_curated
+                notes: Extracellular activity pool in filter paper units; not converted to protein mass or molarity.
+                validity_range: Gelain 2020 cellulose cultures only
+                units: not_applicable
+              catalytic_parameters: []
+              adsorption_parameters: []
+              parameters: []
+          - id: beta_glucosidase
+            data:
+              kind: enzyme
+              name: beta-glucosidase activity of T. harzianum P49P11
+              enzyme_class: beta_glucosidase
+              target_bond_types:
+                - beta_1_4_glycosidic
+              target_substrate_classes:
+                - cellobiose
+              target_substrate_names: []
+              validity_labels:
+                - literature_metadata
+                - assay_activity_pool
+              provenance:
+                source: beta-glucosidase activity assay adapted from Zhang et al. 2009, as applied in Gelain 2020 Methods 2.3.
+                measurement_method: beta-glucosidase activity assay (U per litre of culture)
+                confidence_level: literature_curated
+                notes: Extracellular activity pool in assay units; it acts on no modelled state in this case and is produced and lost only.
+                validity_range: Gelain 2020 cellulose cultures only
+                units: not_applicable
+              catalytic_parameters: []
+              adsorption_parameters: []
+              parameters: []
+      state_species:
+        substrate:
+          entity_type: substrate
+          species: cellulose_celufloc_200
+        biomass:
+          entity_type: organism
+          species: trichoderma_harzianum_p49p11
+        enzyme:
+          entity_type: enzyme
+          species: cellulase_total_filter_paper_activity
+        enzyme_beta_glucosidase:
+          entity_type: enzyme
+          species: beta_glucosidase
+        ledger_unassimilated_substrate:
+          entity_type: ledger
+          species: consumed_cellulose_not_retained_as_biomass
+        ledger_biomass_loss:
+          entity_type: ledger
+          species: biomass_dry_mass_lost
+      product_maps:
+        - id: cellulose_conversion_with_biomass_yield
+          name: Cellulose consumption to biomass with an explicit yield and a closure ledger
+          product_map_type: stoichiometric
+          reactants:
+            substrate: 1.0
+          products:
+            biomass:
+              parameter_role: biomass_yield
+            ledger_unassimilated_substrate:
+              complement_of_parameter_role: biomass_yield
+          notes: >-
+            One gram of consumed cellulose forms Y gram of biomass dry mass; the
+            remaining (1 - Y) gram is booked to an explicit ledger of consumed
+            cellulose not retained as biomass (respired carbon, soluble products and
+            secreted protein were not measured). The ledger closes the dry-mass balance.
+      process_templates:
+        - id: cellulase_limited_cellulose_consumption
+          process_type: homogeneous_michaelis_menten
+          state_roles:
+            substrate: substrate
+            enzyme: enzyme
+            product: biomass
+          parameter_roles:
+            kcat: hydrolysis_capacity
+            km: hydrolysis_half_saturation
+          fixed_parameters:
+            rate_units: gram / liter / hour
+          product_map: cellulose_conversion_with_biomass_yield
+          assumptions:
+            - Bulk cellulose consumption is proportional to measured filter-paper activity and saturates in cellulose (consumption = k_h F S / (K_h + S)).
+            - Consumed cellulose is converted to biomass with a constant explicit yield; soluble intermediates are not resolved.
+        - id: biomass_loss
+          process_type: first_order
+          state_roles:
+            source: biomass
+            product: ledger_biomass_loss
+          parameter_roles:
+            rate_constant: biomass_loss_rate
+          assumptions:
+            - Biomass dry mass is lost at a constant first-order rate into an explicit ledger pool; no viability, lysis or death mechanism is claimed.
+        - id: cellulase_synthesis
+          process_type: proportional_synthesis
+          state_roles:
+            producer: biomass
+            inducer: substrate
+            product: enzyme
+          parameter_roles:
+            specific_rate: cellulase_specific_production_rate
+            induction_half_saturation: induction_half_saturation
+          fixed_parameters:
+            rate_units: filter_paper_unit / liter / hour
+          assumptions:
+            - Filter-paper activity is produced in proportion to biomass and saturably induced by cellulose (production = qF X S / (K_ind + S)); the material cost of production is not represented.
+        - id: cellulase_loss
+          process_type: first_order
+          state_roles:
+            source: enzyme
+          parameter_roles:
+            rate_constant: cellulase_loss_rate
+          assumptions:
+            - Filter-paper activity is lost at a constant first-order rate; no inactive protein pool is represented for an assay activity.
+        - id: beta_glucosidase_synthesis
+          process_type: proportional_synthesis
+          state_roles:
+            producer: biomass
+            inducer: substrate
+            product: enzyme_beta_glucosidase
+          parameter_roles:
+            specific_rate: beta_glucosidase_specific_production_rate
+            induction_half_saturation: induction_half_saturation
+          fixed_parameters:
+            rate_units: beta_glucosidase_assay_unit / liter / hour
+          assumptions:
+            - Beta-glucosidase activity is produced in proportion to biomass with the same saturable cellulose induction as filter-paper activity; it has no feedback on cellulose consumption in this candidate.
+        - id: beta_glucosidase_loss
+          process_type: first_order
+          state_roles:
+            source: enzyme_beta_glucosidase
+          parameter_roles:
+            rate_constant: beta_glucosidase_loss_rate
+          assumptions:
+            - Beta-glucosidase activity is lost at a constant first-order rate.
+      conservation:
+        id: dry_mass_closure_ledger
+        closed_system: true
+        state_weights:
+          substrate: 1.0
+          biomass: 1.0
+          ledger_unassimilated_substrate: 1.0
+          ledger_biomass_loss: 1.0
+      suggested_experiments:
+        - id: gelain_replicate_level_time_courses
+          priority: high
+          description: Obtain individual replicate time courses (not duplicate means) of biomass, cellulose, filter-paper and beta-glucosidase activity for at least one held-out cellulose loading.
+          rationale: Replicate-level data with a measured error model are required before any calibrated constant can be promoted beyond a retrospective fit.
+        - id: induction_and_activity_loss_identifiability
+          priority: high
+          description: Measure activity production at cellulose concentrations below 1 g/L and activity decay in cell-free broth.
+          rationale: The induction constant and both activity-loss constants sit at their fitting bounds; the published means do not identify them.
+    limitations:
+      - Well-mixed batch culture of one strain on one particulate cellulose; nutrient, oxygen, maintenance, pH and morphology dynamics are not represented.
+      - Enzyme pools are assay activities (FPU per litre, beta-glucosidase units per litre); they are not converted to enzyme mass or molarity.
+      - Consumed cellulose not retained as biomass is an explicit closure ledger, not a measured product; soluble sugars and respired carbon were not measured.
+      - Calibrated constants are retrospective fits to published duplicate means without measured uncertainty; the induction constant and both activity-loss constants sit at fitting bounds.
+      - Temperature and pH are controlled set points recorded as metadata; no environmental response law is applied.
+    validity_notes:
+      - The case is exact and implemented with current registry records; it is not an experimentally validated prediction of T. harzianum physiology.
+      - Scope is T. harzianum P49P11 on Celufloc 200 cellulose at 10-30 g/L, 29 C, pH 5.0, dissolved oxygen above 30 percent, 0-96 h.
+    notes: >-
+      Culture-physiology template composing the Gelain 2020 hydrolysis candidate
+      from generic process laws. It names roles only; organism identity, constants
+      and initial conditions come from the bound registry records.

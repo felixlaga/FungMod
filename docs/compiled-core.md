@@ -62,9 +62,20 @@ modifiers compile to numeric kernels; `tests/test_compiled_process_models.py`
 fails if any shipped mechanism falls back. A third-party `Process` that only
 implements `rate`/`contributions` keeps working through the wrapped path.
 
-Kernels must raise the same errors as the unit-aware path. A negative
-substrate still raises `ValueError`; nothing is clipped. `SolverSettings`,
-`solve_checked`, tolerances and failure semantics are unchanged.
+Kernels raise the same parameter errors as the unit-aware path (a non-positive
+`Km`, a negative rate constant). Solver trial iterates are a different matter:
+constitutive laws are defined on the non-negative orthant, and an implicit or
+multistep solver evaluates the right-hand side at predicted states that can sit
+slightly below zero when a pool approaches depletion. The compiled model
+therefore evaluates every rate at `max(state, 0)` and records
+`negative_state_policy` in `solver_metadata["kernel"]`. This is the standard
+non-negativity projection (Shampine et al., 2005) and the same zero extension
+the culture classes use. The integrated state is never clipped: the returned
+trajectory is whatever the solver accepted, and the `non_negative` validator
+reports any accepted state below its tolerance. A caller that passes a negative
+state to a process's unit-aware `rate` still receives a `ValueError`.
+`SolverSettings`, `solve_checked`, tolerances and failure semantics are
+unchanged.
 
 ## Measured effect
 

@@ -17,10 +17,13 @@ from fungal_model.core.provenance import has_text
 from fungal_model.core.units import Q_, Quantity, assert_compatible, ureg
 from fungal_model.research.gelain_culture import CultureBenchmarkError, CultureDesign, source_projection_rates
 
-# These dimensions deliberately cannot convert to enzyme mass, molarity, or to
-# each other. The experiment's two assays measure different responses.
-ureg.define("gelain_fpu = [gelain_filter_paper_activity]")
-ureg.define("gelain_beta_u = [gelain_pnpg_activity]")
+# These study-scoped names alias the core assay-activity dimensions
+# (``filter_paper_unit`` and ``beta_glucosidase_assay_unit``). They deliberately
+# cannot convert to enzyme mass, molarity, or to each other: the experiment's
+# two assays (Ghose 1987 filter-paper activity; beta-glucosidase activity
+# adapted from Zhang et al. 2009) measure different responses.
+ureg.define("gelain_fpu = filter_paper_unit")
+ureg.define("gelain_beta_u = beta_glucosidase_assay_unit")
 OBSERVABLE_UNITS = {"biomass": "gram/liter", "substrate": "gram/liter",
                     "cellulase_activity": "gelain_fpu/liter", "beta_glucosidase_activity": "gelain_beta_u/liter"}
 DISPLAY_UNITS = {"biomass": "g/L", "substrate": "g/L", "cellulase_activity": "FPU/L",

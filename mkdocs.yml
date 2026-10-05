@@ -72,6 +72,7 @@ nav:
       - Virtual experiments: concepts/virtual-experiments.md
       - Outputs and artifacts: concepts/outputs.md
       - Compiled model core: compiled-core.md
+      - Organism physiology in the registry: organism-physiology.md
   - Tutorials:
       - Full example notebooks: notebooks.md
       - Configured models: configured-models.md
