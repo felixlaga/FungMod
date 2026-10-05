@@ -26,6 +26,8 @@ from scipy.optimize import least_squares
 
 from fungal_model.calibration.bayesian import (
     DEFAULT_IDENTIFIABILITY_CRITERIA,
+    IDENTIFIED,
+    WEAKLY_IDENTIFIED,
     BayesianCalibrationResult,
     BayesianProblem,
     EnsembleRun,
@@ -438,8 +440,11 @@ def build_predictor(
         )
 
         def factory(values: Mapping[str, float], *, base_factory: Callable[..., ModelConfig] = base_factory) -> ModelConfig:
-            base = base_factory({symbol: value for symbol, value in values.items() if symbol in common}).raw
-            raw = variant_config(model_id, base, values)
+            # Fixed constants of the variant are part of every candidate; callers that supply only the
+            # fitted symbols (the posterior sampler) still get a complete config.
+            candidate = {**{fixed.config_symbol: fixed.value for fixed in variant.fixed}, **values}
+            base = base_factory({symbol: value for symbol, value in candidate.items() if symbol in common}).raw
+            raw = variant_config(model_id, base, candidate)
             return ModelConfig.from_mapping(raw, path=None)
 
         conditions.append(ConfiguredCondition(condition_id, factory, mappings))
@@ -1087,8 +1092,11 @@ def write_posterior_outputs(
     inputs_path.write_text(json.dumps(inputs, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     coverage_path = output_dir / "coverage.json"
     coverage_path.write_text(json.dumps(coverage if coverage is not None else {"status": "not computed"}, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    verdicts = stage_b_verdicts(study, result, stage_a_comparison=_stage_a_comparison_next_to(output_dir))
+    verdicts_path = output_dir / "verdicts.json"
+    verdicts_path.write_text(json.dumps(verdicts, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     report_path = output_dir / "report.md"
-    report_path.write_text(render_stage_b_report(study, result, coverage), encoding="utf-8")
+    report_path.write_text(render_stage_b_report(study, result, coverage, verdicts=verdicts), encoding="utf-8")
     artifacts = {
         name: file_digest(path)
         for name, path in (
@@ -1096,39 +1104,142 @@ def write_posterior_outputs(
             ("posterior_samples.csv", paths["samples"]),
             ("inputs.json", inputs_path),
             ("coverage.json", coverage_path),
+            ("verdicts.json", verdicts_path),
             ("report.md", report_path),
         )
     }
     artifacts_path = output_dir / "artifacts.json"
     artifacts_path.write_text(json.dumps(artifacts, indent=2) + "\n", encoding="utf-8")
-    return {**paths, "inputs": inputs_path, "coverage": coverage_path, "report": report_path, "artifacts": artifacts_path}
+    return {**paths, "inputs": inputs_path, "coverage": coverage_path, "verdicts": verdicts_path, "report": report_path, "artifacts": artifacts_path}
 
 
-def render_stage_b_report(study: PosteriorStudy, result: BayesianCalibrationResult, coverage: Mapping[str, Any] | None) -> str:
+def stage_b_verdicts(
+    study: PosteriorStudy, result: BayesianCalibrationResult, *, stage_a_comparison: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
+    """Apply the plan's R2 and R3 rules to a posterior and combine them with the recorded R1 screen.
+
+    Every verdict carries ``provisional=True`` when the chain missed the
+    declared convergence rule, as the plan requires.
+    """
+
+    plan = study.plan
+    variant = model_variants(plan)[study.model_id]
+    rules = plan["decision_rules"]
+    multiplier = result.summaries.get("noise_scale:all_observables")
+    adequate = None if multiplier is None else bool(float(multiplier["lower"]) <= 1.0 <= float(multiplier["upper"]))
+    added = {spec.config_symbol: spec.symbol for spec in variant.parameters if spec.new}
+    classes = {symbol: result.identifiability[symbol]["class"] for symbol in added if symbol in result.identifiability}
+    identified = {IDENTIFIED, WEAKLY_IDENTIFIED}
+    r3 = None if not added else all(klass in identified for klass in classes.values())
+    r1 = None
+    if stage_a_comparison is not None:
+        scenario = stage_a_comparison.get("models", {}).get(study.model_id, {}).get("scenarios", {}).get("primary")
+        if scenario is not None:
+            r1 = bool(scenario["screen"]["passed"])
+    if study.model_id == BASELINE_MODEL:
+        outcome = "baseline (R1 and R3 do not apply)"
+    elif r1 is None:
+        outcome = "not scored (stage A screen not recorded)"
+    elif not r1:
+        outcome = "not supported (fails R1)"
+    elif r3:
+        outcome = "supported (R1 and R3)"
+    else:
+        outcome = "improves fit but unidentified (R1, not R3)"
+    return {
+        "provisional": not bool(result.converged),
+        "R1_holdout_support": r1,
+        "R2_adequacy": adequate,
+        "R2_multiplier_interval": None if multiplier is None else [float(multiplier["lower"]), float(multiplier["upper"])],
+        "R3_identification": r3,
+        "added_parameter_classes": {added[symbol]: klass for symbol, klass in classes.items()},
+        "outcome": outcome,
+        "rules": {key: rules[key] for key in ("R1_holdout_support", "R2_adequacy", "R3_identification", "R4_coverage")},
+    }
+
+
+def _stage_a_comparison_next_to(output_dir: Path) -> Mapping[str, Any] | None:
+    candidate = output_dir.parent.parent / "stage_a" / "comparison.json"
+    if candidate.exists():
+        return json.loads(candidate.read_text(encoding="utf-8"))
+    return None
+
+
+def render_stage_b_report(
+    study: PosteriorStudy,
+    result: BayesianCalibrationResult,
+    coverage: Mapping[str, Any] | None,
+    *,
+    verdicts: Mapping[str, Any] | None = None,
+) -> str:
     plan = study.plan
     variant = model_variants(plan)[study.model_id]
     by_config = {spec.config_symbol: spec for spec in variant.parameters}
+    diagnostics = result.diagnostics
+    taus = diagnostics.get("integrated_autocorrelation_time", [])
+    reliable = diagnostics.get("autocorrelation_estimate_reliable", [])
+    label = "provisional (chain not converged by the declared rule)" if not result.converged else "final"
     lines = [
         f"# {plan['benchmark_id']}: stage B, {study.model_id}",
         "",
         plan["models"][study.model_id]["mechanism"],
         "",
-        f"Converged by the declared rule: **{result.converged}** (mean acceptance {result.diagnostics['mean_acceptance_fraction']:.3f}).",
+        f"Converged by the declared rule: **{result.converged}** (mean acceptance "
+        f"{diagnostics['mean_acceptance_fraction']:.3f}, {diagnostics['post_burn_in_steps']} post-burn-in steps, "
+        f"{diagnostics['walkers']} walkers). Verdicts below are **{label}**.",
         "",
-        "| Parameter | Added | Class | Median | 95% interval | Width / prior width |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Parameter | Added | Class | Median | 95% interval | Prior box | Width / prior width | tau | tau reliable |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
+    order = list(result.summaries)
     for symbol, verdict in result.identifiability.items():
         summary = result.summaries[symbol]
-        interval = summary["credible_interval"]
-        added = "yes" if symbol in by_config and by_config[symbol].new else ("" if symbol in by_config else "noise")
-        label = by_config[symbol].symbol if symbol in by_config else symbol
+        interval = verdict["credible_interval"]
+        prior = verdict["prior_bounds"]
+        coordinate = order.index(symbol) if symbol in order else -1
+        tau = taus[coordinate] if 0 <= coordinate < len(taus) else None
+        ok = reliable[coordinate] if 0 <= coordinate < len(reliable) else None
+        added = "yes" if symbol in by_config and by_config[symbol].new else ""
+        name = by_config[symbol].symbol if symbol in by_config else symbol
         lines.append(
-            f"| `{label}` | {added} | {verdict['class']} | {summary['median']:.4g} | [{interval[0]:.4g}, {interval[1]:.4g}] | {verdict.get('width_fraction', float('nan')):.2f} |"
+            f"| `{name}` | {added} | {verdict['class']} | {summary['median']:.4g} | [{interval[0]:.3g}, {interval[1]:.3g}] | "
+            f"[{prior[0]:.3g}, {prior[1]:.3g}] | {verdict['interval_width_fraction_of_prior']:.2f} | "
+            f"{'n/a' if tau is None else f'{tau:.0f}'} | {'n/a' if ok is None else ok} |"
         )
-    if coverage is not None:
+    multiplier = result.summaries.get("noise_scale:all_observables")
+    if multiplier is not None:
+        lines.extend(
+            [
+                "",
+                "| Noise-scale multiplier | Posterior median | 95% interval |",
+                "| --- | --- | --- |",
+                f"| `all_observables` | {multiplier['median']:.3g} | [{multiplier['lower']:.3g}, {multiplier['upper']:.3g}] |",
+            ]
+        )
+    if verdicts is not None:
+        lines.extend(
+            [
+                "",
+                "Decision rules (" + ("provisional" if verdicts["provisional"] else "final") + "):",
+                "",
+                f"- R1 holdout support (stage A screen, primary): {verdicts['R1_holdout_support']}",
+                f"- R2 adequacy (multiplier interval contains 1.0): {verdicts['R2_adequacy']}"
+                + (f"; interval {verdicts['R2_multiplier_interval']}" if verdicts["R2_multiplier_interval"] else ""),
+                f"- R3 identification of added parameters: {verdicts['R3_identification']}"
+                + (f"; classes {verdicts['added_parameter_classes']}" if verdicts["added_parameter_classes"] else ""),
+                f"- Outcome: **{verdicts['outcome']}**",
+            ]
+        )
+    if coverage is not None and "overall" in coverage:
         overall = coverage["overall"]
-        lines.extend(["", f"Posterior predictive coverage at {coverage['credible_mass']:.0%} with measurement noise:", ""])
+        lines.extend(
+            [
+                "",
+                f"Posterior predictive coverage at {float(coverage['credible_mass']):.0%} with measurement noise "
+                f"({coverage['draws']} draws, {coverage.get('failed_draws', 0)} failed):",
+                "",
+            ]
+        )
         for name, item in overall.items():
             lines.append(f"- {name}: {item['inside']}/{item['observations']} inside ({item['fraction']:.0%})")
     lines.extend(["", "Claims excluded by the plan: " + "; ".join(plan["reporting"]["claims_excluded"]) + ".", ""])
@@ -1156,6 +1267,7 @@ __all__ = [
     "run_stage_a",
     "sample_posterior_study",
     "score_predictions",
+    "stage_b_verdicts",
     "training_scales",
     "variant_config",
     "write_posterior_outputs",

@@ -95,3 +95,27 @@ def test_decision_rules_and_claim_boundaries_are_declared(plan) -> None:
         "bound_contact_fraction": 0.02,
         "credible_mass": 0.95,
     }
+
+
+def test_recorded_stage_b_results_are_internally_consistent(plan) -> None:
+    """Every recorded posterior cites the plan chain, labels unconverged chains provisional and digests its files."""
+
+    stage_b = PLAN_PATH.parent / "results" / "stage_b"
+    recorded = sorted(path for path in stage_b.glob("*/verdicts.json")) if stage_b.exists() else []
+    if not recorded:
+        pytest.skip("no stage B posterior recorded yet")
+    chain = {FROZEN_SHA256, *(entry["previous_sha256"] for entry in plan["amendments"])}
+    vocabulary = set(plan["decision_rules"]["outcome_vocabulary"]) | {"baseline (R1 and R3 do not apply)", "not scored (stage A screen not recorded)"}
+    for verdicts_path in recorded:
+        folder = verdicts_path.parent
+        verdicts = json.loads(verdicts_path.read_text(encoding="utf-8"))
+        calibration = json.loads((folder / "bayesian_calibration.json").read_text(encoding="utf-8"))
+        inputs = json.loads((folder / "inputs.json").read_text(encoding="utf-8"))
+        artifacts = json.loads((folder / "artifacts.json").read_text(encoding="utf-8"))
+        assert inputs["plan_sha256"] in chain, folder
+        assert verdicts["provisional"] == (not calibration["converged"]), folder
+        assert verdicts["outcome"] in vocabulary, verdicts["outcome"]
+        for name, digest in artifacts.items():
+            if name == "artifacts.json":
+                continue
+            assert hashlib.sha256((folder / name).read_bytes()).hexdigest() == digest, (folder, name)

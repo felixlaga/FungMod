@@ -1,0 +1,114 @@
+{
+  "draws": 400,
+  "credible_mass": 0.95,
+  "seed": 20261006,
+  "includes_measurement_noise": true,
+  "conditions": {
+    "gelain_2020_cellulose_10gl": {
+      "successful_draws": 400,
+      "per_observable": {
+        "biomass": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "substrate": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "cellulase_activity": {
+          "inside": 3,
+          "observations": 8,
+          "fraction": 0.375
+        },
+        "beta_glucosidase_activity": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        }
+      },
+      "fraction": 0.84375
+    },
+    "gelain_2020_cellulose_20gl": {
+      "successful_draws": 400,
+      "per_observable": {
+        "biomass": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "substrate": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "cellulase_activity": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "beta_glucosidase_activity": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        }
+      },
+      "fraction": 1.0
+    },
+    "gelain_2020_cellulose_30gl": {
+      "successful_draws": 400,
+      "per_observable": {
+        "biomass": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "substrate": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "cellulase_activity": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "beta_glucosidase_activity": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        }
+      },
+      "fraction": 1.0
+    }
+  },
+  "failed_draws": 0,
+  "overall": {
+    "biomass": {
+      "inside": 24,
+      "observations": 24,
+      "fraction": 1.0
+    },
+    "substrate": {
+      "inside": 24,
+      "observations": 24,
+      "fraction": 1.0
+    },
+    "cellulase_activity": {
+      "inside": 19,
+      "observations": 24,
+      "fraction": 0.7916666666666666
+    },
+    "beta_glucosidase_activity": {
+      "inside": 24,
+      "observations": 24,
+      "fraction": 1.0
+    },
+    "all_observables": {
+      "inside": 91,
+      "observations": 96,
+      "fraction": 0.9479166666666666
+    }
+  }
+}
