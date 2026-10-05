@@ -49,6 +49,16 @@ _MODIFIER_COMPATIBILITY_ROLE_BY_FIELD = {
         "minimum_ph_role": "minimum_ph",
         "maximum_ph_role": "maximum_ph",
     },
+    "temperature_cardinal_rosso": {
+        "minimum_temperature_role": "minimum_temperature",
+        "optimum_temperature_role": "optimum_temperature",
+        "maximum_temperature_role": "maximum_temperature",
+    },
+    "ph_cardinal_rosso": {
+        "minimum_ph_role": "minimum_ph",
+        "optimum_ph_role": "optimum_ph",
+        "maximum_ph_role": "maximum_ph",
+    },
     "oxygen_monod": {
         "half_saturation_role": "oxygen_half_saturation",
     },

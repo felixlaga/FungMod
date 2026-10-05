@@ -195,6 +195,21 @@ sourced parameters for those organisms, plus enzyme thermal inactivation.
 Without this, the central promise "how does pH or temperature change
 degradation dynamics" is unfulfillable.
 
+Status 2026-10-05 (ENV-003): partially done. The laws exist and are bindable:
+Rosso CTMI and CPM modifiers, a diprotic pH-ionization Michaelis-Menten
+process law (the SABIO-RK pH-dependent law form) and first-order Arrhenius
+thermal inactivation, all compiled, tested and reported through
+`provenance.environment_response` and `environment_effect_status:
+active_response_model`, with environment ranking allowed only across
+conditions a law covers. The first sourced binding is enzyme-level, not
+organism-level: P. chrysosporium BGL1A on cellobiose over pH 4-8 (SABIO-RK
+entry 38522, Tsukada 2008), exploratory mode only because the assay loadings
+are assumptions. Not done: no sourced cardinal temperatures, cardinal pH
+values or inactivation energies exist in the repository for T. harzianum
+P49P11 or its activity pools, and the session's network policy denied every
+publisher host, so those laws are bound to no organism; a candidate review
+names the sources found. See `progress.md` ENV-003.
+
 ### Step 4. Identifiability and Bayesian calibration on the fast core
 
 With a compiled core and Jacobians, add posterior sampling (MCMC or

@@ -31,6 +31,21 @@ The current PR queue and reconciled scoped phase status are tracked in
 
 # Current project status
 
+2026-10-05 (later): ENV-003 makes environment grids mean something. Rosso
+cardinal temperature and pH laws, a diprotic pH-ionization Michaelis-Menten
+law and first-order Arrhenius thermal inactivation are implemented, compiled
+and bindable from registry templates; assembled cases record which conditions
+act through which law, and the output tables report
+`active_response_model` and allow ranking only across covered conditions. The
+first sourced binding is P. chrysosporium BGL1A on cellobiose over pH 4-8
+(SABIO-RK entry 38522, Tsukada 2008), exploratory mode only. The cardinal and
+inactivation laws are bound to no organism: the repository holds no sourced
+cardinal values or inactivation energies for T. harzianum, and literature
+retrieval was blocked by the session's network policy; a candidate review
+records the sources found. Step 3 is therefore partially done and step 4
+should not start until a sourced temperature response exists for a
+whole-organism case.
+
 2026-10-05: ORG-001 puts the first real organism in the registry. T. harzianum
 P49P11 on Celufloc 200 cellulose runs in `scientific` mode through
 `VirtualExperiment` for three culture loadings, composed from generic process

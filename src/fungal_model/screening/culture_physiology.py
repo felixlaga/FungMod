@@ -700,6 +700,7 @@ def _entities(
         environment_id=environment_id,
         modifiers=modifiers,
         error_type=RegistryCaseBuildError,
+        process_types=tuple(str(process["process_type"]) for process in processes),
     )
     if environment_entity is not None:
         entities["environment"] = environment_entity

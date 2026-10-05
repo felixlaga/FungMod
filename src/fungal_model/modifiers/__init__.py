@@ -1,6 +1,12 @@
 """Environmental and state-dependent process modifiers."""
 
 from .base import EnvironmentalModifier, ModifierMetadata
+from .cardinal import (
+    CARDINAL_PH_MODIFIER_TYPE,
+    CARDINAL_TEMPERATURE_MODIFIER_TYPE,
+    CardinalPHModifier,
+    CardinalTemperatureModifier,
+)
 from .enzyme_inhibition import (
     CompetitiveInhibitionModifier,
     CoupledSubstrateProductInhibitionModifier,
@@ -13,6 +19,10 @@ from .temperature import TemperatureModifier
 from .water_activity import WaterActivityModifier, water_activity_threshold_assumption
 
 __all__ = [
+    "CARDINAL_PH_MODIFIER_TYPE",
+    "CARDINAL_TEMPERATURE_MODIFIER_TYPE",
+    "CardinalPHModifier",
+    "CardinalTemperatureModifier",
     "EnvironmentalModifier",
     "CompetitiveInhibitionModifier",
     "CoupledSubstrateProductInhibitionModifier",

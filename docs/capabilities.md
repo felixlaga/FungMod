@@ -14,7 +14,7 @@ resolve parameter identifiability or supply independent empirical evidence.
 | --- | --- | --- |
 | Registry-backed virtual experiments | Implemented and technically verified | Registry coverage is scoped, not a complete biological database. |
 | Researcher-facing aliases | Implemented | Ambiguous and unknown names fail explicitly. |
-| Environment grids | Implemented | Values affect rates only through explicit laws or condition-specific records. |
+| Environment grids | Implemented | Values affect rates only through explicit laws or condition-specific records; a bound law reports `active_response_model`, and ranking is allowed only when every condition that varies across the screen is covered. See [environment response laws](environment-response.md). |
 | Exploratory ensembles | Implemented | Quantiles are conditional on explicit ranges, not calibrated posteriors. |
 | Scientific-mode exact-input gate | Implemented | Exact-input eligibility is not empirical validation. |
 | Standard tables, plots, reports, manifests | Implemented | Presentation is derived from existing output rows. |
@@ -31,7 +31,8 @@ resolve parameter identifiability or supply independent empirical evidence.
 | First-order, mass-action, homogeneous Michaelis-Menten | Implemented | Homogeneous Michaelis-Menten is dissolved-substrate kinetics. |
 | Surface adsorption/catalysis | Implemented, generic framework | Substrate-specific accessibility and morphology remain scoped. |
 | Linear, branching, and cyclic enzyme pathways | Implemented and software-verified | Broad provenance-backed pathway biology remains partial. |
-| Temperature, pH, oxygen, water-activity modifiers | Implemented when explicitly configured | No response is inferred from metadata alone. |
+| Temperature, pH, oxygen, water-activity modifiers | Implemented when explicitly configured | Arrhenius, Rosso cardinal temperature (CTMI), Gaussian pH, Rosso cardinal pH (CPM), Monod oxygen and water-activity threshold; no response is inferred from metadata alone, and the two cardinal laws are bound to no shipped organism because no sourced cardinal values exist in the repository. |
+| pH-ionization Michaelis-Menten and thermal inactivation process laws | Implemented; one sourced pH-response case | Diprotic ionization pH dependence of `kcat` and `Km` (SABIO-RK law type 24) bound to *P. chrysosporium* BGL1A on cellobiose over pH 4 to 8 (Tsukada 2008 via SABIO-RK entry 38522), exploratory mode only because the assay loadings are explicit assumptions. First-order Arrhenius thermal inactivation is implemented and tested but bound to no shipped case (no sourced inactivation energy). See [environment response laws](environment-response.md). |
 | Reversible product inhibition | Implemented for explicit matched inputs | No toxicity, uptake, or whole-fungus inference. |
 | Competitive and Haldane substrate inhibition | Implemented with provenance/maturity contracts | Framework values are artificial; the five-enzyme showcase uses separately labelled literature-reported inputs but remains unvalidated. |
 | Coupled hydrolysis and substrate transglycosylation | Implemented as a generic process law with one provenance-backed fungal-enzyme configuration | The transfer-product pool is unresolved; no product-linkage assignment, re-hydrolysis, or whole-fungus claim is made. |

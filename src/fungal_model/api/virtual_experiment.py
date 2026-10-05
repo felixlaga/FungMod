@@ -501,20 +501,22 @@ def _registry_with_runtime_environment_overlay(
     *,
     environment_cases: tuple[EnvironmentCase, ...],
 ) -> FungModRegistry:
+    ambiguous_symbols = _ambiguous_condition_specific_symbols(registry)
     runtime_parameters = tuple(
         _runtime_environment_parameter_record(record, environment_case=environment_case)
         for record in registry.parameters.values()
         for environment_case in environment_cases
-        if record.environment_id is not None
+        if record.environment_id is not None and _condition_specific_key(record) not in ambiguous_symbols
     )
     provenance = {
         **dict(registry.provenance),
         "runtime_environment_grid_overlay": True,
         "runtime_environment_ids": [case.environment_id for case in environment_cases],
-        "environment_effect_status": "metadata_only",
+        "ambiguous_condition_specific_symbols": sorted(str(key[0]) for key in ambiguous_symbols),
         "notes": (
             "Runtime EnvironmentGrid overlay. Generated environments and copied "
-            "parameter records are in-memory only and are not written to data_registry."
+            "parameter records are in-memory only and are not written to data_registry. "
+            "Each assembled case reports its own environment_effect_status."
         ),
     }
     return FungModRegistry.build(
@@ -533,6 +535,33 @@ def _registry_with_runtime_environment_overlay(
     )
 
 
+def _condition_specific_key(record: ParameterRecord) -> tuple[str | None, ...]:
+    return (
+        record.parameter_symbol,
+        record.process_type,
+        record.enzyme_class,
+        record.substrate_class,
+        record.fungus_id,
+        record.substrate_id,
+    )
+
+
+def _ambiguous_condition_specific_symbols(registry: FungModRegistry) -> frozenset[tuple[str | None, ...]]:
+    """Symbols whose condition-specific records differ only by environment.
+
+    A runtime grid environment cannot choose among them without inventing a
+    condition match, so none of them is copied: the case then reports the role
+    as missing instead of silently taking one condition's value.
+    """
+
+    environments_by_key: dict[tuple[str | None, ...], set[str]] = {}
+    for record in registry.parameters.values():
+        if record.environment_id is None:
+            continue
+        environments_by_key.setdefault(_condition_specific_key(record), set()).add(record.environment_id)
+    return frozenset(key for key, environments in environments_by_key.items() if len(environments) > 1)
+
+
 def _runtime_environment_parameter_record(
     record: ParameterRecord,
     *,
@@ -548,16 +577,15 @@ def _runtime_environment_parameter_record(
             "runtime_environment_grid_overlay": True,
             "source_environment_id": record.environment_id,
             "target_environment_id": environment_case.environment_id,
-            "environment_effect_status": "metadata_only",
-            "environment_response_model": "none",
             "notes": (
-                "Parameter record reused for a runtime EnvironmentGrid case as "
-                "metadata-only context. Temperature and pH do not modify kinetics."
+                "Parameter record reused for a runtime EnvironmentGrid case as context. "
+                "The record itself carries no response law; temperature and pH change "
+                "kinetics only through laws bound by the case template."
             ),
         },
         notes=(
             f"{record.notes} Runtime EnvironmentGrid reuse for "
-            f"{environment_case.environment_id}; no pH/temperature response law applied."
+            f"{environment_case.environment_id}; the record carries no pH/temperature response law."
         ),
         parameter_symbol=record.parameter_symbol,
         process_type=record.process_type,

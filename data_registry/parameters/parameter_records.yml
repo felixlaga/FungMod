@@ -1290,3 +1290,317 @@ records:
       notes: Stored workbook value at full precision.
     notes: >-
       Deposited t = 0 beta-glucosidase activity is zero in all three cellulose workbooks; the detection limit of the assay is not reported.
+
+  - record_id: tsukada_2008_bgl1a_k0_cellobiose
+    name: BGL1A limiting turnover k0 for cellobiose (Tsukada 2008)
+    maturity: literature_processed
+    provenance:
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter k0 (kcat) (Tsukada et al. 2008, PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      raw_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
+      raw_export_sha256: a5e7ae132382e3afadcb08f1a37204fc7325fef7d02a7c455d54d7c1811ce904
+      publication: Tsukada T, Igarashi K, Fushinobu S, Samejima M (2008) Biotechnol Bioeng 99:1295-1302, PMID 18023045.
+      kinetic_law_type: Michaelis-Menten (pH-dependent), SABIO-RK kinetic-law type 24
+      confidence_level: literature_curated
+      measurement_method: Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).
+      validity_range: Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601).
+    parameter_symbol: bgl1a_k0_cellobiose
+    process_type: ph_ionization_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: phanerochaete_chrysosporium_k3
+    substrate_id: cellobiose
+    environment_id: null
+    value:
+      kind: exact
+      value: 1.81
+      units: 1 / second
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter k0 (kcat).
+      confidence_level: literature_curated
+      notes: Deposited start_value copied verbatim; SABIO-RK standard_deviation 0.05 s^(-1). The reported deviation is not propagated by this exact record.
+    notes: >-
+      Limiting turnover of the pH-dependent law; kcat(pH) = k0 / f_es(pH). It is the plateau constant of the fit, not the turnover at any single pH.
+
+  - record_id: tsukada_2008_bgl1a_Km0_cellobiose
+    name: BGL1A limiting Michaelis constant Km0 for cellobiose (Tsukada 2008)
+    maturity: literature_processed
+    provenance:
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter Km0 (Km, species cellobiose) (Tsukada et al. 2008, PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      raw_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
+      raw_export_sha256: a5e7ae132382e3afadcb08f1a37204fc7325fef7d02a7c455d54d7c1811ce904
+      publication: Tsukada T, Igarashi K, Fushinobu S, Samejima M (2008) Biotechnol Bioeng 99:1295-1302, PMID 18023045.
+      kinetic_law_type: Michaelis-Menten (pH-dependent), SABIO-RK kinetic-law type 24
+      confidence_level: literature_curated
+      measurement_method: Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).
+      validity_range: Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601).
+    parameter_symbol: bgl1a_Km0_cellobiose
+    process_type: ph_ionization_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: phanerochaete_chrysosporium_k3
+    substrate_id: cellobiose
+    environment_id: null
+    value:
+      kind: exact
+      value: 6.8
+      units: millimolar
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter Km0 (Km, species cellobiose).
+      confidence_level: literature_curated
+      notes: Deposited start_value copied verbatim; SABIO-RK standard_deviation 0.29 mM. The reported deviation is not propagated by this exact record.
+    notes: >-
+      Limiting Michaelis constant of the pH-dependent law; Km(pH) = Km0 f_e(pH) / f_es(pH). SABIO-RK normalizes the value to 0.0068 M; the deposited millimolar value is stored.
+
+  - record_id: tsukada_2008_bgl1a_pKe1
+    name: BGL1A free-enzyme lower pKa pKe1 (Tsukada 2008)
+    maturity: literature_processed
+    provenance:
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKe1 (pKa) (Tsukada et al. 2008, PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      raw_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
+      raw_export_sha256: a5e7ae132382e3afadcb08f1a37204fc7325fef7d02a7c455d54d7c1811ce904
+      publication: Tsukada T, Igarashi K, Fushinobu S, Samejima M (2008) Biotechnol Bioeng 99:1295-1302, PMID 18023045.
+      kinetic_law_type: Michaelis-Menten (pH-dependent), SABIO-RK kinetic-law type 24
+      confidence_level: literature_curated
+      measurement_method: Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).
+      validity_range: Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601).
+    parameter_symbol: bgl1a_pKe1
+    process_type: ph_ionization_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: phanerochaete_chrysosporium_k3
+    substrate_id: cellobiose
+    environment_id: null
+    value:
+      kind: exact
+      value: 4.4
+      units: dimensionless
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKe1 (pKa).
+      confidence_level: literature_curated
+      notes: Deposited start_value copied verbatim; SABIO-RK standard_deviation 0.2. The reported deviation is not propagated by this exact record.
+    notes: >-
+      Lower ionization constant of the free enzyme acting on kcat/Km.
+
+  - record_id: tsukada_2008_bgl1a_pKe2
+    name: BGL1A free-enzyme upper pKa pKe2 (Tsukada 2008)
+    maturity: literature_processed
+    provenance:
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKe2 (pKa) (Tsukada et al. 2008, PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      raw_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
+      raw_export_sha256: a5e7ae132382e3afadcb08f1a37204fc7325fef7d02a7c455d54d7c1811ce904
+      publication: Tsukada T, Igarashi K, Fushinobu S, Samejima M (2008) Biotechnol Bioeng 99:1295-1302, PMID 18023045.
+      kinetic_law_type: Michaelis-Menten (pH-dependent), SABIO-RK kinetic-law type 24
+      confidence_level: literature_curated
+      measurement_method: Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).
+      validity_range: Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601).
+    parameter_symbol: bgl1a_pKe2
+    process_type: ph_ionization_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: phanerochaete_chrysosporium_k3
+    substrate_id: cellobiose
+    environment_id: null
+    value:
+      kind: exact
+      value: 7.7
+      units: dimensionless
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKe2 (pKa).
+      confidence_level: literature_curated
+      notes: Deposited start_value copied verbatim; SABIO-RK standard_deviation 0.2. The reported deviation is not propagated by this exact record.
+    notes: >-
+      Upper ionization constant of the free enzyme acting on kcat/Km.
+
+  - record_id: tsukada_2008_bgl1a_pKes1
+    name: BGL1A enzyme-substrate complex lower pKa pKes1 (Tsukada 2008)
+    maturity: literature_processed
+    provenance:
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKes1 (pKa) (Tsukada et al. 2008, PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      raw_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
+      raw_export_sha256: a5e7ae132382e3afadcb08f1a37204fc7325fef7d02a7c455d54d7c1811ce904
+      publication: Tsukada T, Igarashi K, Fushinobu S, Samejima M (2008) Biotechnol Bioeng 99:1295-1302, PMID 18023045.
+      kinetic_law_type: Michaelis-Menten (pH-dependent), SABIO-RK kinetic-law type 24
+      confidence_level: literature_curated
+      measurement_method: Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).
+      validity_range: Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601).
+    parameter_symbol: bgl1a_pKes1
+    process_type: ph_ionization_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: phanerochaete_chrysosporium_k3
+    substrate_id: cellobiose
+    environment_id: null
+    value:
+      kind: exact
+      value: 4.1
+      units: dimensionless
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKes1 (pKa).
+      confidence_level: literature_curated
+      notes: Deposited start_value copied verbatim; SABIO-RK standard_deviation 0.1. The reported deviation is not propagated by this exact record.
+    notes: >-
+      Lower ionization constant of the enzyme-substrate complex acting on kcat.
+
+  - record_id: tsukada_2008_bgl1a_pKes2
+    name: BGL1A enzyme-substrate complex upper pKa pKes2 (Tsukada 2008)
+    maturity: literature_processed
+    provenance:
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKes2 (pKa) (Tsukada et al. 2008, PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      raw_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
+      raw_export_sha256: a5e7ae132382e3afadcb08f1a37204fc7325fef7d02a7c455d54d7c1811ce904
+      publication: Tsukada T, Igarashi K, Fushinobu S, Samejima M (2008) Biotechnol Bioeng 99:1295-1302, PMID 18023045.
+      kinetic_law_type: Michaelis-Menten (pH-dependent), SABIO-RK kinetic-law type 24
+      confidence_level: literature_curated
+      measurement_method: Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).
+      validity_range: Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601).
+    parameter_symbol: bgl1a_pKes2
+    process_type: ph_ionization_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: phanerochaete_chrysosporium_k3
+    substrate_id: cellobiose
+    environment_id: null
+    value:
+      kind: exact
+      value: 7.6
+      units: dimensionless
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKes2 (pKa).
+      confidence_level: literature_curated
+      notes: Deposited start_value copied verbatim; SABIO-RK standard_deviation 0.1. The reported deviation is not propagated by this exact record.
+    notes: >-
+      Upper ionization constant of the enzyme-substrate complex acting on kcat.
+
+  - record_id: tsukada_2008_bgl1a_ph_series_minimum
+    name: BGL1A pH series lower bound (Tsukada 2008)
+    maturity: literature_processed
+    provenance:
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pH variable start_value (Tsukada et al. 2008, PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      raw_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
+      raw_export_sha256: a5e7ae132382e3afadcb08f1a37204fc7325fef7d02a7c455d54d7c1811ce904
+      publication: Tsukada T, Igarashi K, Fushinobu S, Samejima M (2008) Biotechnol Bioeng 99:1295-1302, PMID 18023045.
+      kinetic_law_type: Michaelis-Menten (pH-dependent), SABIO-RK kinetic-law type 24
+      confidence_level: literature_curated
+      measurement_method: Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).
+      validity_range: Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601).
+    parameter_symbol: bgl1a_ph_series_minimum
+    process_type: ph_ionization_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: phanerochaete_chrysosporium_k3
+    substrate_id: cellobiose
+    environment_id: null
+    value:
+      kind: exact
+      value: 4.0
+      units: dimensionless
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pH variable start_value.
+      confidence_level: literature_curated
+      notes: Deposited start_value copied verbatim; SABIO-RK records no standard deviation for this constant. The reported deviation is not propagated by this exact record.
+    notes: >-
+      Lower bound of the pH range over which the source fitted the law. Bound to the minimum_ph role so that cases below pH 4 raise an environmental validity warning.
+
+  - record_id: tsukada_2008_bgl1a_ph_series_maximum
+    name: BGL1A pH series upper bound (Tsukada 2008)
+    maturity: literature_processed
+    provenance:
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pH variable end_value (Tsukada et al. 2008, PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      raw_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
+      raw_export_sha256: a5e7ae132382e3afadcb08f1a37204fc7325fef7d02a7c455d54d7c1811ce904
+      publication: Tsukada T, Igarashi K, Fushinobu S, Samejima M (2008) Biotechnol Bioeng 99:1295-1302, PMID 18023045.
+      kinetic_law_type: Michaelis-Menten (pH-dependent), SABIO-RK kinetic-law type 24
+      confidence_level: literature_curated
+      measurement_method: Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).
+      validity_range: Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601).
+    parameter_symbol: bgl1a_ph_series_maximum
+    process_type: ph_ionization_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: phanerochaete_chrysosporium_k3
+    substrate_id: cellobiose
+    environment_id: null
+    value:
+      kind: exact
+      value: 8.0
+      units: dimensionless
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pH variable end_value.
+      confidence_level: literature_curated
+      notes: Deposited start_value copied verbatim; SABIO-RK records no standard deviation for this constant. The reported deviation is not propagated by this exact record.
+    notes: >-
+      Upper bound of the pH range over which the source fitted the law. Bound to the maximum_ph role so that cases above pH 8 raise an environmental validity warning.
+
+  - record_id: bgl1a_assay_initial_cellobiose_concentration_exploratory
+    name: Exploratory BGL1A assay initial cellobiose concentration
+    maturity: exploratory_prior
+    provenance:
+      source: user-supplied exploratory assumption; SABIO-RK entry 38522 records no substrate concentration (variable S start_value null).
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      measurement_method: explicit scenario assumption, not a measurement
+      validity_range: Exploratory BGL1A pH-response screens only.
+      notes: Chosen of the order of Km0 (6.8 mM) so that the pH dependence of both kcat and Km is visible in the time course; it is not a value from the source.
+    parameter_symbol: bgl1a_assay_initial_cellobiose_concentration
+    process_type: ph_ionization_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: phanerochaete_chrysosporium_k3
+    substrate_id: cellobiose
+    environment_id: null
+    value:
+      kind: exact
+      value: 5.0
+      units: millimolar
+      source: user-supplied exploratory assumption
+      confidence_level: exploratory_assumption
+      notes: Not curated from SABIO-RK or the publication; an explicit exploratory scenario value.
+    notes: >-
+      Exploratory initial cellobiose loading for the BGL1A pH-response case. The
+      same value is used at every pH so that cases differ only in pH; scientific
+      mode rejects this record.
+
+  - record_id: bgl1a_assay_enzyme_concentration_exploratory
+    name: Exploratory BGL1A assay enzyme concentration
+    maturity: exploratory_prior
+    provenance:
+      source: user-supplied exploratory assumption; SABIO-RK entry 38522 records no enzyme concentration (variable E start_value null).
+      confidence_level: exploratory_assumption
+      exploratory_prior: true
+      measurement_method: explicit scenario assumption, not a measurement
+      validity_range: Exploratory BGL1A pH-response screens only.
+      notes: One micromolar of a 53 kDa enzyme is about 53 mg/L; the value only sets the time scale of the exploratory time course and is not a value from the source.
+    parameter_symbol: bgl1a_assay_enzyme_concentration
+    process_type: ph_ionization_michaelis_menten
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    fungus_id: phanerochaete_chrysosporium_k3
+    substrate_id: cellobiose
+    environment_id: null
+    value:
+      kind: exact
+      value: 0.001
+      units: millimolar
+      source: user-supplied exploratory assumption
+      confidence_level: exploratory_assumption
+      notes: Not curated from SABIO-RK or the publication; an explicit exploratory scenario value.
+    notes: >-
+      Exploratory BGL1A enzyme loading for the pH-response case. The same value is
+      used at every pH so that cases differ only in pH; scientific mode rejects
+      this record.

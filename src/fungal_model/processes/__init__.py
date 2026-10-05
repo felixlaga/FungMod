@@ -20,11 +20,13 @@ from .factories import (
     FirstOrderFactory,
     HomogeneousMichaelisMentenFactory,
     MassActionFactory,
+    PHIonizationMichaelisMentenFactory,
     ProcessBuildContext,
     ProcessFactory,
     ProportionalSynthesisFactory,
     SubstrateTransglycosylationFactory,
     SurfaceCatalysisFactory,
+    ThermalInactivationFactory,
     default_foundation_factories,
 )
 from .homogeneous import (
@@ -33,6 +35,14 @@ from .homogeneous import (
     MassActionProcess,
     homogeneous_process_assumption,
 )
+from .inactivation import (
+    THERMAL_INACTIVATION_PROCESS_TYPE,
+    ThermalInactivationProcess,
+)
+from .ionization import (
+    PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE,
+    PHIonizationMichaelisMentenProcess,
+)
 from .physiology import (
     PROPORTIONAL_SYNTHESIS_PROCESS_TYPE,
     ProportionalSynthesisProcess,
@@ -40,6 +50,8 @@ from .physiology import (
 )
 from .rate_modifiers import (
     RateModifierProcess,
+    cardinal_ph_modifier_from_config,
+    cardinal_temperature_modifier_from_config,
     competitive_inhibition_modifier_from_config,
     coupled_substrate_product_inhibition_modifier_from_config,
     ph_modifier_from_config,
@@ -84,6 +96,12 @@ __all__ = [
     "MassActionProcess",
     "MissingProcessIssue",
     "ModelAssemblyContext",
+    "PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE",
+    "PHIonizationMichaelisMentenFactory",
+    "PHIonizationMichaelisMentenProcess",
+    "THERMAL_INACTIVATION_PROCESS_TYPE",
+    "ThermalInactivationFactory",
+    "ThermalInactivationProcess",
     "ModelBuilder",
     "ParameterIssue",
     "ParameterRequirement",
@@ -98,6 +116,8 @@ __all__ = [
     "ProportionalSynthesisFactory",
     "ProportionalSynthesisProcess",
     "RateModifierProcess",
+    "cardinal_ph_modifier_from_config",
+    "cardinal_temperature_modifier_from_config",
     "competitive_inhibition_modifier_from_config",
     "coupled_substrate_product_inhibition_modifier_from_config",
     "StateVariableSpec",

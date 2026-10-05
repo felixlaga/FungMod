@@ -22,3 +22,13 @@ call SABIO-RK. Eligible entries must be plain Michaelis-Menten, Reaction 618,
 EC 3.2.1.21 beta-glucosidase, Cellobiose substrate, beta-D-Glucose/glucose
 product, and must have explicit `Km` in `mM` plus explicit `kcat` in `s^(-1)`.
 No unit conversion is applied.
+
+ENV-003 (2026-10-05) consumes the pH-dependent entries differently from the
+range curation: entry 38522 (Phanerochaete chrysosporium BGL1A wild type,
+Michaelis-Menten (pH-dependent), kinetic-law type 24) is copied verbatim into
+registry parameter records bound to the generic `ph_ionization_michaelis_menten`
+process law, with the raw export's SHA-256 recorded on every record. The
+entries stay excluded from `curated/parameter_range_summary.json`, which is a
+plain Michaelis-Menten range report; nothing in `curated/` was regenerated.
+Entry 38534 (BGL1B, `k0` "estimated from plot", no deviations) and the mutant
+entries are not curated into the registry.

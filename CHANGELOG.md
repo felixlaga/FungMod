@@ -6,6 +6,37 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Environment response laws (`docs/environment-response.md`): Rosso cardinal
+  temperature (`temperature_cardinal_rosso`, CTMI) and cardinal pH
+  (`ph_cardinal_rosso`, CPM) modifiers (`fungal_model.kinetics.cardinal`,
+  `fungal_model.modifiers.cardinal`); a diprotic pH-ionization
+  Michaelis-Menten process law (`ph_ionization_michaelis_menten`,
+  `fungal_model.kinetics.ionization`, `fungal_model.processes.ionization`)
+  matching the SABIO-RK pH-dependent law form; and a first-order Arrhenius
+  thermal-inactivation process law (`thermal_inactivation`,
+  `fungal_model.kinetics.inactivation`, `fungal_model.processes.inactivation`).
+  All compile to numeric kernels, validate their parameters, require sources,
+  and warn outside declared measured ranges. Factories, config builders,
+  configured-output rows and two non-biological toy configs are included.
+- Registry templates bind the new modifiers through role fields and the new
+  process laws through their `process_type`; the environment entity is
+  generated for every condition a bound law reads. Assembled configs record
+  `provenance.environment_response`; `RegistryCaseEnsemble` carries it and
+  the virtual-experiment tables derive `environment_effect_status:
+  active_response_model` from it, list the laws in
+  `environment_response_model`, and allow environment ranking only when every
+  condition that varies across the screen is covered by a law or
+  condition-specific records.
+- First registry case with an active response law: *Phanerochaete
+  chrysosporium* K-3 BGL1A on cellobiose over pH 4 to 8 (SABIO-RK Reaction 618
+  entry 38522, Tsukada et al. 2008). Fungus, five environment, compatibility
+  and template records, eight `literature_processed` constants copied verbatim
+  from the archived raw export (SHA-256 recorded) and two explicit
+  `exploratory_prior` loading assumptions; exploratory mode only.
+- Candidate review for *T. harzianum* cardinal temperatures
+  (`data/experiments/candidate_reviews/trichoderma_harzianum_cardinal_growth_review.yml`),
+  proposed with no transcribed values.
+
 - First whole-organism registry case: *Trichoderma harzianum* P49P11 on
   Celufloc 200 cellulose (Gelain 2020) runs in `scientific` mode through
   `VirtualExperiment` with biomass, filter-paper and beta-glucosidase activity,
@@ -76,6 +107,19 @@ All notable public releases of FungMod are documented here.
   remain explicit; no validated organism model or registry promotion is claimed.
 
 ### Changed
+
+- `EnvironmentGrid` runtime cases and the virtual-experiment registry overlay
+  no longer assert that temperature and pH are inert; their status is the
+  status before assembly and the assembled case decides. Metadata-only
+  behaviour is unchanged for cases that bind no law.
+- The runtime-grid overlay no longer copies condition-specific records that
+  differ only by registry environment (the three Gelain cellulose loadings):
+  a grid over *T. harzianum* reports the loading as missing and lists the
+  symbol under `ambiguous_condition_specific_symbols` instead of silently
+  taking one condition's value.
+- `beta_glucosidase` enzyme class lists `ph_ionization_michaelis_menten` as a
+  compatible process; the SABIO-RK rice-enzyme case still selects plain
+  Michaelis-Menten.
 
 - Compiled models evaluate every rate at `max(state, 0)` (recorded as
   `negative_state_policy` in `solver_metadata["kernel"]`) so that a pool can be

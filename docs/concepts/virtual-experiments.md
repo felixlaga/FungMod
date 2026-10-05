@@ -66,9 +66,13 @@ grid = fm.environment_grid(
 ```
 
 A grid creates explicit environment cases. Temperature, pH, oxygen, or water
-activity only affect rates when an implemented response law or
-condition-specific parameter record is bound. Otherwise the values remain
-metadata and ranking is guarded.
+activity only affect rates when the case template binds an implemented
+response law or a condition-specific parameter record applies. A bound law
+reports `environment_effect_status: active_response_model` and names the law
+in `environment_response_model`; ranking across environments is allowed only
+when every condition that varies across the screen is covered by a law or by
+condition-specific records. Otherwise the values remain metadata and ranking
+is guarded. See [environment response laws](../environment-response.md).
 
 ## Failure is part of the API
 

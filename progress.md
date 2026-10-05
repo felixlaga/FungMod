@@ -93,6 +93,191 @@ Ambiguities: none known. Risk: low.
 Next task: merge this into `main`, bring `main` into the PR chain (#77 to #80)
 so every job re-runs green, then merge the chain in order.
 
+## ENV-003 Bound Environment Response Laws
+
+Date: 2026-10-05
+
+Status: `partial` for step 3 of the state document. The laws are `complete`
+(implemented, compiled, tested, bindable, reported). One sourced binding is
+`complete` at enzyme level (BGL1A pH response, exploratory mode). The
+organism-level bindings (cardinal temperature and pH for T. harzianum, thermal
+inactivation of its activity pools) are `blocked` on sourced data: the
+repository holds none and the session's network policy denied every publisher
+host.
+
+Changed:
+
+- Added `kinetics/cardinal.py`: Rosso CTMI temperature activity and CPM pH
+  activity (dimensionless, one at the optimum, zero at and beyond the cardinal
+  bounds), with ordering checks and the CTMI denominator condition
+  `T_opt >= (T_min + T_max) / 2`. Added `modifiers/cardinal.py`:
+  `CardinalTemperatureModifier` (`temperature_cardinal_rosso`) and
+  `CardinalPHModifier` (`ph_cardinal_rosso`) with build-time constant folding.
+- Added `kinetics/ionization.py` and `processes/ionization.py`:
+  `PHIonizationMichaelisMentenProcess` (`ph_ionization_michaelis_menten`),
+  `v = E kcat(pH) S / (Km(pH) + S)` with `kcat(pH) = k0 / f_es(pH)` and
+  `Km(pH) = Km0 f_e(pH) / f_es(pH)`, the SABIO-RK pH-dependent law form kept
+  verbatim (product of the two ionization terms), optional measured pH bounds,
+  numeric kernel, `effective_constants()` diagnostics, factory.
+- Added `kinetics/inactivation.py` and `processes/inactivation.py`:
+  `ThermalInactivationProcess` (`thermal_inactivation`), first-order loss of an
+  active pool with `k_d(T)` in the Arrhenius reference form, optional inactive
+  pool for closure, optional measured temperature bounds, numeric kernel,
+  factory. Both new factories are in `default_foundation_factories()`.
+- `processes/rate_modifiers.py`, `processes/factories.py`,
+  `workflows/configured_outputs.py`: config builders, requirement collection,
+  limitations and configured-metadata rows for the two cardinal modifiers;
+  `configured_process_laws` rows for the two process laws.
+- `screening/template_environment_modifiers.py`: one vocabulary for modifier
+  and process-law environment conditions (`ENVIRONMENT_MODIFIER_CONDITIONS`,
+  `PROCESS_ENVIRONMENT_CONDITIONS`); cardinal modifier branches; the inline
+  environment entity now also covers conditions read by process laws;
+  `environment_response_summary()` builds the per-condition law summary.
+  `screening/parameter_resolution.py` maps the cardinal role fields.
+- `screening/case_builder.py`: the homogeneous Michaelis-Menten assembler is
+  generalized to one enzyme-kinetics builder parameterized by process type and
+  parameter fields; a `ph_ionization_michaelis_menten` assembler is registered
+  (`scientific`/`toy`, ten required roles including the measured pH bounds);
+  every assembled config records `provenance.environment_response`.
+  `screening/culture_physiology.py` passes its process types to the
+  environment-entity builder.
+- `screening/ensemble.py`: `RegistryCaseEnsemble.environment_response`
+  (default empty) carries the assembled summary into result tables.
+- `api/result_tables.py`: `environment_effect_status` is
+  `active_response_model` when the assembled case binds a law; the policy
+  allows comparison, ranking and response plots only when every condition that
+  varies across the screened environments (temperature, pH, oxygen, water
+  activity) is covered; `environment_response_model` lists `condition:law`
+  pairs; new `environment_effect` and `ph_response` limitation rows; mechanism
+  texts for the pH law. `api/environment_grid.py` and
+  `api/virtual_experiment.py` no longer claim that grid values are inert; the
+  grid status is the status before assembly. The runtime-grid overlay no
+  longer copies condition-specific records whose only difference is the
+  environment (for example the three Gelain cellulose loadings): such a grid
+  case reports the role as missing and names the symbols under
+  `ambiguous_condition_specific_symbols` instead of silently taking one
+  condition's value.
+- Registry: `phanerochaete_chrysosporium_k3` fungus, five
+  `tsukada_2008_bgl1a_assay_30c_ph{4..8}` environments,
+  `phanerochaete_bgl1a_cellobiose_ph_ionization_mm` compatibility,
+  `phanerochaete_bgl1a_cellobiose_ph_ionization_template`, eight
+  `literature_processed` constants copied verbatim from SABIO-RK entry 38522
+  (k0, Km0, pKe1, pKe2, pKes1, pKes2, pH 4 and 8 bounds; raw export SHA-256 on
+  every record; deposited deviations in notes) and two `exploratory_prior`
+  loading assumptions (5 mM cellobiose, 1 micromolar enzyme). The
+  `beta_glucosidase` enzyme class lists the new process.
+- Two toy configs (`toy_ph_ionization_dissolved.yml`,
+  `toy_thermal_inactivation_dissolved.yml`); candidate review
+  `trichoderma_harzianum_cardinal_growth_review.yml` (status `proposed`, no
+  values); docs (`docs/environment-response.md`, capability map, virtual
+  experiment concepts, README, registry README, SABIO README), `CHANGELOG.md`,
+  roadmap and state-document status notes.
+
+Not changed: every existing registry parameter value, the T. harzianum
+template (its temperature and pH remain metadata), the SABIO-RK rice-enzyme
+case (still plain Michaelis-Menten, still `metadata_only` on grids), the
+curated SABIO-RK range files, the output schema version, validators,
+tolerances, solver settings, research models and frozen artifacts. The
+Arrhenius and Gaussian modifiers keep their equations and assumption texts.
+
+Tests added or modified:
+
+- `tests/test_cardinal_response_laws.py` (new, 6): CTMI and CPM closed forms,
+  bounds, Celsius input, rejections (ordering, sub-midpoint optimum, missing
+  source), modifier activity and constant kernels, a generic first-order
+  process wrapped by both cardinal modifiers with compiled parity and an
+  analytic solve, config-builder field checks.
+- `tests/test_ph_ionization_process.py` (new, 12): rate and effective
+  constants against a verbatim transcription of the deposited SABIO-RK
+  formula at five pH values, helper functions and pKa ordering, environment
+  and input fail-closed paths, out-of-range warning, compiled parity across
+  mixed units and product coefficients, compiled solve against an independent
+  `solve_ivp` integration, factory decisions, toy config.
+- `tests/test_thermal_inactivation_process.py` (new, 7): Arrhenius reference
+  form, fail-closed inputs, measured-range warning, compiled parity, analytic
+  exponential decay with closed ledger, factory decisions, toy config closed
+  form.
+- `tests/test_bgl1a_ph_response_case.py` (new, 6): registry constants equal
+  the raw export bit for bit and record its SHA-256 (`data/kinetic_records/**`
+  is now `-text` in `.gitattributes` so Windows checkouts keep the exact bytes,
+  as the other checksummed snapshots already do); modelability exploratory
+  modelable, scientific underparameterized on exactly the two assumptions, the
+  sibling SABIO case unchanged; the assembled case binds the law and records
+  `environment_response`; the public pH series reports `active_response_model`
+  with ranking allowed, pH 6 fastest and pH 8 slowest half-conversion, and the
+  pH 5 trajectory matches an independent integration of the deposited law; a
+  temperature-varying grid keeps the law but blocks ranking with a guardrail
+  naming temperature, a pH 9 grid warns, a pH-only grid allows ranking;
+  scientific mode is blocked.
+- `tests/test_organism_registry_case.py`: a runtime grid over T. harzianum
+  reports the initial loading as missing in both modes and names the
+  ambiguous symbol instead of selecting one of the three loadings.
+- `tests/test_process_factory_library.py`, `tests/test_compiled_process_models.py`,
+  `tests/test_sabiork_reaction_618_registry_case.py`,
+  `tests/test_dataset_candidate_review.py`: factory set, shipped
+  numeric-kernel set, enzyme-class process list and candidate-review listing
+  extended.
+
+Commands run and results:
+
+- `ruff check src tests scripts/run_*.py`: passed.
+- `pyright`: 0 errors.
+- `mkdocs build --strict`: passed.
+- Targeted: `pytest tests/test_cardinal_response_laws.py tests/test_thermal_inactivation_process.py tests/test_ph_ionization_process.py tests/test_bgl1a_ph_response_case.py`: 31 passed.
+- Registry/screening/API/config/guardrail subset (27 modules): 401 passed,
+  1 failed before the enzyme-class assertion in
+  `tests/test_sabiork_reaction_618_registry_case.py` was updated; that module
+  and the grid, API, organism and BGL1A modules (80 tests) re-ran green after
+  the overlay change.
+- Full `pytest` (SBML cross-engine module excluded as on CORE-001): 1772
+  passed, 12 failed in 13m40s (Python 3.11, scipy 1.17.1, libsbml 5.21.2).
+  Eleven failures are the pre-existing set recorded under CORE-001 (ten
+  SBML standards/BioModels tests under python-libsbml 5.21 and the Gelain
+  holdout replay drift); the twelfth was the candidate-review directory
+  listing, whose test was updated during the run and re-ran green (19
+  passed). All 32 added tests pass.
+- Public path timing: the five-condition exploratory BGL1A pH series,
+  tables and report complete in about 4 s.
+
+Scientific behavior impact: a registry case can now change its dynamics with
+pH through a sourced law, and the tables say exactly which condition acts
+through which law. For the BGL1A case the half-conversion time among the
+registry points is shortest at pH 6 and longest at pH 8, following the
+deposited pKa values; cases outside pH 4-8 run with a recorded validity
+warning. No existing case changes numerically: the T. harzianum and SABIO
+rice cases bind no law and keep identical trajectories and statuses.
+Deviation from the step-3 wording: the sourced binding is enzyme-level pH
+response, not organism-level growth response, and no temperature law is bound
+to any case.
+
+Backward compatibility: public APIs are additive, with one behavioural
+change: a runtime `EnvironmentGrid` over a case whose condition-specific
+records span several registry environments (only T. harzianum today) is now
+`underparameterized` instead of silently running with one condition's value.
+`RegistryCaseEnsemble`
+gains a defaulted field and a `to_dict` key; assembled configs gain
+`provenance.environment_response`; the `environment_response_model` column
+now carries `condition:law` pairs for active cases (previously the status
+string, which no shipped case produced); the environment-grid overlay
+provenance no longer carries an `environment_effect_status` key. The
+`compatible_processes` tuple of the `beta_glucosidase` enzyme class gains one
+entry.
+
+Remaining ambiguities and risk: moderate. The BGL1A loadings are assumptions,
+so absolute times are scenario values and only the pH ordering is sourced;
+the deposited deviations are recorded but not propagated (exact records).
+The cardinal and inactivation laws have no sourced binding, so grids over
+temperature for T. harzianum still report `metadata_only`. Varying-condition
+gating compares registry condition values literally (a kelvin and a Celsius
+record of the same temperature would count as varying).
+
+Recommended next task: with a network policy that allows publisher hosts,
+retrieve and archive the cardinal-growth candidate (and a thermal-stability
+source for the Gelain activity pools), fit the CTMI with a recorded artifact,
+author the records, and bind `temperature_cardinal_rosso` and
+`thermal_inactivation` in the T. harzianum template; then step 4
+(identifiability and Bayesian calibration on the compiled core).
+
 ## ORG-001 First Whole-Organism Registry Case
 
 Date: 2026-10-05

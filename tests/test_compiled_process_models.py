@@ -53,9 +53,11 @@ SHIPPED_PROCESS_TYPES = {
     "first_order_decay",
     "mass_action",
     "homogeneous_michaelis_menten",
+    "ph_ionization_michaelis_menten",
     "proportional_synthesis",
     "surface_catalysis",
     "substrate_transglycosylation",
+    "thermal_inactivation",
 }
 
 

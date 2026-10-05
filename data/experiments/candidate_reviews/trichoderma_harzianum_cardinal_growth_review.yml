@@ -1,0 +1,82 @@
+kind: dataset_candidate_review
+candidate_id: trichoderma_harzianum_cardinal_growth
+name: Trichoderma harzianum mycelial growth versus temperature (cardinal-temperature candidate)
+status: proposed
+dataset_maturity: literature_raw
+source:
+  type: literature
+  citation: >-
+    Domingues MVPF, de Moura KE, Salomao D, Elias LM (2016). Effect of temperature
+    on mycelial growth of Trichoderma, Sclerotinia minor and S. sclerotiorum, as
+    well as on mycoparasitism. Summa Phytopathologica 42(3):222-227.
+  doi: 10.1590/0100-5405/2146
+  url: https://www.scielo.br/j/sp/a/ZC7jqk5MYNpXxS6C7MkpS3R/?lang=en
+  authors:
+    - Manuel Victor Pessoni Fernandes Domingues
+    - Karina Elaine de Moura
+    - Denise Salomao
+    - Luciana Mecatti Elias
+  year: 2016
+  notes: >-
+    Citation, authors, year, journal and DOI were taken from web-search result
+    metadata (SciELO and ScienceOpen listings) during ENV-003 on 2026-10-05.
+    The full text was not retrieved: the session's network policy denied every
+    publisher host (scielo.br, doi.org, pmc.ncbi.nlm.nih.gov and others), so no
+    table, figure, isolate list, temperature set or growth value has been read
+    or transcribed. Other candidates surfaced by the same search and equally
+    unretrieved: Kredics et al. (2003) Food Technol Biotechnol 41:37-42 (Trichoderma
+    growth versus temperature, pH and water activity); an Indian Journal of
+    Plant Protection article on factors affecting mycoparasitism of Sclerotinia by
+    Trichoderma (https://epubs.icar.org.in/index.php/IPPJ/article/view/72494);
+    a Biodiversitas article on T. harzianum temperature and pH response
+    (https://journal.biotrop.org/index.php/biodivers/article/download/2098/756/8510).
+intended_use:
+  purpose: >-
+    Candidate source of radial or mycelial growth measurements of Trichoderma
+    harzianum isolates at several temperatures, to be fitted to the Rosso
+    cardinal temperature model (CTMI) that FungMod implements as the
+    temperature_cardinal_rosso modifier, yielding sourced minimum, optimum and
+    maximum cardinal temperatures for an organism-level temperature response.
+  measured_quantities:
+    - mycelial growth rate or colony diameter versus incubation temperature
+    - isolate identity and medium
+  model_targets:
+    - temperature_cardinal_rosso minimum_temperature, optimum_temperature, maximum_temperature
+  not_for:
+    - immediate data ingestion
+    - transfer of agar radial-growth cardinal values to submerged-culture kinetics without an explicit, labelled assumption
+    - the T. harzianum P49P11 strain of Gelain 2020 unless the isolate identity is matched or the transfer is declared
+    - enzyme thermal inactivation constants
+    - whole-fungus degradation claims
+schema_gate:
+  requires_literature_schema: true
+  requires_units: true
+  requires_uncertainty: true
+  requires_preprocessing: true
+  requires_no_real_data_in_review: true
+review:
+  selected_by: FungMod ENV-003 environment-response candidate search
+  review_date: 2026-10-05
+  schema_result: not_run
+  decision_notes: >-
+    Proposed only. The cardinal temperature and pH laws now exist in FungMod but
+    no shipped organism binds them because the repository holds no sourced
+    cardinal values. This candidate names a public open-access source that
+    reports Trichoderma mycelial growth at several temperatures; until its full
+    text is archived with a checksum and its values are extracted with units,
+    uncertainty and preprocessing records, no cardinal temperature may be
+    entered in the registry. Agar radial growth is not submerged-culture growth;
+    any transfer to the Gelain 2020 culture physiology must be an explicit,
+    maturity-labelled assumption rather than a silent reuse.
+  next_action: >-
+    Retrieve the full text (publisher access or a network policy that allows
+    scielo.br and doi.org), archive it under data/experiments/source_intake with
+    a SHA-256 manifest entry, identify the table or figure holding growth versus
+    temperature per isolate, extract the values with digitization or table
+    metadata, fit the CTMI with a recorded fit artifact, and author
+    literature_processed or calibrated parameter records for the three cardinal
+    temperatures with the measured temperature range as validity bounds.
+notes: >-
+  Candidate review only. This file contains no observations, growth values,
+  cardinal temperatures, CSV paths, extracted figure data, calibrated
+  parameters, or validation claims; the cited source has not been read.
