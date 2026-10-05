@@ -114,7 +114,7 @@ No model passed the screen, so no profiles were run and no holdout posteriors
 are planned. Stage B all-condition posteriors (adequacy R2, identifiability
 R3, coverage R4) follow for the three additions; M0 reuses BAYES-001.
 
-## Stage B results (recorded 2026-10-05, in progress)
+## Stage B results (recorded 2026-10-05)
 
 Each addition gets one all-condition posterior under the plan's sampler
 settings (24 walkers or twice the dimension, 8000 steps, 2000 burn-in, the
@@ -159,11 +159,29 @@ Outputs live in `results/stage_b/<model>/` (`bayesian_calibration.json`,
   dominated. Coverage 91 of 96 (cellulase 19 of 24). Outcome: **not
   supported (fails R1)**; its R3 pass is the one added parameter the data
   constrain among the three mechanisms.
-- `M3_conversion_dependent_accessibility`: running; recorded here when its
-  chain completes.
+- `M3_conversion_dependent_accessibility` (24 walkers, 11 coordinates):
+  **not converged**, verdicts **provisional**. Autocorrelation times 232 to
+  371 steps against 6000 post-burn-in steps, effective sample sizes 388 to
+  620, mean acceptance 0.290, 42 minutes of wall-clock. R2 fails: the
+  multiplier's interval is [1.94, 2.62] (median 2.24), the baseline's value.
+  R3 fails: the accessibility exponent `n` is bounded above only (median
+  0.13, interval [0.053, 0.46] against a prior of [0.05, 3]); the data push
+  it towards the lower bound where the baseline is recovered. The common
+  constants keep the baseline's classes (`k_h`, `Y`, `kd`, `qF`, `qB`
+  identified; `Kh` weakly identified; `K_ind`, `kF`, `kB` bounded above
+  only). Coverage 91 of 96. Outcome: **not supported (fails R1)**.
 - `M0_baseline`: BAYES-001's frozen chain (converged; five constants
   identified, four bounded on one side; multiplier 2.25).
 
+Summary across the three additions: none passes R1; none restores adequacy
+under R2 (every multiplier interval excludes 1.0 and overlaps the
+baseline's 2.25); only M1's memory constant is weakly identified under R3,
+while M2's four added constants and M3's exponent are not. None of the three
+chains meets the convergence rule at the planned 8000 steps (the largest
+autocorrelation times are 340 to 529 steps against 6000 post-burn-in
+steps), so every stage B verdict is provisional as the plan requires;
+longer chains would need a dated amendment and more than the plan's
+two-hour compute cap per chain.
 A posterior-study bug surfaced on M1: the sampler supplies only the fitted
 symbols, and the variant factory dropped M1's fixed constant `k_z`, so every
 starting walker had a non-finite posterior. The factory now merges the

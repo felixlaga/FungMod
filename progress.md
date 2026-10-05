@@ -123,13 +123,18 @@ Results (stage A, recorded 2026-10-05, plan digest `9bb36f8d53d8...`):
 Next task: finish stage B within the compute cap, record identifiability and
 coverage for each addition, and carry the verdicts into the paper plan.
 
-## CRIT-002 Gelain Model-Criticism Study: Stage B Posteriors (M2 And M1 Recorded)
+## CRIT-002 Gelain Model-Criticism Study: Stage B Posteriors Recorded
 
 Date: 2026-10-05
 
-Status: partial. The M2 and M1 all-condition posteriors are recorded under
-the frozen plan (digest `6849c8b3...`); the M3 chain is running; M0 reuses
-BAYES-001. Two code defects found while recording are fixed and tested.
+Status: complete for stage B under the plan's compute cap. The M2, M1 and
+M3 all-condition posteriors are recorded under the frozen plan (digest
+`6849c8b3...`); M0 reuses BAYES-001. None of the three chains meets the
+convergence rule at the planned length, so every stage B verdict is
+provisional as the plan requires. Two code defects found while recording
+are fixed and tested. Step 5 item 2's gate (frozen plan, per-mechanism
+identifiability table, failed candidates reported) is met with that
+provisional label.
 
 Changed:
 
@@ -176,13 +181,28 @@ dominated. Coverage 91/96 (cellulase 19/24). Outcome: not supported (fails
 R1). The chain's report was re-rendered after the renderer fix; the
 sampler and analysis outputs are those of the single run.
 
+M3 result (`results/stage_b/M3_conversion_dependent_accessibility/`, 24
+walkers, 8000 steps, 42 min wall-clock): not converged (tau 232 to 371 with
+6000 post-burn-in steps; ESS 388 to 620; mean acceptance 0.290), verdicts
+provisional. R2 fails (multiplier median 2.24, interval [1.94, 2.62]). R3
+fails: `n` bounded above only (median 0.13, interval [0.053, 0.46], prior
+[0.05, 3]). Common constants keep the baseline's classes. Coverage 91/96.
+Outcome: not supported (fails R1).
+
+Across the additions: none passes R1, none restores adequacy under R2, and
+only M1's `kz_loss` is (weakly) identified under R3. The hydrolysis
+candidate's biomass/cellulose misfit is not explained by an induction
+memory, a soluble product pool with inhibition, or conversion-dependent
+accessibility as declared.
+
 Commands: `ruff check` passed; `pyright` 0 errors; criticism tests (see the
 PR). Scientific impact: the soluble-pool mechanism neither restores adequacy
 nor is identified by the duplicate means; nothing is promoted. Backward
 compatibility: `write_posterior_outputs` writes one more file. Risk: low.
 
-Recommended next task: record M3 when its chain completes, then tighten
-the stage A optimiser under an amendment (PETAB-001 finding).
+Recommended next task: tighten the stage A optimiser under a dated
+amendment (PETAB-001 finding) and re-run stage A; chains longer than the
+planned 8000 steps would need a second amendment and more than the 2 h cap.
 
 ## CI-001 Cross-Platform Quality-Gate Repair
 

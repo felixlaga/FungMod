@@ -35,7 +35,9 @@ independent and validates no biology.
   bounded below only); outcome not supported (fails R1). M1 recorded
   2026-10-05: not converged, provisional; R2 fails (multiplier [1.87, 2.53]),
   R3 passes (`kz_loss` weakly identified); outcome not supported (fails R1).
-  M3 follows.
+  M3 recorded 2026-10-05: not converged, provisional; R2 fails (multiplier
+  [1.94, 2.62]), R3 fails (`n` bounded above only); outcome not supported
+  (fails R1). M0 reuses BAYES-001.
 
 What exists today for each model: M0 is the registry case; M1 and M2 are
 compositions of existing generic processes (proportional synthesis, first
