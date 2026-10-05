@@ -93,7 +93,7 @@ def prepare(directory: Path, *, check: bool) -> dict:
     if check:
         if (directory / "observations.json").read_bytes() != output:
             raise ValueError("Frozen observation extract does not match the preserved primary XML.")
-        manifest = json.loads((directory / "manifest.json").read_text())
+        manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
         for entry in manifest["files"]:
             content = (directory / entry["path"]).read_bytes()
             if len(content) != entry["bytes"] or hashlib.sha256(content).hexdigest() != entry["sha256"]:

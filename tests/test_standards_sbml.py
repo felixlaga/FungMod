@@ -26,6 +26,7 @@ from fungal_model.standards import (
     to_sbml,
     write_sbml,
 )
+from fungal_model.standards.cross_engine import compile_kinetic_formula
 
 
 def _parameter(symbol: str, value: float, units: str) -> Parameter:
@@ -239,3 +240,38 @@ def test_export_preserves_mass_action_with_different_species_units():
         times=Q_(np.linspace(0, 60, 21), 'second'),
     )
     assert comparison.agrees(atol=1e-4), comparison.max_absolute_difference
+
+
+def test_reference_formula_compiler_covers_the_emitted_grammar() -> None:
+    symbols = {"k", "A", "Km", "S"}
+    rate = compile_kinetic_formula("-(k * A) / (Km + S) + 2 * S^2 - pow(S, 3) / 4e-1 - -S^-1", symbols)
+    environment = {"k": 0.5, "A": 3.0, "Km": 0.25, "S": 2.0}
+    expected = -(0.5 * 3.0) / (0.25 + 2.0) + 2 * 2.0**2 - 2.0**3 / 0.4 - -(2.0**-1)
+    assert rate(environment) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("formula", "message"),
+    [
+        ("exp(S)", "unsupported operation"),
+        ("k * B", "Unknown symbol 'B'"),
+        ("k * (S", "unsupported operation"),
+        ("k S", "unsupported operation"),
+        ("", "unsupported operation"),
+    ],
+)
+def test_reference_formula_compiler_rejects_what_fungmod_never_emits(formula: str, message: str) -> None:
+    with pytest.raises(SbmlExportError, match=message):
+        compile_kinetic_formula(formula, {"k", "S"})
+
+
+def test_cross_engine_check_survives_libsedml_proxy_registration() -> None:
+    # Importing libsedml re-registers the SWIG proxies shared with libsbml, so
+    # kinetic-law AST nodes stop matching libsbml's AST_* constants. The reference
+    # simulator therefore works from formula text and must keep agreeing here.
+    pytest.importorskip("libsedml", reason="requires the optional 'standards' extra")
+    model, initial_state = ALL_BUILDERS["mm_enzyme"]()
+    comparison = cross_engine_trajectory_check(
+        model, initial_state=initial_state, times=Q_(np.linspace(0.0, 120.0, 41), "second")
+    )
+    assert comparison.agrees(atol=1e-5), comparison.max_absolute_difference
