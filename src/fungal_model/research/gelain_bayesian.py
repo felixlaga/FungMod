@@ -399,7 +399,7 @@ def write_study_outputs(study: StudyProblem, result: BayesianCalibrationResult, 
     paths = result.save(output_dir, thin=int(plan["thin"]))
     inputs = {
         "plan": plan,
-        "plan_path": str(study.plan_path),
+        "plan_path": study.plan_path.as_posix(),
         "plan_sha256": _digest(root / study.plan_path),
         "observations_sha256": _digest(root / OBSERVATIONS_PATH),
         "v2_plan_sha256": _digest(root / V2_PLAN_PATH),
