@@ -21,6 +21,10 @@ from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 
 RateKernel = Callable[[float, np.ndarray], float]
+#: Gradient of a process rate with respect to the numeric state vector: an
+#: array with one entry per model state, in the process's rate units per
+#: state unit, evaluated at the same (projected) state as the rate kernel.
+JacobianKernel = Callable[[float, np.ndarray], np.ndarray]
 """Rate in the owner's rate units at time ``t`` for the numeric state vector ``y``."""
 
 
@@ -74,4 +78,4 @@ class KernelContext:
         return magnitude_in(self.parameters.require_quantity(symbol, units), units, name=symbol)
 
 
-__all__ = ["KernelContext", "RateKernel", "conversion_factor", "magnitude_in"]
+__all__ = ["JacobianKernel", "KernelContext", "RateKernel", "conversion_factor", "magnitude_in"]

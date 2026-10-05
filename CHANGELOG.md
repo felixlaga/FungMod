@@ -6,6 +6,16 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- The compiled process core assembles a Jacobian (`CompiledModel.jacobian`)
+  from per-process gradient kernels: analytic through the new
+  `Process.compile_jacobian` for `first_order_decay`, `mass_action`,
+  `homogeneous_michaelis_menten`, `proportional_synthesis`, the three
+  resource-limited closure processes and the two exchanges; central finite
+  differences of the process's own rate kernel otherwise, with every kind
+  recorded in the kernel summary (`jacobian_kernels`,
+  `analytic_jacobian_count`). `SolverSettings(jacobian="compiled")` hands it
+  to the implicit methods; the default (`finite_difference_by_backend`) and
+  every recorded result are unchanged.
 - The software paper's figures (`paper/figures/`): `fungal_model.research.paper_figures`
   draws the cellulose holdouts, the posterior predictive bands, the stage A
   screen and the cross-solver objectives from the recorded results, writes

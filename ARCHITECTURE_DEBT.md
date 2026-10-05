@@ -115,7 +115,12 @@ classes' compiled path is tested against their native path.
 Exit condition: `Reaction` rate laws and the physiology classes are expressed
 as processes (or builders) that emit the compiled representation; the spatial
 engines apply compiled kernels per cell with vectorized diffusion; the legacy
-`SimulationEngine` is retired; compiled models can supply a Jacobian.
+`SimulationEngine` is retired; compiled models can supply a Jacobian (met,
+opt-in, CORE-002: `CompiledModel.jacobian` from per-process gradients,
+analytic for the simple laws and the closure, finite differences otherwise,
+every kind recorded; the default stays the backend's differences so recorded
+results do not move, which is also why the culture classes keep their native
+path for now).
 
 Removal milestone: completion of step 1 in
 `foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`; step 2

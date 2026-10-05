@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from fungal_model.chemistry.thermodynamics import DynamicThermodynamicConstraint
-from fungal_model.core.kernels import KernelContext, RateKernel
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.units import Q_, Quantity, assert_compatible
 
 if TYPE_CHECKING:
@@ -45,6 +45,14 @@ NUMERIC_KERNEL_KINDS = frozenset({KERNEL_NUMERIC, KERNEL_NUMERIC_THERMODYNAMIC})
 WRAPPED_KERNEL_KINDS = frozenset({KERNEL_QUANTITY_WRAPPED, KERNEL_QUANTITY_WRAPPED_THERMODYNAMIC})
 STOICHIOMETRY_PROBE_VALUES = (0.0, 1.0, 2.0)
 MODEL_REPRESENTATION = "compiled_stoichiometric_rhs"
+JACOBIAN_ANALYTIC = "analytic"
+JACOBIAN_FINITE_DIFFERENCE = "finite_difference"
+JACOBIAN_BY_BACKEND = "finite_difference_by_backend"
+JACOBIAN_COMPILED_LABEL = "compiled_process_gradients"
+# Relative step of the central finite differences that stand in for a missing
+# analytic gradient; the absolute step never drops below the relative step
+# itself, so states near zero are perturbed by at least that much.
+FINITE_DIFFERENCE_RELATIVE_STEP = 1e-6
 # Constitutive rate laws are defined on the non-negative orthant. Solver trial
 # iterates can step slightly outside it near depletion, so rates are evaluated
 # at the projection ``max(state, 0)`` (Shampine, Thompson, Kierzenka and Byrne,
@@ -76,7 +84,7 @@ def resolve_state_units(model: AssembledModel) -> dict[str, str]:
 
 @dataclass(frozen=True)
 class CompiledProcess:
-    """One process of a compiled model: its kernel and its stoichiometric column."""
+    """One process of a compiled model: its kernel, its gradient and its stoichiometric column."""
 
     name: str
     process_type: str
@@ -86,6 +94,8 @@ class CompiledProcess:
     stoichiometry: np.ndarray
     process: Any
     constraint: DynamicThermodynamicConstraint | None = None
+    gradient: JacobianKernel | None = None
+    jacobian_kind: str = JACOBIAN_FINITE_DIFFERENCE
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -141,6 +151,25 @@ class CompiledModel:
             derivative += column * process.rate(time, evaluation_state)
         return derivative
 
+    def jacobian(self, time: float, state: np.ndarray) -> np.ndarray:
+        """``d(dy/dt)/dy`` as a dense matrix, assembled as ``N diag-free sum of column x gradient``.
+
+        Each process gradient is evaluated at ``max(state, 0)`` like the rate
+        and multiplied by the derivative of that projection (zero where the
+        state is negative), so the matrix is the exact derivative of
+        :meth:`rhs` wherever :meth:`rhs` is differentiable.
+        """
+
+        evaluation_state = evaluation_state_for_rates(state)
+        mask = (np.asarray(state, dtype=float) >= 0.0).astype(float)
+        matrix = np.zeros((len(self.state_names), len(self.state_names)), dtype=float)
+        for process, column in zip(self.processes, self._columns, strict=True):
+            if process.gradient is None:
+                raise ValueError(f"Process {process.name!r} has no gradient kernel.")
+            gradient = np.asarray(process.gradient(time, evaluation_state), dtype=float) * mask
+            matrix += np.outer(column, gradient)
+        return matrix
+
     def quantity_state(self, state: np.ndarray) -> dict[str, Quantity]:
         """Reconstruct a unit-bearing state mapping from a numeric vector."""
 
@@ -166,6 +195,7 @@ class CompiledModel:
         """Inspectable record of how every process is evaluated."""
 
         kinds = {process.name: process.kernel_kind for process in self.processes}
+        jacobian_kinds = {process.name: process.jacobian_kind for process in self.processes}
         return {
             "representation": MODEL_REPRESENTATION,
             "state_count": len(self.state_names),
@@ -175,7 +205,9 @@ class CompiledModel:
             "quantity_wrapped_kernel_count": sum(kind in WRAPPED_KERNEL_KINDS for kind in kinds.values()),
             "unit_resolution": "build_time",
             "stoichiometry_probe": "contributions_linear_in_rate",
-            "jacobian": "finite_difference_by_backend",
+            "jacobian": JACOBIAN_BY_BACKEND,
+            "jacobian_kernels": jacobian_kinds,
+            "analytic_jacobian_count": sum(kind == JACOBIAN_ANALYTIC for kind in jacobian_kinds.values()),
             "negative_state_policy": NEGATIVE_STATE_POLICY,
         }
 
@@ -215,6 +247,7 @@ def compile_assembled_model(
         column = _stoichiometry_column(process, rate_units=rate_units, context=context)
         constraint = constraints.get(process.name)
         kernel, kind = _rate_kernel(process, context, rate_units=rate_units, constraint=constraint)
+        gradient, jacobian_kind = _gradient_kernel(process, context, rate_kernel=kernel, kernel_kind=kind)
         compiled.append(
             CompiledProcess(
                 name=process.name,
@@ -225,6 +258,8 @@ def compile_assembled_model(
                 stoichiometry=column,
                 process=process,
                 constraint=constraint,
+                gradient=gradient,
+                jacobian_kind=jacobian_kind,
             )
         )
         columns.append(column)
@@ -345,6 +380,60 @@ def _wrapped_kernel(
     return kernel
 
 
+def _gradient_kernel(
+    process: Any,
+    context: KernelContext,
+    *,
+    rate_kernel: RateKernel,
+    kernel_kind: str,
+) -> tuple[JacobianKernel, str]:
+    """The process's analytic gradient when it offers one and nothing blocks it; central differences otherwise.
+
+    A thermodynamically constrained or quantity-wrapped rate is differentiated
+    numerically, because the blocking test is not differentiable and a wrapped
+    rate has no kernel to differentiate analytically.
+    """
+
+    if kernel_kind == KERNEL_NUMERIC:
+        compile_jacobian = getattr(process, "compile_jacobian", None)
+        analytic = None if compile_jacobian is None else compile_jacobian(context)
+        if analytic is not None:
+            return analytic, JACOBIAN_ANALYTIC
+    indices = sorted({context.state_index[spec.name] for spec in process.state_variables if spec.name in context.state_index})
+    return _finite_difference_gradient(rate_kernel, indices, len(context.state_index)), JACOBIAN_FINITE_DIFFERENCE
+
+
+def _finite_difference_gradient(rate_kernel: RateKernel, indices: list[int], size: int) -> JacobianKernel:
+    """Central differences of ``rate_kernel`` over ``indices``; one-sided at the non-negative boundary."""
+
+    relative_step = FINITE_DIFFERENCE_RELATIVE_STEP
+
+    def gradient(time: float, state: np.ndarray) -> np.ndarray:
+        result = np.zeros(size, dtype=float)
+        work = np.array(state, dtype=float)
+        for index in indices:
+            value = work[index]
+            step = relative_step * max(abs(value), 1.0)
+            lower = value - step
+            if lower < 0.0:
+                # Keep both evaluations in the non-negative orthant the rate is defined on.
+                work[index] = value + step
+                upper_rate = rate_kernel(time, work)
+                work[index] = value
+                base_rate = rate_kernel(time, work)
+                result[index] = (upper_rate - base_rate) / step
+            else:
+                work[index] = value + step
+                upper_rate = rate_kernel(time, work)
+                work[index] = lower
+                lower_rate = rate_kernel(time, work)
+                work[index] = value
+                result[index] = (upper_rate - lower_rate) / (2.0 * step)
+        return result
+
+    return gradient
+
+
 def _blocking_kernel(numeric: RateKernel, feasible: Callable[[np.ndarray], bool]) -> RateKernel:
     """Apply ``block_unfavorable_forward_rate`` semantics to a numeric kernel."""
 
@@ -360,6 +449,11 @@ def _blocking_kernel(numeric: RateKernel, feasible: Callable[[np.ndarray], bool]
 
 
 __all__ = [
+    "FINITE_DIFFERENCE_RELATIVE_STEP",
+    "JACOBIAN_ANALYTIC",
+    "JACOBIAN_BY_BACKEND",
+    "JACOBIAN_COMPILED_LABEL",
+    "JACOBIAN_FINITE_DIFFERENCE",
     "NEGATIVE_STATE_POLICY",
     "evaluation_state_for_rates",
     "KERNEL_NUMERIC",

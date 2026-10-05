@@ -36,7 +36,7 @@ from typing import Any, cast
 import numpy as np
 
 from fungal_model.core.assumptions import Assumption
-from fungal_model.core.kernels import KernelContext, RateKernel
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.processes.base import (
@@ -143,6 +143,31 @@ class ClosureConstants:
 
     def maintenance(self, substrate: float, oxidant: float) -> float:
         return min(self.maintenance_demand, self.capacity(substrate, oxidant))
+
+    def capacity_gradient(self, substrate: float, oxidant: float) -> tuple[float, float]:
+        """``d(capacity)/d(substrate)`` and ``d(capacity)/d(oxidant)``."""
+
+        return (
+            self.uptake_capacity * self.substrate_half_saturation / (self.substrate_half_saturation + substrate) ** 2
+            * oxidant / (self.oxidant_half_saturation + oxidant),
+            self.uptake_capacity * substrate / (self.substrate_half_saturation + substrate)
+            * self.oxidant_half_saturation / (self.oxidant_half_saturation + oxidant) ** 2,
+        )
+
+    def budget_gradient(self, substrate: float, nutrient: float, oxidant: float, biomass: float) -> tuple[float, float, float, float]:
+        """Gradient of ``max(capacity - m, 0) N/(K_N+N) X`` with respect to (S, X, N, O); zero below the demand (the closure's kink)."""
+
+        budget = self.capacity(substrate, oxidant) - self.maintenance_demand
+        if budget <= 0.0:
+            return (0.0, 0.0, 0.0, 0.0)
+        limitation = nutrient / (self.nutrient_half_saturation + nutrient)
+        d_substrate, d_oxidant = self.capacity_gradient(substrate, oxidant)
+        return (
+            d_substrate * limitation * biomass,
+            budget * limitation,
+            budget * self.nutrient_half_saturation / (self.nutrient_half_saturation + nutrient) ** 2 * biomass,
+            d_oxidant * limitation * biomass,
+        )
 
 
 @dataclass(frozen=True, init=False)
@@ -400,6 +425,26 @@ class ResourceLimitedGrowthProcess(_ClosureProcess):
 
         return kernel
 
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        constants, slots = self._compiled_closure(context)
+        share = (1.0 - self._fraction(context.parameters)) * constants.true_yield
+        (s_index, s_scale), (x_index, x_scale), (n_index, n_scale), (o_index, o_scale) = slots
+        size = len(context.state_index)
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            d_s, d_x, d_n, d_o = constants.budget_gradient(
+                state[s_index] * s_scale, state[n_index] * n_scale, state[o_index] * o_scale, state[x_index] * x_scale
+            )
+            result = np.zeros(size, dtype=float)
+            result[s_index] = share * d_s * s_scale
+            result[x_index] = share * d_x * x_scale
+            result[n_index] = share * d_n * n_scale
+            result[o_index] = share * d_o * o_scale
+            return result
+
+        return gradient
+
     def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data["allocation_fraction_symbol"] = self.allocation_fraction_symbol
@@ -470,6 +515,28 @@ class ResourceLimitedMaintenanceProcess(_ClosureProcess):
             return constants.maintenance(state[s_index] * s_scale, state[o_index] * o_scale) * (state[x_index] * x_scale)
 
         return kernel
+
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        constants, slots = self._compiled_closure(context)
+        (s_index, s_scale), (x_index, x_scale), _, (o_index, o_scale) = slots
+        size = len(context.state_index)
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            substrate, biomass, oxidant = state[s_index] * s_scale, state[x_index] * x_scale, state[o_index] * o_scale
+            capacity = constants.capacity(substrate, oxidant)
+            result = np.zeros(size, dtype=float)
+            if capacity < constants.maintenance_demand:
+                d_substrate, d_oxidant = constants.capacity_gradient(substrate, oxidant)
+                result[s_index] = d_substrate * biomass * s_scale
+                result[o_index] = d_oxidant * biomass * o_scale
+                result[x_index] = capacity * x_scale
+            else:
+                result[x_index] = constants.maintenance_demand * x_scale
+            return result
+
+        return gradient
 
 
 @dataclass(frozen=True, init=False)
@@ -569,6 +636,27 @@ class CostedSecretionProcess(_ClosureProcess):
 
         return kernel
 
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        constants, slots = self._compiled_closure(context)
+        fraction, secretion_yield = self._allocation(context.parameters)
+        scale = fraction * secretion_yield
+        (s_index, s_scale), (x_index, x_scale), (n_index, n_scale), (o_index, o_scale) = slots
+        size = len(context.state_index)
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            d_s, d_x, d_n, d_o = constants.budget_gradient(
+                state[s_index] * s_scale, state[n_index] * n_scale, state[o_index] * o_scale, state[x_index] * x_scale
+            )
+            result = np.zeros(size, dtype=float)
+            result[s_index] = scale * d_s * s_scale
+            result[x_index] = scale * d_x * x_scale
+            result[n_index] = scale * d_n * n_scale
+            result[o_index] = scale * d_o * o_scale
+            return result
+
+        return gradient
+
     def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data.update({"allocation_fraction_symbol": self.allocation_fraction_symbol, "secretion_yield_symbol": self.secretion_yield_symbol})
@@ -658,6 +746,20 @@ class _ExchangeProcess(Process):
             return coefficient * (target - state[index] * scale)
 
         return kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        index, scale = context.state_slot(self.pool_state, self.concentration_units)
+        coefficient, _ = self._constants(context.parameters)
+        size = len(context.state_index)
+        derivative = -coefficient * scale
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time, state
+            result = np.zeros(size, dtype=float)
+            result[index] = derivative
+            return result
+
+        return gradient
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
