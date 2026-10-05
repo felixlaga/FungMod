@@ -67,7 +67,7 @@
   },
   "sampler": {
     "n_walkers": 24,
-    "n_steps": 20000,
+    "n_steps": 24000,
     "burn_in": 4000,
     "seed": 20261005,
     "stretch_scale": 2.0,
