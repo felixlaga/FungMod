@@ -31,6 +31,19 @@ The current PR queue and reconciled scoped phase status are tracked in
 
 # Current project status
 
+2026-10-05 (decision): step 5 of the state assessment is redefined as a
+software and methods paper on published data. No wet-lab experiments are
+planned because no laboratory is available. The order is: green CI and a
+merged PR chain, model criticism on Gelain 2020, cross-study transfer from the
+literature (survey in `foundation_progress/TRANSFER_DATASET_SURVEY_2026-10-05.md`:
+no raw deposit beyond Gelain 2020 was found and every candidate is a figure
+digitization), PEtab cross-solver reproduction, unification of the three
+whole-fungus classes, then a reproducibility package and preprint. Modelling
+all fungi remains the long-term goal and is measured in validated cases. The
+phrase "a preregistered wet-lab prediction" in the 2026-10-04 sequence below is
+superseded by this decision; see
+`foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md` step 5.
+
 2026-10-05 (later still): BAYES-001 adds posterior sampling on the compiled
 core. Explicit priors, explicit Gaussian error models with an estimated noise
 multiplier, the Goodman-Weare ensemble sampler, autocorrelation diagnostics,
