@@ -14,7 +14,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "data/benchmarks/gelain_2020_criticism/plan.json"
-FROZEN_SHA256 = "9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e"
+FROZEN_SHA256 = "6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86"
 COMMON_SYMBOLS = {"k_h", "Kh", "Y", "kd", "K_ind", "qF", "kF", "qB", "kB"}
 EXPECTED_PARAMETER_COUNTS = {
     "M0_baseline": 9,
@@ -35,20 +35,24 @@ def test_plan_digest_is_the_frozen_one() -> None:
 
 def test_plan_is_frozen_and_its_amendment_log_is_dated(plan) -> None:
     assert plan["status"].startswith("plan frozen")
-    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [("2026-10-05", "8b368ac8")]
+    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [("2026-10-05", "8b368ac8"), ("2026-10-05", "9bb36f8d")]
+    assert "walkers_rule" in plan["stage_B_posterior"]["sampler"]
     assert "error_model_fields" in plan["shared_structure"]
 
 
-def test_recorded_results_cite_the_frozen_plan_digest() -> None:
+def test_recorded_results_cite_a_digest_in_the_plan_amendment_chain(plan) -> None:
+    """A result cites the plan version it ran under: the current digest or one the amendment log records."""
+
     results = PLAN_PATH.parent / "results"
     if not results.exists():
         pytest.skip("no results recorded under the plan yet")
+    chain = {FROZEN_SHA256, *(entry["previous_sha256"] for entry in plan["amendments"])}
     for inputs_path in sorted(results.rglob("inputs.json")):
         inputs = json.loads(inputs_path.read_text(encoding="utf-8"))
-        assert inputs["plan_sha256"] == FROZEN_SHA256, inputs_path
+        assert inputs["plan_sha256"] in chain, inputs_path
     for frozen_path in sorted(results.rglob("frozen_predictions/*.json")):
         frozen = json.loads(frozen_path.read_text(encoding="utf-8"))
-        assert frozen["plan_sha256"] == FROZEN_SHA256, frozen_path
+        assert frozen["plan_sha256"] in chain, frozen_path
 
 
 def test_plan_data_digests_match_the_frozen_sources(plan) -> None:

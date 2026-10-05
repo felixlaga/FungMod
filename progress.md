@@ -49,6 +49,9 @@ Changed:
   the BAYES-001 identifiability thresholds and posterior predictive coverage,
   decision rules R1 to R4, a four-word outcome vocabulary, excluded claims and
   an amendment rule.
+  Amendment 2 (same day, after stage A was recorded and before any chain ran):
+  the walker rule of at least two walkers per sampled dimension, so M2 samples
+  with 28 walkers; previous digest `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e`.
   Amendment 1 (same day, before any run): machine-readable error-model fields
   and config symbols; previous digest `8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e`.
 - `data/benchmarks/gelain_2020_criticism/README.md`: what the plan is and is

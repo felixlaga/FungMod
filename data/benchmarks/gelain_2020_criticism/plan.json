@@ -486,7 +486,8 @@
       "stretch_scale": 2.0,
       "seed": 20261006,
       "initial_spread_fraction_of_prior_width": 0.05,
-      "initial_center": "stage A all-condition fit"
+      "initial_center": "stage A all-condition fit",
+      "walkers_rule": "24 walkers, or twice the sampled dimension (parameters plus the noise multiplier) rounded up to an even number when that is larger, because the affine-invariant move needs at least two walkers per dimension; M2 therefore samples with 28 walkers"
     },
     "convergence_rule": "every autocorrelation time reliable (chain > 50 tau) and every ESS >= 100; a chain that misses it is reported as not converged and its verdicts are labelled provisional",
     "identifiability": {
@@ -543,6 +544,11 @@
       "date": "2026-10-05",
       "previous_sha256": "8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e",
       "reason": "Machine-readable fields added for the study runner before anything was run: shared_structure.error_model_fields (relative SD 0.1 of the per-observable maximum over the three loadings, rho(biomass, substrate) = -0.5, evidence assumed, one shared log-uniform noise multiplier in [0.1, 10] labelled all_observables) and a config_symbol for every parameter (existing registry symbols gelain_hydrolysis_* for the nine common constants, gelain_criticism_* for additions). The numbers duplicate the prose; no model, bound, rule or setting changed."
+    },
+    {
+      "date": "2026-10-05",
+      "previous_sha256": "9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e",
+      "reason": "stage_B_posterior.sampler.walkers_rule added after stage A was recorded and before any stage B chain ran: M2 has 13 parameters plus the shared noise multiplier, and the ensemble sampler refuses fewer than two walkers per dimension, so its chain uses 28 walkers; the other models keep 24. The stage A results cite the previous digest, which this entry records. No model, bound, rule or other setting changed."
     }
   ],
   "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason, recorded before the affected fit is run; the ledger records the file's sha256 at freezing and after each amendment"

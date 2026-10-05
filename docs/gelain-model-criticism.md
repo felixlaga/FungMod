@@ -13,7 +13,7 @@ independent and validates no biology.
 ## The frozen plan
 
 `data/benchmarks/gelain_2020_criticism/plan.json` (SHA-256
-`9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e`) declares
+`6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86`) declares
 everything before any fit: the data digests, four models with every parameter's
 bounds, units and role, the shared assumed error model with one sampled noise
 multiplier, the two stages, the decision rules, the outcome vocabulary, the
@@ -62,7 +62,7 @@ improves fit but unidentified, not supported, or not run with its reason.
 
 ## Stage A results (recorded 2026-10-05)
 
-Plan digest `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e`; five starts and 250 evaluations per start; every
+Plan digest `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e` (the version before amendment 2, which only added the walker rule); five starts and 250 evaluations per start; every
 fold trains on two loadings and predicts the third; held-out predictions were
 frozen with the plan digest before scoring
 (`data/benchmarks/gelain_2020_criticism/results/stage_a/`).

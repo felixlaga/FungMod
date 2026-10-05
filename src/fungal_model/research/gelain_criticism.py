@@ -881,11 +881,19 @@ class PosteriorStudy:
     center: dict[str, float]
 
 
-def sampler_settings(plan: Mapping[str, Any], *, n_steps: int | None = None, burn_in: int | None = None, n_walkers: int | None = None) -> SamplerSettings:
+def sampler_settings(
+    plan: Mapping[str, Any], *, dimension: int, n_steps: int | None = None, burn_in: int | None = None, n_walkers: int | None = None
+) -> SamplerSettings:
+    """Planned sampler settings; the walker count follows the plan's rule of at least two per dimension."""
+
     spec = dict(plan["stage_B_posterior"]["sampler"])
     criteria = plan["stage_B_posterior"]["identifiability"]
+    planned = int(spec["walkers"])
+    minimum = 2 * int(dimension)
+    minimum += minimum % 2
+    walkers = int(n_walkers) if n_walkers is not None else max(planned, minimum)
     return SamplerSettings(
-        n_walkers=int(n_walkers if n_walkers is not None else spec["walkers"]),
+        n_walkers=walkers,
         n_steps=int(n_steps if n_steps is not None else spec["steps"]),
         burn_in=int(burn_in if burn_in is not None else spec["burn_in"]),
         seed=int(spec["seed"]),
@@ -951,7 +959,8 @@ def build_posterior_study(
     )
     full_center = dict(config_center)
     full_center[f"noise_scale:{noise['label']}"] = 1.0
-    return PosteriorStudy(model_id, plan, predictor, problem, sampler_settings(plan, n_steps=n_steps, burn_in=burn_in, n_walkers=n_walkers), full_center)
+    settings = sampler_settings(plan, dimension=problem.dimension, n_steps=n_steps, burn_in=burn_in, n_walkers=n_walkers)
+    return PosteriorStudy(model_id, plan, predictor, problem, settings, full_center)
 
 
 CHECKPOINT_NAME = gelain_bayesian.CHECKPOINT_NAME

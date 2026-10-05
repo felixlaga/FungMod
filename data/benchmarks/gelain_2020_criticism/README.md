@@ -16,9 +16,10 @@ independent and validates no biology.
   whole-condition holdouts, complexity screen, profiles), stage B (posterior
   sampling, identifiability, posterior predictive coverage), the decision rules
   R1 to R4, the outcome vocabulary, the claims excluded and the amendment rule.
-  Frozen on 2026-10-05 with SHA-256 `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e`;
+  Frozen on 2026-10-05 with SHA-256 `6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86`;
   `tests/test_gelain_criticism_plan.py` pins it.
-- `results/stage_a/`: recorded 2026-10-05 under the plan digest above
+- `results/stage_a/`: recorded 2026-10-05 under the previous plan digest
+  (amendment 2 added only the walker rule afterwards)
   (`inputs.json`, per-model `full_fit_*.json`, `folds_*.json`, frozen held-out
   predictions, `comparison.json`, `report.md`). Outcome: no addition passes the
   R1 screen; M1 and M3 are not supported; M2 improves pooled held-out error by
