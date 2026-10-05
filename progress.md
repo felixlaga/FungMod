@@ -160,8 +160,13 @@ Commands run and results:
   `tests/test_sabiork_reaction_618_registry_case.py` was updated; that module
   and the grid, API, organism and BGL1A modules (80 tests) re-ran green after
   the overlay change.
-- Full `pytest`: running at commit time; the result is recorded in the
-  follow-up ledger commit.
+- Full `pytest` (SBML cross-engine module excluded as on CORE-001): 1772
+  passed, 12 failed in 13m40s (Python 3.11, scipy 1.17.1, libsbml 5.21.2).
+  Eleven failures are the pre-existing set recorded under CORE-001 (ten
+  SBML standards/BioModels tests under python-libsbml 5.21 and the Gelain
+  holdout replay drift); the twelfth was the candidate-review directory
+  listing, whose test was updated during the run and re-ran green (19
+  passed). All 32 added tests pass.
 - Public path timing: the five-condition exploratory BGL1A pH series,
   tables and report complete in about 4 s.
 
