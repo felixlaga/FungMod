@@ -1,8 +1,14 @@
 # FungMod Registry
 
 This registry is not a biological database. It contains toy/development
-fixtures used to test registry loading and the first curated external
-enzyme-kinetics pilot for SABIO-RK Reaction 618.
+fixtures used to test registry loading, the first curated external
+enzyme-kinetics pilot for SABIO-RK Reaction 618, and the first whole-organism
+case: *Trichoderma harzianum* P49P11 on Celufloc 200 cellulose (Gelain 2020),
+whose `culture_physiology` template composes generic process laws and whose
+nine kinetic constants are `calibrated` records from a recorded retrospective
+fit (artifact path and SHA-256 in each record). Those constants authorize
+`scientific` simulation because they are exact and provenance-backed; they are
+not experimentally validated, and three of them sit at fitting bounds.
 
 The registry layer is intended to support future modelability assessment and
 plug-and-play screening. It separates categorical facts, such as enzyme class

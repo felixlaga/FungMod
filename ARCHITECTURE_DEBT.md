@@ -19,7 +19,7 @@ dependencies.
 
 ## FD-009 Model representations and engines outside the compiled core
 
-Status: active, contained since 2026-10-04 (CORE-001)
+Status: active, contained since 2026-10-04 (CORE-001); narrowed 2026-10-05 (ORG-001)
 
 Reason: `ProcessODESolver` now compiles `Process` models to a numeric
 stoichiometric right-hand side with build-time unit resolution. Four other
@@ -31,10 +31,19 @@ cell or per field), the opt-in physiology classes (`FungalCouplingModel`,
 They predate the compiled core and are not reachable from the registry-backed
 `VirtualExperiment` path.
 
-Risk: scientific logic can drift between representations; the physiology
-needed for a whole-fungus case cannot be registered as processes; spatial
-runs stay too slow for calibration; a process without a numeric kernel could
-silently keep the slow path.
+Risk: scientific logic can drift between representations; the resource-limited
+growth, maintenance and costed secretion closures of `DegradingCulture` cannot
+yet be registered as processes; spatial runs stay too slow for calibration; a
+process without a numeric kernel could silently keep the slow path.
+
+Narrowing (ORG-001, 2026-10-05): the registry now reaches whole-organism
+physiology through the generic `culture_physiology` template family and the
+`proportional_synthesis` process, and `tests/test_organism_registry_case.py`
+pins the registry composition of the Gelain hydrolysis candidate to the
+research implementation in `research/gelain_models.py`. The research module
+still owns its own right-hand side for the other candidates (published,
+effective, retained); the Pirt/Monod closures with nitrogen and oxygen
+limitation remain class-bound because no organism record parameterizes them.
 
 Containment: every shipped process and modifier compiles to a numeric kernel
 and `tests/test_compiled_process_models.py` fails if one falls back; the
@@ -48,12 +57,15 @@ engines apply compiled kernels per cell with vectorized diffusion; the legacy
 `SimulationEngine` is retired; compiled models can supply a Jacobian.
 
 Removal milestone: completion of step 1 in
-`foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`, before step 2
-registers organism physiology.
+`foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`; step 2
+(ORG-001) registered the first organism on the compiled core and the remaining
+closures follow with the first organism that parameterizes them.
 
 Tests protecting it: `tests/test_compiled_process_models.py`
 (`test_shipped_process_types_all_compile_to_numeric_kernels`,
-`test_process_without_kernel_uses_recorded_quantity_wrapped_path_exactly`).
+`test_process_without_kernel_uses_recorded_quantity_wrapped_path_exactly`),
+`tests/test_organism_registry_case.py`
+(`test_configured_model_reproduces_the_frozen_research_candidate`).
 
 ## FD-008 Exploratory research-runner rate-law duplication
 

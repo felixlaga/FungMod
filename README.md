@@ -1443,8 +1443,18 @@ Current capability labels mean:
   unsupported geometry fails before simulation. The run compiles the model to a
   numeric stoichiometric right-hand side with units resolved at build time and
   records every process's kernel kind in `solver_metadata["kernel"]`
-  (`docs/compiled-core.md`). The legacy `SimulationEngine`, the spatial engines
-  and the opt-in physiology classes are not on the compiled core yet.
+  (`docs/compiled-core.md`). Rates are evaluated at `max(state, 0)` so pools
+  can deplete without clipping the trajectory; the `non_negative` validator
+  reports accepted states below tolerance. The legacy `SimulationEngine`, the
+  spatial engines and the Pirt/Monod culture closures are not on the compiled
+  core yet.
+- The registry's one whole-organism case (*T. harzianum* P49P11 on Celufloc
+  200 cellulose, `docs/organism-physiology.md`) composes generic process laws
+  through a `culture_physiology` template. Its nine constants are a frozen
+  retrospective fit to published duplicate means; three sit at fitting bounds.
+  It runs in `scientific` mode because it is exact and implemented, not because
+  it is validated. Nutrient, oxygen, maintenance, soluble-intermediate, pH and
+  morphology physiology are absent, and no other organism record is runnable.
 - The generic configured workflow currently supports foundation process
   factories and well-mixed execution; unsupported process types and geometry
   fail before simulation.

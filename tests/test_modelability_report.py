@@ -198,6 +198,39 @@ def test_incompatible_enzyme_substrate_case_is_unsupported(tmp_path: Path) -> No
     assert not report.candidate_processes
 
 
+def test_enzyme_classes_that_do_not_target_the_substrate_are_reported_without_blocking(tmp_path: Path) -> None:
+    """An organism carrying several enzyme classes is modelable through the class that targets the substrate."""
+
+    registry_dir = _copy_registry(tmp_path)
+    fungi_path = registry_dir / "fungi" / "fungi.yml"
+    data = _yaml_mapping(fungi_path)
+    records = cast(list[dict[str, Any]], data["records"])
+    toy = next(record for record in records if record["record_id"] == "toy_fungus_alpha")
+    toy["enzyme_classes"] = ["beta_glucosidase", "toy_cellulase"]
+    fungi_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    registry = load_registry(registry_dir / "registry_index.yml")
+
+    report = assess_modelability(
+        fungus_id="toy_fungus_alpha",
+        substrate_id="toy_cellulose_like_solid",
+        environment_id="toy_lab_environment",
+        registry=registry,
+    )
+    baseline = assess_modelability(
+        fungus_id="toy_fungus_alpha",
+        substrate_id="toy_cellulose_like_solid",
+        environment_id="toy_lab_environment",
+        registry=load_registry(REGISTRY_INDEX),
+    )
+
+    assert report.status == baseline.status
+    assert report.candidate_processes == baseline.candidate_processes
+    assert not _has_item(report.incompatible, "enzyme_substrate_match", "beta_glucosidase")
+    unmatched = [item for item in report.known if item.item_id == "beta_glucosidase"]
+    assert unmatched and unmatched[0].details["used_for_process_selection"] is False
+    assert "not used for process selection" in unmatched[0].message
+
+
 def test_invalid_modelability_mode_fails_clearly() -> None:
     registry = load_registry(REGISTRY_INDEX)
 

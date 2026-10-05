@@ -160,6 +160,13 @@ def test_registry_process_assemblers_advertise_supported_roles() -> None:
     )
     assert homogeneous.deterministic_mode == "scientific"
     assert homogeneous.supported_request_modes == ("scientific", "toy")
+    culture = get_registry_process_assembler("culture_physiology")
+    assert culture is not None
+    assert culture.required_parameter_roles == ()
+    assert culture.required_state_roles == ("substrate", "biomass")
+    assert culture.deterministic_mode == "scientific"
+    assert culture.supported_request_modes == ("scientific", "toy")
+    assert culture.enforce_template_mode_match
     assert get_registry_process_assembler("unsupported_process") is None
 
 

@@ -88,3 +88,46 @@ records:
       - beta_D_glucose
     properties: {}
     notes: Soluble disaccharide substrate for first SABIO-RK kinetic pilot.
+
+  - record_id: cellulose_celufloc_200
+    name: Cellulose (Celufloc 200)
+    display_name: Celufloc 200 cellulose
+    aliases:
+      - Celufloc 200
+      - Celufloc 200 cellulose
+      - cellulose Celufloc 200
+    maturity: literature_metadata
+    provenance:
+      source: >-
+        Gelain 2020 Methods 2.2 (doi:10.1016/j.cesx.2020.100085): cellulose
+        Celufloc 200 (Celuflok Ind. Com., Brazil) at 5-40 g/L as the inducer
+        substrate in Mandels medium with 1 g/L peptone.
+      confidence_level: literature_curated
+      notes: >-
+        Commercial particulate cellulose. The source reports no particle size
+        distribution, crystallinity, accessible surface area or purity; those
+        properties are recorded as explicit unknowns.
+    substrate_class: cellulose_particulate
+    physical_state: solid_polymer
+    bond_classes:
+      - beta_1_4_glycosidic
+    products: []
+    properties:
+      accessible_surface_area:
+        kind: unknown
+        units: meter ** 2 / gram
+        source: Not reported by Gelain 2020.
+        confidence_level: missing_from_source
+        notes: No surface-area measurement exists in the source; the organism case uses an effective bulk saturation law.
+      crystallinity_index:
+        kind: unknown
+        units: dimensionless
+        source: Not reported by Gelain 2020.
+        confidence_level: missing_from_source
+        notes: Crystallinity was not characterized by the source.
+    notes: >-
+      Particulate cellulose used as the sole inducer carbon source in the Gelain
+      2020 batch cultures. Soluble hydrolysis products were not measured in the
+      source; the registry therefore declares no product pool for this substrate
+      and the organism case tracks consumed cellulose that is not retained as
+      biomass through an explicit closure ledger rather than a product species.

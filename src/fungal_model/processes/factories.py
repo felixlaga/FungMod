@@ -18,6 +18,10 @@ from fungal_model.processes.homogeneous import (
     HomogeneousMichaelisMentenProcess,
     MassActionProcess,
 )
+from fungal_model.processes.physiology import (
+    PROPORTIONAL_SYNTHESIS_PROCESS_TYPE,
+    ProportionalSynthesisProcess,
+)
 from fungal_model.processes.rate_modifiers import (
     RateModifierProcess,
     competitive_inhibition_modifier_from_config,
@@ -238,6 +242,58 @@ class HomogeneousMichaelisMentenFactory:
 
 
 @dataclass(frozen=True)
+class ProportionalSynthesisFactory:
+    """Build generic producer-proportional (optionally induced) synthesis processes."""
+
+    process_type: str = PROPORTIONAL_SYNTHESIS_PROCESS_TYPE
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        missing = _missing_config_fields(process_config, ("id", "states", "parameters"))
+        states = _mapping(getattr(process_config, "states", {}))
+        parameters = _mapping(getattr(process_config, "parameters", {}))
+        missing += _missing_mapping_fields(states, ("producer", "product"), prefix="states")
+        missing += _missing_mapping_fields(parameters, ("specific_rate", "rate_units"), prefix="parameters")
+        has_inducer = states.get("inducer") is not None
+        has_half_saturation = parameters.get("induction_half_saturation") is not None
+        incompatible: list[str] = []
+        if has_inducer != has_half_saturation:
+            incompatible.append("states.inducer_requires_parameters.induction_half_saturation")
+        missing += tuple(
+            f"state_units.{state}"
+            for state in (states.get("producer"), states.get("product"), states.get("inducer"))
+            if state is not None and state not in context.state_units
+        )
+        return _decision(self, missing_fields=missing, incompatible_entities=incompatible)
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        _require_buildable(self.can_build(context, process_config))
+        states = _mapping(process_config.states)
+        parameters = _mapping(process_config.parameters)
+        producer_state = str(states["producer"])
+        product_state = str(states["product"])
+        inducer_state = None if states.get("inducer") is None else str(states["inducer"])
+        process = ProportionalSynthesisProcess(
+            name=process_config.id,
+            producer_state=producer_state,
+            producer_units=context.state_units[producer_state],
+            product_state=product_state,
+            product_units=context.state_units[product_state],
+            rate_units=str(parameters["rate_units"]),
+            specific_rate_symbol=str(parameters["specific_rate"]),
+            inducer_state=inducer_state,
+            inducer_units=None if inducer_state is None else context.state_units[inducer_state],
+            induction_half_saturation_symbol=(
+                None
+                if parameters.get("induction_half_saturation") is None
+                else str(parameters["induction_half_saturation"])
+            ),
+            source=context.source,
+            notes="Built from generic proportional-synthesis process config.",
+        )
+        return _apply_rate_modifiers(context, process_config, process)
+
+
+@dataclass(frozen=True)
 class SubstrateTransglycosylationFactory:
     """Build one explicit branch of the coupled substrate-transfer law."""
 
@@ -414,6 +470,7 @@ def default_foundation_factories() -> tuple[ProcessFactory, ...]:
         FirstOrderFactory(),
         MassActionFactory(),
         HomogeneousMichaelisMentenFactory(),
+        ProportionalSynthesisFactory(),
         SubstrateTransglycosylationFactory(),
         SurfaceCatalysisFactory(),
     )

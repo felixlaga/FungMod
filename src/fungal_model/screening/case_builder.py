@@ -300,11 +300,17 @@ def select_registry_case_compatibility(
     substrate = registry.get_substrate(substrate_id)
     for enzyme_class_id in fungus.enzyme_classes:
         for process_type in report.required_processes:
-            for compatibility in registry.get_process_compatibility(
-                enzyme_class=enzyme_class_id,
-                substrate_class=substrate.substrate_class,
-                process_type=process_type,
-            ):
+            try:
+                candidates = registry.get_process_compatibility(
+                    enzyme_class=enzyme_class_id,
+                    substrate_class=substrate.substrate_class,
+                    process_type=process_type,
+                )
+            except RegistryLookupError:
+                # An organism may carry enzyme classes that do not act on this
+                # substrate; only classes with a compatibility record can select.
+                continue
+            for compatibility in candidates:
                 if set(compatibility.required_bond_classes).issubset(substrate.bond_classes):
                     return compatibility
     raise RegistryCaseBuildError(
@@ -1547,6 +1553,33 @@ def _extracellular_enzyme_chain_config_data(
     return data
 
 
+def _culture_physiology_config_data(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    case_template: CaseTemplateRecord,
+    substrate: SubstrateRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    parameter_records: Mapping[str, ParameterRecord],
+    output_directory: str | None,
+) -> dict[str, Any]:
+    from fungal_model.screening.culture_physiology import build_culture_physiology_config_data
+
+    return build_culture_physiology_config_data(
+        registry=registry,
+        compatibility=compatibility,
+        case_template=case_template,
+        substrate=substrate,
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        environment_id=environment_id,
+        parameter_records=parameter_records,
+        output_directory=output_directory,
+    )
+
+
 def _homogeneous_mm_provenance(
     *,
     registry: FungModRegistry,
@@ -1742,6 +1775,26 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
             "or mode='scientific'."
         ),
         config_data_builder=_homogeneous_mm_config_data,
+    ),
+    "culture_physiology": RegistryProcessAssembler(
+        process_type="culture_physiology",
+        process_label="Culture physiology",
+        required_parameter_roles=(),
+        required_state_roles=("substrate", "biomass"),
+        deterministic_mode="scientific",
+        additional_supported_modes=("toy",),
+        required_process_state_metadata=(
+            "config_name",
+            "config_mode",
+            "config_maturity",
+            "parameter_set_id",
+        ),
+        enforce_template_mode_match=True,
+        unsupported_mode_message=(
+            "Culture-physiology registry assembly supports mode='scientific' or mode='toy'; "
+            "exploratory screens sample the same template through the ensemble path."
+        ),
+        config_data_builder=_culture_physiology_config_data,
     ),
     "extracellular_enzyme_chain": RegistryProcessAssembler(
         process_type="extracellular_enzyme_chain",

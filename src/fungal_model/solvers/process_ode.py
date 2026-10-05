@@ -16,7 +16,12 @@ from fungal_model.chemistry.thermodynamics import (
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.core.validators import ValidationResult
 from fungal_model.results import SimulationResult
-from fungal_model.solvers.compiled import CompiledModel, compile_assembled_model, resolve_state_units
+from fungal_model.solvers.compiled import (
+    CompiledModel,
+    compile_assembled_model,
+    evaluation_state_for_rates,
+    resolve_state_units,
+)
 
 if TYPE_CHECKING:
     from fungal_model.processes.assembly import AssembledModel
@@ -233,7 +238,11 @@ def _record_process_rates(
     """
 
     times = np.asarray(time.magnitude, dtype=float)
-    matrix = np.vstack([np.asarray(states[name].magnitude, dtype=float) for name in compiled.state_names])
+    # Accepted states are recorded unclipped; rates at the returned points use
+    # the same non-negative projection as the compiled right-hand side.
+    matrix = evaluation_state_for_rates(
+        np.vstack([np.asarray(states[name].magnitude, dtype=float) for name in compiled.state_names])
+    )
     rates: dict[str, Quantity] = {}
     evaluations: dict[str, list[DynamicThermodynamicEvaluation]] = {
         constraint.constraint_id: []

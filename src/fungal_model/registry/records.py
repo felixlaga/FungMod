@@ -76,10 +76,15 @@ CASE_TEMPLATE_ALLOWED_STATE_ROLES = frozenset(
         "surface_catalyst",
         "homogeneous_catalyst",
         "accessibility_proxy",
+        "biomass",
     }
 )
+# Indexed roles name additional pools of one semantic kind. ``ledger_*`` roles
+# are explicit material-closure pools (for example mass lost from biomass or
+# consumed substrate not retained as biomass); they are model states, not
+# measured observables, and output tables label them as such.
 CASE_TEMPLATE_INDEXED_STATE_ROLE_PATTERN = re.compile(
-    r"^(?:intermediate|catalyst|enzyme)_[a-z0-9][a-z0-9_]*$"
+    r"^(?:intermediate|catalyst|enzyme|ledger)_[a-z0-9][a-z0-9_]*$"
 )
 
 

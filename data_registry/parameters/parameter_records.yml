@@ -639,3 +639,654 @@ records:
       confidence_level: exploratory_assumption
       notes: Explicit demo scaffold value; accessible surface is not dynamically evolved.
     notes: Constant accessible surface area for the first BIO-002 chain step.
+
+  - record_id: gelain_hydrolysis_k_h_calibrated
+    name: Cellulose consumption capacity per unit filter-paper activity (T. harzianum P49P11, Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      measurement_method: >-
+        Nonlinear least squares (scipy least_squares, three optimizer starts, log-parameter
+        bounds fixed before fitting) on 96 published duplicate-mean observations of biomass,
+        cellulose, filter-paper activity and beta-glucosidase activity with training-maximum
+        normalization; no published constant initialized or fixed a free parameter.
+      validity_range: >-
+        T. harzianum P49P11 batch cultures on Celufloc 200 cellulose at 10-30 g/L, 29 C,
+        pH 5.0, dissolved oxygen above 30 percent, 0-96 h; preparation-specific effective
+        constant of a retrospective fit.
+      fit_artifact: data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json
+      fit_artifact_sha256: 1613858bea192a7538b9b0e958b890b447557bbada51d072979e1c9bf8c954a4
+      fit_model: hydrolysis
+      fit_scenario: primary
+      training_conditions:
+        - gelain_2020_cellulose_10gl
+        - gelain_2020_cellulose_20gl
+        - gelain_2020_cellulose_30gl
+      fit_diagnostics:
+        parameter_count: 9
+        practical_rank: 9
+        condition_number: 90467.36841446636
+        objective: 3.9760730626169978
+        near_bounds:
+          - K_ind
+          - kF
+          - kB
+      validation_status: retrospective_development_fit_not_validated
+      uncertainty: unknown_no_measurement_sd_no_confidence_interval
+    parameter_symbol: gelain_hydrolysis_k_h
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    allowed_use: scientific_or_exploratory_when_all_other_inputs_are_valid
+    value:
+      kind: exact
+      value: 0.018378579847405995
+      units: gram / filter_paper_unit / hour
+      source: FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: Full-precision fitted value for fit symbol k_h; retrospective, not validated.
+    notes: >-
+      Effective bulk cellulose consumption capacity per unit filter-paper activity (fit symbol k_h; recorded as gram/gelain_fpu/hour, where gelain_fpu is the study alias of filter_paper_unit). Preparation-specific; not a conversion of assay activity into enzyme concentration. Not at a fitting bound.
+
+  - record_id: gelain_hydrolysis_Kh_calibrated
+    name: Cellulose half-saturation constant of cellulase-limited consumption (T. harzianum P49P11, Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      measurement_method: >-
+        Nonlinear least squares (scipy least_squares, three optimizer starts, log-parameter
+        bounds fixed before fitting) on 96 published duplicate-mean observations of biomass,
+        cellulose, filter-paper activity and beta-glucosidase activity with training-maximum
+        normalization; no published constant initialized or fixed a free parameter.
+      validity_range: >-
+        T. harzianum P49P11 batch cultures on Celufloc 200 cellulose at 10-30 g/L, 29 C,
+        pH 5.0, dissolved oxygen above 30 percent, 0-96 h; preparation-specific effective
+        constant of a retrospective fit.
+      fit_artifact: data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json
+      fit_artifact_sha256: 1613858bea192a7538b9b0e958b890b447557bbada51d072979e1c9bf8c954a4
+      fit_model: hydrolysis
+      fit_scenario: primary
+      training_conditions:
+        - gelain_2020_cellulose_10gl
+        - gelain_2020_cellulose_20gl
+        - gelain_2020_cellulose_30gl
+      fit_diagnostics:
+        parameter_count: 9
+        practical_rank: 9
+        condition_number: 90467.36841446636
+        objective: 3.9760730626169978
+        near_bounds:
+          - K_ind
+          - kF
+          - kB
+      validation_status: retrospective_development_fit_not_validated
+      uncertainty: unknown_no_measurement_sd_no_confidence_interval
+    parameter_symbol: gelain_hydrolysis_Kh
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    allowed_use: scientific_or_exploratory_when_all_other_inputs_are_valid
+    value:
+      kind: exact
+      value: 16.726013979440346
+      units: gram / liter
+      source: FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: Full-precision fitted value for fit symbol Kh; retrospective, not validated.
+    notes: >-
+      Saturation constant of the consumption law in cellulose (fit symbol Kh). Not at a fitting bound; its local trade-off with k_h is strong (correlation 0.88).
+
+  - record_id: gelain_hydrolysis_Y_calibrated
+    name: Biomass dry-mass yield on consumed cellulose (T. harzianum P49P11, Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      measurement_method: >-
+        Nonlinear least squares (scipy least_squares, three optimizer starts, log-parameter
+        bounds fixed before fitting) on 96 published duplicate-mean observations of biomass,
+        cellulose, filter-paper activity and beta-glucosidase activity with training-maximum
+        normalization; no published constant initialized or fixed a free parameter.
+      validity_range: >-
+        T. harzianum P49P11 batch cultures on Celufloc 200 cellulose at 10-30 g/L, 29 C,
+        pH 5.0, dissolved oxygen above 30 percent, 0-96 h; preparation-specific effective
+        constant of a retrospective fit.
+      fit_artifact: data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json
+      fit_artifact_sha256: 1613858bea192a7538b9b0e958b890b447557bbada51d072979e1c9bf8c954a4
+      fit_model: hydrolysis
+      fit_scenario: primary
+      training_conditions:
+        - gelain_2020_cellulose_10gl
+        - gelain_2020_cellulose_20gl
+        - gelain_2020_cellulose_30gl
+      fit_diagnostics:
+        parameter_count: 9
+        practical_rank: 9
+        condition_number: 90467.36841446636
+        objective: 3.9760730626169978
+        near_bounds:
+          - K_ind
+          - kF
+          - kB
+      validation_status: retrospective_development_fit_not_validated
+      uncertainty: unknown_no_measurement_sd_no_confidence_interval
+    parameter_symbol: gelain_hydrolysis_Y
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    allowed_use: scientific_or_exploratory_when_all_other_inputs_are_valid
+    value:
+      kind: exact
+      value: 0.4148331117804989
+      units: dimensionless
+      source: FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: Full-precision fitted value for fit symbol Y; retrospective, not validated.
+    notes: >-
+      Gram biomass dry mass formed per gram cellulose consumed (fit symbol Y); the complement is booked to the closure ledger. Not at a fitting bound.
+
+  - record_id: gelain_hydrolysis_kd_calibrated
+    name: First-order biomass dry-mass loss rate (T. harzianum P49P11, Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      measurement_method: >-
+        Nonlinear least squares (scipy least_squares, three optimizer starts, log-parameter
+        bounds fixed before fitting) on 96 published duplicate-mean observations of biomass,
+        cellulose, filter-paper activity and beta-glucosidase activity with training-maximum
+        normalization; no published constant initialized or fixed a free parameter.
+      validity_range: >-
+        T. harzianum P49P11 batch cultures on Celufloc 200 cellulose at 10-30 g/L, 29 C,
+        pH 5.0, dissolved oxygen above 30 percent, 0-96 h; preparation-specific effective
+        constant of a retrospective fit.
+      fit_artifact: data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json
+      fit_artifact_sha256: 1613858bea192a7538b9b0e958b890b447557bbada51d072979e1c9bf8c954a4
+      fit_model: hydrolysis
+      fit_scenario: primary
+      training_conditions:
+        - gelain_2020_cellulose_10gl
+        - gelain_2020_cellulose_20gl
+        - gelain_2020_cellulose_30gl
+      fit_diagnostics:
+        parameter_count: 9
+        practical_rank: 9
+        condition_number: 90467.36841446636
+        objective: 3.9760730626169978
+        near_bounds:
+          - K_ind
+          - kF
+          - kB
+      validation_status: retrospective_development_fit_not_validated
+      uncertainty: unknown_no_measurement_sd_no_confidence_interval
+    parameter_symbol: gelain_hydrolysis_kd
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    allowed_use: scientific_or_exploratory_when_all_other_inputs_are_valid
+    value:
+      kind: exact
+      value: 0.019870844204703458
+      units: 1 / hour
+      source: FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: Full-precision fitted value for fit symbol kd; retrospective, not validated.
+    notes: >-
+      Constant first-order loss of biomass dry mass (fit symbol kd); not a viability or death measurement. Not at a fitting bound.
+
+  - record_id: gelain_hydrolysis_K_ind_calibrated
+    name: Cellulose induction half-saturation constant for activity production (T. harzianum P49P11, Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      measurement_method: >-
+        Nonlinear least squares (scipy least_squares, three optimizer starts, log-parameter
+        bounds fixed before fitting) on 96 published duplicate-mean observations of biomass,
+        cellulose, filter-paper activity and beta-glucosidase activity with training-maximum
+        normalization; no published constant initialized or fixed a free parameter.
+      validity_range: >-
+        T. harzianum P49P11 batch cultures on Celufloc 200 cellulose at 10-30 g/L, 29 C,
+        pH 5.0, dissolved oxygen above 30 percent, 0-96 h; preparation-specific effective
+        constant of a retrospective fit.
+      fit_artifact: data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json
+      fit_artifact_sha256: 1613858bea192a7538b9b0e958b890b447557bbada51d072979e1c9bf8c954a4
+      fit_model: hydrolysis
+      fit_scenario: primary
+      training_conditions:
+        - gelain_2020_cellulose_10gl
+        - gelain_2020_cellulose_20gl
+        - gelain_2020_cellulose_30gl
+      fit_diagnostics:
+        parameter_count: 9
+        practical_rank: 9
+        condition_number: 90467.36841446636
+        objective: 3.9760730626169978
+        near_bounds:
+          - K_ind
+          - kF
+          - kB
+      validation_status: retrospective_development_fit_not_validated
+      uncertainty: unknown_no_measurement_sd_no_confidence_interval
+    parameter_symbol: gelain_hydrolysis_K_ind
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    allowed_use: scientific_or_exploratory_when_all_other_inputs_are_valid
+    value:
+      kind: exact
+      value: 0.010000000000000236
+      units: gram / liter
+      source: FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: Full-precision fitted value for fit symbol K_ind; retrospective, not validated.
+    notes: >-
+      Saturable induction constant shared by both activity production laws (fit symbol K_ind). The fitted value sits at the lower fitting bound of 0.01 g/L: induction is effectively saturated over the measured range and the data do not identify this constant.
+
+  - record_id: gelain_hydrolysis_qF_calibrated
+    name: Specific filter-paper activity production rate (T. harzianum P49P11, Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      measurement_method: >-
+        Nonlinear least squares (scipy least_squares, three optimizer starts, log-parameter
+        bounds fixed before fitting) on 96 published duplicate-mean observations of biomass,
+        cellulose, filter-paper activity and beta-glucosidase activity with training-maximum
+        normalization; no published constant initialized or fixed a free parameter.
+      validity_range: >-
+        T. harzianum P49P11 batch cultures on Celufloc 200 cellulose at 10-30 g/L, 29 C,
+        pH 5.0, dissolved oxygen above 30 percent, 0-96 h; preparation-specific effective
+        constant of a retrospective fit.
+      fit_artifact: data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json
+      fit_artifact_sha256: 1613858bea192a7538b9b0e958b890b447557bbada51d072979e1c9bf8c954a4
+      fit_model: hydrolysis
+      fit_scenario: primary
+      training_conditions:
+        - gelain_2020_cellulose_10gl
+        - gelain_2020_cellulose_20gl
+        - gelain_2020_cellulose_30gl
+      fit_diagnostics:
+        parameter_count: 9
+        practical_rank: 9
+        condition_number: 90467.36841446636
+        objective: 3.9760730626169978
+        near_bounds:
+          - K_ind
+          - kF
+          - kB
+      validation_status: retrospective_development_fit_not_validated
+      uncertainty: unknown_no_measurement_sd_no_confidence_interval
+    parameter_symbol: gelain_hydrolysis_qF
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    allowed_use: scientific_or_exploratory_when_all_other_inputs_are_valid
+    value:
+      kind: exact
+      value: 5.822884641381956
+      units: filter_paper_unit / gram / hour
+      source: FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: Full-precision fitted value for fit symbol qF; retrospective, not validated.
+    notes: >-
+      Filter-paper activity produced per gram biomass dry mass per hour at saturating induction (fit symbol qF; recorded as gelain_fpu/gram/hour). Not at a fitting bound.
+
+  - record_id: gelain_hydrolysis_kF_calibrated
+    name: First-order filter-paper activity loss rate (T. harzianum P49P11, Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      measurement_method: >-
+        Nonlinear least squares (scipy least_squares, three optimizer starts, log-parameter
+        bounds fixed before fitting) on 96 published duplicate-mean observations of biomass,
+        cellulose, filter-paper activity and beta-glucosidase activity with training-maximum
+        normalization; no published constant initialized or fixed a free parameter.
+      validity_range: >-
+        T. harzianum P49P11 batch cultures on Celufloc 200 cellulose at 10-30 g/L, 29 C,
+        pH 5.0, dissolved oxygen above 30 percent, 0-96 h; preparation-specific effective
+        constant of a retrospective fit.
+      fit_artifact: data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json
+      fit_artifact_sha256: 1613858bea192a7538b9b0e958b890b447557bbada51d072979e1c9bf8c954a4
+      fit_model: hydrolysis
+      fit_scenario: primary
+      training_conditions:
+        - gelain_2020_cellulose_10gl
+        - gelain_2020_cellulose_20gl
+        - gelain_2020_cellulose_30gl
+      fit_diagnostics:
+        parameter_count: 9
+        practical_rank: 9
+        condition_number: 90467.36841446636
+        objective: 3.9760730626169978
+        near_bounds:
+          - K_ind
+          - kF
+          - kB
+      validation_status: retrospective_development_fit_not_validated
+      uncertainty: unknown_no_measurement_sd_no_confidence_interval
+    parameter_symbol: gelain_hydrolysis_kF
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    allowed_use: scientific_or_exploratory_when_all_other_inputs_are_valid
+    value:
+      kind: exact
+      value: 1.0000000024667456e-06
+      units: 1 / hour
+      source: FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: Full-precision fitted value for fit symbol kF; retrospective, not validated.
+    notes: >-
+      Constant first-order loss of filter-paper activity (fit symbol kF). The fitted value sits at the lower fitting bound of 1e-6 per hour: the data do not support measurable activity loss and the constant is effectively zero.
+
+  - record_id: gelain_hydrolysis_qB_calibrated
+    name: Specific beta-glucosidase activity production rate (T. harzianum P49P11, Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      measurement_method: >-
+        Nonlinear least squares (scipy least_squares, three optimizer starts, log-parameter
+        bounds fixed before fitting) on 96 published duplicate-mean observations of biomass,
+        cellulose, filter-paper activity and beta-glucosidase activity with training-maximum
+        normalization; no published constant initialized or fixed a free parameter.
+      validity_range: >-
+        T. harzianum P49P11 batch cultures on Celufloc 200 cellulose at 10-30 g/L, 29 C,
+        pH 5.0, dissolved oxygen above 30 percent, 0-96 h; preparation-specific effective
+        constant of a retrospective fit.
+      fit_artifact: data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json
+      fit_artifact_sha256: 1613858bea192a7538b9b0e958b890b447557bbada51d072979e1c9bf8c954a4
+      fit_model: hydrolysis
+      fit_scenario: primary
+      training_conditions:
+        - gelain_2020_cellulose_10gl
+        - gelain_2020_cellulose_20gl
+        - gelain_2020_cellulose_30gl
+      fit_diagnostics:
+        parameter_count: 9
+        practical_rank: 9
+        condition_number: 90467.36841446636
+        objective: 3.9760730626169978
+        near_bounds:
+          - K_ind
+          - kF
+          - kB
+      validation_status: retrospective_development_fit_not_validated
+      uncertainty: unknown_no_measurement_sd_no_confidence_interval
+    parameter_symbol: gelain_hydrolysis_qB
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    allowed_use: scientific_or_exploratory_when_all_other_inputs_are_valid
+    value:
+      kind: exact
+      value: 13.93577774462081
+      units: beta_glucosidase_assay_unit / gram / hour
+      source: FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: Full-precision fitted value for fit symbol qB; retrospective, not validated.
+    notes: >-
+      Beta-glucosidase activity produced per gram biomass dry mass per hour at saturating induction (fit symbol qB; recorded as gelain_beta_u/gram/hour). Not at a fitting bound.
+
+  - record_id: gelain_hydrolysis_kB_calibrated
+    name: First-order beta-glucosidase activity loss rate (T. harzianum P49P11, Gelain 2020 hydrolysis candidate)
+    maturity: calibrated
+    provenance:
+      source: >-
+        FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      measurement_method: >-
+        Nonlinear least squares (scipy least_squares, three optimizer starts, log-parameter
+        bounds fixed before fitting) on 96 published duplicate-mean observations of biomass,
+        cellulose, filter-paper activity and beta-glucosidase activity with training-maximum
+        normalization; no published constant initialized or fixed a free parameter.
+      validity_range: >-
+        T. harzianum P49P11 batch cultures on Celufloc 200 cellulose at 10-30 g/L, 29 C,
+        pH 5.0, dissolved oxygen above 30 percent, 0-96 h; preparation-specific effective
+        constant of a retrospective fit.
+      fit_artifact: data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json
+      fit_artifact_sha256: 1613858bea192a7538b9b0e958b890b447557bbada51d072979e1c9bf8c954a4
+      fit_model: hydrolysis
+      fit_scenario: primary
+      training_conditions:
+        - gelain_2020_cellulose_10gl
+        - gelain_2020_cellulose_20gl
+        - gelain_2020_cellulose_30gl
+      fit_diagnostics:
+        parameter_count: 9
+        practical_rank: 9
+        condition_number: 90467.36841446636
+        objective: 3.9760730626169978
+        near_bounds:
+          - K_ind
+          - kF
+          - kB
+      validation_status: retrospective_development_fit_not_validated
+      uncertainty: unknown_no_measurement_sd_no_confidence_interval
+    parameter_symbol: gelain_hydrolysis_kB
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    allowed_use: scientific_or_exploratory_when_all_other_inputs_are_valid
+    value:
+      kind: exact
+      value: 1.0000000000000023e-06
+      units: 1 / hour
+      source: FungMod retrospective all-condition fit of the Gelain 2020 hydrolysis candidate to the T. harzianum P49P11 cellulose cultures at 10, 20 and 30 g/L (gelain_2020_joint_culture_v2, scenario primary; article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2).
+      confidence_level: calibrated_retrospective_unvalidated
+      notes: Full-precision fitted value for fit symbol kB; retrospective, not validated.
+    notes: >-
+      Constant first-order loss of beta-glucosidase activity (fit symbol kB). The fitted value sits at the lower fitting bound of 1e-6 per hour: the data do not support measurable activity loss and the constant is effectively zero.
+
+  - record_id: gelain_2020_cellulose_initial_biomass
+    name: Initial biomass dry mass of the Gelain 2020 cellulose cultures
+    maturity: literature_processed
+    provenance:
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row.
+      confidence_level: literature_curated
+      measurement_method: Direct reading of the deposited workbook t = 0 row (cell E2); source initialization, not a sampled measurement.
+      validity_range: Initial condition of the Gelain 2020 cellulose batch cultures only.
+      source_workbooks:
+        - gelain_2020/originals/cellulose/10gL.xlsx (sha256 142eb8649ccf08d4de1df9c6dbe69ca53d3887f7817b4b3b1979c144fcd483f7)
+        - gelain_2020/originals/cellulose/20gL.xlsx (sha256 ad722f2d071601e111379a56459c94738473ce639d75e2f19188dd1e1abd649f)
+        - gelain_2020/originals/cellulose/30gL.xlsx (sha256 c8a5cef153dfba6e22fac4c4202d96dbe3fc44386fb085b14ac3ff7f88c9d406)
+    parameter_symbol: gelain_2020_cellulose_initial_biomass
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    value:
+      kind: exact
+      value: 0.3990672957214788
+      units: gram / liter
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row (cell E2).
+      confidence_level: literature_curated
+      notes: Stored workbook value at full precision.
+    notes: >-
+      Average inoculum cell concentration used by the source as the initial condition of all three cellulose conditions (article Methods 2.2 reports 0.4 +/- 0.02 g/L). Shared by the 10, 20 and 30 g/L conditions.
+
+  - record_id: gelain_2020_cellulose_initial_loading_10gl
+    name: Initial cellulose loading of the Gelain 2020 10 g/L condition
+    maturity: literature_processed
+    provenance:
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row.
+      confidence_level: literature_curated
+      measurement_method: Direct reading of the deposited workbook t = 0 row (cell F2); source initialization, not a sampled measurement.
+      validity_range: Initial condition of the Gelain 2020 cellulose batch cultures only.
+      source_workbooks:
+        - gelain_2020/originals/cellulose/10gL.xlsx (sha256 142eb8649ccf08d4de1df9c6dbe69ca53d3887f7817b4b3b1979c144fcd483f7)
+        - gelain_2020/originals/cellulose/20gL.xlsx (sha256 ad722f2d071601e111379a56459c94738473ce639d75e2f19188dd1e1abd649f)
+        - gelain_2020/originals/cellulose/30gL.xlsx (sha256 c8a5cef153dfba6e22fac4c4202d96dbe3fc44386fb085b14ac3ff7f88c9d406)
+    parameter_symbol: gelain_2020_cellulose_initial_loading
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: gelain_2020_cellulose_batch_10gl
+    value:
+      kind: exact
+      value: 10.0
+      units: gram / liter
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row (cell F2).
+      confidence_level: literature_curated
+      notes: Stored workbook value at full precision.
+    notes: >-
+      Nominal initial Celufloc 200 cellulose loading of the 10 g/L batch condition; the first measured sample (8 h) differs from the nominal loading and is not an initial condition.
+
+  - record_id: gelain_2020_cellulose_initial_loading_20gl
+    name: Initial cellulose loading of the Gelain 2020 20 g/L condition
+    maturity: literature_processed
+    provenance:
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row.
+      confidence_level: literature_curated
+      measurement_method: Direct reading of the deposited workbook t = 0 row (cell F2); source initialization, not a sampled measurement.
+      validity_range: Initial condition of the Gelain 2020 cellulose batch cultures only.
+      source_workbooks:
+        - gelain_2020/originals/cellulose/10gL.xlsx (sha256 142eb8649ccf08d4de1df9c6dbe69ca53d3887f7817b4b3b1979c144fcd483f7)
+        - gelain_2020/originals/cellulose/20gL.xlsx (sha256 ad722f2d071601e111379a56459c94738473ce639d75e2f19188dd1e1abd649f)
+        - gelain_2020/originals/cellulose/30gL.xlsx (sha256 c8a5cef153dfba6e22fac4c4202d96dbe3fc44386fb085b14ac3ff7f88c9d406)
+    parameter_symbol: gelain_2020_cellulose_initial_loading
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: gelain_2020_cellulose_batch_20gl
+    value:
+      kind: exact
+      value: 20.0
+      units: gram / liter
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row (cell F2).
+      confidence_level: literature_curated
+      notes: Stored workbook value at full precision.
+    notes: >-
+      Nominal initial Celufloc 200 cellulose loading of the 20 g/L batch condition; the first measured sample (8 h) differs from the nominal loading and is not an initial condition.
+
+  - record_id: gelain_2020_cellulose_initial_loading_30gl
+    name: Initial cellulose loading of the Gelain 2020 30 g/L condition
+    maturity: literature_processed
+    provenance:
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row.
+      confidence_level: literature_curated
+      measurement_method: Direct reading of the deposited workbook t = 0 row (cell F2); source initialization, not a sampled measurement.
+      validity_range: Initial condition of the Gelain 2020 cellulose batch cultures only.
+      source_workbooks:
+        - gelain_2020/originals/cellulose/10gL.xlsx (sha256 142eb8649ccf08d4de1df9c6dbe69ca53d3887f7817b4b3b1979c144fcd483f7)
+        - gelain_2020/originals/cellulose/20gL.xlsx (sha256 ad722f2d071601e111379a56459c94738473ce639d75e2f19188dd1e1abd649f)
+        - gelain_2020/originals/cellulose/30gL.xlsx (sha256 c8a5cef153dfba6e22fac4c4202d96dbe3fc44386fb085b14ac3ff7f88c9d406)
+    parameter_symbol: gelain_2020_cellulose_initial_loading
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: gelain_2020_cellulose_batch_30gl
+    value:
+      kind: exact
+      value: 30.0
+      units: gram / liter
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row (cell F2).
+      confidence_level: literature_curated
+      notes: Stored workbook value at full precision.
+    notes: >-
+      Nominal initial Celufloc 200 cellulose loading of the 30 g/L batch condition; the first measured sample (8 h) differs from the nominal loading and is not an initial condition.
+
+  - record_id: gelain_2020_cellulose_initial_cellulase_activity
+    name: Initial filter-paper activity of the Gelain 2020 cellulose cultures
+    maturity: literature_processed
+    provenance:
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row.
+      confidence_level: literature_curated
+      measurement_method: Direct reading of the deposited workbook t = 0 row (cell B2); source initialization, not a sampled measurement.
+      validity_range: Initial condition of the Gelain 2020 cellulose batch cultures only.
+      source_workbooks:
+        - gelain_2020/originals/cellulose/10gL.xlsx (sha256 142eb8649ccf08d4de1df9c6dbe69ca53d3887f7817b4b3b1979c144fcd483f7)
+        - gelain_2020/originals/cellulose/20gL.xlsx (sha256 ad722f2d071601e111379a56459c94738473ce639d75e2f19188dd1e1abd649f)
+        - gelain_2020/originals/cellulose/30gL.xlsx (sha256 c8a5cef153dfba6e22fac4c4202d96dbe3fc44386fb085b14ac3ff7f88c9d406)
+    parameter_symbol: gelain_2020_cellulose_initial_cellulase_activity
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    value:
+      kind: exact
+      value: 0.0
+      units: filter_paper_unit / liter
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row (cell B2).
+      confidence_level: literature_curated
+      notes: Stored workbook value at full precision.
+    notes: >-
+      Deposited t = 0 filter-paper activity is zero in all three cellulose workbooks; the detection limit of the assay is not reported.
+
+  - record_id: gelain_2020_cellulose_initial_beta_glucosidase_activity
+    name: Initial beta-glucosidase activity of the Gelain 2020 cellulose cultures
+    maturity: literature_processed
+    provenance:
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row.
+      confidence_level: literature_curated
+      measurement_method: Direct reading of the deposited workbook t = 0 row (cell C2); source initialization, not a sampled measurement.
+      validity_range: Initial condition of the Gelain 2020 cellulose batch cultures only.
+      source_workbooks:
+        - gelain_2020/originals/cellulose/10gL.xlsx (sha256 142eb8649ccf08d4de1df9c6dbe69ca53d3887f7817b4b3b1979c144fcd483f7)
+        - gelain_2020/originals/cellulose/20gL.xlsx (sha256 ad722f2d071601e111379a56459c94738473ce639d75e2f19188dd1e1abd649f)
+        - gelain_2020/originals/cellulose/30gL.xlsx (sha256 c8a5cef153dfba6e22fac4c4202d96dbe3fc44386fb085b14ac3ff7f88c9d406)
+    parameter_symbol: gelain_2020_cellulose_initial_beta_glucosidase_activity
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: null
+    value:
+      kind: exact
+      value: 0.0
+      units: beta_glucosidase_assay_unit / liter
+      source: Gelain 2020 deposited cellulose experimental workbooks (doi:10.17632/shd3wcczsr.2), t = 0 row (cell C2).
+      confidence_level: literature_curated
+      notes: Stored workbook value at full precision.
+    notes: >-
+      Deposited t = 0 beta-glucosidase activity is zero in all three cellulose workbooks; the detection limit of the assay is not reported.

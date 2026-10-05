@@ -784,6 +784,8 @@ def _mechanism_family(process_type: str) -> str:
         return "generic equilibrium surface catalysis"
     if process_type == "extracellular_enzyme_chain":
         return "generic two-step extracellular enzyme chain"
+    if process_type == "culture_physiology":
+        return "generic well-mixed culture physiology composed from registry process templates"
     return "generic configured process law"
 
 
@@ -794,6 +796,11 @@ def _mechanism_law(process_type: str) -> str:
         return "r = k_surface * theta(E, K_ads) * accessible_surface_area"
     if process_type == "extracellular_enzyme_chain":
         return "configured surface step followed by configured homogeneous product-conversion step"
+    if process_type == "culture_physiology":
+        return (
+            "template-declared composition of generic process laws (substrate conversion with explicit yield, "
+            "first-order loss, producer-proportional synthesis) sharing one explicit closure ledger"
+        )
     return "configured process law"
 
 
@@ -804,6 +811,8 @@ def _mechanism_state_variables(process_type: str) -> tuple[str, ...]:
         return ("solid_substrate", "free_catalyst", "product")
     if process_type == "extracellular_enzyme_chain":
         return ("substrate", "intermediate", "product", "surface_catalyst", "homogeneous_catalyst")
+    if process_type == "culture_physiology":
+        return ("substrate", "biomass", "enzyme_pools", "ledger_pools")
     return ()
 
 
@@ -825,6 +834,8 @@ def _mechanism_maturity(process_type: str, role_records: Mapping[str, ParameterR
         return "software_tested_literature_parameterized"
     if "exploratory_prior" in maturities:
         return "software_tested_exploratory_parameterized"
+    if maturities <= {"literature_processed", "calibrated"} and "calibrated" in maturities:
+        return "software_tested_retrospectively_calibrated_unvalidated"
     return "software_tested_mixed_parameter_maturity"
 
 
@@ -845,6 +856,14 @@ def _mechanism_limitations(process_type: str) -> tuple[str, ...]:
         return (
             "Exactly the configured chain steps are represented.",
             "No whole-fungus growth, secretion, uptake, or biomass model.",
+            "No empirical validation claim is implied by simulation output.",
+        )
+    if process_type == "culture_physiology":
+        return (
+            "Exactly the template-declared process laws are represented; nutrient, oxygen, maintenance, "
+            "morphology, and pH dynamics are absent unless a template declares them.",
+            "Enzyme pools are assay activities and are not converted to protein mass or molarity.",
+            "Calibrated parameters are retrospective fits to published means; they are not validated predictions.",
             "No empirical validation claim is implied by simulation output.",
         )
     return ("No empirical validation claim is implied by simulation output.",)
@@ -2169,6 +2188,25 @@ def _limitation_rows(
                 "not_modelled",
                 "important",
                 "The process is well-mixed and does not represent spatial gradients, solid-substrate accessibility, adsorption, or surface morphology.",
+                case.process_type,
+            )
+        )
+    if case.process_type == "culture_physiology":
+        rows.append(
+            _limitation_row(
+                context,
+                "not_modelled",
+                "important",
+                "This is a well-mixed culture physiology case composed from template-declared process laws; nutrient limitation, oxygen transfer, maintenance, morphology, pH dynamics, and soluble intermediates are not represented unless the template declares them.",
+                case.process_type,
+            )
+        )
+        rows.append(
+            _limitation_row(
+                context,
+                "retrospective_calibration",
+                "important",
+                "Calibrated parameter records are retrospective fits to published duplicate means without measured uncertainty; the trajectories are not validated predictions and must not be cited as independent evidence.",
                 case.process_type,
             )
         )

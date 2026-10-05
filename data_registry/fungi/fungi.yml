@@ -56,3 +56,43 @@ records:
       Enzyme-source pseudo-record for a purified or recombinant enzyme
       kinetics case. This is not a whole-fungus growth model and must not imply
       secretion, uptake, biomass growth, or organism-level degradation.
+
+  - record_id: trichoderma_harzianum_p49p11
+    name: Trichoderma harzianum P49P11
+    display_name: T. harzianum P49P11
+    scientific_name: Trichoderma harzianum
+    aliases:
+      - T. harzianum P49P11
+      - Trichoderma harzianum
+      - T. harzianum
+    maturity: literature_metadata
+    provenance:
+      source: >-
+        Gelain L, van der Wielen L, van Gulik WM, Pradella JGC, da Costa AC (2020).
+        Mathematical modelling for the optimization of cellulase production using
+        glycerol for cell growth and cellulose as the inducer substrate. Chemical
+        Engineering Science X 8, 100085. doi:10.1016/j.cesx.2020.100085. Deposited
+        culture data doi:10.17632/shd3wcczsr.2 (CC BY 4.0).
+      confidence_level: literature_curated
+      strain_origin: >-
+        Wild strain isolated from the Amazon forest (Delabona et al. 2012, as cited in
+        Gelain 2020 Methods 2.1); maintained on potato dextrose agar at 29 C.
+      notes: >-
+        First whole-organism registry record. The record names the organism and its
+        assay-defined enzyme capabilities only. Growth, loss, induction and enzyme
+        production constants are separate calibrated parameter records bound through
+        the culture_physiology process compatibility; no constant is stored here.
+    enzyme_classes:
+      - cellulase_total_filter_paper_activity
+      - beta_glucosidase
+    assimilable_products: []
+    notes: >-
+      Whole-culture organism record for Trichoderma harzianum P49P11 grown in
+      submerged batch culture on Celufloc 200 cellulose (Gelain 2020). The
+      organism's physiology reachable from the registry is the retrospectively
+      calibrated hydrolysis candidate (cellulase-limited cellulose consumption with
+      an explicit biomass yield, first-order biomass loss, cellulose-induced
+      filter-paper and beta-glucosidase activity production, first-order activity
+      loss). Nutrient and oxygen limitation, maintenance, soluble intermediates,
+      morphology and pH dynamics are not represented. Assimilable products are not
+      characterized by the source and are left empty rather than guessed.

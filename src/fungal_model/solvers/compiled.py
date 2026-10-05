@@ -45,6 +45,20 @@ NUMERIC_KERNEL_KINDS = frozenset({KERNEL_NUMERIC, KERNEL_NUMERIC_THERMODYNAMIC})
 WRAPPED_KERNEL_KINDS = frozenset({KERNEL_QUANTITY_WRAPPED, KERNEL_QUANTITY_WRAPPED_THERMODYNAMIC})
 STOICHIOMETRY_PROBE_VALUES = (0.0, 1.0, 2.0)
 MODEL_REPRESENTATION = "compiled_stoichiometric_rhs"
+# Constitutive rate laws are defined on the non-negative orthant. Solver trial
+# iterates can step slightly outside it near depletion, so rates are evaluated
+# at the projection ``max(state, 0)`` (Shampine, Thompson, Kierzenka and Byrne,
+# "Non-negative solutions of ODEs", Appl. Math. Comput. 170 (2005) 556-569).
+# The integrated state itself is never clipped; validators check accepted
+# trajectories for negativity beyond tolerance.
+NEGATIVE_STATE_POLICY = "rates_evaluated_at_max_state_zero_trajectory_never_clipped"
+
+
+def evaluation_state_for_rates(state: np.ndarray) -> np.ndarray:
+    """Project a solver trial state onto the non-negative orthant for rate evaluation."""
+
+    return np.maximum(np.asarray(state, dtype=float), 0.0)
+
 
 
 def resolve_state_units(model: AssembledModel) -> dict[str, str]:
@@ -108,18 +122,23 @@ class CompiledModel:
     def rates(self, time: float, state: np.ndarray) -> np.ndarray:
         """Process rate vector, each entry in its process's own rate units."""
 
-        return np.array([process.rate(time, state) for process in self.processes], dtype=float)
+        evaluation_state = evaluation_state_for_rates(state)
+        return np.array([process.rate(time, evaluation_state) for process in self.processes], dtype=float)
 
     def rhs(self, time: float, state: np.ndarray) -> np.ndarray:
         """Time derivative of the numeric state vector in state units per time unit.
 
         Contributions accumulate process by process in model order, matching
-        the summation order of the unit-aware evaluation.
+        the summation order of the unit-aware evaluation. Rates are evaluated
+        at ``max(state, 0)`` (see :data:`NEGATIVE_STATE_POLICY`); the returned
+        derivative is not otherwise altered and the integrated state is never
+        clipped.
         """
 
+        evaluation_state = evaluation_state_for_rates(state)
         derivative = np.zeros(len(self.state_names), dtype=float)
         for process, column in zip(self.processes, self._columns, strict=True):
-            derivative += column * process.rate(time, state)
+            derivative += column * process.rate(time, evaluation_state)
         return derivative
 
     def quantity_state(self, state: np.ndarray) -> dict[str, Quantity]:
@@ -135,7 +154,7 @@ class CompiledModel:
 
         values = np.empty((len(self.processes), times.size), dtype=float)
         for column_index, time in enumerate(times):
-            state = states[:, column_index]
+            state = evaluation_state_for_rates(states[:, column_index])
             for row_index, process in enumerate(self.processes):
                 values[row_index, column_index] = process.rate(float(time), state)
         return {
@@ -157,6 +176,7 @@ class CompiledModel:
             "unit_resolution": "build_time",
             "stoichiometry_probe": "contributions_linear_in_rate",
             "jacobian": "finite_difference_by_backend",
+            "negative_state_policy": NEGATIVE_STATE_POLICY,
         }
 
 
@@ -340,6 +360,8 @@ def _blocking_kernel(numeric: RateKernel, feasible: Callable[[np.ndarray], bool]
 
 
 __all__ = [
+    "NEGATIVE_STATE_POLICY",
+    "evaluation_state_for_rates",
     "KERNEL_NUMERIC",
     "KERNEL_NUMERIC_THERMODYNAMIC",
     "KERNEL_QUANTITY_WRAPPED",
