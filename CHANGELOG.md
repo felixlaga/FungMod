@@ -206,6 +206,17 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- Importing the COPASI stack through `fungal_model.standards.copasi` no longer
+  leaves the process in the C locale. COPASI's static initialiser calls
+  `setlocale(LC_ALL, "C")`, which switched Python's preferred text encoding to
+  ASCII, so every later text read that named no encoding failed on non-ASCII
+  repository files once the `copasi` extra was installed (the culture-benchmark
+  docs check in CI). The import helper restores `LC_CTYPE` and keeps COPASI's
+  numeric locale; the COPASI test modules skip through that helper instead of
+  importing COPASI directly; a regression test checks the encoding in a fresh
+  interpreter. The FungMod-objective check of the cross-solver test tolerates
+  platform floating-point differences (relative 1e-7; macOS differed from
+  Linux by 1e-8).
 - The cross-engine reference simulator compiles kinetic laws from their L3
   infix text instead of libSBML `ASTNode` objects, so SBML round-trip and
   trajectory checks no longer fail once `libsedml` has been imported in the

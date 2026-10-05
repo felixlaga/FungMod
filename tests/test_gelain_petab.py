@@ -65,7 +65,7 @@ def test_fungmod_objective_on_the_exported_problem_is_the_stage_a_objective(prob
     """The PEtab objective at the nominal values reproduces twice the recorded least-squares cost."""
 
     fit = gelain_petab.reference_fit(ROOT, plan)
-    assert problem.fungmod_objective() == pytest.approx(2.0 * fit["cost"], rel=1e-9)
+    assert problem.fungmod_objective() == pytest.approx(2.0 * fit["cost"], rel=1e-7)
     metadata = json.loads((problem.export.directory / "problem_metadata.json").read_text(encoding="utf-8"))
     assert metadata["plan_sha256"] == FROZEN_SHA256
     assert metadata["reference_objective"] == pytest.approx(2.0 * fit["cost"])
@@ -100,9 +100,10 @@ def test_recorded_results_cite_the_plan_and_their_gates_are_consistent(plan) -> 
 
 
 def test_copasi_reproduces_the_problem_from_the_nominal_values(tmp_path) -> None:
-    pytest.importorskip("COPASI", reason="requires the optional 'copasi' extra")
-    pytest.importorskip("basico", reason="requires the optional 'copasi' extra")
-    pytest.importorskip("copasi_petab_importer", reason="requires the optional 'copasi' extra")
+    from fungal_model.standards.copasi import copasi_available
+
+    if not copasi_available():
+        pytest.skip("requires the optional 'copasi' extra")
     comparison = gelain_petab.run_reproduction(ROOT, output_dir=tmp_path, starts=0, seed=1)
     assert comparison["settings"]["as_planned"] is False
     assert comparison["simulation_gate"]["passed"], comparison["simulation_gate"]

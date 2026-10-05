@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 
 import numpy as np
 import pytest
 
 pytest.importorskip("libsbml", reason="requires the optional 'standards' extra")
-pytest.importorskip("COPASI", reason="requires the optional 'copasi' extra")
-pytest.importorskip("basico", reason="requires the optional 'copasi' extra")
-pytest.importorskip("copasi_petab_importer", reason="requires the optional 'copasi' extra")
+from fungal_model.standards import copasi as copasi_module  # noqa: E402
+
+if not copasi_module.copasi_available():
+    pytest.skip("requires the optional 'copasi' extra", allow_module_level=True)
 
 from fungal_model.core.units import Q_
 from fungal_model.standards import conditions_to_petab
@@ -122,3 +125,19 @@ def test_reader_refuses_observable_formulas_fungmod_never_writes(tmp_path):
     export.observables.write_text(text, encoding="utf-8")
     with pytest.raises(CopasiReproductionError, match="not '\\[factor \\*\\] species'"):
         read_petab_tables(export.problem_yaml)
+
+
+def test_requiring_copasi_leaves_the_process_text_encoding_alone() -> None:
+    """Importing COPASI resets the C locale; the helper restores LC_CTYPE so later text reads keep their encoding."""
+
+    script = (
+        "import locale, sys\n"
+        "before = locale.getpreferredencoding(False)\n"
+        "from fungal_model.standards.copasi import copasi_available\n"
+        "assert copasi_available()\n"
+        "after = locale.getpreferredencoding(False)\n"
+        "print(before, after)\n"
+        "sys.exit(0 if before == after else 1)\n"
+    )
+    completed = subprocess.run([sys.executable, "-X", "utf8=0", "-c", script], capture_output=True, text=True, check=False)
+    assert completed.returncode == 0, completed.stdout + completed.stderr

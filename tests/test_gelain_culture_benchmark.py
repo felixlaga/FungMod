@@ -232,7 +232,7 @@ def test_recorded_empirical_result_integrity_and_scores_recompute():
         score = culture.score_predictions(predicted, condition.values, fold["fit"]["normalization_g_l"])
         np.testing.assert_allclose(score["rmse_g_l"], fold["heldout_score"]["rmse_g_l"], atol=1e-6, rtol=1e-6)
         assert fold["condition"] not in fold["fit"]["training_conditions"]
-    text = (ROOT / "docs/gelain-culture-benchmark.md").read_text()
+    text = (ROOT / "docs/gelain-culture-benchmark.md").read_text(encoding="utf-8")
     assert "not independent" in text
     assert "**not SD estimates**" in text
     assert "5/40 g/L cellulose assays were tried during estimation" in text

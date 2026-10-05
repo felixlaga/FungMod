@@ -145,6 +145,16 @@ finish) under a dated amendment of the criticism plan, re-run stage A and
 check whether any R1 verdict changes; then resume stage B (M2 chain, then M1
 and M3) and record identifiability and coverage.
 
+Addendum 2026-10-05 (hosted CI on the recorded head): importing COPASI
+resets the C locale to `C`, which switched Python's preferred text encoding to
+ASCII for the rest of the test session and failed the culture-benchmark docs
+check on Linux and macOS once the `copasi` extra was installed; the import
+helper now restores `LC_CTYPE`, the COPASI test modules skip through it, a
+regression test runs in a fresh interpreter, and the docs read names UTF-8.
+The FungMod-objective check tolerates platform floating-point differences
+(relative 1e-7; macOS differed from Linux by 1e-8). No scientific or numerical
+behaviour changed.
+
 ## CRIT-001 Gelain Model-Criticism Study: Plan Frozen
 
 Date: 2026-10-05
