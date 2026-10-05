@@ -5,3 +5,4 @@
 data/experiments/source_intake/** -text
 data/experiments/literature/** -text
 data/benchmarks/** -text
+data/kinetic_records/** -text

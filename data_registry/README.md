@@ -14,7 +14,8 @@ The registry also holds the first case with an active environment-response
 law: *Phanerochaete chrysosporium* K-3 beta-glucosidase BGL1A on cellobiose,
 whose `ph_ionization_michaelis_menten` compatibility binds the six constants
 and the pH 4-8 range of SABIO-RK Reaction 618 entry 38522 (Tsukada et al.
-2008, PMID 18023045; raw export SHA-256 in every record) to the generic
+2008, PMID 18023045; raw export SHA-256 in every record, with the raw
+export checked out byte-exact through `.gitattributes`) to the generic
 diprotic pH-dependent Michaelis-Menten law. Five environment records give the
 30 C assay at pH 4 to 8. The entry records no substrate or enzyme
 concentration, so the assay loadings are explicit `exploratory_prior`

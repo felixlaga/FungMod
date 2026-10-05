@@ -85,6 +85,8 @@ def test_registry_constants_equal_the_raw_sabio_export_and_record_its_hash() -> 
     registry = load_registry(REGISTRY_INDEX)
     entry = _raw_entry()
     raw = _raw_parameters(entry)
+    # Exact bytes: data/kinetic_records/** is checked out without line-ending
+    # conversion (.gitattributes), like the other checksummed source snapshots.
     digest = hashlib.sha256(RAW_EXPORT.read_bytes()).hexdigest()
     assert entry["kineticlaw"]["kinlaw_type"]["name"] == "Michaelis-Menten (pH-dependent)"
     assert entry["general"]["organism"]["name"] == "Phanerochaete chrysosporium"

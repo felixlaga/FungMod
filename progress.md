@@ -131,7 +131,9 @@ Tests added or modified:
   exponential decay with closed ledger, factory decisions, toy config closed
   form.
 - `tests/test_bgl1a_ph_response_case.py` (new, 6): registry constants equal
-  the raw export bit for bit and record its SHA-256; modelability exploratory
+  the raw export bit for bit and record its SHA-256 (`data/kinetic_records/**`
+  is now `-text` in `.gitattributes` so Windows checkouts keep the exact bytes,
+  as the other checksummed snapshots already do); modelability exploratory
   modelable, scientific underparameterized on exactly the two assumptions, the
   sibling SABIO case unchanged; the assembled case binds the law and records
   `environment_response`; the public pH series reports `active_response_model`
