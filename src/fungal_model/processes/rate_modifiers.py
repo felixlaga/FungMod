@@ -6,6 +6,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
+
+from fungal_model.core.kernels import KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity
 from fungal_model.modifiers import (
@@ -86,6 +89,38 @@ class RateModifierProcess(Process):
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         return self.base_process.contributions(rate)
+
+    @property
+    def rate_units(self) -> str:
+        """Rate units are those of the wrapped base process; modifiers are dimensionless."""
+
+        units = getattr(self.base_process, "rate_units", None)
+        if not isinstance(units, str):
+            raise AttributeError(f"Base process {self.base_process.name!r} declares no rate_units.")
+        return units
+
+    def compile_rate(self, context: KernelContext) -> RateKernel | None:
+        base = self.base_process.compile_rate(context)
+        if base is None:
+            return None
+        if context.environment is None and _requires_environment(self.rate_modifiers):
+            raise ValueError("Explicit environment rate modifiers require an environment entity.")
+        activities: list[RateKernel] = []
+        for modifier in self.rate_modifiers:
+            compile_activity = getattr(modifier, "compile_activity", None)
+            activity = None if compile_activity is None else compile_activity(context)
+            if activity is None:
+                return None
+            activities.append(activity)
+        activity_kernels = tuple(activities)
+
+        def kernel(time: float, state: np.ndarray) -> float:
+            rate = base(time, state)
+            for activity in activity_kernels:
+                rate = rate * activity(time, state)
+            return rate
+
+        return kernel
 
     def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()

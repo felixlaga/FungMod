@@ -16,9 +16,10 @@ Use these sources in order:
 2. `README.md` for the current user-facing capability summary and quality gates.
 3. `foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md` for the central product goal.
 4. `foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md` for active roadmap intent, after checking status against code, tests, and `progress.md`.
-5. `progress.md` for the implementation ledger.
-6. `ARCHITECTURE_DEBT.md` for active architecture-debt containment.
-7. Executable code and tests for actual behavior.
+5. `foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md` for the verified 2026-10-04 state assessment, the solver inventory, and the ordered next-step sequence (compiled model core first).
+6. `progress.md` for the implementation ledger.
+7. `ARCHITECTURE_DEBT.md` for active architecture-debt containment.
+8. Executable code and tests for actual behavior.
 
 If roadmap text, progress notes, and executable behavior disagree, verify the
 behavior from code and tests before acting. Do not assume roadmap phase gates or

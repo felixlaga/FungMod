@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from fungal_model.core.assumptions import Assumption
+from fungal_model.core.kernels import KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity, assert_compatible
 from fungal_model.entities.environment import Environment
+from fungal_model.modifiers.base import constant_activity_kernel
 from fungal_model.kinetics.ph import gaussian_ph_activity, gaussian_ph_activity_assumption
 
 
@@ -67,6 +69,11 @@ class PHModifier:
             str(rate.units),
             name="pH-scaled rate",
         )
+
+    def compile_activity(self, context: KernelContext) -> RateKernel | None:
+        """Environment-only activity: evaluated once at build time."""
+
+        return constant_activity_kernel(self, context)
 
     def to_dict(self) -> dict[str, object]:
         return {

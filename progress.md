@@ -93,6 +93,164 @@ Ambiguities: none known. Risk: low.
 Next task: merge this into `main`, bring `main` into the PR chain (#77 to #80)
 so every job re-runs green, then merge the chain in order.
 
+## CORE-001 Compiled Well-Mixed Process Core
+
+Date: 2026-10-04
+
+Status: `complete` for the well-mixed `Process` path (step 1, first slice).
+The legacy `Reaction` engine, the spatial engines, the physiology classes and
+the research models remain on their own integrators (`FD-009`).
+
+Changed:
+
+- Added `core/kernels.py`: `KernelContext` (state index, state units, time
+  unit, parameters, environment, geometry; build-time conversion factors and
+  parameter values) and the `RateKernel` contract.
+- Added `solvers/compiled.py`: `compile_assembled_model` builds
+  `dy/dt = N v(t, y)` on plain floats. `N` is probed from
+  `Process.contributions` at three rates and must be linear in the rate; each
+  column already carries the rate-unit to state-unit-per-time conversion.
+  Kernel kinds `numeric`, `numeric_thermodynamic`, `quantity_wrapped` and
+  `quantity_wrapped_thermodynamic` are recorded per process in
+  `CompiledModel.summary()`.
+- Added `Process.compile_rate(context)` (default `None`) and numeric kernels on
+  `FirstOrderDecayProcess`, `MassActionProcess`,
+  `HomogeneousMichaelisMentenProcess`, `SurfaceCatalysisProcess`,
+  `SubstrateTransglycosylationProcess` and `RateModifierProcess` (which also
+  gained a `rate_units` property). Kernels reproduce the unit-aware arithmetic
+  in the same operation order and raise the same errors for negative states.
+- Added `compile_activity(context)` on all eight modifiers. Product,
+  competitive, Haldane and coupled inhibition compile to float algebra;
+  temperature, pH, oxygen and water activity fold to a constant through the
+  modifier's own `activity` (`modifiers.base.constant_activity_kernel`).
+- Added `DynamicThermodynamicConstraint.compile_feasibility(context)`, a float
+  mirror of `evaluate`, so thermodynamic blocking stays numeric at solver time.
+- `ProcessODESolver.run` compiles once per run and integrates the compiled
+  right-hand side; `ProcessODESolver.compile(request)` exposes the compiled
+  model; `solver_metadata["kernel"]` records the kernel summary. Process-rate
+  trajectories at returned time points reuse the kernels; constrained
+  processes are still re-evaluated through the unit-aware `enforce` so the
+  recorded activities, quotients and Gibbs energies are unchanged.
+- Documentation: `docs/compiled-core.md` (nav under Core concepts), capability
+  map row, README limitation bullet, `CHANGELOG.md`, `ARCHITECTURE_DEBT.md`
+  `FD-009`.
+
+Not changed:
+
+- Rate laws, parameters, registry records, configs, notebooks, output
+  schemas, validators, `SolverSettings`, `solve_checked`, tolerances, failure
+  semantics, clipping policy (none), thermodynamic diagnostics, the legacy
+  `SimulationEngine`, the spatial engines, the physiology classes, research
+  models, calibration or validation behavior.
+
+Tests added:
+
+- `tests/test_compiled_process_models.py` (32 tests): compiled right-hand side
+  and trajectories equal the unit-aware reference on every packaged model
+  config with identical `nfev`; every kernel matches its process rate
+  pointwise; kernel kinds and numeric thermodynamic enforcement are recorded;
+  all shipped process types compile numerically (architecture-debt boundary);
+  a process without a kernel uses the recorded wrapped path and matches the
+  numeric path to 1e-12; nonlinear contributions and unknown states are
+  rejected; mixed units (micromolar states, per-minute constant, hour time
+  grid) resolve at build time and match the closed form; environment
+  modifiers fold to constants that match the reference and still warn
+  outside their source range; negative states raise the same error text;
+  `KernelContext` and constraint-process checks.
+
+Commands run and results (venv, Python 3.11, numpy 2.4.6, scipy 1.17.1,
+pint 0.25.3, libsbml 5.21.2):
+
+- Parity script over all ten `data/model_configs/*.yml`: maximum relative
+  right-hand-side difference 0, maximum relative trajectory difference 0,
+  identical `nfev`; compiled versus unit-aware solve times 19/252, 5/198,
+  8/478, 1.5/27, 1.4/39, 1.8/65, 1.6/51, 0.6/3.5, 0.8/17, 0.6/3.6 ms.
+- `ruff check src tests scripts/run_*.py`: passed.
+- `pyright`: 0 errors.
+- `mkdocs build --strict`: passed.
+- `pytest tests/test_compiled_process_models.py`: 32 passed.
+- `pytest` (full suite): 1717 passed, 11 failed in 18m44s. The 11 failures
+  are exactly the pre-existing set recorded in STATE-2026-10-04 (ten SBML
+  cross-engine/BioModels tests under libsbml 5.21, one frozen Gelain holdout
+  replay at 4.4e-6 against the 2e-6 gate under scipy 1.17); the count rises
+  from 1685 to 1717 passed by the 32 new tests. Hosted CI on the PR head
+  reproduces the same 11/1717 on ubuntu for Python 3.11 and 3.12, and
+  `main`'s own CI is red with the same SBML failures.
+
+Scientific behavior impact: none intended; the compiled path is verified to
+reproduce the unit-aware path bit-for-bit on every packaged config, and the
+same stiff-solver finite-difference Jacobian is used. Two observable
+non-scientific differences: environment-range warnings fire once per run, and
+`solver_metadata` gains a `kernel` entry.
+
+Backward compatibility: public APIs unchanged; `_state_units` in
+`solvers/process_ode.py` is now an alias of `solvers.compiled.resolve_state_units`;
+third-party `Process` subclasses without `compile_rate` keep working through
+the recorded wrapped path.
+
+Measured public-path effect: a configured run's integration is now a few
+milliseconds; the remaining ~0.6 s per ensemble sample is per-sample bundle
+writing, chiefly three matplotlib figures per sample in
+`SimulationResult.save`. That is a screening output-policy question, not a
+solver one, and was left unchanged here.
+
+Risk: low for numerics (exact parity, same backend, same tolerances);
+moderate for maintenance because each new process must ship a kernel or
+accept the recorded slow path, which the boundary test makes visible.
+
+Recommended next task: CORE-002, express `Reaction` rate laws and the
+`FungalCouplingModel` physiology as processes or builders that emit the
+compiled representation, add an optional analytic Jacobian hook to
+`compile_rate`, then move the spatial engines onto compiled per-cell kernels;
+afterwards reduce per-sample figure output in registry ensembles.
+
+## STATE-2026-10-04 Verified State Assessment And Next-Step Sequence
+
+Date: 2026-10-04
+
+Status: `complete` for the documentation task. No code, data, registry, or
+scientific behavior changed.
+
+Changed:
+
+- Added `foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`: the
+  verified state of the repository on `main` at `50f8496`, the measured
+  registry coverage, a solver/engine inventory with per-RHS timings, the gaps
+  to a validated whole-fungus model, and an ordered next-step sequence.
+- Added the assessment to the `AGENTS.md` active source-of-truth order after
+  the roadmap, and a dated status note at the top of the roadmap status list.
+
+Not changed:
+
+- Source code, tests, registry records, configs, notebooks, benchmarks.
+
+Verification recorded in the assessment (venv on Python 3.11, numpy 2.4.6,
+scipy 1.17.1, pint 0.25.3, libsbml 5.21.2):
+
+- `ruff check src tests scripts/run_*.py`: passed.
+- `pyright`: 0 errors.
+- `pytest`: 1685 passed, 11 failed in 18m41s. The failures are dependency and
+  test-order sensitivity, not model defects: nine SBML cross-engine/unit tests
+  pass in isolation and fail only in the full run; the BioModels round-trip
+  fails under libsbml 5.21; one frozen Gelain holdout replays to 4.4e-6
+  relative difference against the 2e-6 gate under scipy 1.17.
+- Registry enumeration: 27 combinations, 3 runnable in exploratory mode, 0 in
+  scientific mode; 0 shipped case templates bind an environment response law.
+- Timing: `SimulationEngine` and `ProcessODESolver` cost about 0.5 ms per
+  right-hand-side evaluation against 16 us for the same model in plain numpy;
+  the 1D reaction-diffusion engine spends 66 ms per evaluation at 200 cells;
+  the public Reaction 618 ensemble costs about 0.8 s per sample.
+
+Scientific behavior impact: none. Backward compatibility: none.
+
+Risk: low (documentation only).
+
+Recommended next task: CORE-001, a compiled well-mixed model core with
+build-time unit resolution, a stoichiometric matrix probed from
+`Process.contributions`, numeric rate kernels for every shipped process, an
+explicit recorded fallback for processes without kernels, and parity tests
+against the unit-aware path.
+
 ## DIGESTION-001 Conserved Secretion And Extracellular Digestion
 
 Date: 2026-10-03

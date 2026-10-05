@@ -6,6 +6,15 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Compiled well-mixed model core (`fungal_model.solvers.compile_assembled_model`):
+  units resolve once at build time, stoichiometry is probed from
+  `Process.contributions` and checked for linearity, and every shipped process
+  and modifier supplies a numeric rate kernel. Dynamic Gibbs constraints compile
+  to a float feasibility test. `solver_metadata["kernel"]` records each
+  process's kernel kind; processes without a kernel use an explicit, exact
+  unit-aware fallback. Trajectories and evaluation counts are unchanged on every
+  packaged config; solves are 6 to 60 times faster.
+
 - Opt-in balanced secretion–digestion–growth feedback with seven dynamic pools,
   explicit protein synthesis costs, chemically retained inactive protein,
   substrate allocation and batch degradation thresholds. Illustrative kinetics
@@ -43,6 +52,13 @@ All notable public releases of FungMod are documented here.
   holdouts, weighting sensitivity, frozen artifacts and cross-solver checks.
   Missing replicate uncertainty and substantial cellulose prediction errors
   remain explicit; no validated organism model or registry promotion is claimed.
+
+### Changed
+
+- `ProcessODESolver` integrates the compiled right-hand side. Environment-only
+  rate modifiers are evaluated once per run, so their source-range warnings fire
+  once rather than at every right-hand-side evaluation. `_record_process_rates`
+  reuses compiled kernels for unconstrained processes.
 
 ### Fixed
 

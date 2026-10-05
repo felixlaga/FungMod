@@ -24,7 +24,7 @@ resolve parameter identifiability or supply independent empirical evidence.
 
 | Capability | Status | Boundary |
 | --- | --- | --- |
-| Well-mixed process ODEs | Implemented | Unsupported geometry fails before execution. |
+| Well-mixed process ODEs | Implemented; compiled numeric right-hand side | Units resolve at build time, stoichiometry is probed for linearity, every process's kernel kind is recorded; unsupported geometry fails before execution. See [compiled core](compiled-core.md). |
 | Per-state numerical tolerances and sparse spatial Jacobians | Implemented across main engines and joint culture research API | Explicit units and complete state coverage; failed/incomplete runs reject; local numerical error control is not measurement uncertainty. See [audit](solver-thermodynamic-audit.md). |
 | Coupled detailed-balance networks and free-energy equilibrium | Implemented and software-tested | Closed ideal-dilute fixed-volume isothermal elementary mass action; sourced formation energies and kinetics required. Zero-concentration entropy diagnostics are unavailable; no organism validation. |
 | First-order, mass-action, homogeneous Michaelis-Menten | Implemented | Homogeneous Michaelis-Menten is dissolved-substrate kinetics. |

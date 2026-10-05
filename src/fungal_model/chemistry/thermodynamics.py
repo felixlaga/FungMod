@@ -6,12 +6,13 @@ framework does not yet enforce full thermodynamic flux analysis.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 
+from fungal_model.core.kernels import KernelContext
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.provenance import ProvenanceError, UnknownParameterError, has_text
 from fungal_model.core.units import Q_, Quantity, assert_compatible
@@ -366,6 +367,66 @@ class DynamicThermodynamicConstraint:
             favorable=delta_g < -tolerance_value,
             rate_blocked=rate_blocked,
         )
+
+    def compile_feasibility(self, context: KernelContext) -> Callable[[np.ndarray], bool] | None:
+        """Numeric favorability test over a state vector, mirroring :meth:`evaluate`.
+
+        Every constant (standard state, activity floor, temperature, gas
+        constant, standard Gibbs energy, tolerance) is resolved once; the
+        returned closure recomputes only the state-dependent reaction quotient
+        and raises the same errors as :meth:`evaluate` for invalid states.
+        """
+
+        self.validate()
+        standard_concentration = self.standard_concentration.quantity
+        minimum_activity = self.minimum_activity.quantity
+        temperature = self.temperature.quantity
+        gas_constant = self.gas_constant.quantity
+        tolerance = self.absolute_tolerance.quantity
+        assert standard_concentration is not None
+        assert minimum_activity is not None
+        assert temperature is not None
+        assert gas_constant is not None
+        assert tolerance is not None
+        standard_units = str(standard_concentration.units)
+        standard_value = float(standard_concentration.magnitude)
+        floor_value = float(minimum_activity.to("dimensionless").magnitude)
+        temperature_k = float(temperature.to("kelvin").magnitude)
+        gas_constant_value = float(gas_constant.to("joule / mole / kelvin").magnitude)
+        standard_delta_g = self.standard_delta_gibbs_value()
+        tolerance_value = float(tolerance.to("joule / mole").magnitude)
+        participants: list[tuple[str, int, float, float]] = []
+        for participant in self.participants:
+            if participant.state_name not in context.state_index:
+                raise ValueError(
+                    f"Dynamic thermodynamic constraint {self.constraint_id!r} "
+                    f"requires missing state {participant.state_name!r}."
+                )
+            index, factor = context.state_slot(participant.state_name, standard_units)
+            participants.append((participant.state_name, index, factor, float(participant.signed_coefficient)))
+        constraint_id = self.constraint_id
+
+        def favorable(state: np.ndarray) -> bool:
+            log_quotient = 0.0
+            for name, index, factor, coefficient in participants:
+                concentration_value = float(state[index] * factor)
+                if not np.isfinite(concentration_value) or concentration_value < 0.0:
+                    raise ValueError(
+                        f"Dynamic thermodynamic state {name!r} "
+                        "must be a finite nonnegative concentration."
+                    )
+                activity = max(concentration_value / standard_value, floor_value)
+                log_quotient += coefficient * float(np.log(activity))
+            quotient = float(np.exp(log_quotient))
+            if not np.isfinite(log_quotient) or not np.isfinite(quotient) or quotient <= 0.0:
+                raise ValueError(
+                    f"Dynamic thermodynamic constraint {constraint_id!r} "
+                    "produced a non-finite or non-positive reaction quotient."
+                )
+            delta_g = standard_delta_g + gas_constant_value * temperature_k * log_quotient
+            return delta_g < -tolerance_value
+
+        return favorable
 
     def enforce(
         self,

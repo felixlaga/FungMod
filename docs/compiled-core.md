@@ -1,0 +1,103 @@
+# Compiled model core
+
+Since CORE-001 the well-mixed process solver no longer evaluates unit-bearing
+quantities inside the right-hand side. `ProcessODESolver` compiles the
+assembled model once per run (`fungal_model.solvers.compile_assembled_model`)
+into
+
+```text
+dy/dt = N v(t, y)
+```
+
+where `y` is the numeric state vector in the model's declared state units, `N`
+is a stoichiometric matrix (states x processes) and `v` is the vector of
+process rates, each in its process's own rate units. Every unit conversion
+between rate units, state units and the integration time unit is resolved at
+build time. The integrator then calls plain numpy code.
+
+This is a numerical change only. No rate law, parameter, default, threshold or
+biological claim was added; the compiled path reproduces the unit-aware
+evaluation and is tested against it on every packaged model config.
+
+## How a model is compiled
+
+1. **State vector.** `resolve_state_units` orders the model's state variables
+   and fails on conflicting units, exactly as before.
+2. **Stoichiometry.** `Process.contributions` is probed at rates 0, 1 and 2 in
+   the process's rate units. Each contribution is converted to
+   `state units / time unit`, and the probe must be linear in the rate;
+   otherwise compilation fails explicitly. A contribution to an unknown state
+   fails with the same message the solver raised before.
+3. **Rate kernels.** Each process is asked for a numeric kernel through
+   `Process.compile_rate(context)`. The `KernelContext` carries the state
+   index, state units, time unit, parameters, environment and geometry; it
+   resolves parameter values and state conversion factors once. Rate modifiers
+   compile their activity through `compile_activity`; environment-only
+   modifiers (temperature, pH, oxygen, water activity) fold to a constant
+   evaluated with the modifier's own `activity` method, so a source-range
+   warning now fires once per run instead of at every evaluation.
+4. **Thermodynamic blocking.** A process bound to a dynamic Gibbs constraint
+   uses `DynamicThermodynamicConstraint.compile_feasibility`, a float
+   re-implementation of `evaluate`; the kernel returns zero when the forward
+   reaction is unfavorable. Activities, reaction quotients and Gibbs energies
+   are still recorded at the returned time points through the unit-aware
+   `enforce`, so the diagnostics are unchanged.
+
+## Kernel kinds are recorded, never silent
+
+`solver_metadata["kernel"]` records, for every process, which path evaluated
+it:
+
+| Kind | Meaning |
+| --- | --- |
+| `numeric` | Closure from `compile_rate`, plain floats. |
+| `numeric_thermodynamic` | Numeric kernel plus compiled feasibility blocking. |
+| `quantity_wrapped` | The process offered no kernel; its unit-aware `rate` runs on a reconstructed state. Exact, slow. |
+| `quantity_wrapped_thermodynamic` | Wrapped evaluation followed by the constraint's unit-aware `enforce`. |
+
+All five shipped process classes (`FirstOrderDecayProcess`,
+`MassActionProcess`, `HomogeneousMichaelisMentenProcess`,
+`SurfaceCatalysisProcess`, `SubstrateTransglycosylationProcess`) and all eight
+modifiers compile to numeric kernels; `tests/test_compiled_process_models.py`
+fails if any shipped mechanism falls back. A third-party `Process` that only
+implements `rate`/`contributions` keeps working through the wrapped path.
+
+Kernels must raise the same errors as the unit-aware path. A negative
+substrate still raises `ValueError`; nothing is clipped. `SolverSettings`,
+`solve_checked`, tolerances and failure semantics are unchanged.
+
+## Measured effect
+
+On the packaged configs, with identical trajectories and identical numbers of
+right-hand-side evaluations (`nfev`) between the compiled and the unit-aware
+evaluation:
+
+| Config | Unit-aware solve | Compiled solve |
+| --- | ---: | ---: |
+| `alvarez_gonzalez_2022_free_beta_glucosidase_comparison` | 252 ms | 19 ms |
+| `phanerochaete_bgl1b_cellobiose_transglycosylation` | 198 ms | 5 ms |
+| `showcase_dynamic_thermodynamics` | 478 ms | 8 ms |
+| `toy_homogeneous_competitive_inhibition` | 65 ms | 2 ms |
+| `toy_surface_dummy_non_pet_product_inhibition` | 17 ms | 1 ms |
+
+The per-sample cost of a registry ensemble is now dominated by writing the
+per-sample output bundle, chiefly three matplotlib figures per sample
+(about 0.55 s), not by integration. Reducing that is a separate, non-numerical
+change to the screening output policy.
+
+## What is not on the compiled core yet
+
+- The legacy `Reaction`/`SimulationEngine` path, the 1D and N-D
+  reaction-diffusion engines, the opt-in physiology classes
+  (`FungalCouplingModel`, `ResourceLimitedCulture`, `DegradingCulture`) and
+  the research culture models still integrate their own right-hand sides.
+  They are tracked as `FD-009` in `ARCHITECTURE_DEBT.md`.
+- No analytic Jacobian is generated for compiled models; stiff methods use the
+  backend's finite differences, recorded as
+  `"jacobian": "finite_difference_by_backend"`.
+
+## Reproduce
+
+```bash
+python -m pytest tests/test_compiled_process_models.py
+```

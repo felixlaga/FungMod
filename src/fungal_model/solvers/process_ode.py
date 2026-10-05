@@ -16,6 +16,7 @@ from fungal_model.chemistry.thermodynamics import (
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.core.validators import ValidationResult
 from fungal_model.results import SimulationResult
+from fungal_model.solvers.compiled import CompiledModel, compile_assembled_model, resolve_state_units
 
 if TYPE_CHECKING:
     from fungal_model.processes.assembly import AssembledModel
@@ -34,16 +35,37 @@ class RunRequest:
 
 
 class ProcessODESolver:
-    """Integrate a well-mixed assembled process model."""
+    """Integrate a well-mixed assembled process model.
+
+    The model is compiled once per run into a numeric right-hand side (see
+    :mod:`fungal_model.solvers.compiled`); the kernel used for every process is
+    recorded under ``solver_metadata["kernel"]``.
+    """
 
     backend_name = "scipy.solve_ivp"
 
     def __init__(self, model: AssembledModel) -> None:
         self.model = model
 
+    def compile(self, request: RunRequest) -> CompiledModel:
+        """Compile the model for the request's time units without integrating."""
+
+        self._validate_geometry_supported()
+        state_units = resolve_state_units(self.model)
+        state_names = tuple(state_units)
+        time_units = _time_units(request.t_span)
+        y0 = _initial_vector(request.initial_state, state_units, state_names)
+        return compile_assembled_model(
+            self.model,
+            time_units=time_units,
+            initial_state=np.asarray(y0, dtype=float),
+            initial_time=_numeric_t_span(request.t_span, time_units)[0],
+            constraints_by_process=_constraints_by_process(self.model),
+        )
+
     def run(self, request: RunRequest) -> SimulationResult:
         self._validate_geometry_supported()
-        state_units = _state_units(self.model)
+        state_units = resolve_state_units(self.model)
         state_names = tuple(state_units)
         time_units = _time_units(request.t_span)
         t_span_numeric = _numeric_t_span(request.t_span, time_units)
@@ -51,39 +73,15 @@ class ProcessODESolver:
         y0 = _initial_vector(request.initial_state, state_units, state_names)
         settings = self.model.solver_settings
         constraints_by_process = _constraints_by_process(self.model)
+        compiled = compile_assembled_model(
+            self.model,
+            time_units=time_units,
+            initial_state=np.asarray(y0, dtype=float),
+            initial_time=t_span_numeric[0],
+            constraints_by_process=constraints_by_process,
+        )
 
-        def rhs(t: float, y: np.ndarray) -> list[float]:
-            state = _state_from_vector(y, state_units, state_names)
-            time = Q_(t, time_units)
-            derivatives = {
-                name: Q_(0.0, f"{units} / {time_units}")
-                for name, units in state_units.items()
-            }
-            for process in self.model.processes:
-                rate, _ = _enforced_process_rate(
-                    model=self.model,
-                    process=process,
-                    state=state,
-                    time=time,
-                    constraint=constraints_by_process.get(process.name),
-                )
-                for species, contribution in process.contributions(rate).items():
-                    if species not in derivatives:
-                        raise ValueError(
-                            f"Process {process.name!r} contributed to unknown state {species!r}."
-                        )
-                    target_units = f"{state_units[species]} / {time_units}"
-                    derivatives[species] += assert_compatible(
-                        contribution,
-                        target_units,
-                        name=f"{process.name} contribution to {species}",
-                    )
-            return [
-                float(assert_compatible(derivatives[name], f"{state_units[name]} / {time_units}").magnitude)
-                for name in state_names
-            ]
-
-        solution = solve_checked(rhs, t_span_numeric, y0, t_eval=t_eval_numeric,
+        solution = solve_checked(compiled.rhs, t_span_numeric, y0, t_eval=t_eval_numeric,
                                  **settings.scipy_options(state_units, time_units))
         states = {
             name: Q_(solution.y[index], state_units[name])
@@ -95,6 +93,7 @@ class ProcessODESolver:
             time,
             states,
             constraints_by_process=constraints_by_process,
+            compiled=compiled,
         )
         thermodynamic_metadata = _thermodynamic_metadata(
             self.model.thermodynamic_constraints,
@@ -121,6 +120,7 @@ class ProcessODESolver:
                 "nfev": int(solution.nfev),
                 "njev": None if solution.njev is None else int(solution.njev),
                 "nlu": None if solution.nlu is None else int(solution.nlu),
+                "kernel": compiled.summary(),
                 **(
                     {"dynamic_thermodynamics": thermodynamic_metadata}
                     if self.model.thermodynamic_constraints
@@ -160,15 +160,7 @@ class ProcessODESolver:
             )
 
 
-def _state_units(model: AssembledModel) -> dict[str, str]:
-    units: dict[str, str] = {}
-    for spec in model.state_variables:
-        if spec.name in units and units[spec.name] != spec.units:
-            raise ValueError(f"Conflicting state units for {spec.name!r}.")
-        units[spec.name] = spec.units
-    if not units:
-        raise ValueError("Assembled model has no state variables.")
-    return units
+_state_units = resolve_state_units
 
 
 def _time_units(t_span: tuple[Quantity, Quantity]) -> str:
@@ -222,57 +214,60 @@ def _initial_vector(
     ]
 
 
-def _state_from_vector(
-    y: np.ndarray,
-    state_units: Mapping[str, str],
-    state_names: Sequence[str],
-) -> dict[str, Quantity]:
-    return {
-        name: Q_(value, state_units[name])
-        for name, value in zip(state_names, y, strict=True)
-    }
-
-
 def _record_process_rates(
     model: AssembledModel,
     time: Quantity,
     states: Mapping[str, Quantity],
     *,
     constraints_by_process: Mapping[str, DynamicThermodynamicConstraint],
+    compiled: CompiledModel,
 ) -> tuple[
     dict[str, Quantity],
     dict[str, list[DynamicThermodynamicEvaluation]],
 ]:
-    rates: dict[str, list[Quantity]] = {process.name: [] for process in model.processes}
+    """Process-rate trajectories at the returned time points.
+
+    Unconstrained processes reuse their compiled kernels. Thermodynamically
+    constrained processes are re-evaluated through the unit-aware ``enforce``
+    so that activities, reaction quotients and Gibbs energies are recorded.
+    """
+
+    times = np.asarray(time.magnitude, dtype=float)
+    matrix = np.vstack([np.asarray(states[name].magnitude, dtype=float) for name in compiled.state_names])
+    rates: dict[str, Quantity] = {}
     evaluations: dict[str, list[DynamicThermodynamicEvaluation]] = {
         constraint.constraint_id: []
         for constraint in model.thermodynamic_constraints
     }
-    for index, time_value in enumerate(np.asarray(time.magnitude, dtype=float)):
-        state = {
-            name: Q_(np.asarray(quantity.magnitude, dtype=float)[index], quantity.units)
-            for name, quantity in states.items()
-        }
-        current_time = Q_(time_value, time.units)
-        for process in model.processes:
+    if times.size == 0:
+        return rates, evaluations
+    for process in compiled.processes:
+        constraint = constraints_by_process.get(process.name)
+        if constraint is None:
+            values = np.asarray(
+                [process.rate(float(time_value), matrix[:, index]) for index, time_value in enumerate(times)],
+                dtype=float,
+            )
+            rates[process.name] = Q_(values, process.rate_units)
+            continue
+        rate_values: list[Quantity] = []
+        for index, time_value in enumerate(times):
+            state = compiled.quantity_state(matrix[:, index])
             rate, evaluation = _enforced_process_rate(
                 model=model,
-                process=process,
+                process=process.process,
                 state=state,
-                time=current_time,
-                constraint=constraints_by_process.get(process.name),
+                time=Q_(time_value, time.units),
+                constraint=constraint,
             )
-            rates[process.name].append(rate)
+            rate_values.append(rate)
             if evaluation is not None:
                 evaluations[evaluation.constraint_id].append(evaluation)
-    return {
-        name: Q_(
+        rates[process.name] = Q_(
             np.asarray([rate.to(rate_values[0].units).magnitude for rate in rate_values], dtype=float),
             rate_values[0].units,
         )
-        for name, rate_values in rates.items()
-        if rate_values
-    }, evaluations
+    return rates, evaluations
 
 
 def _constraints_by_process(
