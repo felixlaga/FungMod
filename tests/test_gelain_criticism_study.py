@@ -184,3 +184,21 @@ def test_stage_a_runs_end_to_end_on_a_tiny_budget(tmp_path: Path, registry, plan
     assert isinstance(screen["passed"], bool) and "relative_improvement" in screen
     report = (tmp_path / "stage_a" / "report.md").read_text(encoding="utf-8")
     assert "biological validation" in report and "M3_conversion_dependent_accessibility" in report
+
+
+def test_stage_a_reuses_existing_files_for_the_same_plan_digest(tmp_path: Path, registry) -> None:
+    first = study.run_stage_a(
+        ROOT, output_dir=tmp_path, registry=registry, models=["M0_baseline"], scenarios=["primary"], starts=1, max_nfev=3, profiles=False,
+    )
+    log: list[str] = []
+    second = study.run_stage_a(
+        ROOT, output_dir=tmp_path, registry=registry, models=["M0_baseline"], scenarios=["primary"], starts=1, max_nfev=3, profiles=False,
+        log=log.append,
+    )
+    assert any("reusing" in line for line in log)
+    assert second["models"]["M0_baseline"]["scenarios"]["primary"] == first["models"]["M0_baseline"]["scenarios"]["primary"]
+    full = json.loads((tmp_path / "stage_a" / "M0_baseline" / "full_fit_primary.json").read_text(encoding="utf-8"))
+    assert full["plan_sha256"] == first["inputs"]["plan_sha256"]
+    # a different digest must not be reused
+    (tmp_path / "stage_a" / "M0_baseline" / "full_fit_primary.json").write_text(json.dumps({**full, "plan_sha256": "0" * 64}), encoding="utf-8")
+    assert study._existing_stage_a_files(tmp_path / "stage_a" / "M0_baseline", ["primary"], first["inputs"]["plan_sha256"]) is None  # noqa: SLF001

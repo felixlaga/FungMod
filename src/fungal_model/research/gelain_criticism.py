@@ -631,10 +631,17 @@ def run_stage_a(
     starts: int | None = None,
     max_nfev: int | None = None,
     profiles: bool = True,
+    reuse_existing: bool = True,
     plan_path: Path | None = None,
     log: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
-    """Whole-condition holdouts, all-condition fits, the screen and profiles for the declared models."""
+    """Whole-condition holdouts, all-condition fits, the screen and profiles for the declared models.
+
+    With ``reuse_existing`` a model whose fits and folds already exist under
+    ``output_dir`` for the same plan digest is loaded instead of refitted, so
+    the stage can be split across processes or resumed; the screen then needs
+    the baseline's files to be present as well.
+    """
 
     plan = load_plan(root, plan_path)
     bayesian_plan = gelain_bayesian.load_plan(root)
@@ -670,14 +677,23 @@ def run_stage_a(
     _write_json(stage_dir / "inputs.json", inputs)
     summaries: dict[str, dict[str, Any]] = {}
     for model_id in chosen:
-        variant = variants[model_id]
-        predictor = build_predictor(store, plan, model_id, bayesian_plan=bayesian_plan)
         model_dir = stage_dir / model_id
         model_summary: dict[str, Any] = {"model": model_id, "scenarios": {}}
+        existing = _existing_stage_a_files(model_dir, scenario_names, inputs["plan_sha256"]) if reuse_existing else None
+        if existing is not None:
+            if log is not None:
+                log(f"{model_id}: reusing existing stage A files")
+            for scenario, (full, folds) in existing.items():
+                model_summary["scenarios"][scenario] = _scenario_summary(full, folds, names)
+            summaries[model_id] = model_summary
+            continue
+        variant = variants[model_id]
+        predictor = build_predictor(store, plan, model_id, bayesian_plan=bayesian_plan)
         for scenario in scenario_names:
             if log is not None:
                 log(f"{model_id} / {scenario}: all-condition fit")
             full = fit_model(predictor, variant, conditions, scenario=scenario, starts=n_starts, seed=seed, max_nfev=nfev)
+            full["plan_sha256"] = inputs["plan_sha256"]
             _write_json(model_dir / f"full_fit_{scenario}.json", full)
             folds = []
             for held_out in conditions:
@@ -709,34 +725,17 @@ def run_stage_a(
                     fold["score"] = None
                 folds.append(fold)
             _write_json(model_dir / f"folds_{scenario}.json", folds)
-            scored = [fold for fold in folds if fold["score"] is not None]
-            pooled = {
-                name: float(np.mean([fold["score"]["normalized_mse"][name] for fold in scored])) if scored else float("nan")
-                for name in names
-            }
-            model_summary["scenarios"][scenario] = {
-                "folds_scored": len(scored),
-                "folds": len(folds),
-                "pooled_normalized_mse": pooled,
-                "mean_normalized_mse": float(np.mean(list(pooled.values()))) if scored else float("nan"),
-                "pooled_rmse": {
-                    name: float(np.sqrt(np.mean([fold["score"]["rmse"][name] ** 2 for fold in scored]))) if scored else float("nan")
-                    for name in names
-                },
-                "full_rank_everywhere": bool(full.get("diagnostics", {}).get("full_rank", False))
-                and all(fold["fit"].get("diagnostics", {}).get("full_rank", False) for fold in folds),
-                "full_fit_success": bool(full["success"]),
-                "full_fit_parameters": full.get("parameters"),
-                "near_bounds": sorted({symbol for fold in folds for symbol in fold["fit"].get("diagnostics", {}).get("near_bounds", [])}),
-            }
+            model_summary["scenarios"][scenario] = _scenario_summary(full, folds, names)
         summaries[model_id] = model_summary
     screen = stage["screen"]
     for model_id, summary in summaries.items():
         for scenario, scenario_summary in summary["scenarios"].items():
             if model_id == BASELINE_MODEL:
                 scenario_summary["screen"] = {"reference": BASELINE_MODEL, "passed": True, "reasons": ["baseline"]}
-            else:
+            elif scenario in summaries.get(BASELINE_MODEL, {}).get("scenarios", {}):
                 scenario_summary["screen"] = _screen(scenario_summary, summaries[BASELINE_MODEL]["scenarios"][scenario], screen)
+            else:
+                scenario_summary["screen"] = {"reference": BASELINE_MODEL, "passed": False, "reasons": ["not run: baseline results absent"]}
     if profiles:
         for model_id, summary in summaries.items():
             primary = summary["scenarios"].get("primary")
@@ -758,6 +757,46 @@ def run_stage_a(
     _write_json(stage_dir / "comparison.json", comparison)
     (stage_dir / "report.md").write_text(render_stage_a_report(plan, comparison), encoding="utf-8")
     return comparison
+
+
+def _existing_stage_a_files(model_dir: Path, scenarios: Sequence[str], plan_sha256: str) -> dict[str, tuple[dict[str, Any], list[dict[str, Any]]]] | None:
+    """Load a model's stage A fits and folds if every scenario exists for this plan digest."""
+
+    found: dict[str, tuple[dict[str, Any], list[dict[str, Any]]]] = {}
+    for scenario in scenarios:
+        full_path = model_dir / f"full_fit_{scenario}.json"
+        folds_path = model_dir / f"folds_{scenario}.json"
+        if not full_path.exists() or not folds_path.exists():
+            return None
+        full = json.loads(full_path.read_text(encoding="utf-8"))
+        folds = json.loads(folds_path.read_text(encoding="utf-8"))
+        if full.get("plan_sha256") != plan_sha256:
+            return None
+        found[scenario] = (full, folds)
+    return found
+
+
+def _scenario_summary(full: Mapping[str, Any], folds: Sequence[Mapping[str, Any]], names: Sequence[str]) -> dict[str, Any]:
+    scored = [fold for fold in folds if fold.get("score") is not None]
+    pooled = {
+        name: float(np.mean([fold["score"]["normalized_mse"][name] for fold in scored])) if scored else float("nan")
+        for name in names
+    }
+    return {
+        "folds_scored": len(scored),
+        "folds": len(folds),
+        "pooled_normalized_mse": pooled,
+        "mean_normalized_mse": float(np.mean(list(pooled.values()))) if scored else float("nan"),
+        "pooled_rmse": {
+            name: float(np.sqrt(np.mean([fold["score"]["rmse"][name] ** 2 for fold in scored]))) if scored else float("nan")
+            for name in names
+        },
+        "full_rank_everywhere": bool(full.get("diagnostics", {}).get("full_rank", False))
+        and all(fold["fit"].get("diagnostics", {}).get("full_rank", False) for fold in folds),
+        "full_fit_success": bool(full["success"]),
+        "full_fit_parameters": full.get("parameters"),
+        "near_bounds": sorted({symbol for fold in folds for symbol in fold["fit"].get("diagnostics", {}).get("near_bounds", [])}),
+    }
 
 
 def profile_model(
