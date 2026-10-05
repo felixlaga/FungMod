@@ -202,3 +202,48 @@ def test_stage_a_reuses_existing_files_for_the_same_plan_digest(tmp_path: Path, 
     # a different digest must not be reused
     (tmp_path / "stage_a" / "M0_baseline" / "full_fit_primary.json").write_text(json.dumps({**full, "plan_sha256": "0" * 64}), encoding="utf-8")
     assert study._existing_stage_a_files(tmp_path / "stage_a" / "M0_baseline", ["primary"], first["inputs"]["plan_sha256"]) is None  # noqa: SLF001
+
+
+@pytest.mark.parametrize("model_id", ["M1_induction_state", "M3_conversion_dependent_accessibility"])
+def test_posterior_study_is_finite_at_a_candidate_for_variants_with_fixed_constants(registry, plan, model_id) -> None:
+    """The sampler supplies only the fitted symbols; the variant's fixed constants must still reach the config."""
+
+    variant = study.model_variants(plan)[model_id]
+    if model_id == "M1_induction_state":
+        assert variant.fixed, "M1 declares a fixed constant; the regression needs one"
+    center = candidate_values(variant)
+    posterior = study.build_posterior_study(ROOT, model_id, center, registry=registry)
+    assert set(posterior.predictor.fitted_symbols) == set(variant.config_symbols)
+    assert all(fixed.config_symbol not in posterior.problem.labels for fixed in variant.fixed)
+    vector = posterior.problem.coordinates_from_values(posterior.center)
+    assert posterior.problem.inside(vector)
+    assert np.isfinite(posterior.problem.log_posterior(vector))
+
+
+def test_stage_b_verdicts_follow_the_plan_rules(plan) -> None:
+    """R2 and R3 from a synthetic result; R1 from a recorded stage A screen; provisional when not converged."""
+
+    class _Result:
+        def __init__(self, converged: bool, classes: dict[str, str], multiplier: tuple[float, float]) -> None:
+            self.converged = converged
+            self.identifiability = {symbol: {"class": klass} for symbol, klass in classes.items()}
+            self.summaries = {"noise_scale:all_observables": {"lower": multiplier[0], "upper": multiplier[1], "median": sum(multiplier) / 2}}
+
+    plan_data = plan
+
+    class _Study:
+        plan = plan_data
+        model_id = "M3_conversion_dependent_accessibility"
+
+    comparison = {"models": {"M3_conversion_dependent_accessibility": {"scenarios": {"primary": {"screen": {"passed": True}}}}}}
+    verdict = study.stage_b_verdicts(_Study(), _Result(False, {"gelain_criticism_n": "identified"}, (0.9, 1.4)), stage_a_comparison=comparison)
+    assert verdict["provisional"] is True
+    assert verdict["R1_holdout_support"] is True and verdict["R2_adequacy"] is True and verdict["R3_identification"] is True
+    assert verdict["outcome"] == "supported (R1 and R3)"
+    assert verdict["added_parameter_classes"] == {"n": "identified"}
+    unidentified = study.stage_b_verdicts(_Study(), _Result(True, {"gelain_criticism_n": "bounded_below_only"}, (1.5, 2.5)), stage_a_comparison=comparison)
+    assert unidentified["provisional"] is False and unidentified["R2_adequacy"] is False
+    assert unidentified["outcome"] == "improves fit but unidentified (R1, not R3)"
+    failed = {"models": {"M3_conversion_dependent_accessibility": {"scenarios": {"primary": {"screen": {"passed": False}}}}}}
+    assert study.stage_b_verdicts(_Study(), _Result(True, {"gelain_criticism_n": "identified"}, (0.9, 1.4)), stage_a_comparison=failed)["outcome"] == "not supported (fails R1)"
+    assert study.stage_b_verdicts(_Study(), _Result(True, {}, (0.9, 1.4)))["outcome"] == "not scored (stage A screen not recorded)"

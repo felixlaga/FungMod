@@ -114,6 +114,47 @@ No model passed the screen, so no profiles were run and no holdout posteriors
 are planned. Stage B all-condition posteriors (adequacy R2, identifiability
 R3, coverage R4) follow for the three additions; M0 reuses BAYES-001.
 
+## Stage B results (recorded 2026-10-05, in progress)
+
+Each addition gets one all-condition posterior under the plan's sampler
+settings (24 walkers or twice the dimension, 8000 steps, 2000 burn-in, the
+shared noise multiplier sampled jointly), centred on its stage A fit. A chain
+that misses the declared convergence rule (every autocorrelation time
+reliable, every effective sample size at least 100) is reported as not
+converged and its verdicts are labelled provisional, as the plan requires.
+Outputs live in `results/stage_b/<model>/` (`bayesian_calibration.json`,
+`posterior_samples.csv`, `coverage.json`, `verdicts.json`, `report.md`,
+`inputs.json`, `artifacts.json`).
+
+- `M2_soluble_product_pool` (28 walkers, 14 coordinates): **not converged**,
+  verdicts **provisional**. Integrated autocorrelation times 368 to 529 steps
+  against 6000 post-burn-in steps (the rule needs more than 50 tau), effective
+  sample sizes 318 to 457, mean acceptance 0.174 (minimum 0.071), two hours
+  and thirty-five minutes of wall-clock across two resumed runs against the
+  plan's two-hour cap. R2 fails: the shared noise multiplier's 95 percent
+  interval is [1.65, 2.87] (median 1.94), which does not contain 1.0, so the
+  soluble pool does not make the candidate adequate at the assumed 10 percent
+  error (M0: 2.25, [1.95, 2.63]). R3 fails: the added uptake rate `mu`,
+  half-saturation `Ks` and inhibition constant `Ki` are prior dominated
+  (credible intervals 79 to 94 percent of their prior width) and the initial
+  pool `P0` is bounded below only (median 2.8 g/L against an upper bound of
+  3 g/L). Of the nine common constants, `qF` and `qB` stay identified,
+  `k_h` and `kd` fall to weakly identified, and `Y` and `kF` become prior
+  dominated; the pool absorbs what BAYES-001 identified. Posterior predictive
+  coverage with measurement noise is 95 of 96 observations (biomass,
+  substrate and beta-glucosidase 24 of 24, cellulase 23 of 24). Outcome in the
+  plan's vocabulary: **not supported (fails R1)**, with the provisional R2 and
+  R3 verdicts recorded alongside.
+- `M1_induction_state`, `M3_conversion_dependent_accessibility`: running;
+  recorded here when their chains complete.
+- `M0_baseline`: BAYES-001's frozen chain (converged; five constants
+  identified, four bounded on one side; multiplier 2.25).
+
+A posterior-study bug surfaced on M1: the sampler supplies only the fitted
+symbols, and the variant factory dropped M1's fixed constant `k_z`, so every
+starting walker had a non-finite posterior. The factory now merges the
+variant's fixed constants into every candidate; a regression test covers it.
+
 ## What it is not
 
 The six Gelain conditions have informed model criticism since v1 and are not

@@ -123,6 +123,56 @@ Results (stage A, recorded 2026-10-05, plan digest `9bb36f8d53d8...`):
 Next task: finish stage B within the compute cap, record identifiability and
 coverage for each addition, and carry the verdicts into the paper plan.
 
+## CRIT-002 Gelain Model-Criticism Study: Stage B Posteriors (M2 Recorded)
+
+Date: 2026-10-05
+
+Status: partial. The M2 all-condition posterior is recorded under the frozen
+plan (digest `6849c8b3...`); M1 and M3 chains are running; M0 reuses
+BAYES-001. Two code defects found while recording are fixed and tested.
+
+Changed:
+
+- `research/gelain_criticism.py`: the variant config factory merges the
+  variant's fixed constants into every candidate, so the posterior sampler
+  (which supplies only the fitted symbols) no longer drops M1's `k_z` and
+  start every walker at a non-finite posterior; `stage_b_verdicts` applies
+  R2 (multiplier interval contains 1.0) and R3 (every added parameter
+  identified or weakly identified) and combines them with the recorded stage
+  A screen into the plan's outcome vocabulary, labelled provisional when the
+  chain missed the convergence rule; `render_stage_b_report` reads the
+  recorded summary and identifiability fields (it crashed on M2's first
+  completion) and prints tau, bound contacts, the multiplier interval, the
+  rules and coverage; `write_posterior_outputs` adds `verdicts.json` to the
+  digested artifacts.
+- `tests/test_gelain_criticism_study.py`: posterior studies of M1 and M3 are
+  finite at a candidate (M1 has the fixed constant); the verdict helper
+  follows the rules on synthetic results. `tests/test_gelain_criticism_plan.py`:
+  every recorded stage B folder cites the plan chain, labels unconverged
+  chains provisional, uses the outcome vocabulary and matches its digests.
+- `docs/gelain-model-criticism.md` (stage B section), benchmark README.
+
+Not changed: the plan, stage A results, any rate law or constant.
+
+M2 result (`results/stage_b/M2_soluble_product_pool/`, 28 walkers, 8000
+steps, 2000 burn-in, two resumed runs totalling 2 h 35 min wall-clock against
+the plan's 2 h cap): not converged (tau 368 to 529 with 6000 post-burn-in
+steps; ESS 318 to 457; mean acceptance 0.174, minimum 0.071), verdicts
+provisional. R2 fails (multiplier median 1.94, interval [1.65, 2.87]). R3
+fails (`mu`, `Ks`, `Ki` prior dominated; `P0` bounded below only, median
+2.8 g/L against a 3 g/L bound). Common constants: `qF`, `qB` identified;
+`k_h`, `kd` weakly identified; `Kh` bounded below only; `K_ind`, `kB`
+bounded above only; `Y`, `kF` prior dominated. Coverage 95/96 at 95 percent
+with measurement noise. Outcome: not supported (fails R1).
+
+Commands: `ruff check` passed; `pyright` 0 errors; criticism tests (see the
+PR). Scientific impact: the soluble-pool mechanism neither restores adequacy
+nor is identified by the duplicate means; nothing is promoted. Backward
+compatibility: `write_posterior_outputs` writes one more file. Risk: low.
+
+Recommended next task: record M1 and M3 when their chains complete, then
+tighten the stage A optimiser under an amendment (PETAB-001 finding).
+
 ## CI-001 Cross-Platform Quality-Gate Repair
 
 Date: 2026-10-05
