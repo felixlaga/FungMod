@@ -1,0 +1,275 @@
+{
+  "schema_version": 1,
+  "generator": "fungal_model.research.paper_tables (scripts/reproduce_paper.py tables)",
+  "tables": {
+    "table_1_joint_holdouts": {
+      "file": "table_1_joint_holdouts.md",
+      "title": "Whole-condition holdouts of the joint Gelain 2020 benchmark (v2)",
+      "sources": {
+        "data/benchmarks/gelain_2020_v2/results/report.json": "dd9727636936f0b9d0644b278d3f26e95c0447fa4d1723445f93d71bbee41cce",
+        "data/benchmarks/gelain_2020_v2/plan.json": "867120730f815060778ca402bdd55a0b2d02fba1eb1769ad567d07cd42f77046"
+      },
+      "key_numbers": {
+        "hydrolysis_primary_mean_normalized_mse": 0.09182953616070481,
+        "published_primary_mean_normalized_mse": 0.006185303299564693,
+        "published_parameter_count": 20,
+        "published_practical_rank": 19,
+        "published_screen_passed": false,
+        "hydrolysis_screen_passed_by_scenario": {
+          "primary": false,
+          "correlated_assumption": true
+        },
+        "folds_numerically_checked": 33,
+        "folds": 33,
+        "failed_starts": 6,
+        "optimizer_starts": 132,
+        "validated": false
+      }
+    },
+    "table_2_identifiability": {
+      "file": "table_2_identifiability.md",
+      "title": "Identifiability of the nine registry constants of the hydrolysis candidate (BAYES-001)",
+      "sources": {
+        "data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json": "57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97",
+        "data/benchmarks/gelain_2020_bayesian/plan.json": "9574fccc809cc2a49aab2ebc9cbc8cd087d0064d26582da287915cbbce32f01a"
+      },
+      "key_numbers": {
+        "classes": {
+          "k_h": "identified",
+          "Kh": "bounded_below_only",
+          "Y": "identified",
+          "kd": "identified",
+          "K_ind": "bounded_above_only",
+          "qF": "identified",
+          "kF": "bounded_above_only",
+          "qB": "identified",
+          "kB": "bounded_above_only"
+        },
+        "identified_count": 5,
+        "identified_width_fraction_range": [
+          0.050416809892691886,
+          0.15873420317306333
+        ],
+        "noise_multiplier": {
+          "median": 2.2470675911573084,
+          "lower": 1.94883083381696,
+          "upper": 2.6349260611829686
+        },
+        "converged": true,
+        "walkers": 24,
+        "steps": 24000,
+        "burn_in": 4000,
+        "effective_sample_size_range": [
+          1414.195311548412,
+          2119.1670941609445
+        ],
+        "mean_acceptance": 0.3245659722222222
+      }
+    },
+    "table_3_criticism_stage_a": {
+      "file": "table_3_criticism_stage_a.md",
+      "title": "Stage A of the preregistered model-criticism study: whole-condition holdouts and the R1 screen",
+      "sources": {
+        "data/benchmarks/gelain_2020_criticism/results/stage_a/comparison.json": "0460f164324c825d080bbc5db003dd13a604ffda0300574d155f377aee5f3b3b",
+        "data/benchmarks/gelain_2020_criticism/plan.json": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7"
+      },
+      "key_numbers": {
+        "plan_sha256": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7",
+        "optimiser": {
+          "method": "trf",
+          "parameter_space": "natural log",
+          "log_parameter_difference_step": 0.001,
+          "ftol": 1e-10,
+          "xtol": 1e-10,
+          "gtol": 1e-10,
+          "restarts": 3,
+          "restart_relative_cost_tolerance": 1e-06
+        },
+        "models": {
+          "M0_baseline": {
+            "primary": {
+              "mean_normalized_mse": 0.09184077382179383,
+              "relative_improvement": null,
+              "screen_passed": true,
+              "per_observable_change": null
+            },
+            "correlated_assumption": {
+              "mean_normalized_mse": 0.09323582966231118,
+              "relative_improvement": null,
+              "screen_passed": true,
+              "per_observable_change": null
+            }
+          },
+          "M1_induction_state": {
+            "primary": {
+              "mean_normalized_mse": 0.09172860860317678,
+              "relative_improvement": 0.0012213008879334852,
+              "screen_passed": false,
+              "per_observable_change": {
+                "biomass": -0.1887655906246677,
+                "substrate": 2.0991796155902054,
+                "cellulase_activity": -0.03831297067177719,
+                "beta_glucosidase_activity": -0.06287373385254247
+              }
+            },
+            "correlated_assumption": {
+              "mean_normalized_mse": 0.09606422493492617,
+              "relative_improvement": -0.0303359264658134,
+              "screen_passed": false,
+              "per_observable_change": {
+                "biomass": -0.20482878424247442,
+                "substrate": 3.121348599684029,
+                "cellulase_activity": -0.026070068481822695,
+                "beta_glucosidase_activity": -0.045263660356924196
+              }
+            }
+          },
+          "M2_soluble_product_pool": {
+            "primary": {
+              "mean_normalized_mse": 0.0703044096478168,
+              "relative_improvement": 0.23449676301471278,
+              "screen_passed": true,
+              "per_observable_change": {
+                "biomass": -0.2470482454688504,
+                "substrate": -0.14791611613243782,
+                "cellulase_activity": -0.2077138230621428,
+                "beta_glucosidase_activity": -0.27315724565213073
+              }
+            },
+            "correlated_assumption": {
+              "mean_normalized_mse": 0.06889874110854945,
+              "relative_improvement": 0.2610272106968716,
+              "screen_passed": true,
+              "per_observable_change": {
+                "biomass": -0.3639048012175722,
+                "substrate": -0.21011225906083075,
+                "cellulase_activity": -0.21218694026017781,
+                "beta_glucosidase_activity": -0.26275625079159515
+              }
+            }
+          },
+          "M3_conversion_dependent_accessibility": {
+            "primary": {
+              "mean_normalized_mse": 0.09201303782169931,
+              "relative_improvement": -0.0018756810590441209,
+              "screen_passed": false,
+              "per_observable_change": {
+                "biomass": -0.06045530221535789,
+                "substrate": -0.08668634030284306,
+                "cellulase_activity": 0.027728387100987018,
+                "beta_glucosidase_activity": 0.018613769574233663
+              }
+            },
+            "correlated_assumption": {
+              "mean_normalized_mse": 0.09790296328087064,
+              "relative_improvement": -0.05005729702264938,
+              "screen_passed": false,
+              "per_observable_change": {
+                "biomass": -0.09540460707943987,
+                "substrate": 0.11658264738036173,
+                "cellulase_activity": 0.09124051471163908,
+                "beta_glucosidase_activity": 0.08688561025789454
+              }
+            }
+          }
+        }
+      }
+    },
+    "table_4_criticism_stage_b": {
+      "file": "table_4_criticism_stage_b.md",
+      "title": "Stage B of the model-criticism study: adequacy, identification and coverage per added mechanism",
+      "sources": {
+        "data/benchmarks/gelain_2020_criticism/plan.json": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M1_induction_state/verdicts.json": "aeedaa057102203c14c6d45e74fe297a1c00135eff837da2aa00ed4fb479dba8",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M1_induction_state/bayesian_calibration.json": "076601b27ce478195d513d8d4b6412139c3a48d2fd478c2c4503477a18903f8f",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M1_induction_state/coverage.json": "2d7216ebc18573caeafe28a3498538b32931414f1a8a5cd5bfe3ca5881de0e74",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M2_soluble_product_pool/verdicts.json": "439234b9bc279547c68b35ab3d97246518a45af97d321316d4170c7ff37c34a1",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M2_soluble_product_pool/bayesian_calibration.json": "584a42f233b7715afb1800113cc85eb04769345752a64f0dba485d280893527f",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M2_soluble_product_pool/coverage.json": "4511748782e2719feb7095993a4aefe13c9919cf603292481ec6d47ce6259160",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M3_conversion_dependent_accessibility/verdicts.json": "7cde95106c0ca49428a6ce92bc29128b4c7497bb1e9ac2f2c30dbc5ab76f3fc1",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M3_conversion_dependent_accessibility/bayesian_calibration.json": "01bca67c41834fbb32f0809f07c64909bb8f4aab0aacd36e3a23915f30071dc5",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M3_conversion_dependent_accessibility/coverage.json": "2d7216ebc18573caeafe28a3498538b32931414f1a8a5cd5bfe3ca5881de0e74"
+      },
+      "key_numbers": {
+        "M1_induction_state": {
+          "converged": false,
+          "provisional": true,
+          "R1_holdout_support": false,
+          "R2_adequacy": false,
+          "R2_multiplier_interval": [
+            1.868628277019685,
+            2.5274378973567786
+          ],
+          "R3_identification": true,
+          "added_parameter_classes": {
+            "kz_loss": "weakly_identified"
+          },
+          "coverage_inside": 91,
+          "coverage_observations": 96,
+          "largest_autocorrelation_time": 340.3983538251276,
+          "post_burn_in_steps": 6000,
+          "outcome": "not supported (fails R1)"
+        },
+        "M2_soluble_product_pool": {
+          "converged": false,
+          "provisional": true,
+          "R1_holdout_support": true,
+          "R2_adequacy": false,
+          "R2_multiplier_interval": [
+            1.6508059240578155,
+            2.866098022775914
+          ],
+          "R3_identification": false,
+          "added_parameter_classes": {
+            "mu": "prior_dominated",
+            "Ks": "prior_dominated",
+            "Ki": "prior_dominated",
+            "P0": "bounded_below_only"
+          },
+          "coverage_inside": 95,
+          "coverage_observations": 96,
+          "largest_autocorrelation_time": 528.6981320376518,
+          "post_burn_in_steps": 6000,
+          "outcome": "improves fit but unidentified (R1, not R3)"
+        },
+        "M3_conversion_dependent_accessibility": {
+          "converged": false,
+          "provisional": true,
+          "R1_holdout_support": false,
+          "R2_adequacy": false,
+          "R2_multiplier_interval": [
+            1.9361113878231215,
+            2.6221487800686822
+          ],
+          "R3_identification": false,
+          "added_parameter_classes": {
+            "n": "bounded_above_only"
+          },
+          "coverage_inside": 91,
+          "coverage_observations": 96,
+          "largest_autocorrelation_time": 370.97303453639705,
+          "post_burn_in_steps": 6000,
+          "outcome": "not supported (fails R1)"
+        }
+      }
+    },
+    "table_5_cross_solver": {
+      "file": "table_5_cross_solver.md",
+      "title": "Cross-solver reproduction of the baseline optimum in COPASI through PEtab (PETAB-001, second run)",
+      "sources": {
+        "data/benchmarks/gelain_2020_petab/results/comparison.json": "3e86a1214d46bb1debd7d74a60d57ad62550e837d16333d8b904de73e4cfb498",
+        "data/benchmarks/gelain_2020_petab/plan.json": "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628"
+      },
+      "key_numbers": {
+        "outcome": "reproduced",
+        "plan_sha256": "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628",
+        "worst_abs_difference_over_sigma": 1.6373477546054917e-08,
+        "objective_relative_difference_at_optimum": 2.0735598000458472e-08,
+        "reference_objective": 3.9760718986316803,
+        "copasi_best_objective": 3.976071799013196,
+        "optimum_relative_difference": 2.505449767211456e-08,
+        "largest_parameter_relative_difference": 7.382939656266912e-05
+      }
+    }
+  }
+}

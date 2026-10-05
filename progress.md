@@ -26,6 +26,76 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## REPRO-001 Reproducibility Package For The Software Paper
+
+Date: 2026-10-05
+
+Status: complete for the tooling half of step 5 item 6. The paper's five
+tables are generated from the recorded study results by one command with a
+digest manifest; the same command offers tiers of reproduction up to a full
+re-run; the runtime closure is pinned and CI installs the built wheel with
+network access disabled. The tagged release with a DOI, the domain review
+and an independent walkthrough remain open and need people.
+
+Changed:
+
+- `research/paper_tables.py` (new): one builder per table (joint holdouts
+  of v2, BAYES-001 identifiability, criticism stage A, criticism stage B,
+  cross-solver), each returning the Markdown, its source files with SHA-256
+  digests and the key numbers the text quotes; `write_tables`,
+  `check_tables` (committed tables and manifest against the recorded
+  results and the sources' digests); `verify_recorded_results` (digest
+  chains of every study against its plan and amendment log, frozen held-out
+  predictions, stage B artifacts, the cross-solver plan's sources, the
+  compiled-core objective at the recorded cross-solver optimum to 1e-7, the
+  projected gradient of the recorded baseline fit below 1e-2 in log space);
+  `projected_gradient_norm`.
+- `paper/tables/` (new): the five tables and `manifest.json`, generated, with
+  a do-not-edit marker on each.
+- `scripts/reproduce_paper.py` (new): tiers `tables`, `check`, `verify`
+  (seconds to a minute), `stage-a` (re-run stage A and the COPASI
+  reproduction into `outputs/paper_reproduction/`, compare held-out errors to
+  1e-6, screens, outcome and objectives; about two hours) and `full` (every
+  study through its own script, compared on verdict-level fields; a day).
+- `Makefile`: `paper-tables`, `paper-check`, `paper-verify`,
+  `paper-stage-a`, `paper-full`, `wheelhouse`, `install-offline`;
+  `.github/workflows/ci.yml` package job downloads the pinned closure into a
+  wheelhouse and installs the wheel with `--no-index`; `.gitignore` ignores
+  `wheelhouse/`.
+- `paper/paper.md`: every results section cites its table; the
+  reproducibility section describes the command, its tiers and the offline
+  install, and leaves the DOI pending.
+- `docs/reproducing-the-paper.md` (new, in the navigation),
+  `docs/paper-readiness.md` (item 6 status), `CHANGELOG.md`, the state
+  document (item 6 status).
+- `tests/test_paper_tables.py` (new): committed tables and manifest match
+  the recorded results; regeneration elsewhere is byte-identical; manifest
+  digests name the files on disk; every table is cited by the paper; key
+  numbers agree with the tables; missing results refuse; a tampered table is
+  reported; the generator marker is present.
+
+Not changed: any recorded result, plan, rate law or constant. The tables
+format recorded numbers; the verification recomputes two quantities from
+recorded artifacts and otherwise checks digests.
+
+Commands: `ruff check` passed; `pyright` 0 errors on the new module and
+script; `mkdocs build --strict` passed; `pytest tests/test_paper_tables.py
+tests/test_repository_hygiene.py tests/test_quality_config.py
+tests/test_release_configuration.py`: 24 passed; `scripts/reproduce_paper.py
+verify`: 9 of 9 checks passed in 2 s on this container. The `stage-a` and
+`full` tiers were not run here (they re-run studies recorded in CRIT-003
+and earlier on the same code); the offline wheel install runs in CI.
+Scientific impact: none. Backward compatibility: additive. Risk: low.
+
+Remaining ambiguities: the lock file was generated on CPython 3.13 macOS;
+`pip download` on the CI interpreter resolves the pinned versions to that
+platform's wheels, so the offline install proves installability from a
+pinned closure, not bit-for-bit identity across platforms.
+
+Recommended next task: step 5 item 5 (unify the three whole-fungus classes)
+while the amendment 4 M2 chain runs; then the preprint's figures through the
+same generator.
+
 ## CRIT-003 Stage A Optimiser Declared, Stage A Re-Run, Cross-Solver Outcome Reproduced
 
 Date: 2026-10-05

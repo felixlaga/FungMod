@@ -172,11 +172,14 @@ jobs:
       - name: Check distribution metadata
         run: python -m twine check dist/*
 
-      - name: Install wheel in an isolated environment
+      - name: Download the pinned runtime dependencies into a wheelhouse
+        run: python -m pip download -r requirements-lock.txt -d wheelhouse
+
+      - name: Install wheel in an isolated environment without network access
         run: |
           python -m venv /tmp/fungmod-wheel-smoke
           /tmp/fungmod-wheel-smoke/bin/python -m pip install --upgrade pip
-          /tmp/fungmod-wheel-smoke/bin/python -m pip install dist/fungmod-*.whl
+          /tmp/fungmod-wheel-smoke/bin/python -m pip install --no-index --find-links wheelhouse dist/fungmod-*.whl
 
       - name: Run installed-wheel smoke outside the checkout
         working-directory: /tmp

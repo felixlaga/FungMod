@@ -19,6 +19,7 @@ build/
 dist/
 site/
 outputs/
+wheelhouse/
 notebooks/your-notebooks/
 notebooks/outputs/
 notebooks/examples/Outputs/
