@@ -32,7 +32,10 @@ FungMod output quantiles can represent:
 They do not automatically represent:
 
 - empirical confidence intervals;
-- Bayesian posterior intervals;
+- Bayesian posterior intervals (these exist only in a
+  `BayesianCalibrationResult` artifact produced by explicit posterior sampling,
+  carry their declared priors, error model and thresholds, and are conditional
+  on them; see [Bayesian calibration](bayesian-calibration.md));
 - measurement uncertainty;
 - calibration uncertainty;
 - model discrepancy.

@@ -93,6 +93,156 @@ Ambiguities: none known. Risk: low.
 Next task: merge this into `main`, bring `main` into the PR chain (#77 to #80)
 so every job re-runs green, then merge the chain in order.
 
+## BAYES-001 Bayesian Calibration And Identifiability On The Compiled Core
+
+Date: 2026-10-05
+
+Status: `partial` for step 4 of
+`foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`. The
+posterior-sampling machinery, the compiled-core predictor and the first
+recorded identifiability study are `complete` for their stated scope. The
+replicate-recovery half of the step is `blocked`: the Gelain 2020 deposit holds
+no individual replicates or standard deviations, and the session's network
+policy denied every publisher and repository host, so Pakula 2016 is recorded
+as a candidate review only. Jacobians and parameter sensitivities are `not
+started`; sampling is gradient-free on the compiled core. Step 4 was started on
+the owner's instruction although ENV-003 left no sourced organism-level
+temperature response; the machinery does not depend on one.
+
+Changed:
+
+- Added `calibration/bayesian.py` (replacing the placeholder):
+  `PriorSpecification` (`log_uniform`/`uniform`, unit-bearing bounds, mandatory
+  source), `NoiseScalePrior` (log-uniform multiplier on the supplied standard
+  deviations of one observable or of a labelled group sharing one multiplier),
+  `ObservedCondition`, `build_bayesian_problem` (log posterior in sampled
+  coordinates; prediction failures give `-inf` and are counted),
+  `run_ensemble_sampler` (Goodman-Weare affine-invariant stretch move,
+  half-ensemble updates, pluggable `map_function`, progress callbacks, exact
+  resume through `EnsembleRun.extend`), Sokal/emcee integrated autocorrelation
+  times, effective sample sizes and a declared convergence rule,
+  `classify_identifiability` with `IdentifiabilityCriteria` (`identified`,
+  `weakly_identified`, `bounded_above_only`, `bounded_below_only`,
+  `prior_dominated`; default thresholds one quarter, three quarters and two
+  percent bound contact, recorded in every result),
+  `local_information_analysis` (finite-difference Fisher information at the
+  best sample, eigenvalues, practical rank, least constrained combination),
+  `posterior_predictive`, `pooled_replicate_standard_deviation`,
+  `sample_posterior`, `BayesianCalibrationResult` with `to_dict`/`save`
+  carrying the method sources and the claim boundary.
+- Added `calibration/compiled_predictor.py`: `ConfiguredConditionPredictor`
+  rebuilds a condition's `ModelConfig` through a factory per candidate, loads,
+  assembles, compiles and integrates it at the observation times on the
+  compiled core and converts the declared state to the observable's units;
+  `inline_parameter_config_factory` for plain configs.
+- `screening/case_builder.py`: `resolve_registry_case`,
+  `build_resolved_case_config` (exact value overrides; errors for unknown
+  symbols, non-exact records and non-finite values) and
+  `registry_case_config_factory`, so a fitted symbol reaches template-derived
+  coefficients (the culture template bakes the yield into the product map).
+  `build_model_config_from_registry_case` delegates to them with no overrides.
+- Added `research/gelain_bayesian.py`,
+  `scripts/run_gelain_2020_bayesian_calibration.py` (`--plan`, `--processes`,
+  checkpoint and resume), `scripts/record_gelain_bayesian_verdicts.py` and
+  `data/benchmarks/gelain_2020_bayesian/` (primary plan, per-observable
+  variant plan, README, `results/`, `results_per_observable_scales/`).
+  Primary study (24 walkers x 24000 steps, burn-in 4000, converged by the
+  declared rule: autocorrelation times 227 to 339 steps against 20000 post-
+  burn-in steps, effective sample sizes 1414 to 2119): five of nine constants
+  identified (k_h, Y, kd, qF, qB), Kh bounded below only, K_ind, kF, kB bounded
+  above only; shared noise multiplier 2.25 (1.95 to 2.63), so the residuals are
+  about 2.2 times the assumed level; six of nine frozen point values lie inside
+  their credible intervals.
+- Per-observable sensitivity variant (40 walkers x 6000 steps, burn-in 1500,
+  not converged by the declared rule, cited by nothing): with independent
+  multipliers the sampler leaves the least-squares region, inflates the
+  biomass multiplier to about 5.4 (3.2 to 7.5), tightens the substrate
+  multiplier to about 0.5 and moves the yield to the lower edge of its box
+  with the specific activities about five times higher; under the declared
+  unit-scale error model that region is far worse than the frozen fit (log
+  posterior -781 against -572) and eight of nine frozen point values lie
+  outside its 95 percent intervals. It is recorded as a misfit diagnosis: the
+  hydrolysis candidate cannot fit biomass and cellulose simultaneously at the
+  assumed 10 percent error.
+- Registry provenance: the nine calibrated T. harzianum records gain a
+  `bayesian_identifiability` block (artifact, digest, benchmark id, class,
+  posterior median, credible interval, whether the point value lies inside
+  it, convergence, error-model evidence); their exact point values are
+  unchanged.
+- Candidate review `pakula_2016_t_reesei_protein_load_review.yml` (status
+  `proposed`, no values).
+- Docs: `docs/bayesian-calibration.md` (new), `docs/api.md`,
+  `docs/capabilities.md`, `docs/calibration-evidence.md`,
+  `docs/scientific-integrity.md`, `docs/organism-physiology.md`, README,
+  CHANGELOG, `ARCHITECTURE_DEBT.md` (`FD-010`), roadmap and state-document
+  notes.
+
+Not changed: every registry parameter value, the scientific-mode trajectories
+of the organism case, the least-squares, profile-likelihood and evidence-audit
+APIs, the output schema, validators, solver settings, the compiled core (still
+no Jacobians or parameter sensitivities), the research models and the frozen
+v2 artifacts.
+
+Tests added: `tests/test_bayesian_calibration.py` (12: analytic Gaussian
+posterior recovery with Fisher eigenvalues, classifier thresholds on
+constructed samples, sampled identified/one-sided/flat parameters, per-
+observable and shared noise-scale estimation against the residual level,
+pooled replicate deviations, AR(1) autocorrelation time, exact resume,
+posterior predictive bands, toy configured model end to end with
+serialization and seed reproducibility, invalid inputs);
+`tests/test_gelain_bayesian_study.py` (6: plan and priors against the v2
+bounds and the variant plan, observations and assumed errors, predictor parity
+with the public scientific run and the yield override reaching the product
+map, end-to-end study with checkpoint and resume, frozen primary artifact
+consistent with its inputs and the registry provenance, variant artifact
+labelled and uncited); `tests/test_dataset_candidate_review.py` listing.
+
+Commands run and results: `python scripts/run_gelain_2020_bayesian_calibration.py
+--output <dir> --processes 4 --checkpoint-every 500` (primary: 24 walkers x
+24000 steps, resumed twice from its checkpoint, converged; the per-observable
+variant with `--plan data/benchmarks/gelain_2020_bayesian/plan_per_observable_scales.json`,
+40 x 6000, not converged); `python scripts/record_gelain_bayesian_verdicts.py`
+(nine records updated); `ruff check src tests scripts/run_*.py
+scripts/record_gelain_bayesian_verdicts.py` passed; `pyright` on the changed
+modules, scripts and tests: 0 errors; `mkdocs build --strict` passed;
+`pytest tests/test_gelain_bayesian_study.py tests/test_bayesian_calibration.py
+tests/test_organism_registry_case.py`: 29 passed; the 28 test modules that use
+the screening, calibration and candidate-review packages: 404 passed; the full
+`pytest` run: 1792 passed, 11 failed, all eleven the pre-existing Linux set
+(ten SBML tests under python-libsbml 5.21 and the Gelain holdout replay
+drift), both frozen-artifact tests passing; full `pyright`: 0 errors.
+
+Scientific behavior impact: no scientific-mode output changes; no registry
+value changes. The repository now states, with a recorded artifact, which of
+the nine T. harzianum hydrolysis-candidate constants the Gelain duplicate means
+identify under the declared error model (k_h, Y, kd, qF, qB), which are one-
+sided (Kh below; K_ind, kF, kB above) and that the assumed 10 percent error
+understates the residuals by a factor of about 2.2. These are conditional
+statements, labelled as such in the registry provenance and the artifact's
+claim boundary.
+
+Backward-compatibility impact: `fungal_model.calibration.bayesian` replaces a
+placeholder, so nothing depended on it; `fungal_model.screening` gains
+exports; `build_model_config_from_registry_case` keeps its signature and
+output; the study plan schema is new (`1.0.0`). No output schema or registry
+value changed.
+
+Remaining ambiguities and risk: the error model is an assumption and the
+shared multiplier conflates measurement error with model misfit; verdicts are
+conditional on the prior box, the error model and a finite chain; the
+per-observable variant shows a biomass/cellulose tension that replicate data
+or a structural change must resolve; likelihood evaluations rebuild the config
+per candidate (`FD-010`); replicate recovery stays blocked. Risk level:
+medium, because new scientific statements enter the registry provenance; they
+are labelled conditional and change no value.
+
+Recommended next task: obtain replicate-level data with their own error
+estimates (authors for Gelain; Pakula additional files once the network
+allows) and rerun the study with a measured error model; in parallel, treat the
+biomass/cellulose tension as a model-adequacy question (maintenance, product
+inhibition or a cellulose-accessibility term) before step 5, and reduce
+`FD-010` with parameter sensitivities on the compiled core.
+
 ## ENV-003 Bound Environment Response Laws
 
 Date: 2026-10-05

@@ -7,7 +7,7 @@ ID, status, reason, risk, exit condition, removal milestone, and tests
 protecting the boundary. New foundation work should remove entries from this
 file, not normalize them.
 
-Current state: one active contained entry, `FD-009`. `FD-008` was resolved by shared
+Current state: two active contained entries, `FD-009` and `FD-010`. `FD-008` was resolved by shared
 package integration on 2026-09-28. `FD-007` was
 resolved on 2026-08-01 by deterministic build-time staging from the canonical
 resource roots. `FD-005` was resolved in PR-41 by enabling Pyright optional-member-access
@@ -16,6 +16,44 @@ process-to-`Reaction` adapter debt was resolved in Phase 1 Task 4; retained
 `Reaction`, `SimulationEngine`, and `ReactionDiffusionEngine1D` APIs are
 intentional explicit low-level APIs, not native configured workflow
 dependencies.
+
+## FD-010 Per-candidate config rebuild in calibration and no parameter sensitivities
+
+Status: active, contained since 2026-10-05 (BAYES-001)
+
+Reason: `ConfiguredConditionPredictor` evaluates a candidate parameter vector
+by rebuilding the condition's `ModelConfig` through a factory, reloading its
+inputs, assembling the processes and recompiling the model before each
+integration. This is deliberate: a registry template may bind a fitted symbol
+into derived quantities (the culture template bakes the biomass yield into
+product-map coefficients), and only the public build path puts the value
+everywhere it belongs. The compiled core still offers no parameter
+sensitivities or Jacobians, so posterior sampling is gradient-free and the
+local identifiability diagnostic uses finite differences of the residuals.
+
+Risk: roughly two thirds of a likelihood evaluation of the organism case is
+rebuild overhead rather than integration, which caps chain lengths in a
+session; without analytic sensitivities, gradient-based samplers and exact
+Fisher information remain unavailable.
+
+Containment: the predictor is the only calibration path onto the compiled
+core and is tested for exact agreement with `run_configured_model`
+(`tests/test_bayesian_calibration.py`,
+`tests/test_gelain_bayesian_study.py`); the rebuild cost is recorded in the
+ledger; the finite-difference step and eigenvalue cutoff of the local
+information analysis are declared in every result.
+
+Exit condition: compiled models expose parameter slots that kernels read at
+evaluation time (with template-derived coefficients expressed as process
+parameters rather than baked numbers), so a candidate vector updates a
+compiled model in place; kernels supply state and parameter derivatives for
+forward sensitivities.
+
+Removal milestone: the compiled-core Jacobian item of FD-009's exit condition.
+
+Tests protecting it:
+`tests/test_bayesian_calibration.py::test_configured_predictor_matches_the_public_run_and_samples_a_toy_config`,
+`tests/test_gelain_bayesian_study.py::test_predictor_reproduces_the_public_scientific_run_at_the_frozen_fit`.
 
 ## FD-009 Model representations and engines outside the compiled core
 

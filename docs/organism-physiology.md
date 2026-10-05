@@ -116,9 +116,14 @@ result = study.simulate(mode="scientific", output_dir="outputs/t_harzianum_cellu
   rank-deficient and bespoke, and the candidate itself failed the comparison's
   observable-worsening screen in the primary scenario. The registry records
   state this; the trajectories are retrospective, not predictions.
-- Three constants sit at their fitting bounds: induction is effectively
-  saturated and activity loss is effectively zero over the measured range. The
-  data do not identify them.
+- The recorded posterior study (`bayesian-calibration.md`) identifies five of
+  the nine constants (`k_h`, `Y`, `kd`, `qF`, `qB`) under the declared error
+  model; `Kh` has a lower limit only (saturation above the measured loadings is
+  not distinguishable from first-order kinetics), and `K_ind`, `kF`, `kB` sit
+  at the lower edge of their prior boxes: induction is effectively saturated
+  and activity loss is effectively zero over the measured range, so the data
+  give upper limits only. Read those four as the recorded ranges, not as
+  constants.
 - No nutrient or oxygen limitation, maintenance, soluble intermediate, product
   pool, morphology or pH dynamics is represented. Temperature and pH are
   metadata. The consumed cellulose not retained as biomass is an explicit

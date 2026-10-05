@@ -61,6 +61,43 @@
         - CalibrationEvidenceAudit
         - audit_calibration_evidence
 
+## Bayesian calibration and identifiability
+
+::: fungal_model.calibration.bayesian
+    options:
+      members:
+        - PriorSpecification
+        - NoiseScalePrior
+        - ObservedCondition
+        - SamplerSettings
+        - IdentifiabilityCriteria
+        - BayesianProblem
+        - BayesianCalibrationResult
+        - build_bayesian_problem
+        - run_ensemble_sampler
+        - analyze_run
+        - sample_posterior
+        - classify_identifiability
+        - local_information_analysis
+        - posterior_predictive
+        - pooled_replicate_standard_deviation
+
+::: fungal_model.calibration.compiled_predictor
+    options:
+      members:
+        - ObservableMapping
+        - ConfiguredCondition
+        - ConfiguredConditionPredictor
+        - inline_parameter_config_factory
+
+::: fungal_model.screening.case_builder
+    options:
+      members:
+        - ResolvedRegistryCase
+        - resolve_registry_case
+        - build_resolved_case_config
+        - registry_case_config_factory
+
 ## Spatial reaction diffusion
 
 ::: fungal_model.transport

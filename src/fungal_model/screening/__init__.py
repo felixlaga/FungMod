@@ -3,7 +3,11 @@
 from fungal_model.screening.case_builder import (
     RegistryCaseBuildError,
     RegistryCaseConfigMode,
+    ResolvedRegistryCase,
     build_model_config_from_registry_case,
+    build_resolved_case_config,
+    registry_case_config_factory,
+    resolve_registry_case,
     select_registry_case_template,
 )
 from fungal_model.screening.culture_physiology import (
@@ -53,11 +57,15 @@ __all__ = [
     "RegistryScreenResult",
     "RegistryScreenSimulationError",
     "ReportItem",
+    "ResolvedRegistryCase",
     "ScreenSimulationMode",
     "assess_modelability",
     "build_culture_physiology_config_data",
     "build_extracellular_enzyme_chain_config",
     "build_model_config_from_registry_case",
+    "build_resolved_case_config",
+    "registry_case_config_factory",
+    "resolve_registry_case",
     "run_extracellular_enzyme_chain_demo",
     "select_registry_case_template",
     "simulate_screen",

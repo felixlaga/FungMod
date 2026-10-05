@@ -189,6 +189,16 @@ each implementation:
   exploratory mode only, with `environment_effect_status: active_response_model`
   and ranking allowed only across conditions a law covers
   (`docs/environment-response.md`),
+- posterior sampling and identifiability verdicts on the compiled core
+  (`fungal_model.calibration.bayesian`): affine-invariant ensemble sampling
+  over explicit priors and explicit Gaussian error models, optional
+  estimated noise-scale multipliers, autocorrelation and effective-sample
+  diagnostics, declared-threshold classes that say which parameters the data
+  identify and which must stay ranges, local Fisher information and posterior
+  predictive bands; a `ConfiguredConditionPredictor` rebuilds any configured
+  or registry case per candidate, and the recorded *T. harzianum* cellulose
+  study (`data/benchmarks/gelain_2020_bayesian/`) reports its verdicts
+  conditional on an assumed error model (`docs/bayesian-calibration.md`),
 - provenance-bound competitive and Haldane substrate-inhibition modifiers for
   explicitly matched homogeneous Michaelis-Menten processes. These laws
   require explicit primary-source and maturity metadata, exact substrate and

@@ -1,0 +1,87 @@
+kind: dataset_candidate_review
+candidate_id: pakula_2016_t_reesei_protein_load
+name: Pakula 2016 Trichoderma reesei protein-production load time courses (replicate-level calibration candidate)
+status: proposed
+dataset_maturity: literature_raw
+source:
+  type: literature
+  citation: >-
+    Pakula TM, Nygren H, Barth D, Heinonen M, Castillo S, Penttila M, Arvas M
+    (2016). Genome wide analysis of protein production load in Trichoderma
+    reesei. Biotechnology for Biofuels 9:132.
+  doi: 10.1186/s13068-016-0547-5
+  url: https://doi.org/10.1186/s13068-016-0547-5
+  authors:
+    - Tiina M. Pakula
+    - Heli Nygren
+    - Dorothee Barth
+    - Markus Heinonen
+    - Sandra Castillo
+    - Merja Penttila
+    - Mikko Arvas
+  year: 2016
+  notes: >-
+    Citation metadata were already cited in docs/degrading-culture.md and
+    src/fungal_model/fungi/degradation.py as biological motivation. During
+    BAYES-001 on 2026-10-05 the full text and its additional files were not
+    retrieved: the session's network policy denied every publisher and
+    repository host (doi.org, pmc.ncbi.nlm.nih.gov, europepmc.org, ebi.ac.uk,
+    springer.com and others), so no table, figure, cultivation time course,
+    replicate count or measurement error has been read or transcribed.
+intended_use:
+  purpose: >-
+    Candidate source of replicate-level chemostat or batch time courses of
+    biomass, carbon source, specific growth rate and extracellular protein for
+    Trichoderma reesei, needed by step 4 of the 2026-10-04 state document:
+    Bayesian calibration with explicit measurement-error models requires
+    individual replicates or reported standard deviations, which the Gelain
+    2020 deposit does not hold.
+  measured_quantities:
+    - biomass concentration versus time
+    - residual carbon source versus time
+    - extracellular protein concentration versus time
+    - specific growth or dilution rate per cultivation
+  model_targets:
+    - biomass
+    - substrate
+    - secreted protein pool
+    - replicate-based GaussianObservationError with measured_standard_deviation evidence
+  not_for:
+    - immediate data ingestion
+    - the T. harzianum P49P11 registry case of Gelain 2020 (different species, strain, medium and reactor)
+    - transcriptomic or proteomic abundance tables as kinetic observations
+    - whole-fungus validation claims
+schema_gate:
+  requires_literature_schema: true
+  requires_units: true
+  requires_uncertainty: true
+  requires_preprocessing: true
+  requires_no_real_data_in_review: true
+review:
+  selected_by: FungMod BAYES-001 replicate-recovery search
+  review_date: 2026-10-05
+  schema_result: not_run
+  decision_notes: >-
+    Proposed only. Step 4 asks to recover raw replicates for Gelain and Pakula
+    first. The Gelain 2020 Mendeley deposit holds published duplicate means
+    without individual runs or standard deviations, so replicates can only
+    come from the authors. This candidate names the Pakula 2016 study whose
+    additional files may hold replicate-level cultivation measurements; until
+    the files are archived with a checksum and their replicate structure,
+    units, uncertainties and preprocessing are recorded, no observation may
+    enter data/experiments/literature and no error model may claim measured
+    evidence from it.
+  next_action: >-
+    Retrieve the article and its additional files (publisher access or a
+    network policy allowing doi.org and the BMC/Springer hosts), archive them
+    under data/experiments/source_intake with a SHA-256 manifest entry,
+    identify which files carry per-replicate cultivation measurements, extract
+    them with explicit units and replicate identifiers, derive pooled
+    replicate standard deviations with
+    fungal_model.calibration.pooled_replicate_standard_deviation, and only
+    then author literature_processed datasets and a T. reesei organism record.
+notes: >-
+  Candidate review only. This file contains no observations, time courses,
+  replicate values, standard deviations, CSV paths, extracted figure data,
+  calibrated parameters, or validation claims; the cited source has not been
+  read in this session.

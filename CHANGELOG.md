@@ -6,6 +6,36 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Bayesian calibration and identifiability (`docs/bayesian-calibration.md`):
+  `fungal_model.calibration.bayesian` samples the posterior of a configured
+  or registry case with the Goodman-Weare affine-invariant ensemble move over
+  explicit `log_uniform`/`uniform` priors and explicit `GaussianObservationError`
+  models, optionally with noise-scale multipliers (one per observable or one
+  shared by a declared group) labelled `estimated_from_residuals`; reports
+  integrated autocorrelation times,
+  effective sample sizes and a declared convergence rule; classifies every
+  parameter with declared thresholds (`identified`, `weakly_identified`,
+  `bounded_above_only`, `bounded_below_only`, `prior_dominated`); computes a
+  finite-difference Fisher information at the best sample and posterior
+  predictive bands; and pools within-time replicate scatter into a
+  measured-evidence error model. `fungal_model.calibration.compiled_predictor`
+  evaluates configured conditions on the compiled core by rebuilding the
+  config per candidate, and `fungal_model.screening.registry_case_config_factory`
+  (with `resolve_registry_case` and `build_resolved_case_config`) rebuilds a
+  registry case with exact value overrides so that template-derived
+  coefficients follow the fitted symbol.
+- Recorded posterior-sampling study of the *T. harzianum* P49P11 cellulose
+  registry case (`data/benchmarks/gelain_2020_bayesian/`,
+  `scripts/run_gelain_2020_bayesian_calibration.py`,
+  `fungal_model.research.gelain_bayesian`): nine constants, three loadings,
+  v2 bounds as log-uniform priors, assumed error model with one sampled shared
+  scale multiplier, checkpointed parallel run, thinned posterior samples and
+  identifiability verdicts recorded in the provenance of the nine calibrated
+  registry records without changing their point values; a per-observable
+  multiplier variant is recorded as an unconverged sensitivity study that
+  diagnoses the biomass/cellulose misfit.
+- Candidate review `pakula_2016_t_reesei_protein_load_review.yml` (status
+  `proposed`, no values) for replicate-level cultivation data.
 - Environment response laws (`docs/environment-response.md`): Rosso cardinal
   temperature (`temperature_cardinal_rosso`, CTMI) and cardinal pH
   (`ph_cardinal_rosso`, CPM) modifiers (`fungal_model.kinetics.cardinal`,

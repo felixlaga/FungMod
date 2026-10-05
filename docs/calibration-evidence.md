@@ -181,3 +181,12 @@ print(result.optimizer_metadata["profile_likelihood"])
 
 For new experimental evidence, use the separate
 [frozen-prediction validation workflow](independent-validation.md).
+
+## Posterior sampling
+
+Profile likelihood answers whether a least-squares optimum is flat along one
+parameter. [Bayesian calibration](bayesian-calibration.md) answers the wider
+question on the compiled core: given declared priors and an explicit error
+model, which parameters does the data set identify, which are bounded on one
+side only, and which remain prior-dominated ranges. Both are conditional on
+the error model, and neither is validation.
