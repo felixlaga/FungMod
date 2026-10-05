@@ -19,7 +19,7 @@ from fungal_model.research.gelain_models import (
 
 
 def load_joint_cultures(root: Path) -> list[CultureMeasurements]:
-    records = json.loads((root / "data/benchmarks/gelain_2020_v2/observations.json").read_text())
+    records = json.loads((root / "data/benchmarks/gelain_2020_v2/observations.json").read_text(encoding="utf-8"))
     result = []
     source_units = {"biomass": "g/L", "substrate": "g/L", "cellulase_activity": "FPU/L",
                     "beta_glucosidase_activity": "U/L"}
