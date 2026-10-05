@@ -28,6 +28,33 @@ from .residuals import (
     sequential_train_validation_split,
 )
 from .profile import ProfileLikelihoodResult, profile_likelihood
+from .bayesian import (
+    BayesianCalibrationResult,
+    BayesianProblem,
+    DEFAULT_IDENTIFIABILITY_CRITERIA,
+    EnsembleRun,
+    IdentifiabilityCriteria,
+    NoiseScalePrior,
+    ObservedCondition,
+    PriorSpecification,
+    SamplerSettings,
+    analyze_run,
+    build_bayesian_problem,
+    classify_identifiability,
+    integrated_autocorrelation_time,
+    local_information_analysis,
+    pooled_replicate_standard_deviation,
+    posterior_predictive,
+    prior_from_bounds,
+    run_ensemble_sampler,
+    sample_posterior,
+)
+from .compiled_predictor import (
+    ConfiguredCondition,
+    ConfiguredConditionPredictor,
+    ObservableMapping,
+    inline_parameter_config_factory,
+)
 from .independent import IndependentValidationPlan, evaluate_frozen_prediction, freeze_prediction
 from .observation_error import GaussianObservationError
 from .model_validation import (ModelScope, ScopeRange, model_identity, freeze_scoped_prediction,
@@ -35,6 +62,29 @@ from .model_validation import (ModelScope, ScopeRange, model_identity, freeze_sc
 
 __all__ = [
     "APPROXIMATE_NORMAL_95_Z",
+    "BayesianCalibrationResult",
+    "BayesianProblem",
+    "ConfiguredCondition",
+    "ConfiguredConditionPredictor",
+    "DEFAULT_IDENTIFIABILITY_CRITERIA",
+    "EnsembleRun",
+    "IdentifiabilityCriteria",
+    "NoiseScalePrior",
+    "ObservableMapping",
+    "ObservedCondition",
+    "PriorSpecification",
+    "SamplerSettings",
+    "analyze_run",
+    "build_bayesian_problem",
+    "classify_identifiability",
+    "inline_parameter_config_factory",
+    "integrated_autocorrelation_time",
+    "local_information_analysis",
+    "pooled_replicate_standard_deviation",
+    "posterior_predictive",
+    "prior_from_bounds",
+    "run_ensemble_sampler",
+    "sample_posterior",
     "BOUND_PROXIMITY_RELATIVE_TOLERANCE",
     "CalibrationResult",
     "CalibrationAuditCriteria",

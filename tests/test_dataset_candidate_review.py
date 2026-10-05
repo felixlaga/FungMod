@@ -282,6 +282,7 @@ def test_candidate_review_directory_contains_only_review_files() -> None:
         "ariaeenejad_2020_persibgl1_cellobiose_hydrolysis_review.yml",
         "fake_candidate_review.yml",
         "gelain_2020_t_harzianum_review.yml",
+        "pakula_2016_t_reesei_protein_load_review.yml",
         "resa_buckin_2011_cellobiose_hydrolysis_review.yml",
         "trichoderma_harzianum_cardinal_growth_review.yml",
     ]

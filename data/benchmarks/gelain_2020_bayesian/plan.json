@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "gelain_2020_cellulose_bayesian_v1",
+  "design_status": "Retrospective posterior sampling of a registry case on published duplicate means. Never blind or independent validation.",
+  "source": "FungMod posterior sampling of the T. harzianum P49P11 cellulose registry case (hydrolysis candidate) on the Gelain 2020 cellulose cultures at 10, 20 and 30 g/L (article doi:10.1016/j.cesx.2020.100085, data doi:10.17632/shd3wcczsr.2; observations data/benchmarks/gelain_2020_v2/observations.json). Priors are the v2 joint-benchmark bounds, log-uniform. The error model is an assumption (independent Gaussian errors with standard deviation 10 percent of each observable's training maximum, biomass/substrate correlation -0.5) scaled by per-observable multipliers sampled jointly with the parameters; the multipliers absorb model misfit and measurement noise together because the deposit holds no replicates or standard deviations.",
+  "registry_case": {
+    "fungus_id": "trichoderma_harzianum_p49p11",
+    "substrate_id": "cellulose_celufloc_200",
+    "mode": "scientific",
+    "condition_ids": [
+      "gelain_2020_cellulose_10gl",
+      "gelain_2020_cellulose_20gl",
+      "gelain_2020_cellulose_30gl"
+    ],
+    "environment_ids": [
+      "gelain_2020_cellulose_batch_10gl",
+      "gelain_2020_cellulose_batch_20gl",
+      "gelain_2020_cellulose_batch_30gl"
+    ]
+  },
+  "observables": {
+    "biomass": {"state": "biomass_dry_mass_concentration", "units": "gram / liter"},
+    "substrate": {"state": "cellulose_concentration", "units": "gram / liter"},
+    "cellulase_activity": {"state": "cellulase_activity", "units": "filter_paper_unit / liter"},
+    "beta_glucosidase_activity": {"state": "beta_glucosidase_activity", "units": "beta_glucosidase_assay_unit / liter"}
+  },
+  "priors": {
+    "kind": "log_uniform",
+    "bounds_from": "data/benchmarks/gelain_2020_v2/plan.json models.cellulose.hydrolysis.parameters",
+    "source": "Log-uniform within the explicit broad exploratory bounds declared before v2 fitting (data/benchmarks/gelain_2020_v2/plan.json); no published value narrows a prior.",
+    "symbol_map": {
+      "k_h": "gelain_hydrolysis_k_h",
+      "Kh": "gelain_hydrolysis_Kh",
+      "Y": "gelain_hydrolysis_Y",
+      "kd": "gelain_hydrolysis_kd",
+      "K_ind": "gelain_hydrolysis_K_ind",
+      "qF": "gelain_hydrolysis_qF",
+      "kF": "gelain_hydrolysis_kF",
+      "qB": "gelain_hydrolysis_qB",
+      "kB": "gelain_hydrolysis_kB"
+    }
+  },
+  "error_model": {
+    "relative_sd_to_training_max": 0.1,
+    "rho_biomass_substrate": -0.5,
+    "evidence": "assumed",
+    "source": "Declared assumption only, carried over from the v2 correlated_assumption scenario: SD = 10 percent of each observable's training maximum across the three cellulose loadings, biomass/substrate correlation -0.5 from the sign suggested by mass-difference assays, temporal errors independent. Neither magnitude is measured; the deposit holds no replicates or standard deviations.",
+    "noise_scale_priors": {
+      "lower": 0.1,
+      "upper": 10.0,
+      "source": "Log-uniform multiplier on the assumed base standard deviation of each observable, sampled jointly with the parameters because the measurement error is unknown; it absorbs model misfit together with measurement noise."
+    }
+  },
+  "sampler": {
+    "n_walkers": 40,
+    "n_steps": 6000,
+    "burn_in": 1500,
+    "seed": 20261005,
+    "stretch_scale": 2.0,
+    "initial_spread": 0.05,
+    "initial_distribution": "ball",
+    "initial_center": "frozen least-squares fit data/benchmarks/gelain_2020_v2/results/full_fits/cellulose_hydrolysis_primary.json with unit noise-scale multipliers",
+    "autocorrelation_tolerance": 50.0,
+    "minimum_effective_samples": 100.0,
+    "credible_mass": 0.95
+  },
+  "posterior_predictive": {
+    "draws": 400,
+    "quantiles": [0.05, 0.5, 0.95],
+    "start_h": 0.0,
+    "stop_h": 96.0,
+    "step_h": 2.0,
+    "seed": 20261005
+  },
+  "thin": 50,
+  "notes": [
+    "Posterior sampling on published duplicate means; no replicate-level data exist in the deposit, so the noise-scale multipliers conflate measurement error and model misfit.",
+    "The registry records keep their frozen least-squares point values; this study reports which of them the data identify and which must be kept as ranges.",
+    "Retrospective development analysis of one strain and preparation; not validation, not a prediction for other conditions."
+  ],
+  "completion_rule": "Code and numerical verification can pass. Identifiability verdicts are conditional on the declared prior box and error assumptions; model validation still requires matched independent data with measured errors."
+}

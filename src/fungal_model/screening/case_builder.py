@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from fungal_model.io.model_config import ModelConfig
@@ -114,6 +114,49 @@ def build_model_config_from_registry_case(
 ) -> ModelConfig:
     """Convert a modelable registry case into a generic deterministic ``ModelConfig``."""
 
+    resolved = resolve_registry_case(
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        environment_id=environment_id,
+        registry=registry,
+        mode=mode,
+    )
+    return build_resolved_case_config(resolved, registry=registry, output_directory=output_directory)
+
+
+@dataclass(frozen=True)
+class ResolvedRegistryCase:
+    """A modelable registry case resolved once to its compatibility, template and exact records."""
+
+    fungus_id: str
+    substrate_id: str
+    environment_id: str
+    mode: RegistryCaseConfigMode
+    report: ModelabilityReport
+    compatibility: ProcessCompatibilityRecord
+    case_template: CaseTemplateRecord
+    parameter_records: Mapping[str, ParameterRecord]
+
+    @property
+    def roles_by_symbol(self) -> dict[str, tuple[str, ...]]:
+        """Template roles bound to each resolved parameter symbol."""
+
+        roles: dict[str, list[str]] = {}
+        for role, record in self.parameter_records.items():
+            roles.setdefault(record.parameter_symbol, []).append(role)
+        return {symbol: tuple(items) for symbol, items in roles.items()}
+
+
+def resolve_registry_case(
+    *,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    registry: FungModRegistry,
+    mode: RegistryCaseConfigMode = "toy",
+) -> ResolvedRegistryCase:
+    """Resolve the compatibility, template and exact parameter records of a modelable case."""
+
     _validate_mode(mode)
     report = assess_modelability(
         fungus_id=fungus_id,
@@ -169,17 +212,99 @@ def build_model_config_from_registry_case(
         process_label=assembler.process_label,
         mode=mode,
     )
-    config_data = build_registry_process_config_data(
-        registry=registry,
-        compatibility=compatibility,
+    return ResolvedRegistryCase(
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
-        parameter_records=parameter_records,
-        output_directory=output_directory,
+        mode=mode,
+        report=report,
+        compatibility=compatibility,
         case_template=case_template,
+        parameter_records=parameter_records,
+    )
+
+
+def build_resolved_case_config(
+    resolved: ResolvedRegistryCase,
+    *,
+    registry: FungModRegistry,
+    output_directory: str | None = None,
+    value_overrides: Mapping[str, float] | None = None,
+) -> ModelConfig:
+    """Build the ``ModelConfig`` of a resolved case, optionally overriding exact record values.
+
+    ``value_overrides`` maps parameter symbols to candidate values in the
+    record's own units. Every overridden symbol must be one the case resolved
+    with an exact value; the override reaches every place the template binds
+    the symbol, including product-map coefficients derived from it.
+    """
+
+    records: Mapping[str, ParameterRecord] = resolved.parameter_records
+    if value_overrides:
+        roles_by_symbol = resolved.roles_by_symbol
+        unknown = sorted(set(value_overrides).difference(roles_by_symbol))
+        if unknown:
+            raise RegistryCaseBuildError(
+                f"Value overrides name symbols the case does not resolve: {unknown}."
+            )
+        replaced = dict(records)
+        for symbol, value in value_overrides.items():
+            numeric = float(value)
+            if not _is_finite(numeric):
+                raise RegistryCaseBuildError(f"Value override for {symbol!r} must be finite.")
+            for role in roles_by_symbol[symbol]:
+                record = records[role]
+                if not record.value.is_exact:
+                    raise RegistryCaseBuildError(
+                        f"Value override for {symbol!r} requires an exact record; role {role!r} has kind "
+                        f"{record.value.kind!r}."
+                    )
+                replaced[role] = replace(record, value=replace(record.value, value=numeric))
+        records = replaced
+    config_data = build_registry_process_config_data(
+        registry=registry,
+        compatibility=resolved.compatibility,
+        fungus_id=resolved.fungus_id,
+        substrate_id=resolved.substrate_id,
+        environment_id=resolved.environment_id,
+        parameter_records=records,
+        output_directory=output_directory,
+        case_template=resolved.case_template,
     )
     return ModelConfig.from_mapping(config_data)
+
+
+def registry_case_config_factory(
+    *,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    registry: FungModRegistry,
+    mode: RegistryCaseConfigMode = "toy",
+) -> Callable[[Mapping[str, float]], ModelConfig]:
+    """Resolve a case once and return a factory rebuilding its config for candidate values.
+
+    The factory is the calibration hook for registry cases: calibration code
+    varies parameter symbols, the factory materializes the public-path config
+    for each candidate, and nothing is patched behind the template's back.
+    """
+
+    resolved = resolve_registry_case(
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        environment_id=environment_id,
+        registry=registry,
+        mode=mode,
+    )
+
+    def factory(values: Mapping[str, float]) -> ModelConfig:
+        return build_resolved_case_config(resolved, registry=registry, output_directory=None, value_overrides=values)
+
+    return factory
+
+
+def _is_finite(value: float) -> bool:
+    return value == value and value not in (float("inf"), float("-inf"))
 
 
 def get_registry_process_assembler(process_type: str) -> RegistryProcessAssembler | None:

@@ -80,6 +80,7 @@ nav:
   - Capability map: capabilities.md
   - Standards and interoperability: standards.md
   - Calibration evidence: calibration-evidence.md
+  - Bayesian calibration and identifiability: bayesian-calibration.md
   - Independent validation: independent-validation.md
   - Culture benchmark: gelain-culture-benchmark.md
   - Joint culture and activity benchmark: gelain-joint-benchmark.md
