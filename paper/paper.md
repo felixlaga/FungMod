@@ -166,7 +166,10 @@ digested result files.
 
 Table 1 (`paper/tables/table_1_joint_holdouts.md`) lists every model,
 family and scenario of the joint benchmark with its held-out error and
-screen verdict. The joint benchmark compares seven model and family combinations against
+screen verdict, and Figure 1 (`paper/figures/figure_1_cellulose_holdouts.svg`)
+shows the frozen held-out predictions of the hydrolysis candidate and of the
+re-fitted published equations against the published means on the three
+cellulose loadings. The joint benchmark compares seven model and family combinations against
 144 published means (biomass, cellulose or glycerol, filter-paper activity
 and beta-glucosidase activity) with each condition held out in turn. On the
 three cellulose loadings the activity-driven hydrolysis candidate reaches a
@@ -182,7 +185,10 @@ validated.
 
 Table 2 (`paper/tables/table_2_identifiability.md`) gives the class,
 posterior median, credible interval, autocorrelation time and effective
-sample size of every constant. Posterior sampling of the nine registry constants of the hydrolysis
+sample size of every constant; Figure 2
+(`paper/figures/figure_2_posterior_predictive.svg`) shows the posterior
+median and the 5 to 95 percent band of the prediction on each loading, with
+the published means. Posterior sampling of the nine registry constants of the hydrolysis
 candidate (24 walkers, 24 000 steps, 4 000 burn-in, log-uniform priors on
 the declared bounds, one shared noise multiplier) converges by the declared
 rule (every autocorrelation estimate reliable, effective sample sizes
@@ -202,7 +208,10 @@ read as ranges.
 
 Tables 3 and 4 (`paper/tables/table_3_criticism_stage_a.md`,
 `paper/tables/table_4_criticism_stage_b.md`) carry the holdout screen and
-the posterior verdicts per mechanism. A frozen plan declared three mechanisms that could reduce the
+the posterior verdicts per mechanism; Figure 3
+(`paper/figures/figure_3_criticism_screen.svg`) shows each mechanism's change
+in pooled held-out error relative to the baseline against the screen's
+thresholds. A frozen plan declared three mechanisms that could reduce the
 biomass-cellulose misfit, each added to the baseline with its bounds, an
 error model, whole-condition holdouts with a complexity screen (at least 10
 percent pooled held-out improvement, no observable more than 10 percent
@@ -245,7 +254,9 @@ next recorded task.
 ## Cross-solver reproduction
 
 Table 5 (`paper/tables/table_5_cross_solver.md`) records the gates, the
-objectives and the parameter agreement. The baseline problem (three loadings, four observables, 96 measurements,
+objectives and the parameter agreement. Figure 4 (`paper/figures/figure_4_cross_solver.svg`) plots the
+objective at the recorded optimum, after COPASI's local fit and at the end
+of its ten random starts. The baseline problem (three loadings, four observables, 96 measurements,
 nine parameters on a log10 scale with the criticism plan's bounds, sigma
 equal to each observable's maximum over the loadings) was exported as a
 PEtab problem and reproduced in COPASI 4.48 under a frozen plan. The first

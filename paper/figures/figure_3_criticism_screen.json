@@ -1,0 +1,115 @@
+{
+  "generator": "fungal_model.research.paper_figures (scripts/reproduce_paper.py tables)",
+  "title": "Stage A holdout screen of the model-criticism study",
+  "caption": "Change in the pooled held-out normalised error of each candidate mechanism relative to the baseline M0, per observable and pooled, in both error scenarios; the dashed lines are the plan's screen thresholds (at least 10 percent pooled improvement, no observable more than 10 percent worse).",
+  "data": {
+    "reference": "M0_baseline",
+    "observables": [
+      "biomass",
+      "substrate",
+      "cellulase_activity",
+      "beta_glucosidase_activity"
+    ],
+    "minimum_relative_improvement": 0.1,
+    "maximum_observable_worsening": 0.1,
+    "scenarios": {
+      "primary": {
+        "baseline_pooled_normalized_mse": {
+          "biomass": 0.07862600266497231,
+          "substrate": 0.013232538949332004,
+          "cellulase_activity": 0.16032673276114814,
+          "beta_glucosidase_activity": 0.11517782091172286
+        },
+        "models": {
+          "M1_induction_state": {
+            "relative_change_by_observable": {
+              "biomass": -0.1887655906246677,
+              "substrate": 2.0991796155902054,
+              "cellulase_activity": -0.03831297067177719,
+              "beta_glucosidase_activity": -0.06287373385254247
+            },
+            "relative_improvement": 0.0012213008879334852,
+            "passed": false,
+            "reasons": [
+              "pooled normalized held-out error improves by less than the required fraction",
+              "an observable worsens by more than the allowed fraction"
+            ]
+          },
+          "M2_soluble_product_pool": {
+            "relative_change_by_observable": {
+              "biomass": -0.2470482454688504,
+              "substrate": -0.14791611613243782,
+              "cellulase_activity": -0.2077138230621428,
+              "beta_glucosidase_activity": -0.27315724565213073
+            },
+            "relative_improvement": 0.23449676301471278,
+            "passed": true,
+            "reasons": []
+          },
+          "M3_conversion_dependent_accessibility": {
+            "relative_change_by_observable": {
+              "biomass": -0.06045530221535789,
+              "substrate": -0.08668634030284306,
+              "cellulase_activity": 0.027728387100987018,
+              "beta_glucosidase_activity": 0.018613769574233663
+            },
+            "relative_improvement": -0.0018756810590441209,
+            "passed": false,
+            "reasons": [
+              "pooled normalized held-out error improves by less than the required fraction"
+            ]
+          }
+        }
+      },
+      "correlated_assumption": {
+        "baseline_pooled_normalized_mse": {
+          "biomass": 0.08118807546613056,
+          "substrate": 0.012008878399612186,
+          "cellulase_activity": 0.1626420197286064,
+          "beta_glucosidase_activity": 0.11710434505489557
+        },
+        "models": {
+          "M1_induction_state": {
+            "relative_change_by_observable": {
+              "biomass": -0.20482878424247442,
+              "substrate": 3.121348599684029,
+              "cellulase_activity": -0.026070068481822695,
+              "beta_glucosidase_activity": -0.045263660356924196
+            },
+            "relative_improvement": -0.0303359264658134,
+            "passed": false,
+            "reasons": [
+              "pooled normalized held-out error improves by less than the required fraction",
+              "an observable worsens by more than the allowed fraction"
+            ]
+          },
+          "M2_soluble_product_pool": {
+            "relative_change_by_observable": {
+              "biomass": -0.3639048012175722,
+              "substrate": -0.21011225906083075,
+              "cellulase_activity": -0.21218694026017781,
+              "beta_glucosidase_activity": -0.26275625079159515
+            },
+            "relative_improvement": 0.2610272106968716,
+            "passed": true,
+            "reasons": []
+          },
+          "M3_conversion_dependent_accessibility": {
+            "relative_change_by_observable": {
+              "biomass": -0.09540460707943987,
+              "substrate": 0.11658264738036173,
+              "cellulase_activity": 0.09124051471163908,
+              "beta_glucosidase_activity": 0.08688561025789454
+            },
+            "relative_improvement": -0.05005729702264938,
+            "passed": false,
+            "reasons": [
+              "pooled normalized held-out error improves by less than the required fraction",
+              "an observable worsens by more than the allowed fraction"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

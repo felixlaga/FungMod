@@ -6,6 +6,12 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- The software paper's figures (`paper/figures/`): `fungal_model.research.paper_figures`
+  draws the cellulose holdouts, the posterior predictive bands, the stage A
+  screen and the cross-solver objectives from the recorded results, writes
+  the plotted numbers as JSON next to each SVG and a manifest with source
+  digests and key numbers; `scripts/reproduce_paper.py tables` and `check`
+  (and `make paper-tables`, `paper-check`) now cover tables and figures.
 - `fit_least_squares` accepts `diff_step`, `ftol`, `xtol` and `gtol`
   (each `None` by default, leaving scipy's value) and records the declared
   values in `optimizer_metadata`, so a calibration whose predictions come

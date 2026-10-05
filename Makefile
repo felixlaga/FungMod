@@ -55,10 +55,10 @@ wheelhouse: build ## Download every pinned runtime dependency into wheelhouse/ f
 install-offline: wheelhouse ## Install the built wheel with no network access (from wheelhouse/ only).
 	$(PIP) install --no-index --find-links wheelhouse dist/fungmod-*.whl
 
-paper-tables: ## Regenerate paper/tables and its manifest from the recorded study results.
+paper-tables: ## Regenerate paper/tables and paper/figures with their manifests from the recorded study results.
 	$(PYTHON) scripts/reproduce_paper.py tables
 
-paper-check: ## Verify that paper/tables matches the recorded study results (seconds).
+paper-check: ## Verify that paper/tables and paper/figures match the recorded study results (seconds).
 	$(PYTHON) scripts/reproduce_paper.py check
 
 paper-verify: ## Recompute cheap checks from the recorded study artifacts (about a minute).

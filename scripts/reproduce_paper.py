@@ -1,13 +1,13 @@
-"""One command for the software paper's tables and their reproduction, in tiers of cost.
+"""One command for the software paper's tables and figures and their reproduction, in tiers of cost.
 
-    python scripts/reproduce_paper.py tables     # regenerate paper/tables from the recorded results (seconds)
-    python scripts/reproduce_paper.py check      # the committed tables and manifest match the recorded results (seconds)
+    python scripts/reproduce_paper.py tables     # regenerate paper/tables and paper/figures from the recorded results (seconds)
+    python scripts/reproduce_paper.py check      # the committed tables, figures and manifests match the recorded results (seconds)
     python scripts/reproduce_paper.py verify     # recompute cheap checks from the recorded artifacts (about a minute)
     python scripts/reproduce_paper.py stage-a    # re-run stage A and the cross-solver reproduction, compare (about two hours)
     python scripts/reproduce_paper.py full       # also re-run the posterior chains, compare their verdicts (a day of compute)
 
 Every tier is honest about what it recomputes. ``tables`` and ``check`` touch
-no science: they format the recorded result files. ``verify`` recomputes the
+no science: they format and plot the recorded result files. ``verify`` recomputes the
 compiled-core objective at the recorded cross-solver optimum and the
 stationarity of the recorded baseline fit and checks every digest chain.
 ``stage-a`` re-runs the least-squares stage of the model-criticism study and
@@ -37,7 +37,7 @@ for _variable in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
 
     os.environ.setdefault(_variable, "1")
 
-from fungal_model.research import gelain_criticism, gelain_petab, paper_tables  # noqa: E402
+from fungal_model.research import gelain_criticism, gelain_petab, paper_figures, paper_tables  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "outputs" / "paper_reproduction"
@@ -53,14 +53,17 @@ def _tables(args: argparse.Namespace) -> int:
     manifest = paper_tables.write_tables(ROOT, args.directory)
     for name, entry in manifest["tables"].items():
         _log(f"{entry['file']}: {len(entry['sources'])} sources")
+    figures = paper_figures.write_figures(ROOT, args.figures_directory)
+    for name, entry in figures["figures"].items():
+        _log(f"{entry['file']} (+ {entry['data_file']}): {len(entry['sources'])} sources")
     return 0
 
 
 def _check(args: argparse.Namespace) -> int:
-    problems = paper_tables.check_tables(ROOT, args.directory)
+    problems = paper_tables.check_tables(ROOT, args.directory) + paper_figures.check_figures(ROOT, args.figures_directory)
     for problem in problems:
         _log(f"MISMATCH: {problem}")
-    _log("paper tables consistent with the recorded results" if not problems else f"{len(problems)} problem(s)")
+    _log("paper tables and figures consistent with the recorded results" if not problems else f"{len(problems)} problem(s)")
     return 0 if not problems else 1
 
 
@@ -166,10 +169,12 @@ def _full(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     subparsers = parser.add_subparsers(dest="tier", required=True)
-    tables = subparsers.add_parser("tables", help="regenerate paper/tables and its manifest from the recorded results")
-    tables.add_argument("--directory", type=Path, default=None, help="write elsewhere than paper/tables")
-    check = subparsers.add_parser("check", help="the committed tables and manifest match the recorded results")
+    tables = subparsers.add_parser("tables", help="regenerate paper/tables and paper/figures with their manifests from the recorded results")
+    tables.add_argument("--directory", type=Path, default=None, help="write the tables elsewhere than paper/tables")
+    tables.add_argument("--figures-directory", type=Path, default=None, help="write the figures elsewhere than paper/figures")
+    check = subparsers.add_parser("check", help="the committed tables, figures and manifests match the recorded results")
     check.add_argument("--directory", type=Path, default=None)
+    check.add_argument("--figures-directory", type=Path, default=None)
     verify = subparsers.add_parser("verify", help="recompute cheap checks from the recorded artifacts")
     verify.add_argument("--report", type=Path, default=None, help="write the check list as JSON")
     stage_a = subparsers.add_parser("stage-a", help="re-run stage A and the cross-solver reproduction and compare")

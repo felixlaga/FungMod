@@ -26,6 +26,50 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## REPRO-002 The Paper's Figures From The Recorded Results
+
+Date: 2026-10-05
+
+Status: complete. The reproducibility package now regenerates the paper's
+figures as well as its tables with one command.
+
+Changed:
+
+- `research/paper_figures.py` (new): `PaperFigure` (the plotted numbers, a
+  draw callable, sources with digests, key numbers); builders for the
+  whole-condition holdouts on the three cellulose loadings (published means
+  against the frozen held-out predictions of the hydrolysis candidate and
+  the re-fitted published equations, v2 primary scenario), the posterior
+  predictive bands of BAYES-001 (median and 5 to 95 percent band per
+  loading and observable with the published means), the stage A screen of
+  the criticism study (change in pooled held-out error per observable and
+  pooled, relative to M0, against the plan's thresholds, both scenarios)
+  and the cross-solver objectives (recorded optimum, COPASI's local fit,
+  ten random starts); `write_figures`, `check_figures`, `manifest_for`,
+  `render` (SVG with the generator as creator and no date).
+- `paper/figures/` (new): four SVGs, four data JSONs and `manifest.json`.
+- `scripts/reproduce_paper.py`: `tables` writes the figures too
+  (`--figures-directory`), `check` checks them; `Makefile` help text;
+  `paper/paper.md` cites each figure next to its table;
+  `docs/reproducing-the-paper.md`; `CHANGELOG.md`.
+- `tests/test_paper_figures.py` (new): committed data and manifest match
+  the recorded results; regeneration elsewhere is byte-identical for the
+  data and the manifest and produces SVGs with the marker; manifest digests
+  name the files on disk; every figure is cited by the paper; key numbers
+  agree with the data; builders refuse missing results; a tampered data
+  file or SVG is reported.
+
+Not changed: any recorded result, table or study. The figures plot recorded
+numbers; the measured points come from the reviewed literature datasets.
+Scientific impact: none. Backward compatibility: additive. Risk: low.
+
+Remaining ambiguities: SVG bytes are not compared across matplotlib
+versions; the data files are the reproducible artifact.
+
+Recommended next task: finish the amendment 4 M2 chain and its holdout
+posteriors, then refresh the tables, figures and paper text that depend on
+the M2 stage B verdict.
+
 ## CAL-002 Declared Finite-Difference Step In The Public Least-Squares API
 
 Date: 2026-10-05
