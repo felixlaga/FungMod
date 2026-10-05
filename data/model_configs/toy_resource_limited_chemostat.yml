@@ -1,0 +1,307 @@
+kind: model_config
+name: toy resource-limited chemostat benchmark
+mode: toy
+maturity: framework_benchmark
+provenance:
+  source: FungMod foundation benchmark config; not a scientific case.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: >
+    Exercises the generic resource-limited closure processes
+    (resource_limited_growth, resource_limited_maintenance, costed_secretion)
+    and the boundary exchanges (dilution_exchange, gas_transfer) on abstract
+    dissolved pools: a resource pool feeds a cell pool after a maintenance
+    demand, a share of the post-maintenance budget forms a product pool, the
+    resource is diluted against a feed and an acceptor pool is replenished by
+    gas transfer. Units are millimolar and hours; no organism, substrate
+    chemistry or culture interpretation is implied and every stoichiometric
+    coefficient is an artificial benchmark value.
+  validity_range: framework tests only
+  units: not_applicable
+entities:
+  environment:
+    id: environment
+    path: data/environments/lab_30C_pH7.yml
+    loader: environment
+  geometry:
+    id: geometry
+    path: data/geometries/well_mixed_100ml.yml
+    loader: well_mixed
+  substrates:
+    - id: dissolved_resource
+      loader: generic_dissolved
+      data:
+        kind: substrate
+        name: generic dissolved benchmark resource
+        substrate_type: generic_dissolved
+        chemical_class: framework benchmark
+        physical_state: dissolved
+        bond_types: []
+        accessible_bonds: []
+        required_enzyme_classes: []
+        degradation_products:
+          - name: generic benchmark product
+            notes: Toy product for config loading only.
+parameters:
+  - id: closure_parameters
+    parameters:
+      - name: toy true yield
+        symbol: Y_toy
+        value: 0.4
+        units: dimensionless
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy maintenance demand
+        symbol: m_toy
+        value: 0.01
+        units: 1 / hour
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy uptake capacity
+        symbol: q_toy
+        value: 0.5
+        units: 1 / hour
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy resource half-saturation
+        symbol: K_resource_toy
+        value: 0.2
+        units: millimolar
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy nutrient half-saturation
+        symbol: K_nutrient_toy
+        value: 0.05
+        units: millimolar
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy acceptor half-saturation
+        symbol: K_acceptor_toy
+        value: 0.01
+        units: millimolar
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy allocation fraction
+        symbol: f_toy
+        value: 0.3
+        units: dimensionless
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy secretion yield
+        symbol: y_secretion_toy
+        value: 2.0
+        units: dimensionless
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+  - id: exchange_parameters
+    parameters:
+      - name: toy dilution rate
+        symbol: D_toy
+        value: 0.05
+        units: 1 / hour
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy resource feed concentration
+        symbol: resource_feed_toy
+        value: 5.0
+        units: millimolar
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy acceptor transfer coefficient
+        symbol: kLa_toy
+        value: 10.0
+        units: 1 / hour
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy acceptor saturation concentration
+        symbol: acceptor_saturation_toy
+        value: 0.25
+        units: millimolar
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+processes:
+  - id: cell_growth
+    process_type: resource_limited_growth
+    states:
+      substrate: resource_concentration
+      biomass: cell_concentration
+      nutrient: nutrient_concentration
+      oxidant: acceptor_concentration
+      extent: growth_extent
+    parameters:
+      true_yield: Y_toy
+      maintenance_demand: m_toy
+      uptake_capacity: q_toy
+      substrate_half_saturation: K_resource_toy
+      nutrient_half_saturation: K_nutrient_toy
+      oxidant_half_saturation: K_acceptor_toy
+      allocation_fraction: f_toy
+      time_units: hour
+    stoichiometry:
+      resource_concentration: -2.5
+      cell_concentration: 1.0
+      nutrient_concentration: -0.2
+      acceptor_concentration: -1.0
+    assumptions:
+      - toy resource-limited growth benchmark only
+  - id: cell_maintenance
+    process_type: resource_limited_maintenance
+    states:
+      substrate: resource_concentration
+      biomass: cell_concentration
+      nutrient: nutrient_concentration
+      oxidant: acceptor_concentration
+    parameters:
+      true_yield: Y_toy
+      maintenance_demand: m_toy
+      uptake_capacity: q_toy
+      substrate_half_saturation: K_resource_toy
+      nutrient_half_saturation: K_nutrient_toy
+      oxidant_half_saturation: K_acceptor_toy
+      time_units: hour
+    stoichiometry:
+      resource_concentration: -1.0
+      acceptor_concentration: -6.0
+    assumptions:
+      - toy resource-limited maintenance benchmark only
+  - id: product_secretion
+    process_type: costed_secretion
+    states:
+      substrate: resource_concentration
+      biomass: cell_concentration
+      nutrient: nutrient_concentration
+      oxidant: acceptor_concentration
+    parameters:
+      true_yield: Y_toy
+      maintenance_demand: m_toy
+      uptake_capacity: q_toy
+      substrate_half_saturation: K_resource_toy
+      nutrient_half_saturation: K_nutrient_toy
+      oxidant_half_saturation: K_acceptor_toy
+      allocation_fraction: f_toy
+      secretion_yield: y_secretion_toy
+      time_units: hour
+    stoichiometry:
+      resource_concentration: -0.5
+      nutrient_concentration: -0.3
+      acceptor_concentration: -2.0
+      product_concentration: 1.0
+    assumptions:
+      - toy costed secretion benchmark only
+  - id: resource_dilution
+    process_type: dilution_exchange
+    states:
+      pool: resource_concentration
+      ledger: resource_boundary
+    parameters:
+      dilution_rate: D_toy
+      feed: resource_feed_toy
+      time_units: hour
+    assumptions:
+      - toy chemostat dilution benchmark only
+  - id: acceptor_transfer
+    process_type: gas_transfer
+    states:
+      pool: acceptor_concentration
+    parameters:
+      transfer_rate: kLa_toy
+      saturation: acceptor_saturation_toy
+      time_units: hour
+    assumptions:
+      - toy gas transfer benchmark only
+initial_state:
+  states:
+    resource_concentration:
+      value: 1.0
+      units: millimolar
+    cell_concentration:
+      value: 0.1
+      units: millimolar
+    nutrient_concentration:
+      value: 0.5
+      units: millimolar
+    acceptor_concentration:
+      value: 0.25
+      units: millimolar
+    product_concentration:
+      value: 0.0
+      units: millimolar
+    growth_extent:
+      value: 0.0
+      units: millimolar
+    resource_boundary:
+      value: 0.0
+      units: millimolar
+time:
+  start:
+    value: 0.0
+    units: hour
+  stop:
+    value: 20.0
+    units: hour
+  points: 41
+validators:
+  - id: non_negative_states
+    validator_type: non_negative
+    species:
+      - resource_concentration
+      - cell_concentration
+      - nutrient_concentration
+      - acceptor_concentration
+      - product_concentration
+      - growth_extent
+outputs:
+  directory: outputs/toy_resource_limited_chemostat
+  save:
+    - record
+    - validation_report
+  plots:
+    - state_trajectories

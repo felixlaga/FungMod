@@ -61,6 +61,11 @@ def test_default_foundation_library_registers_expected_factories() -> None:
         "substrate_transglycosylation",
         "surface_catalysis",
         "thermal_inactivation",
+        "resource_limited_growth",
+        "resource_limited_maintenance",
+        "costed_secretion",
+        "dilution_exchange",
+        "gas_transfer",
     }
 
 

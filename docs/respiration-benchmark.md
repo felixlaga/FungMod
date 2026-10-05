@@ -99,6 +99,17 @@ use a documented zero extension of the constitutive law; returned trajectories
 are never clipped. Returned pool values below minus ten absolute tolerances
 raise `IntegrationError`; tiny numerical roundoff remains visible.
 
+The same closure is available on the compiled process core:
+`compiled_processes()` returns growth and maintenance as generic
+`resource_limited_growth` / `resource_limited_maintenance` processes carrying
+the solved pathways' dynamic-pool stoichiometry and extent ledgers, plus a
+`dilution_exchange` per pool and a `gas_transfer` for the oxidant, each with a
+boundary ledger; `compiled_parameters()` restates the feed as parameters;
+`simulate_compiled()` integrates them and returns the same `CultureTrajectory`
+with `diagnostics["engine"]` naming the path. `simulate` keeps the native
+right-hand side for its analytic piecewise Jacobian; the two agree to 1e-7
+relative at tight tolerances (`tests/test_culture_processes.py`).
+
 Entropy production is available through `RespiratoryGrowthModel.entropy_production`
 only with complete sourced formation Gibbs energies and declared conditions.
 Each operating pathway must produce nonnegative entropy; favorable maintenance

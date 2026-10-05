@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -222,6 +222,8 @@ class ProcessConfig:
     modifiers: tuple[Mapping[str, Any], ...] = ()
     assumptions: tuple[str, ...] = ()
     raw: Mapping[str, Any] | None = None
+    stoichiometry: Mapping[str, Any] = field(default_factory=dict)
+    """State name to formula units per unit extent, for processes whose pool changes are declared explicitly."""
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "ProcessConfig":
@@ -240,6 +242,7 @@ class ProcessConfig:
             modifiers=tuple(deepcopy(item) for item in data.get("modifiers", ()) or ()),
             assumptions=tuple(str(item) for item in data.get("assumptions", ()) or ()),
             raw=deepcopy(dict(data)),
+            stoichiometry=deepcopy(data.get("stoichiometry", {}) or {}),
         )
 
     def validate(self) -> ModelConfigValidationResult:
@@ -252,6 +255,8 @@ class ProcessConfig:
             invalid.append(f"{self.id}.parameters")
         if not isinstance(self.modifiers, tuple) or any(not isinstance(item, Mapping) for item in self.modifiers):
             invalid.append(f"{self.id}.modifiers")
+        if not isinstance(self.stoichiometry, Mapping):
+            invalid.append(f"{self.id}.stoichiometry")
         if invalid:
             return ModelConfigValidationResult(
                 passed=False,
@@ -270,6 +275,7 @@ class ProcessConfig:
             "modifiers": deepcopy(list(self.modifiers)),
             "assumptions": list(self.assumptions),
             "raw": deepcopy(dict(self.raw or {})),
+            **({"stoichiometry": deepcopy(dict(self.stoichiometry))} if self.stoichiometry else {}),
         }
 
 

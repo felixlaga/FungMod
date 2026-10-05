@@ -26,6 +26,18 @@ from fungal_model.processes.ionization import (
     PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE,
     PHIonizationMichaelisMentenProcess,
 )
+from fungal_model.processes.culture import (
+    COSTED_SECRETION_PROCESS_TYPE,
+    DILUTION_EXCHANGE_PROCESS_TYPE,
+    GAS_TRANSFER_PROCESS_TYPE,
+    RESOURCE_LIMITED_GROWTH_PROCESS_TYPE,
+    RESOURCE_LIMITED_MAINTENANCE_PROCESS_TYPE,
+    CostedSecretionProcess,
+    DilutionExchangeProcess,
+    GasTransferProcess,
+    ResourceLimitedGrowthProcess,
+    ResourceLimitedMaintenanceProcess,
+)
 from fungal_model.processes.physiology import (
     PROPORTIONAL_SYNTHESIS_PROCESS_TYPE,
     ProportionalSynthesisProcess,
@@ -611,6 +623,188 @@ class SurfaceCatalysisFactory:
         return _apply_rate_modifiers(context, process_config, process)
 
 
+_CLOSURE_STATE_FIELDS = ("substrate", "biomass", "nutrient", "oxidant")
+_CLOSURE_PARAMETER_FIELDS = (
+    "true_yield",
+    "maintenance_demand",
+    "uptake_capacity",
+    "substrate_half_saturation",
+    "nutrient_half_saturation",
+    "oxidant_half_saturation",
+)
+
+
+def _closure_missing(context: ProcessBuildContext, process_config: Any, *, extra_parameters: Sequence[str] = ()) -> tuple[str, ...]:
+    missing = _missing_config_fields(process_config, ("id", "states", "parameters", "stoichiometry"))
+    states = _mapping(getattr(process_config, "states", {}))
+    parameters = _mapping(getattr(process_config, "parameters", {}))
+    missing += _missing_mapping_fields(states, _CLOSURE_STATE_FIELDS, prefix="states")
+    missing += _missing_mapping_fields(parameters, (*_CLOSURE_PARAMETER_FIELDS, "time_units", *extra_parameters), prefix="parameters")
+    stoichiometry = _mapping(getattr(process_config, "stoichiometry", {}))
+    if _has_field(process_config, "stoichiometry") and not stoichiometry:
+        missing += ("stoichiometry",)
+    named = [states.get(pool) for pool in _CLOSURE_STATE_FIELDS] + list(stoichiometry) + [states.get("extent")]
+    missing += tuple(f"state_units.{state}" for state in named if state is not None and state not in context.state_units)
+    return missing
+
+
+def _closure_kwargs(context: ProcessBuildContext, process_config: Any) -> dict[str, Any]:
+    states = _mapping(process_config.states)
+    parameters = _mapping(process_config.parameters)
+    substrate = str(states["substrate"])
+    units = context.state_units[substrate]
+    for pool in _CLOSURE_STATE_FIELDS:
+        if context.state_units[str(states[pool])] != units:
+            raise ValueError(f"Closure pools must share the units of the substrate state ({units!r}); {states[pool]!r} differs.")
+    return {
+        "name": process_config.id,
+        "substrate_state": substrate,
+        "biomass_state": str(states["biomass"]),
+        "nutrient_state": str(states["nutrient"]),
+        "oxidant_state": str(states["oxidant"]),
+        "concentration_units": units,
+        "time_units": str(parameters["time_units"]),
+        "true_yield_symbol": str(parameters["true_yield"]),
+        "maintenance_demand_symbol": str(parameters["maintenance_demand"]),
+        "uptake_capacity_symbol": str(parameters["uptake_capacity"]),
+        "substrate_half_saturation_symbol": str(parameters["substrate_half_saturation"]),
+        "nutrient_half_saturation_symbol": str(parameters["nutrient_half_saturation"]),
+        "oxidant_half_saturation_symbol": str(parameters["oxidant_half_saturation"]),
+        "stoichiometry": {str(state): float(value) for state, value in _mapping(process_config.stoichiometry).items()},
+        "extent_state": None if states.get("extent") is None else str(states["extent"]),
+        "source": context.source,
+    }
+
+
+@dataclass(frozen=True)
+class ResourceLimitedGrowthFactory:
+    """Build the biomass-forming extent of the resource-limited closure from config."""
+
+    process_type: str = RESOURCE_LIMITED_GROWTH_PROCESS_TYPE
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        return _decision(self, missing_fields=_closure_missing(context, process_config))
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        _require_buildable(self.can_build(context, process_config))
+        parameters = _mapping(process_config.parameters)
+        allocation = parameters.get("allocation_fraction")
+        process = ResourceLimitedGrowthProcess(
+            **_closure_kwargs(context, process_config),
+            allocation_fraction_symbol=None if allocation is None else str(allocation),
+            notes="Built from generic resource-limited growth config.",
+        )
+        return _apply_rate_modifiers(context, process_config, process)
+
+
+@dataclass(frozen=True)
+class ResourceLimitedMaintenanceFactory:
+    """Build the maintenance extent of the resource-limited closure from config."""
+
+    process_type: str = RESOURCE_LIMITED_MAINTENANCE_PROCESS_TYPE
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        return _decision(self, missing_fields=_closure_missing(context, process_config))
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        _require_buildable(self.can_build(context, process_config))
+        process = ResourceLimitedMaintenanceProcess(
+            **_closure_kwargs(context, process_config), notes="Built from generic resource-limited maintenance config."
+        )
+        return _apply_rate_modifiers(context, process_config, process)
+
+
+@dataclass(frozen=True)
+class CostedSecretionFactory:
+    """Build the costed secretion extent of the resource-limited closure from config."""
+
+    process_type: str = COSTED_SECRETION_PROCESS_TYPE
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        return _decision(
+            self, missing_fields=_closure_missing(context, process_config, extra_parameters=("allocation_fraction", "secretion_yield"))
+        )
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        _require_buildable(self.can_build(context, process_config))
+        parameters = _mapping(process_config.parameters)
+        process = CostedSecretionProcess(
+            **_closure_kwargs(context, process_config),
+            allocation_fraction_symbol=str(parameters["allocation_fraction"]),
+            secretion_yield_symbol=str(parameters["secretion_yield"]),
+            notes="Built from generic costed secretion config.",
+        )
+        return _apply_rate_modifiers(context, process_config, process)
+
+
+def _exchange_missing(context: ProcessBuildContext, process_config: Any, *, coefficient: str, target: str) -> tuple[str, ...]:
+    missing = _missing_config_fields(process_config, ("id", "states", "parameters"))
+    states = _mapping(getattr(process_config, "states", {}))
+    parameters = _mapping(getattr(process_config, "parameters", {}))
+    missing += _missing_mapping_fields(states, ("pool",), prefix="states")
+    missing += _missing_mapping_fields(parameters, (coefficient, target, "time_units"), prefix="parameters")
+    missing += tuple(
+        f"state_units.{state}" for state in (states.get("pool"), states.get("ledger")) if state is not None and state not in context.state_units
+    )
+    return missing
+
+
+@dataclass(frozen=True)
+class DilutionExchangeFactory:
+    """Build a chemostat dilution exchange of one pool from config."""
+
+    process_type: str = DILUTION_EXCHANGE_PROCESS_TYPE
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        return _decision(self, missing_fields=_exchange_missing(context, process_config, coefficient="dilution_rate", target="feed"))
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        _require_buildable(self.can_build(context, process_config))
+        states = _mapping(process_config.states)
+        parameters = _mapping(process_config.parameters)
+        pool = str(states["pool"])
+        process = DilutionExchangeProcess(
+            name=process_config.id,
+            pool_state=pool,
+            concentration_units=context.state_units[pool],
+            time_units=str(parameters["time_units"]),
+            dilution_rate_symbol=str(parameters["dilution_rate"]),
+            feed_symbol=str(parameters["feed"]),
+            ledger_state=None if states.get("ledger") is None else str(states["ledger"]),
+            source=context.source,
+            notes="Built from generic dilution-exchange config.",
+        )
+        return _apply_rate_modifiers(context, process_config, process)
+
+
+@dataclass(frozen=True)
+class GasTransferFactory:
+    """Build a first-order gas transfer into one dissolved pool from config."""
+
+    process_type: str = GAS_TRANSFER_PROCESS_TYPE
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        return _decision(self, missing_fields=_exchange_missing(context, process_config, coefficient="transfer_rate", target="saturation"))
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        _require_buildable(self.can_build(context, process_config))
+        states = _mapping(process_config.states)
+        parameters = _mapping(process_config.parameters)
+        pool = str(states["pool"])
+        process = GasTransferProcess(
+            name=process_config.id,
+            pool_state=pool,
+            concentration_units=context.state_units[pool],
+            time_units=str(parameters["time_units"]),
+            transfer_rate_symbol=str(parameters["transfer_rate"]),
+            saturation_symbol=str(parameters["saturation"]),
+            ledger_state=None if states.get("ledger") is None else str(states["ledger"]),
+            source=context.source,
+            notes="Built from generic gas-transfer config.",
+        )
+        return _apply_rate_modifiers(context, process_config, process)
+
+
 def default_foundation_factories() -> tuple[ProcessFactory, ...]:
     return (
         FirstOrderFactory(),
@@ -621,6 +815,11 @@ def default_foundation_factories() -> tuple[ProcessFactory, ...]:
         SubstrateTransglycosylationFactory(),
         SurfaceCatalysisFactory(),
         ThermalInactivationFactory(),
+        ResourceLimitedGrowthFactory(),
+        ResourceLimitedMaintenanceFactory(),
+        CostedSecretionFactory(),
+        DilutionExchangeFactory(),
+        GasTransferFactory(),
     )
 
 

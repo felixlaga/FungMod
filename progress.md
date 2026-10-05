@@ -26,6 +26,80 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## UNIFY-001 Culture Physiology As Generic Processes On The Compiled Core
+
+Date: 2026-10-05
+
+Status: complete for the two Pirt/Monod classes of step 5 item 5. The
+closure and the chemostat exchanges of `ResourceLimitedCulture` and
+`DegradingCulture` are generic, registrable processes with numeric kernels,
+and both classes integrate on the compiled core with parity against their
+native right-hand side. `FungalCouplingModel` (legacy `Reaction` engine)
+remains, as the legacy-engine item of FD-009.
+
+Changed:
+
+- `processes/culture.py` (new): `ResourceLimitedGrowthProcess`
+  (`(1-f) Y max(capacity-m, 0) N/(K_N+N) X`), `ResourceLimitedMaintenanceProcess`
+  (`min(m, capacity) X`), `CostedSecretionProcess`
+  (`f max(capacity-m, 0) N/(K_N+N) y X`) with `capacity = q S/(K_S+S) O/(K_O+O)`,
+  explicit `stoichiometry` (formula units per unit extent) and an optional
+  extent ledger; `DilutionExchangeProcess` (`D (c_feed - c)`) and
+  `GasTransferProcess` (`k_La (c_sat - c)`) with an optional boundary ledger.
+  Every process has a unit-aware `rate`, a numeric `compile_rate`, linear
+  `contributions`, assumptions, validity labels and failure modes; half-
+  saturations must be positive, fractions in [0, 1], pools non-negative.
+- `processes/factories.py`: five factories reading `states`, `parameters`
+  and `stoichiometry` from config, reporting missing fields and unit
+  mismatches; registered in `default_foundation_factories` (13 types).
+  `io/model_config.py`: `ProcessConfig.stoichiometry` (serialized only when
+  present, so existing configs round-trip unchanged).
+- `data/model_configs/toy_resource_limited_chemostat.yml` (new): the five
+  types on abstract pools (resource, cells, nutrient, acceptor, product) in
+  millimolar and hours, picked up by the compiled-core parity and
+  shipped-kernel tests like every packaged config.
+- `fungi/respiration.py`, `fungi/degradation.py`: `compiled_processes()`,
+  `compiled_parameters()` (the classes' own `Parameter` objects, the
+  secretion yield of the solved pathway and one `feed:<pool>` parameter per
+  pool; a symbol used twice refuses), `simulate_compiled()`; `simulate`
+  refactored into integration and trajectory construction so both paths
+  share the ledger, conservation residual and diagnostics code; trajectory
+  diagnostics gain `engine` (`native_right_hand_side` or
+  `compiled_process_core`) and, for the compiled path, the kernel summary.
+  Hydrolysis maps to enzyme-explicit `HomogeneousMichaelisMentenProcess`,
+  inactivation to `MassActionProcess`; both carry their extent ledger as a
+  product with coefficient one.
+- `ARCHITECTURE_DEBT.md` (FD-009 narrowed), `docs/compiled-core.md`,
+  `docs/degrading-culture.md`, `docs/respiration-benchmark.md`,
+  `docs/organism-physiology.md`, `CHANGELOG.md`, the state document (item 5).
+- Tests: `tests/test_culture_processes.py` (new; kernels equal unit-aware
+  rates on abstract pools in two unit systems, shared post-maintenance
+  budget, analytic mixed steady state of the exchanges, refusals, factories
+  from config and their missing-field reports, the packaged config through
+  the configured workflow, native-versus-compiled parity for both classes in
+  batch and chemostat operation and for the alternative chemistry, duplicate
+  symbols refuse); `tests/test_process_factory_library.py` and
+  `tests/test_compiled_process_models.py` expect the five new types.
+
+Not changed: any rate law, constant, recorded result or the native
+`simulate` trajectories (the existing 83 culture tests pass unchanged apart
+from the added diagnostics key). No organism record binds the new processes;
+the registry template families are untouched.
+
+Scientific impact: none on recorded results; the closure now has one
+implementation usable by configs, the registry and the classes. Backward
+compatibility: additive (`ProcessConfig` gains an optional field; trajectory
+diagnostics gain keys). Risk: low.
+
+Remaining ambiguities: the compiled core has no analytic Jacobian, so the
+classes keep their native path for stiff methods; `FungalCouplingModel` is
+not unified (legacy engine).
+
+Recommended next task: a Jacobian for compiled models (process kernels
+supplying partial derivatives, finite differences otherwise, recorded in the
+kernel summary), after which the classes' native paths can go; then the
+first organism record that parameterizes the closure.
+
 ## REPRO-001 Reproducibility Package For The Software Paper
 
 Date: 2026-10-05
