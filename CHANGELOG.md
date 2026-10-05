@@ -6,6 +6,12 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- `fit_least_squares` accepts `diff_step`, `ftol`, `xtol` and `gtol`
+  (each `None` by default, leaving scipy's value) and records the declared
+  values in `optimizer_metadata`, so a calibration whose predictions come
+  from an adaptive integrator can declare a finite-difference step above the
+  integrator's step noise, as the model-criticism study does through its
+  plan (CRIT-003). Default behaviour is unchanged.
 - Culture physiology as generic processes on the compiled core
   (`fungal_model.processes.culture`): `resource_limited_growth`,
   `resource_limited_maintenance` and `costed_secretion` express the Pirt/Monod

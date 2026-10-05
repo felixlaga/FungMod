@@ -296,8 +296,20 @@ def fit_least_squares(
     residual_scales: Mapping[str, Quantity] | None = None,
     calibration_source: str,
     max_nfev: int | None = None,
+    diff_step: float | None = None,
+    ftol: float | None = None,
+    xtol: float | None = None,
+    gtol: float | None = None,
 ) -> LeastSquaresCalibrationResult:
     """Fit selected parameters by bounded least squares.
+
+    ``diff_step`` is the relative step of the finite-difference Jacobian in
+    the optimizer's parameter space and ``ftol``, ``xtol`` and ``gtol`` its
+    stopping tolerances; ``None`` leaves each at scipy's default, and the
+    values used are recorded in ``optimizer_metadata``. A model integrated
+    by an adaptive solver carries step noise of the order of its tolerance,
+    which scipy's default step (about 1.5e-8) differentiates; declare a step
+    well above that noise when the predictions come from such a solver.
 
     Failed optimizer runs are returned as `success=False` reports rather than
     being hidden or converted into apparently valid fits.
@@ -307,6 +319,7 @@ def fit_least_squares(
         raise ProvenanceError("calibration_source is required.")
     if not fittable_parameters:
         raise ValueError("At least one fittable parameter is required.")
+    optimizer_options = _optimizer_options(diff_step=diff_step, ftol=ftol, xtol=xtol, gtol=gtol)
     base_parameters.validate(require_values=True)
     fittables = tuple(fittable_parameters)
     for parameter in fittables:
@@ -359,6 +372,7 @@ def fit_least_squares(
             x0,
             bounds=bounds,
             max_nfev=max_nfev,
+            **optimizer_options,
         )
     except Exception as exc:
         return LeastSquaresCalibrationResult(
@@ -375,7 +389,7 @@ def fit_least_squares(
             covariance=None,
             confidence_intervals=None,
             warnings=tuple(warnings),
-            optimizer_metadata={"exception_type": type(exc).__name__},
+            optimizer_metadata={"exception_type": type(exc).__name__, **_optimizer_metadata(optimizer_options)},
         )
 
     fitted_parameters = parameter_set_from_vector(optimizer_result.x)
@@ -439,8 +453,40 @@ def fit_least_squares(
             "status": int(optimizer_result.status),
             "optimality": float(optimizer_result.optimality),
             "active_mask": np.asarray(optimizer_result.active_mask, dtype=int).tolist(),
+            **_optimizer_metadata(optimizer_options),
         },
     )
+
+
+def _optimizer_options(
+    *, diff_step: float | None, ftol: float | None, xtol: float | None, gtol: float | None
+) -> dict[str, Any]:
+    """Validated keyword arguments for ``scipy.optimize.least_squares``; absent entries keep scipy's defaults."""
+
+    options: dict[str, Any] = {}
+    for name, value in (("diff_step", diff_step), ("ftol", ftol), ("xtol", xtol), ("gtol", gtol)):
+        if value is None:
+            continue
+        number = float(value)
+        if not np.isfinite(number) or number <= 0.0:
+            raise ValueError(f"{name} must be a finite positive number when given; received {value!r}.")
+        if name == "diff_step" and number >= 1.0:
+            raise ValueError("diff_step is a relative step and must be below one.")
+        options[name] = number
+    return options
+
+
+def _optimizer_metadata(options: Mapping[str, Any]) -> dict[str, Any]:
+    """Record the declared optimizer options; ``None`` marks a value left at scipy's default."""
+
+    return {
+        "method": "trf",
+        "finite_difference_step": options.get("diff_step"),
+        "ftol": options.get("ftol"),
+        "xtol": options.get("xtol"),
+        "gtol": options.get("gtol"),
+        "undeclared_options": "scipy.optimize.least_squares defaults",
+    }
 
 
 __all__ = [
