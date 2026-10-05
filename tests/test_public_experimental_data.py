@@ -40,7 +40,7 @@ def test_source_corruption_fails_before_extraction(tmp_path: Path) -> None:
 def test_culture_datasets_load_with_unknown_errors_and_no_initial_observations(substrate, concentration) -> None:
     path = ROOT / extractor.LITERATURE / f"gelain_2020_{substrate}_{concentration}gl.yml"
     dataset = load_experiment_dataset(path)
-    metadata = yaml.safe_load(path.read_text())
+    metadata = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert dataset.validate().passed
     assert dataset.maturity == "literature_processed"
     assert dataset.system.organism == "Trichoderma harzianum P49P11"
@@ -56,7 +56,7 @@ def test_culture_datasets_load_with_unknown_errors_and_no_initial_observations(s
 
 
 def test_all_recorded_values_have_source_cells_but_no_invented_replicates() -> None:
-    raw = (ROOT / extractor.INTAKE / "gelain_2020/recorded_values.csv").read_text()
+    raw = (ROOT / extractor.INTAKE / "gelain_2020/recorded_values.csv").read_text(encoding="utf-8")
     rows = list(csv.DictReader(io.StringIO(raw)))
     assert len(rows) == 162
     assert sum(r["record_role"] == "published_mean" for r in rows) == 144
@@ -73,7 +73,7 @@ def test_all_recorded_values_have_source_cells_but_no_invented_replicates() -> N
 
 def test_secretome_is_preserved_as_endpoint_spectral_abundance() -> None:
     path = ROOT / extractor.INTAKE / "novy_2021/proteins_all.csv"
-    with path.open() as handle:
+    with path.open(encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 232
     assert rows[0]["TRIRE2"] == "123989"
@@ -92,8 +92,8 @@ def test_candidate_review_remains_ingestion_only() -> None:
 
 
 def test_readiness_documentation_preserves_source_and_prediction_boundaries() -> None:
-    intake = (ROOT / extractor.INTAKE / "README.md").read_text()
-    readiness = (ROOT / "docs/paper-readiness.md").read_text()
+    intake = (ROOT / extractor.INTAKE / "README.md").read_text(encoding="utf-8")
+    readiness = (ROOT / "docs/paper-readiness.md").read_text(encoding="utf-8")
     assert "144 published mean values" in intake
     assert "18 initial-condition entries" in intake
     assert "normalized total spectra" in intake
@@ -101,4 +101,4 @@ def test_readiness_documentation_preserves_source_and_prediction_boundaries() ->
     assert "not yet a validated general predictor" in readiness
     assert "retrospective, within-study" in readiness
     assert "No unknowns are" in readiness
-    assert "paper-readiness.md" in (ROOT / "mkdocs.yml").read_text()
+    assert "paper-readiness.md" in (ROOT / "mkdocs.yml").read_text(encoding="utf-8")

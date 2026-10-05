@@ -207,7 +207,7 @@ def load_culture_conditions(root: Path) -> list[CultureObservations]:
         for dose in doses:
             name = f"gelain_2020_{family}_{dose}gl"
             path = root / "data/experiments/literature/gelain_2020_t_harzianum" / f"{name}.yml"
-            metadata = yaml.safe_load(path.read_text())
+            metadata = yaml.safe_load(path.read_text(encoding="utf-8"))
             dataset = load_experiment_dataset(path)
             if not dataset.validate().passed:
                 raise CultureBenchmarkError(f"Invalid dataset: {path}")
