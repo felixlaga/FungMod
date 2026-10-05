@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import csv
 import json
+import locale
 import math
 import re
 from collections.abc import Callable, Mapping
@@ -51,6 +52,16 @@ class CopasiReproductionError(RuntimeError):
 
 
 def _require_copasi() -> tuple[Any, Any, Any]:
+    """Import the COPASI stack without letting it change the process text encoding.
+
+    Importing ``COPASI`` calls ``setlocale(LC_ALL, "C")`` in its static
+    initialiser, which switches Python's preferred text encoding to ASCII
+    for every later ``open()`` call that names no encoding. COPASI needs
+    the ``C`` numeric locale for its own parsing, so only ``LC_CTYPE`` is
+    restored here.
+    """
+
+    ctype = locale.setlocale(locale.LC_CTYPE)
     try:
         import COPASI
         import basico
@@ -60,6 +71,9 @@ def _require_copasi() -> tuple[Any, Any, Any]:
             "COPASI reproduction requires the optional 'copasi' dependency group. "
             f"Install it with: pip install fungmod[{COPASI_EXTRA}]"
         ) from exc
+    finally:
+        if locale.setlocale(locale.LC_CTYPE) != ctype:
+            locale.setlocale(locale.LC_CTYPE, ctype)
     return COPASI, basico, copasi_petab_importer
 
 
