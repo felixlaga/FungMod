@@ -72,7 +72,7 @@ def fit_protein_output(*, growth_rates: Quantity, protein_output: Quantity,
 
 def load_secretion_data(root: Path | None = None) -> dict[str, Any]:
     directory = package_data_path(DATA_PATH) if root is None else root / DATA_PATH
-    manifest = json.loads((directory / "manifest.json").read_text())
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     for entry in manifest["files"]:
         relative = Path(entry["path"])
         if relative.is_absolute() or ".." in relative.parts:
@@ -82,7 +82,7 @@ def load_secretion_data(root: Path | None = None) -> dict[str, Any]:
             raise ValueError(f"Secretion source/extract checksum mismatch: {relative}")
     if not any(e["path"] == "observations.json" for e in manifest["files"]):
         raise ValueError("Observations must be bound by the manifest.")
-    return json.loads((directory / "observations.json").read_text())
+    return json.loads((directory / "observations.json").read_text(encoding="utf-8"))
 
 
 def strain_holdouts(data: dict[str, Any]) -> dict[str, Any]:

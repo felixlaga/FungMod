@@ -26,6 +26,73 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CI-001 Cross-Platform Quality-Gate Repair
+
+Date: 2026-10-05
+
+Status: complete for the three failure groups that were red on `main` on
+Linux, macOS and Windows. No scientific or numerical behaviour changed; no
+frozen artifact changed.
+
+Changed:
+
+- `standards/cross_engine.py`: the reference SBML simulator compiles each
+  kinetic law from its L3 infix text (`+ - * / ^` and `pow`) with a small
+  recursive-descent parser instead of walking libSBML `ASTNode` objects.
+  SWIG keeps one proxy registry per process, so once `libsedml` had been
+  imported by the SED-ML tests every kinetic-law node came back as a
+  `libsedml.ASTNode` and no longer matched libSBML's `AST_*` constants. Ten
+  SBML tests therefore failed on every platform whenever the full suite ran,
+  and passed when run alone. Unsupported constructs now fail at compile time
+  with the same `SbmlExportError`; unknown symbols are rejected before
+  integration. `compile_kinetic_formula` is public and documented.
+- `tests/test_gelain_joint_artifacts.py`: the frozen holdout replay compared
+  scores at an absolute tolerance of 1e-6 although the predictions themselves
+  are only required to replay to 2e-6 relative. Activity predictions of order
+  1e3 U/L therefore failed by 1.1e-5 under current SciPy. The score tolerance
+  is now the prediction tolerance propagated per observable
+  (2e-6 x max|prediction| + 1e-6); the worst observed ratio across all 33
+  folds and three statistics is 0.004. Manifest paths compare as POSIX.
+- UTF-8 is explicit when reading repository data and documentation in
+  `research/respiration_benchmark.py`, `research/secretion_benchmark.py`,
+  `research/gelain_joint.py`, `research/gelain_culture.py`,
+  `calibration/model_validation.py` (read and write, for symmetry),
+  `scripts/prepare_respiration_data.py` and the affected tests. Windows
+  decoded these files as cp1252 and mangled `±`.
+
+Not changed: every model, solver, registry record, benchmark result and
+frozen artifact; the SBML export itself; the SED-ML and COMBINE exporters.
+
+Tests added (`tests/test_standards_sbml.py`):
+
+- `test_reference_formula_compiler_covers_the_emitted_grammar`
+- `test_reference_formula_compiler_rejects_what_fungmod_never_emits`
+- `test_cross_engine_check_survives_libsedml_proxy_registration`
+
+Commands run:
+
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>`: 0 errors.
+- `pytest tests/test_standards_sedml_combine.py tests/test_standards_sbml.py
+  tests/test_standards_biomodels.py tests/test_gelain_joint_artifacts.py
+  tests/test_public_experimental_data.py tests/test_quality_config.py
+  tests/test_respiration_benchmark.py tests/test_secretion_benchmark.py
+  tests/test_scoped_model_validation.py` (SED-ML first, so the proxy clash is
+  exercised): 101 passed.
+- `pytest` (full suite, Linux): 1703 passed, 0 failed in 17 min 22 s (main: 1685 passed, 11 failed; the seven new
+  test cases account for the difference).
+- Windows and macOS could not run locally; the encoding and path changes are
+  verified on hosted CI.
+
+Scientific impact: none. Backward compatibility: `simulate_reference_sbml`
+and `cross_engine_trajectory_check` keep their signatures and error type; the
+removed private AST walker had no public callers.
+
+Ambiguities: none known. Risk: low.
+
+Next task: merge this into `main`, bring `main` into the PR chain (#77 to #80)
+so every job re-runs green, then merge the chain in order.
+
 ## PAPER-001 Software-Paper Plan Without A Wet Lab
 
 Date: 2026-10-05
