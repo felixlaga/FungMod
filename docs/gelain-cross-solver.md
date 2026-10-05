@@ -12,14 +12,18 @@ this problem.
 ## The frozen plan
 
 `data/benchmarks/gelain_2020_petab/plan.json` (SHA-256
-`a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a`,
+`cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628`,
 pinned by `tests/test_gelain_petab.py`) fixes, before any COPASI run: the
 sources and their digests (the criticism plan, the Bayesian plan, the
 observations and the stage A `M0_baseline` primary fit that is FungMod's
 optimum), the objective, the COPASI settings (importer, weight correction,
 LSODA at relative tolerance 1e-9 and absolute tolerance 1e-12,
 Levenberg-Marquardt, one local fit from FungMod's optimum and ten log-uniform
-random starts with seed 20261005), two gates and three outcomes:
+random starts with seed 20261005), two gates and three outcomes. One dated
+amendment (`a0f8abe9...` to the current digest) replaced the reference-fit
+digest after the criticism plan's amendment 3 re-ran stage A with a declared
+finite-difference step; the first run under `a0f8abe9...` is described below
+because it is what found the defect.
 
 | Gate | Threshold |
 | --- | --- |
@@ -50,50 +54,58 @@ with sigma equal to each observable's maximum over the loadings (the stage A
 plan's bounds on a log10 scale.
 
 Before any COPASI call, FungMod's own objective on the exported problem equals
-twice the recorded stage A cost (`4.030662656`, relative difference below
-1e-9), which ties the PEtab problem to the result it reproduces.
+twice the recorded stage A cost (`3.976071899`, relative difference below
+1e-9 on Linux and 1e-8 on macOS), which ties the PEtab problem to the result
+it reproduces.
 
-## Results (recorded 2026-10-05)
+## Results (recorded 2026-10-05, second run)
 
 `scripts/run_gelain_2020_petab_reproduction.py` wrote
 `data/benchmarks/gelain_2020_petab/results/` (`comparison.json`, `report.md`,
-the PEtab directory and the COPASI file). Outcome: **`copasi_improves`**.
+the PEtab directory and the COPASI file). Outcome: **`reproduced`**.
 
 Simulation at FungMod's optimum: the worst |COPASI − FungMod| / sigma over all
-96 measurements is 1.7e-8 and the objectives agree to 5e-10. The gate passes
+96 measurements is 1.6e-8 and the objectives agree to 2e-8. The gate passes
 by four orders of magnitude; the SBML export, the condition table and the
 weight correction reproduce FungMod's compiled core.
 
-Optimum: COPASI's local Levenberg-Marquardt fit from FungMod's optimum reaches
-3.9803 after 13 991 evaluations, and the ten random starts reach 3.9768 to
-4.0800 (best 3.9768, start 2). FungMod's recorded optimum is 4.0307, so COPASI
-improves on it by 1.3 percent, above the 0.1 percent tolerance. At COPASI's
-best point FungMod's compiled core gives 3.97682321 against COPASI's
-3.97682324 (relative difference 7e-9): the two solvers agree there too, so the
-difference is the optimisers' stopping, not the simulators. FungMod's stage A
-fit (`scipy.optimize.least_squares` in log space, five starts, default
-tolerances) stopped 1.3 percent above the minimum COPASI finds.
+Optimum: COPASI's local Levenberg-Marquardt fit from FungMod's optimum
+(`3.976071899`) reaches `3.976071799`, a relative difference of 2.5e-8 against
+the 0.1 percent tolerance, and the ten random starts reach 3.9768 to 4.0800
+(none below the local fit). Every parameter agrees to better than 1e-4
+relative, with `K_ind`, `kF` and `kB` on their lower bounds in both solvers.
+FungMod's compiled core evaluates COPASI's best point to `3.976071724`
+(relative difference 1.9e-8).
 
 | Parameter | FungMod | COPASI best | relative difference |
 | --- | --- | --- | --- |
-| `k_h` | 0.0127 | 0.0180 | 0.42 |
-| `Kh` | 10.5 | 16.3 | 0.55 |
-| `Y` | 0.372 | 0.406 | 0.093 |
-| `kd` | 0.0179 | 0.0193 | 0.074 |
-| `K_ind` | 0.0101 | 0.0100 (lower bound) | 0.0087 |
-| `qF` | 6.88 | 5.91 | 0.14 |
-| `kF` | 3.9e-5 | 1.0e-6 (lower bound) | 0.97 |
-| `qB` | 16.0 | 14.1 | 0.12 |
-| `kB` | 1.2e-6 | 1.0e-6 (lower bound) | 0.20 |
+| `k_h` | 0.01839 | 0.01839 | 5e-5 |
+| `Kh` | 16.75 | 16.74 | 7e-5 |
+| `Y` | 0.4146 | 0.4146 | 2e-5 |
+| `kd` | 0.01985 | 0.01985 | 5e-5 |
+| `K_ind` | 0.0100 (lower bound) | 0.0100 (lower bound) | 1e-14 |
+| `qF` | 5.823 | 5.823 | 1e-6 |
+| `kF` | 1.0e-6 (lower bound) | 1.0e-6 (lower bound) | 6e-7 |
+| `qB` | 13.94 | 13.94 | 4e-5 |
+| `kB` | 1.0e-6 (lower bound) | 1.0e-6 (lower bound) | 4e-11 |
 
-The better optimum sits on three lower bounds (`K_ind`, `kF`, `kB`) and moves
-along the `k_h`/`Kh` direction that stage A and the Bayesian study already
-flagged as weakly determined. None of this changes any scientific verdict by
-itself: the criticism study's holdout comparisons are relative between models
-fitted with the same optimiser, and the Bayesian study samples the posterior
-rather than relying on the optimum. It does mean the stage A optimiser needs a
-tighter stopping rule or a finishing step before its all-condition fits are
-quoted as optima; that is the next task recorded in `progress.md`.
+### The first run and what it found
+
+The first run (plan digest `a0f8abe9...`, same settings) was recorded with
+outcome `copasi_improves`: at FungMod's then optimum (`4.030662656`) the
+simulations agreed to 1.7e-8 of sigma, but COPASI's local fit reached 3.9803
+and its best random start 3.9768, 1.3 percent lower, and FungMod evaluated
+that point to the same objective (7e-9). The better optimum sat on three lower
+bounds (`K_ind`, `kF`, `kB`) and along the `k_h`/`Kh` direction that stage A
+and the Bayesian study had flagged as weakly determined. The difference was
+the optimisers' stopping, not the simulators: FungMod's stage A fit was using
+scipy's default finite-difference step, which differentiates the adaptive ODE
+integrator's step noise and collapses the trust region. The criticism plan's
+amendment 3 declares the step (`docs/gelain-model-criticism.md`), stage A was
+re-run, and this study was re-run against the new reference fit. COPASI's
+earlier best point (3.9768) is 1.9e-4 above FungMod's new optimum, so the
+agreement is now symmetric: neither solver finds a lower point than the other
+within the tolerance.
 
 ## What it is not
 

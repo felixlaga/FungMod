@@ -8,10 +8,11 @@ Retrospective: the data already informed the fit being reproduced. It
 validates no biology.
 
 - `plan.json`: the frozen plan (SHA-256
-  `a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a`, pinned
+  `cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628`, pinned
   by `tests/test_gelain_petab.py`): sources and digests, the objective, the
   COPASI settings, the gates, the outcome vocabulary, the excluded claims and
-  the amendment rule.
+  the amendment rule. One dated amendment replaced the reference-fit digest
+  after the criticism plan's amendment 3 re-ran stage A.
 - `results/petab/`: the exported PEtab problem (`problem.yaml`, `model.xml`,
   `conditions.tsv`, `observables.tsv`, `measurements.tsv`, `parameters.tsv`,
   `export_metadata.json`) and `problem_metadata.json` with the source digests,
@@ -24,10 +25,13 @@ validates no biology.
   parameter table, the cross-check of FungMod at COPASI's best point and the
   outcome in the plan's vocabulary.
 
-Recorded 2026-10-05: outcome `copasi_improves`. Simulation agreement at
-FungMod's optimum is 1.7e-8 of sigma; COPASI's best objective 3.9768 is 1.3
-percent below FungMod's recorded 4.0307, and FungMod evaluates COPASI's point
-to the same objective (relative difference 7e-9). See
+Recorded 2026-10-05 (second run, after the criticism plan's amendment 3):
+outcome `reproduced`. Simulation agreement at FungMod's optimum is 1.6e-8 of
+sigma; COPASI's local fit reaches 3.9760718 against FungMod's 3.9760719
+(relative difference 2.5e-8), every parameter agrees to better than 1e-4, and
+no random start goes lower. The first run (plan `a0f8abe9...`) recorded
+`copasi_improves` (COPASI 1.3 percent below FungMod's then optimum); it found
+the missing finite-difference step in FungMod's stage A optimiser. See
 `docs/gelain-cross-solver.md`.
 
 ```bash

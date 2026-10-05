@@ -1232,21 +1232,33 @@ def stage_b_verdicts(
     declared convergence rule, as the plan requires.
     """
 
-    plan = study.plan
-    variant = model_variants(plan)[study.model_id]
+    return _verdicts_from_fields(
+        study.plan, study.model_id, result.summaries, result.identifiability, bool(result.converged), stage_a_comparison
+    )
+
+
+def _verdicts_from_fields(
+    plan: Mapping[str, Any],
+    model_id: str,
+    summaries: Mapping[str, Any],
+    identifiability: Mapping[str, Any],
+    converged: bool,
+    stage_a_comparison: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    variant = model_variants(plan)[model_id]
     rules = plan["decision_rules"]
-    multiplier = result.summaries.get("noise_scale:all_observables")
+    multiplier = summaries.get("noise_scale:all_observables")
     adequate = None if multiplier is None else bool(float(multiplier["lower"]) <= 1.0 <= float(multiplier["upper"]))
     added = {spec.config_symbol: spec.symbol for spec in variant.parameters if spec.new}
-    classes = {symbol: result.identifiability[symbol]["class"] for symbol in added if symbol in result.identifiability}
+    classes = {symbol: identifiability[symbol]["class"] for symbol in added if symbol in identifiability}
     identified = {IDENTIFIED, WEAKLY_IDENTIFIED}
     r3 = None if not added else all(klass in identified for klass in classes.values())
     r1 = None
     if stage_a_comparison is not None:
-        scenario = stage_a_comparison.get("models", {}).get(study.model_id, {}).get("scenarios", {}).get("primary")
+        scenario = stage_a_comparison.get("models", {}).get(model_id, {}).get("scenarios", {}).get("primary")
         if scenario is not None:
             r1 = bool(scenario["screen"]["passed"])
-    if study.model_id == BASELINE_MODEL:
+    if model_id == BASELINE_MODEL:
         outcome = "baseline (R1 and R3 do not apply)"
     elif r1 is None:
         outcome = "not scored (stage A screen not recorded)"
@@ -1257,7 +1269,7 @@ def stage_b_verdicts(
     else:
         outcome = "improves fit but unidentified (R1, not R3)"
     return {
-        "provisional": not bool(result.converged),
+        "provisional": not converged,
         "R1_holdout_support": r1,
         "R2_adequacy": adequate,
         "R2_multiplier_interval": None if multiplier is None else [float(multiplier["lower"]), float(multiplier["upper"])],
@@ -1266,6 +1278,57 @@ def stage_b_verdicts(
         "outcome": outcome,
         "rules": {key: rules[key] for key in ("R1_holdout_support", "R2_adequacy", "R3_identification", "R4_coverage")},
     }
+
+
+def _verdict_lines(verdicts: Mapping[str, Any]) -> list[str]:
+    return [
+        "Decision rules (" + ("provisional" if verdicts["provisional"] else "final") + "):",
+        "",
+        f"- R1 holdout support (stage A screen, primary): {verdicts['R1_holdout_support']}",
+        f"- R2 adequacy (multiplier interval contains 1.0): {verdicts['R2_adequacy']}"
+        + (f"; interval {verdicts['R2_multiplier_interval']}" if verdicts["R2_multiplier_interval"] else ""),
+        f"- R3 identification of added parameters: {verdicts['R3_identification']}"
+        + (f"; classes {verdicts['added_parameter_classes']}" if verdicts["added_parameter_classes"] else ""),
+        f"- Outcome: **{verdicts['outcome']}**",
+    ]
+
+
+def refresh_stage_b_verdicts(root: Path, output_dir: Path, *, plan_path: Path | None = None) -> dict[str, Any]:
+    """Recompute a recorded posterior's verdicts against the stage A comparison on disk.
+
+    The posterior itself (summary, samples, coverage, inputs) is left as
+    recorded; only ``verdicts.json``, the decision-rule block of
+    ``report.md`` and the digests of those two files in ``artifacts.json``
+    are rewritten. Used when stage A is re-run under a plan amendment, so
+    that a recorded chain's R1 component follows the screen that is on disk
+    rather than the one that was on disk when the chain finished.
+    """
+
+    plan = load_plan(root, plan_path)
+    model_id = output_dir.name
+    if model_id not in plan["models"]:
+        raise CultureBenchmarkError(f"{output_dir} is not a recorded stage B folder of a declared model.")
+    calibration = json.loads((output_dir / "bayesian_calibration.json").read_text(encoding="utf-8"))
+    verdicts = _verdicts_from_fields(
+        plan, model_id, calibration["summaries"], calibration["identifiability"], bool(calibration["converged"]),
+        _stage_a_comparison_next_to(output_dir),
+    )
+    verdicts_path = output_dir / "verdicts.json"
+    verdicts_path.write_text(json.dumps(verdicts, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    report_path = output_dir / "report.md"
+    lines = report_path.read_text(encoding="utf-8").splitlines()
+    starts = [index for index, line in enumerate(lines) if line.startswith("Decision rules (")]
+    ends = [index for index, line in enumerate(lines) if line.startswith("- Outcome: ")]
+    if len(starts) != 1 or len(ends) != 1 or ends[0] < starts[0]:
+        raise CultureBenchmarkError(f"{report_path} has no single decision-rule block to refresh.")
+    lines[starts[0] : ends[0] + 1] = _verdict_lines(verdicts)
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    artifacts_path = output_dir / "artifacts.json"
+    artifacts = json.loads(artifacts_path.read_text(encoding="utf-8"))
+    for name in ("verdicts.json", "report.md"):
+        artifacts[name] = file_digest(output_dir / name)
+    artifacts_path.write_text(json.dumps(artifacts, indent=2) + "\n", encoding="utf-8")
+    return verdicts
 
 
 def _stage_a_comparison_next_to(output_dir: Path) -> Mapping[str, Any] | None:
@@ -1327,19 +1390,7 @@ def render_stage_b_report(
             ]
         )
     if verdicts is not None:
-        lines.extend(
-            [
-                "",
-                "Decision rules (" + ("provisional" if verdicts["provisional"] else "final") + "):",
-                "",
-                f"- R1 holdout support (stage A screen, primary): {verdicts['R1_holdout_support']}",
-                f"- R2 adequacy (multiplier interval contains 1.0): {verdicts['R2_adequacy']}"
-                + (f"; interval {verdicts['R2_multiplier_interval']}" if verdicts["R2_multiplier_interval"] else ""),
-                f"- R3 identification of added parameters: {verdicts['R3_identification']}"
-                + (f"; classes {verdicts['added_parameter_classes']}" if verdicts["added_parameter_classes"] else ""),
-                f"- Outcome: **{verdicts['outcome']}**",
-            ]
-        )
+        lines.extend(["", *_verdict_lines(verdicts)])
     if coverage is not None and "overall" in coverage:
         overall = coverage["overall"]
         lines.extend(
@@ -1378,6 +1429,7 @@ __all__ = [
     "run_stage_a",
     "sample_posterior_study",
     "score_predictions",
+    "refresh_stage_b_verdicts",
     "stage_b_verdicts",
     "training_scales",
     "variant_config",

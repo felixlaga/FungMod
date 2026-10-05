@@ -124,9 +124,12 @@ def test_recorded_stage_a_results_ran_under_the_declared_optimiser(plan) -> None
         assert fit["optimiser"] == recorded, fit_path
         assert len(fit["restarts"]) <= declared["restarts"], fit_path
         successful = [entry for entry in fit["restarts"] if entry["success"]]
-        assert all(entry["relative_cost_decrease"] > -1e-12 for entry in successful), fit_path
         if successful and len(fit["restarts"]) < declared["restarts"]:
+            # the loop stopped early, so the last restart failed to beat the declared tolerance (a negative
+            # decrease means it ended above the best start, which the fit keeps)
             assert successful[-1]["relative_cost_decrease"] <= declared["restart_relative_cost_tolerance"], fit_path
+        best_start = min(entry["cost"] for entry in fit["starts"] if entry.get("success"))
+        assert fit["cost"] <= best_start + 1e-12, fit_path
 
 
 def test_recorded_stage_b_verdicts_use_the_recorded_stage_a_screen(plan) -> None:
@@ -143,6 +146,48 @@ def test_recorded_stage_b_verdicts_use_the_recorded_stage_a_screen(plan) -> None
         verdicts = json.loads(verdicts_path.read_text(encoding="utf-8"))
         screen = comparison["models"][model_id]["scenarios"]["primary"]["screen"]
         assert verdicts["R1_holdout_support"] == screen["passed"], model_id
+
+
+def test_refreshing_stage_b_verdicts_follows_the_stage_a_screen_on_disk(plan, tmp_path) -> None:
+    """A recorded posterior's R1 component and outcome follow whatever stage A comparison sits next to it."""
+
+    import shutil
+
+    from fungal_model.research import gelain_criticism as study
+
+    recorded = PLAN_PATH.parent / "results" / "stage_b" / "M1_induction_state"
+    if not (recorded / "verdicts.json").exists():
+        pytest.skip("no stage B posterior recorded for M1 yet")
+    results = tmp_path / "results"
+    folder = results / "stage_b" / "M1_induction_state"
+    shutil.copytree(recorded, folder)
+    (results / "stage_a").mkdir(parents=True)
+    comparison_path = results / "stage_a" / "comparison.json"
+
+    def write_screen(passed: bool) -> None:
+        comparison = {"models": {"M1_induction_state": {"scenarios": {"primary": {"screen": {"passed": passed, "reasons": []}}}}}}
+        comparison_path.write_text(json.dumps(comparison), encoding="utf-8")
+
+    original = json.loads((recorded / "verdicts.json").read_text(encoding="utf-8"))
+    write_screen(True)
+    passed = study.refresh_stage_b_verdicts(ROOT, folder)
+    assert passed["R1_holdout_support"] is True
+    assert passed["R2_adequacy"] == original["R2_adequacy"] and passed["R3_identification"] == original["R3_identification"]
+    assert passed["outcome"] == ("supported (R1 and R3)" if original["R3_identification"] else "improves fit but unidentified (R1, not R3)")
+    assert passed["provisional"] == original["provisional"]
+    report = (folder / "report.md").read_text(encoding="utf-8")
+    assert f"- Outcome: **{passed['outcome']}**" in report and "- R1 holdout support (stage A screen, primary): True" in report
+    assert report.count("Decision rules (") == 1
+    artifacts = json.loads((folder / "artifacts.json").read_text(encoding="utf-8"))
+    for name in ("verdicts.json", "report.md"):
+        assert hashlib.sha256((folder / name).read_bytes()).hexdigest() == artifacts[name]
+    assert hashlib.sha256((folder / "bayesian_calibration.json").read_bytes()).hexdigest() == artifacts["bayesian_calibration.json"]
+    write_screen(False)
+    failed = study.refresh_stage_b_verdicts(ROOT, folder)
+    assert failed["R1_holdout_support"] is False and failed["outcome"] == "not supported (fails R1)"
+    assert "- Outcome: **not supported (fails R1)**" in (folder / "report.md").read_text(encoding="utf-8")
+    with pytest.raises(Exception, match="not a recorded stage B folder"):
+        study.refresh_stage_b_verdicts(ROOT, tmp_path / "nope")
 
 
 def test_recorded_stage_b_results_are_internally_consistent(plan) -> None:

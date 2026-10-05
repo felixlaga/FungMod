@@ -11,6 +11,10 @@ Stage B (posterior sampling of one model, centred on its stage A all-condition f
 
 Stage B checkpoints its chain in ``<output>/stage_b/<model>/`` and resumes
 from it when restarted with the same plan.
+
+Refreshing recorded stage B verdicts after stage A was re-run under an amendment:
+
+    python scripts/run_gelain_2020_model_criticism.py refresh-verdicts --output data/benchmarks/gelain_2020_criticism/results
 """
 
 from __future__ import annotations
@@ -98,6 +102,17 @@ def _stage_b(args: argparse.Namespace, log: Any) -> int:
     return 0
 
 
+def _refresh_verdicts(args: argparse.Namespace, log: Any) -> int:
+    stage_b = args.output / "stage_b"
+    folders = sorted(path for path in stage_b.glob("*/verdicts.json")) if stage_b.exists() else []
+    if not folders:
+        raise SystemExit(f"No recorded stage B verdicts under {stage_b}.")
+    for verdicts_path in folders:
+        verdicts = gelain_criticism.refresh_stage_b_verdicts(ROOT, verdicts_path.parent)
+        log(f"{verdicts_path.parent.name}: R1 {verdicts['R1_holdout_support']}; outcome {verdicts['outcome']}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     subparsers = parser.add_subparsers(dest="stage", required=True)
@@ -118,13 +133,21 @@ def main(argv: list[str] | None = None) -> int:
     stage_b.add_argument("--checkpoint-every", type=int, default=250)
     stage_b.add_argument("--no-resume", action="store_true")
     stage_b.add_argument("--skip-predictive", action="store_true")
+    refresh = subparsers.add_parser(
+        "refresh-verdicts", help="recompute every recorded stage B verdict against the stage A comparison on disk"
+    )
+    refresh.add_argument("--output", type=Path, default=ROOT / gelain_criticism.RESULTS_PATH)
     args = parser.parse_args(argv)
     started = time.perf_counter()
 
     def log(message: str) -> None:
         print(f"[{time.perf_counter() - started:8.1f} s] {message}", flush=True)
 
-    return _stage_a(args, log) if args.stage == "stage-a" else _stage_b(args, log)
+    if args.stage == "stage-a":
+        return _stage_a(args, log)
+    if args.stage == "refresh-verdicts":
+        return _refresh_verdicts(args, log)
+    return _stage_b(args, log)
 
 
 if __name__ == "__main__":

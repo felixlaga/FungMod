@@ -1,23 +1,23 @@
 {
-  "plan_sha256": "a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a",
+  "plan_sha256": "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628",
   "sources": {
-    "criticism_plan": "6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86",
+    "criticism_plan": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7",
     "bayesian_plan": "9574fccc809cc2a49aab2ebc9cbc8cd087d0064d26582da287915cbbce32f01a",
     "observations": "cc8cda93a4a1a07cc73cf0c104aeaf315770aa4399e65cb2f3473e97951b699c",
-    "reference_fit": "7877ba476f65319841072184f73ea8e47cf0dd6f33a3f86f4899ca96e12879f3",
-    "plan": "a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a",
-    "sbml": "67f856b018795b40370495f1ee4d8c718684eddd2794d43e6d47607c552cd903"
+    "reference_fit": "80b3df1c3ffd9b942bf74751b9bd551967643381cd448760d90928da297e41dc",
+    "plan": "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628",
+    "sbml": "04af8e4d9527727bb96aa2a82308634fa4b8de5e50b85be4b4a0100d85baea1b"
   },
   "nominal": {
-    "gelain_hydrolysis_k_h": 0.012681776898273303,
-    "gelain_hydrolysis_Kh": 10.531997452512396,
-    "gelain_hydrolysis_Y": 0.3717013528543743,
-    "gelain_hydrolysis_kd": 0.01792003976241154,
-    "gelain_hydrolysis_K_ind": 0.01008756701679325,
-    "gelain_hydrolysis_qF": 6.883661290386444,
-    "gelain_hydrolysis_kF": 3.9039181234178865e-05,
-    "gelain_hydrolysis_qB": 15.992526926418924,
-    "gelain_hydrolysis_kB": 1.2427357609841935e-06
+    "gelain_hydrolysis_k_h": 0.01839387122679473,
+    "gelain_hydrolysis_Kh": 16.74539716546491,
+    "gelain_hydrolysis_Y": 0.4145999322727295,
+    "gelain_hydrolysis_kd": 0.019848069467621906,
+    "gelain_hydrolysis_K_ind": 0.010000000000000111,
+    "gelain_hydrolysis_qF": 5.823298594763041,
+    "gelain_hydrolysis_kF": 1.0000006329108917e-06,
+    "gelain_hydrolysis_qB": 13.937760028320657,
+    "gelain_hydrolysis_kB": 1.0000000000422582e-06
   },
   "scales": {
     "biomass": 9.40625525180876,
@@ -25,6 +25,6 @@
     "cellulase_activity": 887.6433209611139,
     "beta_glucosidase_activity": 2150.797238431824
   },
-  "reference_objective": 4.030662655906759,
-  "fungmod_objective_at_nominal": 4.030662655906758
+  "reference_objective": 3.9760718986316803,
+  "fungmod_objective_at_nominal": 3.9760718986316803
 }

@@ -16,7 +16,7 @@ from fungal_model.research import gelain_petab
 ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / gelain_petab.PLAN_PATH
 RESULTS = ROOT / gelain_petab.RESULTS_PATH
-FROZEN_SHA256 = "a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a"
+FROZEN_SHA256 = "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628"
 
 
 @pytest.fixture(scope="module")
@@ -36,7 +36,8 @@ def test_plan_digest_is_the_frozen_one() -> None:
 def test_plan_sources_still_carry_their_frozen_digests(plan) -> None:
     digests = gelain_petab.verify_sources(ROOT, plan)
     assert set(digests) == {"criticism_plan", "bayesian_plan", "observations", "reference_fit"}
-    assert plan["amendments"] == []
+    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [("2026-10-05", "a0f8abe9")]
+    assert plan["sources"]["criticism_plan"]["sha256"].startswith("9897ab11")
     assert plan["status"].startswith("plan frozen")
 
 

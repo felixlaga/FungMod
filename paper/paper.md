@@ -201,49 +201,72 @@ biomass-cellulose misfit, each added to the baseline with its bounds, an
 error model, whole-condition holdouts with a complexity screen (at least 10
 percent pooled held-out improvement, no observable more than 10 percent
 worse, full practical rank), decision rules and an outcome vocabulary.
-Stage A (least squares, five starts per fold) found: an induction-state
-memory (`M1`) improves the pooled held-out error by 2.7 percent and worsens
-cellulose by 13 percent, not supported; a soluble product pool with Monod
-uptake and product inhibition (`M2`) improves the pooled error by 23.4
-percent but worsens biomass by 31 percent, not supported under the declared
-rule; conversion-dependent accessibility [@kadam2004] (`M3`) worsens the
-pooled error by 7.9 percent with its exponent driven to the lower bound,
-not supported. Every fit has full practical rank. Stage B sampled one
+Stage A (least squares, five starts per fold) was run twice: once with the
+optimiser as first written, and again under a dated amendment that
+declared the finite-difference step after the cross-solver check below
+found the first run stopping above the minimum. The verdicts quoted here
+are from the second run; the first is kept in the plan's amendment log and
+in the ledger. An induction-state memory (`M1`) leaves the pooled held-out
+error unchanged (0.1 percent better) and makes cellulose three times worse,
+not supported; a soluble product pool with Monod uptake and product
+inhibition (`M2`) lowers the pooled held-out error by 23 percent in the
+primary scenario and 26 percent under the correlated error assumption with
+every observable better (biomass by 25 and 36 percent), passing the screen
+in both; conversion-dependent accessibility [@kadam2004] (`M3`) does not
+improve the pooled error (0.2 percent worse) with its exponent near its
+lower bound, not supported. Every fit has full practical rank; every
+all-condition fit has at least three of the shared constants on their lower
+bounds, and the `M2` fit puts the initial soluble pool on the top of its
+declared range. In the first run `M2` had failed the screen because biomass
+worsened by 31 percent; that was the stalled optimiser, not the mechanism,
+and the plan's outcome for `M2` changed from "not supported" to "improves
+fit but unidentified" when the screen was recomputed. Stage B sampled one
 all-condition posterior per addition (24 or 28 walkers, 8000 steps, the
-noise multiplier sampled jointly). None of the three chains met the
-declared convergence rule at that length, so the plan labels their verdicts
-provisional. Under those labels no addition restores adequacy (every
-multiplier interval excludes 1.0 and overlaps the baseline's 2.25); only the
-induction memory constant of `M1` is weakly identified, while the four
-constants of `M2` are prior dominated or bounded on one side and the
-exponent of `M3` is bounded above only, driven towards the baseline;
-posterior predictive coverage with measurement noise is 91 to 95 of 96
-observations. The stated misfit is not explained by any of the three
-declared mechanisms.
+noise multiplier sampled jointly), each centred on the first-run fit; the
+chains were not re-run after the amendment because the centre is a starting
+point, not a result. None of the three chains met the declared convergence
+rule at that length, so the plan labels their verdicts provisional. Under
+those labels no addition restores adequacy (every multiplier interval
+excludes 1.0 and overlaps the baseline's 2.25); only the induction memory
+constant of `M1` is weakly identified, while the four constants of `M2` are
+prior dominated or bounded on one side and the exponent of `M3` is bounded
+above only, driven towards the baseline; posterior predictive coverage with
+measurement noise is 91 to 95 of 96 observations. The soluble pool is the
+one addition the holdouts support, and the one whose constants the
+duplicate means do not identify; a chain centred on its new fit is the
+next recorded task.
 
 ## Cross-solver reproduction
 
 The baseline problem (three loadings, four observables, 96 measurements,
 nine parameters on a log10 scale with the criticism plan's bounds, sigma
 equal to each observable's maximum over the loadings) was exported as a
-PEtab problem and reproduced in COPASI 4.48 under a frozen plan. FungMod's
-objective on the exported problem equals twice its recorded least-squares
-cost (4.0307, relative difference below 1e-9). At that point COPASI's time
-courses differ from the compiled core by at most 1.7e-8 of sigma over the
-96 measurements and the objectives agree to 5e-10. COPASI's
-Levenberg-Marquardt fit from the same point then reaches 3.9803, and the
-best of ten seeded random starts 3.9768, 1.3 percent below FungMod's
-optimum, outside the 0.1 percent tolerance the plan set for agreement.
-FungMod's compiled core evaluates COPASI's best point to 3.97682321 against
-COPASI's 3.97682324. The solvers agree; FungMod's multi-start least squares
-stopped early along a direction (`k_h` against `Kh`, with three loss and
-induction constants on their lower bounds) that the posterior study had
-already classified as weakly determined. The plan's outcome vocabulary
-calls this `copasi_improves`, and the next recorded task tightens the
-stopping rule under a dated amendment before any all-condition fit is
-quoted as an optimum. No verdict of the criticism study changes by itself,
-because its comparisons are relative between models fitted with the same
-optimiser, and the posterior study does not rely on the optimum.
+PEtab problem and reproduced in COPASI 4.48 under a frozen plan. The first
+run found a defect in our own optimiser. At FungMod's then recorded
+optimum (objective 4.0307) COPASI's time courses differed from the compiled
+core by at most 1.7e-8 of sigma, but COPASI's Levenberg-Marquardt fit from
+the same point reached 3.9803 and the best of ten seeded random starts
+3.9768, 1.3 percent lower, and FungMod's compiled core evaluated that point
+to the same objective (relative difference 7e-9). The solvers agreed; the
+optimisers did not. The cause, recorded in a dated amendment of the
+criticism plan, was the finite-difference Jacobian: with scipy's default
+step of about 1.5e-8 the differences were dominated by the adaptive ODE
+integrator's step noise (derivative norms for the weakly entering constants
+fifteen times their converged values), and the trust region collapsed
+above the minimum with every start reporting a satisfied step tolerance.
+Declaring a log-space difference step of 1e-3, as the earlier benchmark
+plan already did, moved every start of the baseline to the same minimum
+(objective 3.97607, cost spread across five starts 5e-6, projected
+gradient norm 2.5e-3 in log space against 0.22 before). Stage A of the
+criticism study was re-run under the amendment and the cross-solver study
+was re-run against the new reference: COPASI's local fit now reaches
+3.9760718 against FungMod's 3.9760719 (relative difference 2.5e-8), every
+parameter agrees to better than 1e-4 relative, three constants (`K_ind`,
+`kF`, `kB`) sit on their lower bounds in both solvers, and no random start
+goes lower. Outcome in the plan's vocabulary: `reproduced`. The episode is
+reported in full because it is the kind of defect that a cross-solver check
+exists to find: a result that was internally consistent and wrong by 1.3
+percent.
 
 # Relation to existing tools
 
@@ -270,9 +293,10 @@ attached.
 - Nutrient, oxygen and maintenance physiology are absent from the organism
   case; solid-substrate accessibility is a placeholder; there is no spatial
   mycelium.
-- The least-squares optimiser's stopping rule is now known to stop above
-  the minimum on this problem; the tightened rule and its re-run are
-  pending.
+- The least-squares optimiser's finite-difference step was undeclared until
+  the cross-solver check found it stopping 1.3 percent above the minimum;
+  the public calibration API still uses scipy's default step and is not
+  used by any recorded result in this paper.
 - The stage B chains did not reach the declared convergence rule within the
   plan's compute cap; their verdicts are provisional.
 - Software verification (parity tests, reference simulators, cross-solver

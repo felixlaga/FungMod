@@ -81,15 +81,15 @@
       <species metaid="meta_beta_glucosidase_activity" sboTerm="SBO:0000247" id="beta_glucosidase_activity" name="beta_glucosidase_activity" compartment="compartment" initialAmount="0" substanceUnits="unit_3" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false"/>
     </listOfSpecies>
     <listOfParameters>
-      <parameter sboTerm="SBO:0000025" id="gelain_hydrolysis_k_h" name="gelain_hydrolysis_k_h" value="0.0126817768982733" units="unit_4" constant="true"/>
-      <parameter sboTerm="SBO:0000027" id="gelain_hydrolysis_Kh" name="gelain_hydrolysis_Kh" value="10.5319974525124" units="unit_1" constant="true"/>
-      <parameter id="gelain_hydrolysis_Y" name="gelain_hydrolysis_Y" value="0.371701352854374" units="unit_5" constant="true"/>
-      <parameter sboTerm="SBO:0000009" id="gelain_hydrolysis_kd" name="gelain_hydrolysis_kd" value="0.0179200397624115" units="unit_6" constant="true"/>
-      <parameter id="gelain_hydrolysis_K_ind" name="gelain_hydrolysis_K_ind" value="0.0100875670167932" units="unit_1" constant="true"/>
-      <parameter id="gelain_hydrolysis_qF" name="gelain_hydrolysis_qF" value="6.88366129038644" units="unit_7" constant="true"/>
-      <parameter sboTerm="SBO:0000009" id="gelain_hydrolysis_kF" name="gelain_hydrolysis_kF" value="3.90391812341789e-05" units="unit_6" constant="true"/>
-      <parameter id="gelain_hydrolysis_qB" name="gelain_hydrolysis_qB" value="15.9925269264189" units="unit_8" constant="true"/>
-      <parameter sboTerm="SBO:0000009" id="gelain_hydrolysis_kB" name="gelain_hydrolysis_kB" value="1.24273576098419e-06" units="unit_6" constant="true"/>
+      <parameter sboTerm="SBO:0000025" id="gelain_hydrolysis_k_h" name="gelain_hydrolysis_k_h" value="0.0183938712267947" units="unit_4" constant="true"/>
+      <parameter sboTerm="SBO:0000027" id="gelain_hydrolysis_Kh" name="gelain_hydrolysis_Kh" value="16.7453971654649" units="unit_1" constant="true"/>
+      <parameter id="gelain_hydrolysis_Y" name="gelain_hydrolysis_Y" value="0.41459993227273" units="unit_5" constant="true"/>
+      <parameter sboTerm="SBO:0000009" id="gelain_hydrolysis_kd" name="gelain_hydrolysis_kd" value="0.0198480694676219" units="unit_6" constant="true"/>
+      <parameter id="gelain_hydrolysis_K_ind" name="gelain_hydrolysis_K_ind" value="0.0100000000000001" units="unit_1" constant="true"/>
+      <parameter id="gelain_hydrolysis_qF" name="gelain_hydrolysis_qF" value="5.82329859476304" units="unit_7" constant="true"/>
+      <parameter sboTerm="SBO:0000009" id="gelain_hydrolysis_kF" name="gelain_hydrolysis_kF" value="1.00000063291089e-06" units="unit_6" constant="true"/>
+      <parameter id="gelain_hydrolysis_qB" name="gelain_hydrolysis_qB" value="13.9377600283207" units="unit_8" constant="true"/>
+      <parameter sboTerm="SBO:0000009" id="gelain_hydrolysis_kB" name="gelain_hydrolysis_kB" value="1.00000000004226e-06" units="unit_6" constant="true"/>
       <parameter id="gelain_2020_cellulose_initial_biomass" name="gelain_2020_cellulose_initial_biomass" value="0.399067295721479" units="unit_1" constant="true"/>
       <parameter id="gelain_2020_cellulose_initial_loading" name="gelain_2020_cellulose_initial_loading" value="10" units="unit_1" constant="true"/>
       <parameter id="gelain_2020_cellulose_initial_cellulase_activity" name="gelain_2020_cellulose_initial_cellulase_activity" value="0" units="unit_2" constant="true"/>

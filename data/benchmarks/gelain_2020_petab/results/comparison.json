@@ -1,31 +1,31 @@
 {
-  "outcome": "copasi_improves",
+  "outcome": "reproduced",
   "cross_check_at_copasi_best": {
-    "fungmod_objective": 3.9768232076180348,
-    "copasi_objective": 3.9768232362016986,
-    "relative_difference": 7.187562077200983e-09
+    "fungmod_objective": 3.976071723809489,
+    "copasi_objective": 3.976071799013196,
+    "relative_difference": 1.8914071742923574e-08
   },
   "simulation_gate": {
     "passed": true,
-    "worst_abs_difference_over_sigma": 1.6546225897527232e-08,
+    "worst_abs_difference_over_sigma": 1.6373477546054917e-08,
     "per_observable": {
-      "observable_biomass": 1.6546225897527232e-08,
-      "observable_substrate": 1.526908779845278e-08,
-      "observable_cellulase_activity": 1.1446637028171996e-08,
-      "observable_beta_glucosidase_activity": 1.0979611063388301e-08
+      "observable_biomass": 1.3288275208549879e-08,
+      "observable_substrate": 1.2983764834598542e-08,
+      "observable_cellulase_activity": 1.6373477546054917e-08,
+      "observable_beta_glucosidase_activity": 1.6173495423485713e-08
     },
-    "objective_relative_difference": 5.055742533253273e-10,
-    "copasi_objective": 4.0306626538689585,
-    "fungmod_objective": 4.030662655906758
+    "objective_relative_difference": 2.0735598000458472e-08,
+    "copasi_objective": 3.976071981077909,
+    "fungmod_objective": 3.9760718986316803
   },
   "optimum_gate": {
-    "passed": false,
-    "reference_objective": 4.030662655906759,
-    "copasi_best_objective": 3.9768232362016986,
-    "copasi_best_source": "start_1",
-    "relative_difference": 0.013357461117754599,
-    "copasi_improves": true,
-    "local_fit_objective": 3.9802922625222403,
+    "passed": true,
+    "reference_objective": 3.9760718986316803,
+    "copasi_best_objective": 3.976071799013196,
+    "copasi_best_source": "local_fit",
+    "relative_difference": 2.505449767211456e-08,
+    "copasi_improves": false,
+    "local_fit_objective": 3.976071799013196,
     "start_objectives": [
       3.981006625373243,
       3.9768232362016986,
@@ -43,80 +43,80 @@
     {
       "symbol": "k_h",
       "config_symbol": "gelain_hydrolysis_k_h",
-      "fungmod": 0.012681776898273303,
-      "copasi": 0.018043883509711877,
-      "relative_difference": 0.42281981889845854
+      "fungmod": 0.01839387122679473,
+      "copasi": 0.018394791499672603,
+      "relative_difference": 5.003149508465084e-05
     },
     {
       "symbol": "Kh",
       "config_symbol": "gelain_hydrolysis_Kh",
-      "fungmod": 10.531997452512396,
-      "copasi": 16.330164674598855,
-      "relative_difference": 0.5505287338161398
+      "fungmod": 16.74539716546491,
+      "copasi": 16.744160862896983,
+      "relative_difference": 7.382939656266912e-05
     },
     {
       "symbol": "Y",
       "config_symbol": "gelain_hydrolysis_Y",
-      "fungmod": 0.3717013528543743,
-      "copasi": 0.4062450773067665,
-      "relative_difference": 0.0929340832018059
+      "fungmod": 0.4145999322727295,
+      "copasi": 0.4145920726364329,
+      "relative_difference": 1.8957157695470324e-05
     },
     {
       "symbol": "kd",
       "config_symbol": "gelain_hydrolysis_kd",
-      "fungmod": 0.01792003976241154,
-      "copasi": 0.019250371724804566,
-      "relative_difference": 0.07423710996353287
+      "fungmod": 0.019848069467621906,
+      "copasi": 0.0198489974623373,
+      "relative_difference": 4.6754910693379154e-05
     },
     {
       "symbol": "K_ind",
       "config_symbol": "gelain_hydrolysis_K_ind",
-      "fungmod": 0.01008756701679325,
+      "fungmod": 0.010000000000000111,
       "copasi": 0.01,
-      "relative_difference": 0.008680687488615672
+      "relative_difference": 1.1102230246251442e-14
     },
     {
       "symbol": "qF",
       "config_symbol": "gelain_hydrolysis_qF",
-      "fungmod": 6.883661290386444,
-      "copasi": 5.9121855563444035,
-      "relative_difference": 0.14112776516165607
+      "fungmod": 5.823298594763041,
+      "copasi": 5.8232908778451575,
+      "relative_difference": 1.3251798371306733e-06
     },
     {
       "symbol": "kF",
       "config_symbol": "gelain_hydrolysis_kF",
-      "fungmod": 3.9039181234178865e-05,
-      "copasi": 1.0000148349465366e-06,
-      "relative_difference": 0.974384328683845
+      "fungmod": 1.0000006329108917e-06,
+      "copasi": 1e-06,
+      "relative_difference": 6.32910491207231e-07
     },
     {
       "symbol": "qB",
       "config_symbol": "gelain_hydrolysis_qB",
-      "fungmod": 15.992526926418924,
-      "copasi": 14.138015680162159,
-      "relative_difference": 0.11596111451237871
+      "fungmod": 13.937760028320657,
+      "copasi": 13.937188236027755,
+      "relative_difference": 4.102469060598168e-05
     },
     {
       "symbol": "kB",
       "config_symbol": "gelain_hydrolysis_kB",
-      "fungmod": 1.2427357609841935e-06,
+      "fungmod": 1.0000000000422582e-06,
       "copasi": 1e-06,
-      "relative_difference": 0.19532371128674791
+      "relative_difference": 4.225826197849447e-11
     }
   ],
-  "plan_sha256": "a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a",
+  "plan_sha256": "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628",
   "sources": {
-    "criticism_plan": "6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86",
+    "criticism_plan": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7",
     "bayesian_plan": "9574fccc809cc2a49aab2ebc9cbc8cd087d0064d26582da287915cbbce32f01a",
     "observations": "cc8cda93a4a1a07cc73cf0c104aeaf315770aa4399e65cb2f3473e97951b699c",
-    "reference_fit": "7877ba476f65319841072184f73ea8e47cf0dd6f33a3f86f4899ca96e12879f3",
-    "plan": "a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a",
-    "sbml": "67f856b018795b40370495f1ee4d8c718684eddd2794d43e6d47607c552cd903"
+    "reference_fit": "80b3df1c3ffd9b942bf74751b9bd551967643381cd448760d90928da297e41dc",
+    "plan": "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628",
+    "sbml": "04af8e4d9527727bb96aa2a82308634fa4b8de5e50b85be4b4a0100d85baea1b"
   },
   "settings": {
     "starts": 10,
     "seed": 20261005,
     "as_planned": true
   },
-  "fungmod_objective_at_nominal": 4.030662655906758
+  "fungmod_objective_at_nominal": 3.9760718986316803
 }

@@ -26,6 +26,137 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CRIT-003 Stage A Optimiser Declared, Stage A Re-Run, Cross-Solver Outcome Reproduced
+
+Date: 2026-10-05
+
+Status: complete. The model-criticism plan's stage A optimiser was stopping
+above the minimum; amendment 3 (digest `9897ab11...`) declares the settings
+that were missing, stage A was re-run for every model and scenario under it,
+the PEtab cross-solver plan was amended (digest `cfb8c9a6...`) to the new
+reference fit and its reproduction re-run with outcome `reproduced`, and the
+recorded stage B verdicts were refreshed against the new screen. The
+scientific verdict for the soluble product pool (M2) changes from "not
+supported (fails R1)" to "improves fit but unidentified (R1, not R3)".
+
+Finding (from PETAB-001): COPASI reached an objective 1.3 percent below
+FungMod's recorded M0 optimum and FungMod evaluated that point to the same
+value. Diagnosis on M0 before any variant was refitted: every recorded start
+had stopped on scipy's step tolerance (status 3) after 20 to 60 evaluations,
+not on the 250-evaluation cap; the cost gradient at the recorded point was
+0.18 along `qF` and 0.09 along `k_h` in log space (not stationary); with
+scipy's default difference step (about 1.5e-8) the residual-derivative
+norms for `K_ind` and `kB` were fifteen times their converged values (3.77
+against 0.24, 2.5e-3 against 1.6e-4) because the differences were
+dominated by the adaptive ODE integrator's step noise, so the trust region
+collapsed; tightening ftol, xtol and gtol alone (1e-10, 1e-12, xtol off)
+changed nothing. A log-space difference step of 1e-3, which the v2 plan had
+declared and this plan omitted, took the midpoint start to cost 1.98804,
+below COPASI's 1.98841, with restarts no longer improving it.
+
+Changed:
+
+- `data/benchmarks/gelain_2020_criticism/plan.json`: amendment 3 adds
+  `stage_A_least_squares.optimiser` (method unchanged; log-space difference
+  step 1e-3; ftol, xtol, gtol 1e-10; up to three restarts of the best start
+  until the relative cost decrease is below 1e-6) with the diagnosis and the
+  consequences in its reason. No rule, bound, model or other setting changed.
+- `research/gelain_criticism.py`: `OptimiserSettings` (read from the plan,
+  every field required), `fit_model(..., optimiser=...)` passes the step and
+  tolerances to scipy, restarts the best start from its own solution and
+  records every start and restart; `run_stage_a` records the settings in
+  `inputs.json` and the report; `profile_model` takes the same settings;
+  `refresh_stage_b_verdicts` recomputes a recorded posterior's verdicts
+  against the stage A comparison on disk, rewrites `verdicts.json`, the
+  decision-rule block of `report.md` and the digests of those two files;
+  `scripts/run_gelain_2020_model_criticism.py refresh-verdicts`.
+- `data/benchmarks/gelain_2020_petab/plan.json`: one dated amendment replaces
+  the criticism-plan and reference-fit digests (new reference cost
+  1.9880359493158402, objective 3.9760718986316803); gates, settings and
+  outcomes unchanged.
+- Results replaced: `gelain_2020_criticism/results/stage_a/` (every model and
+  scenario, with M2's profiles) and `gelain_2020_petab/results/`. Stage B
+  folders: `verdicts.json`, the decision-rule lines of `report.md` and the
+  two digests in `artifacts.json` for M2 (R1 now true); M1 and M3 unchanged.
+- `standards/copasi.py` (merged from the PEtab branch): the COPASI import
+  helper restores `LC_CTYPE`, because COPASI's static initialiser resets the
+  C locale and switched Python's text encoding to ASCII for the rest of a
+  test session.
+- Tests: `tests/test_gelain_criticism_plan.py` (new digest and amendment
+  tuple, the optimiser block, recorded stage A files carry the declared
+  settings and restarts, stage B verdicts' R1 equals the stage A screen on
+  disk, the refresh helper on a copied folder); `tests/test_gelain_criticism_study.py`
+  (`OptimiserSettings` refusals, settings recorded in the tiny stage A run,
+  the recorded M0 primary fit is stationary: projected cost gradient norm in
+  log space below 1e-2); `tests/test_gelain_petab.py` (new digest, the
+  amendment, a cross-platform tolerance of 1e-7 on the objective check).
+- `docs/gelain-model-criticism.md`, `docs/gelain-cross-solver.md`, both
+  benchmark READMEs, `CHANGELOG.md`, the state document (items 2 and 4),
+  `paper/paper.md` (criticism, cross-solver and limitation paragraphs).
+
+Not changed: any rate law, registry record, bound, prior, error model or
+decision rule; BAYES-001 and the v2 results; the stage B chains and their
+samples, summaries and coverage.
+
+Stage A under amendment 3 (`results/stage_a/`, five starts, 250
+evaluations, every fit full rank, every all-condition start at the same cost
+except two of M2's five in local minima):
+
+| Model | Scenario | Held-out MSE | vs M0 | Screen |
+| --- | --- | --- | --- | --- |
+| M0 | primary | 0.0918 | | reference |
+| M0 | correlated | 0.0932 | | reference |
+| M1 | primary | 0.0917 | +0.1% | failed (substrate +210%) |
+| M1 | correlated | 0.0961 | -3.0% | failed (substrate +312%) |
+| M2 | primary | 0.0703 | +23.4% | passed (every observable better) |
+| M2 | correlated | 0.0689 | +26.1% | passed (every observable better) |
+| M3 | primary | 0.0920 | -0.2% | failed (no improvement) |
+| M3 | correlated | 0.0979 | -5.0% | failed (substrate +12%) |
+
+The first run (CRIT-001, digest `9bb36f8d...`) had M0 0.0907, M1 0.0882
+(+2.7%), M2 0.0695 (+23.4% with biomass 31% worse) and M3 0.0979; its M2
+verdict rested on the biomass clause, which the converged fit does not
+trigger (biomass 25% better). M2's all-condition fit: cost 1.414 against
+M0's 1.988; `Y` 0.46, `kd` 0.025/h, `mu` 0.23/h, `Ks` 0.0016 g/L, `Ki` 47
+g/L, `P0` on its 3 g/L upper bound, `K_ind`, `kF`, `kB` on their lower
+bounds. Profiles for M2 (`profiles_primary.json`, nuisance-reoptimised cost at the fitted value times 0.5, 1 and 2; reference 1.4135): `Y`, `qF`, `qB`, `kd` and the lower half of `mu` and `P0` raise the cost clearly (1.50 to 1.85), `k_h` and `Kh` mildly (1.43 to 1.45), while `Ks`, `Ki`, `kF`, `kB` and `K_ind` are flat (within 1e-3 of the reference at both factors), which agrees with the stage B classes for the pool's constants; several nuisance refits reached 1.4132, 2e-4 below the reference, so the all-condition fit sits in a valley where the declared restart tolerance of 1e-6 stops earlier than the warm-started profile refits do, and that is reported rather than smoothed over.
+
+Cross-solver reproduction re-run (`gelain_2020_petab/results/`, plan
+`cfb8c9a6...`): simulation agreement 1.6e-8 of sigma, objectives within
+2e-8; COPASI's local fit 3.976071799 against FungMod's 3.976071899
+(relative difference 2.5e-8, gate 1e-3); every parameter within 1e-4
+relative; best random start 3.9768, none below the local fit. Outcome
+`reproduced`.
+
+Stage B refresh (`refresh-verdicts`): M2 R1 true, outcome "improves fit but
+unidentified (R1, not R3)" (R2 and R3 unchanged: multiplier [1.65, 2.87];
+`mu`, `Ks`, `Ki` prior dominated, `P0` bounded below only); M1 and M3 R1
+false, outcomes unchanged. The chains were not re-run: their initial centre
+is a starting point rather than a result, they are already reported as
+unconverged and provisional, and M2's chain started from the superseded
+fit, which is stated in the docs and the paper.
+
+Commands: `ruff check src tests scripts/run_*.py` passed; `pyright` 0
+errors; `mkdocs build --strict` passed; stage A re-run (M0 8 min, M1 and
+M3 about 13 min each, M2 70 min plus profiles); COPASI reproduction 72 s;
+criticism, PEtab, COPASI and culture-benchmark tests (see the PR for
+counts); full `pytest` on the PR head reported in the PR. Scientific
+impact: the M2 verdict changes as stated; nothing is promoted beyond
+retrospective fit; the stage A optimum of the baseline is now stationary
+and reproduced by an independent solver. Backward compatibility:
+`fit_model` and `profile_model` require `optimiser`; fit files gain
+`optimiser` and `restarts`; `inputs.json` gains `optimiser`. Risk: low for
+code; the scientific finding is the point.
+
+Remaining ambiguities: the M2 posterior was sampled from the superseded
+centre and did not converge; the public `fit_least_squares` API still uses
+scipy's default difference step (follow-up).
+
+Recommended next task: a dated amendment 4 for an M2 stage B chain centred
+on the converged fit, with a compute budget above the two-hour cap, so that
+R3 for the one mechanism that passes R1 rests on a chain that started where
+the holdouts point.
+
 ## PETAB-001 Cross-Solver Reproduction Of The Gelain Fit Through PEtab And COPASI
 
 Date: 2026-10-05
