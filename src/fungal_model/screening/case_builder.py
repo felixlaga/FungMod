@@ -27,6 +27,7 @@ from fungal_model.screening.template_environment_modifiers import (
     ENVIRONMENT_MODIFIER_TYPES,
     build_template_environment_entity,
     build_template_environment_modifier,
+    environment_response_summary,
 )
 
 RegistryCaseConfigMode = Literal["toy", "scientific"]
@@ -42,6 +43,30 @@ HOMOGENEOUS_MM_PARAMETER_ROLES = (
     "substrate_initial_concentration",
     "enzyme_initial_concentration",
 )
+PH_IONIZATION_MM_PROCESS_TYPE = "ph_ionization_michaelis_menten"
+PH_IONIZATION_MM_PARAMETER_ROLES = (
+    "turnover",
+    "michaelis_constant",
+    "free_enzyme_lower_pk",
+    "free_enzyme_upper_pk",
+    "complex_lower_pk",
+    "complex_upper_pk",
+    "minimum_ph",
+    "maximum_ph",
+    "substrate_initial_concentration",
+    "enzyme_initial_concentration",
+)
+_HOMOGENEOUS_MM_PROCESS_PARAMETER_ROLES = {"km": "km", "kcat": "kcat"}
+_PH_IONIZATION_MM_PROCESS_PARAMETER_ROLES = {
+    "turnover": "turnover",
+    "michaelis_constant": "michaelis_constant",
+    "free_enzyme_lower_pk": "free_enzyme_lower_pk",
+    "free_enzyme_upper_pk": "free_enzyme_upper_pk",
+    "complex_lower_pk": "complex_lower_pk",
+    "complex_upper_pk": "complex_upper_pk",
+    "minimum_ph": "minimum_ph",
+    "maximum_ph": "maximum_ph",
+}
 EXTRACELLULAR_ENZYME_CHAIN_PARAMETER_ROLES = (
     "solid_substrate_initial_concentration",
     "cellulase_initial_concentration",
@@ -195,7 +220,7 @@ def build_registry_process_config_data(
             assembler=assembler,
         )
     substrate = registry.get_substrate(substrate_id)
-    return assembler.config_data_builder(
+    data = assembler.config_data_builder(
         registry=registry,
         compatibility=compatibility,
         case_template=case_template,
@@ -206,6 +231,13 @@ def build_registry_process_config_data(
         parameter_records=parameter_records,
         output_directory=output_directory,
     )
+    provenance = data.get("provenance")
+    if not isinstance(provenance, dict):
+        raise RegistryCaseBuildError(
+            f"{assembler.process_label} assembly must return a provenance mapping."
+        )
+    provenance["environment_response"] = environment_response_summary(data.get("processes", ()))
+    return data
 
 
 def select_registry_case_template(
@@ -713,12 +745,14 @@ def _template_environment_entity(
     registry: FungModRegistry,
     environment_id: str,
     modifiers: list[dict[str, Any]],
+    process_types: tuple[str, ...] = (),
 ) -> dict[str, Any] | None:
     return build_template_environment_entity(
         registry=registry,
         environment_id=environment_id,
         modifiers=modifiers,
         error_type=RegistryCaseBuildError,
+        process_types=process_types,
     )
 
 
@@ -1100,8 +1134,26 @@ def _bio001_geometry_data() -> dict[str, Any]:
     }
 
 
-def _homogeneous_mm_config_data(
+def _homogeneous_mm_config_data(**kwargs: Any) -> dict[str, Any]:
+    return _enzyme_kinetics_config_data(
+        process_type="homogeneous_michaelis_menten",
+        process_parameter_roles=_HOMOGENEOUS_MM_PROCESS_PARAMETER_ROLES,
+        **kwargs,
+    )
+
+
+def _ph_ionization_mm_config_data(**kwargs: Any) -> dict[str, Any]:
+    return _enzyme_kinetics_config_data(
+        process_type=PH_IONIZATION_MM_PROCESS_TYPE,
+        process_parameter_roles=_PH_IONIZATION_MM_PROCESS_PARAMETER_ROLES,
+        **kwargs,
+    )
+
+
+def _enzyme_kinetics_config_data(
     *,
+    process_type: str,
+    process_parameter_roles: Mapping[str, str],
     registry: FungModRegistry,
     compatibility: ProcessCompatibilityRecord,
     case_template: CaseTemplateRecord,
@@ -1112,6 +1164,8 @@ def _homogeneous_mm_config_data(
     parameter_records: Mapping[str, ParameterRecord],
     output_directory: str | None,
 ) -> dict[str, Any]:
+    """Assemble one dissolved enzyme-kinetics process (plain or pH-dependent Michaelis-Menten)."""
+
     substrate_state = _template_state(case_template, "substrate")
     product_state = _template_state(case_template, "product")
     enzyme_state = _template_state(case_template, "enzyme")
@@ -1141,6 +1195,7 @@ def _homogeneous_mm_config_data(
         registry=registry,
         environment_id=environment_id,
         modifiers=modifiers,
+        process_types=(process_type,),
     )
     enzyme_class = registry.get_enzyme_class(compatibility.enzyme_class)
     entities: dict[str, Any] = {
@@ -1205,7 +1260,7 @@ def _homogeneous_mm_config_data(
         "processes": [
             {
                 "id": process_id,
-                "process_type": "homogeneous_michaelis_menten",
+                "process_type": process_type,
                 "states": {
                     "substrate": substrate_state,
                     "product": product_state,
@@ -1213,8 +1268,10 @@ def _homogeneous_mm_config_data(
                 },
                 "product_map": _product_map_id(case_template),
                 "parameters": {
-                    "km": parameter_records["km"].parameter_symbol,
-                    "kcat": parameter_records["kcat"].parameter_symbol,
+                    **{
+                        field: parameter_records[role].parameter_symbol
+                        for field, role in process_parameter_roles.items()
+                    },
                     "rate_units": rate_units,
                 },
                 "modifiers": modifiers,
@@ -1775,6 +1832,28 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
             "or mode='scientific'."
         ),
         config_data_builder=_homogeneous_mm_config_data,
+    ),
+    PH_IONIZATION_MM_PROCESS_TYPE: RegistryProcessAssembler(
+        process_type=PH_IONIZATION_MM_PROCESS_TYPE,
+        process_label="pH-ionization Michaelis-Menten",
+        required_parameter_roles=PH_IONIZATION_MM_PARAMETER_ROLES,
+        required_state_roles=("substrate", "product", "enzyme"),
+        deterministic_mode="scientific",
+        additional_supported_modes=("toy",),
+        required_process_state_metadata=(
+            "config_name",
+            "config_mode",
+            "config_maturity",
+            "process_id",
+            "parameter_set_id",
+            "product_map_name",
+        ),
+        enforce_template_mode_match=True,
+        unsupported_mode_message=(
+            "pH-ionization Michaelis-Menten registry assembly supports mode='toy' "
+            "or mode='scientific'."
+        ),
+        config_data_builder=_ph_ionization_mm_config_data,
     ),
     "culture_physiology": RegistryProcessAssembler(
         process_type="culture_physiology",

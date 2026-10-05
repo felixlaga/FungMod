@@ -1,0 +1,180 @@
+kind: model_config
+name: toy pH-ionization Michaelis-Menten benchmark
+mode: toy
+maturity: framework_benchmark
+provenance:
+  source: FungMod foundation benchmark config; not a scientific case.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: >
+    Exercises the generic ph_ionization_michaelis_menten process in a
+    non-biological dissolved setting: a catalyst pool converts a substrate pool
+    to a product pool with Michaelis-Menten constants scaled by two-pKa
+    ionization factors evaluated at the environment pH. Units are molar and
+    seconds so that no enzyme, organism, or culture interpretation is implied.
+  validity_range: framework tests only
+  units: not_applicable
+entities:
+  environment:
+    id: environment
+    path: data/environments/lab_30C_pH7.yml
+    loader: environment
+  geometry:
+    id: geometry
+    path: data/geometries/well_mixed_100ml.yml
+    loader: well_mixed
+  substrates:
+    - id: dissolved_substrate
+      loader: generic_dissolved
+      data:
+        kind: substrate
+        name: generic dissolved benchmark substrate
+        substrate_type: generic_dissolved
+        chemical_class: framework benchmark
+        physical_state: dissolved
+        bond_types: []
+        accessible_bonds: []
+        required_enzyme_classes: []
+        degradation_products:
+          - name: generic product
+            notes: Toy product for config loading only.
+parameters:
+  - id: ionization_parameters
+    parameters:
+      - name: toy limiting turnover
+        symbol: k0_toy
+        value: 0.5
+        units: 1 / second
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy limiting Michaelis constant
+        symbol: Km0_toy
+        value: 1.0
+        units: millimolar
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy free-catalyst lower pKa
+        symbol: pKe1_toy
+        value: 4.0
+        units: dimensionless
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy free-catalyst upper pKa
+        symbol: pKe2_toy
+        value: 8.0
+        units: dimensionless
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy complex lower pKa
+        symbol: pKes1_toy
+        value: 4.5
+        units: dimensionless
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy complex upper pKa
+        symbol: pKes2_toy
+        value: 7.5
+        units: dimensionless
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy minimum measured pH
+        symbol: pH_min_toy
+        value: 3.0
+        units: dimensionless
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+      - name: toy maximum measured pH
+        symbol: pH_max_toy
+        value: 9.0
+        units: dimensionless
+        uncertainty: 0.0
+        source: FungMod foundation benchmark config.
+        confidence_level: testing
+        notes: Artificial value for config loading only.
+        measurement_method: defined benchmark value
+        validity_range: framework tests only
+processes:
+  - id: ph_dependent_conversion
+    process_type: ph_ionization_michaelis_menten
+    states:
+      substrate: substrate_concentration
+      enzyme: catalyst_concentration
+      product: product_concentration
+    parameters:
+      turnover: k0_toy
+      michaelis_constant: Km0_toy
+      free_enzyme_lower_pk: pKe1_toy
+      free_enzyme_upper_pk: pKe2_toy
+      complex_lower_pk: pKes1_toy
+      complex_upper_pk: pKes2_toy
+      minimum_ph: pH_min_toy
+      maximum_ph: pH_max_toy
+      rate_units: millimolar / second
+    assumptions:
+      - toy pH-ionization Michaelis-Menten benchmark only
+initial_state:
+  states:
+    substrate_concentration:
+      value: 2.0
+      units: millimolar
+    catalyst_concentration:
+      value: 0.01
+      units: millimolar
+    product_concentration:
+      value: 0.0
+      units: millimolar
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 600.0
+    units: second
+  points: 61
+validators:
+  - id: non_negative_states
+    validator_type: non_negative
+    species:
+      - substrate_concentration
+      - catalyst_concentration
+      - product_concentration
+  - id: substrate_product_balance
+    validator_type: mass_balance
+    conserved_weights:
+      substrate_concentration: 1.0
+      product_concentration: 1.0
+outputs:
+  directory: outputs/toy_ph_ionization_dissolved
+  save:
+    - record
+    - validation_report
+  plots:
+    - state_trajectories

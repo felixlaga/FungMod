@@ -283,6 +283,7 @@ def test_candidate_review_directory_contains_only_review_files() -> None:
         "fake_candidate_review.yml",
         "gelain_2020_t_harzianum_review.yml",
         "resa_buckin_2011_cellobiose_hydrolysis_review.yml",
+        "trichoderma_harzianum_cardinal_growth_review.yml",
     ]
 
 

@@ -52,7 +52,7 @@ def test_registry_loads_beta_glucosidase_enzyme_class() -> None:
     assert enzyme.name == "beta-glucosidase"
     assert enzyme.target_bond_classes == ("beta_1_4_glycosidic",)
     assert enzyme.compatible_substrate_classes == ("cellobiose",)
-    assert enzyme.compatible_processes == (PROCESS_TYPE,)
+    assert enzyme.compatible_processes == (PROCESS_TYPE, "ph_ionization_michaelis_menten")
     _assert_sabiork_provenance(enzyme.provenance)
 
 

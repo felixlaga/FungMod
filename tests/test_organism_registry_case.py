@@ -331,3 +331,27 @@ def _sha256(path: Path) -> str:
 def _csv_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def test_runtime_environment_grid_does_not_choose_among_condition_specific_loadings(tmp_path: Path) -> None:
+    """A grid environment has no loading of its own; the three condition-scoped loadings stay unselected."""
+
+    from fungal_model.api import EnvironmentGrid
+
+    study = VirtualExperiment.from_registry(
+        fungi=FUNGUS_ID,
+        substrates=SUBSTRATE_ID,
+        environments=EnvironmentGrid(temperature_C=[29.0, 35.0], ph=[5.0]),
+        registry=REGISTRY_INDEX,
+    )
+    for mode in ("scientific", "exploratory"):
+        reports = study.preflight(mode=mode)
+        assert {report.status for report in reports} == {"underparameterized"}
+        assert all(
+            {item.item_id for item in report.missing} == {"gelain_2020_cellulose_initial_loading"} for report in reports
+        )
+    with pytest.raises(VirtualExperimentError):
+        study.simulate(mode="scientific", output_dir=tmp_path / "grid", quicklook=False)
+    overlay = study.registry.provenance
+    assert overlay["ambiguous_condition_specific_symbols"] == ["gelain_2020_cellulose_initial_loading"]
+    assert "environment_effect_status" not in overlay

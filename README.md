@@ -179,7 +179,16 @@ each implementation:
 - explicit `Environment`, `Geometry`, and `Enzyme` entities for process-centered
   assembly,
 - environment-driven temperature, pH, water-activity, oxygen, and product
-  inhibition modifiers,
+  inhibition modifiers, including the Rosso cardinal temperature (CTMI) and
+  cardinal pH (CPM) growth-response laws,
+- a pH-ionization Michaelis-Menten process law (diprotic ionization of `kcat`
+  and `Km`, the SABIO-RK pH-dependent law form) and a first-order Arrhenius
+  thermal-inactivation process law, both compiled to numeric kernels,
+- a first registry case with an active environment response: *P. chrysosporium*
+  BGL1A on cellobiose over pH 4 to 8 (SABIO-RK entry 38522, Tsukada 2008),
+  exploratory mode only, with `environment_effect_status: active_response_model`
+  and ranking allowed only across conditions a law covers
+  (`docs/environment-response.md`),
 - provenance-bound competitive and Haldane substrate-inhibition modifiers for
   explicitly matched homogeneous Michaelis-Menten processes. These laws
   require explicit primary-source and maturity metadata, exact substrate and

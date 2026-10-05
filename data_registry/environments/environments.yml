@@ -269,3 +269,198 @@ records:
       Submerged batch culture of T. harzianum P49P11 in Mandels medium with 1 g/L
       peptone, 29 C, pH 5.0, dissolved oxygen above 30 percent, 30 g/L Celufloc 200
       cellulose, duplicate cultures with different inocula, sampled 8-96 h.
+
+  - record_id: tsukada_2008_bgl1a_assay_30c_ph4
+    name: Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 4.0 (50 mM sodium acetate)
+    display_name: BGL1A assay 30C pH4
+    aliases:
+      - BGL1A assay pH 4
+      - bgl1a 30C pH4
+    maturity: literature_processed
+    provenance:
+      source: >-
+        SABIO-RK Reaction 618 kinetic-law entry 38522 experimental conditions
+        (pH range 4-8 at 30 C; "Temperature given in PMID:16896601"), reporting
+        Tsukada et al. (2008) Biotechnol Bioeng 99:1295-1302 (PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      confidence_level: literature_curated
+      notes: >-
+        One pH point of the source's pH series with the buffer the source lists
+        for this pH range. A case template may bind a pH response law that reads
+        the pH condition; the temperature is a set point recorded as metadata
+        unless a template binds a temperature law.
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: SABIO-RK entry 38522 envvar_temperature 30 C (temperature given in PMID:16896601).
+        confidence_level: literature_curated
+        notes: Converted from the reported 30 C assay temperature.
+      ph:
+        kind: exact
+        value: 4.0
+        units: dimensionless
+        source: SABIO-RK entry 38522 pH variable range 4-8; 50 mM sodium acetate for pH 4.0-5.5.
+        confidence_level: literature_curated
+        notes: Assay pH within the source's measured range.
+    notes: >-
+      Buffer 50 mM sodium acetate (pH 4.0-5.5 range of the source). pH 4.0 is the lower bound of the measured pH range.
+
+  - record_id: tsukada_2008_bgl1a_assay_30c_ph5
+    name: Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 5.0 (50 mM sodium acetate)
+    display_name: BGL1A assay 30C pH5
+    aliases:
+      - BGL1A assay pH 5
+      - bgl1a 30C pH5
+    maturity: literature_processed
+    provenance:
+      source: >-
+        SABIO-RK Reaction 618 kinetic-law entry 38522 experimental conditions
+        (pH range 4-8 at 30 C; "Temperature given in PMID:16896601"), reporting
+        Tsukada et al. (2008) Biotechnol Bioeng 99:1295-1302 (PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      confidence_level: literature_curated
+      notes: >-
+        One pH point of the source's pH series with the buffer the source lists
+        for this pH range. A case template may bind a pH response law that reads
+        the pH condition; the temperature is a set point recorded as metadata
+        unless a template binds a temperature law.
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: SABIO-RK entry 38522 envvar_temperature 30 C (temperature given in PMID:16896601).
+        confidence_level: literature_curated
+        notes: Converted from the reported 30 C assay temperature.
+      ph:
+        kind: exact
+        value: 5.0
+        units: dimensionless
+        source: SABIO-RK entry 38522 pH variable range 4-8; 50 mM sodium acetate for pH 4.0-5.5.
+        confidence_level: literature_curated
+        notes: Assay pH within the source's measured range.
+    notes: >-
+      Buffer 50 mM sodium acetate (pH 4.0-5.5 range of the source).
+
+  - record_id: tsukada_2008_bgl1a_assay_30c_ph6
+    name: Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 6.0 (50 mM MES)
+    display_name: BGL1A assay 30C pH6
+    aliases:
+      - BGL1A assay pH 6
+      - bgl1a 30C pH6
+    maturity: literature_processed
+    provenance:
+      source: >-
+        SABIO-RK Reaction 618 kinetic-law entry 38522 experimental conditions
+        (pH range 4-8 at 30 C; "Temperature given in PMID:16896601"), reporting
+        Tsukada et al. (2008) Biotechnol Bioeng 99:1295-1302 (PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      confidence_level: literature_curated
+      notes: >-
+        One pH point of the source's pH series with the buffer the source lists
+        for this pH range. A case template may bind a pH response law that reads
+        the pH condition; the temperature is a set point recorded as metadata
+        unless a template binds a temperature law.
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: SABIO-RK entry 38522 envvar_temperature 30 C (temperature given in PMID:16896601).
+        confidence_level: literature_curated
+        notes: Converted from the reported 30 C assay temperature.
+      ph:
+        kind: exact
+        value: 6.0
+        units: dimensionless
+        source: SABIO-RK entry 38522 pH variable range 4-8; 50 mM MES for pH 6.0-6.5.
+        confidence_level: literature_curated
+        notes: Assay pH within the source's measured range.
+    notes: >-
+      Buffer 50 mM MES (pH 6.0-6.5 range of the source).
+
+  - record_id: tsukada_2008_bgl1a_assay_30c_ph7
+    name: Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 7.0 (50 mM HEPES)
+    display_name: BGL1A assay 30C pH7
+    aliases:
+      - BGL1A assay pH 7
+      - bgl1a 30C pH7
+    maturity: literature_processed
+    provenance:
+      source: >-
+        SABIO-RK Reaction 618 kinetic-law entry 38522 experimental conditions
+        (pH range 4-8 at 30 C; "Temperature given in PMID:16896601"), reporting
+        Tsukada et al. (2008) Biotechnol Bioeng 99:1295-1302 (PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      confidence_level: literature_curated
+      notes: >-
+        One pH point of the source's pH series with the buffer the source lists
+        for this pH range. A case template may bind a pH response law that reads
+        the pH condition; the temperature is a set point recorded as metadata
+        unless a template binds a temperature law.
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: SABIO-RK entry 38522 envvar_temperature 30 C (temperature given in PMID:16896601).
+        confidence_level: literature_curated
+        notes: Converted from the reported 30 C assay temperature.
+      ph:
+        kind: exact
+        value: 7.0
+        units: dimensionless
+        source: SABIO-RK entry 38522 pH variable range 4-8; 50 mM HEPES for pH 7.0-7.5.
+        confidence_level: literature_curated
+        notes: Assay pH within the source's measured range.
+    notes: >-
+      Buffer 50 mM HEPES (pH 7.0-7.5 range of the source).
+
+  - record_id: tsukada_2008_bgl1a_assay_30c_ph8
+    name: Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 8.0 (50 mM EPPS)
+    display_name: BGL1A assay 30C pH8
+    aliases:
+      - BGL1A assay pH 8
+      - bgl1a 30C pH8
+    maturity: literature_processed
+    provenance:
+      source: >-
+        SABIO-RK Reaction 618 kinetic-law entry 38522 experimental conditions
+        (pH range 4-8 at 30 C; "Temperature given in PMID:16896601"), reporting
+        Tsukada et al. (2008) Biotechnol Bioeng 99:1295-1302 (PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      confidence_level: literature_curated
+      notes: >-
+        One pH point of the source's pH series with the buffer the source lists
+        for this pH range. A case template may bind a pH response law that reads
+        the pH condition; the temperature is a set point recorded as metadata
+        unless a template binds a temperature law.
+    conditions:
+      temperature:
+        kind: exact
+        value: 303.15
+        units: kelvin
+        source: SABIO-RK entry 38522 envvar_temperature 30 C (temperature given in PMID:16896601).
+        confidence_level: literature_curated
+        notes: Converted from the reported 30 C assay temperature.
+      ph:
+        kind: exact
+        value: 8.0
+        units: dimensionless
+        source: SABIO-RK entry 38522 pH variable range 4-8; 50 mM EPPS for pH 8.0.
+        confidence_level: literature_curated
+        notes: Assay pH within the source's measured range.
+    notes: >-
+      Buffer 50 mM EPPS (pH 8.0 range of the source). pH 8.0 is the upper bound of the measured pH range.

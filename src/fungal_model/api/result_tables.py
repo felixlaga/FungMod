@@ -182,6 +182,7 @@ def _build_table_rows(
         "missing_parameters": [],
         "suggested_experiments": [],
     }
+    varying_conditions = _varying_environment_conditions(registry, screen_result.case_results)
     for case_index, case in enumerate(screen_result.case_results):
         report = reports_by_case.get(
             (case.fungus_id, case.substrate_id, case.environment_id),
@@ -193,6 +194,7 @@ def _build_table_rows(
             case=case,
             case_index=case_index,
             role_records=role_records,
+            varying_conditions=varying_conditions,
         )
         rows["modelability_preflight"].append(_preflight_row(context, report))
         rows["modelability_items"].extend(_modelability_item_rows(context, report))
@@ -293,17 +295,24 @@ def _case_context(
     case: RegistryCaseEnsemble,
     case_index: int,
     role_records: Mapping[str, ParameterRecord],
+    varying_conditions: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     fungus = registry.get_fungus(case.fungus_id)
     substrate = registry.get_substrate(case.substrate_id)
     environment = registry.get_environment(case.environment_id)
     env_values = _environment_values(environment.conditions, environment.provenance)
+    environment_response = dict(getattr(case, "environment_response", {}) or {})
     environment_effect_status = _environment_effect_status(
         environment_id=case.environment_id,
         environment_provenance=environment.provenance,
         role_records=role_records,
+        environment_response=environment_response,
     )
-    environment_policy = _environment_policy(environment_effect_status)
+    environment_policy = _environment_policy(
+        environment_effect_status,
+        environment_response=environment_response,
+        varying_conditions=varying_conditions,
+    )
     return {
         "output_schema_version": OUTPUT_SCHEMA_VERSION,
         "case_id": f"case_{case_index:04d}",
@@ -399,12 +408,53 @@ def _environment_source(provenance: Mapping[str, Any]) -> str:
     return "registry"
 
 
+_RESPONSE_CONDITION_NAMES = ("temperature", "ph", "oxygen_concentration", "oxygen", "water_activity")
+
+
+def _varying_environment_conditions(
+    registry: FungModRegistry,
+    case_results: Sequence[RegistryCaseEnsemble],
+) -> frozenset[str]:
+    """Return the environment conditions whose values differ across the screened environments."""
+
+    observed: dict[str, set[tuple[Any, ...]]] = {name: set() for name in _RESPONSE_CONDITION_NAMES}
+    for environment_id in dict.fromkeys(case.environment_id for case in case_results):
+        try:
+            environment = registry.get_environment(environment_id)
+        except RegistryLookupError:
+            continue
+        for name in _RESPONSE_CONDITION_NAMES:
+            spec = environment.conditions.get(name)
+            if spec is None:
+                observed[name].add(("absent",))
+                continue
+            observed[name].add(
+                (
+                    spec.kind,
+                    spec.value,
+                    spec.lower,
+                    spec.upper,
+                    spec.units,
+                    spec.notes if spec.kind == "not_applicable" else "",
+                )
+            )
+    return frozenset(
+        "oxygen_concentration" if name == "oxygen" else name
+        for name, values in observed.items()
+        if len(values) > 1
+    )
+
+
 def _environment_effect_status(
     *,
     environment_id: str,
     environment_provenance: Mapping[str, Any],
     role_records: Mapping[str, ParameterRecord],
+    environment_response: Mapping[str, Any] | None = None,
 ) -> str:
+    response = environment_response or {}
+    if response.get("status") == "active_response_model" and response.get("conditions"):
+        return "active_response_model"
     status = environment_provenance.get("environment_effect_status")
     if status is not None:
         return str(status)
@@ -415,7 +465,12 @@ def _environment_effect_status(
     return "metadata_only"
 
 
-def _environment_policy(environment_effect_status: str) -> dict[str, Any]:
+def _environment_policy(
+    environment_effect_status: str,
+    *,
+    environment_response: Mapping[str, Any] | None = None,
+    varying_conditions: frozenset[str] = frozenset(),
+) -> dict[str, Any]:
     if environment_effect_status == "metadata_only":
         return {
             "environment_response_model": "none",
@@ -426,7 +481,9 @@ def _environment_policy(environment_effect_status: str) -> dict[str, Any]:
                 "Metadata-only environment cases cannot be ranked or plotted as environmental response models."
             ),
         }
-    if environment_effect_status in {"condition_specific_parameters", "active_response_model"}:
+    if environment_effect_status == "active_response_model":
+        return _active_response_policy(environment_response or {}, varying_conditions)
+    if environment_effect_status == "condition_specific_parameters":
         return {
             "environment_response_model": environment_effect_status,
             "environment_comparison_allowed": True,
@@ -440,6 +497,43 @@ def _environment_policy(environment_effect_status: str) -> dict[str, Any]:
         "environment_ranking_allowed": False,
         "environment_response_plot_allowed": False,
         "environment_guardrail": "No environment response interpretation is available for this case.",
+    }
+
+
+def _active_response_policy(
+    environment_response: Mapping[str, Any],
+    varying_conditions: frozenset[str],
+) -> dict[str, Any]:
+    conditions = environment_response.get("conditions", {})
+    covered = tuple(sorted(str(name) for name in conditions)) if isinstance(conditions, Mapping) else ()
+    laws = ";".join(
+        f"{name}:{law.get('law', '')}"
+        for name in covered
+        for law in (conditions[name].get("laws", ()) if isinstance(conditions, Mapping) else ())
+        if isinstance(law, Mapping)
+    )
+    uncovered = tuple(sorted(varying_conditions.difference(covered)))
+    if uncovered:
+        return {
+            "environment_response_model": laws or "active_response_model",
+            "environment_comparison_allowed": False,
+            "environment_ranking_allowed": False,
+            "environment_response_plot_allowed": False,
+            "environment_guardrail": (
+                f"Response laws cover {', '.join(covered)} only; the screen also varies "
+                f"{', '.join(uncovered)} without a response law or condition-specific record, so these "
+                "cases cannot be ranked or plotted as environmental response models."
+            ),
+        }
+    return {
+        "environment_response_model": laws or "active_response_model",
+        "environment_comparison_allowed": True,
+        "environment_ranking_allowed": True,
+        "environment_response_plot_allowed": True,
+        "environment_guardrail": (
+            f"Environment comparisons are allowed: explicit response laws act on {', '.join(covered)}; "
+            "every other environment condition is metadata and the laws carry the documented limitations."
+        ),
     }
 
 
@@ -780,6 +874,8 @@ def _process_mechanism_descriptor(
 def _mechanism_family(process_type: str) -> str:
     if process_type == "homogeneous_michaelis_menten":
         return "generic homogeneous Michaelis-Menten process"
+    if process_type == "ph_ionization_michaelis_menten":
+        return "generic homogeneous Michaelis-Menten process with diprotic pH-dependent constants"
     if process_type == "surface_catalysis":
         return "generic equilibrium surface catalysis"
     if process_type == "extracellular_enzyme_chain":
@@ -792,6 +888,11 @@ def _mechanism_family(process_type: str) -> str:
 def _mechanism_law(process_type: str) -> str:
     if process_type == "homogeneous_michaelis_menten":
         return "r = Vmax * S / (Km + S), or explicit-enzyme equivalent when configured"
+    if process_type == "ph_ionization_michaelis_menten":
+        return (
+            "r = E * kcat(pH) * S / (Km(pH) + S) with kcat(pH) = k0 / f_es(pH), "
+            "Km(pH) = Km0 * f_e(pH) / f_es(pH), f(pH) = (10^(pK_low - pH) + 1)(10^(pH - pK_high) + 1)"
+        )
     if process_type == "surface_catalysis":
         return "r = k_surface * theta(E, K_ads) * accessible_surface_area"
     if process_type == "extracellular_enzyme_chain":
@@ -807,6 +908,8 @@ def _mechanism_law(process_type: str) -> str:
 def _mechanism_state_variables(process_type: str) -> tuple[str, ...]:
     if process_type == "homogeneous_michaelis_menten":
         return ("substrate", "product", "enzyme_or_vmax")
+    if process_type == "ph_ionization_michaelis_menten":
+        return ("substrate", "product", "enzyme")
     if process_type == "surface_catalysis":
         return ("solid_substrate", "free_catalyst", "product")
     if process_type == "extracellular_enzyme_chain":
@@ -843,6 +946,14 @@ def _mechanism_limitations(process_type: str) -> tuple[str, ...]:
     if process_type == "homogeneous_michaelis_menten":
         return (
             "Well-mixed homogeneous process only.",
+            "Not a whole-fungus physiology, secretion, uptake, or biomass model.",
+            "No empirical validation claim is implied by simulation output.",
+        )
+    if process_type == "ph_ionization_michaelis_menten":
+        return (
+            "Well-mixed homogeneous process only.",
+            "pH acts only through the source-fitted diprotic ionization factors over the measured pH range; "
+            "no buffer, ionic-strength, stability, or pH-dynamics effects, and temperature stays metadata.",
             "Not a whole-fungus physiology, secretion, uptake, or biomass model.",
             "No empirical validation claim is implied by simulation output.",
         )
@@ -2155,6 +2266,34 @@ def _limitation_rows(
                 "EnvironmentGrid",
             )
         )
+    if context.get("environment_effect_status") == "active_response_model":
+        response = dict(getattr(case, "environment_response", {}) or {})
+        conditions = response.get("conditions", {})
+        covered = ", ".join(sorted(str(name) for name in conditions)) if isinstance(conditions, Mapping) else ""
+        rows.append(
+            _limitation_row(
+                context,
+                "environment_effect",
+                "important",
+                (
+                    f"Environment response is active for {covered}: rates change with these conditions only "
+                    "through the explicit configured laws, each read once from the static environment. "
+                    "Every other environment condition is metadata, and the laws inherit the measured "
+                    "range and preparation of their source."
+                ),
+                "environment_response",
+            )
+        )
+        if not context.get("environment_comparison_allowed"):
+            rows.append(
+                _limitation_row(
+                    context,
+                    "environment_effect",
+                    "important",
+                    str(context.get("environment_guardrail", "")),
+                    "environment_response",
+                )
+            )
     for assumption in report.assumptions:
         rows.append(_limitation_row(context, "preflight", "info", assumption, "modelability"))
     for item in report.missing:
@@ -2172,7 +2311,17 @@ def _limitation_rows(
                 "parameter_records",
             )
         )
-    if case.process_type == "homogeneous_michaelis_menten":
+    if case.process_type == "ph_ionization_michaelis_menten":
+        rows.append(
+            _limitation_row(
+                context,
+                "ph_response",
+                "important",
+                "pH changes the kinetics only through the diprotic ionization factors fitted by the source over its measured pH range; buffer identity, ionic strength, pH-dependent stability, and temperature remain outside the law.",
+                case.process_type,
+            )
+        )
+    if case.process_type in {"homogeneous_michaelis_menten", "ph_ionization_michaelis_menten"}:
         rows.append(
             _limitation_row(
                 context,

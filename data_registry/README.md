@@ -10,6 +10,18 @@ fit (artifact path and SHA-256 in each record). Those constants authorize
 `scientific` simulation because they are exact and provenance-backed; they are
 not experimentally validated, and three of them sit at fitting bounds.
 
+The registry also holds the first case with an active environment-response
+law: *Phanerochaete chrysosporium* K-3 beta-glucosidase BGL1A on cellobiose,
+whose `ph_ionization_michaelis_menten` compatibility binds the six constants
+and the pH 4-8 range of SABIO-RK Reaction 618 entry 38522 (Tsukada et al.
+2008, PMID 18023045; raw export SHA-256 in every record) to the generic
+diprotic pH-dependent Michaelis-Menten law. Five environment records give the
+30 C assay at pH 4 to 8. The entry records no substrate or enzyme
+concentration, so the assay loadings are explicit `exploratory_prior`
+assumptions and the case runs in exploratory mode only; it is an
+enzyme-kinetics case, not a whole-fungus model, and temperature stays
+metadata for it.
+
 The registry layer is intended to support future modelability assessment and
 plug-and-play screening. It separates categorical facts, such as enzyme class
 and substrate class compatibility, from numeric value specifications.

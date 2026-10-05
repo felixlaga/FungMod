@@ -18,12 +18,22 @@ from fungal_model.processes.homogeneous import (
     HomogeneousMichaelisMentenProcess,
     MassActionProcess,
 )
+from fungal_model.processes.inactivation import (
+    THERMAL_INACTIVATION_PROCESS_TYPE,
+    ThermalInactivationProcess,
+)
+from fungal_model.processes.ionization import (
+    PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE,
+    PHIonizationMichaelisMentenProcess,
+)
 from fungal_model.processes.physiology import (
     PROPORTIONAL_SYNTHESIS_PROCESS_TYPE,
     ProportionalSynthesisProcess,
 )
 from fungal_model.processes.rate_modifiers import (
     RateModifierProcess,
+    cardinal_ph_modifier_from_config,
+    cardinal_temperature_modifier_from_config,
     competitive_inhibition_modifier_from_config,
     coupled_substrate_product_inhibition_modifier_from_config,
     oxygen_modifier_from_config,
@@ -237,6 +247,135 @@ class HomogeneousMichaelisMentenFactory:
             rate_units=str(parameters["rate_units"]),
             source=context.source,
             notes="Built from generic homogeneous Michaelis-Menten process config.",
+        )
+        return _apply_rate_modifiers(context, process_config, process)
+
+
+@dataclass(frozen=True)
+class PHIonizationMichaelisMentenFactory:
+    """Build enzyme-explicit Michaelis-Menten processes with diprotic pH-dependent constants."""
+
+    process_type: str = PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE
+
+    _REQUIRED_PARAMETER_FIELDS = (
+        "turnover",
+        "michaelis_constant",
+        "free_enzyme_lower_pk",
+        "free_enzyme_upper_pk",
+        "complex_lower_pk",
+        "complex_upper_pk",
+        "rate_units",
+    )
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        missing = _missing_config_fields(process_config, ("id", "states", "parameters"))
+        states = _mapping(getattr(process_config, "states", {}))
+        parameters = _mapping(getattr(process_config, "parameters", {}))
+        missing += _missing_mapping_fields(states, ("substrate", "enzyme"), prefix="states")
+        missing += _missing_mapping_fields(parameters, self._REQUIRED_PARAMETER_FIELDS, prefix="parameters")
+        incompatible: list[str] = []
+        if (parameters.get("minimum_ph") is None) != (parameters.get("maximum_ph") is None):
+            incompatible.append("parameters.minimum_ph_and_maximum_ph_must_be_given_together")
+        missing += tuple(
+            f"state_units.{state}"
+            for state in (states.get("substrate"), states.get("product"), states.get("enzyme"))
+            if state is not None and state not in context.state_units
+        )
+        product_map_id = getattr(process_config, "product_map", None)
+        if isinstance(product_map_id, str):
+            if product_map_id not in context.product_maps:
+                missing += (f"product_maps.{product_map_id}",)
+            else:
+                missing += tuple(
+                    f"state_units.{state}"
+                    for state in sorted(context.product_maps[product_map_id].species)
+                    if state not in context.state_units
+                )
+        return _decision(self, missing_fields=missing, incompatible_entities=incompatible)
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        _require_buildable(self.can_build(context, process_config))
+        states = _mapping(process_config.states)
+        parameters = _mapping(process_config.parameters)
+        substrate_state = str(states["substrate"])
+        enzyme_state = str(states["enzyme"])
+        product_map_id = getattr(process_config, "product_map", None)
+        product_coefficients = (
+            context.product_maps[product_map_id].products
+            if isinstance(product_map_id, str) and product_map_id in context.product_maps
+            else None
+        )
+        process = PHIonizationMichaelisMentenProcess(
+            name=process_config.id,
+            substrate_state=substrate_state,
+            enzyme_state=enzyme_state,
+            product_state=None if states.get("product") is None else str(states["product"]),
+            product_coefficients=product_coefficients,
+            substrate_units=context.state_units[substrate_state],
+            enzyme_units=context.state_units[enzyme_state],
+            rate_units=str(parameters["rate_units"]),
+            turnover_symbol=str(parameters["turnover"]),
+            michaelis_constant_symbol=str(parameters["michaelis_constant"]),
+            free_enzyme_lower_pk_symbol=str(parameters["free_enzyme_lower_pk"]),
+            free_enzyme_upper_pk_symbol=str(parameters["free_enzyme_upper_pk"]),
+            complex_lower_pk_symbol=str(parameters["complex_lower_pk"]),
+            complex_upper_pk_symbol=str(parameters["complex_upper_pk"]),
+            minimum_ph_symbol=None if parameters.get("minimum_ph") is None else str(parameters["minimum_ph"]),
+            maximum_ph_symbol=None if parameters.get("maximum_ph") is None else str(parameters["maximum_ph"]),
+            source=context.source,
+            notes="Built from generic pH-ionization Michaelis-Menten process config.",
+        )
+        return _apply_rate_modifiers(context, process_config, process)
+
+
+@dataclass(frozen=True)
+class ThermalInactivationFactory:
+    """Build generic first-order thermal inactivation processes."""
+
+    process_type: str = THERMAL_INACTIVATION_PROCESS_TYPE
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        missing = _missing_config_fields(process_config, ("id", "states", "parameters"))
+        states = _mapping(getattr(process_config, "states", {}))
+        parameters = _mapping(getattr(process_config, "parameters", {}))
+        missing += _missing_mapping_fields(states, ("active",), prefix="states")
+        missing += _missing_mapping_fields(
+            parameters,
+            ("reference_rate_constant", "inactivation_energy", "reference_temperature"),
+            prefix="parameters",
+        )
+        incompatible: list[str] = []
+        if (parameters.get("minimum_temperature") is None) != (parameters.get("maximum_temperature") is None):
+            incompatible.append("parameters.minimum_temperature_and_maximum_temperature_must_be_given_together")
+        missing += tuple(
+            f"state_units.{state}"
+            for state in (states.get("active"), states.get("inactive"))
+            if state is not None and state not in context.state_units
+        )
+        return _decision(self, missing_fields=missing, incompatible_entities=incompatible)
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        _require_buildable(self.can_build(context, process_config))
+        states = _mapping(process_config.states)
+        parameters = _mapping(process_config.parameters)
+        active_state = str(states["active"])
+        process = ThermalInactivationProcess(
+            name=process_config.id,
+            active_state=active_state,
+            inactive_state=None if states.get("inactive") is None else str(states["inactive"]),
+            state_units=context.state_units[active_state],
+            rate_units=None if parameters.get("rate_units") is None else str(parameters["rate_units"]),
+            reference_rate_constant_symbol=str(parameters["reference_rate_constant"]),
+            inactivation_energy_symbol=str(parameters["inactivation_energy"]),
+            reference_temperature_symbol=str(parameters["reference_temperature"]),
+            minimum_temperature_symbol=(
+                None if parameters.get("minimum_temperature") is None else str(parameters["minimum_temperature"])
+            ),
+            maximum_temperature_symbol=(
+                None if parameters.get("maximum_temperature") is None else str(parameters["maximum_temperature"])
+            ),
+            source=context.source,
+            notes="Built from generic thermal inactivation process config.",
         )
         return _apply_rate_modifiers(context, process_config, process)
 
@@ -470,9 +609,11 @@ def default_foundation_factories() -> tuple[ProcessFactory, ...]:
         FirstOrderFactory(),
         MassActionFactory(),
         HomogeneousMichaelisMentenFactory(),
+        PHIonizationMichaelisMentenFactory(),
         ProportionalSynthesisFactory(),
         SubstrateTransglycosylationFactory(),
         SurfaceCatalysisFactory(),
+        ThermalInactivationFactory(),
     )
 
 
@@ -549,6 +690,10 @@ def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> 
         return temperature_modifier_from_config(mapping)
     if modifier_type == "ph_gaussian":
         return ph_modifier_from_config(mapping)
+    if modifier_type == "temperature_cardinal_rosso":
+        return cardinal_temperature_modifier_from_config(mapping)
+    if modifier_type == "ph_cardinal_rosso":
+        return cardinal_ph_modifier_from_config(mapping)
     if modifier_type == "oxygen_monod":
         return oxygen_modifier_from_config(mapping)
     if modifier_type == "water_activity_threshold":

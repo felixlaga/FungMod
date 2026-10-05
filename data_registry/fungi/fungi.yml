@@ -96,3 +96,43 @@ records:
       loss). Nutrient and oxygen limitation, maintenance, soluble intermediates,
       morphology and pH dynamics are not represented. Assimilable products are not
       characterized by the source and are left empty rather than guessed.
+
+  - record_id: phanerochaete_chrysosporium_k3
+    name: Phanerochaete chrysosporium K-3 (BGL1A enzyme source)
+    display_name: P. chrysosporium K-3
+    scientific_name: Phanerochaete chrysosporium
+    aliases:
+      - P. chrysosporium
+      - Phanerochaete chrysosporium
+      - P. chrysosporium K-3
+      - BGL1A source
+    maturity: literature_metadata
+    provenance:
+      source: >-
+        SABIO-RK Reaction 618 kinetic-law entry 38522 (organism Phanerochaete
+        chrysosporium, strain K-3, NCBI taxonomy 5306; recombinant GH1
+        beta-glucosidase BGL1A, UniProt Q25BW5, expressed in Escherichia coli
+        Rosetta DE3), reporting Tsukada T, Igarashi K, Fushinobu S, Samejima M
+        (2008) Role of subsite +1 residues in pH dependence and catalytic activity
+        of the glycoside hydrolase family 1 beta-glucosidase BGL1A from the
+        basidiomycete Phanerochaete chrysosporium. Biotechnol Bioeng 99:1295-1302,
+        PMID 18023045.
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      raw_export: data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/raw/kinlaw_entries_reaction_618.json
+      raw_export_sha256: a5e7ae132382e3afadcb08f1a37204fc7325fef7d02a7c455d54d7c1811ce904
+      confidence_level: literature_curated
+      notes: >-
+        Enzyme-source organism record. The registry case reachable from it is the
+        kinetics of recombinant BGL1A on cellobiose with the source-fitted pH
+        dependence; it is not a whole-fungus growth, secretion, uptake, or
+        wood-decay model.
+    enzyme_classes:
+      - beta_glucosidase
+    assimilable_products: []
+    notes: >-
+      White-rot basidiomycete strain K-3 named by the source as the origin of the
+      GH1 beta-glucosidase BGL1A. Only the enzyme class with a sourced kinetic law
+      is listed; the organism's other activities are not characterized in the
+      registry and are not guessed.

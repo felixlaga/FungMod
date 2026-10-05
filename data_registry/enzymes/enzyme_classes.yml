@@ -53,6 +53,7 @@ records:
       - cellobiose
     compatible_processes:
       - homogeneous_michaelis_menten
+      - ph_ionization_michaelis_menten
     notes: First real enzyme-class registry record for soluble beta-glucoside hydrolysis; not full cellulose degradation.
 
   - record_id: cellulase_total_filter_paper_activity

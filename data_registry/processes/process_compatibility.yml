@@ -238,3 +238,55 @@ records:
       cellulose. Every role resolves to an exact registry record: nine
       retrospectively calibrated constants and four deposited initial conditions.
       The case is exact and implemented, not experimentally validated.
+
+  - record_id: phanerochaete_bgl1a_cellobiose_ph_ionization_mm
+    name: P. chrysosporium BGL1A on cellobiose, pH-dependent Michaelis-Menten (Tsukada 2008 via SABIO-RK)
+    maturity: literature_metadata
+    provenance:
+      source: >-
+        SABIO-RK Reaction 618 kinetic-law entry 38522: Michaelis-Menten
+        (pH-dependent), kinetic-law type 24, recombinant BGL1A wild type on
+        cellobiose, pH 4-8 at 30 C (Tsukada et al. 2008, PMID 18023045).
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      confidence_level: literature_metadata
+      notes: >-
+        Binds the generic ph_ionization_michaelis_menten process law to the
+        source-fitted constants. The law reads the environment pH; the pH-range
+        roles carry the measured range so that cases outside pH 4-8 warn.
+        Temperature is metadata for this record.
+    enzyme_class: beta_glucosidase
+    substrate_class: cellobiose
+    required_bond_classes:
+      - beta_1_4_glycosidic
+    process_type: ph_ionization_michaelis_menten
+    required_parameters:
+      - bgl1a_k0_cellobiose
+      - bgl1a_Km0_cellobiose
+      - bgl1a_pKe1
+      - bgl1a_pKe2
+      - bgl1a_pKes1
+      - bgl1a_pKes2
+      - bgl1a_ph_series_minimum
+      - bgl1a_ph_series_maximum
+      - bgl1a_assay_initial_cellobiose_concentration
+      - bgl1a_assay_enzyme_concentration
+    parameter_roles:
+      turnover: bgl1a_k0_cellobiose
+      michaelis_constant: bgl1a_Km0_cellobiose
+      free_enzyme_lower_pk: bgl1a_pKe1
+      free_enzyme_upper_pk: bgl1a_pKe2
+      complex_lower_pk: bgl1a_pKes1
+      complex_upper_pk: bgl1a_pKes2
+      minimum_ph: bgl1a_ph_series_minimum
+      maximum_ph: bgl1a_ph_series_maximum
+      substrate_initial_concentration: bgl1a_assay_initial_cellobiose_concentration
+      enzyme_initial_concentration: bgl1a_assay_enzyme_concentration
+    product_map_required: true
+    case_template_id: phanerochaete_bgl1a_cellobiose_ph_ionization_template
+    notes: >-
+      First registry case with an active environment-response law. The six
+      kinetic constants and the pH range are exact source values; the assay
+      loadings are explicit exploratory assumptions, so the case runs in
+      exploratory mode only.

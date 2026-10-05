@@ -917,3 +917,74 @@ records:
       Culture-physiology template composing the Gelain 2020 hydrolysis candidate
       from generic process laws. It names roles only; organism identity, constants
       and initial conditions come from the bound registry records.
+
+  - record_id: phanerochaete_bgl1a_cellobiose_ph_ionization_template
+    case_template_id: phanerochaete_bgl1a_cellobiose_ph_ionization_template
+    name: P. chrysosporium BGL1A cellobiose pH-dependent Michaelis-Menten assembly template
+    maturity: literature_metadata
+    provenance:
+      source: SABIO-RK Reaction 618 kinetic-law entry 38522 (Tsukada et al. 2008, PMID 18023045)
+      source_database: SABIO-RK
+      source_reaction_id: "618"
+      selected_kinlaw_entry_id: "38522"
+      confidence_level: literature_metadata
+      notes: Assembly metadata for the BGL1A pH-response case; it creates no parameter evidence.
+    schema_version: "1"
+    process_type: ph_ionization_michaelis_menten
+    state_roles:
+      substrate: cellobiose_concentration
+      product: beta_D_glucose_concentration
+      enzyme: bgl1a_concentration
+    initial_state_mapping:
+      substrate:
+        parameter_role: substrate_initial_concentration
+        units_from_role: substrate_initial_concentration
+      product:
+        value: 0.0
+        units_from_role: substrate_initial_concentration
+      enzyme:
+        parameter_role: enzyme_initial_concentration
+        units_from_role: enzyme_initial_concentration
+    product_map:
+      id: phanerochaete_bgl1a_cellobiose_product_map
+      product_map_type: stoichiometric
+      substrate_state_role: substrate
+      product_state_role: product
+      stoichiometric_yield: 2.0
+      notes: Reaction 618 stoichiometry (cellobiose + H2O -> 2 beta-D-glucose).
+    stoichiometric_yields:
+      product: 2.0
+    time_grid:
+      start: 0.0
+      stop: 14400.0
+      points: 145
+      units: second
+    observable_roles:
+      - substrate
+      - product
+      - enzyme
+      - degradation_rate
+      - product_release_rate
+    output_state_roles:
+      substrate: cellobiose_concentration
+      product: beta_D_glucose_concentration
+      enzyme: bgl1a_concentration
+    process_state_metadata:
+      config_name: "P. chrysosporium BGL1A cellobiose pH-dependent Michaelis-Menten (Tsukada 2008 via SABIO-RK)"
+      config_mode: scientific
+      config_maturity: scientific
+      process_id: phanerochaete_bgl1a_ph_ionization_mm
+      parameter_set_id: phanerochaete_bgl1a_parameters
+      product_map_name: BGL1A cellobiose to beta-D-glucose product map
+      public_path: true
+    limitations:
+      - Dissolved homogeneous Michaelis-Menten kinetics with the source-fitted diprotic pH dependence of kcat and Km; pH is read once from the environment.
+      - This is an enzyme-kinetics case for recombinant BGL1A, not a whole-fungus growth, secretion, uptake, or wood-decay model.
+      - The assay substrate and enzyme loadings are explicit exploratory assumptions because SABIO-RK entry 38522 records no concentrations; the case therefore runs in exploratory mode only.
+      - Temperature is the 30 C set point of the source; no temperature response law is bound, so temperature stays metadata and cases at other temperatures cannot be ranked by temperature.
+    validity_notes:
+      - The pH law was fitted over pH 4-8 in four buffers (sodium acetate, MES, HEPES, EPPS); the bound pH-range roles make cases outside that range warn rather than fail.
+      - The 2:1 glucose yield is reaction stoichiometry; the source reports initial rates, not product time courses.
+    notes: >
+      Template describing how the BGL1A pH-response registry case is assembled.
+      It does not fetch SABIO-RK data and does not create parameter evidence.

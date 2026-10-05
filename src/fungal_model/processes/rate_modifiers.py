@@ -12,6 +12,8 @@ from fungal_model.core.kernels import KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity
 from fungal_model.modifiers import (
+    CardinalPHModifier,
+    CardinalTemperatureModifier,
     CompetitiveInhibitionModifier,
     CoupledSubstrateProductInhibitionModifier,
     OxygenModifier,
@@ -383,6 +385,68 @@ def temperature_modifier_from_config(modifier_config: Mapping[str, Any]) -> Temp
     )
 
 
+def cardinal_temperature_modifier_from_config(
+    modifier_config: Mapping[str, Any],
+) -> CardinalTemperatureModifier:
+    """Build a Rosso cardinal-temperature modifier from explicit config fields."""
+
+    modifier_type = "temperature_cardinal_rosso"
+    return CardinalTemperatureModifier(
+        minimum_temperature_symbol=_required_symbol(
+            modifier_config,
+            "minimum_temperature_symbol",
+            "minimum_temperature",
+            field_name="minimum_temperature_symbol",
+            modifier_type=modifier_type,
+        ),
+        optimum_temperature_symbol=_required_symbol(
+            modifier_config,
+            "optimum_temperature_symbol",
+            "optimum_temperature",
+            field_name="optimum_temperature_symbol",
+            modifier_type=modifier_type,
+        ),
+        maximum_temperature_symbol=_required_symbol(
+            modifier_config,
+            "maximum_temperature_symbol",
+            "maximum_temperature",
+            field_name="maximum_temperature_symbol",
+            modifier_type=modifier_type,
+        ),
+        source=_modifier_source(modifier_config, "Explicit configured Rosso cardinal temperature modifier."),
+    )
+
+
+def cardinal_ph_modifier_from_config(modifier_config: Mapping[str, Any]) -> CardinalPHModifier:
+    """Build a Rosso cardinal-pH modifier from explicit config fields."""
+
+    modifier_type = "ph_cardinal_rosso"
+    return CardinalPHModifier(
+        minimum_ph_symbol=_required_symbol(
+            modifier_config,
+            "minimum_ph_symbol",
+            "minimum_ph",
+            field_name="minimum_ph_symbol",
+            modifier_type=modifier_type,
+        ),
+        optimum_ph_symbol=_required_symbol(
+            modifier_config,
+            "optimum_ph_symbol",
+            "optimum_ph",
+            field_name="optimum_ph_symbol",
+            modifier_type=modifier_type,
+        ),
+        maximum_ph_symbol=_required_symbol(
+            modifier_config,
+            "maximum_ph_symbol",
+            "maximum_ph",
+            field_name="maximum_ph_symbol",
+            modifier_type=modifier_type,
+        ),
+        source=_modifier_source(modifier_config, "Explicit configured Rosso cardinal pH modifier."),
+    )
+
+
 def ph_modifier_from_config(modifier_config: Mapping[str, Any]) -> PHModifier:
     """Build a Gaussian pH modifier from explicit config fields."""
 
@@ -502,6 +566,7 @@ def _required_state_variables(
 
 def _modifier_limitations(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
     limitations = ["Rate is scaled only by explicitly configured generic modifiers."]
+    limitations.extend(_cardinal_modifier_limitations(modifiers))
     if any(isinstance(modifier, ProductInhibitionModifier) for modifier in modifiers):
         limitations.append("Product inhibition support is single-product reversible inhibition only.")
     if any(isinstance(modifier, CompetitiveInhibitionModifier) for modifier in modifiers):
@@ -542,6 +607,21 @@ def _modifier_limitations(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
         limitations.append(
             "Water-activity scaling uses the existing threshold modifier and requires "
             "explicit environment water activity plus a configured threshold parameter."
+        )
+    return tuple(limitations)
+
+
+def _cardinal_modifier_limitations(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
+    limitations: list[str] = []
+    if any(isinstance(modifier, CardinalTemperatureModifier) for modifier in modifiers):
+        limitations.append(
+            "Temperature scaling uses the Rosso cardinal temperature model: an empirical growth-level "
+            "shape with zero activity outside the cardinal range and no thermal-history or injury effects."
+        )
+    if any(isinstance(modifier, CardinalPHModifier) for modifier in modifiers):
+        limitations.append(
+            "pH scaling uses the Rosso cardinal pH model: an empirical growth-level shape with zero "
+            "activity outside the cardinal range and no ionization, buffer, or ionic-strength chemistry."
         )
     return tuple(limitations)
 
@@ -616,7 +696,17 @@ def _modifier_failure_modes(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
 
 def _requires_environment(modifiers: tuple[Any, ...]) -> bool:
     return any(
-        isinstance(modifier, (TemperatureModifier, PHModifier, OxygenModifier, WaterActivityModifier))
+        isinstance(
+            modifier,
+            (
+                TemperatureModifier,
+                PHModifier,
+                OxygenModifier,
+                WaterActivityModifier,
+                CardinalTemperatureModifier,
+                CardinalPHModifier,
+            ),
+        )
         for modifier in modifiers
     )
 
@@ -709,6 +799,34 @@ def _required_parameters(
                         name="Arrhenius validity temperature bound",
                         description="Optional explicit temperature bound for configured Arrhenius scaling.",
                     )
+        elif isinstance(modifier, CardinalTemperatureModifier):
+            for symbol, name in (
+                (modifier.minimum_temperature_symbol, "cardinal minimum temperature"),
+                (modifier.optimum_temperature_symbol, "cardinal optimum temperature"),
+                (modifier.maximum_temperature_symbol, "cardinal maximum temperature"),
+            ):
+                _add_requirement(
+                    requirements,
+                    existing_units,
+                    symbol=symbol,
+                    units="kelvin",
+                    name=name,
+                    description="Cardinal temperature of the explicit configured Rosso CTMI modifier.",
+                )
+        elif isinstance(modifier, CardinalPHModifier):
+            for symbol, name in (
+                (modifier.minimum_ph_symbol, "cardinal minimum pH"),
+                (modifier.optimum_ph_symbol, "cardinal optimum pH"),
+                (modifier.maximum_ph_symbol, "cardinal maximum pH"),
+            ):
+                _add_requirement(
+                    requirements,
+                    existing_units,
+                    symbol=symbol,
+                    units="dimensionless",
+                    name=name,
+                    description="Cardinal pH of the explicit configured Rosso CPM modifier.",
+                )
         elif isinstance(modifier, PHModifier):
             _add_requirement(
                 requirements,

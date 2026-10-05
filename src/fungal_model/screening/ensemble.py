@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import product
 import json
 from pathlib import Path
@@ -102,6 +102,8 @@ class RegistryCaseEnsemble:
     modelability_report: ModelabilityReport
     samples: tuple[EnsembleSample, ...]
     sample_failures: tuple[EnsembleSampleFailure, ...] = ()
+    environment_response: Mapping[str, Any] = field(default_factory=dict)
+    """Environment-response summary of the assembled config (``provenance.environment_response``)."""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -112,6 +114,7 @@ class RegistryCaseEnsemble:
             "modelability_report": self.modelability_report.to_dict(),
             "samples": [sample.to_dict() for sample in self.samples],
             "sample_failures": [failure.to_dict() for failure in self.sample_failures],
+            "environment_response": dict(self.environment_response),
         }
 
 
@@ -282,6 +285,7 @@ def _run_case_samples(
 ) -> RegistryCaseEnsemble:
     samples: list[EnsembleSample] = []
     failures: list[EnsembleSampleFailure] = []
+    environment_response: dict[str, Any] = {}
     case_dir = output_root / f"{fungus_id}__{substrate_id}__{environment_id}"
     for sample_index in range(n_samples):
         sample_dir = case_dir / f"sample_{sample_index:04d}"
@@ -300,6 +304,7 @@ def _run_case_samples(
                 sampled_records=sampled_records,
                 sample_dir=sample_dir,
             )
+            environment_response = _environment_response(config)
             samples.append(
                 _run_sample(
                     config=config,
@@ -332,6 +337,7 @@ def _run_case_samples(
         modelability_report=report,
         samples=tuple(samples),
         sample_failures=tuple(failures),
+        environment_response=environment_response,
     )
 
 
@@ -358,6 +364,7 @@ def _run_scientific_case_sample(
             role_records=role_records,
             sample_dir=sample_dir,
         )
+        environment_response = _environment_response(config)
         sample = _run_sample(
             config=config,
             sample_dir=sample_dir,
@@ -389,7 +396,18 @@ def _run_scientific_case_sample(
         modelability_report=report,
         samples=samples,
         sample_failures=failures,
+        environment_response=environment_response,
     )
+
+
+def _environment_response(config: ModelConfig) -> dict[str, Any]:
+    """Return the assembled config's environment-response summary, or an empty mapping."""
+
+    provenance = config.raw.get("provenance", {})
+    if not isinstance(provenance, Mapping):
+        return {}
+    response = provenance.get("environment_response", {})
+    return dict(response) if isinstance(response, Mapping) else {}
 
 
 def _resolve_role_records(

@@ -255,6 +255,12 @@ def _configured_process_modifiers(config: ModelConfig) -> list[dict[str, Any]]:
 def _configured_process_laws(config: ModelConfig) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for process in config.processes:
+        if process.process_type == "ph_ionization_michaelis_menten":
+            rows.append(_ph_ionization_law_row(process))
+            continue
+        if process.process_type == "thermal_inactivation":
+            rows.append(_thermal_inactivation_law_row(process))
+            continue
         if process.process_type != "substrate_transglycosylation":
             continue
         raw = process.raw or {}
@@ -433,6 +439,46 @@ def _configured_process_modifier_row(
                 ),
             }
         )
+    elif modifier_type == "temperature_cardinal_rosso":
+        row.update(
+            {
+                "environment_value": "temperature",
+                "minimum_temperature_symbol": modifier.get(
+                    "minimum_temperature_symbol", modifier.get("minimum_temperature", "")
+                ),
+                "optimum_temperature_symbol": modifier.get(
+                    "optimum_temperature_symbol", modifier.get("optimum_temperature", "")
+                ),
+                "maximum_temperature_symbol": modifier.get(
+                    "maximum_temperature_symbol", modifier.get("maximum_temperature", "")
+                ),
+                "maturity": "configured_temperature_response_law",
+                "equation": (
+                    "gamma_T = (T-Tmax)(T-Tmin)^2 / {(Topt-Tmin)[(Topt-Tmin)(T-Topt) - (Topt-Tmax)(Topt+Tmin-2T)]}"
+                ),
+                "limitation": (
+                    "Rosso cardinal temperature scaling only; configured only when environment temperature "
+                    "and three explicit unit-compatible cardinal temperatures are present. Zero activity "
+                    "outside the cardinal range; no thermal history, injury, or mechanistic basis."
+                ),
+            }
+        )
+    elif modifier_type == "ph_cardinal_rosso":
+        row.update(
+            {
+                "environment_value": "ph",
+                "minimum_ph_symbol": modifier.get("minimum_ph_symbol", modifier.get("minimum_ph", "")),
+                "optimum_ph_symbol": modifier.get("optimum_ph_symbol", modifier.get("optimum_ph", "")),
+                "maximum_ph_symbol": modifier.get("maximum_ph_symbol", modifier.get("maximum_ph", "")),
+                "maturity": "configured_ph_response_law",
+                "equation": "gamma_pH = (pH-pHmin)(pH-pHmax) / [(pH-pHmin)(pH-pHmax) - (pH-pHopt)^2]",
+                "limitation": (
+                    "Rosso cardinal pH scaling only; configured only when environment pH and three explicit "
+                    "cardinal pH values are present. Zero activity outside the cardinal range; no ionization, "
+                    "buffer, or ionic-strength chemistry."
+                ),
+            }
+        )
     elif modifier_type == "oxygen_monod":
         row.update(
             {
@@ -474,6 +520,57 @@ def _configured_process_modifier_row(
             }
         )
     return row
+
+
+def _ph_ionization_law_row(process: Any) -> dict[str, Any]:
+    parameters = process.parameters
+    return {
+        "process_id": process.id,
+        "type": process.process_type,
+        "environment_value": "ph",
+        "substrate_state": process.states.get("substrate", ""),
+        "enzyme_state": process.states.get("enzyme", ""),
+        "turnover": parameters.get("turnover", ""),
+        "michaelis_constant": parameters.get("michaelis_constant", ""),
+        "free_enzyme_lower_pk": parameters.get("free_enzyme_lower_pk", ""),
+        "free_enzyme_upper_pk": parameters.get("free_enzyme_upper_pk", ""),
+        "complex_lower_pk": parameters.get("complex_lower_pk", ""),
+        "complex_upper_pk": parameters.get("complex_upper_pk", ""),
+        "minimum_ph": parameters.get("minimum_ph", ""),
+        "maximum_ph": parameters.get("maximum_ph", ""),
+        "maturity": "configured_ph_response_law",
+        "equation": (
+            "v = E*(k0/f_es(pH))*S/(Km0*f_e(pH)/f_es(pH) + S); "
+            "f(pH) = (10^(pK_low - pH) + 1)*(10^(pH - pK_high) + 1)"
+        ),
+        "limitation": (
+            "Diprotic ionization pH dependence of kcat and Km read once from the static environment; "
+            "fitted over the source pH range with several buffers, no buffer, ionic-strength, "
+            "stability, or pH-dynamics effects."
+        ),
+    }
+
+
+def _thermal_inactivation_law_row(process: Any) -> dict[str, Any]:
+    parameters = process.parameters
+    return {
+        "process_id": process.id,
+        "type": process.process_type,
+        "environment_value": "temperature",
+        "active_state": process.states.get("active", ""),
+        "inactive_state": process.states.get("inactive", ""),
+        "reference_rate_constant": parameters.get("reference_rate_constant", ""),
+        "inactivation_energy": parameters.get("inactivation_energy", ""),
+        "reference_temperature": parameters.get("reference_temperature", ""),
+        "minimum_temperature": parameters.get("minimum_temperature", ""),
+        "maximum_temperature": parameters.get("maximum_temperature", ""),
+        "maturity": "configured_temperature_response_law",
+        "equation": "dA/dt = -k_d,ref*exp(-(E_d/R)*(1/T - 1/T_ref))*A",
+        "limitation": (
+            "Irreversible first-order loss with an Arrhenius-scaled constant read once from the static "
+            "environment; no reversible unfolding, proteolysis, stabilizer, or pH-stability effects."
+        ),
+    }
 
 
 def _validation_summary(result: SimulationResult) -> dict[str, Any]:

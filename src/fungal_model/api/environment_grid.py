@@ -39,7 +39,10 @@ class EnvironmentCase:
                 units=self.temperature_units,
                 source="FungMod runtime EnvironmentGrid",
                 confidence_level="runtime_metadata",
-                notes="Runtime virtual-experiment environment metadata; no response law is implied.",
+                notes=(
+                    "Runtime virtual-experiment temperature; it changes rates only through a "
+                    "response law bound by the case template."
+                ),
             )
         if self.ph is not None:
             conditions["ph"] = ValueSpec(
@@ -48,7 +51,10 @@ class EnvironmentCase:
                 units="dimensionless",
                 source="FungMod runtime EnvironmentGrid",
                 confidence_level="runtime_metadata",
-                notes="Runtime virtual-experiment pH metadata; no response law is implied.",
+                notes=(
+                    "Runtime virtual-experiment pH; it changes rates only through a response law "
+                    "bound by the case template."
+                ),
             )
         if self.oxygen:
             conditions["oxygen"] = ValueSpec(
@@ -75,8 +81,9 @@ class EnvironmentCase:
             provenance=provenance,
             notes=(
                 "Generated in memory for a virtual experiment. This record is not "
-                "written to data_registry and does not imply an environmental "
-                "response model."
+                "written to data_registry. Its environment_effect_status is the status "
+                "before case assembly; a response law bound by the case template raises "
+                "the assembled case to active_response_model."
             ),
             conditions=conditions,
         )
@@ -96,11 +103,12 @@ class EnvironmentCase:
 
 @dataclass(frozen=True)
 class EnvironmentGrid:
-    """API placeholder for future environment grids.
+    """Registry environment IDs or a numeric temperature/pH/oxygen grid.
 
-    API-001 supports registry-backed environment IDs. Numeric grids are kept as
-    explicit metadata for later milestones, but are not converted into new
-    environment records here.
+    Numeric grid values become in-memory environment records. They change
+    rates only when the selected case template binds a response law or process
+    law that reads the condition; otherwise the assembled case reports
+    ``metadata_only`` and environment ranking stays blocked.
     """
 
     environment_ids: tuple[str, ...] = ()
@@ -157,8 +165,9 @@ class EnvironmentGrid:
                     "generated_by": "EnvironmentGrid",
                     "notes": (
                         "Runtime environment case for virtual-experiment screening. "
-                        "Temperature and pH are metadata unless an explicit response law "
-                        "or condition-specific parameter record is active."
+                        "Temperature and pH are metadata unless the case template binds an "
+                        "explicit response law or a condition-specific parameter record applies; "
+                        "the assembled case reports the resulting environment_effect_status."
                     ),
                 },
             )
