@@ -32,7 +32,10 @@ independent and validates no biology.
   `report.md`, `inputs.json`, `artifacts.json`). M2 recorded 2026-10-05: not
   converged by the declared rule, so its verdicts are provisional; R2 and R3
   fail (multiplier [1.65, 2.87]; `mu`, `Ks`, `Ki` prior dominated, `P0`
-  bounded below only); outcome not supported (fails R1). M1 and M3 follow.
+  bounded below only); outcome not supported (fails R1). M1 recorded
+  2026-10-05: not converged, provisional; R2 fails (multiplier [1.87, 2.53]),
+  R3 passes (`kz_loss` weakly identified); outcome not supported (fails R1).
+  M3 follows.
 
 What exists today for each model: M0 is the registry case; M1 and M2 are
 compositions of existing generic processes (proportional synthesis, first

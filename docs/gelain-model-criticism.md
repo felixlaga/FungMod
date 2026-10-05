@@ -145,8 +145,22 @@ Outputs live in `results/stage_b/<model>/` (`bayesian_calibration.json`,
   substrate and beta-glucosidase 24 of 24, cellulase 23 of 24). Outcome in the
   plan's vocabulary: **not supported (fails R1)**, with the provisional R2 and
   R3 verdicts recorded alongside.
-- `M1_induction_state`, `M3_conversion_dependent_accessibility`: running;
-  recorded here when their chains complete.
+- `M1_induction_state` (24 walkers, 11 coordinates): **not converged**,
+  verdicts **provisional**. Autocorrelation times 267 to 340 steps against
+  6000 post-burn-in steps, effective sample sizes 423 to 540, mean acceptance
+  0.264, 49 minutes of wall-clock. R2 fails: the multiplier's interval is
+  [1.87, 2.53] (median 2.16), indistinguishable from the baseline's 2.25, so
+  the induced state does not change the misfit level. R3 passes: the added
+  memory constant `kz_loss` is weakly identified (median 0.053 per hour,
+  interval [0.024, 0.58], 35 percent of the prior width). Of the common
+  constants `Y`, `kd`, `qF` and `qB` stay identified (`qF` and `qB` now
+  scale the induced pool, medians 0.60 and 1.41), `k_h`, `Kh` and `kz_loss`
+  are weakly identified, `K_ind` is bounded above only and `kF`, `kB` prior
+  dominated. Coverage 91 of 96 (cellulase 19 of 24). Outcome: **not
+  supported (fails R1)**; its R3 pass is the one added parameter the data
+  constrain among the three mechanisms.
+- `M3_conversion_dependent_accessibility`: running; recorded here when its
+  chain completes.
 - `M0_baseline`: BAYES-001's frozen chain (converged; five constants
   identified, four bounded on one side; multiplier 2.25).
 

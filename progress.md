@@ -123,12 +123,12 @@ Results (stage A, recorded 2026-10-05, plan digest `9bb36f8d53d8...`):
 Next task: finish stage B within the compute cap, record identifiability and
 coverage for each addition, and carry the verdicts into the paper plan.
 
-## CRIT-002 Gelain Model-Criticism Study: Stage B Posteriors (M2 Recorded)
+## CRIT-002 Gelain Model-Criticism Study: Stage B Posteriors (M2 And M1 Recorded)
 
 Date: 2026-10-05
 
-Status: partial. The M2 all-condition posterior is recorded under the frozen
-plan (digest `6849c8b3...`); M1 and M3 chains are running; M0 reuses
+Status: partial. The M2 and M1 all-condition posteriors are recorded under
+the frozen plan (digest `6849c8b3...`); the M3 chain is running; M0 reuses
 BAYES-001. Two code defects found while recording are fixed and tested.
 
 Changed:
@@ -165,13 +165,24 @@ fails (`mu`, `Ks`, `Ki` prior dominated; `P0` bounded below only, median
 bounded above only; `Y`, `kF` prior dominated. Coverage 95/96 at 95 percent
 with measurement noise. Outcome: not supported (fails R1).
 
+M1 result (`results/stage_b/M1_induction_state/`, 24 walkers, 8000 steps,
+49 min wall-clock): not converged (tau 267 to 340 with 6000 post-burn-in
+steps; ESS 423 to 540; mean acceptance 0.264), verdicts provisional. R2
+fails (multiplier median 2.16, interval [1.87, 2.53]; baseline 2.25). R3
+passes: `kz_loss` weakly identified (median 0.053 per hour, interval
+[0.024, 0.58]). Common constants: `Y`, `kd`, `qF`, `qB` identified; `k_h`,
+`Kh` weakly identified; `K_ind` bounded above only; `kF`, `kB` prior
+dominated. Coverage 91/96 (cellulase 19/24). Outcome: not supported (fails
+R1). The chain's report was re-rendered after the renderer fix; the
+sampler and analysis outputs are those of the single run.
+
 Commands: `ruff check` passed; `pyright` 0 errors; criticism tests (see the
 PR). Scientific impact: the soluble-pool mechanism neither restores adequacy
 nor is identified by the duplicate means; nothing is promoted. Backward
 compatibility: `write_posterior_outputs` writes one more file. Risk: low.
 
-Recommended next task: record M1 and M3 when their chains complete, then
-tighten the stage A optimiser under an amendment (PETAB-001 finding).
+Recommended next task: record M3 when its chain completes, then tighten
+the stage A optimiser under an amendment (PETAB-001 finding).
 
 ## CI-001 Cross-Platform Quality-Gate Repair
 
