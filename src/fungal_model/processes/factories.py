@@ -39,6 +39,7 @@ from fungal_model.processes.rate_modifiers import (
     oxygen_modifier_from_config,
     ph_modifier_from_config,
     product_inhibition_modifier_from_config,
+    substrate_reactivity_modifier_from_config,
     substrate_inhibition_modifier_from_config,
     temperature_modifier_from_config,
     water_activity_modifier_from_config,
@@ -671,6 +672,8 @@ def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> 
     modifier_type = str(mapping.get("type") or mapping.get("modifier_type") or "").strip()
     if modifier_type == "product_inhibition":
         return product_inhibition_modifier_from_config(mapping, state_units=context.state_units)
+    if modifier_type == "substrate_reactivity":
+        return substrate_reactivity_modifier_from_config(mapping, state_units=context.state_units)
     if modifier_type == "competitive_inhibition":
         return competitive_inhibition_modifier_from_config(
             mapping,

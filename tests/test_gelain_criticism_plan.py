@@ -14,7 +14,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "data/benchmarks/gelain_2020_criticism/plan.json"
-FROZEN_SHA256 = "8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e"
+FROZEN_SHA256 = "9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e"
 COMMON_SYMBOLS = {"k_h", "Kh", "Y", "kd", "K_ind", "qF", "kF", "qB", "kB"}
 EXPECTED_PARAMETER_COUNTS = {
     "M0_baseline": 9,
@@ -33,9 +33,10 @@ def test_plan_digest_is_the_frozen_one() -> None:
     assert hashlib.sha256(PLAN_PATH.read_bytes()).hexdigest() == FROZEN_SHA256
 
 
-def test_plan_is_frozen_unrun_and_unamended(plan) -> None:
+def test_plan_is_frozen_unrun_and_its_amendment_log_is_dated(plan) -> None:
     assert plan["status"].startswith("plan frozen")
-    assert plan["amendments"] == []
+    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [("2026-10-05", "8b368ac8")]
+    assert "error_model_fields" in plan["shared_structure"]
     assert not (PLAN_PATH.parent / "results").exists()
 
 

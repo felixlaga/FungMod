@@ -16,7 +16,7 @@ independent and validates no biology.
   whole-condition holdouts, complexity screen, profiles), stage B (posterior
   sampling, identifiability, posterior predictive coverage), the decision rules
   R1 to R4, the outcome vocabulary, the claims excluded and the amendment rule.
-  Frozen on 2026-10-05 with SHA-256 `8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e`;
+  Frozen on 2026-10-05 with SHA-256 `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e`;
   `tests/test_gelain_criticism_plan.py` pins it.
 - `results/`: absent until the study runs. Every run must cite this plan's
   digest and record any amendment first.

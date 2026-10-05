@@ -46,6 +46,17 @@
       "rtol": 1e-10,
       "atol": 1e-12,
       "maximum_scaled_difference": 1e-05
+    },
+    "error_model_fields": {
+      "relative_sd_to_training_max": 0.1,
+      "rho_biomass_substrate": -0.5,
+      "evidence": "assumed",
+      "noise_scale": {
+        "structure": "shared",
+        "lower": 0.1,
+        "upper": 10.0,
+        "label": "all_observables"
+      }
     }
   },
   "models": {
@@ -59,63 +70,72 @@
           "lower": 1e-06,
           "upper": 1.0,
           "units": "gram/gelain_fpu/hour",
-          "role": "hydrolysis_capacity"
+          "role": "hydrolysis_capacity",
+          "config_symbol": "gelain_hydrolysis_k_h"
         },
         {
           "symbol": "Kh",
           "lower": 0.001,
           "upper": 100.0,
           "units": "gram/liter",
-          "role": "hydrolysis_half_saturation"
+          "role": "hydrolysis_half_saturation",
+          "config_symbol": "gelain_hydrolysis_Kh"
         },
         {
           "symbol": "Y",
           "lower": 0.01,
           "upper": 1.0,
           "units": "dimensionless",
-          "role": "biomass_yield"
+          "role": "biomass_yield",
+          "config_symbol": "gelain_hydrolysis_Y"
         },
         {
           "symbol": "kd",
           "lower": 1e-05,
           "upper": 0.5,
           "units": "1/hour",
-          "role": "biomass_loss_rate"
+          "role": "biomass_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kd"
         },
         {
           "symbol": "K_ind",
           "lower": 0.01,
           "upper": 100.0,
           "units": "gram/liter",
-          "role": "induction_half_saturation"
+          "role": "induction_half_saturation",
+          "config_symbol": "gelain_hydrolysis_K_ind"
         },
         {
           "symbol": "qF",
           "lower": 0.01,
           "upper": 1000.0,
           "units": "gelain_fpu/gram/hour",
-          "role": "cellulase_specific_production_rate"
+          "role": "cellulase_specific_production_rate",
+          "config_symbol": "gelain_hydrolysis_qF"
         },
         {
           "symbol": "kF",
           "lower": 1e-06,
           "upper": 0.1,
           "units": "1/hour",
-          "role": "cellulase_loss_rate"
+          "role": "cellulase_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kF"
         },
         {
           "symbol": "qB",
           "lower": 0.01,
           "upper": 3000.0,
           "units": "gelain_beta_u/gram/hour",
-          "role": "beta_glucosidase_specific_production_rate"
+          "role": "beta_glucosidase_specific_production_rate",
+          "config_symbol": "gelain_hydrolysis_qB"
         },
         {
           "symbol": "kB",
           "lower": 1e-06,
           "upper": 0.1,
           "units": "1/hour",
-          "role": "beta_glucosidase_loss_rate"
+          "role": "beta_glucosidase_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kB"
         }
       ],
       "new_code_required": false
@@ -128,7 +148,8 @@
           "symbol": "k_z",
           "value": 1.0,
           "units": "1/hour",
-          "reason": "the scale of z is not separately identifiable from qF and qB; z is defined as induced biomass equivalent"
+          "reason": "the scale of z is not separately identifiable from qF and qB; z is defined as induced biomass equivalent",
+          "config_symbol": "gelain_criticism_k_z"
         }
       ],
       "parameters": [
@@ -137,63 +158,72 @@
           "lower": 1e-06,
           "upper": 1.0,
           "units": "gram/gelain_fpu/hour",
-          "role": "hydrolysis_capacity"
+          "role": "hydrolysis_capacity",
+          "config_symbol": "gelain_hydrolysis_k_h"
         },
         {
           "symbol": "Kh",
           "lower": 0.001,
           "upper": 100.0,
           "units": "gram/liter",
-          "role": "hydrolysis_half_saturation"
+          "role": "hydrolysis_half_saturation",
+          "config_symbol": "gelain_hydrolysis_Kh"
         },
         {
           "symbol": "Y",
           "lower": 0.01,
           "upper": 1.0,
           "units": "dimensionless",
-          "role": "biomass_yield"
+          "role": "biomass_yield",
+          "config_symbol": "gelain_hydrolysis_Y"
         },
         {
           "symbol": "kd",
           "lower": 1e-05,
           "upper": 0.5,
           "units": "1/hour",
-          "role": "biomass_loss_rate"
+          "role": "biomass_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kd"
         },
         {
           "symbol": "K_ind",
           "lower": 0.01,
           "upper": 100.0,
           "units": "gram/liter",
-          "role": "induction_half_saturation"
+          "role": "induction_half_saturation",
+          "config_symbol": "gelain_hydrolysis_K_ind"
         },
         {
           "symbol": "qF",
           "lower": 0.01,
           "upper": 1000.0,
           "units": "gelain_fpu/gram/hour",
-          "role": "cellulase_specific_production_rate"
+          "role": "cellulase_specific_production_rate",
+          "config_symbol": "gelain_hydrolysis_qF"
         },
         {
           "symbol": "kF",
           "lower": 1e-06,
           "upper": 0.1,
           "units": "1/hour",
-          "role": "cellulase_loss_rate"
+          "role": "cellulase_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kF"
         },
         {
           "symbol": "qB",
           "lower": 0.01,
           "upper": 3000.0,
           "units": "gelain_beta_u/gram/hour",
-          "role": "beta_glucosidase_specific_production_rate"
+          "role": "beta_glucosidase_specific_production_rate",
+          "config_symbol": "gelain_hydrolysis_qB"
         },
         {
           "symbol": "kB",
           "lower": 1e-06,
           "upper": 0.1,
           "units": "1/hour",
-          "role": "beta_glucosidase_loss_rate"
+          "role": "beta_glucosidase_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kB"
         },
         {
           "symbol": "kz_loss",
@@ -202,7 +232,8 @@
           "units": "1/hour",
           "role": "induction_state_loss_rate",
           "new": true,
-          "meaning": "memory time constant of the induced state; small values delay and smooth activity production"
+          "meaning": "memory time constant of the induced state; small values delay and smooth activity production",
+          "config_symbol": "gelain_criticism_kz_loss"
         }
       ],
       "expected_symmetries": "kz_loss trades against qF and qB when the induction phase is short relative to sampling",
@@ -217,63 +248,72 @@
           "lower": 1e-06,
           "upper": 1.0,
           "units": "gram/gelain_fpu/hour",
-          "role": "hydrolysis_capacity"
+          "role": "hydrolysis_capacity",
+          "config_symbol": "gelain_hydrolysis_k_h"
         },
         {
           "symbol": "Kh",
           "lower": 0.001,
           "upper": 100.0,
           "units": "gram/liter",
-          "role": "hydrolysis_half_saturation"
+          "role": "hydrolysis_half_saturation",
+          "config_symbol": "gelain_hydrolysis_Kh"
         },
         {
           "symbol": "Y",
           "lower": 0.01,
           "upper": 1.0,
           "units": "dimensionless",
-          "role": "biomass_yield"
+          "role": "biomass_yield",
+          "config_symbol": "gelain_hydrolysis_Y"
         },
         {
           "symbol": "kd",
           "lower": 1e-05,
           "upper": 0.5,
           "units": "1/hour",
-          "role": "biomass_loss_rate"
+          "role": "biomass_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kd"
         },
         {
           "symbol": "K_ind",
           "lower": 0.01,
           "upper": 100.0,
           "units": "gram/liter",
-          "role": "induction_half_saturation"
+          "role": "induction_half_saturation",
+          "config_symbol": "gelain_hydrolysis_K_ind"
         },
         {
           "symbol": "qF",
           "lower": 0.01,
           "upper": 1000.0,
           "units": "gelain_fpu/gram/hour",
-          "role": "cellulase_specific_production_rate"
+          "role": "cellulase_specific_production_rate",
+          "config_symbol": "gelain_hydrolysis_qF"
         },
         {
           "symbol": "kF",
           "lower": 1e-06,
           "upper": 0.1,
           "units": "1/hour",
-          "role": "cellulase_loss_rate"
+          "role": "cellulase_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kF"
         },
         {
           "symbol": "qB",
           "lower": 0.01,
           "upper": 3000.0,
           "units": "gelain_beta_u/gram/hour",
-          "role": "beta_glucosidase_specific_production_rate"
+          "role": "beta_glucosidase_specific_production_rate",
+          "config_symbol": "gelain_hydrolysis_qB"
         },
         {
           "symbol": "kB",
           "lower": 1e-06,
           "upper": 0.1,
           "units": "1/hour",
-          "role": "beta_glucosidase_loss_rate"
+          "role": "beta_glucosidase_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kB"
         },
         {
           "symbol": "mu",
@@ -282,7 +322,8 @@
           "units": "1/hour",
           "role": "maximum_specific_growth_rate",
           "new": true,
-          "meaning": "Monod growth on the soluble pool"
+          "meaning": "Monod growth on the soluble pool",
+          "config_symbol": "gelain_criticism_mu"
         },
         {
           "symbol": "Ks",
@@ -291,7 +332,8 @@
           "units": "gram/liter",
           "role": "uptake_half_saturation",
           "new": true,
-          "meaning": "Monod half-saturation of the soluble pool"
+          "meaning": "Monod half-saturation of the soluble pool",
+          "config_symbol": "gelain_criticism_Ks"
         },
         {
           "symbol": "Ki",
@@ -300,7 +342,8 @@
           "units": "gram/liter",
           "role": "product_inhibition_constant",
           "new": true,
-          "meaning": "soluble product inhibition of hydrolysis; the upper bound makes inhibition negligible"
+          "meaning": "soluble product inhibition of hydrolysis; the upper bound makes inhibition negligible",
+          "config_symbol": "gelain_criticism_Ki"
         },
         {
           "symbol": "P0",
@@ -309,7 +352,8 @@
           "units": "gram/liter",
           "role": "initial_soluble_product",
           "new": true,
-          "meaning": "unmeasured initial soluble carbon; an explicit unknown, not a measured initial condition"
+          "meaning": "unmeasured initial soluble carbon; an explicit unknown, not a measured initial condition",
+          "config_symbol": "gelain_criticism_P0"
         }
       ],
       "expected_symmetries": "mu and Ks are jointly constrained only while P is near Ks; P0 trades against mu for the first 8 h; Ki is bounded below only if hydrolysis never saturates in P",
@@ -325,63 +369,72 @@
           "lower": 1e-06,
           "upper": 1.0,
           "units": "gram/gelain_fpu/hour",
-          "role": "hydrolysis_capacity"
+          "role": "hydrolysis_capacity",
+          "config_symbol": "gelain_hydrolysis_k_h"
         },
         {
           "symbol": "Kh",
           "lower": 0.001,
           "upper": 100.0,
           "units": "gram/liter",
-          "role": "hydrolysis_half_saturation"
+          "role": "hydrolysis_half_saturation",
+          "config_symbol": "gelain_hydrolysis_Kh"
         },
         {
           "symbol": "Y",
           "lower": 0.01,
           "upper": 1.0,
           "units": "dimensionless",
-          "role": "biomass_yield"
+          "role": "biomass_yield",
+          "config_symbol": "gelain_hydrolysis_Y"
         },
         {
           "symbol": "kd",
           "lower": 1e-05,
           "upper": 0.5,
           "units": "1/hour",
-          "role": "biomass_loss_rate"
+          "role": "biomass_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kd"
         },
         {
           "symbol": "K_ind",
           "lower": 0.01,
           "upper": 100.0,
           "units": "gram/liter",
-          "role": "induction_half_saturation"
+          "role": "induction_half_saturation",
+          "config_symbol": "gelain_hydrolysis_K_ind"
         },
         {
           "symbol": "qF",
           "lower": 0.01,
           "upper": 1000.0,
           "units": "gelain_fpu/gram/hour",
-          "role": "cellulase_specific_production_rate"
+          "role": "cellulase_specific_production_rate",
+          "config_symbol": "gelain_hydrolysis_qF"
         },
         {
           "symbol": "kF",
           "lower": 1e-06,
           "upper": 0.1,
           "units": "1/hour",
-          "role": "cellulase_loss_rate"
+          "role": "cellulase_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kF"
         },
         {
           "symbol": "qB",
           "lower": 0.01,
           "upper": 3000.0,
           "units": "gelain_beta_u/gram/hour",
-          "role": "beta_glucosidase_specific_production_rate"
+          "role": "beta_glucosidase_specific_production_rate",
+          "config_symbol": "gelain_hydrolysis_qB"
         },
         {
           "symbol": "kB",
           "lower": 1e-06,
           "upper": 0.1,
           "units": "1/hour",
-          "role": "beta_glucosidase_loss_rate"
+          "role": "beta_glucosidase_loss_rate",
+          "config_symbol": "gelain_hydrolysis_kB"
         },
         {
           "symbol": "n",
@@ -390,7 +443,8 @@
           "units": "dimensionless",
           "role": "reactivity_exponent",
           "new": true,
-          "meaning": "n = 1 is the Kadam form; n -> 0 recovers M0"
+          "meaning": "n = 1 is the Kadam form; n -> 0 recovers M0",
+          "config_symbol": "gelain_criticism_n"
         }
       ],
       "new_code_required": true,
@@ -484,6 +538,12 @@
       "promotion of any constant beyond retrospective fit"
     ]
   },
-  "amendments": [],
+  "amendments": [
+    {
+      "date": "2026-10-05",
+      "previous_sha256": "8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e",
+      "reason": "Machine-readable fields added for the study runner before anything was run: shared_structure.error_model_fields (relative SD 0.1 of the per-observable maximum over the three loadings, rho(biomass, substrate) = -0.5, evidence assumed, one shared log-uniform noise multiplier in [0.1, 10] labelled all_observables) and a config_symbol for every parameter (existing registry symbols gelain_hydrolysis_* for the nine common constants, gelain_criticism_* for additions). The numbers duplicate the prose; no model, bound, rule or setting changed."
+    }
+  ],
   "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason, recorded before the affected fit is run; the ledger records the file's sha256 at freezing and after each amendment"
 }

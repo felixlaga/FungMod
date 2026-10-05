@@ -31,6 +31,7 @@ from fungal_model.calibration import (
     local_information_analysis,
     pooled_replicate_standard_deviation,
     posterior_predictive,
+    posterior_predictive_coverage,
     prior_from_bounds,
     run_ensemble_sampler,
     sample_posterior,
@@ -471,3 +472,28 @@ def test_invalid_inputs_are_rejected() -> None:
         sample_posterior(
             base_parameters=base, priors=priors, conditions=[condition], predict=linear_predict, settings=settings, source=""
         )
+
+
+def test_posterior_predictive_coverage_tracks_the_error_model() -> None:
+    rng = np.random.default_rng(5)
+    observed = 2.0 * X + 1.0 + rng.normal(0.0, 0.2, X.size)
+    base, priors, condition, _ = linear_problem(observed, sd=0.2, scalar_sd=True)
+    settings = SamplerSettings(n_walkers=12, n_steps=800, burn_in=200, seed=8)
+    result = sample_posterior(
+        base_parameters=base, priors=priors, conditions=[condition], predict=linear_predict, settings=settings, source=SOURCE
+    )
+    coverage = posterior_predictive_coverage(result, draws=400, seed=3)
+    assert coverage["failed_draws"] == 0 and coverage["includes_measurement_noise"]
+    assert coverage["overall"]["y"]["observations"] == X.size
+    assert coverage["overall"]["y"]["fraction"] >= 0.8
+    assert coverage["conditions"]["line"]["per_observable"]["y"]["fraction"] == coverage["overall"]["all_observables"]["fraction"]
+    narrow = linear_problem(observed, sd=0.01, scalar_sd=True)[2]
+    narrow_result = sample_posterior(
+        base_parameters=base, priors=priors, conditions=[narrow], predict=linear_predict, settings=settings, source=SOURCE,
+        local_information=False,
+    )
+    assert posterior_predictive_coverage(narrow_result, draws=400, seed=3)["overall"]["y"]["fraction"] < 0.5
+    with pytest.raises(ValueError):
+        posterior_predictive_coverage(result, draws=1)
+    with pytest.raises(ValueError):
+        posterior_predictive_coverage(result, draws=10, credible_mass=1.0)

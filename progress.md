@@ -30,13 +30,16 @@ Status key:
 
 Date: 2026-10-05
 
-Status: plan frozen, nothing run. This is step 5 item 2 of the software-paper
-plan. No fit, sample or score exists under it.
+Status: plan frozen and the study machinery implemented and tested; no fit,
+sample or score has been recorded under it yet. This is step 5 item 2 of the
+software-paper plan.
+Development fits during implementation (tiny-budget tests, one timing fit per
+model) were not recorded and inform no decision.
 
 Changed:
 
 - `data/benchmarks/gelain_2020_criticism/plan.json` (SHA-256
-  `8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e`): four models
+  `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e`): four models
   (M0 registry baseline; M1 induction state; M2 soluble product pool with
   Monod uptake, product inhibition and an explicit unmeasured initial soluble
   carbon; M3 conversion-dependent accessibility after Kadam 2004), every
@@ -46,6 +49,8 @@ Changed:
   the BAYES-001 identifiability thresholds and posterior predictive coverage,
   decision rules R1 to R4, a four-word outcome vocabulary, excluded claims and
   an amendment rule.
+  Amendment 1 (same day, before any run): machine-readable error-model fields
+  and config symbols; previous digest `8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e`.
 - `data/benchmarks/gelain_2020_criticism/README.md`: what the plan is and is
   not, and what each model needs before it can run.
 - `tests/test_gelain_criticism_plan.py`: pins the digest, the data digests,
@@ -53,10 +58,39 @@ Changed:
   flagging of every added parameter, the decision rules and the claim
   boundaries, and that no results directory exists yet.
 
-Not changed: every model, process, registry record, benchmark result and
-frozen artifact.
+- `src/fungal_model/research/gelain_criticism.py` (later the same day):
+  composes the four variants from the registry base configuration for each
+  loading (M1 adds an induced pool through proportional synthesis and
+  first-order loss; M2 adds a soluble product state, a second enzyme-explicit
+  Michaelis-Menten uptake process with the yield product map, the
+  product-inhibition modifier and an explicit initial pool; M3 adds the
+  reactivity modifier to hydrolysis), runs stage A (multi-start log-space
+  least squares on training loadings only, frozen held-out predictions that
+  cite the plan digest, the v2 screen against M0, profiles) and stage B
+  (priors from the plan's bounds, the shared noise multiplier, checkpointed
+  ensemble sampling, identifiability, posterior predictive bands and
+  coverage). `scripts/run_gelain_2020_model_criticism.py` drives both stages.
+- `src/fungal_model/modifiers/reactivity.py`: generic `substrate_reactivity`
+  rate modifier, rate times `(S / S_ref)^n` with provenance to Kadam, Rydholm
+  and McMillan (2004); config builder in `processes/rate_modifiers.py` and
+  factory registration; the factor is zero at or below zero substrate.
+- `src/fungal_model/calibration/bayesian.py`: `posterior_predictive_coverage`.
+- `docs/gelain-model-criticism.md` and the changelog.
 
-Tests: five new plan-contract tests. Commands: `pytest
+Not changed: every model, registry record, benchmark result and frozen
+artifact; the registry case itself (variants are composed at run time and
+run in exploratory mode with the study as the source of every added value).
+
+Tests: five plan-contract tests; `tests/test_substrate_reactivity_modifier.py`
+(analytic activity, invalid constants, config builder errors, compiled kernel
+against the analytic solution of a non-cellulose toy process);
+`tests/test_gelain_criticism_study.py` (plan to variant mapping, M0 parity
+with the Bayesian study predictor at the frozen fit, every variant integrates
+and closes its declared mass balance, the variant configs declare their
+additions honestly, scoring statistics, fit-model error paths, a tiny stage A
+end to end with digest-cited frozen predictions);
+`test_posterior_predictive_coverage_tracks_the_error_model` in
+`tests/test_bayesian_calibration.py`. Commands: `pytest
 tests/test_gelain_criticism_plan.py tests/test_repository_hygiene.py
 tests/test_quality_config.py` (see the PR for the result).
 
@@ -68,10 +102,9 @@ in for inoculum and medium carry-over that the deposit does not measure; M3
 needs a new generic modifier before it can run; stage B holdout posteriors are
 capped by compute and may be reported as not run. Risk: low.
 
-Next task: after the PR chain and #82 are on `main`, implement the M1 and M2
-case-template variants (exploratory maturity), the generic conversion
-reactivity modifier for M3, a posterior predictive coverage utility and the
-study runner, then run stage A.
+Next task: run stage A under the plan, record its outputs with the plan
+digest, then stage B per model within the compute cap, and report every model
+in the plan's four-word vocabulary.
 
 ## PAPER-001 Software-Paper Plan Without A Wet Lab
 

@@ -6,6 +6,22 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Gelain 2020 model-criticism study (`docs/gelain-model-criticism.md`): a
+  frozen, digest-pinned plan comparing an induction state, a soluble product
+  pool with Monod uptake and product inhibition, and conversion-dependent
+  accessibility against the registry hydrolysis candidate;
+  `fungal_model.research.gelain_criticism` composes the variants from the
+  registry base configuration, runs whole-condition least-squares holdouts
+  with the v2 screen (stage A) and posterior sampling with identifiability
+  and coverage (stage B); `scripts/run_gelain_2020_model_criticism.py`.
+  Results are not yet recorded.
+- Generic `substrate_reactivity` rate modifier
+  (`fungal_model.modifiers.reactivity`): rate times `(S / S_ref)^n` after the
+  Kadam 2004 substrate reactivity factor, with a compiled kernel and config
+  builder; tested on a non-cellulose toy process.
+- `posterior_predictive_coverage` in `fungal_model.calibration.bayesian`: the
+  fraction of fitted observations inside the central posterior predictive
+  interval with measurement noise.
 - Bayesian calibration and identifiability (`docs/bayesian-calibration.md`):
   `fungal_model.calibration.bayesian` samples the posterior of a configured
   or registry case with the Goodman-Weare affine-invariant ensemble move over
