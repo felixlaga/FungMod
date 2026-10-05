@@ -240,23 +240,73 @@ cited by nothing, shows that the hydrolysis candidate cannot fit biomass and
 cellulose simultaneously at the assumed error level. See `progress.md`
 BAYES-001.
 
-### Step 5. The scientific result (this is the paper)
+### Step 5. The scientific result without a wet lab (this is the paper)
 
-Pick one question and design the experiment before touching the code again.
-Candidates, in rising ambition:
+Decision 2026-10-05: the first paper is a software and methods paper built on
+published data only. No new experiments are planned, because no laboratory is
+available. The long-term goal of modelling all fungi stands and is restated
+after step 6. Every claim below is retrospective and must be labelled so.
 
-- Cross-species transfer: calibrate secretion/growth physiology on A. niger
-  and T. reesei, predict T. harzianum degradation time courses without refit.
-- Prospective prediction: predict mass-loss and product-release curves for a
-  fungus x substrate x temperature set that no training data cover, then run
-  those cultures with a collaborating lab and score against the frozen
-  prediction.
-- Closed-loop experimental design: show that the model's suggested experiments
-  reduce predictive uncertainty more than a naive design, measured in the lab.
+Ordered work, each with an exit gate:
 
-Any of these needs a wet-lab partner and a preregistered analysis plan. The
-existing frozen-prediction contract is the right tool for it. Without new
-experiments the ceiling is a methods or software paper.
+1. **Green CI and a merged chain.** Resolve the three failure groups that were
+   red on `main` across platforms (reference-simulator SWIG proxy clash after
+   `libsedml` import, a holdout replay score tolerance tighter than the
+   prediction tolerance it derives from, Windows default-encoding reads and
+   backslash path comparisons), then merge PRs #77 to #80 into `main`. Gate:
+   every job green on Linux, macOS and Windows for three Python versions.
+2. **Model criticism on Gelain 2020 (the computational result).** BAYES-001
+   showed the published hydrolysis candidate cannot fit biomass and cellulose
+   together at the assumed error level. Declare two to four explicit
+   alternative mechanisms (candidates: biomass decay or maintenance, substrate
+   accessibility loss, product inhibition of hydrolysis, an induction lag),
+   compare them by whole-condition holdouts and posterior predictive checks
+   under a plan frozen before any fit, and report which mechanisms the data
+   support and which parameters stay unidentified. Gate: the frozen plan, a
+   per-mechanism identifiability table, and failed candidates reported.
+3. **Cross-study transfer from the literature (the intended headline).** Find a
+   second published submerged cellulose-culture time course, preferring the
+   same organism from another laboratory, then the same genus. Freeze the
+   Gelain-calibrated model, predict the second study without refitting, and
+   score it under the frozen-prediction contract. Gate: the second dataset is
+   checksummed with licence and provenance before any prediction; the
+   prediction is frozen before scoring; a failed transfer is reported as a
+   result. If no usable dataset exists, the search and its gaps are recorded
+   and the transfer claim is withdrawn, not weakened.
+   Survey 2026-10-05 (`foundation_progress/TRANSFER_DATASET_SURVEY_2026-10-05.md`,
+   abstract level only because the session's network policy blocked every
+   publisher and repository): no open raw-data deposit of a submerged
+   Trichoderma cellulose batch with biomass, substrate and enzyme time courses
+   other than Gelain 2020 was found. The viable targets are figure
+   digitizations: Saez 2002 with Schell 2002 (T. reesei on Solka-floc, NREL),
+   Velkovska 1997 (T. reesei RUT-C30) and Delabona 2016 (same strain, same
+   laboratory, lignocellulose). A digitized time course may serve as the
+   held-out target only when its digitization uncertainty is carried
+   explicitly and a person with normal web access has read the full texts to
+   confirm strain, conditions and replicates.
+4. **Cross-solver reproduction through PEtab.** Export the Gelain problem with
+   the existing PEtab writer, fit it in an external tool (pyPESTO or COPASI)
+   and show the same optimum within a stated tolerance. Gate: one command
+   reproduces the external fit and its result is checksummed.
+5. **Unify the three whole-fungus classes** before adding any physiology, as
+   section 6 already demands.
+6. **Reproducibility package and preprint.** One command regenerates every
+   table and figure; a pinned environment; a PyPI wheel with an offline install
+   test; a tagged release with a DOI; AI assistance disclosed; a domain
+   researcher reviews the biological mapping. Venues: a bioRxiv preprint as
+   soon as items 2 and 4 hold; a methods paper (PLOS Computational Biology or
+   Bioinformatics); JOSS only after its six-month public-history window, late
+   November 2026 at the earliest (see `docs/paper-readiness.md`).
+
+What the paper may claim: a provenance-aware, uncertainty-honest
+virtual-experiment engine demonstrated on one real organism with
+identifiability analysis, model criticism and a frozen-holdout prediction
+contract. What it may not claim: validated prediction for untested fungi,
+substrates or conditions, or "full fungus modelling".
+
+The wet-lab candidates (prospective prediction, closed-loop experimental
+design) are deferred, not abandoned. The frozen-prediction contract remains
+the tool for them when a partner laboratory exists.
 
 ### Step 6. Spatial mycelium (the "full fungus" step, after 1 to 5)
 
@@ -264,6 +314,17 @@ Hyphal tip extension and branching with local uptake and secretion, coupled to
 the compiled reaction-diffusion core, validated against colony-expansion and
 microscopy data. This is a multi-year programme on its own and should not start
 until a well-mixed organism model is predictive.
+
+### After step 6. Modelling all fungi
+
+The end goal is unchanged: predict degradation by any fungus on any material
+under any environment. The table in `docs/paper-readiness.md` states what that
+needs: several validated strain, substrate and environment models and
+demonstrated transfer between them. Genome annotations alone cannot supply
+kinetics. Step 5.3 is the first transfer test; each later organism case must
+pass the same frozen-prediction contract before the registry calls it
+predictive. "All fungi" is a programme measured in validated cases, not a
+feature.
 
 ## 6. What to stop doing
 

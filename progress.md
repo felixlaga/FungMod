@@ -93,6 +93,47 @@ Ambiguities: none known. Risk: low.
 Next task: merge this into `main`, bring `main` into the PR chain (#77 to #80)
 so every job re-runs green, then merge the chain in order.
 
+## PAPER-001 Software-Paper Plan Without A Wet Lab
+
+Date: 2026-10-05
+
+Status: plan recorded on the owner's decision. No code, data, test or numerical
+behaviour changed.
+
+Changed:
+
+- `foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`: step 5 is
+  now the software-and-methods-paper plan on published data, with six ordered
+  items and exit gates (green CI and merged chain; Gelain model criticism;
+  cross-study transfer from the literature; PEtab cross-solver reproduction;
+  whole-fungus class unification; reproducibility package and preprint), a
+  statement of what the paper may and may not claim, and an "After step 6"
+  note that keeps modelling all fungi as the long-term goal measured in
+  validated cases.
+- `foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md`: dated decision note
+  superseding the wet-lab step in the 2026-10-04 sequence.
+- `foundation_progress/TRANSFER_DATASET_SURVEY_2026-10-05.md`: AI-assisted,
+  abstract-level survey of candidate transfer datasets with a verification
+  caveat on every item. Bottom line: no open raw-data deposit of a submerged
+  Trichoderma cellulose batch with biomass, substrate and enzyme time courses
+  other than Gelain 2020 was found; the usable candidates (Saez 2002 with
+  Schell 2002, Velkovska 1997, Delabona 2016) are figure digitizations.
+
+Not changed: every executable module, dataset, registry record and test.
+
+Tests: none; documentation only.
+
+Scientific impact: none. Backward compatibility: unaffected.
+
+Ambiguities: the survey could not open any publisher or repository page, so
+strain, conditions, replicate structure and licences of the candidates are
+unverified; a person with normal web access must confirm them before any
+candidate is registered. Risk: low.
+
+Next task: CI-001 (cross-platform quality-gate repair, in progress on
+`claude/ci-green`), then merge the PR chain, then the frozen plan for the
+Gelain model-criticism study.
+
 ## BAYES-001 Bayesian Calibration And Identifiability On The Compiled Core
 
 Date: 2026-10-05
