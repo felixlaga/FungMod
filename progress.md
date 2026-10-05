@@ -141,8 +141,9 @@ modules, scripts and tests: 0 errors; `mkdocs build --strict` passed;
 `pytest tests/test_gelain_bayesian_study.py tests/test_bayesian_calibration.py
 tests/test_organism_registry_case.py`: 29 passed; the 28 test modules that use
 the screening, calibration and candidate-review packages: 404 passed; the full
-`pytest` run and full `pyright` were still running at this commit and are
-reported in the pull request.
+`pytest` run: 1792 passed, 11 failed, all eleven the pre-existing Linux set
+(ten SBML tests under python-libsbml 5.21 and the Gelain holdout replay
+drift), both frozen-artifact tests passing; full `pyright`: 0 errors.
 
 Scientific behavior impact: no scientific-mode output changes; no registry
 value changes. The repository now states, with a recorded artifact, which of
