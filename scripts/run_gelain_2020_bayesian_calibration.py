@@ -38,6 +38,12 @@ def _log_posterior(vector: np.ndarray) -> float:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True, help="Output directory (created if missing).")
+    parser.add_argument(
+        "--plan",
+        type=Path,
+        default=None,
+        help="Plan file relative to the repository root (default: the primary plan).",
+    )
     parser.add_argument("--processes", type=int, default=1, help="Worker processes for likelihood evaluation.")
     parser.add_argument("--steps", type=int, default=None, help="Override the planned step count (development only).")
     parser.add_argument("--burn-in", type=int, default=None, help="Override the planned burn-in (development only).")
@@ -49,7 +55,9 @@ def main(argv: list[str] | None = None) -> int:
 
     global _STUDY
     started = time.perf_counter()
-    _STUDY = gelain_bayesian.build_study(ROOT, n_steps=args.steps, burn_in=args.burn_in, n_walkers=args.walkers)
+    _STUDY = gelain_bayesian.build_study(
+        ROOT, n_steps=args.steps, burn_in=args.burn_in, n_walkers=args.walkers, plan_path=args.plan
+    )
     study = _STUDY
 
     def log(message: str) -> None:

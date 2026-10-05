@@ -65,8 +65,10 @@ SOURCE_UNITS = {
 }
 
 
-def load_plan(root: Path) -> dict[str, Any]:
-    plan = json.loads((root / PLAN_PATH).read_text(encoding="utf-8"))
+def load_plan(root: Path, plan_path: Path | None = None) -> dict[str, Any]:
+    """Load the primary plan, or the plan at ``plan_path`` (relative to ``root``)."""
+
+    plan = json.loads((root / (plan_path or PLAN_PATH)).read_text(encoding="utf-8"))
     if plan.get("schema_version") != "1.0.0":
         raise CultureBenchmarkError("Unsupported Bayesian study plan schema.")
     return plan
@@ -144,8 +146,22 @@ def build_priors(root: Path, plan: Mapping[str, Any]) -> list[PriorSpecification
 
 
 def build_noise_scale_priors(plan: Mapping[str, Any]) -> list[NoiseScalePrior]:
+    """Noise-scale priors with the structure the plan declares.
+
+    ``shared`` samples one multiplier for every observable (the relative
+    weights of the assumed error model are kept); ``per_observable`` samples
+    one multiplier per observable (each can be re-weighted independently).
+    """
+
     spec = plan["error_model"]["noise_scale_priors"]
-    return [NoiseScalePrior(name, float(spec["lower"]), float(spec["upper"]), spec["source"]) for name in plan["observables"]]
+    structure = str(spec["structure"])
+    names = tuple(plan["observables"])
+    lower, upper, source = float(spec["lower"]), float(spec["upper"]), str(spec["source"])
+    if structure == "shared":
+        return [NoiseScalePrior(names, lower, upper, source, label=str(spec["label"]))]
+    if structure == "per_observable":
+        return [NoiseScalePrior((name,), lower, upper, source) for name in names]
+    raise CultureBenchmarkError(f"Unknown noise-scale structure {structure!r}; expected 'shared' or 'per_observable'.")
 
 
 def build_predictor(registry: FungModRegistry, plan: Mapping[str, Any]) -> ConfiguredConditionPredictor:
@@ -179,8 +195,8 @@ def frozen_fit_center(root: Path, plan: Mapping[str, Any]) -> dict[str, float]:
     fit = json.loads((root / FROZEN_FIT_PATH).read_text(encoding="utf-8"))
     values = {item["symbol"]: float(item["value"]) for item in fit["parameters"]}
     center = {registry_symbol: values[fit_symbol] for fit_symbol, registry_symbol in plan["priors"]["symbol_map"].items()}
-    for name in plan["observables"]:
-        center[f"noise_scale:{name}"] = 1.0
+    for prior in build_noise_scale_priors(plan):
+        center[f"noise_scale:{prior.name}"] = 1.0
     return center
 
 
@@ -215,10 +231,19 @@ class StudyProblem:
     problem: BayesianProblem
     settings: SamplerSettings
     center: dict[str, float]
+    plan_path: Path = PLAN_PATH
 
 
-def build_study(root: Path, *, registry: FungModRegistry | None = None, n_steps: int | None = None, burn_in: int | None = None, n_walkers: int | None = None) -> StudyProblem:
-    plan = load_plan(root)
+def build_study(
+    root: Path,
+    *,
+    registry: FungModRegistry | None = None,
+    n_steps: int | None = None,
+    burn_in: int | None = None,
+    n_walkers: int | None = None,
+    plan_path: Path | None = None,
+) -> StudyProblem:
+    plan = load_plan(root, plan_path)
     store = registry if registry is not None else load_registry(root / REGISTRY_INDEX)
     predictor = build_predictor(store, plan)
     problem = build_bayesian_problem(
@@ -228,7 +253,14 @@ def build_study(root: Path, *, registry: FungModRegistry | None = None, n_steps:
         predict=predictor,
         noise_scale_priors=build_noise_scale_priors(plan),
     )
-    return StudyProblem(plan, predictor, problem, sampler_settings(plan, n_steps=n_steps, burn_in=burn_in, n_walkers=n_walkers), frozen_fit_center(root, plan))
+    return StudyProblem(
+        plan,
+        predictor,
+        problem,
+        sampler_settings(plan, n_steps=n_steps, burn_in=burn_in, n_walkers=n_walkers),
+        frozen_fit_center(root, plan),
+        plan_path or PLAN_PATH,
+    )
 
 
 CHECKPOINT_NAME = "chain_checkpoint.npz"
@@ -367,7 +399,8 @@ def write_study_outputs(study: StudyProblem, result: BayesianCalibrationResult, 
     paths = result.save(output_dir, thin=int(plan["thin"]))
     inputs = {
         "plan": plan,
-        "plan_sha256": _digest(root / PLAN_PATH),
+        "plan_path": str(study.plan_path),
+        "plan_sha256": _digest(root / study.plan_path),
         "observations_sha256": _digest(root / OBSERVATIONS_PATH),
         "v2_plan_sha256": _digest(root / V2_PLAN_PATH),
         "frozen_fit_sha256": _digest(root / FROZEN_FIT_PATH),
@@ -412,9 +445,10 @@ def render_report(study: StudyProblem, result: BayesianCalibrationResult) -> str
             f"{verdict['interval_width_fraction_of_prior']:.2f} | {'n/a' if tau is None else f'{tau:.0f}'} |"
         )
     lines.extend(["", "| Noise-scale multiplier | Posterior median | Credible interval |", "| --- | --- | --- |"])
-    for name in plan["observables"]:
-        summary = result.summaries[f"noise_scale:{name}"]
-        lines.append(f"| `{name}` | {summary['median']:.3g} | [{summary['lower']:.3g}, {summary['upper']:.3g}] |")
+    for prior in result.problem.noise_scale_priors:
+        summary = result.summaries[f"noise_scale:{prior.name}"]
+        scope = ", ".join(prior.observables)
+        lines.append(f"| `{prior.name}` ({scope}) | {summary['median']:.3g} | [{summary['lower']:.3g}, {summary['upper']:.3g}] |")
     lines.extend(["", result.to_dict()["claim_boundary"], ""])
     for note in result.notes:
         lines.append(f"- {note}")

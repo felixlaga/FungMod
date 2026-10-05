@@ -118,7 +118,8 @@ result = study.simulate(mode="scientific", output_dir="outputs/t_harzianum_cellu
   state this; the trajectories are retrospective, not predictions.
 - Three constants sit at their fitting bounds: induction is effectively
   saturated and activity loss is effectively zero over the measured range. The
-  data do not identify them.
+  recorded posterior study (`bayesian-calibration.md`) will state which
+  constants the data identify; its chain is still running.
 - No nutrient or oxygen limitation, maintenance, soluble intermediate, product
   pool, morphology or pH dynamics is represented. Temperature and pH are
   metadata. The consumed cellulose not retained as biomass is an explicit

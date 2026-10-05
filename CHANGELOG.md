@@ -10,8 +10,9 @@ All notable public releases of FungMod are documented here.
   `fungal_model.calibration.bayesian` samples the posterior of a configured
   or registry case with the Goodman-Weare affine-invariant ensemble move over
   explicit `log_uniform`/`uniform` priors and explicit `GaussianObservationError`
-  models, optionally with per-observable noise-scale multipliers labelled
-  `estimated_from_residuals`; reports integrated autocorrelation times,
+  models, optionally with noise-scale multipliers (one per observable or one
+  shared by a declared group) labelled `estimated_from_residuals`; reports
+  integrated autocorrelation times,
   effective sample sizes and a declared convergence rule; classifies every
   parameter with declared thresholds (`identified`, `weakly_identified`,
   `bounded_above_only`, `bounded_below_only`, `prior_dominated`); computes a
@@ -27,10 +28,12 @@ All notable public releases of FungMod are documented here.
   registry case (`data/benchmarks/gelain_2020_bayesian/`,
   `scripts/run_gelain_2020_bayesian_calibration.py`,
   `fungal_model.research.gelain_bayesian`): nine constants, three loadings,
-  v2 bounds as log-uniform priors, assumed error model with sampled scale
-  multipliers, checkpointed parallel run, thinned posterior samples and
+  v2 bounds as log-uniform priors, assumed error model with one sampled shared
+  scale multiplier, checkpointed parallel run, thinned posterior samples and
   identifiability verdicts recorded in the provenance of the nine calibrated
-  registry records without changing their point values.
+  registry records without changing their point values; a per-observable
+  multiplier variant is recorded as an unconverged sensitivity study that
+  diagnoses the biomass/cellulose misfit.
 - Candidate review `pakula_2016_t_reesei_protein_load_review.yml` (status
   `proposed`, no values) for replicate-level cultivation data.
 - Environment response laws (`docs/environment-response.md`): Rosso cardinal

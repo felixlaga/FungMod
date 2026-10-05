@@ -118,24 +118,46 @@ class PriorSpecification:
 
 @dataclass(frozen=True)
 class NoiseScalePrior:
-    """Log-uniform prior on a multiplier of the supplied standard deviations of one observable."""
+    """Log-uniform prior on one multiplier of the supplied standard deviations.
 
-    observable: str
+    ``observables`` names the observables that share the multiplier. A prior on
+    one observable is labelled after it; one shared by several observables
+    needs an explicit ``label``. The sampled coordinate is
+    ``noise_scale:<name>``.
+    """
+
+    observables: tuple[str, ...]
     lower: float
     upper: float
     source: str
+    label: str = ""
 
     def __post_init__(self) -> None:
-        if not has_text(self.observable):
-            raise ValueError("A noise-scale prior requires an observable name.")
+        if isinstance(self.observables, str):
+            raise TypeError("Noise-scale prior observables must be a sequence of names, not one string.")
+        names = tuple(self.observables)
+        object.__setattr__(self, "observables", names)
+        if not names or not all(has_text(name) for name in names):
+            raise ValueError("A noise-scale prior requires at least one observable name.")
+        if len(set(names)) != len(names):
+            raise ValueError(f"Noise-scale prior observables must be unique: {names}.")
+        if len(names) > 1 and not has_text(self.label):
+            raise ValueError(f"A noise-scale prior shared by {names} requires a label.")
         if not has_text(self.source):
-            raise ProvenanceError(f"Noise-scale prior on {self.observable!r} requires a source.")
+            raise ProvenanceError(f"Noise-scale prior {self.name!r} requires a source.")
         if not (np.isfinite(self.lower) and np.isfinite(self.upper) and 0.0 < self.lower < self.upper):
-            raise ValueError(f"Noise-scale prior on {self.observable!r} needs finite positive ordered bounds.")
+            raise ValueError(f"Noise-scale prior {self.name!r} needs finite positive ordered bounds.")
+
+    @property
+    def name(self) -> str:
+        """Coordinate name: the label, or the single observable it scales."""
+
+        return self.label if has_text(self.label) else self.observables[0]
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "observable": self.observable,
+            "label": self.name,
+            "observables": list(self.observables),
             "kind": PRIOR_LOG_UNIFORM,
             "lower": self.lower,
             "upper": self.upper,
@@ -329,7 +351,11 @@ class BayesianProblem:
 
     def noise_scales_from_coordinates(self, vector: np.ndarray) -> dict[str, float]:
         values = self.values_from_coordinates(vector)
-        return {prior.observable: values[NOISE_SCALE_PREFIX + prior.observable] for prior in self.noise_scale_priors}
+        return {
+            observable: values[NOISE_SCALE_PREFIX + prior.name]
+            for prior in self.noise_scale_priors
+            for observable in prior.observables
+        }
 
     def scaled_error(self, condition: ObservedCondition, scales: Mapping[str, float]) -> GaussianObservationError:
         if not scales:
@@ -404,9 +430,12 @@ def build_bayesian_problem(
     if len(set(ids)) != len(ids):
         raise ValueError("Condition identifiers must be unique.")
     observed_names = {name for condition in conditions for name in condition.error.observables}
-    scale_names = [prior.observable for prior in noise_scale_priors]
+    scale_names = [observable for prior in noise_scale_priors for observable in prior.observables]
     if len(set(scale_names)) != len(scale_names):
-        raise ValueError("Noise-scale observables must be unique.")
+        raise ValueError("Noise-scale observables must be unique across priors.")
+    scale_labels = [prior.name for prior in noise_scale_priors]
+    if len(set(scale_labels)) != len(scale_labels):
+        raise ValueError("Noise-scale labels must be unique.")
     unknown = sorted(set(scale_names).difference(observed_names))
     if unknown:
         raise ValueError(f"Noise-scale priors name observables absent from every condition: {unknown}.")
@@ -431,7 +460,7 @@ def build_bayesian_problem(
             lower.append(low)
             upper.append(high)
     for prior in noise_scale_priors:
-        labels.append(NOISE_SCALE_PREFIX + prior.observable)
+        labels.append(NOISE_SCALE_PREFIX + prior.name)
         units.append("dimensionless")
         kinds.append(COORDINATE_LOG)
         lower.append(float(np.log(prior.lower)))
@@ -649,6 +678,9 @@ def chain_diagnostics(run: EnsembleRun, settings: SamplerSettings) -> dict[str, 
         "max_acceptance_fraction": float(np.max(acceptance)),
         "evaluations": int(run.evaluations),
         "failed_evaluations": int(run.failed_evaluations),
+        "failed_evaluations_meaning": (
+            "proposals with a non-finite log posterior: outside the prior box or a prediction failure"
+        ),
         "converged": converged,
         "convergence_rule": (
             f"every autocorrelation estimate reliable (chain longer than {settings.autocorrelation_tolerance:g} tau) "
@@ -904,7 +936,7 @@ class BayesianCalibrationResult:
             "parameters": list(self.problem.parameter_symbols),
             "parameter_units": {symbol: units for symbol, units in zip(self.problem.labels, self.problem.units, strict=True)},
             "priors": self.problem.prior_records(),
-            "noise_scale_observables": [prior.observable for prior in self.problem.noise_scale_priors],
+            "noise_scales": {prior.name: list(prior.observables) for prior in self.problem.noise_scale_priors},
             "noise_evidence": list(self.noise_evidence),
             "conditions": [condition.condition_id for condition in self.problem.conditions],
             "observation_count": int(sum(condition.observed.size for condition in self.problem.conditions)),

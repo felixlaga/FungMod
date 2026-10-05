@@ -8,14 +8,19 @@ and which must stay ranges. It is retrospective, uses no replicate-level data
 (the deposit holds none) and validates nothing.
 
 - `plan.json`: registry case, observables, priors (the v2 joint-benchmark
-  bounds, log-uniform), the assumed error model with its sampled scale
-  multipliers, sampler settings, posterior-predictive grid and thinning.
+  bounds, log-uniform), the assumed error model with its one sampled shared
+  scale multiplier, sampler settings, posterior-predictive grid and thinning.
+- `plan_per_observable_scales.json`: the same study with one multiplier per
+  observable, a sensitivity variant run with `--plan`; its outputs are in
+  `results_per_observable_scales/`, are not converged by the declared rule and
+  are cited by nothing in the registry.
 - `results/bayesian_calibration.json`: settings, diagnostics, posterior
   summaries, identifiability verdicts with their declared thresholds, local
   Fisher information at the best sample, posterior predictive bands and the
   claim boundary.
 - `results/posterior_samples.csv`: thinned post-burn-in samples in natural
-  units (one column per constant and per noise-scale multiplier).
+  units (one column per constant and one for the shared noise-scale
+  multiplier).
 - `results/inputs.json`, `results/artifacts.json`, `results/report.md`:
   input digests, output digests and a human-readable summary table.
 

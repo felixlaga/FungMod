@@ -31,6 +31,21 @@ The current PR queue and reconciled scoped phase status are tracked in
 
 # Current project status
 
+2026-10-05 (later still): BAYES-001 adds posterior sampling on the compiled
+core. Explicit priors, explicit Gaussian error models with an estimated noise
+multiplier, the Goodman-Weare ensemble sampler, autocorrelation diagnostics,
+declared-threshold identifiability classes, local Fisher information and
+posterior predictive bands exist and are tested; a registry-case predictor
+rebuilds the case per candidate. The primary study's verdicts are pending its running chain. The error model remains
+an assumption because no replicate-level data exist: the Gelain deposit holds
+duplicate means only and Pakula 2016 could not be retrieved under the network
+policy, so it is a candidate review. A per-observable multiplier variant shows
+the hydrolysis candidate cannot fit biomass and cellulose simultaneously at
+the assumed error level; that is a model-adequacy question for step 5. Step 4
+was started on the owner's instruction although ENV-003 had left no sourced
+organism-level temperature response; the sampling machinery does not depend
+on one.
+
 2026-10-05 (later): ENV-003 makes environment grids mean something. Rosso
 cardinal temperature and pH laws, a diprotic pH-ionization Michaelis-Menten
 law and first-order Arrhenius thermal inactivation are implemented, compiled

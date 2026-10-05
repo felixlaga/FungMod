@@ -83,7 +83,7 @@ def linear_problem(observed: np.ndarray, *, sd: float = 0.5, noise_scale: bool =
         prior_from_bounds(symbol="b", lower=-10.0, upper=10.0, units="dimensionless", source=SOURCE, kind="uniform"),
     ]
     condition = ObservedCondition("line", X, observed[:, None], gaussian_error("y", sd, None if scalar_sd else X.size))
-    scales = [NoiseScalePrior("y", 0.1, 10.0, SOURCE)] if noise_scale else []
+    scales = [NoiseScalePrior(("y",), 0.1, 10.0, SOURCE)] if noise_scale else []
     return base, priors, condition, scales
 
 
@@ -198,13 +198,69 @@ def test_noise_scale_multiplier_is_estimated_from_residual_scatter() -> None:
         predict=linear_predict,
         settings=settings,
         source=SOURCE,
-        noise_scale_priors=[NoiseScalePrior("y", 0.1, 10.0, SOURCE)],
+        noise_scale_priors=[NoiseScalePrior(("y",), 0.1, 10.0, SOURCE)],
     )
     scale = result.summaries[NOISE_SCALE_PREFIX + "y"]
     assert 1.5 < scale["median"] < 2.7, scale
     assert NOISE_SCALE_EVIDENCE in result.noise_evidence and "assumed" in result.noise_evidence
-    assert result.to_dict()["noise_scale_observables"] == ["y"]
+    assert result.to_dict()["noise_scales"] == {"y": ["y"]}
     assert "noise_scale:y" not in result.identifiability
+
+
+def test_shared_noise_scale_covers_several_observables_under_one_label() -> None:
+    rng = np.random.default_rng(3)
+    times = np.linspace(0.0, 4.0, 25)
+    observed = np.column_stack([2.0 * times + 1.0 + rng.normal(0.0, 0.6, times.size) for _ in range(2)])
+    design = np.column_stack([times, np.ones_like(times)])
+    fitted = design @ np.linalg.lstsq(design, observed, rcond=None)[0]
+    whitened_sum = float(np.sum(((observed - fitted) / 0.2) ** 2))
+    expected_scale = np.sqrt(whitened_sum / (observed.size - 2))
+    base = ParameterSet([parameter_for_testing("a", 1.0), parameter_for_testing("b", 1.0)])
+    priors = [
+        prior_from_bounds(symbol="a", lower=-10.0, upper=10.0, units="dimensionless", source=SOURCE, kind="uniform"),
+        prior_from_bounds(symbol="b", lower=-10.0, upper=10.0, units="dimensionless", source=SOURCE, kind="uniform"),
+    ]
+    error = GaussianObservationError(
+        ("y", "z"),
+        ("dimensionless", "dimensionless"),
+        {"y": Q_(0.2, "dimensionless"), "z": Q_(0.2, "dimensionless")},
+        np.eye(2),
+        SOURCE,
+        "assumed",
+    )
+    condition = ObservedCondition("pair", times, observed, error)
+
+    def predict(parameters: ParameterSet, condition_id: str, times: np.ndarray) -> np.ndarray:
+        line = linear_predict(parameters, condition_id, times)[:, 0]
+        return np.column_stack([line, line])
+
+    with pytest.raises(ValueError, match="requires a label"):
+        NoiseScalePrior(("y", "z"), 0.1, 10.0, SOURCE)
+    with pytest.raises(TypeError, match="not one string"):
+        NoiseScalePrior("y", 0.1, 10.0, SOURCE)  # type: ignore[arg-type]
+    shared = NoiseScalePrior(("y", "z"), 0.1, 10.0, SOURCE, label="both")
+    assert shared.name == "both" and shared.to_dict()["observables"] == ["y", "z"]
+    problem = build_bayesian_problem(
+        base_parameters=base, priors=priors, conditions=[condition], predict=predict, noise_scale_priors=[shared]
+    )
+    assert problem.labels[-1] == "noise_scale:both"
+    vector = problem.coordinates_from_values({"a": 2.0, "b": 1.0, "noise_scale:both": 3.0})
+    scales = problem.noise_scales_from_coordinates(vector)
+    assert set(scales) == {"y", "z"} and np.allclose([scales["y"], scales["z"]], 3.0)
+    with pytest.raises(ValueError, match="unique across priors"):
+        build_bayesian_problem(
+            base_parameters=base, priors=priors, conditions=[condition], predict=predict,
+            noise_scale_priors=[shared, NoiseScalePrior(("y",), 0.1, 10.0, SOURCE)],
+        )
+    settings = SamplerSettings(n_walkers=12, n_steps=1200, burn_in=300, seed=5)
+    result = sample_posterior(
+        base_parameters=base, priors=priors, conditions=[condition], predict=predict, settings=settings,
+        source=SOURCE, noise_scale_priors=[shared],
+    )
+    scale = result.summaries["noise_scale:both"]
+    assert 0.8 * expected_scale < scale["median"] < 1.25 * expected_scale, (scale, expected_scale)
+    assert 2.0 < expected_scale < 4.0
+    assert result.to_dict()["noise_scales"] == {"both": ["y", "z"]}
 
 
 def test_pooled_replicate_standard_deviation_matches_the_analytic_value() -> None:
@@ -383,14 +439,14 @@ def test_invalid_inputs_are_rejected() -> None:
     with pytest.raises(ValueError):
         IdentifiabilityCriteria(source=SOURCE, identified_max_width_fraction=0.9, weak_max_width_fraction=0.5)
     with pytest.raises(ProvenanceError):
-        NoiseScalePrior("y", 0.1, 10.0, source="")
+        NoiseScalePrior(("y",), 0.1, 10.0, source="")
     with pytest.raises(ValueError, match="shape"):
         ObservedCondition("c", X, np.zeros((5, 2)), gaussian_error("y", 1.0, 5))
     base, priors, condition, _ = linear_problem(2.0 * X + 1.0)
     with pytest.raises(ValueError, match="absent from every condition"):
         build_bayesian_problem(
             base_parameters=base, priors=priors, conditions=[condition], predict=linear_predict,
-            noise_scale_priors=[NoiseScalePrior("z", 0.1, 10.0, SOURCE)],
+            noise_scale_priors=[NoiseScalePrior(("z",), 0.1, 10.0, SOURCE)],
         )
     with pytest.raises(KeyError):
         build_bayesian_problem(

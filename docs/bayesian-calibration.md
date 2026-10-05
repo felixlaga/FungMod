@@ -14,10 +14,13 @@ carries the thresholds it used and a claim boundary saying so.
 - **Priors.** `PriorSpecification` is `log_uniform` (uniform in the natural
   logarithm between positive bounds) or `uniform`, with unit-bearing bounds and
   a mandatory source. `NoiseScalePrior` is a log-uniform multiplier on the
-  supplied standard deviations of one observable, sampled jointly with the
-  parameters when the measurement error is unknown; the result labels it
+  supplied standard deviations of one observable, or of a declared group of
+  observables sharing one multiplier, sampled jointly with the parameters when
+  the measurement error is unknown; the result labels it
   `estimated_from_residuals` because it absorbs model misfit together with
-  measurement noise.
+  measurement noise. A shared multiplier sets the overall error level while
+  keeping the declared relative weighting of the observables; per-observable
+  multipliers let the sampler re-weight the observables against each other.
 - **Data.** `ObservedCondition` holds the rows of one condition in the units
   and order of its `GaussianObservationError`. Repeated times are replicates;
   `pooled_replicate_standard_deviation` turns within-time replicate scatter
@@ -86,11 +89,16 @@ beta-glucosidase activity). The priors are the v2 joint-benchmark bounds,
 log-uniform. The error model is the v2 `correlated_assumption` scenario
 (standard deviation 10 percent of each observable's training maximum,
 biomass/substrate correlation -0.5, independent in time, evidence `assumed`)
-with one log-uniform scale multiplier per observable sampled with the
-parameters, because the deposit holds no replicates or standard deviations.
-Run `python scripts/run_gelain_2020_bayesian_calibration.py --output
+with one log-uniform scale multiplier shared by the four observables and
+sampled with the parameters, because the deposit holds no replicates or
+standard deviations. The shared multiplier sets the overall error level from
+the residuals and keeps the declared relative weighting, so the posterior is
+centred where the least-squares fit is and widened to the misfit actually
+present. Run `python scripts/run_gelain_2020_bayesian_calibration.py --output
 outputs/gelain-bayesian --processes 4` from the repository after
-installation; the run checkpoints and resumes.
+installation; the run checkpoints and resumes. A per-observable sensitivity
+variant (`plan_per_observable_scales.json`, `--plan`, results in
+`results_per_observable_scales/`) is recorded alongside it; see below.
 
 RESULTS_TABLE_PLACEHOLDER
 
@@ -99,6 +107,27 @@ provenance now names this artifact, the credible interval and the verdict, so
 that a parameter the data do not identify is visibly a range rather than a
 constant. Nothing in the scientific-mode run changes: an exact record is still
 used as the one value it carries.
+
+## Sensitivity variant: per-observable multipliers
+
+`results_per_observable_scales/` records the same data, priors and model with
+one multiplier per observable (40 walkers x 6000 steps, burn-in 1500). Its
+chain did not meet the declared convergence rule (integrated autocorrelation
+times of 270 to 380 steps against 4500 post-burn-in steps; effective sample
+sizes 470 to 670), so it carries no verdicts and nothing in the registry cites
+it. It is kept because of what it shows about the model: when the observables
+may be re-weighted independently, the sampler leaves the least-squares region
+entirely. It inflates the biomass multiplier to about 5.4 (credible interval
+3.2 to 7.5), tightens the substrate multiplier to about 0.5, and moves the
+yield to the lower edge of its prior box with the two specific activities
+about five times higher than the frozen fit, while cellulose and the two
+activities are then fitted more closely. Under the declared unit-scale error
+model this region is far worse than the frozen fit (log posterior -781 against
+-572), and eight of the nine frozen point values lie outside its 95 percent
+intervals. Read it as a misfit diagnosis, not as a calibration: the hydrolysis
+candidate cannot fit biomass and cellulose simultaneously at the assumed 10
+percent error, and which observable to trust is a question only replicate
+measurements with their own error estimates can settle.
 
 ## Replicate recovery status
 

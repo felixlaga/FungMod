@@ -138,8 +138,11 @@ Jacobian and a conservation ledger. It just is not generic.
    error model, no prospective held-out experiment, no cross-species transfer
    test. The project's own evaluator keeps `publication_claim_authorized`
    false, correctly.
-7. **No Bayesian inference.** Profile likelihood exists; posterior sampling,
-   proper error models and identifiability-aware model selection do not.
+7. **Bayesian inference exists only on assumed errors.** Posterior sampling,
+   identifiability classes and local information exist since BAYES-001
+   (2026-10-05); every error model is still an assumption because no
+   replicate-level data exist, and identifiability-aware model selection does
+   not exist.
 8. **Scale.** The public path cannot run the ensemble sizes the central-goal
    document promises in acceptable time.
 
@@ -216,6 +219,26 @@ With a compiled core and Jacobians, add posterior sampling (MCMC or
 simulation-based inference) with explicit measurement-error models and
 replicate-level data. Recover raw replicates for Gelain and Pakula first. Report
 which parameters the data identify and which the model must leave as ranges.
+
+Status 2026-10-05 (BAYES-001): partially done. Posterior sampling exists on
+the compiled core (`fungal_model.calibration.bayesian`: explicit priors,
+explicit Gaussian error models with an estimated noise multiplier, the
+Goodman-Weare ensemble sampler, autocorrelation and effective-sample
+diagnostics with a declared convergence rule, identifiability classes with
+declared thresholds, finite-difference Fisher information, posterior
+predictive bands, pooled replicate deviations) with a predictor that rebuilds
+a registry case per candidate. The recorded study
+(`data/benchmarks/gelain_2020_bayesian/`) samples the nine T. harzianum
+hydrolysis-candidate constants over the three Gelain loadings.
+Its verdicts are pending the running chain. Not done: replicate recovery (the Gelain deposit holds
+duplicate means only; Pakula 2016 could not be retrieved under the network
+policy and is a candidate review), so the error model is an assumption whose
+overall level is estimated from the residuals; Jacobians and parameter
+sensitivities (sampling is gradient-free and rebuilds the config per
+candidate, `FD-010`). A per-observable multiplier variant, not converged and
+cited by nothing, shows that the hydrolysis candidate cannot fit biomass and
+cellulose simultaneously at the assumed error level. See `progress.md`
+BAYES-001.
 
 ### Step 5. The scientific result (this is the paper)
 
