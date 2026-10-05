@@ -33,11 +33,22 @@ def test_plan_digest_is_the_frozen_one() -> None:
     assert hashlib.sha256(PLAN_PATH.read_bytes()).hexdigest() == FROZEN_SHA256
 
 
-def test_plan_is_frozen_unrun_and_its_amendment_log_is_dated(plan) -> None:
+def test_plan_is_frozen_and_its_amendment_log_is_dated(plan) -> None:
     assert plan["status"].startswith("plan frozen")
     assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [("2026-10-05", "8b368ac8")]
     assert "error_model_fields" in plan["shared_structure"]
-    assert not (PLAN_PATH.parent / "results").exists()
+
+
+def test_recorded_results_cite_the_frozen_plan_digest() -> None:
+    results = PLAN_PATH.parent / "results"
+    if not results.exists():
+        pytest.skip("no results recorded under the plan yet")
+    for inputs_path in sorted(results.rglob("inputs.json")):
+        inputs = json.loads(inputs_path.read_text(encoding="utf-8"))
+        assert inputs["plan_sha256"] == FROZEN_SHA256, inputs_path
+    for frozen_path in sorted(results.rglob("frozen_predictions/*.json")):
+        frozen = json.loads(frozen_path.read_text(encoding="utf-8"))
+        assert frozen["plan_sha256"] == FROZEN_SHA256, frozen_path
 
 
 def test_plan_data_digests_match_the_frozen_sources(plan) -> None:

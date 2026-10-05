@@ -1,0 +1,25 @@
+{
+  "plan_sha256": "9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e",
+  "observations_sha256": "cc8cda93a4a1a07cc73cf0c104aeaf315770aa4399e65cb2f3473e97951b699c",
+  "bayesian_plan_sha256": "9574fccc809cc2a49aab2ebc9cbc8cd087d0064d26582da287915cbbce32f01a",
+  "starts": 5,
+  "max_nfev": 250,
+  "seed": 20261006,
+  "models": [
+    "M0_baseline",
+    "M1_induction_state",
+    "M2_soluble_product_pool",
+    "M3_conversion_dependent_accessibility"
+  ],
+  "scenarios": [
+    "primary",
+    "correlated_assumption"
+  ],
+  "amendments": [
+    {
+      "date": "2026-10-05",
+      "previous_sha256": "8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e",
+      "reason": "Machine-readable fields added for the study runner before anything was run: shared_structure.error_model_fields (relative SD 0.1 of the per-observable maximum over the three loadings, rho(biomass, substrate) = -0.5, evidence assumed, one shared log-uniform noise multiplier in [0.1, 10] labelled all_observables) and a config_symbol for every parameter (existing registry symbols gelain_hydrolysis_* for the nine common constants, gelain_criticism_* for additions). The numbers duplicate the prose; no model, bound, rule or setting changed."
+    }
+  ]
+}

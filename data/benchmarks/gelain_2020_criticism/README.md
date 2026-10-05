@@ -1,4 +1,4 @@
-# Gelain 2020 model-criticism study v1 (plan frozen, not run)
+# Gelain 2020 model-criticism study v1
 
 A preregistered comparison of explicit mechanisms added to the registry
 hydrolysis candidate (`trichoderma_harzianum_p49p11` x `cellulose_celufloc_200`)
@@ -18,8 +18,14 @@ independent and validates no biology.
   R1 to R4, the outcome vocabulary, the claims excluded and the amendment rule.
   Frozen on 2026-10-05 with SHA-256 `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e`;
   `tests/test_gelain_criticism_plan.py` pins it.
-- `results/`: absent until the study runs. Every run must cite this plan's
-  digest and record any amendment first.
+- `results/stage_a/`: recorded 2026-10-05 under the plan digest above
+  (`inputs.json`, per-model `full_fit_*.json`, `folds_*.json`, frozen held-out
+  predictions, `comparison.json`, `report.md`). Outcome: no addition passes the
+  R1 screen; M1 and M3 are not supported; M2 improves pooled held-out error by
+  23 percent but worsens biomass by 31 percent, above the plan's 10 percent
+  allowance, so it is not supported under R1 either. See
+  `docs/gelain-model-criticism.md`.
+- `results/stage_b/<model>/`: all-condition posteriors as they complete.
 
 What exists today for each model: M0 is the registry case; M1 and M2 are
 compositions of existing generic processes (proportional synthesis, first

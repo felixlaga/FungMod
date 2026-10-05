@@ -1,0 +1,499 @@
+[
+  {
+    "condition": "gelain_2020_cellulose_10gl",
+    "scenario": "primary",
+    "fit": {
+      "model": "M0_baseline",
+      "scenario": "primary",
+      "training_conditions": [
+        "gelain_2020_cellulose_20gl",
+        "gelain_2020_cellulose_30gl"
+      ],
+      "success": true,
+      "cost": 0.7912239680997097,
+      "nfev": 48,
+      "normalization": {
+        "biomass": 9.40625525180876,
+        "substrate": 31.188432670702987,
+        "cellulase_activity": 842.7412414519945,
+        "beta_glucosidase_activity": 2150.797238431824
+      },
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "config_symbol": "gelain_hydrolysis_k_h",
+          "value": 0.0763942711723205,
+          "units": "gram/gelain_fpu/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "Kh",
+          "config_symbol": "gelain_hydrolysis_Kh",
+          "value": 87.56031635878104,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "Y",
+          "config_symbol": "gelain_hydrolysis_Y",
+          "value": 0.4287705740718761,
+          "units": "dimensionless",
+          "fixed": false
+        },
+        {
+          "symbol": "kd",
+          "config_symbol": "gelain_hydrolysis_kd",
+          "value": 0.02335853638795401,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "K_ind",
+          "config_symbol": "gelain_hydrolysis_K_ind",
+          "value": 0.012995309239640845,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "qF",
+          "config_symbol": "gelain_hydrolysis_qF",
+          "value": 4.206431183954144,
+          "units": "gelain_fpu/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kF",
+          "config_symbol": "gelain_hydrolysis_kF",
+          "value": 0.00013304851934831718,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "qB",
+          "config_symbol": "gelain_hydrolysis_qB",
+          "value": 10.682205250523765,
+          "units": "gelain_beta_u/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kB",
+          "config_symbol": "gelain_hydrolysis_kB",
+          "value": 1.453208692648572e-06,
+          "units": "1/hour",
+          "fixed": false
+        }
+      ],
+      "diagnostics": {
+        "singular_values": [
+          4.383816845576517,
+          3.8724659013860214,
+          2.214568586890748,
+          1.4490127864941507,
+          0.9015055008441499,
+          0.09808152067317909,
+          0.07192711004890757,
+          0.04327059422083227,
+          0.003607400369937644
+        ],
+        "practical_rank": 9,
+        "free_parameters": 9,
+        "full_rank": true,
+        "condition_number": 1215.2288063474068,
+        "near_bounds": []
+      },
+      "starts": [
+        {
+          "start": 0,
+          "success": true,
+          "cost": 0.8159977836737939,
+          "nfev": 27,
+          "status": 3
+        },
+        {
+          "start": 1,
+          "success": true,
+          "cost": 0.7912239680997097,
+          "nfev": 48,
+          "status": 3
+        },
+        {
+          "start": 2,
+          "success": true,
+          "cost": 0.8626480659144097,
+          "nfev": 59,
+          "status": 3
+        },
+        {
+          "start": 3,
+          "success": true,
+          "cost": 0.8160653899336098,
+          "nfev": 37,
+          "status": 3
+        },
+        {
+          "start": 4,
+          "success": true,
+          "cost": 0.8200275985396435,
+          "nfev": 33,
+          "status": 3
+        }
+      ],
+      "noise": {}
+    },
+    "frozen_prediction_file": "stage_a/M0_baseline/frozen_predictions/gelain_2020_cellulose_10gl_primary.json",
+    "frozen_prediction_sha256": "7fe9cb3bd94e26a813703fa9cfba5801521a84f5dfb60b176ea225a3b0af5131",
+    "score": {
+      "rmse": {
+        "biomass": 2.2931134154310966,
+        "substrate": 1.1513620729064933,
+        "cellulase_activity": 403.0337993531348,
+        "beta_glucosidase_activity": 718.1864684719029
+      },
+      "bias": {
+        "biomass": -2.070914017220784,
+        "substrate": 0.31538733679826725,
+        "cellulase_activity": -341.2198775789106,
+        "beta_glucosidase_activity": -607.9257752580495
+      },
+      "normalized_mse": {
+        "biomass": 0.059431617559918846,
+        "substrate": 0.0013628144743420881,
+        "cellulase_activity": 0.22871489138318582,
+        "beta_glucosidase_activity": 0.11150016140798043
+      },
+      "n": 32
+    }
+  },
+  {
+    "condition": "gelain_2020_cellulose_20gl",
+    "scenario": "primary",
+    "fit": {
+      "model": "M0_baseline",
+      "scenario": "primary",
+      "training_conditions": [
+        "gelain_2020_cellulose_10gl",
+        "gelain_2020_cellulose_30gl"
+      ],
+      "success": true,
+      "cost": 1.744103434176314,
+      "nfev": 26,
+      "normalization": {
+        "biomass": 9.40625525180876,
+        "substrate": 31.188432670702987,
+        "cellulase_activity": 887.6433209611139,
+        "beta_glucosidase_activity": 1976.4526999260297
+      },
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "config_symbol": "gelain_hydrolysis_k_h",
+          "value": 0.014667390057306317,
+          "units": "gram/gelain_fpu/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "Kh",
+          "config_symbol": "gelain_hydrolysis_Kh",
+          "value": 13.338179997464076,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "Y",
+          "config_symbol": "gelain_hydrolysis_Y",
+          "value": 0.2940164149297861,
+          "units": "dimensionless",
+          "fixed": false
+        },
+        {
+          "symbol": "kd",
+          "config_symbol": "gelain_hydrolysis_kd",
+          "value": 0.011971778692163579,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "K_ind",
+          "config_symbol": "gelain_hydrolysis_K_ind",
+          "value": 0.010004889361652596,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "qF",
+          "config_symbol": "gelain_hydrolysis_qF",
+          "value": 7.204009502952482,
+          "units": "gelain_fpu/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kF",
+          "config_symbol": "gelain_hydrolysis_kF",
+          "value": 0.0009370243498241302,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "qB",
+          "config_symbol": "gelain_hydrolysis_qB",
+          "value": 16.696627597281537,
+          "units": "gelain_beta_u/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kB",
+          "config_symbol": "gelain_hydrolysis_kB",
+          "value": 1.0779636821057714e-06,
+          "units": "1/hour",
+          "fixed": false
+        }
+      ],
+      "diagnostics": {
+        "singular_values": [
+          3.784886275330983,
+          3.4011029942276596,
+          1.9077818526840384,
+          1.126192350002971,
+          0.3937885449514691,
+          0.17444230857230864,
+          0.0741626698208341,
+          0.04332874309562078,
+          0.009451166722700148
+        ],
+        "practical_rank": 9,
+        "free_parameters": 9,
+        "full_rank": true,
+        "condition_number": 400.4676233507032,
+        "near_bounds": [
+          "K_ind"
+        ]
+      },
+      "starts": [
+        {
+          "start": 0,
+          "success": true,
+          "cost": 1.744103434176314,
+          "nfev": 26,
+          "status": 3
+        },
+        {
+          "start": 1,
+          "success": true,
+          "cost": 2.271036486599728,
+          "nfev": 40,
+          "status": 3
+        },
+        {
+          "start": 2,
+          "success": true,
+          "cost": 2.271336108606906,
+          "nfev": 35,
+          "status": 3
+        },
+        {
+          "start": 3,
+          "success": true,
+          "cost": 2.271356134831138,
+          "nfev": 28,
+          "status": 3
+        },
+        {
+          "start": 4,
+          "success": true,
+          "cost": 2.271109586322087,
+          "nfev": 45,
+          "status": 3
+        }
+      ],
+      "noise": {}
+    },
+    "frozen_prediction_file": "stage_a/M0_baseline/frozen_predictions/gelain_2020_cellulose_20gl_primary.json",
+    "frozen_prediction_sha256": "c4bfcea0e679a5025df2b17fc64075e815661e0ecf5a64df47d293d444256774",
+    "score": {
+      "rmse": {
+        "biomass": 2.65336904497244,
+        "substrate": 1.533086396093256,
+        "cellulase_activity": 79.05007977010632,
+        "beta_glucosidase_activity": 248.22369546616937
+      },
+      "bias": {
+        "biomass": -1.664953219986874,
+        "substrate": -1.0655473382214367,
+        "cellulase_activity": -37.54536315821032,
+        "beta_glucosidase_activity": -149.22380977134677
+      },
+      "normalized_mse": {
+        "biomass": 0.07957227904054828,
+        "substrate": 0.0024162738785382188,
+        "cellulase_activity": 0.007930994448085314,
+        "beta_glucosidase_activity": 0.015772975298674163
+      },
+      "n": 32
+    }
+  },
+  {
+    "condition": "gelain_2020_cellulose_30gl",
+    "scenario": "primary",
+    "fit": {
+      "model": "M0_baseline",
+      "scenario": "primary",
+      "training_conditions": [
+        "gelain_2020_cellulose_10gl",
+        "gelain_2020_cellulose_20gl"
+      ],
+      "success": true,
+      "cost": 1.021198867354505,
+      "nfev": 34,
+      "normalization": {
+        "biomass": 8.219913529590286,
+        "substrate": 19.973133273578657,
+        "cellulase_activity": 887.6433209611139,
+        "beta_glucosidase_activity": 2150.797238431824
+      },
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "config_symbol": "gelain_hydrolysis_k_h",
+          "value": 0.012825992362692247,
+          "units": "gram/gelain_fpu/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "Kh",
+          "config_symbol": "gelain_hydrolysis_Kh",
+          "value": 11.877020284654387,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "Y",
+          "config_symbol": "gelain_hydrolysis_Y",
+          "value": 0.47131913219840144,
+          "units": "dimensionless",
+          "fixed": false
+        },
+        {
+          "symbol": "kd",
+          "config_symbol": "gelain_hydrolysis_kd",
+          "value": 0.017007257721651806,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "K_ind",
+          "config_symbol": "gelain_hydrolysis_K_ind",
+          "value": 0.010221535826082297,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "qF",
+          "config_symbol": "gelain_hydrolysis_qF",
+          "value": 7.3711252087588415,
+          "units": "gelain_fpu/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kF",
+          "config_symbol": "gelain_hydrolysis_kF",
+          "value": 6.220526802589703e-05,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "qB",
+          "config_symbol": "gelain_hydrolysis_qB",
+          "value": 17.31387956900871,
+          "units": "gelain_beta_u/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kB",
+          "config_symbol": "gelain_hydrolysis_kB",
+          "value": 2.882128241489888e-05,
+          "units": "1/hour",
+          "fixed": false
+        }
+      ],
+      "diagnostics": {
+        "singular_values": [
+          5.424366494641671,
+          3.727030616742039,
+          2.090428630076544,
+          1.1450408279620223,
+          0.7521232373779674,
+          0.17666209899634555,
+          0.05744160691198403,
+          0.003421441853391221,
+          0.0014467203453070172
+        ],
+        "practical_rank": 9,
+        "free_parameters": 9,
+        "full_rank": true,
+        "condition_number": 3749.422970539986,
+        "near_bounds": []
+      },
+      "starts": [
+        {
+          "start": 0,
+          "success": true,
+          "cost": 1.022671469215326,
+          "nfev": 30,
+          "status": 3
+        },
+        {
+          "start": 1,
+          "success": true,
+          "cost": 4.300618236558321,
+          "nfev": 26,
+          "status": 3
+        },
+        {
+          "start": 2,
+          "success": true,
+          "cost": 1.0326487300699785,
+          "nfev": 42,
+          "status": 3
+        },
+        {
+          "start": 3,
+          "success": true,
+          "cost": 1.021198867354505,
+          "nfev": 34,
+          "status": 3
+        },
+        {
+          "start": 4,
+          "success": true,
+          "cost": 1.0402855460886469,
+          "nfev": 33,
+          "status": 3
+        }
+      ],
+      "noise": {}
+    },
+    "frozen_prediction_file": "stage_a/M0_baseline/frozen_predictions/gelain_2020_cellulose_30gl_primary.json",
+    "frozen_prediction_sha256": "0d521d29d6aafd79642efd6348ef4c5e43a6f4297b57ad96cd9b40c1432e5e20",
+    "score": {
+      "rmse": {
+        "biomass": 2.6711186630902644,
+        "substrate": 3.8628726552012504,
+        "cellulase_activity": 428.6977921032374,
+        "beta_glucosidase_activity": 975.2022236755117
+      },
+      "bias": {
+        "biomass": 0.9066281778901529,
+        "substrate": -2.9304050232306618,
+        "cellulase_activity": 366.2093285366616,
+        "beta_glucosidase_activity": 810.7389918445472
+      },
+      "normalized_mse": {
+        "biomass": 0.10559706942178436,
+        "substrate": 0.03740489007150423,
+        "cellulase_activity": 0.23325207420133917,
+        "beta_glucosidase_activity": 0.20558452717887216
+      },
+      "n": 32
+    }
+  }
+]

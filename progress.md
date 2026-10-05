@@ -102,9 +102,23 @@ in for inoculum and medium carry-over that the deposit does not measure; M3
 needs a new generic modifier before it can run; stage B holdout posteriors are
 capped by compute and may be reported as not run. Risk: low.
 
-Next task: run stage A under the plan, record its outputs with the plan
-digest, then stage B per model within the compute cap, and report every model
-in the plan's four-word vocabulary.
+Results (stage A, recorded 2026-10-05, plan digest `9bb36f8d53d8...`):
+
+- Mean normalized held-out MSE, primary scenario: M0 0.0907, M1 0.0882
+  (+2.7 percent, substrate 13 percent worse), M2 0.0695 (+23.4 percent, biomass
+  31 percent worse), M3 0.0979 (-7.9 percent, both activities worse). Every fit
+  had full practical rank.
+- Verdicts under the preregistered rules: M1 not supported; M2 not supported
+  under R1 (fails only the per-observable clause: it fits substrate and both
+  activities clearly better by giving up biomass, removing biomass loss,
+  lowering the yield to 0.18 and pushing the unmeasured initial soluble pool to
+  2.9 g/L near its declared ceiling); M3 not supported. The biomass/cellulose
+  tension of BAYES-001 is not resolved by any of the three additions; it moves.
+- No profiles were run because no model passed the screen. Stage B
+  all-condition posteriors for the three additions follow; M0 reuses BAYES-001.
+
+Next task: finish stage B within the compute cap, record identifiability and
+coverage for each addition, and carry the verdicts into the paper plan.
 
 ## PAPER-001 Software-Paper Plan Without A Wet Lab
 

@@ -60,6 +60,60 @@ Outputs go to `data/benchmarks/gelain_2020_criticism/results/` and cite the
 plan digest. A model is reported with one of four words only: supported,
 improves fit but unidentified, not supported, or not run with its reason.
 
+## Stage A results (recorded 2026-10-05)
+
+Plan digest `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e`; five starts and 250 evaluations per start; every
+fold trains on two loadings and predicts the third; held-out predictions were
+frozen with the plan digest before scoring
+(`data/benchmarks/gelain_2020_criticism/results/stage_a/`).
+
+| Model | Scenario | Mean normalized held-out MSE | Change vs M0 | Screen (R1) |
+| --- | --- | --- | --- | --- |
+| `M0_baseline` | primary | 0.0907 |  | passed (reference) |
+| `M0_baseline` | correlated_assumption | 0.0908 |  | passed (reference) |
+| `M1_induction_state` | primary | 0.0882 | +2.7% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
+| `M1_induction_state` | correlated_assumption | 0.0963 | -6.1% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
+| `M2_soluble_product_pool` | primary | 0.0695 | +23.4% | failed: an observable worsens by more than the allowed fraction |
+| `M2_soluble_product_pool` | correlated_assumption | 0.0802 | +11.6% | failed: an observable worsens by more than the allowed fraction |
+| `M3_conversion_dependent_accessibility` | primary | 0.0979 | -7.9% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
+| `M3_conversion_dependent_accessibility` | correlated_assumption | 0.1163 | -28.1% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
+
+Per-observable pooled normalized held-out MSE, primary scenario:
+
+| Model | biomass | substrate | cellulase activity | beta-glucosidase activity |
+| --- | --- | --- | --- | --- |
+| `M0_baseline` | 0.0815 | 0.0137 | 0.1566 | 0.1110 |
+| `M1_induction_state` | 0.0792 | 0.0155 | 0.1523 | 0.1060 |
+| `M2_soluble_product_pool` | 0.1067 | 0.0078 | 0.1034 | 0.0601 |
+| `M3_conversion_dependent_accessibility` | 0.0753 | 0.0143 | 0.1825 | 0.1195 |
+
+Every fit had full practical rank in every fold and in the all-condition fit.
+Verdicts in the plan's vocabulary:
+
+- `M1_induction_state`: **not supported**. The induced state improves the
+  all-condition fit (cost 1.876 against 2.015 for M0) but held-out error improves by
+  only 2.7 percent and substrate worsens by 13 percent; the memory constant
+  settles near 0.13 per hour.
+- `M2_soluble_product_pool`: **not supported** under R1, and the most
+  informative failure. Pooled held-out error improves by 23 percent (primary)
+  and 12 percent (correlated), with substrate, cellulase and beta-glucosidase
+  all clearly better, but biomass worsens by 31 percent, above the 10 percent
+  the plan allows. The all-condition fit removes biomass loss
+  (kd 3.8e-05 per hour), lowers the yield to 0.18, pushes the
+  initial soluble pool to 2.86 g/L near the top of its declared
+  range, makes uptake nearly saturated (Ks 0.0012 g/L) and leaves
+  product inhibition weak (Ki 73 g/L). The biomass/cellulose
+  tension of BAYES-001 reappears as a trade: the pool fits every other
+  observable by giving up biomass.
+- `M3_conversion_dependent_accessibility`: **not supported**. Held-out error
+  is 8 percent worse than the baseline (28 percent under the correlated
+  assumption) and both activities worsen; the exponent settles at
+  0.10, which nearly recovers the baseline.
+
+No model passed the screen, so no profiles were run and no holdout posteriors
+are planned. Stage B all-condition posteriors (adequacy R2, identifiability
+R3, coverage R4) follow for the three additions; M0 reuses BAYES-001.
+
 ## What it is not
 
 The six Gelain conditions have informed model criticism since v1 and are not
