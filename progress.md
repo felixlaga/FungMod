@@ -142,9 +142,15 @@ Commands run and results:
 - `pyright`: 0 errors.
 - `mkdocs build --strict`: passed.
 - Targeted: `pytest tests/test_proportional_synthesis_process.py tests/test_organism_registry_case.py tests/test_modelability_report.py tests/test_registry_case_builder.py tests/test_compiled_process_models.py tests/test_process_factory_library.py`: 120 passed.
-- Registry/screening/API/maturity/guardrail subset (29 modules) and the full
-  `pytest` run were still executing when this entry was committed; their
-  results are recorded in the follow-up ledger commit.
+- Registry/screening/API/maturity/guardrail subset (29 modules): 548 passed,
+  1 failed (`test_gelain_joint_artifacts.py::test_every_frozen_holdout_replays_with_training_only_scales_and_matching_scores`,
+  the pre-existing scipy 1.17 replay drift of 4.43e-6 against the 2e-6 gate
+  recorded under CORE-001; unchanged by this work).
+- Full `pytest`: 1738 passed, 11 failed in 13m05s (Python 3.11, numpy 2.4.6,
+  scipy 1.17.1, libsbml 5.21.2). The 11 failures are exactly the pre-existing
+  set recorded under CORE-001 (ten SBML cross-engine/BioModels tests under
+  python-libsbml 5.21 and the Gelain holdout replay drift); the 21 added tests
+  all pass.
 - Public path timing: the three-condition scientific `VirtualExperiment` run,
   tables, quick-look plots and report complete in about 5.5 s.
 
