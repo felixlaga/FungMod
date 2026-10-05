@@ -1086,6 +1086,37 @@ def sample_posterior(
     )
 
 
+def _prediction_conditions(problem: BayesianProblem, conditions: Sequence[ObservedCondition] | None) -> dict[str, ObservedCondition]:
+    """The conditions a posterior predictive may address: the fitted ones, or an explicit list that may include held-out ones.
+
+    A held-out condition is one the predictor can simulate but the likelihood
+    did not see; its observations are never used to weight the samples, only
+    to be compared with the bands. The caller states which conditions are
+    held out by passing them here; the output records them.
+    """
+
+    chosen = tuple(problem.conditions) if conditions is None else tuple(conditions)
+    if not chosen:
+        raise ValueError("At least one condition is required for a posterior predictive.")
+    fitted = {condition.condition_id for condition in problem.conditions}
+    lookup: dict[str, ObservedCondition] = {}
+    for condition in chosen:
+        if condition.condition_id in lookup:
+            raise ValueError(f"Condition {condition.condition_id!r} is listed twice.")
+        if condition.condition_id in fitted:
+            recorded = next(c for c in problem.conditions if c.condition_id == condition.condition_id)
+            if recorded is not condition and (
+                tuple(recorded.observables) != tuple(condition.observables)
+                or not np.array_equal(recorded.times, condition.times)
+                or not np.array_equal(recorded.observed, condition.observed)
+            ):
+                raise ValueError(f"Condition {condition.condition_id!r} differs from the fitted condition of that id.")
+        elif tuple(condition.observables) != tuple(problem.conditions[0].observables):
+            raise ValueError(f"Held-out condition {condition.condition_id!r} must declare the fitted observables.")
+        lookup[condition.condition_id] = condition
+    return lookup
+
+
 def posterior_predictive(
     result: BayesianCalibrationResult,
     *,
@@ -1094,11 +1125,14 @@ def posterior_predictive(
     quantiles: Sequence[float] = (0.05, 0.5, 0.95),
     seed: int = 0,
     include_measurement_noise: bool = False,
+    conditions: Sequence[ObservedCondition] | None = None,
 ) -> dict[str, Any]:
     """Quantiles of the model prediction over posterior draws at requested times.
 
     With ``include_measurement_noise`` the (scaled) error model is added to each
     draw, giving bands for new observations rather than for the mean trajectory.
+    ``conditions`` may name conditions the likelihood did not see (held out);
+    the output lists them under ``held_out``.
     """
 
     if draws < 2:
@@ -1107,10 +1141,12 @@ def posterior_predictive(
     if levels.ndim != 1 or not levels.size or np.any(levels <= 0.0) or np.any(levels >= 1.0) or np.any(np.diff(levels) <= 0):
         raise ValueError("Quantiles must be increasing values in (0, 1).")
     problem = result.problem
-    conditions = {condition.condition_id: condition for condition in problem.conditions}
-    unknown = sorted(set(times_by_condition).difference(conditions))
+    lookup = _prediction_conditions(problem, conditions)
+    unknown = sorted(set(times_by_condition).difference(lookup))
     if unknown:
         raise KeyError(f"Unknown conditions for posterior prediction: {unknown}.")
+    conditions_by_id = lookup
+    fitted_ids = {condition.condition_id for condition in problem.conditions}
     flat = result.flat_samples()
     rng = np.random.default_rng(seed)
     picks = rng.integers(0, flat.shape[0], draws)
@@ -1120,11 +1156,12 @@ def posterior_predictive(
         "includes_measurement_noise": include_measurement_noise,
         "seed": int(seed),
         "conditions": {},
+        "held_out": sorted(set(times_by_condition).difference(fitted_ids)),
         "failed_draws": 0,
     }
     for condition_id, requested in times_by_condition.items():
         times = _finite_array(requested, name=f"{condition_id} prediction times", ndim=1)
-        condition = conditions[condition_id]
+        condition = conditions_by_id[condition_id]
         if include_measurement_noise:
             try:
                 condition.error.arrays(times.size)
@@ -1203,15 +1240,19 @@ def posterior_predictive_coverage(
     draws: int,
     credible_mass: float = 0.95,
     seed: int = 0,
+    conditions: Sequence[ObservedCondition] | None = None,
 ) -> dict[str, Any]:
-    """Fraction of the fitted observations inside the central posterior predictive interval.
+    """Fraction of the observations inside the central posterior predictive interval.
 
     Each draw adds the (scaled) measurement error of that draw to the model
     prediction at the observed times, so the interval is for new observations,
     not for the mean trajectory. Coverage far below ``credible_mass`` means the
     model plus its error model cannot account for the data; coverage far above
     it means the error model is wider than the residuals. It is a diagnostic,
-    not a test statistic.
+    not a test statistic. By default the fitted conditions are scored;
+    ``conditions`` may instead name held-out conditions the likelihood never
+    saw, which the output lists under ``held_out`` (that is a predictive check,
+    the fitted-data coverage is not).
     """
 
     if draws < 2:
@@ -1220,6 +1261,8 @@ def posterior_predictive_coverage(
         raise ValueError("credible_mass must lie strictly between 0 and 1.")
     lower_level, upper_level = (1.0 - credible_mass) / 2.0, 1.0 - (1.0 - credible_mass) / 2.0
     problem = result.problem
+    lookup = _prediction_conditions(problem, conditions)
+    fitted_ids = {condition.condition_id for condition in problem.conditions}
     flat = result.flat_samples()
     rng = np.random.default_rng(seed)
     picks = rng.integers(0, flat.shape[0], draws)
@@ -1229,12 +1272,13 @@ def posterior_predictive_coverage(
         "seed": int(seed),
         "includes_measurement_noise": True,
         "conditions": {},
+        "held_out": sorted(set(lookup).difference(fitted_ids)),
         "failed_draws": 0,
         "overall": {},
     }
     inside_total: dict[str, int] = {}
     count_total: dict[str, int] = {}
-    for condition in problem.conditions:
+    for condition in lookup.values():
         times = condition.times
         predictions: list[np.ndarray] = []
         for pick in picks:
