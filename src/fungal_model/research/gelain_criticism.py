@@ -485,6 +485,66 @@ class _PredictionFailure(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class OptimiserSettings:
+    """The plan's declared least-squares settings for stage A (amendment 3).
+
+    ``diff_step`` is the relative finite-difference step in natural-log
+    parameter space passed to :func:`scipy.optimize.least_squares`; the
+    predictor integrates an adaptive-step ODE, so scipy's default step of
+    about 1.5e-8 differentiates the integrator's step noise and the trust
+    region collapses above the minimum (PETAB-001). ``restarts`` repeats the
+    fit from the best start, which resets the trust region, until the
+    relative cost decrease falls below ``restart_tolerance``.
+    """
+
+    diff_step: float
+    ftol: float
+    xtol: float
+    gtol: float
+    restarts: int
+    restart_tolerance: float
+
+    def __post_init__(self) -> None:
+        if not (0.0 < self.diff_step < 1.0):
+            raise CultureBenchmarkError("diff_step must lie strictly between zero and one.")
+        for name in ("ftol", "xtol", "gtol", "restart_tolerance"):
+            value = getattr(self, name)
+            if not (np.isfinite(value) and 0.0 < value < 1.0):
+                raise CultureBenchmarkError(f"{name} must be a finite number strictly between zero and one.")
+        if self.restarts < 0:
+            raise CultureBenchmarkError("restarts must not be negative.")
+
+    @classmethod
+    def from_plan(cls, stage: Mapping[str, Any]) -> OptimiserSettings:
+        """Read ``stage_A_least_squares.optimiser``; every field is required (no silent defaults)."""
+
+        try:
+            block = stage["optimiser"]
+            return cls(
+                diff_step=float(block["log_parameter_difference_step"]),
+                ftol=float(block["ftol"]),
+                xtol=float(block["xtol"]),
+                gtol=float(block["gtol"]),
+                restarts=int(block["restarts"]),
+                restart_tolerance=float(block["restart_relative_cost_tolerance"]),
+            )
+        except KeyError as exc:
+            raise CultureBenchmarkError(f"The stage A optimiser block must declare {exc.args[0]!r}.") from exc
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "method": "trf",
+            "parameter_space": "natural log",
+            "log_parameter_difference_step": self.diff_step,
+            "ftol": self.ftol,
+            "xtol": self.xtol,
+            "gtol": self.gtol,
+            "restarts": self.restarts,
+            "restart_relative_cost_tolerance": self.restart_tolerance,
+        }
+
+
 def fit_model(
     predictor: ConfiguredConditionPredictor,
     variant: ModelVariant,
@@ -494,6 +554,7 @@ def fit_model(
     starts: int,
     seed: int,
     max_nfev: int,
+    optimiser: OptimiserSettings,
     fixed: Mapping[str, float] | None = None,
     warm_start: Mapping[str, float] | None = None,
     relative_singular_value_cutoff: float = 1e-6,
@@ -503,8 +564,12 @@ def fit_model(
 
     ``scenario`` is ``primary`` (residuals scaled by the training maxima) or
     ``correlated_assumption`` (whitened by the shared assumed error model).
-    ``fixed`` pins fit symbols for profile refits. Failures are returned as
-    failed starts, never converted into a fit.
+    ``optimiser`` carries the plan's declared difference step, tolerances
+    and restart rule; the best start is restarted from its own solution
+    until the relative cost decrease is below the declared tolerance, and
+    every restart is recorded. ``fixed`` pins fit symbols for profile
+    refits. Failures are returned as failed starts, never converted into a
+    fit.
     """
 
     if scenario not in {"primary", "correlated_assumption"}:
@@ -548,11 +613,17 @@ def fit_model(
                 pieces.append(condition.error.residuals(predicted, condition.observed))
         return np.concatenate(pieces)
 
+    def solve(x0: np.ndarray) -> Any:
+        return least_squares(
+            residual, x0, bounds=(lower, upper), max_nfev=max_nfev, method="trf",
+            diff_step=optimiser.diff_step, ftol=optimiser.ftol, xtol=optimiser.xtol, gtol=optimiser.gtol,
+        )
+
     attempts: list[dict[str, Any]] = []
     best: Any = None
     for index, x0 in enumerate(initial):
         try:
-            solution = least_squares(residual, x0, bounds=(lower, upper), max_nfev=max_nfev, method="trf")
+            solution = solve(x0)
         except _PredictionFailure as exc:
             attempts.append({"start": index, "success": False, "reason": str(exc)[:200]})
             continue
@@ -569,6 +640,24 @@ def fit_model(
             "starts": attempts,
             "reason": "every start failed",
         }
+    restarts: list[dict[str, Any]] = []
+    for index in range(optimiser.restarts):
+        try:
+            solution = solve(best.x)
+        except _PredictionFailure as exc:
+            restarts.append({"restart": index, "success": False, "reason": str(exc)[:200]})
+            break
+        previous = float(best.cost)
+        cost = float(solution.cost)
+        decrease = (previous - cost) / previous if previous > 0 else 0.0
+        restarts.append({
+            "restart": index, "success": bool(solution.success), "cost": cost, "nfev": int(solution.nfev),
+            "status": int(solution.status), "relative_cost_decrease": decrease,
+        })
+        if np.isfinite(cost) and cost < previous:
+            best = solution
+        if not decrease > optimiser.restart_tolerance:
+            break
     singular = np.linalg.svd(np.asarray(best.jac, dtype=float), compute_uv=False)
     practical_rank = int(np.sum(singular > singular[0] * relative_singular_value_cutoff)) if singular.size and singular[0] > 0 else 0
     log_range = upper - lower
@@ -599,6 +688,8 @@ def fit_model(
             "near_bounds": near_bounds,
         },
         "starts": attempts,
+        "restarts": restarts,
+        "optimiser": optimiser.to_dict(),
         "noise": {condition.condition_id: condition.error.to_dict(condition.times.size) for condition in training}
         if scenario == "correlated_assumption"
         else {},
@@ -678,6 +769,7 @@ def run_stage_a(
     n_starts = int(starts if starts is not None else stage["starts"])
     nfev = int(max_nfev if max_nfev is not None else stage["max_nfev"])
     seed = int(stage["seed"])
+    optimiser = OptimiserSettings.from_plan(stage)
     names = conditions[0].observables
     inputs = {
         "plan_sha256": file_digest(root / (plan_path or PLAN_PATH)),
@@ -685,6 +777,7 @@ def run_stage_a(
         "bayesian_plan_sha256": file_digest(root / BAYESIAN_PLAN_PATH),
         "starts": n_starts,
         "max_nfev": nfev,
+        "optimiser": optimiser.to_dict(),
         "seed": seed,
         "models": chosen,
         "scenarios": scenario_names,
@@ -710,7 +803,7 @@ def run_stage_a(
         for scenario in scenario_names:
             if log is not None:
                 log(f"{model_id} / {scenario}: all-condition fit")
-            full = fit_model(predictor, variant, conditions, scenario=scenario, starts=n_starts, seed=seed, max_nfev=nfev)
+            full = fit_model(predictor, variant, conditions, scenario=scenario, starts=n_starts, seed=seed, max_nfev=nfev, optimiser=optimiser)
             full["plan_sha256"] = inputs["plan_sha256"]
             _write_json(model_dir / f"full_fit_{scenario}.json", full)
             folds = []
@@ -718,7 +811,9 @@ def run_stage_a(
                 training = [condition for condition in conditions if condition.condition_id != held_out.condition_id]
                 if log is not None:
                     log(f"{model_id} / {scenario}: holding out {held_out.condition_id}")
-                fit = fit_model(predictor, variant, training, scenario=scenario, starts=n_starts, seed=seed + 1, max_nfev=nfev)
+                fit = fit_model(
+                    predictor, variant, training, scenario=scenario, starts=n_starts, seed=seed + 1, max_nfev=nfev, optimiser=optimiser
+                )
                 fold: dict[str, Any] = {"condition": held_out.condition_id, "scenario": scenario, "fit": fit}
                 if fit["success"] or "cost" in fit:
                     config_values = variant.config_values(_fit_values(fit))
@@ -769,6 +864,7 @@ def run_stage_a(
                 factors=(0.5, 1.0, 2.0),
                 seed=seed,
                 max_nfev=min(nfev, 100),
+                optimiser=optimiser,
             )
             _write_json(stage_dir / model_id / "profiles_primary.json", summary["profiles"])
     comparison = {"inputs": inputs, "models": summaries, "decision_rule": plan["decision_rules"]["R1_holdout_support"]}
@@ -826,17 +922,20 @@ def profile_model(
     factors: Sequence[float],
     seed: int,
     max_nfev: int,
+    optimiser: OptimiserSettings,
 ) -> dict[str, Any]:
     """Nuisance-reoptimised profile loss at fitted value x factors (primary scenario)."""
 
-    reference = fit_model(predictor, variant, conditions, scenario="primary", starts=1, seed=seed, max_nfev=max_nfev, warm_start=fitted)
+    reference = fit_model(
+        predictor, variant, conditions, scenario="primary", starts=1, seed=seed, max_nfev=max_nfev, optimiser=optimiser, warm_start=fitted
+    )
     profiles: dict[str, Any] = {"reference_cost": reference.get("cost"), "parameters": {}}
     for spec in variant.parameters:
         points = []
         for factor in factors:
             value = float(np.clip(fitted[spec.symbol] * factor, spec.lower, spec.upper))
             refit = fit_model(
-                predictor, variant, conditions, scenario="primary", starts=1, seed=seed, max_nfev=max_nfev,
+                predictor, variant, conditions, scenario="primary", starts=1, seed=seed, max_nfev=max_nfev, optimiser=optimiser,
                 fixed={spec.symbol: value}, warm_start=fitted,
             )
             points.append({"factor": factor, "value": value, "cost": refit.get("cost"), "success": refit["success"]})
@@ -848,6 +947,16 @@ def profile_model(
     return profiles
 
 
+def _optimiser_sentence(settings: Mapping[str, Any] | None) -> str:
+    if settings is None:
+        return "."
+    return (
+        f"; log-space finite-difference step {settings['log_parameter_difference_step']:g}, tolerances "
+        f"ftol {settings['ftol']:g}, xtol {settings['xtol']:g}, gtol {settings['gtol']:g}, up to {settings['restarts']} restarts "
+        f"of the best start until the relative cost decrease is below {settings['restart_relative_cost_tolerance']:g}."
+    )
+
+
 def render_stage_a_report(plan: Mapping[str, Any], comparison: Mapping[str, Any]) -> str:
     lines = [
         f"# {plan['benchmark_id']}: stage A",
@@ -855,7 +964,8 @@ def render_stage_a_report(plan: Mapping[str, Any], comparison: Mapping[str, Any]
         plan["design_status"],
         "",
         f"Plan digest `{comparison['inputs']['plan_sha256']}`; {comparison['inputs']['starts']} starts, "
-        f"{comparison['inputs']['max_nfev']} evaluations per start.",
+        f"{comparison['inputs']['max_nfev']} evaluations per start"
+        + _optimiser_sentence(comparison["inputs"].get("optimiser")),
         "",
         "| Model | Scenario | Folds scored | Mean normalized held-out MSE | Improvement vs M0 | Full rank everywhere | Screen |",
         "| --- | --- | --- | --- | --- | --- | --- |",
@@ -1256,6 +1366,7 @@ __all__ = [
     "build_posterior_study",
     "build_predictor",
     "file_digest",
+    "OptimiserSettings",
     "fit_model",
     "load_plan",
     "midpoint_values",

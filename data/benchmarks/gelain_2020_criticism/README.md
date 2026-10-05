@@ -16,8 +16,13 @@ independent and validates no biology.
   whole-condition holdouts, complexity screen, profiles), stage B (posterior
   sampling, identifiability, posterior predictive coverage), the decision rules
   R1 to R4, the outcome vocabulary, the claims excluded and the amendment rule.
-  Frozen on 2026-10-05 with SHA-256 `6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86`;
-  `tests/test_gelain_criticism_plan.py` pins it.
+  Frozen on 2026-10-05; current SHA-256
+  `9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7` after
+  three dated amendments (machine-readable error-model fields; the walker
+  rule; the stage A optimiser settings added after PETAB-001 found the
+  optimiser stopping above the minimum: log-space difference step 1e-3,
+  tolerances 1e-10, up to three restarts). `tests/test_gelain_criticism_plan.py`
+  pins it.
 - `results/stage_a/`: recorded 2026-10-05 under the previous plan digest
   (amendment 2 added only the walker rule afterwards)
   (`inputs.json`, per-model `full_fit_*.json`, `folds_*.json`, frozen held-out

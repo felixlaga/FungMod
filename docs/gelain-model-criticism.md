@@ -13,13 +13,35 @@ independent and validates no biology.
 ## The frozen plan
 
 `data/benchmarks/gelain_2020_criticism/plan.json` (SHA-256
-`6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86`) declares
+`9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7`) declares
 everything before any fit: the data digests, four models with every parameter's
 bounds, units and role, the shared assumed error model with one sampled noise
 multiplier, the two stages, the decision rules, the outcome vocabulary, the
 excluded claims and an amendment rule. `tests/test_gelain_criticism_plan.py`
 pins the digest, so a change to the plan is impossible without a dated
 amendment inside the file and a new digest in the test and the ledger.
+
+Three dated amendments are recorded in the file. The first two (digests
+`8b368ac8...` to `9bb36f8d...` to `6849c8b3...`) added machine-readable
+error-model fields and the walker rule before the runs they affect. The third
+(`6849c8b3...` to the current digest) added the stage A optimiser settings
+after the cross-solver reproduction (PETAB-001) showed that FungMod's recorded
+`M0_baseline` optimum was 1.3 percent above the minimum COPASI found. The
+diagnosis, recorded in the amendment: every start had stopped on scipy's step
+tolerance rather than the evaluation cap; the cost gradient at the recorded
+point was far from zero; and the finite-difference Jacobian at scipy's default
+step (about 1.5e-8) was differentiating the adaptive ODE integrator's step
+noise, so derivative norms for weakly entering constants were 15 times their
+converged values and the trust region collapsed. The v2 plan had declared a
+log-space difference step of 1e-3 and this plan omitted it. The amendment
+declares that step, tolerances of 1e-10, and up to three restarts of the best
+start until the relative cost decrease is below 1e-6; `OptimiserSettings`
+reads the block with no defaults, and every fit file records the settings and
+its restarts. Stage A was re-run for every model and scenario under the new
+digest; the stage B chains were not re-run (their initial centre is a starting
+point, and they are already reported as unconverged and provisional), and
+their R1 component is checked against the new screen by
+`tests/test_gelain_criticism_plan.py`.
 
 | Model | Mechanism added to the baseline | Added parameters |
 | --- | --- | --- |
