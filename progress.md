@@ -242,6 +242,87 @@ Results (stage A, recorded 2026-10-05, plan digest `9bb36f8d53d8...`):
 Next task: finish stage B within the compute cap, record identifiability and
 coverage for each addition, and carry the verdicts into the paper plan.
 
+## CRIT-002 Gelain Model-Criticism Study: Stage B Posteriors Recorded
+
+Date: 2026-10-05
+
+Status: complete for stage B under the plan's compute cap. The M2, M1 and
+M3 all-condition posteriors are recorded under the frozen plan (digest
+`6849c8b3...`); M0 reuses BAYES-001. None of the three chains meets the
+convergence rule at the planned length, so every stage B verdict is
+provisional as the plan requires. Two code defects found while recording
+are fixed and tested. Step 5 item 2's gate (frozen plan, per-mechanism
+identifiability table, failed candidates reported) is met with that
+provisional label.
+
+Changed:
+
+- `research/gelain_criticism.py`: the variant config factory merges the
+  variant's fixed constants into every candidate, so the posterior sampler
+  (which supplies only the fitted symbols) no longer drops M1's `k_z` and
+  start every walker at a non-finite posterior; `stage_b_verdicts` applies
+  R2 (multiplier interval contains 1.0) and R3 (every added parameter
+  identified or weakly identified) and combines them with the recorded stage
+  A screen into the plan's outcome vocabulary, labelled provisional when the
+  chain missed the convergence rule; `render_stage_b_report` reads the
+  recorded summary and identifiability fields (it crashed on M2's first
+  completion) and prints tau, bound contacts, the multiplier interval, the
+  rules and coverage; `write_posterior_outputs` adds `verdicts.json` to the
+  digested artifacts.
+- `tests/test_gelain_criticism_study.py`: posterior studies of M1 and M3 are
+  finite at a candidate (M1 has the fixed constant); the verdict helper
+  follows the rules on synthetic results. `tests/test_gelain_criticism_plan.py`:
+  every recorded stage B folder cites the plan chain, labels unconverged
+  chains provisional, uses the outcome vocabulary and matches its digests.
+- `docs/gelain-model-criticism.md` (stage B section), benchmark README.
+
+Not changed: the plan, stage A results, any rate law or constant.
+
+M2 result (`results/stage_b/M2_soluble_product_pool/`, 28 walkers, 8000
+steps, 2000 burn-in, two resumed runs totalling 2 h 35 min wall-clock against
+the plan's 2 h cap): not converged (tau 368 to 529 with 6000 post-burn-in
+steps; ESS 318 to 457; mean acceptance 0.174, minimum 0.071), verdicts
+provisional. R2 fails (multiplier median 1.94, interval [1.65, 2.87]). R3
+fails (`mu`, `Ks`, `Ki` prior dominated; `P0` bounded below only, median
+2.8 g/L against a 3 g/L bound). Common constants: `qF`, `qB` identified;
+`k_h`, `kd` weakly identified; `Kh` bounded below only; `K_ind`, `kB`
+bounded above only; `Y`, `kF` prior dominated. Coverage 95/96 at 95 percent
+with measurement noise. Outcome: not supported (fails R1).
+
+M1 result (`results/stage_b/M1_induction_state/`, 24 walkers, 8000 steps,
+49 min wall-clock): not converged (tau 267 to 340 with 6000 post-burn-in
+steps; ESS 423 to 540; mean acceptance 0.264), verdicts provisional. R2
+fails (multiplier median 2.16, interval [1.87, 2.53]; baseline 2.25). R3
+passes: `kz_loss` weakly identified (median 0.053 per hour, interval
+[0.024, 0.58]). Common constants: `Y`, `kd`, `qF`, `qB` identified; `k_h`,
+`Kh` weakly identified; `K_ind` bounded above only; `kF`, `kB` prior
+dominated. Coverage 91/96 (cellulase 19/24). Outcome: not supported (fails
+R1). The chain's report was re-rendered after the renderer fix; the
+sampler and analysis outputs are those of the single run.
+
+M3 result (`results/stage_b/M3_conversion_dependent_accessibility/`, 24
+walkers, 8000 steps, 42 min wall-clock): not converged (tau 232 to 371 with
+6000 post-burn-in steps; ESS 388 to 620; mean acceptance 0.290), verdicts
+provisional. R2 fails (multiplier median 2.24, interval [1.94, 2.62]). R3
+fails: `n` bounded above only (median 0.13, interval [0.053, 0.46], prior
+[0.05, 3]). Common constants keep the baseline's classes. Coverage 91/96.
+Outcome: not supported (fails R1).
+
+Across the additions: none passes R1, none restores adequacy under R2, and
+only M1's `kz_loss` is (weakly) identified under R3. The hydrolysis
+candidate's biomass/cellulose misfit is not explained by an induction
+memory, a soluble product pool with inhibition, or conversion-dependent
+accessibility as declared.
+
+Commands: `ruff check` passed; `pyright` 0 errors; criticism tests (see the
+PR). Scientific impact: the soluble-pool mechanism neither restores adequacy
+nor is identified by the duplicate means; nothing is promoted. Backward
+compatibility: `write_posterior_outputs` writes one more file. Risk: low.
+
+Recommended next task: tighten the stage A optimiser under a dated
+amendment (PETAB-001 finding) and re-run stage A; chains longer than the
+planned 8000 steps would need a second amendment and more than the 2 h cap.
+
 ## CI-001 Cross-Platform Quality-Gate Repair
 
 Date: 2026-10-05
