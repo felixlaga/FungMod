@@ -30,6 +30,15 @@ All notable public releases of FungMod are documented here.
   the pulled-front speed of the Edelstein system, conservation, symmetry,
   solver agreement and two unit systems (`docs/spatial-mycelium.md`). No
   organism parameters and no colony data yet.
+- Gelain model-criticism study, amendment 4 (CRIT-004): the
+  `M2_soluble_product_pool` all-condition posterior is re-recorded from the
+  converged stage A fit with 36000 steps (still not converged; multiplier
+  interval [1.63, 2.23], added constants bounded on one side or prior
+  dominated, outcome unchanged and provisional), and the plan's holdout
+  posteriors run per fold through `run_gelain_2020_model_criticism.py
+  stage-b --hold-out` with the held-out loading scored by posterior
+  predictive coverage (held-out coverage 22/32, 69 percent with 10 g/L held out, 32/32, 100 percent with 20 g/L held out, 19/32, 59 percent with 30 g/L held out, none of the three fold chains converged). `posterior_predictive_coverage`
+  takes an explicit condition list; table 4 and the manifests regenerated.
 - The software paper is a LaTeX manuscript, `paper/paper.tex` (it replaces
   the Markdown draft; `make paper-pdf` builds it with latexmk). The paper
   tables are now also written as LaTeX fragments (`paper/tables/*.tex`,

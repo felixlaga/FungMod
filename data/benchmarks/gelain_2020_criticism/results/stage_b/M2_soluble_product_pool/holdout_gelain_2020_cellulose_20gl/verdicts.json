@@ -1,0 +1,23 @@
+{
+  "provisional": true,
+  "R1_holdout_support": null,
+  "R2_adequacy": false,
+  "R2_multiplier_interval": [
+    1.8703725894416274,
+    2.8957891255513233
+  ],
+  "R3_identification": false,
+  "added_parameter_classes": {
+    "mu": "bounded_below_only",
+    "Ks": "prior_dominated",
+    "Ki": "prior_dominated",
+    "P0": "bounded_below_only"
+  },
+  "outcome": "not scored (stage A screen not recorded)",
+  "rules": {
+    "R1_holdout_support": "passes the stage A screen against M0 in the primary scenario",
+    "R2_adequacy": "the 95% interval of the shared noise multiplier contains 1.0 (adequate at the assumed 10% error); otherwise report the multiplier as the inadequacy factor",
+    "R3_identification": "every added parameter is classified identified or weakly identified; a mechanism whose added parameters are all bounded on one side only or prior dominated is 'improves fit but unidentified' even if R1 passes",
+    "R4_coverage": "reported, not thresholded"
+  }
+}
