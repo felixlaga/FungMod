@@ -52,8 +52,11 @@ includes and references every figure.
 `make paper-pdf` runs `latexmk -pdf` in `paper/` and writes
 `paper/paper.pdf`, which is not committed (the build products are ignored by
 git). It needs a TeX distribution with `latexmk`, `natbib`, `booktabs`,
-`tabularx`, `microtype`, `caption`, `graphicx` and `hyperref` (any recent
-TeX Live suffices; `lmodern` is used when present). The manuscript never
+`tabularx`, `geometry`, `graphicx`, `url` and `hyperref`; `lmodern`,
+`caption` and `microtype` are used when present. A full TeX Live has all of
+them; on a minimal installation such as TinyTeX run
+`tlmgr install natbib booktabs tabularx geometry hyperref url lm caption microtype latexmk`
+first. The manuscript never
 types a number from a study: it includes the generated table fragments and
 figure PDFs, so a stale table shows up as a failing `check`, not as a
 silently wrong manuscript.

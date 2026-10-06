@@ -14,14 +14,14 @@
 \usepackage{tabularx}
 \usepackage{array}
 \usepackage{graphicx}
-\usepackage{caption}
 \usepackage[round,authoryear]{natbib}
-\usepackage{microtype}
 \usepackage{url}
 \usepackage[hidelinks]{hyperref}
 \urlstyle{same}
 \bibliographystyle{plainnat}
-\captionsetup{font=small,labelfont=bf}
+% Cosmetic packages a minimal TeX installation may lack; the build does not need them.
+\IfFileExists{caption.sty}{\usepackage{caption}\captionsetup{font=small,labelfont=bf}}{}
+\IfFileExists{microtype.sty}{\usepackage{microtype}}{}
 
 \title{FungMod: provenance-aware virtual experiments with identifiability
   analysis, preregistered model criticism and cross-solver reproduction for
