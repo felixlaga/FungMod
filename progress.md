@@ -126,6 +126,42 @@ Recommended next task: user time-course tables (`timecourse.csv`) compared
 against the simulated trajectories with the existing comparison metrics, then
 fitting of user kinetic constants to them.
 
+## FIX-DOCS001 Two Defects Found By The Documentation Audit
+
+Date: 2026-10-06
+
+Status: complete. The README and docs audit (DOCS-001) ran every documented
+example and found two code defects; both are fixed with regression tests.
+
+- SABIO-RK proposals: `_proposed_parameter_symbol` mapped every parameter of a
+  type it does not special-case to the bare type token, so the four `pKa`
+  parameters of the pH-dependent entries (38522 and seven others in Reaction
+  618) all became `pka` and `review_source_proposal` refused the whole
+  reaction with a duplicate record ID. The parameter's SABIO-RK name now
+  completes the symbol when it differs from the type (`pka_pke1`, `pka_pke2`,
+  `pka_pkes1`, `pka_pkes2`); `Km_<species>`, `kcat_<substrate>`, the
+  concentration symbols and types whose name adds nothing (`ph`) are unchanged.
+- Preflight: `assess_modelability` now checks the environment conditions the
+  selected process law reads at run time, declared by the law modules
+  (`PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS = ("ph",)`,
+  `THERMAL_INACTIVATION_ENVIRONMENT_CONDITIONS = ("temperature",)`, collected
+  in `PROCESS_ENVIRONMENT_CONDITIONS`). A missing or unknown value is a
+  missing item; a range or distribution is incompatible ("the law needs one
+  value per run; use an environment with an exact pH, or an EnvironmentGrid
+  point"). The *P. chrysosporium* K-3 case in `toy_lab_environment` (pH range)
+  is therefore no longer modelable; in the Tsukada assay environments and
+  EnvironmentGrid points it is unchanged.
+
+Tests: `tests/test_preflight_fixes_docs001.py` (distinct symbols in every
+Reaction 618 entry, the whole proposal reviewable, ranged pH blocking in both
+modes, exact pH unchanged, the declared conditions, processes without
+environment reads unaffected).
+
+Not changed: any rate law, parameter record or registry record; the
+homogeneous Michaelis-Menten and culture cases. Scientific impact: a case that
+could only fail at run time is now refused at preflight.
+
+
 ## DOCS-001 README And Docs Accuracy Audit
 
 Status: `complete` for the stated scope (2026-10-06). Documentation only: no

@@ -371,6 +371,18 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- SABIO-RK proposals gave every parameter of one type the same proposed symbol
+  when its species did not distinguish them, so the four pKa values of a
+  pH-dependent kinetic law collided (`proposed_sabiork_parameter_618_38522_pka`)
+  and the whole Reaction 618 proposal could not be reviewed. The SABIO-RK
+  parameter name now completes such symbols (`pka_pke1`, `pka_pkes2`); symbols
+  whose name adds nothing are unchanged (FIX-DOCS001).
+- Preflight reported the pH-ionization Michaelis-Menten case as modelable in an
+  environment whose pH is a range, after which every simulation sample failed.
+  Preflight now checks the environment conditions each process law reads
+  (`PROCESS_ENVIRONMENT_CONDITIONS`: pH for the ionization law, temperature for
+  thermal inactivation) and reports a range or unknown as blocking, with the
+  remedy (FIX-DOCS001).
 - Importing the COPASI stack through `fungal_model.standards.copasi` no longer
   leaves the process in the C locale. COPASI's static initialiser calls
   `setlocale(LC_ALL, "C")`, which switched Python's preferred text encoding to

@@ -1061,6 +1061,12 @@ def _proposed_parameter_symbol(
         return "enzyme_concentration"
     if type_token == "concentration" and species_token:
         return f"initial_{species_token}_concentration"
+    # A kinetic law may carry several parameters of one type (for example the
+    # four pKa values of a diprotic pH-dependent law); the SABIO-RK parameter
+    # name then distinguishes them, so it becomes part of the symbol.
+    name_token = _token(name)
+    if type_token and name_token and name_token != type_token:
+        return f"{type_token}_{name_token}"
     return type_token or "parameter"
 
 
