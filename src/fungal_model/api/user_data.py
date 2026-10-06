@@ -2780,8 +2780,11 @@ def _generate_records(
         )
 
     rows_by_case: dict[tuple[str, str, str, str], dict[str, _Kinetics]] = {}
+    constant_conditions: dict[tuple[str, str, str], set[str]] = {}
     for row in parsed.kinetics:
         rows_by_case.setdefault(row.case_key, {})[row.quantity] = row
+        if row.quantity in _KINETIC_CONSTANT_QUANTITIES:
+            constant_conditions.setdefault((row.strain_id, row.class_key, row.substrate_id), set()).add(row.condition_id)
     pairs: list[tuple[str, _Substrate]] = [
         (class_key, substrate)
         for class_key in used_classes
@@ -2800,8 +2803,14 @@ def _generate_records(
                 continue
             strain = parsed.strains[item.strain_id]
             strain_laws = parsed.laws.get((strain.strain_id, class_key, substrate.substrate_id), {})
+            measured = constant_conditions.get((strain.strain_id, class_key, substrate.substrate_id), set())
             for condition in parsed.conditions.values():
                 case_rows = rows_by_case.get((strain.strain_id, class_key, substrate.substrate_id, condition.condition_id), {})
+                elsewhere = (
+                    ()
+                    if condition.condition_id in measured
+                    else tuple(other for other in parsed.conditions.values() if other.condition_id in measured)
+                )
                 case = _CaseContext(
                     strain=strain,
                     info=info,
@@ -2812,6 +2821,7 @@ def _generate_records(
                     form_started=started,
                     laws=tuple(strain_laws),
                     genome=item.genome if item.genome_only else None,
+                    measured_elsewhere=elsewhere,
                 )
                 for quantity in _FORM_QUANTITIES[form]:
                     mapping, origin = _role_mapping(quantity, case)
@@ -2882,6 +2892,8 @@ class _CaseContext:
     laws: tuple[str, ...]
     # Set when the class of this strain comes from its genome annotation alone.
     genome: _GenomeClassEvidence | None = None
+    # Other conditions at which this strain, class and substrate have kinetic constants, when this case has none.
+    measured_elsewhere: tuple[_Condition, ...] = ()
 
 
 def _pair_laws(parsed: _Parsed, pair: tuple[str, str]) -> tuple[ResponseLaw, ...]:
@@ -3670,7 +3682,22 @@ def _with_genome_note(request: str, genome: _GenomeClassEvidence | None) -> str:
 
 
 def _measurement_request(quantity: str, *, case: _CaseContext, units_text: str) -> str:
-    return _with_genome_note(_measurement_request_text(quantity, case=case, units_text=units_text), case.genome)
+    request = _with_measured_condition_note(
+        _measurement_request_text(quantity, case=case, units_text=units_text), case.measured_elsewhere
+    )
+    return _with_genome_note(request, case.genome)
+
+
+def _with_measured_condition_note(request: str, measured: Sequence[_Condition]) -> str:
+    """Name the conditions at which the case's kinetic constants were stated instead of this one."""
+
+    if not measured:
+        return request
+    where = " and ".join(f"{condition.condition_id} ({_condition_text(condition)})" for condition in measured)
+    return (
+        f"{request.rstrip('.')}; kinetics.csv states kinetic constants of this strain, enzyme class and substrate "
+        f"only at {where}, and FungMod does not reuse kinetics measured at another condition."
+    )
 
 
 def _measurement_request_text(quantity: str, *, case: _CaseContext, units_text: str) -> str:
@@ -3970,10 +3997,33 @@ def _state_names(class_key: str, substrate: _Substrate, *, form: str) -> dict[st
     return names
 
 
+def enzyme_class_acts_on(
+    *,
+    target_bond_classes: Sequence[str],
+    compatible_substrate_classes: Sequence[str],
+    substrate_class: str,
+    bond_classes: Sequence[str],
+) -> tuple[str, ...]:
+    """Return the bond classes through which an enzyme class acts on a substrate, sorted; empty when it does not.
+
+    This is the categorical compatibility rule of the registry and of user
+    datasets: the substrate class must be one of the enzyme class's compatible
+    substrate classes, and the substrate must carry a bond class the enzyme
+    class targets.
+    """
+
+    if substrate_class not in compatible_substrate_classes:
+        return ()
+    return tuple(sorted(set(bond_classes).intersection(target_bond_classes)))
+
+
 def _shared_bonds(info: _EnzymeClassInfo, substrate: _Substrate) -> tuple[str, ...] | None:
-    if substrate.substrate_class not in info.compatible_substrate_classes:
-        return None
-    shared = tuple(sorted(set(substrate.bond_classes).intersection(info.target_bond_classes)))
+    shared = enzyme_class_acts_on(
+        target_bond_classes=info.target_bond_classes,
+        compatible_substrate_classes=info.compatible_substrate_classes,
+        substrate_class=substrate.substrate_class,
+        bond_classes=substrate.bond_classes,
+    )
     return shared or None
 
 
@@ -4404,5 +4454,6 @@ __all__ = [
     "UserDataError",
     "UserDataset",
     "VMAX_ROUTES",
+    "enzyme_class_acts_on",
     "load_user_dataset",
 ]

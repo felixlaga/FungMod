@@ -18,6 +18,7 @@
         - load_user_dataset
         - UserDataset
         - UserDataError
+        - enzyme_class_acts_on
 
 ::: fungal_model.api.user_data_sources
     options:
@@ -26,6 +27,14 @@
         - UserTablesDraft
         - UserTablesSourceError
         - SABIORK_UNIT_SPELLINGS
+
+::: fungal_model.api.user_data_assembly
+    options:
+      members:
+        - assemble_user_tables
+        - AssembledTablesDraft
+        - UserTablesAssemblyError
+        - ASSEMBLY_STATUSES
 
 ## Environment grids
 

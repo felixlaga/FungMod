@@ -118,6 +118,14 @@ def test_user_data_sources_has_no_organism_substrate_or_enzyme_specific_tokens()
         assert forbidden not in module, forbidden
 
 
+def test_user_data_assembly_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
+    """The assembly module names its sources and rules, never an organism, substrate or enzyme."""
+
+    module = (ROOT / "src" / "fungal_model" / "api" / "user_data_assembly.py").read_text(encoding="utf-8").lower()
+    for forbidden in USER_DATA_FORBIDDEN_TOKENS:
+        assert forbidden not in module, forbidden
+
+
 def test_user_data_import_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
     user_data = (ROOT / "src" / "fungal_model" / "api" / "user_data.py").read_text(encoding="utf-8").lower()
 
