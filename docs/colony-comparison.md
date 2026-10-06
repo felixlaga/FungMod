@@ -7,7 +7,7 @@ puteana* and *Rhizoctonia solani* under sixteen temperature-humidity
 conditions. The test is declared before anything is run, in
 `data/benchmarks/de_ligne_2019_colony/plan.json`, and
 `tests/test_colony_comparison_plan.py` pins that file's SHA-256
-(`ea6e2e7270b809fee092655f7e6882cf266e16d86d955c276ba5e2edc5ad959e`), so
+(`ca0e016cf22652c3d44bcfad49ac64f706eeea2f78a459470b11722c6f495103`), so
 a change to the plan is impossible without a dated amendment inside the
 file and a new digest in the test and the ledger.
 
@@ -43,7 +43,8 @@ through cardinal response laws in temperature and water activity?
   inert, so the disc is the only source), with the SPATIAL-001 processes:
   saturating extension that pays for the length it lays down, tip
   diffusion, lateral branching that needs internal reserve, anastomosis,
-  tip loss, uptake from the disc, diffusive and active translocation. One
+  tip loss, uptake from the disc, diffusive translocation (the active,
+  tip-directed term was removed by amendment 2; see below). One
   activity `phi_c` in [0, 1] per condition scales the extension speed and
   the branching rate; every other parameter is shared across conditions.
   A comparison variant gives extension and branching separate activities
@@ -98,6 +99,36 @@ of reach; the axisymmetric grid is the planned remedy and its agreement with
 the Cartesian model is the first check of stage 0. Declaring the operators,
 the error model, the hold-outs and the rules now keeps those later
 engineering choices from being tuned to the data.
+
+## Amendment 2: the active translocation term was ill-posed
+
+The first recorded stage 0 (2026-10-06, under amendment 1, kept in
+`results/stage_0_superseded_ea6e2e72/`) failed two of its three checks at the
+artificial check values: halving the radial cell changed the tip count by up
+to 57 percent and the area by 10 percent (threshold 2), and the cartesian
+reference differed by 76 and 19 percent (threshold 3); the solver check
+passed. The failure was the model's. The active translocation term carried
+internal reserve up the tip-density gradient, branching made tips where the
+reserve was, and the tips aggregated into a spike whose height grew without
+bound as the cell shrank, the finite-time aggregation known from
+Keller-Segel chemotaxis models:
+
+| Active translocation | 24 h tip count on 141, 283, 566 radial cells | Peak tip density per halving of the cell |
+| --- | --- | --- |
+| `D_a = 1` | 27 669, 64 922, 146 399 | doubles |
+| `D_a = 0.1` | 1 434, 1 301, 1 161 | quadruples |
+| `D_a = 1e-4` | 9 617, 9 531, 9 531 | converged |
+
+A fit over the declared bounds of `D_a` could have exploited that grid
+artifact. Amendment 2, dated and recorded before any fit, removes the active
+term and its parameter from `colony_reserve_v1`, adds a well-posedness guard
+that re-solves every scored solution (stage 0 check values, every stage A
+optimum, every stage C prediction, the stage D posterior median) on the
+doubled radial grid with the 2 percent threshold, adds decision rule R0 that
+reports a failure as "not run (not grid converged)", and makes the 3 percent
+symmetry threshold the plan already stated machine-readable. The
+translocation process now declares the aggregation as a failure mode
+whenever its active term is used.
 
 ## What it is not
 

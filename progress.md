@@ -90,7 +90,7 @@ assumption, not a measurement.
 Status: `partial` (plan frozen 2026-10-06 and amended once the same day, before any check was recorded, to make the area operator's detection density a grid-independent constant; stage 0 core pieces built under SPATIAL-002, the runner and the recorded checks not; no fit run).
 
 `data/benchmarks/de_ligne_2019_colony/plan.json` (SHA-256
-`ea6e2e7270b809fee092655f7e6882cf266e16d86d955c276ba5e2edc5ad959e`, pinned by
+`ca0e016cf22652c3d44bcfad49ac64f706eeea2f78a459470b11722c6f495103`, pinned by
 `tests/test_colony_comparison_plan.py`) declares the within-study transfer test
 of the continuum mycelium (SPATIAL-001) against DATA-003 before anything is
 run: an axisymmetric geometry on the scan window with the inoculum disc, the

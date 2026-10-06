@@ -63,7 +63,7 @@ OBSERVABLE_UNITS = {"area": "centimeter ** 2", "tips": "dimensionless"}
 READABLE_EXCLUDES = ("sd_one_sided", "sd_asymmetric_bar")
 
 FIELD_ROLES = {"tips": "tips", "hyphae": "hyphae", "internal": "internal_substrate", "reserve": "external_substrate"}
-SHARED_SYMBOLS = ("Kv", "c_ext", "Dn", "a", "dn", "cu", "Di", "Da", "R0", "n0", "rho0")
+SHARED_SYMBOLS = ("Kv", "c_ext", "Dn", "a", "dn", "cu", "Di", "R0", "n0", "rho0")
 SCALED_SYMBOLS = ("v", "b")
 CHECK_SOURCE = (
     "COLONY-001 stage 0 software-check value: an artificial framework value inside the plan's bounds, "
@@ -80,7 +80,6 @@ STAGE_0_CHECK_VALUES: dict[str, float] = {
     "dn": 0.02,
     "cu": 0.1,
     "Di": 5.0,
-    "Da": 1.0,
     "R0": 50.0,
     "n0": 5.0,
     "rho0": 10.0,
@@ -326,9 +325,10 @@ def colony_model(
             name="uptake", external_field="reserve", external_units=reserve_units, internal_field="internal",
             internal_units=internal_units, hypha_field="hyphae", hypha_units=hypha_units, rate_symbol="cu",
         ),
+        # Diffusive translocation only: plan amendment 2 removed the active term, whose
+        # tip-directed flux made the model aggregate without bound under grid refinement.
         Translocation(
             name="translocation", internal_field="internal", internal_units=internal_units, diffusivity_symbol="Di",
-            tip_field="tips", tip_units=tip_units, active_diffusivity_symbol="Da",
         ),
     )
     parameters = ParameterSet(
@@ -338,7 +338,7 @@ def colony_model(
                 uncertainty=None, source=source, confidence_level=confidence_level,  # type: ignore[arg-type]
                 notes=next(item["meaning"] for item in plan["model"]["parameters"] if item["symbol"] == symbol),
             )
-            for symbol in ("v", "b", "Kv", "c_ext", "Dn", "a", "dn", "cu", "Di", "Da")
+            for symbol in ("v", "b", "Kv", "c_ext", "Dn", "a", "dn", "cu", "Di")
         ]
     )
     return MyceliumModel(grid=colony_grid(plan, geometry=geometry, cells=cells, source=source), fields=specs, processes=processes, parameters=parameters, time_units=time_units)
@@ -411,13 +411,49 @@ def observables(result: MyceliumResult, plan: Mapping[str, Any]) -> dict[str, np
 
 
 # --------------------------------------------------------------------------- #
-# Stage 0: recorded software checks
+# Well-posedness guard and stage 0: recorded software checks
 # --------------------------------------------------------------------------- #
+
+OBSERVABLE_NAMES = ("tip_count", "mycelial_area_cm2")
 
 
 def _relative_difference(a: np.ndarray, b: np.ndarray) -> float:
     scale = max(float(np.max(np.abs(a))), float(np.max(np.abs(b))), 1e-12)
     return float(np.max(np.abs(a - b)) / scale)
+
+
+def grid_threshold(plan: Mapping[str, Any]) -> float:
+    return float(plan["geometry"]["well_posedness_guard"]["max_relative_difference"])
+
+
+def grid_convergence(
+    plan: Mapping[str, Any],
+    values: Mapping[str, float],
+    phi: float,
+    *,
+    hours: Sequence[int] | None = None,
+    cells: int | None = None,
+) -> dict[str, Any]:
+    """The plan's well-posedness guard: re-solve on the doubled radial grid and compare both observables.
+
+    Returns both observable trajectories, the largest relative difference per
+    observable over the output times, and whether the result is grid
+    converged under the plan's threshold. A result that is not grid
+    converged cannot be scored under the plan.
+    """
+
+    base_cells = int(cells or plan["geometry"]["domain"]["cells"])
+    coarse = observables(simulate_condition(plan, values, phi, hours=hours, cells=base_cells), plan)
+    fine = observables(simulate_condition(plan, values, phi, hours=hours, cells=2 * base_cells), plan)
+    differences = {name: _relative_difference(coarse[name], fine[name]) for name in OBSERVABLE_NAMES}
+    return {
+        "cells": [base_cells, 2 * base_cells],
+        "relative_differences": differences,
+        "threshold": grid_threshold(plan),
+        "passed": max(differences.values()) <= grid_threshold(plan),
+        "coarse": coarse,
+        "fine": fine,
+    }
 
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
@@ -455,9 +491,9 @@ def run_stage_0(
     output.mkdir(parents=True, exist_ok=True)
     geometry = plan["geometry"]
     thresholds = {
-        "grid": 0.02,
+        "grid": grid_threshold(plan),
         "solver": float(geometry["solver_check"]["max_relative_difference"]),
-        "symmetry": 0.03,
+        "symmetry": float(geometry["symmetry_threshold"]),
     }
     hour_list = list(hours) if hours is not None else list(range(1, 63))
     cells = int(radial_cells or geometry["domain"]["cells"])
@@ -506,11 +542,9 @@ def run_stage_0(
     checks["reference_observables"] = reference_observables
     say(f"radial reference: {elapsed:.1f} s, {reference.solver_metadata['nfev']} right-hand sides")
 
-    fine = simulate_condition(plan, values, STAGE_0_CHECK_PHI, hours=hour_list, cells=2 * cells)
-    fine_observables = observables(fine, plan)
+    fine_observables = observables(simulate_condition(plan, values, STAGE_0_CHECK_PHI, hours=hour_list, cells=2 * cells), plan)
     grid_differences = {
-        name: _relative_difference(reference_observables[name], fine_observables[name])
-        for name in ("tip_count", "mycelial_area_cm2")
+        name: _relative_difference(reference_observables[name], fine_observables[name]) for name in OBSERVABLE_NAMES
     }
     checks["grid"] = {"cells": [cells, 2 * cells], "relative_differences": grid_differences, "passed": max(grid_differences.values()) <= thresholds["grid"]}
     say(f"grid check: {grid_differences}")
@@ -556,6 +590,7 @@ def run_stage_0(
 
 __all__ = [
     "CHECK_SOURCE",
+    "OBSERVABLE_NAMES",
     "DATASET_DIR",
     "PLAN_PATH",
     "RESULTS_PATH",
@@ -571,6 +606,8 @@ __all__ = [
     "colony_model",
     "file_digest",
     "fit_error_models",
+    "grid_convergence",
+    "grid_threshold",
     "initial_fields",
     "load_observations",
     "load_plan",

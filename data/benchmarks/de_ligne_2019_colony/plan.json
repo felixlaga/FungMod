@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "benchmark_id": "de_ligne_2019_colony_comparison_v1",
-  "status": "plan frozen 2026-10-06, amended once the same day before stage 0 was recorded; no fit has been run",
+  "status": "plan frozen 2026-10-06, amended twice the same day before any fit; stage 0 recorded once under amendment 1 (superseded) and re-run under amendment 2; no fit has been run",
   "frozen_on": "2026-10-06",
   "design_status": "Written after the dataset was digitized and inspected (final values and the article's stated optima were read while verifying the extraction) but before any model was run against it or any parameter fitted. Not blind, not registered with a third party, not a validation of biology: a declared contract for a within-study transfer test of one model family on one experiment.",
   "question": "Can the continuum mycelium of SPATIAL-001 (tip density, hyphal length density, an internal reserve carried by the mycelium and the inoculum reserve it draws on), with one dimensionless environment activity per condition multiplying tip extension and branching, reproduce the hourly mycelial area and tip count of one species across the sixteen temperature-humidity conditions of De Ligne et al. 2019, and predict four held-out conditions from the activities fitted on the other twelve through cardinal response laws?",
@@ -64,6 +64,18 @@
         "atol": 1e-10
       },
       "max_relative_difference": 0.005
+    },
+    "symmetry_threshold": 0.03,
+    "well_posedness_guard": {
+      "max_relative_difference": 0.02,
+      "definition": "re-solve on the doubled radial grid (566 cells) and compare both observables at every output time; the largest relative difference must not exceed max_relative_difference",
+      "applies_to": [
+        "the stage 0 check values",
+        "every stage A optimum, for each training condition",
+        "every stage C prediction, for each held-out condition",
+        "the stage D posterior median, for each condition"
+      ],
+      "on_failure": "the result is reported as not grid converged, with both solutions, and cannot satisfy R1 or R2"
     }
   },
   "model": {
@@ -121,7 +133,7 @@
       {
         "name": "translocation",
         "type": "Translocation",
-        "law": "internal diffuses with Di and is carried up the tip-density gradient with Da"
+        "law": "internal diffuses with Di; no active term (amendment 2)"
       }
     ],
     "environment_activity": {
@@ -213,15 +225,6 @@
         "upper": 100.0,
         "prior": "log_uniform",
         "meaning": "diffusive translocation of the internal reserve"
-      },
-      {
-        "symbol": "Da",
-        "role": "shared",
-        "units": "millimeter ** 4 / hour",
-        "lower": 0.0001,
-        "upper": 100.0,
-        "prior": "log_uniform",
-        "meaning": "active translocation towards tips"
       },
       {
         "symbol": "R0",
@@ -356,7 +359,8 @@
       "not run (reason stated)"
     ],
     "identification_qualifier": "an outcome that passes R1 or R2 while failing R3 carries the qualifier 'unidentified' and promotes no parameter",
-    "ties": "if both variants reproduce and transfer, the one with fewer parameters is preferred; both are reported"
+    "ties": "if both variants reproduce and transfer, the one with fewer parameters is preferred; both are reported",
+    "R0_grid_converged": "every scored solution passes geometry.well_posedness_guard; a stage whose solution fails it is reported as not grid converged and its outcome is 'not run (not grid converged)'"
   },
   "reporting": {
     "outputs": "data/benchmarks/de_ligne_2019_colony/results/<species>/<stage>/ with inputs.json citing this plan's sha256",
@@ -377,6 +381,11 @@
       "date": "2026-10-06",
       "previous_sha256": "e7a8706e85fef7739e96c7fe21d8aac0cbf2e4719201b1c203c9296d033066e4",
       "reason": "observation_operators.mycelial_area tied the detection density to the model cell (one segment per cell side), which made the area observable change with the grid and the plan's own grid-convergence check ill-posed; found while building stage 0, before any check was recorded or any fit run. The detection density is now a declared constant, 1 per millimetre, independent of the grid. No model, bound, rule, hold-out or other setting changed."
+    },
+    {
+      "date": "2026-10-06",
+      "previous_sha256": "ea6e2e7270b809fee092655f7e6882cf266e16d86d955c276ba5e2edc5ad959e",
+      "reason": "The first recorded stage 0 (kept in results/stage_0_superseded_ea6e2e72) failed its grid check (largest relative difference 0.574 in tip count, 0.102 in area, threshold 0.02) and its symmetry check (0.760 and 0.192, threshold 0.03) while the solver check passed (3.6e-6). A probe traced the failure to the model: the active translocation term D_a s grad(n) carries internal reserve up the tip-density gradient and branching makes tips where the reserve is, a chemotaxis-like positive feedback that concentrates tips into a spike whose height grows without bound as the cell shrinks (24 h tip count 27669, 64922, 146399 on 141, 283, 566 radial cells at D_a = 1; 1434, 1301, 1161 with the peak density quadrupling per halving at D_a = 0.1); with D_a = 1e-4 the same model converges (9617, 9531, 9531). A fit over the declared D_a bounds could exploit that grid artifact. Amendment 2, before any fit: the active term and its parameter D_a are removed from colony_reserve_v1 (translocation is diffusive only); a well-posedness guard re-solves every scored solution on the doubled radial grid with the grid threshold, and decision rule R0 makes a failure 'not run (not grid converged)'; the symmetry threshold the plan already stated in prose (3 percent) is made machine-readable. No other model term, bound, operator, hold-out, stage or rule changed."
     }
   ],
   "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason and the previous sha256, recorded before the affected stage is run; the ledger records the file's sha256 at freezing and after each amendment"
