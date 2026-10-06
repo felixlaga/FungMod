@@ -136,6 +136,36 @@ secretion cost needs one derived rate constant (`alpha_E_c_E`, the product
 of the secretion coefficient and the secretion cost), carried by
 `compiled_parameters` with its provenance.
 
+## The compiled Jacobian
+
+A compiled model can assemble `d(dy/dt)/dy` itself:
+`CompiledModel.jacobian(t, y)` sums, over processes, the stoichiometric
+column times the gradient of the process rate with respect to the state
+vector. A process may offer that gradient analytically through
+`Process.compile_jacobian`; `first_order_decay`, `mass_action` (with
+catalysts), `homogeneous_michaelis_menten`, `proportional_synthesis`, the
+three resource-limited closure processes and the two exchanges do. Every
+other process (and any process behind a rate modifier or a dynamic
+thermodynamic constraint) is differentiated by central finite differences of
+its own rate kernel over the states it declares, and the kind of every
+process is recorded in the kernel summary under `jacobian_kernels` with
+`analytic_jacobian_count`. Gradients are evaluated at the same projected
+state as the rates and multiplied by the projection's derivative, so the
+matrix is the exact derivative of the right-hand side wherever it is
+differentiable; at the closure's kink the one-sided derivative the classes
+use applies.
+
+`SolverSettings(jacobian="compiled")` makes the implicit methods (`LSODA`,
+`BDF`, `Radau`) take that matrix instead of differentiating the right-hand
+side themselves; explicit methods ignore the option. The default stays
+`"finite_difference_by_backend"`, so no recorded result changes unless a
+run declares otherwise; the run's `solver_metadata["kernel"]["jacobian"]`
+says which was used, and `SolverSettings.to_dict()` records the option only
+when it is set. `tests/test_compiled_jacobian.py` checks the assembled
+matrix against finite differences of the compiled right-hand side on every
+packaged config and reproduces the backend-difference trajectories and the
+culture classes' analytic-Jacobian trajectories with it.
+
 ## What is not on the compiled core yet
 
 - The legacy `Reaction`/`SimulationEngine` path, the 1D and N-D
@@ -146,9 +176,9 @@ of the secretion coefficient and the secretion cost), carried by
   `Reaction` objects for caller-supplied Python rate laws, which cannot be
   compiled; `simulate_compiled` is the compiled path of all three classes.
   They are tracked as `FD-009` in `ARCHITECTURE_DEBT.md`.
-- No analytic Jacobian is generated for compiled models; stiff methods use the
-  backend's finite differences, recorded as
-  `"jacobian": "finite_difference_by_backend"`.
+- By default stiff methods still use the backend's finite differences,
+  recorded as `"jacobian": "finite_difference_by_backend"`; the compiled
+  Jacobian below is opt-in so that recorded results stay byte-stable.
 
 ## Reproduce
 

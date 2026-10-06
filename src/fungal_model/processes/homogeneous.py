@@ -9,7 +9,7 @@ from typing import cast
 import numpy as np
 
 from fungal_model.core.assumptions import Assumption
-from fungal_model.core.kernels import KernelContext, RateKernel, conversion_factor
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel, conversion_factor
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.kinetics.michaelis_menten import (
@@ -128,6 +128,21 @@ class FirstOrderDecayProcess(Process):
             return (rate_constant * substrate) * scale
 
         return kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        index, to_state = context.state_slot(self.substrate_state, self.state_units)
+        rate_constant = context.parameter(self.rate_constant_symbol, "1 / second")
+        scale = conversion_factor(f"{self.state_units} / second", self.rate_units, name=f"{self.name} rate")
+        size = len(context.state_index)
+        derivative = rate_constant * to_state * scale
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time, state
+            result = np.zeros(size, dtype=float)
+            result[index] = derivative
+            return result
+
+        return gradient
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
@@ -257,6 +272,51 @@ class MassActionProcess(Process):
             return rate * scale
 
         return kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        """Product rule over reactants and catalysts.
+
+        For a reaction order below one the derivative at a zero state is
+        unbounded; the kernel returns zero there, the only finite choice, and
+        the rate kernel itself is unaffected.
+        """
+
+        rate_constant = context.parameter(self.rate_constant_symbol, self.rate_constant_units)
+        orders = self._rate_orders()
+        slots = tuple(
+            (species, *context.state_slot(species, self.state_units[species]), float(order))
+            for species, order in orders.items()
+        )
+        probe = Q_(1.0, self.rate_constant_units)
+        for species, order in orders.items():
+            probe = probe * Q_(1.0, self.state_units[species]) ** float(order)
+        scale = float(assert_compatible(probe, self.rate_units, name=f"{self.name} rate").magnitude)
+        size = len(context.state_index)
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            quantities = []
+            for species, index, to_state, order in slots:
+                quantity = state[index] * to_state
+                if quantity < 0:
+                    raise ValueError(f"{species} must be non-negative.")
+                quantities.append((index, quantity, order, to_state))
+            result = np.zeros(size, dtype=float)
+            for position, (index, quantity, order, to_state) in enumerate(quantities):
+                if order == 1.0:
+                    own = 1.0
+                elif quantity == 0.0:
+                    own = 0.0
+                else:
+                    own = order * quantity ** (order - 1.0)
+                partial = rate_constant * scale * to_state * own
+                for other, (_, other_quantity, other_order, _) in enumerate(quantities):
+                    if other != position:
+                        partial *= other_quantity ** other_order
+                result[index] += partial
+            return result
+
+        return gradient
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
@@ -442,6 +502,48 @@ class HomogeneousMichaelisMentenProcess(Process):
             return ((kcat * enzyme) * (substrate / (km + substrate))) * scale
 
         return enzyme_kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        substrate_index, to_substrate = context.state_slot(self.substrate_state, self.substrate_units)
+        km = context.parameter(self.km_symbol, self.substrate_units)
+        if km <= 0:
+            raise ValueError("km must be positive for Michaelis-Menten kinetics.")
+        size = len(context.state_index)
+        if self.vmax_symbol is not None:
+            vmax = context.parameter(self.vmax_symbol, self.rate_units)
+
+            def vmax_gradient(time: float, state: np.ndarray) -> np.ndarray:
+                del time
+                substrate = state[substrate_index] * to_substrate
+                if substrate < 0:
+                    raise ValueError("substrate must be non-negative for Michaelis-Menten kinetics.")
+                result = np.zeros(size, dtype=float)
+                result[substrate_index] = vmax * km / (km + substrate) ** 2 * to_substrate
+                return result
+
+            return vmax_gradient
+        assert self.enzyme_state is not None
+        assert self.enzyme_units is not None
+        assert self.kcat_symbol is not None
+        enzyme_index, to_enzyme = context.state_slot(self.enzyme_state, self.enzyme_units)
+        kcat_units = f"{self.rate_units} / ({self.enzyme_units})"
+        kcat = context.parameter(self.kcat_symbol, kcat_units)
+        scale = float(
+            assert_compatible(Q_(1.0, kcat_units) * Q_(1.0, self.enzyme_units), self.rate_units, name=f"{self.name} rate").magnitude
+        )
+
+        def enzyme_gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            substrate = state[substrate_index] * to_substrate
+            enzyme = state[enzyme_index] * to_enzyme
+            if enzyme < 0 or substrate < 0:
+                raise ValueError("substrate and enzyme must be non-negative for Michaelis-Menten kinetics.")
+            result = np.zeros(size, dtype=float)
+            result[substrate_index] = kcat * enzyme * km / (km + substrate) ** 2 * scale * to_substrate
+            result[enzyme_index] += kcat * substrate / (km + substrate) * scale * to_enzyme
+            return result
+
+        return enzyme_gradient
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")

@@ -14,7 +14,7 @@ from typing import Any
 
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.errors import InvalidMechanismError
-from fungal_model.core.kernels import KernelContext, RateKernel
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity
 
@@ -199,6 +199,23 @@ class Process:
         states. ``None`` means no kernel is offered; the compiled solver then
         evaluates :meth:`rate` on a reconstructed unit-bearing state and
         records that explicitly.
+        """
+
+        del context
+        return None
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        """Return the gradient kernel of :meth:`compile_rate`, or ``None``.
+
+        The kernel receives the integration time and the numeric state vector
+        and returns ``d(rate)/d(state)`` as one entry per model state, in the
+        process's rate units per state unit, evaluated at the projected
+        state the rate kernel sees. ``None`` means no analytic gradient is
+        offered; the compiled solver then differentiates the rate kernel by
+        central finite differences over the states this process declares and
+        records that explicitly. Where a rate law has a kink (a ``max`` or
+        ``min``), the kernel returns the one-sided derivative the process
+        documents.
         """
 
         del context

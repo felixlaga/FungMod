@@ -16,7 +16,9 @@ from fungal_model.chemistry.thermodynamics import (
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.core.validators import ValidationResult
 from fungal_model.results import SimulationResult
+from fungal_model.core.numerics import JACOBIAN_COMPILED
 from fungal_model.solvers.compiled import (
+    JACOBIAN_COMPILED_LABEL,
     CompiledModel,
     compile_assembled_model,
     evaluation_state_for_rates,
@@ -86,8 +88,14 @@ class ProcessODESolver:
             constraints_by_process=constraints_by_process,
         )
 
-        solution = solve_checked(compiled.rhs, t_span_numeric, y0, t_eval=t_eval_numeric,
-                                 **settings.scipy_options(state_units, time_units))
+        options = settings.scipy_options(state_units, time_units)
+        use_compiled_jacobian = settings.jacobian == JACOBIAN_COMPILED and settings.uses_jacobian
+        if use_compiled_jacobian:
+            options["jac"] = compiled.jacobian
+        solution = solve_checked(compiled.rhs, t_span_numeric, y0, t_eval=t_eval_numeric, **options)
+        kernel_summary = compiled.summary()
+        if use_compiled_jacobian:
+            kernel_summary["jacobian"] = JACOBIAN_COMPILED_LABEL
         states = {
             name: Q_(solution.y[index], state_units[name])
             for index, name in enumerate(state_names)
@@ -125,7 +133,7 @@ class ProcessODESolver:
                 "nfev": int(solution.nfev),
                 "njev": None if solution.njev is None else int(solution.njev),
                 "nlu": None if solution.nlu is None else int(solution.nlu),
-                "kernel": compiled.summary(),
+                "kernel": kernel_summary,
                 **(
                     {"dynamic_thermodynamics": thermodynamic_metadata}
                     if self.model.thermodynamic_constraints

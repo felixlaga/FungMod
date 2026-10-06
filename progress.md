@@ -26,6 +26,65 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CORE-002 Compiled Jacobian From Per-Process Gradients
+
+Date: 2026-10-05
+
+Status: complete, opt-in. The FD-009 exit item "compiled models can supply
+a Jacobian" is met without moving any recorded result.
+
+Changed:
+
+- `core/kernels.py`: `JacobianKernel`. `processes/base.py`:
+  `Process.compile_jacobian(context)` returning the gradient of the rate
+  kernel with respect to the numeric state vector, or `None`.
+- `solvers/compiled.py`: `CompiledProcess.gradient` and `jacobian_kind`
+  (`analytic` or `finite_difference`); `CompiledModel.jacobian(t, y)` sums
+  stoichiometric column times gradient, evaluated at the projected state and
+  masked by the projection's derivative; the finite-difference fallback
+  perturbs only the states a process declares, one-sided at the
+  non-negative boundary, relative step 1e-6; the kernel summary records
+  `jacobian_kernels` and `analytic_jacobian_count`. A thermodynamically
+  constrained or quantity-wrapped rate is always differentiated numerically.
+- Analytic gradients: `FirstOrderDecayProcess`, `MassActionProcess`
+  (reactants and catalysts by the product rule; an order below one at a zero
+  state returns zero, documented), `HomogeneousMichaelisMentenProcess` (both
+  forms), `ProportionalSynthesisProcess` (constitutive and induced),
+  `ResourceLimitedGrowthProcess`, `ResourceLimitedMaintenanceProcess`,
+  `CostedSecretionProcess` (the classes' one-sided derivatives at the
+  capacity-equals-demand kink, through `ClosureConstants.capacity_gradient`
+  and `budget_gradient`), `DilutionExchangeProcess`, `GasTransferProcess`.
+- `core/numerics.py`: `SolverSettings.jacobian`
+  (`finite_difference_by_backend`, the default, or `compiled`), validated,
+  serialised only when set; `uses_jacobian`. `solvers/process_ode.py`: the
+  implicit methods receive `compiled.jacobian` when asked and the run
+  records `kernel["jacobian"] = "compiled_process_gradients"`.
+- `docs/compiled-core.md` (new section), `ARCHITECTURE_DEBT.md` (FD-009
+  exit item), `CHANGELOG.md`.
+- Tests: `tests/test_compiled_jacobian.py` (new): the assembled matrix
+  equals finite differences of the compiled right-hand side on every
+  packaged config at the initial state and random perturbations; the simple
+  laws and the closure report analytic kinds, modifier-wrapped and
+  constrained processes finite differences; catalysed mass action with a
+  fractional order; integration with the compiled Jacobian reproduces the
+  backend-difference trajectory on the toy chemostat (BDF) and the
+  `DegradingCulture` native analytic-Jacobian trajectory to 1e-7; explicit
+  methods ignore the option; settings validation and serialisation; a
+  process offering only a rate is differentiated numerically and recorded.
+
+Not changed: any default, any recorded result, any rate law. Scientific
+impact: none. Backward compatibility: additive (`SolverSettings` gains a
+defaulted field; the kernel summary gains two keys). Risk: low.
+
+Remaining ambiguities: making the compiled Jacobian the default for implicit
+methods would move trajectories within solver tolerance and therefore the
+recorded study artifacts; that is a decision for a dated re-run, not a
+code default. Rate modifiers have no gradient hooks yet (finite differences
+apply).
+
+Recommended next task: finish the amendment 4 M2 chain; then decide whether
+a future study plan declares `jacobian: compiled`.
+
 ## REPRO-002 The Paper's Figures From The Recorded Results
 
 Date: 2026-10-05

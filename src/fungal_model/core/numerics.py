@@ -27,6 +27,12 @@ def _positive_scalar(value: Any, name: str) -> float:
     return float(array)
 
 
+JACOBIAN_FINITE_DIFFERENCE_BY_BACKEND = "finite_difference_by_backend"
+JACOBIAN_COMPILED = "compiled"
+JACOBIAN_OPTIONS = frozenset({JACOBIAN_FINITE_DIFFERENCE_BY_BACKEND, JACOBIAN_COMPILED})
+IMPLICIT_METHODS = frozenset({"LSODA", "BDF", "Radau"})
+
+
 @dataclass(frozen=True)
 class SolverSettings:
     """Recorded integration controls with optional unit-bearing per-state atol.
@@ -41,10 +47,18 @@ class SolverSettings:
     atol: float | Mapping[str, Quantity] = 1e-10
     max_step: Quantity | None = None
     first_step: Quantity | None = None
+    #: How implicit methods obtain the Jacobian: ``finite_difference_by_backend``
+    #: (scipy differentiates the right-hand side) or ``compiled`` (the compiled
+    #: model assembles it from per-process gradient kernels, analytic where a
+    #: process offers one and central finite differences otherwise). Explicit
+    #: methods ignore it. Only the compiled process core honours ``compiled``.
+    jacobian: str = JACOBIAN_FINITE_DIFFERENCE_BY_BACKEND
 
     def __post_init__(self) -> None:
         if self.method not in {"LSODA", "BDF", "Radau", "DOP853", "RK45", "RK23"}:
             raise ValueError(f"Unsupported integration method: {self.method!r}.")
+        if self.jacobian not in JACOBIAN_OPTIONS:
+            raise ValueError(f"Unsupported jacobian option: {self.jacobian!r}; choose one of {sorted(JACOBIAN_OPTIONS)}.")
         if not 100 * np.finfo(float).eps <= _positive_scalar(self.rtol, "rtol") < 1:
             raise ValueError("rtol must be at least 100 machine epsilons and less than one.")
         if isinstance(self.atol, Mapping):
@@ -89,7 +103,15 @@ class SolverSettings:
         # Keep old scalar-settings serialization byte-for-byte compatible.
         if self.first_step is not None:
             result["first_step"] = quantity(self.first_step)
+        if self.jacobian != JACOBIAN_FINITE_DIFFERENCE_BY_BACKEND:
+            result["jacobian"] = self.jacobian
         return result
+
+    @property
+    def uses_jacobian(self) -> bool:
+        """Whether the chosen method consumes a Jacobian at all."""
+
+        return self.method in IMPLICIT_METHODS
 
 
 def solve_checked(fun, t_span, y0, *, t_eval=None, **options):
@@ -132,4 +154,12 @@ def solve_checked(fun, t_span, y0, *, t_eval=None, **options):
     return result
 
 
-__all__ = ["IntegrationError", "SolverSettings", "solve_checked"]
+__all__ = [
+    "IMPLICIT_METHODS",
+    "JACOBIAN_COMPILED",
+    "JACOBIAN_FINITE_DIFFERENCE_BY_BACKEND",
+    "JACOBIAN_OPTIONS",
+    "IntegrationError",
+    "SolverSettings",
+    "solve_checked",
+]
