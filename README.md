@@ -61,6 +61,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Area | Implemented capability |
 | --- | --- |
 | Dynamics | Unit-aware ODE models and uniform Cartesian 1D/2D/3D reaction-diffusion |
+| Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
 | Uncertainty | Monte Carlo propagation, local sensitivity, and variance-based global sensitivity |

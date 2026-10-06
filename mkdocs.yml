@@ -74,6 +74,7 @@ nav:
       - Compiled model core: compiled-core.md
       - Organism physiology in the registry: organism-physiology.md
       - Environment response laws: environment-response.md
+      - Spatial mycelium: spatial-mycelium.md
   - Tutorials:
       - Full example notebooks: notebooks.md
       - Configured models: configured-models.md

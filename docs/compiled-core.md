@@ -175,7 +175,11 @@ culture classes' analytic-Jacobian trajectories with it.
   analytic piecewise Jacobian, and `FungalCouplingModel.reactions()` keeps
   `Reaction` objects for caller-supplied Python rate laws, which cannot be
   compiled; `simulate_compiled` is the compiled path of all three classes.
-  They are tracked as `FD-009` in `ARCHITECTURE_DEBT.md`.
+  They are tracked as `FD-009` in `ARCHITECTURE_DEBT.md`. The spatial
+  mycelium core (`fungal_model.mycelium`, [spatial mycelium](spatial-mycelium.md))
+  compiles its own field processes to vectorised kernels with the same
+  build-time unit resolution and negative-state policy; it does not yet lift
+  well-mixed `Process` kernels per cell.
 - By default stiff methods still use the backend's finite differences,
   recorded as `"jacobian": "finite_difference_by_backend"`; the compiled
   Jacobian below is opt-in so that recorded results stay byte-stable.

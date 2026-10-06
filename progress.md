@@ -26,6 +26,101 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## SPATIAL-001 A Continuum Mycelium On A Compiled Spatial Core
+
+Date: 2026-10-06
+
+Status: complete for the first slice of step 6 (exploratory). A fungus can
+now occupy space in FungMod: `fungal_model.mycelium` compiles field
+processes for hyphal growth on a uniform grid to numpy kernels, verified
+against analytic and conservation results. Nothing in it is parameterised
+for an organism; the owner decided to start step 6 before the transfer
+test of step 5.3, and the module says so in its maturity label.
+
+Changed:
+
+- `mycelium/grid.py`: `SpatialGrid` (one to three axes, `no_flux` or
+  `periodic` per axis, cell widths in metres, measures, coordinates).
+- `mycelium/operators.py`: conservative finite-volume operators on plain
+  arrays (face values and gradients, harmonic face mean, first-order upwind
+  advective flux, divergence, diffusive tendency, drift face velocities,
+  spatial integral).
+- `mycelium/fields.py`: `FieldSpec`, `FieldKernelContext` (field slots and
+  parameters converted once at compile time), the kernel types.
+- `mycelium/processes.py`: the `FieldProcess` contract (fields read and
+  changed, parameter requirements, assumptions, validity, failure modes,
+  `compile_tendency`, optional `compile_rate`, `to_dict`).
+- `mycelium/hyphae.py`: ten generic processes in the continuum forms of
+  Edelstein (1982) and Boswell et al. (2003), each functional form declared
+  as this implementation's choice with its limitations: `TipExtension`
+  (hyphae gain `v n`; `v` constant or saturating in an internal substrate;
+  an optional cost drawn only from that substrate, so it cannot overdraw),
+  `TipMotion` (diffusion plus drift up or down a declared field, upwind),
+  `LateralBranching` (`b rho` or `b rho s`), `DichotomousBranching`,
+  `Anastomosis` (`-a n rho`), `FirstOrderLoss` (optionally into a product
+  field), `LocalUptake` (linear or saturating), `Translocation` (diffusive
+  plus an active term up the tip-density gradient), `LocalSecretion`
+  (optionally saturating with a cost), `FieldDiffusion`;
+  `continuum_process_types()`.
+- `mycelium/model.py`: `MyceliumModel.compile` (refuses missing fields,
+  incompatible units, missing parameters, negative rates and non-positive
+  half-saturations), `CompiledMyceliumModel` (`rhs` at `max(field, 0)`,
+  `rates`, nearest-neighbour sparsity for implicit methods other than
+  LSODA, `simulate` through `solve_checked`), `MyceliumResult`
+  (`spatial_integral`, `occupied_measure`, `front_position`,
+  `results_summary` with maturity, assumptions and limitations),
+  `total_amount` for conservation ledgers.
+- `mycelium/benchmarks.py`: `artificial_colony_model` (two dimensions, all
+  substrate-coupled processes) and `artificial_front_model` (the
+  one-dimensional Edelstein system), round framework-benchmark values with
+  `testing` confidence.
+- `docs/spatial-mycelium.md` (new, in the navigation), `docs/api.md`,
+  `docs/capabilities.md`, `docs/paper-readiness.md`, `docs/compiled-core.md`,
+  `README.md`, `CHANGELOG.md`, `ARCHITECTURE_DEBT.md` (FD-009 narrowed),
+  the state document (step 6 status).
+- Tests: `tests/test_mycelium_core.py` (grid validation, operators against
+  the transport Laplacian in two and three dimensions, upwind conservation
+  and non-negativity, boundary faces, harmonic mean, process registry and
+  declarations, refusals of partial or overdrawing options, compile-time
+  checks, two unit systems against a closed form, every mechanism's
+  tendency in its declared units, negative-field policy, result API);
+  `tests/test_mycelium_colony.py` (pulled-front speed within 5 percent of
+  `2 sqrt(D alpha)` approached from below, colony conservation to 1e-7,
+  monotone expansion, symmetry to 1e-10, LSODA/BDF/RK45 agreement to 2e-4,
+  right-hand-side time bound, translocation conservation and active
+  transport towards tips).
+
+Not changed: the 1D and N-D reaction-diffusion engines, every well-mixed
+process, every registry record, every recorded study. Scientific impact:
+none; no organism or substrate is claimed and the module is exploratory.
+Backward compatibility: additive (a new package and docs page). Risk: low
+for code; the scientific risk is misuse of artificial parameters as if
+measured, which the maturity label, the `testing` confidence and the
+scientific-mode refusal guard against.
+
+Commands run (venv, Python 3.11): `ruff check src tests scripts/run_*.py
+scripts/reproduce_paper.py`; `pyright` (whole package); `mkdocs build
+--strict`; `pytest tests/test_mycelium_core.py tests/test_mycelium_colony.py`
+(18 passed) with the reaction-diffusion, hygiene and guardrail modules;
+results in the PR.
+
+Measured: 0.4 ms per right-hand side at 50 x 50 cells and four fields; the
+40 x 40 colony over 24 hours in 19 s with LSODA and 39 s with BDF on the
+sparse pattern; the unit-aware engines took 66 ms per right-hand side at
+200 cells.
+
+Remaining ambiguities: the active translocation and tropism terms are
+declared forms, not reproductions of any paper's equations; the extent of a
+colony depends on a threshold the caller declares; the harmonic-mean gating
+of translocation by hyphal density was tried and removed because it starves
+the tip zone, which the docs record.
+
+Recommended next task: a sparse compiled Jacobian for the spatial core so
+that colony solves are fast enough for calibration; then, once the owner
+supplies the Vidal-Diez de Ulzurrun 2019 time series and the Boswell 2003
+parameter table, a registry-parameterised *R. solani* case under a frozen
+plan comparing colony area and tip counts over time.
+
 ## PAPER-002 The Manuscript In LaTeX With Generated Table Fragments And PDF Figures
 
 Date: 2026-10-06
