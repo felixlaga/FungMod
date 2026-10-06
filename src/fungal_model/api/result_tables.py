@@ -212,12 +212,14 @@ def _build_table_rows(
             state_roles = _state_roles(sample)
             trajectory_rows = _read_trajectory(sample)
             rate_rows = _read_process_rates(sample)
+            state_rate_rows = _read_state_rates(sample)
             derived_rows = _read_derived_quantities(sample)
             rows["time_series_long"].extend(
                 _time_series_rows(
                     sample_context=sample_context,
                     trajectory_rows=trajectory_rows,
                     rate_rows=rate_rows,
+                    state_rate_rows=state_rate_rows,
                     derived_rows=derived_rows,
                     state_roles=state_roles,
                 )
@@ -227,7 +229,7 @@ def _build_table_rows(
                 _final_metric_rows(
                     sample_context=sample_context,
                     trajectory_rows=trajectory_rows,
-                    rate_rows=rate_rows,
+                    state_rate_rows=state_rate_rows,
                     state_roles=state_roles,
                 )
             )
@@ -1072,6 +1074,15 @@ def _read_process_rates(sample: EnsembleSample) -> list[dict[str, str]]:
     return _read_csv(path)
 
 
+def _read_state_rates(sample: EnsembleSample) -> list[dict[str, str]] | None:
+    """Rows of the sample's ``state_rates.csv``, or ``None`` when the bundle has none."""
+
+    path = Path(sample.output_directory) / "state_rates.csv"
+    if not path.exists():
+        return None
+    return _read_csv(path)
+
+
 def _read_derived_quantities(sample: EnsembleSample) -> list[dict[str, str]]:
     path = Path(sample.output_directory) / "derived_quantities.csv"
     if not path.exists():
@@ -1084,6 +1095,7 @@ def _time_series_rows(
     sample_context: Mapping[str, Any],
     trajectory_rows: Sequence[Mapping[str, str]],
     rate_rows: Sequence[Mapping[str, str]],
+    state_rate_rows: Sequence[Mapping[str, str]] | None,
     derived_rows: Sequence[Mapping[str, str]],
     state_roles: Mapping[str, str],
 ) -> list[dict[str, Any]]:
@@ -1095,7 +1107,7 @@ def _time_series_rows(
     product_state = state_roles.get("product")
     initial_substrate = _initial_state_value(trajectory_rows, substrate_state)
     initial_product = _initial_state_value(trajectory_rows, product_state)
-    rate_by_index = _rate_by_index(rate_rows)
+    role_rates = _role_rate_observables(state_rate_rows, state_roles)
     rate_rows_by_index = _quantity_rows_by_index(rate_rows)
     derived_rows_by_index = _quantity_rows_by_index(derived_rows)
     for index, row in enumerate(trajectory_rows):
@@ -1164,19 +1176,8 @@ def _time_series_rows(
                         "source": "derived_from_states",
                     }
                 )
-        if index in rate_by_index:
-            rate = rate_by_index[index]
-            for state_name in ("degradation_rate", "product_release_rate"):
-                output.append(
-                    {
-                        **base,
-                        "state": state_name,
-                        "state_role": "derived_rate",
-                        "value": rate["value"],
-                        "units": rate["units"],
-                        "source": "simulation_process_rate",
-                    }
-                )
+        for observable_name, role_rate in role_rates.items():
+            output.append(_role_rate_time_series_row(base, observable_name, role_rate, index))
         for rate in rate_rows_by_index.get(index, ()):
             output.append(
                 {
@@ -1206,7 +1207,7 @@ def _final_metric_rows(
     *,
     sample_context: Mapping[str, Any],
     trajectory_rows: Sequence[Mapping[str, str]],
-    rate_rows: Sequence[Mapping[str, str]],
+    state_rate_rows: Sequence[Mapping[str, str]] | None,
     state_roles: Mapping[str, str],
 ) -> list[dict[str, Any]]:
     base = _base_sample_columns(sample_context)
@@ -1223,7 +1224,7 @@ def _final_metric_rows(
     final_substrate = _optional_float(final_row.get(substrate_state or ""))
     initial_product = _initial_state_value(trajectory_rows, product_state)
     final_product = _optional_float(final_row.get(product_state or ""))
-    max_rate = _maximum_process_rate(rate_rows)
+    role_rates = _role_rate_observables(state_rate_rows, state_roles)
     rows: list[dict[str, Any]] = []
     if substrate_state is None or final_substrate is None:
         rows.append(
@@ -1377,20 +1378,23 @@ def _final_metric_rows(
                         "",
                     )
                 )
-    for metric_name in ("maximum_product_release_rate", "maximum_substrate_depletion_rate"):
-        if max_rate is None:
+    for metric_name, observable_name in _MAXIMUM_RATE_METRICS:
+        role_rate = role_rates[observable_name]
+        if role_rate.reason:
+            rows.append(
+                _metric_row(base, metric_name, "", "not_applicable", "not_applicable", role_rate.reason)
+            )
+        else:
             rows.append(
                 _metric_row(
                     base,
                     metric_name,
-                    "",
-                    "not_applicable",
-                    "not_applicable",
-                    "No process-rate trajectory was available.",
+                    max(role_rate.values.values()),
+                    role_rate.units,
+                    "computed",
+                    role_rate.metric_note,
                 )
             )
-        else:
-            rows.append(_metric_row(base, metric_name, max_rate["value"], max_rate["units"], "computed", ""))
     return rows
 
 
@@ -2721,9 +2725,63 @@ def _initial_state_value(
     return _optional_float(trajectory_rows[0].get(state_name))
 
 
-def _rate_by_index(rate_rows: Sequence[Mapping[str, str]]) -> dict[int, dict[str, Any]]:
-    output: dict[int, dict[str, Any]] = {}
-    for row in rate_rows:
+STATE_RATE_SOURCE = "simulation_state_rate"
+NO_STATE_RATE_TRAJECTORY_REASON = "No state-rate trajectory was recorded for this sample."
+# Each observable is the recorded net rate of one mapped state times a sign:
+# (observable name, state role, sign, symbolic definition).
+_ROLE_RATE_OBSERVABLES = (
+    ("degradation_rate", "substrate", -1.0, "-d[substrate]/dt"),
+    ("product_release_rate", "product", 1.0, "+d[product]/dt"),
+)
+_MAXIMUM_RATE_METRICS = (
+    ("maximum_product_release_rate", "product_release_rate"),
+    ("maximum_substrate_depletion_rate", "degradation_rate"),
+)
+
+
+@dataclass(frozen=True)
+class _RoleRate:
+    """Signed net rate of one mapped state per time index, or why it is unavailable."""
+
+    values: Mapping[int, float]
+    units: str
+    metric_note: str
+    reason: str
+
+
+def _role_rate_observables(
+    state_rate_rows: Sequence[Mapping[str, str]] | None,
+    state_roles: Mapping[str, str],
+) -> dict[str, _RoleRate]:
+    return {
+        observable_name: _role_rate(
+            state_rate_rows,
+            role=role,
+            state_name=state_roles.get(role),
+            sign=sign,
+            description=description,
+        )
+        for observable_name, role, sign, description in _ROLE_RATE_OBSERVABLES
+    }
+
+
+def _role_rate(
+    state_rate_rows: Sequence[Mapping[str, str]] | None,
+    *,
+    role: str,
+    state_name: str | None,
+    sign: float,
+    description: str,
+) -> _RoleRate:
+    if not state_rate_rows:
+        return _RoleRate({}, "", "", NO_STATE_RATE_TRAJECTORY_REASON)
+    if state_name is None:
+        return _RoleRate({}, "", "", f"No {role} state mapping was available.")
+    values: dict[int, float] = {}
+    units: set[str] = set()
+    for row in state_rate_rows:
+        if row.get("name") != state_name:
+            continue
         try:
             index = int(str(row.get("index", "")))
         except ValueError:
@@ -2731,12 +2789,50 @@ def _rate_by_index(rate_rows: Sequence[Mapping[str, str]]) -> dict[int, dict[str
         value = _optional_float(row.get("value"))
         if value is None:
             continue
-        output[index] = {
-            "name": row.get("name", ""),
-            "value": value,
-            "units": row.get("units", ""),
+        # Adding 0.0 turns a negated zero into +0.0.
+        values[index] = sign * value + 0.0
+        units.add(str(row.get("units", "")))
+    if not values:
+        return _RoleRate({}, "", "", f"No state-rate trajectory was recorded for {role} state {state_name!r}.")
+    if len(units) != 1:
+        return _RoleRate(
+            {}, "", "", f"State-rate rows for {role} state {state_name!r} carry inconsistent units {sorted(units)}."
+        )
+    return _RoleRate(
+        values,
+        units.pop(),
+        f"Maximum over the returned time points of {description} for state {state_name}, "
+        "from the recorded state-rate trajectory.",
+        "",
+    )
+
+
+def _role_rate_time_series_row(
+    base: Mapping[str, Any],
+    observable_name: str,
+    role_rate: _RoleRate,
+    index: int,
+) -> dict[str, Any]:
+    if not role_rate.reason and index in role_rate.values:
+        return {
+            **base,
+            "state": observable_name,
+            "state_role": "derived_rate",
+            "value": role_rate.values[index],
+            "units": role_rate.units,
+            "source": STATE_RATE_SOURCE,
+            "notes": "",
         }
-    return output
+    reason = role_rate.reason or "No state-rate value was recorded at this time index."
+    return {
+        **base,
+        "state": observable_name,
+        "state_role": "derived_rate",
+        "value": "",
+        "units": "not_applicable",
+        "source": "not_applicable",
+        "notes": reason,
+    }
 
 
 def _quantity_rows_by_index(
@@ -2772,18 +2868,6 @@ def _derived_quantity_role(name: str) -> str:
     if name.endswith((".favorable", ".rate_blocked")):
         return "thermodynamic_enforcement_flag"
     return "simulation_derived_quantity"
-
-
-def _maximum_process_rate(rate_rows: Sequence[Mapping[str, str]]) -> dict[str, Any] | None:
-    values: list[tuple[float, str]] = []
-    for row in rate_rows:
-        value = _optional_float(row.get("value"))
-        if value is not None:
-            values.append((value, row.get("units", "")))
-    if not values:
-        return None
-    value, units = max(values, key=lambda item: item[0])
-    return {"value": value, "units": units}
 
 
 def _value_source(record: ParameterRecord) -> str:

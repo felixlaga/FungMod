@@ -33,6 +33,7 @@ def test_configured_output_manifest_lists_existing_reproducibility_files(tmp_pat
         "solver_diagnostics.json",
         "solver_diagnostics.csv",
         "process_build_decisions.json",
+        "state_rates.csv",
     ):
         assert required_file in manifest["files"]
 

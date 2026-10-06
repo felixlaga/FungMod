@@ -826,9 +826,19 @@ configured conservation diagnostics copied from existing per-sample
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
-In output schema `1.8.0`, `time_series_long.csv` retains legacy
-`degradation_rate`/`product_release_rate` presentation aliases and also writes
-authoritative `process_rate.<process_id>` rows for every configured process.
+In output schema `2.0.0`, `time_series_long.csv` reports `degradation_rate`
+as -d[substrate]/dt and `product_release_rate` as +d[product]/dt of the case's
+mapped substrate and product states (source `simulation_state_rate`), each in
+that state's units per time unit. They are read from the per-sample
+`state_rates.csv` net state-rate trajectory, which the well-mixed solver
+records by evaluating the same compiled right-hand side it integrated at every
+returned time point. `final_metrics.csv` reports `maximum_substrate_depletion_rate`
+and `maximum_product_release_rate` as the maxima of those two series over the
+returned time points. When a case maps no substrate or product state, or a
+sample bundle has no `state_rates.csv`, the rows and metrics are
+`not_applicable` with the reason in `notes`; process rates are never used in
+their place. `process_rate.<process_id>` rows are still written for every
+configured process.
 Persisted `derived_quantities.csv` values are copied under the collision-safe
 `derived_quantity.<name>` namespace with explicit thermodynamic or general
 derived roles; the standard writer does not recompute them.
@@ -1334,9 +1344,10 @@ biology.
 
 Assembled process models now support native well-mixed execution through
 `AssembledModel.run()`. The method delegates to `ProcessODESolver`, returns a
-standard `SimulationResult`, records process-rate trajectories, runs supplied
-validators, and rejects unsupported geometry instead of silently switching
-execution paths.
+standard `SimulationResult`, records process-rate trajectories and net
+state-rate trajectories (`SimulationResult.state_rates`, written as
+`state_rates.csv`), runs supplied validators, and rejects unsupported geometry
+instead of silently switching execution paths.
 
 Substrate, geometry, product-map, and validator loading now goes through
 registries. The default substrate registry is generic-first and supports
