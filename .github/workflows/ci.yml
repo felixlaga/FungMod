@@ -153,7 +153,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          # The offline install below uses requirements-lock.txt, generated on
+          # CPython 3.13; its pins (numpy 2.5) need Python 3.12 or later.
+          python-version: "3.13"
 
       - name: Install build tooling
         run: |

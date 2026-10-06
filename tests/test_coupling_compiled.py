@@ -21,7 +21,7 @@ from fungal_model.fungi.coupling import SECRETION_COST_RATE_SYMBOL
 from fungal_model.io import ProcessConfig
 from fungal_model.processes import MassActionProcess, ModelBuilder, ProcessBuildContext, ProcessLibrary, ProcessRegistry
 from fungal_model.solvers import ProcessODESolver, RunRequest
-from tests.test_fungal_coupling import SOURCE, _fungus, _model, _parameter
+from tests.test_fungal_coupling import SOURCE, _model, _parameter
 
 TEST_SOURCE = "Artificial catalysed mass-action benchmark; no physical claim."
 
@@ -188,7 +188,7 @@ def test_coupling_compiled_path_keeps_the_legacy_refusals() -> None:
 
 def test_zero_cost_and_maintenance_reduce_to_the_original_benchmark() -> None:
     model = _model()
-    assert model.fungus is _fungus(assimilable=True) or model.fungus.species_name == "Artificial benchmark fungus"
+    assert model.fungus.species_name == "Artificial benchmark fungus"
     result = model.simulate_compiled(degradation=[_degradation_process()], initial_state=INITIAL,
                                      t_span=(Q_(0.0, "second"), Q_(20.0, "second")))
     final = {name: float(values.magnitude[-1]) for name, values in result.states.items()}
