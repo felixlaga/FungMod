@@ -113,7 +113,7 @@ scientific validity or a restriction on preparing a methods paper/preprint.
 | Extracellular enzyme degradation | Implemented for bounded named mechanisms; exploratory comparisons exist | Matched conditions, identified parameters, uncertainty, held-out predictions |
 | One strain in a controlled reactor | Minimal coupling plus a separate data-backed effective biomass/substrate benchmark with source reproduction and retrospective holdouts | Resolve model discrepancy and observation mapping; explicit induction/production, suitable activity measurements and independent predictions |
 | Physiologically constrained strain model | Not implemented as a coupled organism model | Transport, oxygen transfer and respiration, carbon/nitrogen/energy balances, intracellular metabolic coupling, secretion allocation and regulation |
-| Spatial filamentous colony | Fixed-grid reaction diffusion exists; moving fungal morphology does not | Hyphal extension/branching, local uptake/secretion, diffusion and boundary coupling, substrate accessibility, microscopy and spatial validation |
+| Spatial filamentous colony | Continuum hyphal processes (extension, motion, branching, anastomosis, uptake, translocation, secretion) run on the compiled spatial core, exploratory and software-verified; moving fungal morphology does not exist | Organism parameters from the literature, a checksummed colony-expansion dataset, substrate accessibility, microscopy and spatial validation |
 | Arbitrary fungus on arbitrary material | Unsupported | Multiple validated strain/substrate/environment models and demonstrated transfer; genome annotations alone cannot supply kinetics |
 
 The existing coupling's “active biomass” and the source paper's induced

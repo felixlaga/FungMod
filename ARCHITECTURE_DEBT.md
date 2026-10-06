@@ -105,6 +105,16 @@ runs them through `simulate_compiled`, pinned to its legacy engine by
 `tests/test_coupling_compiled.py`; the degradation must be supplied as
 processes because a `Reaction`'s Python rate law cannot be compiled.
 
+Narrowing (SPATIAL-001, 2026-10-06): the spatial mycelium core
+(`fungal_model.mycelium`) compiles field processes to vectorised numpy
+kernels with build-time unit resolution, conservative finite-volume
+transport and the negative-state policy of the well-mixed core, so hyphal
+growth no longer needs the `Reaction`-based engines; `tests/test_mycelium_core.py`
+pins its diffusion operator to the transport engines' Laplacian. The 1D and
+N-D reaction-diffusion engines remain the `Reaction` path for their own
+cases, and the mycelium core does not yet lift well-mixed `Process` kernels
+per cell nor supply a sparse compiled Jacobian; both are its next steps.
+
 Containment: every shipped process and modifier compiles to a numeric kernel
 and `tests/test_compiled_process_models.py` fails if one falls back; the
 fallback path is recorded in `solver_metadata["kernel"]`, never silent; the

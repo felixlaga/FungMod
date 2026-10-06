@@ -6,6 +6,19 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- `fungal_model.mycelium` (SPATIAL-001, exploratory): a continuum mycelium
+  on a compiled finite-volume core in one to three dimensions. `SpatialGrid`,
+  `FieldSpec`, the `FieldProcess` contract and ten generic processes (tip
+  extension with an optional substrate-saturating speed and cost, tip motion
+  by diffusion and drift, lateral and dichotomous branching, anastomosis,
+  first-order losses, local uptake, translocation with an active term towards
+  tips, local secretion, field diffusion), each with assumptions, validity
+  labels, failure modes and literature-form provenance; `MyceliumModel.compile`
+  resolves every unit once and refuses bad declarations; `MyceliumResult`
+  reports integrals, occupied measure and front position. Verified against
+  the pulled-front speed of the Edelstein system, conservation, symmetry,
+  solver agreement and two unit systems (`docs/spatial-mycelium.md`). No
+  organism parameters and no colony data yet.
 - The software paper is a LaTeX manuscript, `paper/paper.tex` (it replaces
   the Markdown draft; `make paper-pdf` builds it with latexmk). The paper
   tables are now also written as LaTeX fragments (`paper/tables/*.tex`,

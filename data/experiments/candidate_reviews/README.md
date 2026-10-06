@@ -22,3 +22,11 @@ candidate with a specific cellobiose hydrolysis figure target. It is still a
 review only: REAL-002F found unresolved source-text conflict in the Figure 6
 time axis, so the figure has not been digitized and no extracted observations
 have been added.
+
+The De Ligne 2019 review (`de_ligne_2019_colony_growth_review.yml`) names the
+colony-expansion dataset selected for the spatial mycelium core: mycelial area
+and tip counts of *Rhizoctonia solani* and *Coniophora puteana* under sixteen
+temperature and humidity conditions, IMA Fungus 10:7, CC BY 4.0. It is
+`selected_for_schema_review`: the article and its additional files are still to
+be committed under `../source_intake/de_ligne_2019/` with digests before the
+literature schema can be checked and any series extracted.
