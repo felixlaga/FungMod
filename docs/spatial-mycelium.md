@@ -124,7 +124,8 @@ spatial core is the next performance step.
 - No organism parameters: a registry record for a mycelium must still be
   authored from the literature (Boswell et al. 2003 for *Rhizoctonia
   solani* is the candidate source) and a colony-expansion dataset
-  (Vidal-Diez de Ulzurrun et al. 2019 for *R. solani* and *Coniophora
-  puteana* is the candidate) checksummed before any comparison is a result.
+  (De Ligne et al. 2019, IMA Fungus 10:7, CC BY 4.0, for *R. solani* and
+  *Coniophora puteana* is the candidate, recorded in
+  `data/experiments/candidate_reviews/de_ligne_2019_colony_growth_review.yml`) checksummed before any comparison is a result.
 - The existing 1D and N-D reaction-diffusion engines are unchanged; they
   remain the `Reaction`-based path recorded under `FD-009`.

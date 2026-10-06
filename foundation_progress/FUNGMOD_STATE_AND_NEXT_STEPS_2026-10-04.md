@@ -363,7 +363,8 @@ translocation and local secretion, verified against the analytic pulled-front
 speed, conservation, symmetry and solver agreement, exploratory and
 unparameterised. Open: organism parameters from the literature (Boswell et
 al. 2003, *Rhizoctonia solani*), a checksummed colony-expansion dataset
-(Vidal-Diez de Ulzurrun et al. 2019 is the candidate), a sparse compiled
+(De Ligne et al. 2019, IMA Fungus 10:7, CC BY 4.0, is the candidate;
+`data/experiments/candidate_reviews/de_ligne_2019_colony_growth_review.yml`), a sparse compiled
 Jacobian for calibration speed, lifting well-mixed process kernels per cell,
 registry and configured-workflow reachability.
 

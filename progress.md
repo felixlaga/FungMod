@@ -117,7 +117,7 @@ the tip zone, which the docs record.
 
 Recommended next task: a sparse compiled Jacobian for the spatial core so
 that colony solves are fast enough for calibration; then, once the owner
-supplies the Vidal-Diez de Ulzurrun 2019 time series and the Boswell 2003
+supplies the De Ligne et al. 2019 time series and the Boswell 2003
 parameter table, a registry-parameterised *R. solani* case under a frozen
 plan comparing colony area and tip counts over time.
 
