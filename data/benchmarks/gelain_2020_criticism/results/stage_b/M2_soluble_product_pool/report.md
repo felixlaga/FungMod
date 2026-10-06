@@ -26,10 +26,10 @@ Converged by the declared rule: **False** (mean acceptance 0.174, 6000 post-burn
 
 Decision rules (provisional):
 
-- R1 holdout support (stage A screen, primary): False
+- R1 holdout support (stage A screen, primary): True
 - R2 adequacy (multiplier interval contains 1.0): False; interval [1.6508059240578155, 2.866098022775914]
 - R3 identification of added parameters: False; classes {'mu': 'prior_dominated', 'Ks': 'prior_dominated', 'Ki': 'prior_dominated', 'P0': 'bounded_below_only'}
-- Outcome: **not supported (fails R1)**
+- Outcome: **improves fit but unidentified (R1, not R3)**
 
 Posterior predictive coverage at 95% with measurement noise (400 draws, 0 failed):
 

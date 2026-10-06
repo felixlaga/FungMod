@@ -1,9 +1,19 @@
 {
-  "plan_sha256": "9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e",
+  "plan_sha256": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7",
   "observations_sha256": "cc8cda93a4a1a07cc73cf0c104aeaf315770aa4399e65cb2f3473e97951b699c",
   "bayesian_plan_sha256": "9574fccc809cc2a49aab2ebc9cbc8cd087d0064d26582da287915cbbce32f01a",
   "starts": 5,
   "max_nfev": 250,
+  "optimiser": {
+    "method": "trf",
+    "parameter_space": "natural log",
+    "log_parameter_difference_step": 0.001,
+    "ftol": 1e-10,
+    "xtol": 1e-10,
+    "gtol": 1e-10,
+    "restarts": 3,
+    "restart_relative_cost_tolerance": 1e-06
+  },
   "seed": 20261006,
   "models": [
     "M0_baseline",
@@ -20,6 +30,16 @@
       "date": "2026-10-05",
       "previous_sha256": "8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e",
       "reason": "Machine-readable fields added for the study runner before anything was run: shared_structure.error_model_fields (relative SD 0.1 of the per-observable maximum over the three loadings, rho(biomass, substrate) = -0.5, evidence assumed, one shared log-uniform noise multiplier in [0.1, 10] labelled all_observables) and a config_symbol for every parameter (existing registry symbols gelain_hydrolysis_* for the nine common constants, gelain_criticism_* for additions). The numbers duplicate the prose; no model, bound, rule or setting changed."
+    },
+    {
+      "date": "2026-10-05",
+      "previous_sha256": "9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e",
+      "reason": "stage_B_posterior.sampler.walkers_rule added after stage A was recorded and before any stage B chain ran: M2 has 13 parameters plus the shared noise multiplier, and the ensemble sampler refuses fewer than two walkers per dimension, so its chain uses 28 walkers; the other models keep 24. The stage A results cite the previous digest, which this entry records. No model, bound, rule or other setting changed."
+    },
+    {
+      "date": "2026-10-05",
+      "previous_sha256": "6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86",
+      "reason": "stage_A_least_squares.optimiser added after stage A and stage B were recorded and before any refit, because the cross-solver reproduction (PETAB-001, plan a0f8abe9) found COPASI 1.3 percent below FungMod's recorded M0 optimum and FungMod evaluates COPASI's point to the same objective. Diagnosis on M0 before any variant was refitted: every recorded start stopped on scipy's step tolerance (status 3) after 20 to 60 evaluations, not on the evaluation cap; at the recorded optimum the cost gradient in log space is 0.18 along qF and 0.09 along k_h, so it is not a stationary point; with scipy's default difference step the residual-derivative norms for K_ind and kB are 15 times their converged values (3.77 against 0.24 and 2.5e-3 against 1.6e-4) because the step differentiates the ODE integrator's adaptive-step noise, and the trust region collapses; tightening ftol, xtol and gtol alone (1e-10, 1e-12, xtol off) changes nothing. With a log-space difference step of 1e-3 the midpoint start reaches cost 1.98804 (objective 3.97608), below COPASI's best 1.98841, and restarts no longer improve it. The v2 plan already declared this step (log_parameter_difference_step 0.001); this plan omitted it. Consequences: stage A is re-run for every model and both scenarios under this digest and the earlier stage A files are replaced; the R1 screen and every other rule, bound and setting are unchanged; stage B chains recorded under 6849c8b3 are not re-run, because their initial centre is a starting point rather than a result and they are already reported as unconverged and provisional, and their R1 component is re-checked against the new screen; the PEtab cross-solver plan's reference-fit digest is amended in that plan and the reproduction re-run."
     }
   ]
 }

@@ -153,10 +153,72 @@ def test_score_predictions_reports_the_v2_statistics() -> None:
 def test_fit_model_rejects_unknown_scenarios_and_pins(registry, plan, bayesian_plan, conditions) -> None:
     variant = study.model_variants(plan)["M0_baseline"]
     predictor = study.build_predictor(registry, plan, "M0_baseline", bayesian_plan=bayesian_plan)
+    optimiser = study.OptimiserSettings.from_plan(plan["stage_A_least_squares"])
     with pytest.raises(CultureBenchmarkError, match="scenario"):
-        study.fit_model(predictor, variant, conditions, scenario="bogus", starts=1, seed=1, max_nfev=2)
+        study.fit_model(predictor, variant, conditions, scenario="bogus", starts=1, seed=1, max_nfev=2, optimiser=optimiser)
     with pytest.raises(CultureBenchmarkError, match="pin"):
-        study.fit_model(predictor, variant, conditions, scenario="primary", starts=1, seed=1, max_nfev=2, fixed={"nope": 1.0})
+        study.fit_model(
+            predictor, variant, conditions, scenario="primary", starts=1, seed=1, max_nfev=2, optimiser=optimiser, fixed={"nope": 1.0}
+        )
+
+
+def test_optimiser_settings_come_from_the_plan_without_defaults(plan) -> None:
+    stage = plan["stage_A_least_squares"]
+    settings = study.OptimiserSettings.from_plan(stage)
+    assert settings.diff_step == stage["optimiser"]["log_parameter_difference_step"] == 0.001
+    assert settings.to_dict()["restart_relative_cost_tolerance"] == stage["optimiser"]["restart_relative_cost_tolerance"]
+    with pytest.raises(CultureBenchmarkError, match="optimiser"):
+        study.OptimiserSettings.from_plan({key: value for key, value in stage.items() if key != "optimiser"})
+    partial = {**stage, "optimiser": {key: value for key, value in stage["optimiser"].items() if key != "ftol"}}
+    with pytest.raises(CultureBenchmarkError, match="ftol"):
+        study.OptimiserSettings.from_plan(partial)
+    with pytest.raises(CultureBenchmarkError, match="diff_step"):
+        study.OptimiserSettings(diff_step=0.0, ftol=1e-10, xtol=1e-10, gtol=1e-10, restarts=1, restart_tolerance=1e-6)
+    with pytest.raises(CultureBenchmarkError, match="restarts"):
+        study.OptimiserSettings(diff_step=1e-3, ftol=1e-10, xtol=1e-10, gtol=1e-10, restarts=-1, restart_tolerance=1e-6)
+
+
+def test_recorded_m0_primary_fit_is_stationary_within_its_bounds(registry, plan, bayesian_plan, conditions) -> None:
+    """The recorded all-condition M0 optimum has a small projected cost gradient in log space.
+
+    Central differences with the plan's difference step; coordinates on a
+    bound whose gradient points outward are projected out. The point the
+    first stage A run recorded (before amendment 3) had a projected gradient
+    norm of 0.22 and was 1.3 percent above the minimum COPASI found.
+    """
+
+    fit_path = ROOT / study.PLAN_PATH.parent / "results" / "stage_a" / "M0_baseline" / "full_fit_primary.json"
+    if not fit_path.exists():
+        pytest.skip("no stage A results recorded yet")
+    fit = json.loads(fit_path.read_text(encoding="utf-8"))
+    assert fit["success"] and fit["plan_sha256"] == hashlib.sha256((ROOT / study.PLAN_PATH).read_bytes()).hexdigest()
+    variant = study.model_variants(plan)["M0_baseline"]
+    predictor = study.build_predictor(registry, plan, "M0_baseline", bayesian_plan=bayesian_plan)
+    scales = study.training_scales(conditions)
+    free = list(variant.parameters)
+    lower, upper = variant.log_bounds()
+
+    def cost(log_values: np.ndarray) -> float:
+        values = {spec.symbol: float(value) for spec, value in zip(free, np.exp(log_values), strict=True)}
+        config_values = variant.config_values(values)
+        residuals = np.concatenate(
+            [((predictor.predict_values(config_values, c.condition_id, c.times) - c.observed) / scales).ravel() for c in conditions]
+        )
+        return 0.5 * float(residuals @ residuals)
+
+    point = np.log([float(entry["value"]) for entry in fit["parameters"]])
+    assert cost(point) == pytest.approx(fit["cost"], rel=1e-9)
+    step = float(plan["stage_A_least_squares"]["optimiser"]["log_parameter_difference_step"])
+    gradient = np.zeros_like(point)
+    for index in range(point.size):
+        unit = np.zeros_like(point)
+        unit[index] = step
+        gradient[index] = (cost(point + unit) - cost(point - unit)) / (2.0 * step)
+    on_lower = (point - lower < 1e-6) & (gradient > 0.0)
+    on_upper = (upper - point < 1e-6) & (gradient < 0.0)
+    projected = np.where(on_lower | on_upper, 0.0, gradient)
+    assert float(np.linalg.norm(projected)) < 1e-2
+    assert {spec.symbol for spec, flag in zip(free, on_lower, strict=True) if flag} <= set(fit["diagnostics"]["near_bounds"])
 
 
 def test_stage_a_runs_end_to_end_on_a_tiny_budget(tmp_path: Path, registry, plan) -> None:
@@ -182,8 +244,14 @@ def test_stage_a_runs_end_to_end_on_a_tiny_budget(tmp_path: Path, registry, plan
     assert comparison["models"]["M0_baseline"]["scenarios"]["primary"]["screen"]["reasons"] == ["baseline"]
     screen = comparison["models"]["M3_conversion_dependent_accessibility"]["scenarios"]["primary"]["screen"]
     assert isinstance(screen["passed"], bool) and "relative_improvement" in screen
+    full = json.loads((tmp_path / "stage_a" / "M0_baseline" / "full_fit_primary.json").read_text(encoding="utf-8"))
+    assert full["optimiser"] == study.OptimiserSettings.from_plan(plan["stage_A_least_squares"]).to_dict() == inputs["optimiser"]
+    assert len(full["restarts"]) <= plan["stage_A_least_squares"]["optimiser"]["restarts"]
+    assert all({"restart", "success"} <= set(entry) for entry in full["restarts"])
+    assert all("relative_cost_decrease" in entry for entry in full["restarts"] if entry["success"])
     report = (tmp_path / "stage_a" / "report.md").read_text(encoding="utf-8")
     assert "biological validation" in report and "M3_conversion_dependent_accessibility" in report
+    assert "finite-difference step 0.001" in report
 
 
 def test_stage_a_reuses_existing_files_for_the_same_plan_digest(tmp_path: Path, registry) -> None:

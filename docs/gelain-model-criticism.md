@@ -13,13 +13,35 @@ independent and validates no biology.
 ## The frozen plan
 
 `data/benchmarks/gelain_2020_criticism/plan.json` (SHA-256
-`6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86`) declares
+`9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7`) declares
 everything before any fit: the data digests, four models with every parameter's
 bounds, units and role, the shared assumed error model with one sampled noise
 multiplier, the two stages, the decision rules, the outcome vocabulary, the
 excluded claims and an amendment rule. `tests/test_gelain_criticism_plan.py`
 pins the digest, so a change to the plan is impossible without a dated
 amendment inside the file and a new digest in the test and the ledger.
+
+Three dated amendments are recorded in the file. The first two (digests
+`8b368ac8...` to `9bb36f8d...` to `6849c8b3...`) added machine-readable
+error-model fields and the walker rule before the runs they affect. The third
+(`6849c8b3...` to the current digest) added the stage A optimiser settings
+after the cross-solver reproduction (PETAB-001) showed that FungMod's recorded
+`M0_baseline` optimum was 1.3 percent above the minimum COPASI found. The
+diagnosis, recorded in the amendment: every start had stopped on scipy's step
+tolerance rather than the evaluation cap; the cost gradient at the recorded
+point was far from zero; and the finite-difference Jacobian at scipy's default
+step (about 1.5e-8) was differentiating the adaptive ODE integrator's step
+noise, so derivative norms for weakly entering constants were 15 times their
+converged values and the trust region collapsed. The v2 plan had declared a
+log-space difference step of 1e-3 and this plan omitted it. The amendment
+declares that step, tolerances of 1e-10, and up to three restarts of the best
+start until the relative cost decrease is below 1e-6; `OptimiserSettings`
+reads the block with no defaults, and every fit file records the settings and
+its restarts. Stage A was re-run for every model and scenario under the new
+digest; the stage B chains were not re-run (their initial centre is a starting
+point, and they are already reported as unconverged and provisional), and
+their R1 component is checked against the new screen by
+`tests/test_gelain_criticism_plan.py`.
 
 | Model | Mechanism added to the baseline | Added parameters |
 | --- | --- | --- |
@@ -60,59 +82,96 @@ Outputs go to `data/benchmarks/gelain_2020_criticism/results/` and cite the
 plan digest. A model is reported with one of four words only: supported,
 improves fit but unidentified, not supported, or not run with its reason.
 
-## Stage A results (recorded 2026-10-05)
+## Stage A results (re-recorded 2026-10-05 under amendment 3)
 
-Plan digest `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e` (the version before amendment 2, which only added the walker rule); five starts and 250 evaluations per start; every
-fold trains on two loadings and predicts the third; held-out predictions were
-frozen with the plan digest before scoring
-(`data/benchmarks/gelain_2020_criticism/results/stage_a/`).
+Plan digest `9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7`;
+five starts and 250 evaluations per start with the declared optimiser
+(log-space finite-difference step 1e-3, tolerances 1e-10, up to three
+restarts of the best start); every fold trains on two loadings and predicts
+the third; held-out predictions were frozen with the plan digest before
+scoring (`data/benchmarks/gelain_2020_criticism/results/stage_a/`). The first
+stage A run (digest `9bb36f8d...`, scipy's default difference step) is
+superseded; its verdicts and the reason are given at the end of this section.
 
 | Model | Scenario | Mean normalized held-out MSE | Change vs M0 | Screen (R1) |
 | --- | --- | --- | --- | --- |
-| `M0_baseline` | primary | 0.0907 |  | passed (reference) |
-| `M0_baseline` | correlated_assumption | 0.0908 |  | passed (reference) |
-| `M1_induction_state` | primary | 0.0882 | +2.7% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
-| `M1_induction_state` | correlated_assumption | 0.0963 | -6.1% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
-| `M2_soluble_product_pool` | primary | 0.0695 | +23.4% | failed: an observable worsens by more than the allowed fraction |
-| `M2_soluble_product_pool` | correlated_assumption | 0.0802 | +11.6% | failed: an observable worsens by more than the allowed fraction |
-| `M3_conversion_dependent_accessibility` | primary | 0.0979 | -7.9% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
-| `M3_conversion_dependent_accessibility` | correlated_assumption | 0.1163 | -28.1% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
+| `M0_baseline` | primary | 0.0918 |  | passed (reference) |
+| `M0_baseline` | correlated_assumption | 0.0932 |  | passed (reference) |
+| `M1_induction_state` | primary | 0.0917 | +0.1% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
+| `M1_induction_state` | correlated_assumption | 0.0961 | -3.0% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
+| `M2_soluble_product_pool` | primary | 0.0703 | +23.4% | passed |
+| `M2_soluble_product_pool` | correlated_assumption | 0.0689 | +26.1% | passed |
+| `M3_conversion_dependent_accessibility` | primary | 0.0920 | -0.2% | failed: pooled normalized held-out error improves by less than the required fraction |
+| `M3_conversion_dependent_accessibility` | correlated_assumption | 0.0979 | -5.0% | failed: pooled normalized held-out error improves by less than the required fraction; an observable worsens by more than the allowed fraction |
 
 Per-observable pooled normalized held-out MSE, primary scenario:
 
 | Model | biomass | substrate | cellulase activity | beta-glucosidase activity |
 | --- | --- | --- | --- | --- |
-| `M0_baseline` | 0.0815 | 0.0137 | 0.1566 | 0.1110 |
-| `M1_induction_state` | 0.0792 | 0.0155 | 0.1523 | 0.1060 |
-| `M2_soluble_product_pool` | 0.1067 | 0.0078 | 0.1034 | 0.0601 |
-| `M3_conversion_dependent_accessibility` | 0.0753 | 0.0143 | 0.1825 | 0.1195 |
+| `M0_baseline` | 0.0786 | 0.0132 | 0.1603 | 0.1152 |
+| `M1_induction_state` | 0.0638 | 0.0410 | 0.1542 | 0.1079 |
+| `M2_soluble_product_pool` | 0.0592 | 0.0113 | 0.1270 | 0.0837 |
+| `M3_conversion_dependent_accessibility` | 0.0739 | 0.0121 | 0.1648 | 0.1173 |
 
-Every fit had full practical rank in every fold and in the all-condition fit.
-Verdicts in the plan's vocabulary:
+Every fit had full practical rank in every fold and in the all-condition fit,
+and every start of every all-condition fit converged to the same cost (M0
+1.988, M1 1.864, M3 1.954; M2 1.414 from three of five starts, the other two
+in local minima at 1.45 and 1.81). The baseline's all-condition fit puts
+`K_ind`, `kF` and `kB` on their lower bounds (projected gradient norm 2.5e-3
+in log space); it is the fit the cross-solver study reproduces. Verdicts in
+the plan's vocabulary:
 
-- `M1_induction_state`: **not supported**. The induced state improves the
-  all-condition fit (cost 1.876 against 2.015 for M0) but held-out error improves by
-  only 2.7 percent and substrate worsens by 13 percent; the memory constant
-  settles near 0.13 per hour.
-- `M2_soluble_product_pool`: **not supported** under R1, and the most
-  informative failure. Pooled held-out error improves by 23 percent (primary)
-  and 12 percent (correlated), with substrate, cellulase and beta-glucosidase
-  all clearly better, but biomass worsens by 31 percent, above the 10 percent
-  the plan allows. The all-condition fit removes biomass loss
-  (kd 3.8e-05 per hour), lowers the yield to 0.18, pushes the
-  initial soluble pool to 2.86 g/L near the top of its declared
-  range, makes uptake nearly saturated (Ks 0.0012 g/L) and leaves
-  product inhibition weak (Ki 73 g/L). The biomass/cellulose
-  tension of BAYES-001 reappears as a trade: the pool fits every other
-  observable by giving up biomass.
-- `M3_conversion_dependent_accessibility`: **not supported**. Held-out error
-  is 8 percent worse than the baseline (28 percent under the correlated
-  assumption) and both activities worsen; the exponent settles at
-  0.10, which nearly recovers the baseline.
+- `M1_induction_state`: **not supported**. The induced state lowers the
+  all-condition cost (1.864 against 1.988) and improves held-out biomass by
+  19 percent, but the pooled held-out error is unchanged (0.1 percent better)
+  and substrate is three times worse (0.041 against 0.013); the memory
+  constant settles at 0.094 per hour with the specific production rates five
+  to six times lower than the baseline's, so the induced state absorbs the
+  synthesis dynamics and the cellulose course pays for it.
+- `M2_soluble_product_pool`: **passes R1** in both scenarios. Pooled held-out
+  error is 23 percent lower (primary) and 26 percent lower (correlated), and
+  every observable improves: biomass by 25 and 36 percent, substrate by 15
+  and 21, cellulase by 21 and 21, beta-glucosidase by 27 and 26. The
+  all-condition fit (cost 1.414 against 1.988) keeps the yield at 0.46 and
+  the biomass loss at 0.025 per hour, makes uptake nearly saturated
+  (`Ks` 0.0016 g/L, `mu` 0.23 per hour), leaves product inhibition weak
+  (`Ki` 47 g/L) and puts the initial soluble pool `P0` on the top of its
+  declared range (3 g/L); the held-out folds also touch the `Ks`, `Ki` and
+  `P0` bounds. The screen is the holdout rule only: what the data say about
+  these constants is stage B's question, and the answer recorded there is
+  that they are not identified.
+- `M3_conversion_dependent_accessibility`: **not supported**. Pooled held-out
+  error is 0.2 percent worse than the baseline (5 percent under the
+  correlated assumption, where substrate worsens by 12 percent); the exponent
+  settles at 0.16, which nearly recovers the baseline.
 
-No model passed the screen, so no profiles were run and no holdout posteriors
-are planned. Stage B all-condition posteriors (adequacy R2, identifiability
-R3, coverage R4) follow for the three additions; M0 reuses BAYES-001.
+Profiles (nuisance-reoptimised loss at fitted value times 0.5, 1 and 2,
+`results/stage_a/M2_soluble_product_pool/profiles_primary.json`) ran for M2
+as the plan requires for a model that passes the screen. Against the
+reference cost of 1.4135, halving or doubling `Y`, `qF`, `qB` or `kd`, or
+halving `mu` or `P0`, raises the re-optimised cost to between 1.50 and 1.85;
+`k_h` and `Kh` raise it to 1.43 to 1.45; `Ks`, `Ki`, `kF`, `kB` and `K_ind`
+leave it within 1e-3 of the reference at both factors, which is the
+least-squares counterpart of the prior-dominated and one-sided classes that
+stage B assigns to the pool's constants. Several nuisance refits reached
+1.4132, 2e-4 below the reference, so the all-condition fit sits in a valley
+where the declared restart tolerance (1e-6) stops earlier than the
+warm-started profile refits do; the plan's `reference_improved` flag records
+it for those parameters.
+
+What the first run had said, and why it changed. Under the first stage A
+run (five starts, scipy's default finite-difference step of about 1.5e-8)
+M0's held-out error was 0.0907, M1's 0.0882 (+2.7 percent), M2's 0.0695
+(+23.4 percent, but biomass 31 percent worse) and M3's 0.0979 (-7.9 percent);
+no model passed R1, and the recorded verdict for M2 was "not supported" on
+the biomass clause alone. The cross-solver study then found the baseline's
+optimum 1.3 percent above the minimum COPASI reached, the diagnosis traced it
+to the difference step (see the amendment text above), and the whole stage
+was re-run. The pooled numbers barely moved (M2's pooled improvement is the
+same 23 percent); the per-observable pattern did, because the stalled M2 fit
+had traded biomass for the other three observables and the converged one
+does not. The first run's files are not kept; its numbers survive in the
+ledger (CRIT-001) and in the amendment log.
 
 ## Stage B results (recorded 2026-10-05)
 
@@ -143,8 +202,13 @@ Outputs live in `results/stage_b/<model>/` (`bayesian_calibration.json`,
   dominated; the pool absorbs what BAYES-001 identified. Posterior predictive
   coverage with measurement noise is 95 of 96 observations (biomass,
   substrate and beta-glucosidase 24 of 24, cellulase 23 of 24). Outcome in the
-  plan's vocabulary: **not supported (fails R1)**, with the provisional R2 and
-  R3 verdicts recorded alongside.
+  plan's vocabulary: **improves fit but unidentified (R1, not R3)**, with the
+  provisional R2 and R3 verdicts recorded alongside. The chain was centred on
+  the first stage A fit (yield 0.18, biomass loss near zero) and is not
+  re-run under amendment 3; its R1 component was refreshed against the new
+  screen (`refresh-verdicts`), and a chain centred on the converged fit is
+  the next recorded task. Under the first run's screen the outcome had been
+  "not supported (fails R1)".
 - `M1_induction_state` (24 walkers, 11 coordinates): **not converged**,
   verdicts **provisional**. Autocorrelation times 267 to 340 steps against
   6000 post-burn-in steps, effective sample sizes 423 to 540, mean acceptance
@@ -173,10 +237,13 @@ Outputs live in `results/stage_b/<model>/` (`bayesian_calibration.json`,
 - `M0_baseline`: BAYES-001's frozen chain (converged; five constants
   identified, four bounded on one side; multiplier 2.25).
 
-Summary across the three additions: none passes R1; none restores adequacy
-under R2 (every multiplier interval excludes 1.0 and overlaps the
-baseline's 2.25); only M1's memory constant is weakly identified under R3,
-while M2's four added constants and M3's exponent are not. None of the three
+Summary across the three additions: M2 passes R1 under the amended stage A
+and M1 and M3 do not; none restores adequacy under R2 (every multiplier
+interval excludes 1.0 and overlaps the baseline's 2.25); only M1's memory
+constant is weakly identified under R3, while M2's four added constants and
+M3's exponent are not. M2 is therefore the one mechanism the holdouts
+support and the one whose constants the duplicate means do not identify,
+on a chain that started from the superseded fit. None of the three
 chains meets the convergence rule at the planned 8000 steps (the largest
 autocorrelation times are 340 to 529 steps against 6000 post-burn-in
 steps), so every stage B verdict is provisional as the plan requires;

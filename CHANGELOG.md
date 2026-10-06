@@ -174,6 +174,21 @@ All notable public releases of FungMod are documented here.
 
 ### Changed
 
+- Gelain model-criticism stage A (`fungal_model.research.gelain_criticism`):
+  the least-squares optimiser reads its finite-difference step, tolerances
+  and restart rule from the plan's new `stage_A_least_squares.optimiser`
+  block (`OptimiserSettings`, no defaults), records them with every fit, and
+  restarts the best start from its own solution until the relative cost
+  decrease is below the declared tolerance. Plan amendment 3 (digest
+  `9897ab11...`) declares a log-space difference step of 1e-3, tolerances of
+  1e-10 and up to three restarts; stage A was re-run for every model under
+  it. `refresh_stage_b_verdicts` and the `refresh-verdicts` subcommand
+  recompute a recorded posterior's R1 component against the stage A
+  comparison on disk and re-digest the two files they rewrite.
+- Gelain cross-solver reproduction re-run against the new reference fit under
+  a dated amendment of its plan (digest `cfb8c9a6...`): outcome `reproduced`
+  (COPASI's local fit within 2.5e-8 of FungMod's optimum, every parameter
+  within 1e-4 relative, no random start lower).
 - `EnvironmentGrid` runtime cases and the virtual-experiment registry overlay
   no longer assert that temperature and pH are inert; their status is the
   status before assembly and the assembled case decides. Metadata-only
@@ -295,6 +310,27 @@ All notable public releases of FungMod are documented here.
 
 ### Findings
 
+- The stage A optimiser of the model-criticism study had been stopping above
+  the minimum: with scipy's default finite-difference step (about 1.5e-8) the
+  Jacobian differentiated the adaptive ODE integrator's step noise, derivative
+  norms for weakly entering constants were fifteen times their converged
+  values, and the trust region collapsed with every start reporting a
+  satisfied step tolerance. The cross-solver reproduction found it (COPASI 1.3
+  percent below FungMod's optimum); tightening the tolerances alone changed
+  nothing; a declared log-space step of 1e-3 (the v2 plan already had one)
+  brings every start of the baseline to the same minimum (objective 3.97607,
+  projected gradient norm 2.5e-3 in log space against 0.22 before). The
+  recorded stage A results and the cross-solver result were replaced under
+  dated amendments; the stage B chains were not re-run (their initial centre is
+  a starting point and they are reported as unconverged), and their R1
+  components were refreshed against the new screen. Under the declared step
+  the soluble product pool (M2) passes the R1 holdout screen in both
+  scenarios with every observable better (pooled held-out error 23 and 26
+  percent below the baseline); the first run had recorded it as failing
+  because biomass worsened by 31 percent, which was the stalled optimiser.
+  M2's outcome is now "improves fit but unidentified (R1, not R3)"; M1 and
+  M3 still fail R1. The public `fit_least_squares` API still uses scipy's
+  default step (follow-up).
 - Earlier cross-source structural-adequacy and deactivation-warranted claims
   are superseded by the research-analysis corrections above. Training residuals
   and local Jacobian diagnostics do not establish those conclusions. The

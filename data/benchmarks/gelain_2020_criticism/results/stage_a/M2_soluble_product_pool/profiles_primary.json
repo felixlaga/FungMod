@@ -1,0 +1,304 @@
+{
+  "reference_cost": 1.413471823514213,
+  "parameters": {
+    "k_h": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 0.006915265206436984,
+          "cost": 1.439789548969349,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 0.013830530412873968,
+          "cost": 1.4134718350893776,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 0.027661060825747937,
+          "cost": 1.4465563496254612,
+          "success": true
+        }
+      ],
+      "reference_improved": false
+    },
+    "Kh": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 8.277465846644581,
+          "cost": 1.4323969299970922,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 16.554931693289163,
+          "cost": 1.4134718350893776,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 33.109863386578326,
+          "cost": 1.427638826207409,
+          "success": true
+        }
+      ],
+      "reference_improved": false
+    },
+    "Y": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 0.23051490491530494,
+          "cost": 1.6535813407547764,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 0.46102980983060987,
+          "cost": 1.4134718233360144,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 0.9220596196612197,
+          "cost": 1.6133893156371768,
+          "success": true
+        }
+      ],
+      "reference_improved": true
+    },
+    "kd": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 0.012699366984362963,
+          "cost": 1.4973259933778642,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 0.025398733968725926,
+          "cost": 1.4134718350893776,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 0.05079746793745185,
+          "cost": 1.5347957098406924,
+          "success": true
+        }
+      ],
+      "reference_improved": false
+    },
+    "K_ind": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 0.01,
+          "cost": 1.4134718239625448,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 0.010000000055064979,
+          "cost": 1.4134718199115341,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 0.020000000110129958,
+          "cost": 1.4343559400760064,
+          "success": true
+        }
+      ],
+      "reference_improved": true
+    },
+    "qF": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 2.049059810186192,
+          "cost": 1.8501932951456408,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 4.098119620372384,
+          "cost": 1.413171885359023,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 8.196239240744768,
+          "cost": 1.5360919486692568,
+          "success": true
+        }
+      ],
+      "reference_improved": true
+    },
+    "kF": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 1e-06,
+          "cost": 1.4134718296483124,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 1.0008719173476538e-06,
+          "cost": 1.413471811914276,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 2.0017438346953075e-06,
+          "cost": 1.4134746303077435,
+          "success": true
+        }
+      ],
+      "reference_improved": true
+    },
+    "qB": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 4.893513554820699,
+          "cost": 1.8523724470351346,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 9.787027109641398,
+          "cost": 1.4131768879259592,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 19.574054219282797,
+          "cost": 1.54252238824422,
+          "success": true
+        }
+      ],
+      "reference_improved": true
+    },
+    "kB": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 1e-06,
+          "cost": 1.4134717813808189,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 1.0059813514597515e-06,
+          "cost": 1.4134718350893776,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 2.011962702919503e-06,
+          "cost": 1.4134822573365444,
+          "success": true
+        }
+      ],
+      "reference_improved": true
+    },
+    "mu": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 0.11271325953044771,
+          "cost": 1.5014113395516526,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 0.22542651906089542,
+          "cost": 1.4131746139008796,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 0.45085303812179084,
+          "cost": 1.4172882461746177,
+          "success": true
+        }
+      ],
+      "reference_improved": true
+    },
+    "Ks": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 0.001,
+          "cost": 1.4134409604217628,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 0.001561926803201347,
+          "cost": 1.413471820294863,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 0.003123853606402694,
+          "cost": 1.4135290049970366,
+          "success": true
+        }
+      ],
+      "reference_improved": true
+    },
+    "Ki": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 23.729686812698993,
+          "cost": 1.4138546003044636,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 47.45937362539799,
+          "cost": 1.4134718268944928,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 94.91874725079597,
+          "cost": 1.413263873730455,
+          "success": true
+        }
+      ],
+      "reference_improved": true
+    },
+    "P0": {
+      "points": [
+        {
+          "factor": 0.5,
+          "value": 1.4999999999999998,
+          "cost": 1.6323924651588313,
+          "success": true
+        },
+        {
+          "factor": 1.0,
+          "value": 2.9999999999999996,
+          "cost": 1.4134718264656385,
+          "success": true
+        },
+        {
+          "factor": 2.0,
+          "value": 3.0,
+          "cost": 1.4134718251116478,
+          "success": true
+        }
+      ],
+      "reference_improved": false
+    }
+  }
+}

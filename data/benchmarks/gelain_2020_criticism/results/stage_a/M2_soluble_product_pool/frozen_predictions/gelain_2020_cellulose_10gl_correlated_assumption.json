@@ -1,5 +1,5 @@
 {
-  "plan_sha256": "9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e",
+  "plan_sha256": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7",
   "model": "M2_soluble_product_pool",
   "scenario": "correlated_assumption",
   "condition": "gelain_2020_cellulose_10gl",
@@ -25,143 +25,143 @@
   ],
   "predictions": [
     [
-      1.8160128699108316,
-      9.382463457423412,
-      41.863217071673596,
-      102.1694621705028
+      2.056960484246382,
+      9.612274876374178,
+      24.425137242746427,
+      60.93300647209315
     ],
     [
-      1.9845322440081554,
-      8.59808434386121,
-      65.44658508104061,
-      159.92076432511016
+      2.1931422852195945,
+      8.851984832011395,
+      47.973050111086735,
+      119.6776150698826
     ],
     [
-      2.944574165088632,
-      5.009659105502619,
-      155.76438265511888,
-      381.8200336106509
+      3.4465442992733815,
+      4.623414627220115,
+      140.94804651807513,
+      351.6208791822293
     ],
     [
-      3.446304192814461,
-      2.5151639455286503,
-      234.03368194472762,
-      574.7810705763311
+      3.966978561908434,
+      1.8439780015903953,
+      225.14861906287172,
+      561.674725832867
     ],
     [
-      2.9744158360956425,
-      0.23269776094915431,
-      378.3196870514575,
-      933.7538742119984
+      2.910820933828383,
+      0.07171471173435486,
+      380.4275444479847,
+      949.0466236882576
     ],
     [
-      2.54289495104933,
-      0.07297178877619893,
-      405.2041020122487,
-      1002.828864797033
+      2.3675162118888045,
+      0.014615050382252857,
+      414.09422997953334,
+      1033.0343756857408
     ],
     [
-      1.4757205196663583,
-      0.0018286203646146525,
-      414.56774547051657,
-      1036.9969970871566
+      1.2324244209664368,
+      8.66154599669831e-05,
+      432.2514446845836,
+      1078.3308944462935
     ],
     [
-      0.6987099465832333,
-      1.4153445766407705e-05,
-      403.81359032586914,
-      1025.6287554020853
+      0.5133005024463673,
+      8.731236326210334e-08,
+      432.3328433740504,
+      1078.5339588234397
     ]
   ],
   "parameters": [
     {
       "symbol": "k_h",
       "config_symbol": "gelain_hydrolysis_k_h",
-      "value": 0.0299138817645364,
+      "value": 0.03729536325109293,
       "units": "gram/gelain_fpu/hour",
       "fixed": false
     },
     {
       "symbol": "Kh",
       "config_symbol": "gelain_hydrolysis_Kh",
-      "value": 60.440387096280304,
+      "value": 56.078570713491374,
       "units": "gram/liter",
       "fixed": false
     },
     {
       "symbol": "Y",
       "config_symbol": "gelain_hydrolysis_Y",
-      "value": 0.5216195490302052,
+      "value": 0.5835138766120357,
       "units": "dimensionless",
       "fixed": false
     },
     {
       "symbol": "kd",
       "config_symbol": "gelain_hydrolysis_kd",
-      "value": 0.031185459500314282,
+      "value": 0.03649683444447891,
       "units": "1/hour",
       "fixed": false
     },
     {
       "symbol": "K_ind",
       "config_symbol": "gelain_hydrolysis_K_ind",
-      "value": 0.1041009308610269,
+      "value": 0.010000000004605174,
       "units": "gram/liter",
       "fixed": false
     },
     {
       "symbol": "qF",
       "config_symbol": "gelain_hydrolysis_qF",
-      "value": 3.1882214046112103,
+      "value": 2.7994426631587945,
       "units": "gelain_fpu/gram/hour",
       "fixed": false
     },
     {
       "symbol": "kF",
       "config_symbol": "gelain_hydrolysis_kF",
-      "value": 0.0011301089231930115,
+      "value": 1.0000133025606123e-06,
       "units": "1/hour",
       "fixed": false
     },
     {
       "symbol": "qB",
       "config_symbol": "gelain_hydrolysis_qB",
-      "value": 7.762620043976946,
+      "value": 6.98372566797275,
       "units": "gelain_beta_u/gram/hour",
       "fixed": false
     },
     {
       "symbol": "kB",
       "config_symbol": "gelain_hydrolysis_kB",
-      "value": 0.0004932596099247987,
+      "value": 1.0000000013815513e-06,
       "units": "1/hour",
       "fixed": false
     },
     {
       "symbol": "mu",
       "config_symbol": "gelain_criticism_mu",
-      "value": 1.9978426172039376,
+      "value": 0.25880356743275046,
       "units": "1/hour",
       "fixed": false
     },
     {
       "symbol": "Ks",
       "config_symbol": "gelain_criticism_Ks",
-      "value": 1.215216569150067,
+      "value": 0.0013221940507364394,
       "units": "gram/liter",
       "fixed": false
     },
     {
       "symbol": "Ki",
       "config_symbol": "gelain_criticism_Ki",
-      "value": 0.6021529622375167,
+      "value": 66.78833172459862,
       "units": "gram/liter",
       "fixed": false
     },
     {
       "symbol": "P0",
       "config_symbol": "gelain_criticism_P0",
-      "value": 2.923800563918274,
+      "value": 2.999999995933376,
       "units": "gram/liter",
       "fixed": false
     }

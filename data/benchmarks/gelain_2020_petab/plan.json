@@ -25,7 +25,7 @@
   "sources": {
     "criticism_plan": {
       "path": "data/benchmarks/gelain_2020_criticism/plan.json",
-      "sha256": "6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86"
+      "sha256": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7"
     },
     "bayesian_plan": {
       "path": "data/benchmarks/gelain_2020_bayesian/plan.json",
@@ -37,8 +37,8 @@
     },
     "reference_fit": {
       "path": "data/benchmarks/gelain_2020_criticism/results/stage_a/M0_baseline/full_fit_primary.json",
-      "sha256": "7877ba476f65319841072184f73ea8e47cf0dd6f33a3f86f4899ca96e12879f3",
-      "note": "FungMod's optimum: scipy least_squares in log space, five starts, cost 2.0153313279533793 (objective 4.0306626559067586)"
+      "sha256": "80b3df1c3ffd9b942bf74751b9bd551967643381cd448760d90928da297e41dc",
+      "note": "FungMod's optimum under the criticism plan's amendment 3 (log-space difference step 1e-3, tolerances 1e-10, restarts): scipy least_squares in log space, five starts, cost 1.9880359493158402 (objective 3.9760718986316803)"
     }
   },
   "copasi": {
@@ -80,6 +80,12 @@
     "that the optimum is unique or the parameters identified (see the criticism and Bayesian studies)",
     "any statement about models other than M0_baseline"
   ],
-  "amendments": [],
+  "amendments": [
+    {
+      "date": "2026-10-05",
+      "previous_sha256": "a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a",
+      "reason": "sources.criticism_plan.sha256 and sources.reference_fit (sha256 and note) updated before any re-run, because the criticism plan's amendment 3 (digest 9897ab11) added the stage A optimiser settings that this study's first run (outcome copasi_improves under a0f8abe9) showed to be missing, and stage A was re-run under them; the reference fit is the new M0_baseline primary all-condition fit. The question, the problem, the COPASI settings, the gates and the outcome vocabulary are unchanged; the reproduction is re-run under this digest and the earlier result files are replaced."
+    }
+  ],
   "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason, recorded before the affected run; the ledger records the file's sha256 at freezing and after each amendment"
 }

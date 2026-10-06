@@ -269,6 +269,15 @@ Ordered work, each with an exit gate:
    restores adequacy, and only the induction memory constant is weakly
    identified; every stage B verdict is provisional because no chain meets
    the convergence rule at the planned length. Gate met with that label.
+   Re-recorded 2026-10-05 (CRIT-003): the stage A optimiser had been
+   stopping above the minimum (undeclared finite-difference step, found by
+   the cross-solver check); under amendment 3 the soluble product pool (M2)
+   passes the holdout screen in both scenarios with every observable better,
+   while M1 and M3 still fail it. M2's stage B posterior (unchanged,
+   provisional) leaves its four constants prior dominated or bounded on one
+   side, so its outcome is "improves fit but unidentified (R1, not R3)";
+   nothing restores adequacy. Gate still met with the provisional label; the
+   M2 chain centred on the new fit is the next study task.
 3. **Cross-study transfer from the literature (the intended headline).** Find a
    second published submerged cellulose-culture time course, preferring the
    same organism from another laboratory, then the same genus. Freeze the
@@ -297,8 +306,11 @@ Ordered work, each with an exit gate:
    reproduces FungMod's simulation to 1.7e-8 of sigma, then finds an objective
    1.3 percent below FungMod's recorded optimum; FungMod evaluates that point to
    the same objective. Outcome `copasi_improves` under the frozen plan: the
-   solvers agree, the stage A optimiser stopped early. Tightening it is the
-   next task before any all-condition fit is quoted as an optimum.
+   solvers agree, the stage A optimiser stopped early.
+   Re-recorded 2026-10-05 (CRIT-003): the stage A optimiser was missing a
+   declared finite-difference step (amendment 3 of the criticism plan); after
+   the re-run, COPASI's local fit and FungMod's optimum agree to 2.5e-8 and
+   every parameter to better than 1e-4. Outcome `reproduced`. Gate met.
 5. **Unify the three whole-fungus classes** before adding any physiology, as
    section 6 already demands.
 6. **Reproducibility package and preprint.** One command regenerates every

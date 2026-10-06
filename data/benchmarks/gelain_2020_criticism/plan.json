@@ -465,6 +465,16 @@
     ],
     "starts": 5,
     "max_nfev": 250,
+    "optimiser": {
+      "method": "scipy.optimize.least_squares, trust-region reflective, natural-log parameter space (unchanged)",
+      "log_parameter_difference_step": 0.001,
+      "ftol": 1e-10,
+      "xtol": 1e-10,
+      "gtol": 1e-10,
+      "restarts": 3,
+      "restart_relative_cost_tolerance": 1e-06,
+      "meaning": "the finite-difference Jacobian uses a relative step of 1e-3 in log space (the v2 plan's log_parameter_difference_step) instead of scipy's default of about 1.5e-8, which differentiates the adaptive ODE integrator's step noise; after the multi-start the best start is refitted from its own solution, which resets the trust region, until the relative cost decrease is below 1e-6 or three restarts have run; every restart is recorded"
+    },
     "seed": 20261006,
     "screen": {
       "reference": "M0_baseline",
@@ -549,6 +559,11 @@
       "date": "2026-10-05",
       "previous_sha256": "9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e",
       "reason": "stage_B_posterior.sampler.walkers_rule added after stage A was recorded and before any stage B chain ran: M2 has 13 parameters plus the shared noise multiplier, and the ensemble sampler refuses fewer than two walkers per dimension, so its chain uses 28 walkers; the other models keep 24. The stage A results cite the previous digest, which this entry records. No model, bound, rule or other setting changed."
+    },
+    {
+      "date": "2026-10-05",
+      "previous_sha256": "6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86",
+      "reason": "stage_A_least_squares.optimiser added after stage A and stage B were recorded and before any refit, because the cross-solver reproduction (PETAB-001, plan a0f8abe9) found COPASI 1.3 percent below FungMod's recorded M0 optimum and FungMod evaluates COPASI's point to the same objective. Diagnosis on M0 before any variant was refitted: every recorded start stopped on scipy's step tolerance (status 3) after 20 to 60 evaluations, not on the evaluation cap; at the recorded optimum the cost gradient in log space is 0.18 along qF and 0.09 along k_h, so it is not a stationary point; with scipy's default difference step the residual-derivative norms for K_ind and kB are 15 times their converged values (3.77 against 0.24 and 2.5e-3 against 1.6e-4) because the step differentiates the ODE integrator's adaptive-step noise, and the trust region collapses; tightening ftol, xtol and gtol alone (1e-10, 1e-12, xtol off) changes nothing. With a log-space difference step of 1e-3 the midpoint start reaches cost 1.98804 (objective 3.97608), below COPASI's best 1.98841, and restarts no longer improve it. The v2 plan already declared this step (log_parameter_difference_step 0.001); this plan omitted it. Consequences: stage A is re-run for every model and both scenarios under this digest and the earlier stage A files are replaced; the R1 screen and every other rule, bound and setting are unchanged; stage B chains recorded under 6849c8b3 are not re-run, because their initial centre is a starting point rather than a result and they are already reported as unconverged and provisional, and their R1 component is re-checked against the new screen; the PEtab cross-solver plan's reference-fit digest is amended in that plan and the reproduction re-run."
     }
   ],
   "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason, recorded before the affected fit is run; the ledger records the file's sha256 at freezing and after each amendment"

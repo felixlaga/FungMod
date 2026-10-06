@@ -109,72 +109,72 @@
     }
   ],
   "nominal": {
-    "gelain_hydrolysis_k_h": 0.012681776898273303,
-    "gelain_hydrolysis_Kh": 10.531997452512396,
-    "gelain_hydrolysis_Y": 0.3717013528543743,
-    "gelain_hydrolysis_kd": 0.01792003976241154,
-    "gelain_hydrolysis_K_ind": 0.01008756701679325,
-    "gelain_hydrolysis_qF": 6.883661290386444,
-    "gelain_hydrolysis_kF": 3.9039181234178865e-05,
-    "gelain_hydrolysis_qB": 15.992526926418924,
-    "gelain_hydrolysis_kB": 1.2427357609841935e-06
+    "gelain_hydrolysis_k_h": 0.01839387122679473,
+    "gelain_hydrolysis_Kh": 16.74539716546491,
+    "gelain_hydrolysis_Y": 0.4145999322727295,
+    "gelain_hydrolysis_kd": 0.019848069467621906,
+    "gelain_hydrolysis_K_ind": 0.010000000000000111,
+    "gelain_hydrolysis_qF": 5.823298594763041,
+    "gelain_hydrolysis_kF": 1.0000006329108917e-06,
+    "gelain_hydrolysis_qB": 13.937760028320657,
+    "gelain_hydrolysis_kB": 1.0000000000422582e-06
   },
   "simulation_at_nominal": {
     "copasi": {
-      "objective": 4.0306626538689585,
+      "objective": 3.976071981077909,
       "per_observable": {
-        "observable_biomass": 1.4219810742558836,
-        "observable_substrate": 0.0985563502399897,
-        "observable_cellulase_activity": 1.497689726113515,
-        "observable_beta_glucosidase_activity": 1.0124355032595693
+        "observable_biomass": 1.2526836488965079,
+        "observable_substrate": 0.11430717877371761,
+        "observable_cellulase_activity": 1.549651738225135,
+        "observable_beta_glucosidase_activity": 1.0594294151825459
       },
       "measurements": 96
     },
     "fungmod": {
-      "objective": 4.030662655906758,
+      "objective": 3.9760718986316803,
       "per_observable": {
-        "observable_biomass": 1.4219810865782272,
-        "observable_substrate": 0.09855634762756542,
-        "observable_cellulase_activity": 1.4976897243542464,
-        "observable_beta_glucosidase_activity": 1.012435497346719
+        "observable_biomass": 1.2526836540890944,
+        "observable_substrate": 0.11430717485293647,
+        "observable_cellulase_activity": 1.5496516938496265,
+        "observable_beta_glucosidase_activity": 1.0594293758400237
       },
       "measurements": 96
     },
     "max_abs_difference_over_sigma": {
-      "observable_biomass": 1.6546225897527232e-08,
-      "observable_substrate": 1.526908779845278e-08,
-      "observable_cellulase_activity": 1.1446637028171996e-08,
-      "observable_beta_glucosidase_activity": 1.0979611063388301e-08
+      "observable_biomass": 1.3288275208549879e-08,
+      "observable_substrate": 1.2983764834598542e-08,
+      "observable_cellulase_activity": 1.6373477546054917e-08,
+      "observable_beta_glucosidase_activity": 1.6173495423485713e-08
     },
-    "objective_relative_difference": 5.055742533253273e-10
+    "objective_relative_difference": 2.0735598000458472e-08
   },
   "local_fit": {
     "start": {
-      "gelain_hydrolysis_k_h": 0.012681776898273303,
-      "gelain_hydrolysis_Kh": 10.531997452512396,
-      "gelain_hydrolysis_Y": 0.3717013528543743,
-      "gelain_hydrolysis_kd": 0.01792003976241154,
-      "gelain_hydrolysis_K_ind": 0.01008756701679325,
-      "gelain_hydrolysis_qF": 6.883661290386444,
-      "gelain_hydrolysis_kF": 3.9039181234178865e-05,
-      "gelain_hydrolysis_qB": 15.992526926418924,
-      "gelain_hydrolysis_kB": 1.2427357609841935e-06
+      "gelain_hydrolysis_k_h": 0.01839387122679473,
+      "gelain_hydrolysis_Kh": 16.74539716546491,
+      "gelain_hydrolysis_Y": 0.4145999322727295,
+      "gelain_hydrolysis_kd": 0.019848069467621906,
+      "gelain_hydrolysis_K_ind": 0.010000000000000111,
+      "gelain_hydrolysis_qF": 5.823298594763041,
+      "gelain_hydrolysis_kF": 1.0000006329108917e-06,
+      "gelain_hydrolysis_qB": 13.937760028320657,
+      "gelain_hydrolysis_kB": 1.0000000000422582e-06
     },
     "values": {
-      "gelain_hydrolysis_k_h": 0.016180928148221835,
-      "gelain_hydrolysis_Kh": 14.000251301597334,
-      "gelain_hydrolysis_Y": 0.41302702135015573,
-      "gelain_hydrolysis_kd": 0.019922784605114704,
+      "gelain_hydrolysis_k_h": 0.018394791499672603,
+      "gelain_hydrolysis_Kh": 16.744160862896983,
+      "gelain_hydrolysis_Y": 0.4145920726364329,
+      "gelain_hydrolysis_kd": 0.0198489974623373,
       "gelain_hydrolysis_K_ind": 0.01,
-      "gelain_hydrolysis_qF": 6.004914579798606,
+      "gelain_hydrolysis_qF": 5.8232908778451575,
       "gelain_hydrolysis_kF": 1e-06,
-      "gelain_hydrolysis_qB": 14.337904338724652,
+      "gelain_hydrolysis_qB": 13.937188236027755,
       "gelain_hydrolysis_kB": 1e-06
     },
-    "copasi_objective": 3.98029226252224,
-    "function_evaluations": 13991,
+    "copasi_objective": 3.9760717990131975,
+    "function_evaluations": 95,
     "failed_evaluations": 0,
-    "objective": 3.9802922625222403
+    "objective": 3.976071799013196
   },
   "starts": [
     {
@@ -469,18 +469,18 @@
     }
   ],
   "best": {
-    "objective": 3.9768232362016986,
+    "objective": 3.976071799013196,
     "values": {
-      "gelain_hydrolysis_k_h": 0.018043883509711877,
-      "gelain_hydrolysis_Kh": 16.330164674598855,
-      "gelain_hydrolysis_Y": 0.4062450773067665,
-      "gelain_hydrolysis_kd": 0.019250371724804566,
+      "gelain_hydrolysis_k_h": 0.018394791499672603,
+      "gelain_hydrolysis_Kh": 16.744160862896983,
+      "gelain_hydrolysis_Y": 0.4145920726364329,
+      "gelain_hydrolysis_kd": 0.0198489974623373,
       "gelain_hydrolysis_K_ind": 0.01,
-      "gelain_hydrolysis_qF": 5.9121855563444035,
-      "gelain_hydrolysis_kF": 1.0000148349465366e-06,
-      "gelain_hydrolysis_qB": 14.138015680162159,
+      "gelain_hydrolysis_qF": 5.8232908778451575,
+      "gelain_hydrolysis_kF": 1e-06,
+      "gelain_hydrolysis_qB": 13.937188236027755,
       "gelain_hydrolysis_kB": 1e-06
     },
-    "source": "start_1"
+    "source": "local_fit"
   }
 }

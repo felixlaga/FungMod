@@ -14,7 +14,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "data/benchmarks/gelain_2020_criticism/plan.json"
-FROZEN_SHA256 = "6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86"
+FROZEN_SHA256 = "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7"
 COMMON_SYMBOLS = {"k_h", "Kh", "Y", "kd", "K_ind", "qF", "kF", "qB", "kB"}
 EXPECTED_PARAMETER_COUNTS = {
     "M0_baseline": 9,
@@ -35,9 +35,18 @@ def test_plan_digest_is_the_frozen_one() -> None:
 
 def test_plan_is_frozen_and_its_amendment_log_is_dated(plan) -> None:
     assert plan["status"].startswith("plan frozen")
-    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [("2026-10-05", "8b368ac8"), ("2026-10-05", "9bb36f8d")]
+    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [
+        ("2026-10-05", "8b368ac8"),
+        ("2026-10-05", "9bb36f8d"),
+        ("2026-10-05", "6849c8b3"),
+    ]
     assert "walkers_rule" in plan["stage_B_posterior"]["sampler"]
     assert "error_model_fields" in plan["shared_structure"]
+    optimiser = plan["stage_A_least_squares"]["optimiser"]
+    assert optimiser["log_parameter_difference_step"] == 0.001
+    assert optimiser["ftol"] == optimiser["xtol"] == optimiser["gtol"] == 1e-10
+    assert optimiser["restarts"] == 3 and optimiser["restart_relative_cost_tolerance"] == 1e-6
+    assert "ODE integrator" in optimiser["meaning"]
 
 
 def test_recorded_results_cite_a_digest_in_the_plan_amendment_chain(plan) -> None:
@@ -95,6 +104,90 @@ def test_decision_rules_and_claim_boundaries_are_declared(plan) -> None:
         "bound_contact_fraction": 0.02,
         "credible_mass": 0.95,
     }
+
+
+def test_recorded_stage_a_results_ran_under_the_declared_optimiser(plan) -> None:
+    """Stage A files cite the amended plan and record the declared optimiser settings and restarts."""
+
+    stage_a = PLAN_PATH.parent / "results" / "stage_a"
+    if not (stage_a / "inputs.json").exists():
+        pytest.skip("no stage A results recorded yet")
+    inputs = json.loads((stage_a / "inputs.json").read_text(encoding="utf-8"))
+    assert inputs["plan_sha256"] == FROZEN_SHA256
+    declared = plan["stage_A_least_squares"]["optimiser"]
+    recorded = inputs["optimiser"]
+    for key in ("log_parameter_difference_step", "ftol", "xtol", "gtol", "restarts", "restart_relative_cost_tolerance"):
+        assert recorded[key] == declared[key], key
+    for fit_path in sorted(stage_a.glob("*/full_fit_*.json")):
+        fit = json.loads(fit_path.read_text(encoding="utf-8"))
+        assert fit["plan_sha256"] == FROZEN_SHA256, fit_path
+        assert fit["optimiser"] == recorded, fit_path
+        assert len(fit["restarts"]) <= declared["restarts"], fit_path
+        successful = [entry for entry in fit["restarts"] if entry["success"]]
+        if successful and len(fit["restarts"]) < declared["restarts"]:
+            # the loop stopped early, so the last restart failed to beat the declared tolerance (a negative
+            # decrease means it ended above the best start, which the fit keeps)
+            assert successful[-1]["relative_cost_decrease"] <= declared["restart_relative_cost_tolerance"], fit_path
+        best_start = min(entry["cost"] for entry in fit["starts"] if entry.get("success"))
+        assert fit["cost"] <= best_start + 1e-12, fit_path
+
+
+def test_recorded_stage_b_verdicts_use_the_recorded_stage_a_screen(plan) -> None:
+    """Each stage B verdict's R1 component equals the screen in the stage A comparison on disk."""
+
+    results = PLAN_PATH.parent / "results"
+    comparison_path = results / "stage_a" / "comparison.json"
+    verdict_paths = sorted((results / "stage_b").glob("*/verdicts.json")) if (results / "stage_b").exists() else []
+    if not comparison_path.exists() or not verdict_paths:
+        pytest.skip("stage A comparison or stage B verdicts not recorded yet")
+    comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+    for verdicts_path in verdict_paths:
+        model_id = verdicts_path.parent.name
+        verdicts = json.loads(verdicts_path.read_text(encoding="utf-8"))
+        screen = comparison["models"][model_id]["scenarios"]["primary"]["screen"]
+        assert verdicts["R1_holdout_support"] == screen["passed"], model_id
+
+
+def test_refreshing_stage_b_verdicts_follows_the_stage_a_screen_on_disk(plan, tmp_path) -> None:
+    """A recorded posterior's R1 component and outcome follow whatever stage A comparison sits next to it."""
+
+    import shutil
+
+    from fungal_model.research import gelain_criticism as study
+
+    recorded = PLAN_PATH.parent / "results" / "stage_b" / "M1_induction_state"
+    if not (recorded / "verdicts.json").exists():
+        pytest.skip("no stage B posterior recorded for M1 yet")
+    results = tmp_path / "results"
+    folder = results / "stage_b" / "M1_induction_state"
+    shutil.copytree(recorded, folder)
+    (results / "stage_a").mkdir(parents=True)
+    comparison_path = results / "stage_a" / "comparison.json"
+
+    def write_screen(passed: bool) -> None:
+        comparison = {"models": {"M1_induction_state": {"scenarios": {"primary": {"screen": {"passed": passed, "reasons": []}}}}}}
+        comparison_path.write_text(json.dumps(comparison), encoding="utf-8")
+
+    original = json.loads((recorded / "verdicts.json").read_text(encoding="utf-8"))
+    write_screen(True)
+    passed = study.refresh_stage_b_verdicts(ROOT, folder)
+    assert passed["R1_holdout_support"] is True
+    assert passed["R2_adequacy"] == original["R2_adequacy"] and passed["R3_identification"] == original["R3_identification"]
+    assert passed["outcome"] == ("supported (R1 and R3)" if original["R3_identification"] else "improves fit but unidentified (R1, not R3)")
+    assert passed["provisional"] == original["provisional"]
+    report = (folder / "report.md").read_text(encoding="utf-8")
+    assert f"- Outcome: **{passed['outcome']}**" in report and "- R1 holdout support (stage A screen, primary): True" in report
+    assert report.count("Decision rules (") == 1
+    artifacts = json.loads((folder / "artifacts.json").read_text(encoding="utf-8"))
+    for name in ("verdicts.json", "report.md"):
+        assert hashlib.sha256((folder / name).read_bytes()).hexdigest() == artifacts[name]
+    assert hashlib.sha256((folder / "bayesian_calibration.json").read_bytes()).hexdigest() == artifacts["bayesian_calibration.json"]
+    write_screen(False)
+    failed = study.refresh_stage_b_verdicts(ROOT, folder)
+    assert failed["R1_holdout_support"] is False and failed["outcome"] == "not supported (fails R1)"
+    assert "- Outcome: **not supported (fails R1)**" in (folder / "report.md").read_text(encoding="utf-8")
+    with pytest.raises(Exception, match="not a recorded stage B folder"):
+        study.refresh_stage_b_verdicts(ROOT, tmp_path / "nope")
 
 
 def test_recorded_stage_b_results_are_internally_consistent(plan) -> None:
