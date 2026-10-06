@@ -91,6 +91,8 @@ all files in the bundle.
 
 ## Next
 
+- Run the same workflow on your own measurements with
+  [user-supplied data](user-data.md).
 - Run the [zero-to-report notebook](notebooks.md#zero-to-a-complete-report).
 - Learn how [virtual-experiment modes](concepts/virtual-experiments.md) differ.
 - Use the [output reference](concepts/outputs.md) for downstream analysis.

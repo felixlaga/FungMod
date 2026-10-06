@@ -1594,7 +1594,10 @@ def test_singular_source_identity_aliases_are_mandatory(tmp_path: Path, field: s
         )
 
 
-@pytest.mark.parametrize("reserved_key", [PARAMETER_BRIDGE_PROVENANCE_KEY, "fungmod_curation"])
+@pytest.mark.parametrize(
+    "reserved_key",
+    [PARAMETER_BRIDGE_PROVENANCE_KEY, "fungmod_curation", "fungmod_user_dataset"],
+)
 def test_authoring_rejects_reserved_provenance_key_collisions(
     tmp_path: Path,
     reserved_key: str,

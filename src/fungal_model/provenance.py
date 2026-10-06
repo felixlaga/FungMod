@@ -9,11 +9,17 @@ from typing import Any, Literal
 CURATION_AUDIT_PROVENANCE_KEY = "fungmod_curation"
 PARAMETER_BRIDGE_PROVENANCE_KEY = "fungmod_parameter_bridge"
 REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY = "fungmod_registry_record_authoring"
+# Records generated from user-supplied tables (``fungal_model.api.user_data``)
+# carry this namespace. It is reserved so curator authoring cannot relabel a
+# user-dataset record as curated evidence; it does not change how
+# ``classify_parameter_provenance`` classifies the record.
+USER_DATASET_PROVENANCE_KEY = "fungmod_user_dataset"
 RESERVED_PROVENANCE_KEYS = frozenset(
     {
         CURATION_AUDIT_PROVENANCE_KEY,
         PARAMETER_BRIDGE_PROVENANCE_KEY,
         REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY,
+        USER_DATASET_PROVENANCE_KEY,
     }
 )
 
@@ -80,6 +86,7 @@ __all__ = [
     "PARAMETER_BRIDGE_PROVENANCE_KEY",
     "REGISTRY_RECORD_AUTHORING_PROVENANCE_KEY",
     "RESERVED_PROVENANCE_KEYS",
+    "USER_DATASET_PROVENANCE_KEY",
     "ParameterProvenanceClass",
     "classify_parameter_provenance",
 ]

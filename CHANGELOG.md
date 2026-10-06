@@ -6,6 +6,23 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- User-supplied enzyme and kinetics tables into virtual experiments
+  (USERDATA-001): `load_user_dataset` reads a directory with
+  `user_dataset.yml` and CSV tables of strains, enzyme classes, substrates,
+  conditions and kinetics, collects every validation issue (file, row, column,
+  message) into one `UserDataError`, and returns a `UserDataset` of
+  `<dataset_id>__`-namespaced production registry mappings with a SHA-256
+  digest. `VirtualExperiment.from_registry`, `from_names` and
+  `virtual_experiment` take `user_data=` and overlay the records in memory
+  before name resolution; the summary and output manifest record
+  `user_dataset_id` and `user_dataset_digest`. Evidence types map to the
+  maturities `user_measured`, `user_reported_literature`, `user_design_value`
+  and `exploratory_prior`; missing roles become `user_dataset_gap` unknowns
+  whose `measurement_request` provenance preflight now quotes as the suggested
+  experiment. `fungmod_user_dataset` is a reserved provenance namespace.
+  Homogeneous Michaelis-Menten on dissolved substrates only
+  (`docs/user-data.md`).
+
 - Axisymmetric grid geometry for the spatial mycelium core, colony observables
   (counts outside an inoculum disc, window-truncated hull radius and area) and the
   Rosso and Robinson cardinal water-activity law and modifier (SPATIAL-002);

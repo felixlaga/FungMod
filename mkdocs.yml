@@ -70,6 +70,7 @@ nav:
   - Scientific user guide: user-guide.md
   - Core concepts:
       - Virtual experiments: concepts/virtual-experiments.md
+      - User-supplied data: user-data.md
       - Outputs and artifacts: concepts/outputs.md
       - Compiled model core: compiled-core.md
       - Organism physiology in the registry: organism-physiology.md

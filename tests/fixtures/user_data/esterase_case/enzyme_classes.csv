@@ -1,0 +1,2 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+carboxylesterase,carboxylesterase,3.1.1.1,carboxylic_ester,aryl_ester,"FungMod user-data import fixture; illustrative values, not measurements"
