@@ -388,6 +388,43 @@ pass the same frozen-prediction contract before the registry calls it
 predictive. "All fungi" is a programme measured in validated cases, not a
 feature.
 
+Owner's clarification (2026-10-06): the product is not a register of every
+fungus as a model. It is a workflow in which the user names fungus X,
+substrate Y and conditions Z, and FungMod assembles the enzymes and their
+kinetic parameters, from stored records, from data the user supplies (the
+preferred route) or fetched from public databases, and then simulates. What
+exists against that target (survey of `main`, 2026-10-06):
+
+- Exists: name resolution, environment grids, the modelability preflight,
+  template and parameter selection by enzyme, substrate and bond class, the
+  two modes, uncertainty ensembles and the provenance, limitation,
+  missing-parameter and suggested-experiment tables; user data through the
+  dataset and kinetic-record schemas, least-squares and Bayesian
+  calibration, a user registry path and the signed curation-to-promotion
+  pipeline.
+- Partial: one calibrated whole organism; the dbCAN genome route
+  (`fungal_model.capability`) maps an annotation to enzyme classes but no
+  rates and is not connected to `VirtualExperiment`; SABIO-RK is the only
+  fetcher and yields review-only proposals; environment values change
+  results only through a bound response law or condition-specific record.
+- Missing: assembly of enzymes and kinetics for an arbitrary named fungus;
+  fetchers for UniProt, BRENDA, CAZy or MycoCosm; a route from a user's
+  enzyme-activity or kinetic table straight into a virtual experiment
+  without hand-authored registry records; a command-line interface.
+
+The next product work after step 6 is therefore that assembly route, in
+this order: user-supplied enzyme and kinetic tables first, then the genome
+route connected to the preflight, then further fetchers, each producing
+records that keep their source and stay explicit where unknown.
+
+Publication decision (2026-10-06): a software-only paper, with no new
+research results. The draft is `paper/joss/paper.md` in the Journal of Open
+Source Software's 2026 format; `paper/paper.tex` stays as the record of the
+case studies and is not the submission. JOSS's 2026 policy can treat
+submissions generated largely with AI assistance as out of scope; the
+draft's AI-usage section must state the author's own contributions before
+submission.
+
 ## 6. What to stop doing
 
 - Stop adding output-table, report and diagnostics ergonomics. Thirty files per

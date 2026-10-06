@@ -6,6 +6,11 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- A software-only paper draft for the Journal of Open Source Software,
+  `paper/joss/paper.md` with its bibliography (PAPER-003): no research
+  results, the journal's 2026 sections, author statements still to be
+  completed; a workflow builds its PDF with the journal's toolchain and
+  `tests/test_joss_paper.py` checks its sections, citations and length.
 - Axisymmetric grid geometry for the spatial mycelium core, colony observables
   (counts outside an inoculum disc, window-truncated hull radius and area) and the
   Rosso and Robinson cardinal water-activity law and modifier (SPATIAL-002);

@@ -1,5 +1,12 @@
 # Reproducing the software paper
 
+The submission draft is the short software paper `paper/joss/paper.md`
+(Journal of Open Source Software format, with `paper/joss/paper.bib`). It
+reports no research results; the workflow `.github/workflows/draft-pdf.yml`
+builds its PDF with the journal's own toolchain whenever it changes, and
+`tests/test_joss_paper.py` checks its sections, citations and length. The
+rest of this page concerns the longer case-study manuscript.
+
 The draft manuscript in `paper/paper.tex` (LaTeX; `make paper-pdf` builds
 it) quotes numbers from five recorded
 studies on the Gelain 2020 cultures: the joint benchmark (v2), the Bayesian
