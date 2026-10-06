@@ -22,6 +22,20 @@
         "Christopher G. Hunt"
       ],
       "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "id": "de_ligne_2019",
+      "article_doi": "10.1186/s43008-019-0009-3",
+      "creators": [
+        "Liselotte De Ligne",
+        "Guillermo Vidal-Diez de Ulzurrun",
+        "Jan M. Baetens",
+        "Jan Van den Bulcke",
+        "Joris Van Acker",
+        "Bernard De Baets"
+      ],
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "retrieved_by": "repository owner, from the article page; the development container cannot reach the publisher"
     }
   ],
   "files": [
@@ -152,6 +166,60 @@
       "bytes": 37264,
       "sha256": "5a9c77bc3d45e2697627238b66e87b98f8cb3d97301ad8e6bb1a569366a223b7",
       "retrieved_on": "2026-09-28"
+    },
+    {
+      "path": "de_ligne_2019/article.pdf",
+      "url": "https://imafungus.biomedcentral.com/counter/pdf/10.1186/s43008-019-0009-3.pdf",
+      "license": "CC-BY-4.0",
+      "role": "article",
+      "bytes": 3240498,
+      "sha256": "79e1c9e0b084abd459b2ac5b5e8bf379e807a92aff65e4fded5402434f0b435e",
+      "retrieved_on": "2026-10-06"
+    },
+    {
+      "path": "de_ligne_2019/additional_file_1.pdf",
+      "url": "https://static-content.springer.com/esm/art%3A10.1186%2Fs43008-019-0009-3/MediaObjects/43008_2019_9_MOESM1_ESM.pdf",
+      "license": "CC-BY-4.0",
+      "role": "supplementary_methods_figure_s1",
+      "bytes": 536946,
+      "sha256": "8dcb791857116292fdb2e9fe7a529bb824687e2e905917fb7b25d19b07654aee",
+      "retrieved_on": "2026-10-06"
+    },
+    {
+      "path": "de_ligne_2019/additional_file_2.pdf",
+      "url": "https://static-content.springer.com/esm/art%3A10.1186%2Fs43008-019-0009-3/MediaObjects/43008_2019_9_MOESM2_ESM.pdf",
+      "license": "CC-BY-4.0",
+      "role": "supplementary_figure_s2_c_puteana_area",
+      "bytes": 455902,
+      "sha256": "44f840a853a0888758fa866eceaaf2e45340d648ed5c88ebc5553b2121c016ac",
+      "retrieved_on": "2026-10-06"
+    },
+    {
+      "path": "de_ligne_2019/additional_file_3.pdf",
+      "url": "https://static-content.springer.com/esm/art%3A10.1186%2Fs43008-019-0009-3/MediaObjects/43008_2019_9_MOESM3_ESM.pdf",
+      "license": "CC-BY-4.0",
+      "role": "supplementary_figure_s3_r_solani_area",
+      "bytes": 619341,
+      "sha256": "dd31afc5e8a86b182cf949754f1870ee8caa5edc168ce6010bd6dace1f91c3f3",
+      "retrieved_on": "2026-10-06"
+    },
+    {
+      "path": "de_ligne_2019/additional_file_4.pdf",
+      "url": "https://static-content.springer.com/esm/art%3A10.1186%2Fs43008-019-0009-3/MediaObjects/43008_2019_9_MOESM4_ESM.pdf",
+      "license": "CC-BY-4.0",
+      "role": "supplementary_figure_s4_c_puteana_tips",
+      "bytes": 471006,
+      "sha256": "b84b44a34ffa4c6450e54ac146c107bcc0563245147c903add0c4b9d0614c208",
+      "retrieved_on": "2026-10-06"
+    },
+    {
+      "path": "de_ligne_2019/additional_file_5.pdf",
+      "url": "https://static-content.springer.com/esm/art%3A10.1186%2Fs43008-019-0009-3/MediaObjects/43008_2019_9_MOESM5_ESM.pdf",
+      "license": "CC-BY-4.0",
+      "role": "supplementary_figure_s5_r_solani_tips",
+      "bytes": 608568,
+      "sha256": "ac322f7857eb8a9d5719b7120dcd29d0aabe9fd5f264801356497c96b6c5d081",
+      "retrieved_on": "2026-10-06"
     }
   ]
 }

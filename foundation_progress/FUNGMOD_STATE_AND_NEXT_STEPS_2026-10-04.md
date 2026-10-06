@@ -361,12 +361,18 @@ is a compiled spatial core with generic continuum processes for tip
 extension, tip motion, branching, anastomosis, losses, local uptake,
 translocation and local secretion, verified against the analytic pulled-front
 speed, conservation, symmetry and solver agreement, exploratory and
-unparameterised. Open: organism parameters from the literature (Boswell et
-al. 2003, *Rhizoctonia solani*), a checksummed colony-expansion dataset
-(De Ligne et al. 2019, IMA Fungus 10:7, CC BY 4.0, is the candidate;
-`data/experiments/candidate_reviews/de_ligne_2019_colony_growth_review.yml`), a sparse compiled
-Jacobian for calibration speed, lifting well-mixed process kernels per cell,
-registry and configured-workflow reachability.
+unparameterised. The colony-expansion dataset is ingested (DATA-003,
+2026-10-06): De Ligne et al. 2019, IMA Fungus 10:7, CC BY 4.0, hourly
+mycelial area and tip counts of *R. solani* and *C. puteana* under sixteen
+temperature-humidity conditions, digitized from the supplementary figures
+with both panel readings and every limitation flagged
+(`data/experiments/literature/de_ligne_2019_colony_growth/`). Open: the
+observation operator from hyphal density fields to scanned area and
+graph-derived tip count, a frozen calibrate-and-hold-out plan over the
+sixteen conditions, organism parameters from the literature (Boswell et
+al. 2003, *Rhizoctonia solani*), a sparse compiled Jacobian for calibration
+speed, lifting well-mixed process kernels per cell, registry and
+configured-workflow reachability.
 
 ### After step 6. Modelling all fungi
 

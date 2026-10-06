@@ -6,7 +6,8 @@ mycelium on a uniform one-, two- or three-dimensional grid, compiled once
 to numpy kernels like the well-mixed process core, and verified against
 analytic and conservation results. It is **exploratory**: every process is
 generic and provenance-labelled, but no organism record parameterises it
-yet and no colony-expansion dataset has been checksummed against it. A
+yet and no comparison with colony data has been run. The colony-expansion
+dataset it is meant to meet is ingested (De Ligne et al. 2019, see below). A
 result from this module carries that label and its limitations.
 
 ## What it models
@@ -123,9 +124,17 @@ spatial core is the next performance step.
   entry points.
 - No organism parameters: a registry record for a mycelium must still be
   authored from the literature (Boswell et al. 2003 for *Rhizoctonia
-  solani* is the candidate source) and a colony-expansion dataset
-  (De Ligne et al. 2019, IMA Fungus 10:7, CC BY 4.0, for *R. solani* and
-  *Coniophora puteana* is the candidate, recorded in
-  `data/experiments/candidate_reviews/de_ligne_2019_colony_growth_review.yml`) checksummed before any comparison is a result.
+  solani* is the candidate source).
+- No comparison with colony data yet. The colony-expansion dataset is
+  ingested: `data/experiments/literature/de_ligne_2019_colony_growth/`
+  holds the hourly mycelial area and tip count of *R. solani* and
+  *Coniophora puteana* under sixteen temperature-humidity conditions from
+  De Ligne et al. 2019 (IMA Fungus 10:7, CC BY 4.0), digitized from the
+  supplementary figures with every reading limitation flagged
+  (`scripts/digitize_de_ligne_2019_figures.py`). Before any comparison is a
+  result, an observation operator from the model's hyphal length and tip
+  density fields to the scanned mycelial area and graph-derived tip count
+  must be declared, and a frozen plan must name the conditions used for
+  calibration and those held out.
 - The existing 1D and N-D reaction-diffusion engines are unchanged; they
   remain the `Reaction`-based path recorded under `FD-009`.

@@ -1,0 +1,821 @@
+kind: experiment_dataset
+dataset_id: de_ligne_2019_c_puteana_area_v1
+name: De Ligne 2019 mycelial area of Coniophora puteana MUCL 11662 under sixteen temperature and humidity
+  conditions, Figure S2
+maturity: literature_processed
+source:
+  type: literature
+  citation: De Ligne L, Vidal-Diez de Ulzurrun G, Baetens JM, Van den Bulcke J, Van Acker J, De Baets
+    B. Analysis of spatio-temporal fungal growth dynamics under different environmental conditions. IMA
+    Fungus. 2019;10:7.
+  doi: 10.1186/s43008-019-0009-3
+  url: https://imafungus.biomedcentral.com/articles/10.1186/s43008-019-0009-3
+  authors:
+  - Liselotte De Ligne
+  - Guillermo Vidal-Diez de Ulzurrun
+  - Jan M. Baetens
+  - Jan Van den Bulcke
+  - Joris Van Acker
+  - Bernard De Baets
+  year: 2019
+  figure_or_table: 'Additional file 2: Figure S2, eight panels'
+  extraction_method: Raster figure digitization of the panels embedded in the supplementary PDF
+  extraction_tool: scripts/digitize_de_ligne_2019_figures.py with numpy 2.4.6, scipy 1.17.1, Pillow 12.3.0,
+    pypdfium2 5.14.0
+  extracted_by: Claude (Anthropic) for FungMod
+  extraction_date: '2026-10-06'
+  raw_units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  license: CC BY 4.0
+  notes: 'Open access under CC BY 4.0. The article''s additional files were downloaded by the repository
+    owner and preserved under data/experiments/source_intake/de_ligne_2019 with their SHA-256 digests;
+    the development container cannot reach the publisher. The source plots the mean of four replicates
+    with standard-deviation bars at every hour; individual replicates are not published (data available
+    from the authors on request). LITERATURE_PROCESSED: these are the authors'' per-condition means read
+    from figures, not raw replicate measurements. All sixteen conditions of one species come from one
+    laboratory, one experiment and one figure; agreement between them is within-study transfer, not independent
+    replication.'
+system:
+  organism: Coniophora puteana MUCL 11662
+  enzyme: null
+  substrate: 'inert surface: the bottom lid of a polystyrene Petri dish, inoculated with a 1 cm agar disc
+    cut from the periphery of a 3-day mother culture on malt extract agar; the lids restrict the height
+    to 0.6 mm'
+  product: null
+  environment: climate cabinet at the stated temperature and relative humidity; imaged hourly on a flatbed
+    scanner
+  geometry: two-dimensional colony on a flat surface, 2125 x 2125 pixel scans of about 4 x 4 cm around
+    the inoculum
+  notes: 'The quantity is extracted by the authors'' image analysis (Vidal-Diez de Ulzurrun et al. 2015):
+    a line-detection ridge map converted to a graph whose nodes are hyphal junctions and tips. Mycelial
+    area and tip count are graph-derived colony measures, not biomass; the inoculum disc was removed digitally,
+    so growth on the agar disc is not captured. The scan window limits the measurable colony; the authors
+    report that expansion was limited after 62 h.'
+conditions:
+  temperature_grid:
+    values:
+    - 15.0
+    - 20.0
+    - 25.0
+    - 30.0
+    units: degree_Celsius
+  relative_humidity_grid:
+    values:
+    - 65.0
+    - 70.0
+    - 75.0
+    - 80.0
+    units: percent
+  sampling_times:
+    values:
+    - 1.0
+    - 2.0
+    - 3.0
+    - 4.0
+    - 5.0
+    - 6.0
+    - 7.0
+    - 8.0
+    - 9.0
+    - 10.0
+    - 11.0
+    - 12.0
+    - 13.0
+    - 14.0
+    - 15.0
+    - 16.0
+    - 17.0
+    - 18.0
+    - 19.0
+    - 20.0
+    - 21.0
+    - 22.0
+    - 23.0
+    - 24.0
+    - 25.0
+    - 26.0
+    - 27.0
+    - 28.0
+    - 29.0
+    - 30.0
+    - 31.0
+    - 32.0
+    - 33.0
+    - 34.0
+    - 35.0
+    - 36.0
+    - 37.0
+    - 38.0
+    - 39.0
+    - 40.0
+    - 41.0
+    - 42.0
+    - 43.0
+    - 44.0
+    - 45.0
+    - 46.0
+    - 47.0
+    - 48.0
+    - 49.0
+    - 50.0
+    - 51.0
+    - 52.0
+    - 53.0
+    - 54.0
+    - 55.0
+    - 56.0
+    - 57.0
+    - 58.0
+    - 59.0
+    - 60.0
+    - 61.0
+    - 62.0
+    units: hour
+  replicates_per_condition:
+    value: 4
+    units: dimensionless
+  notes: Sixteen combinations of four temperatures and four relative humidities, one condition per measurement
+    series; the per-series conditions are recorded on each measurement entry. Six Petri dishes were prepared
+    per condition and four replicates were retained after excluding contaminated dishes. The series conditions
+    are transcribed from the panel titles and the legend labels; the extractor verifies the legend colour
+    order and the article's statement of the optimal conditions at 62 h.
+measurements:
+- id: area_15c_65rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_15c_65rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 15.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 65.0
+      units: percent
+  notes: 15 C and 65 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_15c_70rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_15c_70rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 15.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 70.0
+      units: percent
+  notes: 15 C and 70 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_15c_75rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_15c_75rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 15.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 75.0
+      units: percent
+  notes: 15 C and 75 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_15c_80rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_15c_80rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 15.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 80.0
+      units: percent
+  notes: 15 C and 80 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_20c_65rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_20c_65rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 20.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 65.0
+      units: percent
+  notes: 20 C and 65 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_20c_70rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_20c_70rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 20.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 70.0
+      units: percent
+  notes: 20 C and 70 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_20c_75rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_20c_75rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 20.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 75.0
+      units: percent
+  notes: 20 C and 75 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_20c_80rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_20c_80rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 20.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 80.0
+      units: percent
+  notes: 20 C and 80 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_25c_65rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_25c_65rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 25.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 65.0
+      units: percent
+  notes: 25 C and 65 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_25c_70rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_25c_70rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 25.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 70.0
+      units: percent
+  notes: 25 C and 70 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_25c_75rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_25c_75rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 25.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 75.0
+      units: percent
+  notes: 25 C and 75 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_25c_80rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_25c_80rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 25.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 80.0
+      units: percent
+  notes: 25 C and 80 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_30c_65rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_30c_65rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 30.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 65.0
+      units: percent
+  notes: 30 C and 65 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_30c_70rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_30c_70rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 30.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 70.0
+      units: percent
+  notes: 30 C and 70 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_30c_75rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_30c_75rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 30.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 75.0
+      units: percent
+  notes: 30 C and 75 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+- id: area_30c_80rh
+  measured_quantity: mycelial area
+  observable_type: state
+  data_file: de_ligne_2019_c_puteana_area_30c_80rh.csv
+  time_column: time_h
+  value_column: mycelial_area_cm2
+  uncertainty_column: mycelial_area_sd_cm2
+  units:
+    time: hour
+    value: centimeter ** 2
+    uncertainty: centimeter ** 2
+  uncertainty_type: standard deviation of four replicates as plotted by the source; empty where the bar
+    could not be read (see flags)
+  censoring: none
+  replicate_id_column: null
+  conditions:
+    temperature:
+      value: 30.0
+      units: degree_Celsius
+    relative_humidity:
+      value: 80.0
+      units: percent
+  notes: 30 C and 80 percent RH; mean of four replicates per hour. Read twice, from the temperature panel
+    and from the humidity panel of the same figure.
+measurement_definitions:
+  measured_quantity: mycelial area
+  units: centimeter ** 2
+  uncertainty_definition: 'Standard deviation of the four replicates as plotted by the source, read from
+    the error-bar caps; empty where the bar could not be read (flags sd_below_marker_radius, sd_unavailable).
+    Digitization resolution: one pixel is 0.01965 centimeter ** 2 in the coarsest panel; a standard deviation
+    smaller than the marker radius (0.0835 to 0.08841 centimeter ** 2) is hidden behind the marker and
+    cannot be read.'
+  measurement_method: Hourly flatbed scans of Petri dishes in a climate cabinet for 62 h; the colony network
+    was extracted by line detection and converted to a graph from which the mycelial area and the number
+    of tips were computed (Vidal-Diez de Ulzurrun et al. 2015); the mean of four replicates is plotted
+    per hour.
+preprocessing:
+  status: raw_figure_digitization_with_panel_cross_check
+  raw_data_available: false
+  steps:
+  - verified the SHA-256 of the article and the five additional files
+  - extracted the embedded raster images of the supplementary PDF page in object order and verified their
+    count and pixel sizes
+  - verified that the two legend images carry the four series hues in the declared label order
+  - located the plot frame and the grey gridlines inside it, kept the equally spaced subset of the candidates,
+    fitted each axis through them at the declared tick values with a residual below one pixel, and verified
+    that the fitted y zero lies on the frame bottom
+  - classified pixels into the four series by hue, estimated the shared marker radius from unoccluded
+    discs
+  - located markers with a disc template that penalises background under the template, so partly hidden
+    discs still yield their centre
+  - estimated each series' horizontal stagger from its own markers and assigned hours from the de-staggered
+    position, excluding markers that fit no hour
+  - read each error bar along the marker column through occluding series, accepting an end only where
+    its cap is visible
+  - converted pixel positions to values with the fitted axes, without smoothing, interpolation or fitting
+  - merged the two appearances of every condition (temperature panel and humidity panel) as their mean,
+    storing both values and their difference
+  - 'checked the article''s prose statements against the merged values: the optimal conditions at 62 h,
+    and the equal final R. solani area at 65 percent RH for 15 and 20 C reached earlier at 20 C'
+  unit_conversions:
+  - time_h = (marker_x_px - x_zero_px) / x_px_per_hour, then de-staggered and rounded to the hour
+  - mycelial_area_cm2 = (y_zero_px - marker_y_px) / y_px_per_unit, averaged over the two panels
+  - mycelial_area_sd_cm2 = half the distance between the visible bar caps / y_px_per_unit
+  excluded_points: []
+  notes: No value was interpolated, smoothed or filled. Hours at which no marker could be located in either
+    panel are listed under excluded_points and are absent from the CSV. Flags on every row name the reading
+    limitations; the flag glossary is under digitization.flag_glossary. The value stored is the mean of
+    the two panel readings; the two readings and their difference are kept as columns.
+digitization:
+  software: numpy 2.4.6, scipy 1.17.1, Pillow 12.3.0, pypdfium2 5.14.0
+  source_page: additional_file_2.pdf, page 1, embedded raster images
+  source_series: 'Figure S2: eight panels, four series each, 62 hourly markers per series'
+  axis_calibration:
+    method: equally spaced grey gridlines at the declared tick values, least-squares line per axis; the
+      x frame is padded and carries no value, the y zero is verified against the frame bottom
+    x_ticks: 10 to 60 h in steps of 10 h
+    y_ticks: 2 to 10 centimeter ** 2 in steps of 2
+    panels:
+    - panel_index: 0
+      family: humidity
+      fixed_value: 80
+      image_size_pixels: 1000 x 800
+      decoded_pixel_sha256: 922e49b0acb7e96ec4249176e63bdab8fb62026bda4eba66496449bfe34c35f1
+      x_axis: zero at column 111.33, 13.914 px per hour, residual 0.48 px over 6 gridlines
+      y_axis: zero at row 655.20, 50.9000 px per centimeter ** 2 upward, residual 0.40 px over 5 gridlines;
+        fitted zero +0.20 px from the frame bottom
+      marker_radius_px: 4.25
+      series_stagger_hours:
+        light_blue: -0.012
+        navy: 0.158
+        orange: 0.299
+        green: 0.446
+      markers_per_series:
+        light_blue: 61
+        navy: 62
+        orange: 62
+        green: 62
+      excluded_detections:
+      - series: light_blue
+        time_h: 19
+        reason: duplicate detection at the same hour; the more visible marker was kept
+    - panel_index: 1
+      family: humidity
+      fixed_value: 75
+      image_size_pixels: 1000 x 800
+      decoded_pixel_sha256: b9711cd136d69d62c46238a4b404719527dd2b1b0dd32841439c02ace6b7844a
+      x_axis: zero at column 111.33, 13.914 px per hour, residual 0.48 px over 6 gridlines
+      y_axis: zero at row 655.20, 50.9000 px per centimeter ** 2 upward, residual 0.40 px over 5 gridlines;
+        fitted zero +0.20 px from the frame bottom
+      marker_radius_px: 4.25
+      series_stagger_hours:
+        light_blue: -0.006
+        navy: 0.157
+        orange: 0.453
+        green: 0.299
+      markers_per_series:
+        light_blue: 61
+        navy: 51
+        orange: 62
+        green: 62
+      excluded_detections: []
+    - panel_index: 2
+      family: humidity
+      fixed_value: 65
+      image_size_pixels: 1000 x 800
+      decoded_pixel_sha256: 3cfcabeffea9d9ecd702eec21fca15213ebb097472a3abad35b0adfe42e81c62
+      x_axis: zero at column 111.33, 13.914 px per hour, residual 0.48 px over 6 gridlines
+      y_axis: zero at row 655.20, 50.9000 px per centimeter ** 2 upward, residual 0.40 px over 5 gridlines;
+        fitted zero +0.20 px from the frame bottom
+      marker_radius_px: 4.25
+      series_stagger_hours:
+        light_blue: 0.454
+        navy: -0.002
+        orange: 0.132
+        green: 0.305
+      markers_per_series:
+        light_blue: 62
+        navy: 60
+        orange: 62
+        green: 62
+      excluded_detections: []
+    - panel_index: 3
+      family: temperature
+      fixed_value: 15
+      image_size_pixels: 1000 x 800
+      decoded_pixel_sha256: 47ae61d70ff84610b7b258e9bc2597713f7029c2b307eb98daad3c1de06efe25
+      x_axis: zero at column 111.33, 13.914 px per hour, residual 0.48 px over 6 gridlines
+      y_axis: zero at row 655.20, 50.9000 px per centimeter ** 2 upward, residual 0.40 px over 5 gridlines;
+        fitted zero +0.20 px from the frame bottom
+      marker_radius_px: 4.25
+      series_stagger_hours:
+        light_blue: 0.451
+        navy: -0.003
+        orange: 0.15
+        green: 0.298
+      markers_per_series:
+        light_blue: 62
+        navy: 58
+        orange: 62
+        green: 56
+      excluded_detections: []
+    - panel_index: 4
+      family: temperature
+      fixed_value: 20
+      image_size_pixels: 1000 x 800
+      decoded_pixel_sha256: 2134eb067fe3d8194471d2c398096cfd84b7fff2e64e73ce3c48ed80828d8696
+      x_axis: zero at column 111.33, 13.914 px per hour, residual 0.48 px over 6 gridlines
+      y_axis: zero at row 655.20, 50.9000 px per centimeter ** 2 upward, residual 0.40 px over 5 gridlines;
+        fitted zero +0.20 px from the frame bottom
+      marker_radius_px: 4.25
+      series_stagger_hours:
+        light_blue: -0.01
+        navy: 0.455
+        orange: 0.146
+        green: 0.298
+      markers_per_series:
+        light_blue: 60
+        navy: 62
+        orange: 62
+        green: 62
+      excluded_detections: []
+    - panel_index: 5
+      family: temperature
+      fixed_value: 25
+      image_size_pixels: 1000 x 800
+      decoded_pixel_sha256: 94393a759a1a80473707b7b4483796dcf01b4346e5289ced2eb292d1d29099c6
+      x_axis: zero at column 111.33, 13.914 px per hour, residual 0.48 px over 6 gridlines
+      y_axis: zero at row 655.20, 50.9000 px per centimeter ** 2 upward, residual 0.40 px over 5 gridlines;
+        fitted zero +0.20 px from the frame bottom
+      marker_radius_px: 4.5
+      series_stagger_hours:
+        light_blue: -0.005
+        navy: 0.146
+        orange: 0.456
+        green: 0.294
+      markers_per_series:
+        light_blue: 62
+        navy: 62
+        orange: 62
+        green: 60
+      excluded_detections: []
+    - panel_index: 7
+      family: temperature
+      fixed_value: 30
+      image_size_pixels: 1000 x 800
+      decoded_pixel_sha256: fbe5fae0aefa9f7d637a6286631f0f260cb93b85d03ee73fbaa882df709a08f5
+      x_axis: zero at column 111.33, 13.914 px per hour, residual 0.48 px over 6 gridlines
+      y_axis: zero at row 655.20, 50.9000 px per centimeter ** 2 upward, residual 0.40 px over 5 gridlines;
+        fitted zero +0.20 px from the frame bottom
+      marker_radius_px: 4.25
+      series_stagger_hours:
+        light_blue: -0.01
+        navy: 0.153
+        orange: 0.302
+        green: 0.449
+      markers_per_series:
+        light_blue: 60
+        navy: 61
+        orange: 61
+        green: 62
+      excluded_detections: []
+    - panel_index: 8
+      family: humidity
+      fixed_value: 70
+      image_size_pixels: 1000 x 758
+      decoded_pixel_sha256: 267b2b2d975bec3364c16d5269a5f06ecf48f56397c249e4c4a0fd8bd99af5dc
+      x_axis: zero at column 111.33, 13.914 px per hour, residual 0.48 px over 6 gridlines
+      y_axis: zero at row 655.20, 50.9000 px per centimeter ** 2 upward, residual 0.40 px over 5 gridlines;
+        fitted zero +0.20 px from the frame bottom
+      marker_radius_px: 4.25
+      series_stagger_hours:
+        light_blue: -0.005
+        navy: 0.457
+        orange: 0.146
+        green: 0.299
+      markers_per_series:
+        light_blue: 59
+        navy: 62
+        orange: 61
+        green: 60
+      excluded_detections:
+      - series: light_blue
+        time_h: 9
+        reason: duplicate detection at the same hour; the more visible marker was kept
+  estimated_digitization_error:
+    value: 0.0196
+    units: centimeter ** 2
+    basis: One pixel of marker position at the calibrated scale of the coarsest panel; the per-row column
+      records one pixel (unoccluded marker) or two pixels (partly hidden marker) at the panel's own scale.
+      The difference between the two panel readings of the same value is stored per row as an empirical
+      check.
+  included_points: 992
+  excluded_points: []
+  exclusion_reason: No points excluded. The t = 0 inoculation is not plotted.
+  flag_counts:
+    sd_below_marker_radius: 132
+    sd_one_sided: 460
+    sd_from_one_panel: 60
+    marker_partially_hidden: 374
+    sd_unavailable: 61
+    single_panel: 39
+    panel_disagreement: 2
+    sd_asymmetric_bar: 10
+  flag_glossary:
+    marker_partially_hidden: less than 85 percent of the marker disc is visible behind another series;
+      position uncertainty widened to two pixels
+    sd_asymmetric_bar: both bar caps visible but their distances from the marker centre differ by more
+      than two pixels; the mean half-length is stored
+    sd_one_sided: only one bar cap is visible; the standard deviation is that half-length
+    sd_below_marker_radius: the bar does not reach beyond the marker disc, so the standard deviation is
+      smaller than the marker radius and is left empty
+    sd_unavailable: neither bar cap is visible; the standard deviation is left empty
+    single_panel: the marker was found in only one of the two panels that plot this condition
+    panel_disagreement: the two panels differ by more than three pixels of the coarser panel; the mean
+      is stored and the difference is recorded
+    sd_from_one_panel: the standard deviation could be read in only one of the two panels
+  series_colours:
+    legend_order:
+    - light_blue
+    - navy
+    - orange
+    - green
+    temperature_labels_c:
+    - 15
+    - 20
+    - 25
+    - 30
+    relative_humidity_labels_percent:
+    - 65
+    - 70
+    - 75
+    - 80
+    note: Legend labels transcribed from the legend images; the hue order of the legend rows is machine-verified.
+supplementary_data:
+  file_name: data/experiments/source_intake/de_ligne_2019/additional_file_2.pdf
+  source_url_or_doi: https://doi.org/10.1186/s43008-019-0009-3
+  checksum: sha256:44f840a853a0888758fa866eceaaf2e45340d648ed5c88ebc5553b2121c016ac
+  access_date: '2026-10-06'
+  notes: Downloaded by the repository owner from the article page; preserved verbatim under source_intake
+    with the article PDF.
+validation:
+  expected_columns:
+  - time_h
+  - mycelial_area_cm2
+  - mycelial_area_sd_cm2
+  - panel_difference_cm2
+  - digitization_uncertainty_cm2
+  - temperature_panel_value_cm2
+  - humidity_panel_value_cm2
+  - flags
+  allow_missing_uncertainty: true
+notes: Literature-processed colony growth curves of Coniophora puteana MUCL 11662 (mycelial area) over
+  a temperature-humidity grid, extracted for the spatial mycelium core. They support calibration and held-out
+  prediction across conditions within one study under a frozen plan; they do not validate any model on
+  their own, do not transfer to submerged culture or other strains, and the area and tip count need a
+  declared observation operator before comparison with hyphal density fields.
