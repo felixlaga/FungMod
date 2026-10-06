@@ -1,6 +1,6 @@
 """One command for the software paper's tables and figures and their reproduction, in tiers of cost.
 
-    python scripts/reproduce_paper.py tables     # regenerate paper/tables and paper/figures from the recorded results (seconds)
+    python scripts/reproduce_paper.py tables     # regenerate paper/tables (Markdown, LaTeX) and paper/figures (SVG, PDF) from the recorded results (seconds)
     python scripts/reproduce_paper.py check      # the committed tables, figures and manifests match the recorded results (seconds)
     python scripts/reproduce_paper.py verify     # recompute cheap checks from the recorded artifacts (about a minute)
     python scripts/reproduce_paper.py stage-a    # re-run stage A and the cross-solver reproduction, compare (about two hours)
@@ -169,7 +169,7 @@ def _full(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     subparsers = parser.add_subparsers(dest="tier", required=True)
-    tables = subparsers.add_parser("tables", help="regenerate paper/tables and paper/figures with their manifests from the recorded results")
+    tables = subparsers.add_parser("tables", help="regenerate paper/tables (Markdown and LaTeX) and paper/figures (SVG and PDF) with their manifests from the recorded results")
     tables.add_argument("--directory", type=Path, default=None, help="write the tables elsewhere than paper/tables")
     tables.add_argument("--figures-directory", type=Path, default=None, help="write the figures elsewhere than paper/figures")
     check = subparsers.add_parser("check", help="the committed tables, figures and manifests match the recorded results")

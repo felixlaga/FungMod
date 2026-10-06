@@ -4,6 +4,7 @@
   "tables": {
     "table_1_joint_holdouts": {
       "file": "table_1_joint_holdouts.md",
+      "latex_file": "table_1_joint_holdouts.tex",
       "title": "Whole-condition holdouts of the joint Gelain 2020 benchmark (v2)",
       "sources": {
         "data/benchmarks/gelain_2020_v2/results/report.json": "dd9727636936f0b9d0644b278d3f26e95c0447fa4d1723445f93d71bbee41cce",
@@ -28,6 +29,7 @@
     },
     "table_2_identifiability": {
       "file": "table_2_identifiability.md",
+      "latex_file": "table_2_identifiability.tex",
       "title": "Identifiability of the nine registry constants of the hydrolysis candidate (BAYES-001)",
       "sources": {
         "data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json": "57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97",
@@ -68,6 +70,7 @@
     },
     "table_3_criticism_stage_a": {
       "file": "table_3_criticism_stage_a.md",
+      "latex_file": "table_3_criticism_stage_a.tex",
       "title": "Stage A of the preregistered model-criticism study: whole-condition holdouts and the R1 screen",
       "sources": {
         "data/benchmarks/gelain_2020_criticism/results/stage_a/comparison.json": "0460f164324c825d080bbc5db003dd13a604ffda0300574d155f377aee5f3b3b",
@@ -177,6 +180,7 @@
     },
     "table_4_criticism_stage_b": {
       "file": "table_4_criticism_stage_b.md",
+      "latex_file": "table_4_criticism_stage_b.tex",
       "title": "Stage B of the model-criticism study: adequacy, identification and coverage per added mechanism",
       "sources": {
         "data/benchmarks/gelain_2020_criticism/plan.json": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7",
@@ -255,6 +259,7 @@
     },
     "table_5_cross_solver": {
       "file": "table_5_cross_solver.md",
+      "latex_file": "table_5_cross_solver.tex",
       "title": "Cross-solver reproduction of the baseline optimum in COPASI through PEtab (PETAB-001, second run)",
       "sources": {
         "data/benchmarks/gelain_2020_petab/results/comparison.json": "3e86a1214d46bb1debd7d74a60d57ad62550e837d16333d8b904de73e4cfb498",

@@ -26,6 +26,81 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PAPER-002 The Manuscript In LaTeX With Generated Table Fragments And PDF Figures
+
+Date: 2026-10-06
+
+Status: complete. The software paper is a LaTeX manuscript that includes
+its tables and figures from generated files; the Markdown draft is replaced,
+not kept in parallel, so there is one manuscript to edit.
+
+Changed:
+
+- `paper/paper.tex` (new, replaces `paper/paper.md`): the same text as the
+  Markdown draft, converted (natbib author-year citations from
+  `paper/paper.bib`, `\texttt` for identifiers, math for the tolerances
+  and the ODE), with the five tables pulled in by `\input` from
+  `paper/tables/*.tex` and the four figures by `\includegraphics` from
+  `paper/figures/*.pdf`, each referenced by label in the text. The
+  reproducibility section now says that the tables and figures are
+  generated LaTeX fragments and PDFs and that the test suite fails when
+  the manuscript stops including one. Draft-status note dated 2026-10-06.
+- `research/paper_tables.py`: `latex_escape`, `latex_inline` (Markdown
+  code spans become `\texttt`, underscores may break inside narrow
+  columns), `PaperTable.latex_file_name` and `rendered_latex` (a `table`
+  float with `\footnotesize`, `\tabcolsep` 4pt, the title as caption,
+  the label `tab:<name>`, one full-width `tabularx` per pipe table whose
+  columns with cells longer than 11 characters wrap with widths
+  proportional to their content between a floor and a cap, and the notes
+  as a paragraph); `write_tables` writes the `.tex` next to the `.md`,
+  `check_tables` checks it, the manifest names it (`latex_file`).
+  `MARKDOWN_MARKER`, `LATEX_MARKER`.
+- `research/paper_figures.py`: `PaperFigure.pdf_file_name`, `render` with
+  `fmt="pdf"` (creator marker, no creation or modification date),
+  `write_figures` writes the PDF, `check_figures` requires it with the
+  marker (`PDF_MARKER`, the module name, because PDF string literals
+  escape the parentheses of the full generator string), the manifest names
+  it (`pdf_file`).
+- `paper/tables/*.tex` (new, five), `paper/figures/*.pdf` (new, four), both
+  manifests regenerated.
+- `Makefile`: `paper-pdf` (latexmk in `paper/`); `.gitignore`: the LaTeX
+  build products; `scripts/reproduce_paper.py` help text;
+  `docs/reproducing-the-paper.md` (manuscript, both table formats, both
+  figure formats, a section on building the manuscript, CI wording);
+  `CHANGELOG.md`; the state document (item 6).
+- Tests: `tests/test_paper_tables.py` (regeneration byte-identical for the
+  `.tex` too; the manuscript includes and references every table and does
+  not mention the Markdown draft; `latex_inline` escapes every special
+  character and sets code spans in typewriter; every LaTeX table is a
+  captioned float with one `tabularx` per pipe table whose `hsize` factors
+  sum to the X count; a tampered or missing `.tex` is reported; both
+  formats carry their marker); `tests/test_paper_figures.py` (the PDF is
+  regenerated with the marker and without dates; the manuscript includes
+  and references every figure's PDF; a tampered or missing PDF is
+  reported).
+
+Not changed: any recorded result, table content, figure data or study; the
+Markdown tables and SVG figures are still written and checked. Scientific
+impact: none. Backward compatibility: the manifests gain one key per entry
+(`latex_file`, `pdf_file`); `paper/paper.md` no longer exists.
+
+Commands run (venv, Python 3.11, TeX Live 2023 with latexmk): `ruff check`
+on the changed modules, tests and script: passed; `pyright` on them: 0
+errors; `python scripts/reproduce_paper.py tables`; `make paper-pdf`
+(latexmk): 13 pages, no overfull or underfull boxes after the column
+weighting; `pytest tests/test_paper_tables.py tests/test_paper_figures.py`:
+17 passed; the whole-package gates are reported in the PR.
+
+Remaining ambiguities: the PDF and SVG bytes depend on the matplotlib
+version and are compared for presence and marker only, like the SVG
+before; the manuscript's narrative sentences are still not checked word by
+word.
+
+Recommended next task: finish the amendment 4 M2 chain and its holdout
+posteriors, then refresh the tables, figures and the manuscript text that
+depend on the M2 stage B verdict (the amendment-4 branch must merge this
+one first, since it edits the manuscript).
+
 ## CORE-002 Compiled Jacobian From Per-Process Gradients
 
 Date: 2026-10-05
