@@ -26,6 +26,32 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## COLONY-001 Frozen Plan For The De Ligne 2019 Colony Comparison
+
+Status: `partial` (plan frozen 2026-10-06; stage 0 software not built; no fit run).
+
+`data/benchmarks/de_ligne_2019_colony/plan.json` (SHA-256
+`e7a8706e85fef7739e96c7fe21d8aac0cbf2e4719201b1c203c9296d033066e4`, pinned by
+`tests/test_colony_comparison_plan.py`) declares the within-study transfer test
+of the continuum mycelium (SPATIAL-001) against DATA-003 before anything is
+run: an axisymmetric geometry on the scan window with the inoculum disc, the
+`colony_reserve_v1` model (tips, hyphae, internal reserve, inoculum reserve;
+one environment activity per condition scaling extension and branching, every
+other parameter shared; a two-activity comparison variant), the two
+observation operators (tips outside the disc; the window-truncated disc of the
+outermost detected hyphae as the convex-hull area), a per-series linear error
+model fitted to the readable bars, the four held-out conditions (each
+temperature and humidity level once), stages 0 to D, the decision rules and
+the four-phrase outcome vocabulary, the excluded claims and the amendment rule.
+`docs/colony-comparison.md` is the page. The feasibility run that sized the
+plan (the artificial colony on a 40 x 40 mm Cartesian grid, 62 h) took about
+three minutes per solve, so stage 0 starts with the axisymmetric grid.
+
+Recommended next task: stage 0 (axisymmetric grid with the Cartesian agreement
+check, observation operators, the cardinal water-activity law, the error-model
+fit, the runner with `--check`, the measured budget), then stage A for
+*C. puteana*.
+
 ## DATA-003 De Ligne 2019 Colony Growth Dataset Ingested From Figures
 
 Status: `complete` for the stated scope (2026-10-06).
