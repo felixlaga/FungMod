@@ -14,7 +14,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "data/benchmarks/gelain_2020_criticism/plan.json"
-FROZEN_SHA256 = "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7"
+FROZEN_SHA256 = "7952e010b55f55887e22025c22a192fb1c7f2eb3f61fc130b71af2a019a98672"
 COMMON_SYMBOLS = {"k_h", "Kh", "Y", "kd", "K_ind", "qF", "kF", "qB", "kB"}
 EXPECTED_PARAMETER_COUNTS = {
     "M0_baseline": 9,
@@ -39,7 +39,14 @@ def test_plan_is_frozen_and_its_amendment_log_is_dated(plan) -> None:
         ("2026-10-05", "8b368ac8"),
         ("2026-10-05", "9bb36f8d"),
         ("2026-10-05", "6849c8b3"),
+        ("2026-10-05", "9897ab11"),
     ]
+    overrides = plan["stage_B_posterior"]["sampler"]["model_overrides"]
+    assert overrides == {"M2_soluble_product_pool": {**overrides["M2_soluble_product_pool"], "steps": 36000, "burn_in": 8000}}
+    assert 36000 - 8000 > 50 * 529
+    holdout = plan["stage_B_posterior"]["holdout_sampler"]
+    assert holdout["steps"] == 8000 and holdout["burn_in"] == 2000
+    assert "12 h" in plan["stage_B_posterior"]["compute_cap"]
     assert "walkers_rule" in plan["stage_B_posterior"]["sampler"]
     assert "error_model_fields" in plan["shared_structure"]
     optimiser = plan["stage_A_least_squares"]["optimiser"]
@@ -113,14 +120,16 @@ def test_recorded_stage_a_results_ran_under_the_declared_optimiser(plan) -> None
     if not (stage_a / "inputs.json").exists():
         pytest.skip("no stage A results recorded yet")
     inputs = json.loads((stage_a / "inputs.json").read_text(encoding="utf-8"))
-    assert inputs["plan_sha256"] == FROZEN_SHA256
+    # stage A must have run under amendment 3 or later (amendment 4 touched stage B only)
+    since_amendment_3 = {FROZEN_SHA256, *(entry["previous_sha256"] for entry in plan["amendments"][3:])}
+    assert inputs["plan_sha256"] in since_amendment_3
     declared = plan["stage_A_least_squares"]["optimiser"]
     recorded = inputs["optimiser"]
     for key in ("log_parameter_difference_step", "ftol", "xtol", "gtol", "restarts", "restart_relative_cost_tolerance"):
         assert recorded[key] == declared[key], key
     for fit_path in sorted(stage_a.glob("*/full_fit_*.json")):
         fit = json.loads(fit_path.read_text(encoding="utf-8"))
-        assert fit["plan_sha256"] == FROZEN_SHA256, fit_path
+        assert fit["plan_sha256"] in since_amendment_3, fit_path
         assert fit["optimiser"] == recorded, fit_path
         assert len(fit["restarts"]) <= declared["restarts"], fit_path
         successful = [entry for entry in fit["restarts"] if entry["success"]]
@@ -194,7 +203,11 @@ def test_recorded_stage_b_results_are_internally_consistent(plan) -> None:
     """Every recorded posterior cites the plan chain, labels unconverged chains provisional and digests its files."""
 
     stage_b = PLAN_PATH.parent / "results" / "stage_b"
-    recorded = sorted(path for path in stage_b.glob("*/verdicts.json")) if stage_b.exists() else []
+    recorded = (
+        sorted(path for path in [*stage_b.glob("*/verdicts.json"), *stage_b.glob("*/holdout_*/verdicts.json")])
+        if stage_b.exists()
+        else []
+    )
     if not recorded:
         pytest.skip("no stage B posterior recorded yet")
     chain = {FROZEN_SHA256, *(entry["previous_sha256"] for entry in plan["amendments"])}
@@ -207,6 +220,11 @@ def test_recorded_stage_b_results_are_internally_consistent(plan) -> None:
         artifacts = json.loads((folder / "artifacts.json").read_text(encoding="utf-8"))
         assert inputs["plan_sha256"] in chain, folder
         assert verdicts["provisional"] == (not calibration["converged"]), folder
+        if folder.name.startswith("holdout_"):
+            held = folder.name[len("holdout_"):]
+            assert inputs["held_out_conditions"] == [held] and held not in inputs["fitted_conditions"], folder
+            coverage = json.loads((folder / "coverage.json").read_text(encoding="utf-8"))
+            assert coverage["held_out_coverage"]["held_out"] == [held], folder
         assert verdicts["outcome"] in vocabulary, verdicts["outcome"]
         for name, digest in artifacts.items():
             if name == "artifacts.json":

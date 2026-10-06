@@ -497,3 +497,40 @@ def test_posterior_predictive_coverage_tracks_the_error_model() -> None:
         posterior_predictive_coverage(result, draws=1)
     with pytest.raises(ValueError):
         posterior_predictive_coverage(result, draws=10, credible_mass=1.0)
+
+
+def test_posterior_predictive_scores_held_out_conditions_the_likelihood_never_saw() -> None:
+    """Coverage and bands for an explicit held-out condition; the fitted data are scored separately."""
+
+    rng = np.random.default_rng(11)
+    observed = 2.0 * X + 1.0 + rng.normal(0.0, 0.2, X.size)
+    base, priors, condition, _ = linear_problem(observed, sd=0.2, scalar_sd=True)
+    far_times = X + 10.0
+    far_observed = 2.0 * far_times + 1.0 + rng.normal(0.0, 0.2, X.size)
+    held_out = ObservedCondition("line_far", far_times, far_observed[:, None], gaussian_error("y", 0.2))
+    settings = SamplerSettings(n_walkers=12, n_steps=800, burn_in=200, seed=8)
+    result = sample_posterior(
+        base_parameters=base, priors=priors, conditions=[condition], predict=linear_predict, settings=settings, source=SOURCE
+    )
+    fitted = posterior_predictive_coverage(result, draws=400, seed=3)
+    assert fitted["held_out"] == [] and set(fitted["conditions"]) == {"line"}
+    coverage = posterior_predictive_coverage(result, draws=400, seed=3, conditions=[held_out])
+    assert coverage["held_out"] == ["line_far"] and set(coverage["conditions"]) == {"line_far"}
+    assert coverage["overall"]["y"]["observations"] == X.size and coverage["overall"]["y"]["fraction"] >= 0.8
+    both = posterior_predictive_coverage(result, draws=400, seed=3, conditions=[condition, held_out])
+    assert both["held_out"] == ["line_far"] and both["overall"]["y"]["observations"] == 2 * X.size
+    bands = posterior_predictive(
+        result, times_by_condition={"line_far": far_times}, draws=200, seed=3, conditions=[held_out], include_measurement_noise=True
+    )
+    assert bands["held_out"] == ["line_far"] and bands["conditions"]["line_far"]["successful_draws"] == 200
+    with pytest.raises(KeyError):
+        posterior_predictive(result, times_by_condition={"line_far": far_times}, draws=20, seed=3)
+    with pytest.raises(ValueError, match="observables"):
+        posterior_predictive_coverage(
+            result, draws=10, seed=3, conditions=[ObservedCondition("other", X, observed[:, None], gaussian_error("z", 0.2))]
+        )
+    with pytest.raises(ValueError, match="differs"):
+        altered = ObservedCondition("line", X, observed[:, None] + 1.0, gaussian_error("y", 0.2))
+        posterior_predictive_coverage(result, draws=10, seed=3, conditions=[altered])
+    with pytest.raises(ValueError, match="twice"):
+        posterior_predictive_coverage(result, draws=10, seed=3, conditions=[held_out, held_out])

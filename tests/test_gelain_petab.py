@@ -16,7 +16,19 @@ from fungal_model.research import gelain_petab
 ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / gelain_petab.PLAN_PATH
 RESULTS = ROOT / gelain_petab.RESULTS_PATH
-FROZEN_SHA256 = "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628"
+FROZEN_SHA256 = "11dfe15850b80c3217dd821547613365cb77c88d39a007f65cd954ae1706d320"
+
+
+def valid_result_digests(plan: dict) -> set[str]:
+    """The current digest and any earlier one whose amendment declares the recorded results still valid."""
+
+    entries = plan["amendments"]
+    valid = {FROZEN_SHA256}
+    for index, entry in enumerate(entries):
+        # entry i records the digest before amendment i; results under it stay valid only if every later amendment says so
+        if all(later.get("results_remain_valid", False) for later in entries[index:]):
+            valid.add(entry["previous_sha256"])
+    return valid
 
 
 @pytest.fixture(scope="module")
@@ -36,8 +48,13 @@ def test_plan_digest_is_the_frozen_one() -> None:
 def test_plan_sources_still_carry_their_frozen_digests(plan) -> None:
     digests = gelain_petab.verify_sources(ROOT, plan)
     assert set(digests) == {"criticism_plan", "bayesian_plan", "observations", "reference_fit"}
-    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [("2026-10-05", "a0f8abe9")]
-    assert plan["sources"]["criticism_plan"]["sha256"].startswith("9897ab11")
+    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [
+        ("2026-10-05", "a0f8abe9"),
+        ("2026-10-06", "cfb8c9a6"),
+    ]
+    assert plan["sources"]["criticism_plan"]["sha256"].startswith("7952e010")
+    assert plan["amendments"][1]["results_remain_valid"] is True and "stage_B_posterior" in plan["amendments"][1]["reason"]
+    assert not plan["amendments"][0].get("results_remain_valid", False)
     assert plan["status"].startswith("plan frozen")
 
 
@@ -82,7 +99,7 @@ def test_recorded_results_cite_the_plan_and_their_gates_are_consistent(plan) -> 
     if not comparison_path.exists():
         pytest.skip("no COPASI reproduction recorded yet")
     comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
-    assert comparison["plan_sha256"] == FROZEN_SHA256
+    assert comparison["plan_sha256"] in valid_result_digests(plan)
     gates = plan["gates"]
     simulation, optimum = comparison["simulation_gate"], comparison["optimum_gate"]
     assert simulation["passed"] == (

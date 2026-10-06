@@ -12,18 +12,23 @@ this problem.
 ## The frozen plan
 
 `data/benchmarks/gelain_2020_petab/plan.json` (SHA-256
-`cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628`,
+`11dfe15850b80c3217dd821547613365cb77c88d39a007f65cd954ae1706d320`,
 pinned by `tests/test_gelain_petab.py`) fixes, before any COPASI run: the
 sources and their digests (the criticism plan, the Bayesian plan, the
 observations and the stage A `M0_baseline` primary fit that is FungMod's
 optimum), the objective, the COPASI settings (importer, weight correction,
 LSODA at relative tolerance 1e-9 and absolute tolerance 1e-12,
 Levenberg-Marquardt, one local fit from FungMod's optimum and ten log-uniform
-random starts with seed 20261005), two gates and three outcomes. One dated
-amendment (`a0f8abe9...` to the current digest) replaced the reference-fit
+random starts with seed 20261005), two gates and three outcomes. A first
+dated amendment (`a0f8abe9...` to `cfb8c9a6...`) replaced the reference-fit
 digest after the criticism plan's amendment 3 re-ran stage A with a declared
 finite-difference step; the first run under `a0f8abe9...` is described below
-because it is what found the defect.
+because it is what found the defect. A second (`cfb8c9a6...` to the current
+digest, 2026-10-06) re-pinned the criticism plan after its amendment 4, which
+changed only the stage B posterior section; the sections this study reads
+(models, data, shared structure, stage A) are unchanged, so the amendment
+records `results_remain_valid` and the results recorded under `cfb8c9a6...`
+stand.
 
 | Gate | Threshold |
 | --- | --- |

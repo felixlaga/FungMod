@@ -1,0 +1,123 @@
+{
+  "model": "M2_soluble_product_pool",
+  "plan_sha256": "7952e010b55f55887e22025c22a192fb1c7f2eb3f61fc130b71af2a019a98672",
+  "observations_sha256": "cc8cda93a4a1a07cc73cf0c104aeaf315770aa4399e65cb2f3473e97951b699c",
+  "bayesian_plan_sha256": "9574fccc809cc2a49aab2ebc9cbc8cd087d0064d26582da287915cbbce32f01a",
+  "predictor": {
+    "fitted_symbols": [
+      "gelain_hydrolysis_k_h",
+      "gelain_hydrolysis_Kh",
+      "gelain_hydrolysis_Y",
+      "gelain_hydrolysis_kd",
+      "gelain_hydrolysis_K_ind",
+      "gelain_hydrolysis_qF",
+      "gelain_hydrolysis_kF",
+      "gelain_hydrolysis_qB",
+      "gelain_hydrolysis_kB",
+      "gelain_criticism_mu",
+      "gelain_criticism_Ks",
+      "gelain_criticism_Ki",
+      "gelain_criticism_P0"
+    ],
+    "enforce_maturity": true,
+    "conditions": {
+      "gelain_2020_cellulose_10gl": {
+        "observables": [
+          {
+            "observable": "biomass",
+            "state": "biomass_dry_mass_concentration",
+            "units": "gram / liter"
+          },
+          {
+            "observable": "substrate",
+            "state": "cellulose_concentration",
+            "units": "gram / liter"
+          },
+          {
+            "observable": "cellulase_activity",
+            "state": "cellulase_activity",
+            "units": "filter_paper_unit / liter"
+          },
+          {
+            "observable": "beta_glucosidase_activity",
+            "state": "beta_glucosidase_activity",
+            "units": "beta_glucosidase_assay_unit / liter"
+          }
+        ]
+      },
+      "gelain_2020_cellulose_20gl": {
+        "observables": [
+          {
+            "observable": "biomass",
+            "state": "biomass_dry_mass_concentration",
+            "units": "gram / liter"
+          },
+          {
+            "observable": "substrate",
+            "state": "cellulose_concentration",
+            "units": "gram / liter"
+          },
+          {
+            "observable": "cellulase_activity",
+            "state": "cellulase_activity",
+            "units": "filter_paper_unit / liter"
+          },
+          {
+            "observable": "beta_glucosidase_activity",
+            "state": "beta_glucosidase_activity",
+            "units": "beta_glucosidase_assay_unit / liter"
+          }
+        ]
+      },
+      "gelain_2020_cellulose_30gl": {
+        "observables": [
+          {
+            "observable": "biomass",
+            "state": "biomass_dry_mass_concentration",
+            "units": "gram / liter"
+          },
+          {
+            "observable": "substrate",
+            "state": "cellulose_concentration",
+            "units": "gram / liter"
+          },
+          {
+            "observable": "cellulase_activity",
+            "state": "cellulase_activity",
+            "units": "filter_paper_unit / liter"
+          },
+          {
+            "observable": "beta_glucosidase_activity",
+            "state": "beta_glucosidase_activity",
+            "units": "beta_glucosidase_assay_unit / liter"
+          }
+        ]
+      }
+    },
+    "integration": "compiled stoichiometric right-hand side on scipy.solve_ivp with the config's solver settings"
+  },
+  "data_sha256": "7c878459e2ba231a793a8e76a20ba78d21f7f551643bd98372939cb622eb8466",
+  "center": {
+    "gelain_hydrolysis_k_h": 0.010671201993371817,
+    "gelain_hydrolysis_Kh": 14.921452023571897,
+    "gelain_hydrolysis_Y": 0.5659759745941915,
+    "gelain_hydrolysis_kd": 0.027118815670744128,
+    "gelain_hydrolysis_K_ind": 0.010019744427617109,
+    "gelain_hydrolysis_qF": 4.626420997831453,
+    "gelain_hydrolysis_kF": 0.00041353980026636754,
+    "gelain_hydrolysis_qB": 10.627139907296737,
+    "gelain_hydrolysis_kB": 1.3301474275289584e-05,
+    "gelain_criticism_mu": 0.24541077300557987,
+    "gelain_criticism_Ks": 0.007246632647531594,
+    "gelain_criticism_Ki": 20.659498087635605,
+    "gelain_criticism_P0": 2.999999727844626,
+    "noise_scale:all_observables": 1.0
+  },
+  "fitted_conditions": [
+    "gelain_2020_cellulose_10gl",
+    "gelain_2020_cellulose_20gl"
+  ],
+  "held_out_conditions": [
+    "gelain_2020_cellulose_30gl"
+  ]
+}

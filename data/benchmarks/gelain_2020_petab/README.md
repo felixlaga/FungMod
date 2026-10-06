@@ -8,11 +8,13 @@ Retrospective: the data already informed the fit being reproduced. It
 validates no biology.
 
 - `plan.json`: the frozen plan (SHA-256
-  `cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628`, pinned
+  `11dfe15850b80c3217dd821547613365cb77c88d39a007f65cd954ae1706d320`, pinned
   by `tests/test_gelain_petab.py`): sources and digests, the objective, the
   COPASI settings, the gates, the outcome vocabulary, the excluded claims and
-  the amendment rule. One dated amendment replaced the reference-fit digest
-  after the criticism plan's amendment 3 re-ran stage A.
+  the amendment rule. A first dated amendment replaced the reference-fit
+  digest after the criticism plan's amendment 3 re-ran stage A; a second
+  (2026-10-06) re-pinned the criticism plan after its amendment 4, which
+  changed only stage B, so the recorded results remain valid.
 - `results/petab/`: the exported PEtab problem (`problem.yaml`, `model.xml`,
   `conditions.tsv`, `observables.tsv`, `measurements.tsv`, `parameters.tsv`,
   `export_metadata.json`) and `problem_metadata.json` with the source digests,

@@ -1,6 +1,6 @@
 {
   "model": "M2_soluble_product_pool",
-  "plan_sha256": "6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86",
+  "plan_sha256": "7952e010b55f55887e22025c22a192fb1c7f2eb3f61fc130b71af2a019a98672",
   "observations_sha256": "cc8cda93a4a1a07cc73cf0c104aeaf315770aa4399e65cb2f3473e97951b699c",
   "bayesian_plan_sha256": "9574fccc809cc2a49aab2ebc9cbc8cd087d0064d26582da287915cbbce32f01a",
   "predictor": {
@@ -98,19 +98,25 @@
   },
   "data_sha256": "627e1ba3fc0d19196a7e76f35cc6772b13e9bca36a5aaf10c3043164a46be742",
   "center": {
-    "gelain_hydrolysis_k_h": 0.03204227679449852,
-    "gelain_hydrolysis_Kh": 38.82851216226912,
-    "gelain_hydrolysis_Y": 0.1774165729176744,
-    "gelain_hydrolysis_kd": 3.783089311219284e-05,
-    "gelain_hydrolysis_K_ind": 0.012272057745661685,
-    "gelain_hydrolysis_qF": 7.992128487185831,
-    "gelain_hydrolysis_kF": 0.0005522462805623992,
-    "gelain_hydrolysis_qB": 20.341029207148367,
-    "gelain_hydrolysis_kB": 0.0014911929636380636,
-    "gelain_criticism_mu": 0.08587556361399959,
-    "gelain_criticism_Ks": 0.0011753952051648333,
-    "gelain_criticism_Ki": 73.32526995093794,
-    "gelain_criticism_P0": 2.859369190675647,
+    "gelain_hydrolysis_k_h": 0.013830530412873968,
+    "gelain_hydrolysis_Kh": 16.554931693289163,
+    "gelain_hydrolysis_Y": 0.46102980983060987,
+    "gelain_hydrolysis_kd": 0.025398733968725926,
+    "gelain_hydrolysis_K_ind": 0.010000000055064979,
+    "gelain_hydrolysis_qF": 4.098119620372384,
+    "gelain_hydrolysis_kF": 1.0008719173476538e-06,
+    "gelain_hydrolysis_qB": 9.787027109641398,
+    "gelain_hydrolysis_kB": 1.0059813514597515e-06,
+    "gelain_criticism_mu": 0.22542651906089542,
+    "gelain_criticism_Ks": 0.001561926803201347,
+    "gelain_criticism_Ki": 47.45937362539799,
+    "gelain_criticism_P0": 2.9999999999999996,
     "noise_scale:all_observables": 1.0
-  }
+  },
+  "fitted_conditions": [
+    "gelain_2020_cellulose_10gl",
+    "gelain_2020_cellulose_20gl",
+    "gelain_2020_cellulose_30gl"
+  ],
+  "held_out_conditions": []
 }
