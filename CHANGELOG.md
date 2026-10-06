@@ -6,6 +6,13 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- De Ligne et al. 2019 colony growth dataset (DATA-003): hourly mycelial area
+  and tip counts of *Coniophora puteana* and *Rhizoctonia solani* under sixteen
+  temperature-humidity conditions, digitized from the supplementary figures by
+  `scripts/digitize_de_ligne_2019_figures.py` with the source PDFs preserved
+  under `data/experiments/source_intake/de_ligne_2019/`, both panel readings
+  of every value stored with their difference, and every reading limitation
+  flagged. `literature_processed`; no model comparison yet.
 - `fungal_model.mycelium` (SPATIAL-001, exploratory): a continuum mycelium
   on a compiled finite-volume core in one to three dimensions. `SpatialGrid`,
   `FieldSpec`, the `FieldProcess` contract and ten generic processes (tip

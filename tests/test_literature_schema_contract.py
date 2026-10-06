@@ -76,6 +76,15 @@ REVIEWED_SOURCES = {
         "cao_2015_figure_5a_m3.csv",
         "cao_2015_figure_5a_m3.yml",
     ],
+    "de_ligne_2019_colony_growth": [
+        f"de_ligne_2019_{species}_{quantity}{suffix}"
+        for species in ("c_puteana", "r_solani")
+        for quantity in ("area", "tips")
+        for suffix in (
+            ".yml",
+            *(f"_{temperature}c_{humidity}rh.csv" for temperature in (15, 20, 25, 30) for humidity in (65, 70, 75, 80)),
+        )
+    ],
 }
 
 

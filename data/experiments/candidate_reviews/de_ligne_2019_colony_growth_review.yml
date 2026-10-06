@@ -1,7 +1,7 @@
 kind: dataset_candidate_review
 candidate_id: de_ligne_2019_colony_growth
 name: De Ligne 2019 mycelial area and tip counts of Rhizoctonia solani and Coniophora puteana under sixteen temperature and humidity conditions
-status: selected_for_schema_review
+status: approved_for_ingestion
 dataset_maturity: literature_processed
 source:
   type: literature
@@ -26,9 +26,13 @@ source:
     Petri dishes under sixteen combinations of four temperatures (15, 20, 25, 30 C)
     and four relative humidities (65, 70, 75, 80 percent RH), imaged hourly on a
     flatbed scanner for 62 hours; mycelial area and number of tips extracted by the
-    authors' image analysis (Vidal-Diez de Ulzurrun et al. 2015). The article's
-    additional files and the owner's downloaded copies are the intended source
-    files; none has been inspected yet.
+    authors' image analysis (Vidal-Diez de Ulzurrun et al. 2015). The article PDF and
+    its five additional files, downloaded by the owner, are preserved under
+    data/experiments/source_intake/de_ligne_2019 with SHA-256 digests. Additional
+    files 2 to 5 carry the growth curves as raster panels (mean of four replicates
+    with standard-deviation bars, hourly to 62 h); no table or machine-readable
+    series is published, and individual replicates are available from the authors
+    on request only.
 intended_use:
   purpose: >-
     Colony-expansion target for the spatial mycelium core (SPATIAL-001): mycelial
@@ -52,8 +56,18 @@ schema_gate:
 review:
   selected_by: Repository owner with the FungMod development session, after an abstract-level survey of open colony-growth datasets
   review_date: 2026-10-06
-  schema_result: pending
+  schema_result: passed
   decision_notes: >-
+    Ingested on 2026-10-06 as data/experiments/literature/de_ligne_2019_colony_growth
+    (four literature_processed datasets, sixty-four condition series, 3954
+    observations) by scripts/digitize_de_ligne_2019_figures.py, which reads every
+    condition from both panels that plot it, stores both readings and their
+    difference, flags every reading limitation (hidden markers, unreadable
+    standard-deviation bars, single-panel values) and verifies three prose
+    statements of the article before writing. The observation operator from mycelial
+    area and tip count to hyphal length and tip density fields is still to be
+    declared before any comparison with the continuum model is a result.
+    Selection rationale:
     Selected over the Zenodo soil-microcosm network dataset of Fricker and Boddy (a
     backup for network-level comparison), the microfluidic single-hypha datasets
     (microscale parameters only) and the Postia placenta confocal study (single
@@ -66,6 +80,7 @@ review:
     the per-condition sampling recorded, and the observation operator from image
     area to hyphal length density declared before any comparison.
 notes: >-
-  Review only; no observations, series or file paths to data are recorded here. The
-  repository owner's first commit on the literature branch (2026-10-06) carried
-  LaTeX build products only, so the files are still outstanding.
+  Review only; no observations are recorded here. The repository owner's first
+  commit on the literature branch (2026-10-06) carried LaTeX build products only;
+  the files arrived on the lit-correct branch the same day and were moved into the
+  source intake.

@@ -26,6 +26,56 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## DATA-003 De Ligne 2019 Colony Growth Dataset Ingested From Figures
+
+Status: `complete` for the stated scope (2026-10-06).
+
+Scope: the colony-expansion target for the spatial mycelium core (SPATIAL-001).
+De Ligne et al. 2019 (IMA Fungus 10:7, DOI `10.1186/s43008-019-0009-3`, CC BY
+4.0) measured the mycelial area and the number of hyphal tips of *Coniophora
+puteana* MUCL 11662 and *Rhizoctonia solani* AG4-HG-I S010-1 on an inert
+Petri-dish surface, hourly for 62 h, under sixteen temperature-humidity
+conditions, as the mean of four replicates with standard-deviation bars. The
+data exist only as raster panels in additional files 2 to 5.
+
+What exists:
+
+- `data/experiments/source_intake/de_ligne_2019/`: the article and the five
+  additional files downloaded by the owner, preserved with SHA-256 digests in
+  `manifest.json`, plus `digitized_panels.csv`, the per-panel extraction table.
+- `scripts/digitize_de_ligne_2019_figures.py`: verifies the digests, extracts
+  the embedded panels, verifies the legend colour order, calibrates each axis
+  from the equally spaced gridlines with the frame bottom as the verified
+  y zero, classifies the four staggered series by hue, locates the disc
+  markers with a background-penalised template so partly hidden discs still
+  give their centre, reads each error bar through occluders and accepts an end
+  only where its cap is visible, merges the two appearances of every condition
+  (temperature panel and humidity panel) and checks three prose statements of
+  the article before writing; `--check` reproduces the committed files.
+- `data/experiments/literature/de_ligne_2019_colony_growth/`: four
+  `literature_processed` datasets (species x quantity), sixteen condition
+  series each, 3954 observations in total; every row stores both panel
+  readings, their difference, the digitization resolution and a flag column
+  with a glossary in the metadata.
+- Tests: `tests/test_de_ligne_2019_dataset.py` (files, schema, loader,
+  flags, bounded panel disagreement, panel coverage, the article's statements,
+  the review record, manifest digests, documentation, and the extractor's
+  reproduction when `pypdfium2` and Pillow are installed);
+  `tests/test_literature_schema_contract.py` and
+  `tests/test_dataset_candidate_review.py` updated.
+
+What it is not: no model comparison, no observation operator from hyphal
+density fields to scanned area or graph-derived tip count, no parameters, no
+validation. The sixteen conditions of a species are one experiment; agreement
+across them is within-study transfer. Standard deviations are empty where the
+bar was hidden behind the marker or unreadable (flagged), and the small
+panels of figures S3 to S5 leave many bars unreadable because the four series
+are staggered by little more than a pixel.
+
+Recommended next task: declare the observation operator and a frozen
+calibrate-and-hold-out plan over the sixteen conditions, then run the
+continuum model against one species.
+
 ## SPATIAL-001 A Continuum Mycelium On A Compiled Spatial Core
 
 Date: 2026-10-06

@@ -302,6 +302,7 @@ def test_literature_directory_contains_only_reviewed_sources() -> None:
         "alvarez_gonzalez_2022_free_beta_glucosidase",
         "ariaeenejad_2020_persibgl1_cellobiose",
         "cao_2015_bgl6_cellobiose",
+        "de_ligne_2019_colony_growth",
         "gelain_2020_t_harzianum",
     ]
     ingested = " ".join(directories)
@@ -329,12 +330,12 @@ def _assert_no_observation_payload_fields(value: Any) -> None:
             _assert_no_observation_payload_fields(nested)
 
 
-def test_colony_growth_candidate_review_is_selected_but_not_ingestible_yet() -> None:
+def test_colony_growth_candidate_review_is_approved_after_the_schema_passed() -> None:
     review = load_dataset_candidate_review(CANDIDATE_DIR / "de_ligne_2019_colony_growth_review.yml")
 
     assert review.validate().passed
-    assert review.status == "selected_for_schema_review"
-    assert review.review["schema_result"] == "pending"
+    assert review.status == "approved_for_ingestion"
+    assert review.review["schema_result"] == "passed"
     assert review.source["doi"] == "10.1186/s43008-019-0009-3" and "CC BY 4.0" in review.source["notes"]
     assert set(review.intended_use["measured_quantities"]) == {"mycelial area", "number of hyphal tips"}
     assert review.raw["dataset_maturity"] == "literature_processed"
