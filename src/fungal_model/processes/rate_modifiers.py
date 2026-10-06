@@ -19,6 +19,7 @@ from fungal_model.modifiers import (
     OxygenModifier,
     PHModifier,
     ProductInhibitionModifier,
+    SubstrateReactivityModifier,
     SubstrateInhibitionModifier,
     TemperatureModifier,
     WaterActivityModifier,
@@ -162,6 +163,40 @@ def product_inhibition_modifier_from_config(
         product_state=product_state,
         inhibition_constant_symbol=inhibition_constant,
         product_units=state_units[product_state],
+    )
+
+
+def substrate_reactivity_modifier_from_config(
+    modifier_config: Mapping[str, Any],
+    *,
+    state_units: Mapping[str, str],
+) -> SubstrateReactivityModifier:
+    """Build a conversion-dependent substrate reactivity modifier from explicit config fields."""
+
+    substrate_state = _required_text(
+        modifier_config,
+        "substrate_state",
+        field_name="substrate_state",
+        modifier_type="substrate_reactivity",
+    )
+    _require_state(substrate_state, state_units=state_units, modifier_type="substrate_reactivity")
+    return SubstrateReactivityModifier(
+        substrate_state=substrate_state,
+        reference_concentration_symbol=_required_symbol(
+            modifier_config,
+            "reference_concentration",
+            "reference_concentration_symbol",
+            field_name="reference_concentration",
+            modifier_type="substrate_reactivity",
+        ),
+        exponent_symbol=_required_symbol(
+            modifier_config,
+            "exponent",
+            "exponent_symbol",
+            field_name="exponent",
+            modifier_type="substrate_reactivity",
+        ),
+        substrate_units=state_units[substrate_state],
     )
 
 
@@ -972,6 +1007,7 @@ __all__ = [
     "oxygen_modifier_from_config",
     "ph_modifier_from_config",
     "product_inhibition_modifier_from_config",
+    "substrate_reactivity_modifier_from_config",
     "substrate_inhibition_modifier_from_config",
     "temperature_modifier_from_config",
     "water_activity_modifier_from_config",

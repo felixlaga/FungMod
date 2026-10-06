@@ -15,6 +15,11 @@ from .enzyme_inhibition import (
 from .oxygen import OxygenModifier, oxygen_monod_assumption
 from .ph import PHModifier
 from .product_inhibition import ProductInhibitionModifier, product_inhibition_assumption
+from .reactivity import (
+    SUBSTRATE_REACTIVITY_MODIFIER_TYPE,
+    SubstrateReactivityModifier,
+    substrate_reactivity_assumption,
+)
 from .temperature import TemperatureModifier
 from .water_activity import WaterActivityModifier, water_activity_threshold_assumption
 
@@ -30,10 +35,13 @@ __all__ = [
     "OxygenModifier",
     "PHModifier",
     "ProductInhibitionModifier",
+    "SUBSTRATE_REACTIVITY_MODIFIER_TYPE",
+    "SubstrateReactivityModifier",
     "SubstrateInhibitionModifier",
     "TemperatureModifier",
     "WaterActivityModifier",
     "oxygen_monod_assumption",
     "product_inhibition_assumption",
+    "substrate_reactivity_assumption",
     "water_activity_threshold_assumption",
 ]

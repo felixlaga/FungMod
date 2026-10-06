@@ -1,0 +1,142 @@
+{
+  "model": "M0_baseline",
+  "scenario": "primary",
+  "training_conditions": [
+    "gelain_2020_cellulose_10gl",
+    "gelain_2020_cellulose_20gl",
+    "gelain_2020_cellulose_30gl"
+  ],
+  "success": true,
+  "cost": 2.0153313279533793,
+  "nfev": 30,
+  "normalization": {
+    "biomass": 9.40625525180876,
+    "substrate": 31.188432670702987,
+    "cellulase_activity": 887.6433209611139,
+    "beta_glucosidase_activity": 2150.797238431824
+  },
+  "parameters": [
+    {
+      "symbol": "k_h",
+      "config_symbol": "gelain_hydrolysis_k_h",
+      "value": 0.012681776898273303,
+      "units": "gram/gelain_fpu/hour",
+      "fixed": false
+    },
+    {
+      "symbol": "Kh",
+      "config_symbol": "gelain_hydrolysis_Kh",
+      "value": 10.531997452512396,
+      "units": "gram/liter",
+      "fixed": false
+    },
+    {
+      "symbol": "Y",
+      "config_symbol": "gelain_hydrolysis_Y",
+      "value": 0.3717013528543743,
+      "units": "dimensionless",
+      "fixed": false
+    },
+    {
+      "symbol": "kd",
+      "config_symbol": "gelain_hydrolysis_kd",
+      "value": 0.01792003976241154,
+      "units": "1/hour",
+      "fixed": false
+    },
+    {
+      "symbol": "K_ind",
+      "config_symbol": "gelain_hydrolysis_K_ind",
+      "value": 0.01008756701679325,
+      "units": "gram/liter",
+      "fixed": false
+    },
+    {
+      "symbol": "qF",
+      "config_symbol": "gelain_hydrolysis_qF",
+      "value": 6.883661290386444,
+      "units": "gelain_fpu/gram/hour",
+      "fixed": false
+    },
+    {
+      "symbol": "kF",
+      "config_symbol": "gelain_hydrolysis_kF",
+      "value": 3.9039181234178865e-05,
+      "units": "1/hour",
+      "fixed": false
+    },
+    {
+      "symbol": "qB",
+      "config_symbol": "gelain_hydrolysis_qB",
+      "value": 15.992526926418924,
+      "units": "gelain_beta_u/gram/hour",
+      "fixed": false
+    },
+    {
+      "symbol": "kB",
+      "config_symbol": "gelain_hydrolysis_kB",
+      "value": 1.2427357609841935e-06,
+      "units": "1/hour",
+      "fixed": false
+    }
+  ],
+  "diagnostics": {
+    "singular_values": [
+      4.810249410217476,
+      3.85781740292924,
+      2.66084772188668,
+      1.4065807903462826,
+      0.5596247371178623,
+      0.31766088913440077,
+      0.2356554301811513,
+      0.0023772497053715937,
+      0.00010047313241416603
+    ],
+    "practical_rank": 9,
+    "free_parameters": 9,
+    "full_rank": true,
+    "condition_number": 47875.977334805015,
+    "near_bounds": [
+      "K_ind"
+    ]
+  },
+  "starts": [
+    {
+      "start": 0,
+      "success": true,
+      "cost": 2.0153313279533793,
+      "nfev": 30,
+      "status": 3
+    },
+    {
+      "start": 1,
+      "success": true,
+      "cost": 2.0539113854158053,
+      "nfev": 33,
+      "status": 3
+    },
+    {
+      "start": 2,
+      "success": true,
+      "cost": 2.0589322107644565,
+      "nfev": 34,
+      "status": 3
+    },
+    {
+      "start": 3,
+      "success": true,
+      "cost": 2.0536294979587524,
+      "nfev": 62,
+      "status": 3
+    },
+    {
+      "start": 4,
+      "success": true,
+      "cost": 2.0339781996467794,
+      "nfev": 26,
+      "status": 3
+    }
+  ],
+  "noise": {},
+  "plan_sha256": "9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e"
+}

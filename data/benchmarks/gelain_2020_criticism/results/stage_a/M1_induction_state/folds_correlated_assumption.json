@@ -1,0 +1,1396 @@
+[
+  {
+    "condition": "gelain_2020_cellulose_10gl",
+    "scenario": "correlated_assumption",
+    "fit": {
+      "model": "M1_induction_state",
+      "scenario": "correlated_assumption",
+      "training_conditions": [
+        "gelain_2020_cellulose_20gl",
+        "gelain_2020_cellulose_30gl"
+      ],
+      "success": true,
+      "cost": 79.13480721352428,
+      "nfev": 58,
+      "normalization": {
+        "biomass": 9.40625525180876,
+        "substrate": 31.188432670702987,
+        "cellulase_activity": 842.7412414519945,
+        "beta_glucosidase_activity": 2150.797238431824
+      },
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "config_symbol": "gelain_hydrolysis_k_h",
+          "value": 0.5224667924026877,
+          "units": "gram/gelain_fpu/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "Kh",
+          "config_symbol": "gelain_hydrolysis_Kh",
+          "value": 44.894306706683714,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "Y",
+          "config_symbol": "gelain_hydrolysis_Y",
+          "value": 0.5763363831757268,
+          "units": "dimensionless",
+          "fixed": false
+        },
+        {
+          "symbol": "kd",
+          "config_symbol": "gelain_hydrolysis_kd",
+          "value": 0.0269865250435707,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "K_ind",
+          "config_symbol": "gelain_hydrolysis_K_ind",
+          "value": 0.010349164955136861,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "qF",
+          "config_symbol": "gelain_hydrolysis_qF",
+          "value": 0.32713707789617186,
+          "units": "gelain_fpu/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kF",
+          "config_symbol": "gelain_hydrolysis_kF",
+          "value": 0.01681013117660935,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "qB",
+          "config_symbol": "gelain_hydrolysis_qB",
+          "value": 0.7591759470452989,
+          "units": "gelain_beta_u/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kB",
+          "config_symbol": "gelain_hydrolysis_kB",
+          "value": 0.013870751975756098,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kz_loss",
+          "config_symbol": "gelain_criticism_kz_loss",
+          "value": 0.01609953663215686,
+          "units": "1/hour",
+          "fixed": false
+        }
+      ],
+      "diagnostics": {
+        "singular_values": [
+          46.39509601127192,
+          28.418192531729446,
+          22.47914493864498,
+          14.328869091651724,
+          8.647638797984344,
+          5.278421023662179,
+          3.77171714899761,
+          0.49040446297003343,
+          0.11409847157154304,
+          0.06237970556386854
+        ],
+        "practical_rank": 10,
+        "free_parameters": 10,
+        "full_rank": true,
+        "condition_number": 743.7530458326626,
+        "near_bounds": []
+      },
+      "starts": [
+        {
+          "start": 0,
+          "success": true,
+          "cost": 82.07465132290264,
+          "nfev": 44,
+          "status": 3
+        },
+        {
+          "start": 1,
+          "success": true,
+          "cost": 83.68949240418314,
+          "nfev": 46,
+          "status": 3
+        },
+        {
+          "start": 2,
+          "success": true,
+          "cost": 82.63412337137001,
+          "nfev": 52,
+          "status": 3
+        },
+        {
+          "start": 3,
+          "success": true,
+          "cost": 215.2972215757888,
+          "nfev": 146,
+          "status": 2
+        },
+        {
+          "start": 4,
+          "success": true,
+          "cost": 79.13480721352428,
+          "nfev": 58,
+          "status": 3
+        }
+      ],
+      "noise": {
+        "gelain_2020_cellulose_20gl": {
+          "observables": [
+            "biomass",
+            "substrate",
+            "cellulase_activity",
+            "beta_glucosidase_activity"
+          ],
+          "units": [
+            "gram / liter",
+            "gram / liter",
+            "filter_paper_unit / liter",
+            "beta_glucosidase_assay_unit / liter"
+          ],
+          "standard_deviations": [
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ]
+          ],
+          "correlation": [
+            [
+              1.0,
+              -0.5,
+              0.0,
+              0.0
+            ],
+            [
+              -0.5,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "left_limits": [
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ]
+          ],
+          "source": "Declared assumption only, carried over from the v2 correlated_assumption scenario: SD = 10 percent of each observable's training maximum across the three cellulose loadings, biomass/substrate correlation -0.5 from the sign suggested by mass-difference assays, temporal errors independent. Neither magnitude is measured; the deposit holds no replicates or standard deviations.",
+          "evidence": "assumed",
+          "detection_limit_source": null,
+          "temporal_independence_assumed": true,
+          "supports": "zero or one left-censored component per simultaneous row"
+        },
+        "gelain_2020_cellulose_30gl": {
+          "observables": [
+            "biomass",
+            "substrate",
+            "cellulase_activity",
+            "beta_glucosidase_activity"
+          ],
+          "units": [
+            "gram / liter",
+            "gram / liter",
+            "filter_paper_unit / liter",
+            "beta_glucosidase_assay_unit / liter"
+          ],
+          "standard_deviations": [
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ]
+          ],
+          "correlation": [
+            [
+              1.0,
+              -0.5,
+              0.0,
+              0.0
+            ],
+            [
+              -0.5,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "left_limits": [
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ]
+          ],
+          "source": "Declared assumption only, carried over from the v2 correlated_assumption scenario: SD = 10 percent of each observable's training maximum across the three cellulose loadings, biomass/substrate correlation -0.5 from the sign suggested by mass-difference assays, temporal errors independent. Neither magnitude is measured; the deposit holds no replicates or standard deviations.",
+          "evidence": "assumed",
+          "detection_limit_source": null,
+          "temporal_independence_assumed": true,
+          "supports": "zero or one left-censored component per simultaneous row"
+        }
+      }
+    },
+    "frozen_prediction_file": "stage_a/M1_induction_state/frozen_predictions/gelain_2020_cellulose_10gl_correlated_assumption.json",
+    "frozen_prediction_sha256": "f9fca9ad822d8406a3d7a62364acfef24dcb2c603f21465cd82bc7638afa7459",
+    "score": {
+      "rmse": {
+        "biomass": 1.5542375567502358,
+        "substrate": 1.420748755665904,
+        "cellulase_activity": 393.8910877755457,
+        "beta_glucosidase_activity": 714.0587552111161
+      },
+      "bias": {
+        "biomass": -1.5272622526175406,
+        "substrate": -1.068173221364246,
+        "cellulase_activity": -336.9443883225446,
+        "beta_glucosidase_activity": -612.9128832262891
+      },
+      "normalized_mse": {
+        "biomass": 0.027302428513923102,
+        "substrate": 0.0020751403149067826,
+        "cellulase_activity": 0.21845591774659645,
+        "beta_glucosidase_activity": 0.11022216991521613
+      },
+      "n": 32
+    }
+  },
+  {
+    "condition": "gelain_2020_cellulose_20gl",
+    "scenario": "correlated_assumption",
+    "fit": {
+      "model": "M1_induction_state",
+      "scenario": "correlated_assumption",
+      "training_conditions": [
+        "gelain_2020_cellulose_10gl",
+        "gelain_2020_cellulose_30gl"
+      ],
+      "success": true,
+      "cost": 173.39263637577938,
+      "nfev": 44,
+      "normalization": {
+        "biomass": 9.40625525180876,
+        "substrate": 31.188432670702987,
+        "cellulase_activity": 887.6433209611139,
+        "beta_glucosidase_activity": 1976.4526999260297
+      },
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "config_symbol": "gelain_hydrolysis_k_h",
+          "value": 0.15260791051386807,
+          "units": "gram/gelain_fpu/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "Kh",
+          "config_symbol": "gelain_hydrolysis_Kh",
+          "value": 7.191686740681157,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "Y",
+          "config_symbol": "gelain_hydrolysis_Y",
+          "value": 0.5235771931402817,
+          "units": "dimensionless",
+          "fixed": false
+        },
+        {
+          "symbol": "kd",
+          "config_symbol": "gelain_hydrolysis_kd",
+          "value": 0.022531094909528884,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "K_ind",
+          "config_symbol": "gelain_hydrolysis_K_ind",
+          "value": 0.010124358536798179,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "qF",
+          "config_symbol": "gelain_hydrolysis_qF",
+          "value": 0.5088386369574388,
+          "units": "gelain_fpu/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kF",
+          "config_symbol": "gelain_hydrolysis_kF",
+          "value": 0.01795765790711827,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "qB",
+          "config_symbol": "gelain_hydrolysis_qB",
+          "value": 1.0991433706311315,
+          "units": "gelain_beta_u/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kB",
+          "config_symbol": "gelain_hydrolysis_kB",
+          "value": 0.014774158319346652,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kz_loss",
+          "config_symbol": "gelain_criticism_kz_loss",
+          "value": 0.01470013550233544,
+          "units": "1/hour",
+          "fixed": false
+        }
+      ],
+      "diagnostics": {
+        "singular_values": [
+          41.734000847259395,
+          27.51777461074309,
+          19.885445869491623,
+          11.208764346622456,
+          7.424050292968101,
+          5.216813484215904,
+          3.7496698674112627,
+          1.5926824572183398,
+          0.6147712281335433,
+          0.2909012821571884
+        ],
+        "practical_rank": 10,
+        "free_parameters": 10,
+        "full_rank": true,
+        "condition_number": 143.46447886987463,
+        "near_bounds": []
+      },
+      "starts": [
+        {
+          "start": 0,
+          "success": true,
+          "cost": 174.42955526369445,
+          "nfev": 48,
+          "status": 3
+        },
+        {
+          "start": 1,
+          "success": true,
+          "cost": 244.40877073863095,
+          "nfev": 132,
+          "status": 2
+        },
+        {
+          "start": 2,
+          "success": true,
+          "cost": 244.40970326156216,
+          "nfev": 98,
+          "status": 2
+        },
+        {
+          "start": 3,
+          "success": true,
+          "cost": 244.40906281154656,
+          "nfev": 89,
+          "status": 2
+        },
+        {
+          "start": 4,
+          "success": true,
+          "cost": 173.39263637577938,
+          "nfev": 44,
+          "status": 4
+        }
+      ],
+      "noise": {
+        "gelain_2020_cellulose_10gl": {
+          "observables": [
+            "biomass",
+            "substrate",
+            "cellulase_activity",
+            "beta_glucosidase_activity"
+          ],
+          "units": [
+            "gram / liter",
+            "gram / liter",
+            "filter_paper_unit / liter",
+            "beta_glucosidase_assay_unit / liter"
+          ],
+          "standard_deviations": [
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ]
+          ],
+          "correlation": [
+            [
+              1.0,
+              -0.5,
+              0.0,
+              0.0
+            ],
+            [
+              -0.5,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "left_limits": [
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ]
+          ],
+          "source": "Declared assumption only, carried over from the v2 correlated_assumption scenario: SD = 10 percent of each observable's training maximum across the three cellulose loadings, biomass/substrate correlation -0.5 from the sign suggested by mass-difference assays, temporal errors independent. Neither magnitude is measured; the deposit holds no replicates or standard deviations.",
+          "evidence": "assumed",
+          "detection_limit_source": null,
+          "temporal_independence_assumed": true,
+          "supports": "zero or one left-censored component per simultaneous row"
+        },
+        "gelain_2020_cellulose_30gl": {
+          "observables": [
+            "biomass",
+            "substrate",
+            "cellulase_activity",
+            "beta_glucosidase_activity"
+          ],
+          "units": [
+            "gram / liter",
+            "gram / liter",
+            "filter_paper_unit / liter",
+            "beta_glucosidase_assay_unit / liter"
+          ],
+          "standard_deviations": [
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ]
+          ],
+          "correlation": [
+            [
+              1.0,
+              -0.5,
+              0.0,
+              0.0
+            ],
+            [
+              -0.5,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "left_limits": [
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ]
+          ],
+          "source": "Declared assumption only, carried over from the v2 correlated_assumption scenario: SD = 10 percent of each observable's training maximum across the three cellulose loadings, biomass/substrate correlation -0.5 from the sign suggested by mass-difference assays, temporal errors independent. Neither magnitude is measured; the deposit holds no replicates or standard deviations.",
+          "evidence": "assumed",
+          "detection_limit_source": null,
+          "temporal_independence_assumed": true,
+          "supports": "zero or one left-censored component per simultaneous row"
+        }
+      }
+    },
+    "frozen_prediction_file": "stage_a/M1_induction_state/frozen_predictions/gelain_2020_cellulose_20gl_correlated_assumption.json",
+    "frozen_prediction_sha256": "a336ca5972b550aacad568eb2cabeb05b9d2e77deebafbec7a04f38d207a7878",
+    "score": {
+      "rmse": {
+        "biomass": 1.1136736322534024,
+        "substrate": 4.08695403741433,
+        "cellulase_activity": 88.53666891254417,
+        "beta_glucosidase_activity": 300.43825750412003
+      },
+      "bias": {
+        "biomass": -0.5224770159098711,
+        "substrate": -2.9931873493363828,
+        "cellulase_activity": -48.6246785897778,
+        "beta_glucosidase_activity": -205.49185516972128
+      },
+      "normalized_mse": {
+        "biomass": 0.014017880553145335,
+        "substrate": 0.017171664958530505,
+        "cellulase_activity": 0.009948769686565117,
+        "beta_glucosidase_activity": 0.023106683634718368
+      },
+      "n": 32
+    }
+  },
+  {
+    "condition": "gelain_2020_cellulose_30gl",
+    "scenario": "correlated_assumption",
+    "fit": {
+      "model": "M1_induction_state",
+      "scenario": "correlated_assumption",
+      "training_conditions": [
+        "gelain_2020_cellulose_10gl",
+        "gelain_2020_cellulose_20gl"
+      ],
+      "success": true,
+      "cost": 81.47160732330062,
+      "nfev": 37,
+      "normalization": {
+        "biomass": 8.219913529590286,
+        "substrate": 19.973133273578657,
+        "cellulase_activity": 887.6433209611139,
+        "beta_glucosidase_activity": 2150.797238431824
+      },
+      "parameters": [
+        {
+          "symbol": "k_h",
+          "config_symbol": "gelain_hydrolysis_k_h",
+          "value": 0.12707367584379162,
+          "units": "gram/gelain_fpu/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "Kh",
+          "config_symbol": "gelain_hydrolysis_Kh",
+          "value": 8.452219442727285,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "Y",
+          "config_symbol": "gelain_hydrolysis_Y",
+          "value": 0.6599756109208815,
+          "units": "dimensionless",
+          "fixed": false
+        },
+        {
+          "symbol": "kd",
+          "config_symbol": "gelain_hydrolysis_kd",
+          "value": 0.02298929060561557,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "K_ind",
+          "config_symbol": "gelain_hydrolysis_K_ind",
+          "value": 0.010005152427493853,
+          "units": "gram/liter",
+          "fixed": false
+        },
+        {
+          "symbol": "qF",
+          "config_symbol": "gelain_hydrolysis_qF",
+          "value": 0.6464789607212493,
+          "units": "gelain_fpu/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kF",
+          "config_symbol": "gelain_hydrolysis_kF",
+          "value": 0.015853423117817757,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "qB",
+          "config_symbol": "gelain_hydrolysis_qB",
+          "value": 1.43252063754479,
+          "units": "gelain_beta_u/gram/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kB",
+          "config_symbol": "gelain_hydrolysis_kB",
+          "value": 0.013646418051265687,
+          "units": "1/hour",
+          "fixed": false
+        },
+        {
+          "symbol": "kz_loss",
+          "config_symbol": "gelain_criticism_kz_loss",
+          "value": 0.02076390384985925,
+          "units": "1/hour",
+          "fixed": false
+        }
+      ],
+      "diagnostics": {
+        "singular_values": [
+          41.2702737934167,
+          31.10792390846546,
+          19.496814207564416,
+          12.475780743297367,
+          9.801283750238301,
+          6.429122101548996,
+          4.598023871423854,
+          3.1296063391556173,
+          0.28786860956633453,
+          0.12778350726086393
+        ],
+        "practical_rank": 10,
+        "free_parameters": 10,
+        "full_rank": true,
+        "condition_number": 322.97026962302266,
+        "near_bounds": [
+          "K_ind"
+        ]
+      },
+      "starts": [
+        {
+          "start": 0,
+          "success": true,
+          "cost": 81.47160732330062,
+          "nfev": 37,
+          "status": 3
+        },
+        {
+          "start": 1,
+          "success": false,
+          "cost": 194.08166226674857,
+          "nfev": 250,
+          "status": 0
+        },
+        {
+          "start": 2,
+          "success": true,
+          "cost": 93.83020474601946,
+          "nfev": 72,
+          "status": 3
+        },
+        {
+          "start": 3,
+          "success": false,
+          "cost": 194.080716516523,
+          "nfev": 250,
+          "status": 0
+        },
+        {
+          "start": 4,
+          "success": true,
+          "cost": 130.0356509903396,
+          "nfev": 23,
+          "status": 3
+        }
+      ],
+      "noise": {
+        "gelain_2020_cellulose_10gl": {
+          "observables": [
+            "biomass",
+            "substrate",
+            "cellulase_activity",
+            "beta_glucosidase_activity"
+          ],
+          "units": [
+            "gram / liter",
+            "gram / liter",
+            "filter_paper_unit / liter",
+            "beta_glucosidase_assay_unit / liter"
+          ],
+          "standard_deviations": [
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ]
+          ],
+          "correlation": [
+            [
+              1.0,
+              -0.5,
+              0.0,
+              0.0
+            ],
+            [
+              -0.5,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "left_limits": [
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ]
+          ],
+          "source": "Declared assumption only, carried over from the v2 correlated_assumption scenario: SD = 10 percent of each observable's training maximum across the three cellulose loadings, biomass/substrate correlation -0.5 from the sign suggested by mass-difference assays, temporal errors independent. Neither magnitude is measured; the deposit holds no replicates or standard deviations.",
+          "evidence": "assumed",
+          "detection_limit_source": null,
+          "temporal_independence_assumed": true,
+          "supports": "zero or one left-censored component per simultaneous row"
+        },
+        "gelain_2020_cellulose_20gl": {
+          "observables": [
+            "biomass",
+            "substrate",
+            "cellulase_activity",
+            "beta_glucosidase_activity"
+          ],
+          "units": [
+            "gram / liter",
+            "gram / liter",
+            "filter_paper_unit / liter",
+            "beta_glucosidase_assay_unit / liter"
+          ],
+          "standard_deviations": [
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ],
+            [
+              0.940625525180876,
+              3.118843267070299,
+              88.76433209611139,
+              215.07972384318242
+            ]
+          ],
+          "correlation": [
+            [
+              1.0,
+              -0.5,
+              0.0,
+              0.0
+            ],
+            [
+              -0.5,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "left_limits": [
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ],
+            [
+              null,
+              null,
+              null,
+              null
+            ]
+          ],
+          "source": "Declared assumption only, carried over from the v2 correlated_assumption scenario: SD = 10 percent of each observable's training maximum across the three cellulose loadings, biomass/substrate correlation -0.5 from the sign suggested by mass-difference assays, temporal errors independent. Neither magnitude is measured; the deposit holds no replicates or standard deviations.",
+          "evidence": "assumed",
+          "detection_limit_source": null,
+          "temporal_independence_assumed": true,
+          "supports": "zero or one left-censored component per simultaneous row"
+        }
+      }
+    },
+    "frozen_prediction_file": "stage_a/M1_induction_state/frozen_predictions/gelain_2020_cellulose_30gl_correlated_assumption.json",
+    "frozen_prediction_sha256": "691dcd0f0992ee1670c84b83d632bae844a684d67c90fc5f6249a423b03a91b2",
+    "score": {
+      "rmse": {
+        "biomass": 3.202764884663524,
+        "substrate": 7.165958359190266,
+        "cellulase_activity": 442.32495052751125,
+        "beta_glucosidase_activity": 973.0641936582936
+      },
+      "bias": {
+        "biomass": 2.269817366238139,
+        "substrate": -5.184625573643023,
+        "cellulase_activity": 386.013287970713,
+        "beta_glucosidase_activity": 844.3852431232007
+      },
+      "normalized_mse": {
+        "biomass": 0.1518153267200258,
+        "substrate": 0.1287230022953906,
+        "cellulase_activity": 0.24831668168606658,
+        "beta_glucosidase_activity": 0.20468406971462105
+      },
+      "n": 32
+    }
+  }
+]

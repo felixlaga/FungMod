@@ -264,6 +264,11 @@ Ordered work, each with an exit gate:
    under a plan frozen before any fit, and report which mechanisms the data
    support and which parameters stay unidentified. Gate: the frozen plan, a
    per-mechanism identifiability table, and failed candidates reported.
+   Recorded 2026-10-05 (CRIT-001, CRIT-002, `docs/gelain-model-criticism.md`):
+   none of the three declared mechanisms passes the holdout screen, none
+   restores adequacy, and only the induction memory constant is weakly
+   identified; every stage B verdict is provisional because no chain meets
+   the convergence rule at the planned length. Gate met with that label.
 3. **Cross-study transfer from the literature (the intended headline).** Find a
    second published submerged cellulose-culture time course, preferring the
    same organism from another laboratory, then the same genus. Freeze the

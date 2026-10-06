@@ -26,6 +26,184 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CRIT-001 Gelain Model-Criticism Study: Plan Frozen
+
+Date: 2026-10-05
+
+Status: plan frozen and the study machinery implemented and tested; no fit,
+sample or score has been recorded under it yet. This is step 5 item 2 of the
+software-paper plan.
+Development fits during implementation (tiny-budget tests, one timing fit per
+model) were not recorded and inform no decision.
+
+Changed:
+
+- `data/benchmarks/gelain_2020_criticism/plan.json` (SHA-256
+  `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e`): four models
+  (M0 registry baseline; M1 induction state; M2 soluble product pool with
+  Monod uptake, product inhibition and an explicit unmeasured initial soluble
+  carbon; M3 conversion-dependent accessibility after Kadam 2004), every
+  parameter with bounds, units and role, the shared assumed error model with
+  one sampled noise multiplier, stage A least-squares whole-condition holdouts
+  with the v2 complexity screen and profiles, stage B posterior sampling with
+  the BAYES-001 identifiability thresholds and posterior predictive coverage,
+  decision rules R1 to R4, a four-word outcome vocabulary, excluded claims and
+  an amendment rule.
+  Amendment 2 (same day, after stage A was recorded and before any chain ran):
+  the walker rule of at least two walkers per sampled dimension, so M2 samples
+  with 28 walkers; previous digest `9bb36f8d53d8dad66fd53beda9239ac1b1984c028018ff885ac44d9620921c4e`.
+  Amendment 1 (same day, before any run): machine-readable error-model fields
+  and config symbols; previous digest `8b368ac8d6b683f688907c0bb38d4b5a3d2730d29a7b8ca4c37d92db1e187c7e`.
+- `data/benchmarks/gelain_2020_criticism/README.md`: what the plan is and is
+  not, and what each model needs before it can run.
+- `tests/test_gelain_criticism_plan.py`: pins the digest, the data digests,
+  the parameter counts (9, 10, 13, 10), positivity of every bound, the
+  flagging of every added parameter, the decision rules and the claim
+  boundaries, and that no results directory exists yet.
+
+- `src/fungal_model/research/gelain_criticism.py` (later the same day):
+  composes the four variants from the registry base configuration for each
+  loading (M1 adds an induced pool through proportional synthesis and
+  first-order loss; M2 adds a soluble product state, a second enzyme-explicit
+  Michaelis-Menten uptake process with the yield product map, the
+  product-inhibition modifier and an explicit initial pool; M3 adds the
+  reactivity modifier to hydrolysis), runs stage A (multi-start log-space
+  least squares on training loadings only, frozen held-out predictions that
+  cite the plan digest, the v2 screen against M0, profiles) and stage B
+  (priors from the plan's bounds, the shared noise multiplier, checkpointed
+  ensemble sampling, identifiability, posterior predictive bands and
+  coverage). `scripts/run_gelain_2020_model_criticism.py` drives both stages.
+- `src/fungal_model/modifiers/reactivity.py`: generic `substrate_reactivity`
+  rate modifier, rate times `(S / S_ref)^n` with provenance to Kadam, Rydholm
+  and McMillan (2004); config builder in `processes/rate_modifiers.py` and
+  factory registration; the factor is zero at or below zero substrate.
+- `src/fungal_model/calibration/bayesian.py`: `posterior_predictive_coverage`.
+- `docs/gelain-model-criticism.md` and the changelog.
+
+Not changed: every model, registry record, benchmark result and frozen
+artifact; the registry case itself (variants are composed at run time and
+run in exploratory mode with the study as the source of every added value).
+
+Tests: five plan-contract tests; `tests/test_substrate_reactivity_modifier.py`
+(analytic activity, invalid constants, config builder errors, compiled kernel
+against the analytic solution of a non-cellulose toy process);
+`tests/test_gelain_criticism_study.py` (plan to variant mapping, M0 parity
+with the Bayesian study predictor at the frozen fit, every variant integrates
+and closes its declared mass balance, the variant configs declare their
+additions honestly, scoring statistics, fit-model error paths, a tiny stage A
+end to end with digest-cited frozen predictions);
+`test_posterior_predictive_coverage_tracks_the_error_model` in
+`tests/test_bayesian_calibration.py`. Commands: `pytest
+tests/test_gelain_criticism_plan.py tests/test_repository_hygiene.py
+tests/test_quality_config.py` (see the PR for the result).
+
+Scientific impact: none yet; the plan commits the study to its decision rules
+before data are touched. Backward compatibility: unaffected.
+
+Ambiguities: M2's initial soluble carbon `P0` is an explicit unknown standing
+in for inoculum and medium carry-over that the deposit does not measure; M3
+needs a new generic modifier before it can run; stage B holdout posteriors are
+capped by compute and may be reported as not run. Risk: low.
+
+Results (stage A, recorded 2026-10-05, plan digest `9bb36f8d53d8...`):
+
+- Mean normalized held-out MSE, primary scenario: M0 0.0907, M1 0.0882
+  (+2.7 percent, substrate 13 percent worse), M2 0.0695 (+23.4 percent, biomass
+  31 percent worse), M3 0.0979 (-7.9 percent, both activities worse). Every fit
+  had full practical rank.
+- Verdicts under the preregistered rules: M1 not supported; M2 not supported
+  under R1 (fails only the per-observable clause: it fits substrate and both
+  activities clearly better by giving up biomass, removing biomass loss,
+  lowering the yield to 0.18 and pushing the unmeasured initial soluble pool to
+  2.9 g/L near its declared ceiling); M3 not supported. The biomass/cellulose
+  tension of BAYES-001 is not resolved by any of the three additions; it moves.
+- No profiles were run because no model passed the screen. Stage B
+  all-condition posteriors for the three additions follow; M0 reuses BAYES-001.
+
+Next task: finish stage B within the compute cap, record identifiability and
+coverage for each addition, and carry the verdicts into the paper plan.
+
+## CRIT-002 Gelain Model-Criticism Study: Stage B Posteriors Recorded
+
+Date: 2026-10-05
+
+Status: complete for stage B under the plan's compute cap. The M2, M1 and
+M3 all-condition posteriors are recorded under the frozen plan (digest
+`6849c8b3...`); M0 reuses BAYES-001. None of the three chains meets the
+convergence rule at the planned length, so every stage B verdict is
+provisional as the plan requires. Two code defects found while recording
+are fixed and tested. Step 5 item 2's gate (frozen plan, per-mechanism
+identifiability table, failed candidates reported) is met with that
+provisional label.
+
+Changed:
+
+- `research/gelain_criticism.py`: the variant config factory merges the
+  variant's fixed constants into every candidate, so the posterior sampler
+  (which supplies only the fitted symbols) no longer drops M1's `k_z` and
+  start every walker at a non-finite posterior; `stage_b_verdicts` applies
+  R2 (multiplier interval contains 1.0) and R3 (every added parameter
+  identified or weakly identified) and combines them with the recorded stage
+  A screen into the plan's outcome vocabulary, labelled provisional when the
+  chain missed the convergence rule; `render_stage_b_report` reads the
+  recorded summary and identifiability fields (it crashed on M2's first
+  completion) and prints tau, bound contacts, the multiplier interval, the
+  rules and coverage; `write_posterior_outputs` adds `verdicts.json` to the
+  digested artifacts.
+- `tests/test_gelain_criticism_study.py`: posterior studies of M1 and M3 are
+  finite at a candidate (M1 has the fixed constant); the verdict helper
+  follows the rules on synthetic results. `tests/test_gelain_criticism_plan.py`:
+  every recorded stage B folder cites the plan chain, labels unconverged
+  chains provisional, uses the outcome vocabulary and matches its digests.
+- `docs/gelain-model-criticism.md` (stage B section), benchmark README.
+
+Not changed: the plan, stage A results, any rate law or constant.
+
+M2 result (`results/stage_b/M2_soluble_product_pool/`, 28 walkers, 8000
+steps, 2000 burn-in, two resumed runs totalling 2 h 35 min wall-clock against
+the plan's 2 h cap): not converged (tau 368 to 529 with 6000 post-burn-in
+steps; ESS 318 to 457; mean acceptance 0.174, minimum 0.071), verdicts
+provisional. R2 fails (multiplier median 1.94, interval [1.65, 2.87]). R3
+fails (`mu`, `Ks`, `Ki` prior dominated; `P0` bounded below only, median
+2.8 g/L against a 3 g/L bound). Common constants: `qF`, `qB` identified;
+`k_h`, `kd` weakly identified; `Kh` bounded below only; `K_ind`, `kB`
+bounded above only; `Y`, `kF` prior dominated. Coverage 95/96 at 95 percent
+with measurement noise. Outcome: not supported (fails R1).
+
+M1 result (`results/stage_b/M1_induction_state/`, 24 walkers, 8000 steps,
+49 min wall-clock): not converged (tau 267 to 340 with 6000 post-burn-in
+steps; ESS 423 to 540; mean acceptance 0.264), verdicts provisional. R2
+fails (multiplier median 2.16, interval [1.87, 2.53]; baseline 2.25). R3
+passes: `kz_loss` weakly identified (median 0.053 per hour, interval
+[0.024, 0.58]). Common constants: `Y`, `kd`, `qF`, `qB` identified; `k_h`,
+`Kh` weakly identified; `K_ind` bounded above only; `kF`, `kB` prior
+dominated. Coverage 91/96 (cellulase 19/24). Outcome: not supported (fails
+R1). The chain's report was re-rendered after the renderer fix; the
+sampler and analysis outputs are those of the single run.
+
+M3 result (`results/stage_b/M3_conversion_dependent_accessibility/`, 24
+walkers, 8000 steps, 42 min wall-clock): not converged (tau 232 to 371 with
+6000 post-burn-in steps; ESS 388 to 620; mean acceptance 0.290), verdicts
+provisional. R2 fails (multiplier median 2.24, interval [1.94, 2.62]). R3
+fails: `n` bounded above only (median 0.13, interval [0.053, 0.46], prior
+[0.05, 3]). Common constants keep the baseline's classes. Coverage 91/96.
+Outcome: not supported (fails R1).
+
+Across the additions: none passes R1, none restores adequacy under R2, and
+only M1's `kz_loss` is (weakly) identified under R3. The hydrolysis
+candidate's biomass/cellulose misfit is not explained by an induction
+memory, a soluble product pool with inhibition, or conversion-dependent
+accessibility as declared.
+
+Commands: `ruff check` passed; `pyright` 0 errors; criticism tests (see the
+PR). Scientific impact: the soluble-pool mechanism neither restores adequacy
+nor is identified by the duplicate means; nothing is promoted. Backward
+compatibility: `write_posterior_outputs` writes one more file. Risk: low.
+
+Recommended next task: tighten the stage A optimiser under a dated
+amendment (PETAB-001 finding) and re-run stage A; chains longer than the
+planned 8000 steps would need a second amendment and more than the 2 h cap.
+
 ## CI-001 Cross-Platform Quality-Gate Repair
 
 Date: 2026-10-05

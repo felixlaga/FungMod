@@ -1197,6 +1197,88 @@ def parameter_for_testing(symbol: str, value: float, units: str = "dimensionless
     )
 
 
+def posterior_predictive_coverage(
+    result: BayesianCalibrationResult,
+    *,
+    draws: int,
+    credible_mass: float = 0.95,
+    seed: int = 0,
+) -> dict[str, Any]:
+    """Fraction of the fitted observations inside the central posterior predictive interval.
+
+    Each draw adds the (scaled) measurement error of that draw to the model
+    prediction at the observed times, so the interval is for new observations,
+    not for the mean trajectory. Coverage far below ``credible_mass`` means the
+    model plus its error model cannot account for the data; coverage far above
+    it means the error model is wider than the residuals. It is a diagnostic,
+    not a test statistic.
+    """
+
+    if draws < 2:
+        raise ValueError("At least two posterior draws are required.")
+    if not 0.0 < credible_mass < 1.0:
+        raise ValueError("credible_mass must lie strictly between 0 and 1.")
+    lower_level, upper_level = (1.0 - credible_mass) / 2.0, 1.0 - (1.0 - credible_mass) / 2.0
+    problem = result.problem
+    flat = result.flat_samples()
+    rng = np.random.default_rng(seed)
+    picks = rng.integers(0, flat.shape[0], draws)
+    output: dict[str, Any] = {
+        "draws": int(draws),
+        "credible_mass": float(credible_mass),
+        "seed": int(seed),
+        "includes_measurement_noise": True,
+        "conditions": {},
+        "failed_draws": 0,
+        "overall": {},
+    }
+    inside_total: dict[str, int] = {}
+    count_total: dict[str, int] = {}
+    for condition in problem.conditions:
+        times = condition.times
+        predictions: list[np.ndarray] = []
+        for pick in picks:
+            vector = flat[pick]
+            try:
+                parameters = problem.parameters_from_coordinates(vector)
+                predicted = np.asarray(problem.predict(parameters, condition.condition_id, times), dtype=float)
+            except _PREDICTION_FAILURES:
+                output["failed_draws"] += 1
+                continue
+            if predicted.shape != condition.observed.shape or not np.all(np.isfinite(predicted)):
+                output["failed_draws"] += 1
+                continue
+            error = problem.scaled_error(condition, problem.noise_scales_from_coordinates(vector))
+            sd, _ = error.arrays(times.size)
+            chol = np.linalg.cholesky(error.correlation)
+            predictions.append(predicted + (rng.standard_normal(predicted.shape) @ chol.T) * sd)
+        if len(predictions) < 2:
+            raise ValueError(f"Too few successful posterior draws for {condition.condition_id!r}.")
+        stack = np.stack(predictions)
+        lower = np.quantile(stack, lower_level, axis=0)
+        upper = np.quantile(stack, upper_level, axis=0)
+        inside = (condition.observed >= lower) & (condition.observed <= upper)
+        per_observable = {}
+        for index, name in enumerate(condition.observables):
+            hits, total = int(inside[:, index].sum()), int(inside.shape[0])
+            per_observable[name] = {"inside": hits, "observations": total, "fraction": hits / total}
+            inside_total[name] = inside_total.get(name, 0) + hits
+            count_total[name] = count_total.get(name, 0) + total
+        output["conditions"][condition.condition_id] = {
+            "successful_draws": int(stack.shape[0]),
+            "per_observable": per_observable,
+            "fraction": float(inside.mean()),
+        }
+    overall = {
+        name: {"inside": inside_total[name], "observations": count_total[name], "fraction": inside_total[name] / count_total[name]}
+        for name in inside_total
+    }
+    all_inside, all_count = sum(inside_total.values()), sum(count_total.values())
+    overall["all_observables"] = {"inside": all_inside, "observations": all_count, "fraction": all_inside / all_count}
+    output["overall"] = overall
+    return output
+
+
 __all__ = [
     "BOUNDED_ABOVE_ONLY",
     "BOUNDED_BELOW_ONLY",
@@ -1230,6 +1312,7 @@ __all__ = [
     "parameter_for_testing",
     "pooled_replicate_standard_deviation",
     "posterior_predictive",
+    "posterior_predictive_coverage",
     "prior_from_bounds",
     "run_ensemble_sampler",
     "sample_posterior",
