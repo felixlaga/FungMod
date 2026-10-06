@@ -71,6 +71,28 @@ With your own measurements, put them in a folder of small CSV tables
 source and units, and turns anything missing into a named measurement request
 ([user-supplied data](docs/user-data.md)).
 
+### Command line
+
+The package also installs a `fungmod` command (or `python -m fungal_model`)
+for the same virtual experiments without writing Python: name the fungus,
+the substrate and the conditions, choose a mode, and FungMod preflights,
+simulates and writes the tables, manifest and report:
+
+```bash
+fungmod run --fungus "P. chrysosporium" --substrate cellobiose \
+  --temperature-c 30 --ph 5 \
+  --mode exploratory --samples 32 --seed 1 --output runs/first --report
+```
+
+It prints the preflight table, the final metrics and threshold times of each
+case, the limitations count and where the provenance and limitations tables
+are. `--mode`, and in exploratory mode `--samples` and `--seed`, are
+required, because there is no hidden default; scientific mode means exact
+inputs and implemented mechanisms, not experimental validation. A case the
+preflight blocks exits with code 3 and its measurement requests.
+`fungmod preflight`, `fungmod check-data DIR` and `fungmod list` cover the
+other steps ([command line](docs/cli.md)).
+
 Start with the [installation guide](https://fungmod.readthedocs.io/en/latest/install/),
 run a complete workflow in
 [`20_zero_to_complete_virtual_experiment.ipynb`](notebooks/examples/20_zero_to_complete_virtual_experiment.ipynb),
@@ -85,6 +107,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
 | Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests ([user-supplied data](docs/user-data.md)) |
+| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts ([command line](docs/cli.md)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |

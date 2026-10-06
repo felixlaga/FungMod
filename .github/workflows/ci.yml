@@ -221,3 +221,6 @@ jobs:
           assert configured.solver_metadata["success"] is True
           print(f"fungmod {fm.__version__} installed-wheel smoke passed")
           PY
+          /tmp/fungmod-wheel-smoke/bin/fungmod --version
+          /tmp/fungmod-wheel-smoke/bin/fungmod list > /tmp/fungmod-wheel-list.txt
+          grep -q sabiork_beta_glucosidase_source /tmp/fungmod-wheel-list.txt

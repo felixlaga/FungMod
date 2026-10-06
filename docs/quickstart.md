@@ -93,6 +93,8 @@ all files in the bundle.
 
 ## Next
 
+- Run the same study from a shell with the [command line](cli.md)
+  (`fungmod run`, `fungmod preflight`, `fungmod list`).
 - Run the same workflow on your own measurements with
   [user-supplied data](user-data.md).
 - Run the [zero-to-report notebook](notebooks.md#zero-to-a-complete-report).
