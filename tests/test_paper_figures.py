@@ -26,6 +26,9 @@ def test_regenerating_the_figures_elsewhere_is_byte_identical_for_the_data(tmp_p
         assert (tmp_path / entry["data_file"]).read_bytes() == (FIGURES / entry["data_file"]).read_bytes(), name
         svg = (tmp_path / entry["file"]).read_text(encoding="utf-8")
         assert svg.startswith("<?xml") and paper_figures.GENERATOR in svg and "<dc:date>" not in svg, name
+        pdf = (tmp_path / entry["pdf_file"]).read_bytes()
+        assert pdf.startswith(b"%PDF") and paper_figures.PDF_MARKER in pdf, name
+        assert b"/CreationDate" not in pdf and b"/ModDate" not in pdf, name
     assert (tmp_path / paper_figures.MANIFEST_NAME).read_bytes() == (FIGURES / paper_figures.MANIFEST_NAME).read_bytes()
 
 
@@ -39,11 +42,13 @@ def test_manifest_digests_name_the_files_on_disk() -> None:
             assert hashlib.sha256((ROOT / source).read_bytes()).hexdigest() == digest, source
 
 
-def test_every_figure_is_cited_by_the_paper() -> None:
-    text = (ROOT / "paper" / "paper.md").read_text(encoding="utf-8")
+def test_every_figure_is_included_and_referenced_by_the_manuscript() -> None:
+    text = (ROOT / "paper" / "paper.tex").read_text(encoding="utf-8")
     manifest = json.loads((FIGURES / paper_figures.MANIFEST_NAME).read_text(encoding="utf-8"))
-    for entry in manifest["figures"].values():
-        assert f"figures/{entry['file']}" in text, entry["file"]
+    for name, entry in manifest["figures"].items():
+        assert entry["pdf_file"] == f"{name}.pdf"
+        assert f"{{figures/{entry['pdf_file']}}}" in text, name
+        assert f"\\ref{{fig:{name}}}" in text, name
 
 
 def test_key_numbers_agree_with_the_plotted_data() -> None:
@@ -90,6 +95,11 @@ def test_check_figures_reports_tampering(tmp_path: Path) -> None:
     svg = tmp_path / "figure_3_criticism_screen.svg"
     svg.write_text(svg.read_text(encoding="utf-8").replace(paper_figures.GENERATOR, "edited by hand"), encoding="utf-8")
     assert any("generator marker" in problem for problem in paper_figures.check_figures(ROOT, tmp_path))
+    pdf = tmp_path / "figure_2_posterior_predictive.pdf"
+    pdf.write_bytes(pdf.read_bytes().replace(paper_figures.PDF_MARKER, b"edited_by_hand_" + b"x" * (len(paper_figures.PDF_MARKER) - 15)))
+    assert any("figure_2_posterior_predictive.pdf does not carry" in problem for problem in paper_figures.check_figures(ROOT, tmp_path))
+    pdf.unlink()
+    assert any("figure_2_posterior_predictive.pdf is missing" in problem for problem in paper_figures.check_figures(ROOT, tmp_path))
     shutil.rmtree(tmp_path / "figure_1_cellulose_holdouts.svg", ignore_errors=True)
     (tmp_path / "figure_1_cellulose_holdouts.svg").unlink()
     assert any("figure_1_cellulose_holdouts.svg is missing" in problem for problem in paper_figures.check_figures(ROOT, tmp_path))

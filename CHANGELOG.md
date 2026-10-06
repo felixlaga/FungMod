@@ -6,6 +6,13 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- The software paper is a LaTeX manuscript, `paper/paper.tex` (it replaces
+  the Markdown draft; `make paper-pdf` builds it with latexmk). The paper
+  tables are now also written as LaTeX fragments (`paper/tables/*.tex`,
+  captioned full-width floats generated next to the Markdown copies by the
+  same command and checked the same way; `latex_inline` escapes cell text)
+  and the figures also as PDF (`paper/figures/*.pdf`, generator marker, no
+  date); the manifests name the new files and `check` covers them.
 - The compiled process core assembles a Jacobian (`CompiledModel.jacobian`)
   from per-process gradient kernels: analytic through the new
   `Process.compile_jacobian` for `first_order_decay`, `mass_action`,
