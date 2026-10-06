@@ -6,3 +6,5 @@ data/experiments/source_intake/** -text
 data/experiments/literature/** -text
 data/benchmarks/** -text
 data/kinetic_records/** -text
+# User-dataset digests (USERDATA-001 to 005) are taken over exact table bytes.
+tests/fixtures/user_data/** -text
