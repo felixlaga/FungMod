@@ -366,13 +366,16 @@ unparameterised. The colony-expansion dataset is ingested (DATA-003,
 mycelial area and tip counts of *R. solani* and *C. puteana* under sixteen
 temperature-humidity conditions, digitized from the supplementary figures
 with both panel readings and every limitation flagged
-(`data/experiments/literature/de_ligne_2019_colony_growth/`). Open: the
-observation operator from hyphal density fields to scanned area and
-graph-derived tip count, a frozen calibrate-and-hold-out plan over the
-sixteen conditions, organism parameters from the literature (Boswell et
-al. 2003, *Rhizoctonia solani*), a sparse compiled Jacobian for calibration
-speed, lifting well-mixed process kernels per cell, registry and
-configured-workflow reachability.
+(`data/experiments/literature/de_ligne_2019_colony_growth/`). The
+comparison is declared in a frozen plan (COLONY-001,
+`docs/colony-comparison.md`): observation operators, error model, four
+held-out conditions, stages and decision rules, pinned by digest before any
+software or fit. Open: stage 0 of that plan (axisymmetric grid, operators,
+the cardinal water-activity law, the runner), then the fits; organism
+parameters from the literature (Boswell et al. 2003, *Rhizoctonia
+solani*); a sparse compiled Jacobian for calibration speed; lifting
+well-mixed process kernels per cell; registry and configured-workflow
+reachability.
 
 ### After step 6. Modelling all fungi
 

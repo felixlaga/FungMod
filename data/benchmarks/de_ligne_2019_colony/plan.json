@@ -1,0 +1,372 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "de_ligne_2019_colony_comparison_v1",
+  "status": "plan frozen 2026-10-06; stage 0 software not yet built; no fit has been run",
+  "frozen_on": "2026-10-06",
+  "design_status": "Written after the dataset was digitized and inspected (final values and the article's stated optima were read while verifying the extraction) but before any model was run against it or any parameter fitted. Not blind, not registered with a third party, not a validation of biology: a declared contract for a within-study transfer test of one model family on one experiment.",
+  "question": "Can the continuum mycelium of SPATIAL-001 (tip density, hyphal length density, an internal reserve carried by the mycelium and the inoculum reserve it draws on), with one dimensionless environment activity per condition multiplying tip extension and branching, reproduce the hourly mycelial area and tip count of one species across the sixteen temperature-humidity conditions of De Ligne et al. 2019, and predict four held-out conditions from the activities fitted on the other twelve through cardinal response laws?",
+  "data": {
+    "directory": "data/experiments/literature/de_ligne_2019_colony_growth",
+    "dataset_sha256": {
+      "de_ligne_2019_c_puteana_area.yml": "2a4cbc7e7b7ab75cff266623323522bcbe65fdb323cd411a3bea543000149111",
+      "de_ligne_2019_c_puteana_tips.yml": "df723b32b276b767dd57888916ca624c11626e6d8bfacad1bddad14886842907",
+      "de_ligne_2019_r_solani_area.yml": "d83650c68801d370625120d32d9f7881c9c2a35924dece60b20719b1a84eb9ca",
+      "de_ligne_2019_r_solani_tips.yml": "fd19772ae02065ec2fbfd5e14dc03595ca3083573c48e41b23a301f572f903e0"
+    },
+    "panel_table_sha256": "ecfecbf818310584643f7a321e749c06033462af48e397a90698d1f775a04cea",
+    "observables": {
+      "mycelial_area": "mycelial_area_cm2 (centimeter ** 2)",
+      "tip_count": "tip_count (dimensionless)"
+    },
+    "times": "every hour from 1 to 62 h that the series holds; nothing is interpolated",
+    "species_order": [
+      "c_puteana",
+      "r_solani"
+    ],
+    "species_order_reason": "C. puteana grows more slowly, so its hull stays inside the 40 x 40 mm scan window in most conditions and the window truncation of the area operator matters less; R. solani fills the window in its fastest conditions and is run second with the same plan.",
+    "row_rules": {
+      "panel_disagreement": "excluded from every objective and listed in the report",
+      "single_panel": "kept; the value comes from one panel reading",
+      "missing_sd": "kept; the error model below supplies the weight"
+    }
+  },
+  "geometry": {
+    "symmetry": "axisymmetric: one radial coordinate, cylindrical divergence; the colony starts as a centred disc on a uniform surface and the model has no anisotropy",
+    "domain": {
+      "radius_mm": 28.3,
+      "reason": "half-diagonal of the 40 x 40 mm scan window",
+      "cells": 283,
+      "cell_mm": 0.1,
+      "boundaries": "no_flux at the centre and the outer radius"
+    },
+    "inoculum": {
+      "radius_mm": 5.0,
+      "reason": "the 1 cm agar disc cut from the mother culture",
+      "fields_inside": [
+        "tips",
+        "hyphae",
+        "reserve"
+      ],
+      "fields_outside": "zero"
+    },
+    "window": "observables are evaluated on the intersection of the colony disc with the 40 x 40 mm square window centred on the inoculum",
+    "symmetry_check": "stage 0 must show that the axisymmetric model and the two-dimensional Cartesian model of SPATIAL-001 (80 x 80 cells of 0.5 mm) agree on both observables within 3 percent over 62 h for one declared parameter set before any fit is run",
+    "grid_check": "0.1 mm against 0.05 mm cells within 2 percent on both observables for the same parameter set",
+    "solver_check": {
+      "primary": {
+        "method": "LSODA",
+        "rtol": 1e-06,
+        "atol": 1e-09
+      },
+      "check": {
+        "method": "BDF",
+        "rtol": 1e-07,
+        "atol": 1e-10
+      },
+      "max_relative_difference": 0.005
+    }
+  },
+  "model": {
+    "name": "colony_reserve_v1",
+    "basis": "SPATIAL-001 continuum processes (Edelstein 1982; Boswell et al. 2003 forms) on four fields; every law is the implementation's declared choice, no parameter value is taken from either source",
+    "fields": {
+      "tips": {
+        "units": "1 / millimeter ** 2",
+        "meaning": "hyphal tip density"
+      },
+      "hyphae": {
+        "units": "1 / millimeter",
+        "meaning": "hyphal length per area"
+      },
+      "internal": {
+        "units": "microgram / millimeter ** 2",
+        "meaning": "reserve carried inside the mycelium"
+      },
+      "reserve": {
+        "units": "microgram / millimeter ** 2",
+        "meaning": "reserve in the inoculum disc, the only external source on the inert surface"
+      }
+    },
+    "processes": [
+      {
+        "name": "extension",
+        "type": "TipExtension",
+        "law": "d hyphae/dt = phi * v * internal / (Kv + internal) * tips; the internal reserve pays c_ext per unit length"
+      },
+      {
+        "name": "motion",
+        "type": "TipMotion",
+        "law": "tips diffuse with Dn; no drift"
+      },
+      {
+        "name": "branching",
+        "type": "LateralBranching",
+        "law": "d tips/dt = phi * b * hyphae * internal"
+      },
+      {
+        "name": "anastomosis",
+        "type": "Anastomosis",
+        "law": "d tips/dt = -a * tips * hyphae"
+      },
+      {
+        "name": "tip_death",
+        "type": "FirstOrderLoss",
+        "law": "d tips/dt = -dn * tips"
+      },
+      {
+        "name": "uptake",
+        "type": "LocalUptake",
+        "law": "reserve moves into internal at cu * hyphae * reserve, inside the disc only because reserve is zero elsewhere"
+      },
+      {
+        "name": "translocation",
+        "type": "Translocation",
+        "law": "internal diffuses with Di and is carried up the tip-density gradient with Da"
+      }
+    ],
+    "environment_activity": {
+      "symbol": "phi",
+      "definition": "one dimensionless activity per condition in [0, 1], multiplying the extension speed v and the branching rate b of that condition; every other rate is shared across conditions and unscaled",
+      "variants": {
+        "M_one_activity": "one phi_c per condition scales both v and b (the primary model)",
+        "M_two_activities": "separate phi_v,c and phi_b,c per condition (the comparison model; its extra twelve parameters must pass the complexity screen of the criticism plan to be preferred)"
+      }
+    },
+    "parameters": [
+      {
+        "symbol": "v",
+        "role": "environment_scaled",
+        "units": "millimeter / hour",
+        "lower": 0.01,
+        "upper": 3.0,
+        "prior": "log_uniform",
+        "meaning": "tip extension speed at phi = 1 and saturating reserve"
+      },
+      {
+        "symbol": "b",
+        "role": "environment_scaled",
+        "units": "1 / (millimeter * hour * microgram / millimeter ** 2)",
+        "lower": 0.0001,
+        "upper": 10.0,
+        "prior": "log_uniform",
+        "meaning": "lateral branching rate per hyphal length per internal reserve at phi = 1"
+      },
+      {
+        "symbol": "Kv",
+        "role": "shared",
+        "units": "microgram / millimeter ** 2",
+        "lower": 0.001,
+        "upper": 100.0,
+        "prior": "log_uniform",
+        "meaning": "internal reserve at half the extension speed"
+      },
+      {
+        "symbol": "c_ext",
+        "role": "shared",
+        "units": "microgram / millimeter",
+        "lower": 0.0001,
+        "upper": 10.0,
+        "prior": "log_uniform",
+        "meaning": "reserve spent per unit hyphal length laid down"
+      },
+      {
+        "symbol": "Dn",
+        "role": "shared",
+        "units": "millimeter ** 2 / hour",
+        "lower": 0.0001,
+        "upper": 1.0,
+        "prior": "log_uniform",
+        "meaning": "tip random-walk diffusivity"
+      },
+      {
+        "symbol": "a",
+        "role": "shared",
+        "units": "millimeter / hour",
+        "lower": 0.0001,
+        "upper": 10.0,
+        "prior": "log_uniform",
+        "meaning": "anastomosis rate per hyphal density"
+      },
+      {
+        "symbol": "dn",
+        "role": "shared",
+        "units": "1 / hour",
+        "lower": 0.0001,
+        "upper": 1.0,
+        "prior": "log_uniform",
+        "meaning": "first-order tip loss"
+      },
+      {
+        "symbol": "cu",
+        "role": "shared",
+        "units": "millimeter / hour",
+        "lower": 0.0001,
+        "upper": 10.0,
+        "prior": "log_uniform",
+        "meaning": "uptake of the inoculum reserve per hyphal density"
+      },
+      {
+        "symbol": "Di",
+        "role": "shared",
+        "units": "millimeter ** 2 / hour",
+        "lower": 0.001,
+        "upper": 100.0,
+        "prior": "log_uniform",
+        "meaning": "diffusive translocation of the internal reserve"
+      },
+      {
+        "symbol": "Da",
+        "role": "shared",
+        "units": "millimeter ** 4 / hour",
+        "lower": 0.0001,
+        "upper": 100.0,
+        "prior": "log_uniform",
+        "meaning": "active translocation towards tips"
+      },
+      {
+        "symbol": "R0",
+        "role": "shared",
+        "units": "microgram / millimeter ** 2",
+        "lower": 0.1,
+        "upper": 1000.0,
+        "prior": "log_uniform",
+        "meaning": "initial reserve density inside the inoculum disc; an explicit unknown, the agar disc is not characterised"
+      },
+      {
+        "symbol": "n0",
+        "role": "shared",
+        "units": "1 / millimeter ** 2",
+        "lower": 0.01,
+        "upper": 100.0,
+        "prior": "log_uniform",
+        "meaning": "initial tip density inside the disc; unknown because the source removed the disc from every image"
+      },
+      {
+        "symbol": "rho0",
+        "role": "shared",
+        "units": "1 / millimeter",
+        "lower": 0.01,
+        "upper": 100.0,
+        "prior": "log_uniform",
+        "meaning": "initial hyphal length density inside the disc; unknown for the same reason"
+      },
+      {
+        "symbol": "phi_c",
+        "role": "per_condition",
+        "units": "dimensionless",
+        "lower": 0.0,
+        "upper": 1.0,
+        "prior": "uniform",
+        "meaning": "environment activity of condition c (twelve training conditions in stage A; the four held-out ones are predicted in stage C, never fitted)"
+      }
+    ],
+    "parameter_source": "Explicit exploratory search bounds, not measured constants of either species; no value from Boswell et al. 2003 or any other source is fixed or used as a start.",
+    "initial_internal": "zero everywhere; the mycelium starts without carried reserve and must draw on the disc"
+  },
+  "observation_operators": {
+    "tip_count": "N(t) = 2 pi * integral over r_disc < r < R_window(theta) of tips(r, t) r dr, i.e. the tip density integrated over the colony outside the inoculum disc and inside the square window; tips inside the disc are not counted because the source removed the disc digitally before counting nodes of degree one",
+    "mycelial_area": "A(t) = area of the intersection of the disc of radius R(t) with the 40 x 40 mm window, where R(t) is the largest radius at which hyphae(r, t) >= rho_det with rho_det = 1 / cell side (one hyphal segment crossing a cell), and R(t) >= r_disc always; the source's mycelial area is the convex hull of all graph nodes, which for an axisymmetric colony is the disc of the outermost detected hyphae, and the hull includes the artificial nodes on the inoculum boundary",
+    "assumptions": [
+      "the colony is axisymmetric and the window-truncated disc is its convex hull",
+      "a hyphal segment is detected by the scanner wherever the length density reaches one segment per cell of the model grid; the scanner resolution of 21 micrometres per pixel is finer than this, so rho_det is a declared operator constant, not a measured threshold",
+      "mycelial area is not biomass and tip count is not hyphal length; neither observable constrains the internal reserve directly"
+    ]
+  },
+  "error_model": {
+    "type": "per_series_linear_sd",
+    "definition": "sigma_s(t) = s0 + s1 * y_s(t), fitted by least squares to the readable standard deviations of series s (rows with a non-empty sd that carry neither sd_one_sided nor sd_asymmetric_bar), and applied to every row of the series; s0 and s1 are reported per series",
+    "minimum_readable_rows": 15,
+    "pooling_rule": "a series with fewer readable rows uses the fit pooled over the other series of the same species and observable, and the report names it",
+    "why_not_pointwise": "one-sided and partially hidden bar readings are biased towards shorter bars; the smooth model uses them only through the fit",
+    "floor": "sigma is never below the row's digitization_uncertainty column",
+    "noise_multiplier": "one shared log-uniform multiplier in [0.1, 10] on sigma in stage D, as in the criticism plan",
+    "correlation": "none assumed between area and tip count; this is a declared simplification"
+  },
+  "stage_0_software": {
+    "purpose": "everything the fits need, verified before any fit; a software stage with no data comparison",
+    "items": [
+      "an axisymmetric one-dimensional grid option in fungal_model.mycelium (cylindrical divergence, conservative, no-flux ends) with conservation tests and the symmetry check above",
+      "the two observation operators as tested functions of a MyceliumResult and the window geometry",
+      "a cardinal water-activity activity law (Rosso and Robinson 2001, International Journal of Food Microbiology 63:265-273; cardinal model with a_w,max = 1) beside the existing Rosso CTMI temperature law, with provenance and tests",
+      "the error-model fit from the committed CSVs, reported per series",
+      "a study runner that reads this plan, cites its digest in every output, and reproduces its outputs with --check",
+      "measured solve time per condition on the axisymmetric grid and the resulting budget for the stages below"
+    ]
+  },
+  "stage_A_joint_fit": {
+    "scope": "per species: one joint weighted least-squares fit of the shared parameters, v, b and the twelve training phi_c on both observables of the twelve training conditions",
+    "objective": "sum over training rows of ((model - observed) / sigma_s(t)) ** 2, both observables, hours as present",
+    "starts": 4,
+    "seed": 20191007,
+    "optimiser": "the criticism plan's settings: log-space parameters, finite-difference step 1e-3, ftol = xtol = gtol = 1e-10, up to three restarts of the best start until the relative cost decrease is below 1e-6",
+    "variants": [
+      "M_one_activity",
+      "M_two_activities"
+    ],
+    "screen": "M_two_activities is preferred only if it passes the v2 complexity screen of the criticism plan against M_one_activity",
+    "budget_note": "one 62 h solve at 283 radial cells is expected in seconds; the budget is recorded in stage 0 before this stage starts"
+  },
+  "stage_B_response_laws": {
+    "scope": "fit phi(T, RH) = CTMI(T; T_min, T_opt, T_max) * CM(a_w; a_min, a_opt, a_max = 1), with a_w = RH / 100, to the twelve stage A activities by weighted least squares, the weights from the stage A profile widths of each phi_c",
+    "water_activity_assumption": "the surface water activity equals the cabinet's equilibrium relative humidity divided by 100; the agar disc's own moisture is not modelled",
+    "identifiability": "every law parameter is classified with the BAYES-001 thresholds from profiles; a parameter bounded on one side only is reported so",
+    "constraint": "T_opt >= (T_min + T_max) / 2 as the CTMI implementation requires; the four temperature levels 15 to 30 C may leave T_max unbounded above, which is reported, not fixed"
+  },
+  "stage_C_held_out": {
+    "held_out_conditions": [
+      [
+        15,
+        75
+      ],
+      [
+        20,
+        65
+      ],
+      [
+        25,
+        80
+      ],
+      [
+        30,
+        70
+      ]
+    ],
+    "selection_rule": "each temperature level and each humidity level is held out exactly once, chosen before any fit; the same four conditions for both species",
+    "procedure": "phi for each held-out condition is computed from the stage B laws; the model is run with the stage A shared parameters; nothing is refitted; both observables are scored with the same standardised residuals as stage A",
+    "frozen_before_scoring": "the four predictions are written with the plan digest before they are compared with the held-out rows"
+  },
+  "stage_D_posterior": {
+    "scope": "the ensemble sampler of BAYES-001 over the stage A parameters and the shared noise multiplier, centred on the stage A fit, for M_one_activity only; posterior predictive coverage reported as in the criticism plan",
+    "optional": "run only if stage A reproduces (rule R1); otherwise reported as not run"
+  },
+  "decision_rules": {
+    "R1_reproduces": "the stage A root-mean-square standardised residual over the twelve training conditions is at most 2.0 for both observables",
+    "R2_transfers": "the stage C root-mean-square standardised residual over the four held-out conditions is at most 1.5 times the stage A value for both observables",
+    "R3_identified": "v, b and every response-law parameter are classified identified or weakly identified",
+    "R4_coverage": "reported, not thresholded",
+    "outcome_vocabulary": [
+      "reproduces and transfers (R1 and R2)",
+      "reproduces but does not transfer (R1, not R2)",
+      "does not reproduce (fails R1)",
+      "not run (reason stated)"
+    ],
+    "identification_qualifier": "an outcome that passes R1 or R2 while failing R3 carries the qualifier 'unidentified' and promotes no parameter",
+    "ties": "if both variants reproduce and transfer, the one with fewer parameters is preferred; both are reported"
+  },
+  "reporting": {
+    "outputs": "data/benchmarks/de_ligne_2019_colony/results/<species>/<stage>/ with inputs.json citing this plan's sha256",
+    "per_condition": "fitted phi_c with its profile interval, both observables plotted against the data with the error band, the standardised residuals",
+    "held_out": "the four predictions, their scores, and whether R2 holds",
+    "always": "the error-model fits per series, the excluded rows, the stage 0 checks, the solver and grid checks, and the maturity label exploratory on every result"
+  },
+  "excluded_claims": [
+    "no biological validation: one experiment, one laboratory, one figure per species; agreement across its conditions is within-study transfer",
+    "no transfer to other strains, substrates, submerged culture, three-dimensional growth or the microscale",
+    "no claim about the mechanism of the humidity response: the cardinal water-activity law is an empirical shape with a declared equilibrium assumption",
+    "no hyphal geometry: mean segment length, branching angles and diameters are not modelled or compared",
+    "no promotion of any fitted constant to a registry record beyond a retrospective fit labelled with this plan",
+    "the inoculum reserve, initial tip and hyphal densities are explicit unknowns of the fit, not measurements"
+  ],
+  "amendments": [],
+  "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason and the previous sha256, recorded before the affected stage is run; the ledger records the file's sha256 at freezing and after each amendment"
+}

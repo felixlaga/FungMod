@@ -6,6 +6,10 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Frozen plan for the colony comparison (COLONY-001): the within-study
+  transfer test of the continuum mycelium against the De Ligne 2019 curves,
+  declared with its geometry, observation operators, error model, hold-outs,
+  stages and decision rules before any software or fit, digest-pinned.
 - De Ligne et al. 2019 colony growth dataset (DATA-003): hourly mycelial area
   and tip counts of *Coniophora puteana* and *Rhizoctonia solani* under sixteen
   temperature-humidity conditions, digitized from the supplementary figures by
