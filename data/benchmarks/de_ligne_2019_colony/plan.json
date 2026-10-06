@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "benchmark_id": "de_ligne_2019_colony_comparison_v1",
-  "status": "plan frozen 2026-10-06; stage 0 software not yet built; no fit has been run",
+  "status": "plan frozen 2026-10-06, amended once the same day before stage 0 was recorded; no fit has been run",
   "frozen_on": "2026-10-06",
   "design_status": "Written after the dataset was digitized and inspected (final values and the article's stated optima were read while verifying the extraction) but before any model was run against it or any parameter fitted. Not blind, not registered with a third party, not a validation of biology: a declared contract for a within-study transfer test of one model family on one experiment.",
   "question": "Can the continuum mycelium of SPATIAL-001 (tip density, hyphal length density, an internal reserve carried by the mycelium and the inoculum reserve it draws on), with one dimensionless environment activity per condition multiplying tip extension and branching, reproduce the hourly mycelial area and tip count of one species across the sixteen temperature-humidity conditions of De Ligne et al. 2019, and predict four held-out conditions from the activities fitted on the other twelve through cardinal response laws?",
@@ -265,12 +265,17 @@
   },
   "observation_operators": {
     "tip_count": "N(t) = 2 pi * integral over r_disc < r < R_window(theta) of tips(r, t) r dr, i.e. the tip density integrated over the colony outside the inoculum disc and inside the square window; tips inside the disc are not counted because the source removed the disc digitally before counting nodes of degree one",
-    "mycelial_area": "A(t) = area of the intersection of the disc of radius R(t) with the 40 x 40 mm window, where R(t) is the largest radius at which hyphae(r, t) >= rho_det with rho_det = 1 / cell side (one hyphal segment crossing a cell), and R(t) >= r_disc always; the source's mycelial area is the convex hull of all graph nodes, which for an axisymmetric colony is the disc of the outermost detected hyphae, and the hull includes the artificial nodes on the inoculum boundary",
+    "mycelial_area": "A(t) = area of the intersection of the disc of radius R(t) with the 40 x 40 mm window, where R(t) is the distance of the farthest cell centre at which hyphae(r, t) >= rho_det, with rho_det the declared detection density below, and R(t) >= r_disc always; the source's mycelial area is the convex hull of all graph nodes, which for an axisymmetric colony is the disc of the outermost detected hyphae, and the hull includes the artificial nodes on the inoculum boundary",
     "assumptions": [
       "the colony is axisymmetric and the window-truncated disc is its convex hull",
-      "a hyphal segment is detected by the scanner wherever the length density reaches one segment per cell of the model grid; the scanner resolution of 21 micrometres per pixel is finer than this, so rho_det is a declared operator constant, not a measured threshold",
+      "a cell holds graph nodes wherever its hyphal length density reaches one millimetre per square millimetre; the scanner resolution of 21 micrometres per pixel is finer than any model cell, so rho_det is a declared operator constant, not a measured threshold, and it does not change with the grid",
       "mycelial area is not biomass and tip count is not hyphal length; neither observable constrains the internal reserve directly"
-    ]
+    ],
+    "detection_density": {
+      "value": 1.0,
+      "units": "1 / millimeter",
+      "meaning": "hyphal length per area at which a cell counts as holding graph nodes: one millimetre of hypha per square millimetre, a declared operator constant independent of the model grid"
+    }
   },
   "error_model": {
     "type": "per_series_linear_sd",
@@ -367,6 +372,12 @@
     "no promotion of any fitted constant to a registry record beyond a retrospective fit labelled with this plan",
     "the inoculum reserve, initial tip and hyphal densities are explicit unknowns of the fit, not measurements"
   ],
-  "amendments": [],
+  "amendments": [
+    {
+      "date": "2026-10-06",
+      "previous_sha256": "e7a8706e85fef7739e96c7fe21d8aac0cbf2e4719201b1c203c9296d033066e4",
+      "reason": "observation_operators.mycelial_area tied the detection density to the model cell (one segment per cell side), which made the area observable change with the grid and the plan's own grid-convergence check ill-posed; found while building stage 0, before any check was recorded or any fit run. The detection density is now a declared constant, 1 per millimetre, independent of the grid. No model, bound, rule, hold-out or other setting changed."
+    }
+  ],
   "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason and the previous sha256, recorded before the affected stage is run; the ledger records the file's sha256 at freezing and after each amendment"
 }

@@ -141,11 +141,21 @@ confidence, refused by scientific mode.
   two geometries for a uniform density, and follow the outermost detected
   cell (`tests/test_colony_observation.py`).
 
-Measured on the development container (one core): the 40 x 40 artificial
-colony over 24 hours takes about 19 s with LSODA (20 000 right-hand sides,
-dense backend Jacobian) and 39 s with BDF on the sparse pattern; the
-right-hand side itself is 7 s of that. A compiled sparse Jacobian for the
-spatial core is the next performance step.
+Two Jacobian paths exist (SPATIAL-002). On a one-axis grid LSODA integrates
+the state in cell-major order with a banded Jacobian of half-bandwidth
+`2 F - 1` for `F` fields, so a Jacobian costs a few right-hand sides instead
+of one per state: the radial colony comparison model (283 cells, four
+fields, 62 hours) went from about 220 s to 4 s with the same trajectory.
+The implicit methods (BDF, Radau) receive a sparse finite-difference
+Jacobian on the nearest-neighbour pattern, built with one right-hand side
+per colour (`3 ** ndim * F` colours, cells coloured by index modulo three
+per axis) and a fixed step `sqrt(eps) * max(|y|, 1)`: scipy's own adaptive
+estimator overflowed on these clipped fields and failed the integration,
+and the fixed rule does not. Measured on the development container (one
+core): the 40 x 40 artificial colony over 24 hours takes about 19 s with
+LSODA (dense backend Jacobian) and 39 s with BDF on the sparse pattern. A
+compiled analytic sparse Jacobian remains the next performance step for
+two- and three-dimensional grids.
 
 ## What it is not
 

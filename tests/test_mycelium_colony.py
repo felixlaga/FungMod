@@ -10,6 +10,7 @@ import pytest
 from fungal_model.core.numerics import SolverSettings
 from fungal_model.core.units import Q_
 from fungal_model.mycelium import FieldSpec, MyceliumModel, SpatialGrid, TipMotion, Translocation, total_amount
+from fungal_model.mycelium.model import JACOBIAN_STRUCTURE
 from fungal_model.mycelium.benchmarks import (
     HYPHA_UNITS,
     SUBSTRATE_UNITS,
@@ -44,7 +45,7 @@ def test_edelstein_front_spreads_at_the_pulled_front_speed() -> None:
     assert np.all(np.diff(speeds[2:]) > 0.0)  # and keeps approaching it
     assert speeds[-1] == pytest.approx(analytic, rel=0.05)
     assert result.fields["tips"].magnitude.min() >= -1e-9 and result.fields["hyphae"].magnitude.min() >= 0.0
-    assert result.solver_metadata["jacobian_structure"] == "cartesian_sparse_nearest_neighbour"
+    assert result.solver_metadata["jacobian_structure"] == JACOBIAN_STRUCTURE
 
 
 def _colony(cells: int = 24, hours: float = 12.0, method: str = "LSODA", **overrides: float):
@@ -81,7 +82,7 @@ def test_explicit_implicit_and_sparse_methods_agree_on_the_colony() -> None:
     reference = _colony(cells=16, hours=6.0, method="LSODA")
     sparse = _colony(cells=16, hours=6.0, method="BDF")
     explicit = _colony(cells=16, hours=6.0, method="RK45")
-    assert sparse.solver_metadata["jacobian_structure"] == "cartesian_sparse_nearest_neighbour"
+    assert sparse.solver_metadata["jacobian_structure"] == JACOBIAN_STRUCTURE
     for name in reference.fields:
         np.testing.assert_allclose(sparse.fields[name].magnitude, reference.fields[name].magnitude, rtol=2e-4, atol=1e-7, err_msg=name)
         np.testing.assert_allclose(explicit.fields[name].magnitude, reference.fields[name].magnitude, rtol=2e-4, atol=1e-7, err_msg=name)

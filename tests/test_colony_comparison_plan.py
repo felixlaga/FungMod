@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "data/benchmarks/de_ligne_2019_colony/plan.json"
 DATASET_DIR = ROOT / "data/experiments/literature/de_ligne_2019_colony_growth"
 PANEL_TABLE = ROOT / "data/experiments/source_intake/de_ligne_2019/digitized_panels.csv"
-FROZEN_SHA256 = "e7a8706e85fef7739e96c7fe21d8aac0cbf2e4719201b1c203c9296d033066e4"
+FROZEN_SHA256 = "ea6e2e7270b809fee092655f7e6882cf266e16d86d955c276ba5e2edc5ad959e"
 SHARED = {"Kv", "c_ext", "Dn", "a", "dn", "cu", "Di", "Da", "R0", "n0", "rho0"}
 
 
@@ -31,9 +31,22 @@ def test_plan_digest_is_the_frozen_one() -> None:
 
 def test_plan_is_frozen_before_any_fit(plan) -> None:
     assert plan["status"].startswith("plan frozen 2026-10-06")
-    assert plan["amendments"] == []
+    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [("2026-10-06", "e7a8706e")]
+    assert "detection density" in plan["amendments"][0]["reason"]
+    assert plan["observation_operators"]["detection_density"] == {
+        "value": 1.0,
+        "units": "1 / millimeter",
+        "meaning": plan["observation_operators"]["detection_density"]["meaning"],
+    }
     assert "before the affected stage is run" in plan["amendment_rule"]
-    assert not (PLAN_PATH.parent / "results").exists(), "no result may exist before stage 0 is built and recorded"
+    results = PLAN_PATH.parent / "results"
+    if results.exists():
+        # Only stage 0 (software checks, no fit) may be recorded under this plan so far.
+        assert sorted(path.name for path in results.iterdir()) == ["stage_0"]
+        chain = {FROZEN_SHA256, *(entry["previous_sha256"] for entry in plan["amendments"])}
+        for inputs_path in sorted(results.rglob("inputs.json")):
+            inputs = json.loads(inputs_path.read_text(encoding="utf-8"))
+            assert inputs["plan_sha256"] in chain, inputs_path
 
 
 def test_plan_pins_the_committed_dataset(plan) -> None:
