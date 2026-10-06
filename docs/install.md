@@ -33,7 +33,11 @@ Verify the installation from a directory that is not a repository checkout:
 
 ```bash
 python -c "import fungmod; print(fungmod.__version__)"
+fungmod --version
 ```
+
+The `fungmod` command is installed with the package; see the
+[command line](cli.md).
 
 Both import namespaces are supported:
 

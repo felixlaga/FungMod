@@ -67,6 +67,7 @@ nav:
   - Home: index.md
   - Install: install.md
   - Quickstart: quickstart.md
+  - Command line: cli.md
   - Scientific user guide: user-guide.md
   - Core concepts:
       - Virtual experiments: concepts/virtual-experiments.md
