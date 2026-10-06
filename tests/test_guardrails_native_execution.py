@@ -143,12 +143,14 @@ def test_high_level_workflows_do_not_construct_low_level_solvers_directly() -> N
     searched_paths = (
         ROOT / "src" / "fungal_model" / "workflows",
         ROOT / "src" / "fungal_model" / "plugins" / "pet",
+        ROOT / "src" / "fungal_model" / "cli.py",
+        ROOT / "src" / "fungal_model" / "__main__.py",
         ROOT / "notebooks" / "examples",
     )
     violations: list[str] = []
 
     for root in searched_paths:
-        for path in sorted(root.rglob("*")):
+        for path in [root] if root.is_file() else sorted(root.rglob("*")):
             if path.suffix not in {".py", ".ipynb"}:
                 continue
             relative = path.relative_to(ROOT).as_posix()

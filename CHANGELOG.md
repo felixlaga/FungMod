@@ -15,6 +15,25 @@ All notable public releases of FungMod are documented here.
   0.03) checks passed; the two superseded stage 0 records are kept as the
   evidence for amendments 2 and 3. `tip_fraction_beyond_radius` and the
   plan-declared window and symmetry window in the study module. No fit.
+
+- Command-line virtual experiments (CLI-001): the `fungmod` console script
+  (`fungal_model.cli:main`, also `python -m fungal_model`) with `run`,
+  `preflight`, `check-data` and `list`. `fungmod run --fungus NAME
+  --substrate NAME` with `--environment`/`--condition` names or a
+  `--temperature-c`/`--ph`/`--oxygen` grid, optional `--user-data` and
+  `--registry`, prints the preflight table (status, missing items and their
+  suggested experiments), simulates through `VirtualExperiment.simulate`, writes
+  the tables, manifest and Markdown report (`--report` adds the HTML report),
+  and prints each case's final metrics and threshold times, the limitations
+  count and the provenance and limitations table paths. `--mode` is required;
+  exploratory mode requires `--samples` and `--seed`, scientific mode refuses
+  them; `--output` must be new or empty. Exit codes: 0 success, 1 simulation
+  failure, 2 usage or input error (user-data issues as `file:row:column:
+  message`), 3 a case blocked by the preflight, with its measurement requests.
+  `DegradationScreenResult.case_summary()` and `summary_metrics()` read the
+  existing tables, and `fungal_model.api.result_tables.preflight_policy` (was
+  private) gives the per-mode simulation policy (`docs/cli.md`).
+
 - User-supplied enzyme and kinetics tables into virtual experiments
   (USERDATA-001): `load_user_dataset` reads a directory with
   `user_dataset.yml` and CSV tables of strains, enzyme classes, substrates,
