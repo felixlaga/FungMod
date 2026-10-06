@@ -7,20 +7,18 @@ puteana* and *Rhizoctonia solani* under sixteen temperature-humidity
 conditions. The test is declared before anything is run, in
 `data/benchmarks/de_ligne_2019_colony/plan.json`, and
 `tests/test_colony_comparison_plan.py` pins that file's SHA-256
-(`ca0e016cf22652c3d44bcfad49ac64f706eeea2f78a459470b11722c6f495103`), so
+(`2ce70b6b21b2d254f4d01d3fb5ec1523442299f2ed6ce2853c270fab712acd9d`), so
 a change to the plan is impossible without a dated amendment inside the
 file and a new digest in the test and the ledger.
 
-**Status:** plan frozen on 2026-10-06 and amended once the same day, before
-any check was recorded: the first draft tied the area operator's detection
-density to the model cell, which would have made the plan's own
-grid-convergence check ill-posed; the amendment declares it as a constant
-(the file's amendment log records the previous digest and the reason). Of the
-stage 0 software, the
-axisymmetric grid, the observation operators and the cardinal water-activity
-law exist (SPATIAL-002); the error-model fit, the study runner and the
-recorded stage 0 checks do not, and no fit has been run. Nothing on this page
-is a result.
+**Status:** plan frozen on 2026-10-06 and amended three times the same day,
+before any fit; each amendment is dated in the file with the previous digest
+and its reason. Amendment 1 made the area operator's detection density a
+grid-independent constant. Amendments 2 and 3 followed recorded stage 0 checks
+that failed, and the superseded records are kept as their evidence
+(`results/stage_0_superseded_ea6e2e72/`, `results/stage_0_superseded_ca0e016c/`).
+The stage 0 software exists (SPATIAL-002); stage 0 is re-recorded under
+amendment 3, and no fit has been run. Nothing on this page is a result.
 
 ## The question
 
@@ -33,11 +31,13 @@ through cardinal response laws in temperature and water activity?
 ## What the plan declares
 
 - **Geometry.** The colony is axisymmetric: one radial coordinate from the
-  centre of the inoculum disc (radius 5 mm, the 1 cm agar disc) to the
-  half-diagonal of the 40 x 40 mm scan window, in 0.1 mm cells with no-flux
-  ends. Stage 0 must show that this agrees with the two-dimensional
-  Cartesian model of SPATIAL-001 within 3 percent on both observables, and
-  that halving the cell and switching the solver change nothing material.
+  centre of the inoculum disc (radius 5 mm, the 1 cm agar disc) to the wall
+  of a 9 cm dish (a declared assumption, amendment 3), in 0.1 mm cells with
+  no-flux ends; the observables are read on the 40 x 40 mm scan window.
+  Stage 0 must show that this agrees with the two-dimensional Cartesian
+  model of SPATIAL-001 on the window within 3 percent on both observables
+  while the tips have not reached the window walls, and that halving the
+  cell and switching the solver change nothing material.
 - **Model.** `colony_reserve_v1`: tips, hyphae, an internal reserve carried
   by the mycelium and the inoculum reserve it draws on (the Petri lid is
   inert, so the disc is the only source), with the SPATIAL-001 processes:
@@ -129,6 +129,51 @@ reports a failure as "not run (not grid converged)", and makes the 3 percent
 symmetry threshold the plan already stated machine-readable. The
 translocation process now declares the aggregation as a failure mode
 whenever its active term is used.
+
+## Amendment 3: the radial wall belongs at the dish, not at the window
+
+The stage 0 re-run under amendment 2 (`results/stage_0_superseded_ca0e016c/`)
+passed its grid check (5.3e-5 in tip count, 0.0056 in area, threshold 0.02)
+and its solver check (1.1e-7, threshold 0.005), and failed its symmetry check
+(0.382 in tip count, 0.059 in area, threshold 0.03). The radial and cartesian
+models agreed within 1 to 3 percent until about 12 h and then diverged,
+because the two domains differed. The cartesian reference was the 40 mm scan
+window, with walls that reflect tips back into it. The radial domain ended at
+the window's half-diagonal, 28.3 mm, with a wall of its own. Neither wall is
+physical: the window is the scanner's field of view inside a larger dish.
+
+| Probe at the stage 0 check values | Tip count | Area |
+| --- | --- | --- |
+| 28.3 mm against 45 mm radial wall, largest relative difference over 62 h | 0.46 | |
+| 45 mm against 90 mm radial wall, largest over 62 h (below 0.001 until 36 h) | 0.041 | 0.0052 |
+| 0.5 mm cartesian reference against the radial model, hours 1 to 12 | 0.027 | 0.058 (at 2 h) |
+
+The radial tip front also runs ahead of the detected colony edge: when the
+hull is at 16.65 mm (14 h), 99.9 percent of the tips lie within 21.35 mm, so
+tips reach the cartesian walls well before the detected colony does.
+
+Amendment 3, dated and recorded before any fit:
+
+- the radial domain ends at the wall of a 9 cm Petri dish (45 mm, 450 cells of
+  0.1 mm). The article does not state the experimental dish diameter, so 9 cm
+  is a declared assumption: it is the diameter of the mother-culture dishes
+  the article names, and six such dishes, the number scanned at once, fit the
+  scan bed of the scanner it names;
+- the 40 mm scan window is declared separately, as the square on which both
+  observables are read;
+- the symmetry check compares the radial model with a 0.25 mm cartesian
+  reference on the window (half the 0.5 mm cell, whose area difference at 2 h
+  is consistent with the hull's quantisation to cell centres), only over the
+  leading output hours at which at most 0.1 percent of the radial tips lie
+  beyond the window half side. On the reference that admits hours 1 to 12; at
+  least eight compared hours are required, and the 3 percent threshold is
+  unchanged. This comparison window was recorded before any cartesian result
+  at a finer cell was available.
+
+No model term, parameter, bound, operator, hold-out, stage or decision rule
+changed. The cartesian reference is costly: about 4 minutes at 0.5 mm and
+several hours at 0.25 mm, because the stiff two-dimensional solve
+refactorises a 102 400-state sparse Jacobian.
 
 ## What it is not
 

@@ -255,6 +255,26 @@ def plan_bounds(plan: Mapping[str, Any]) -> dict[str, tuple[float, float]]:
     return {item["symbol"]: (float(item["lower"]), float(item["upper"])) for item in plan["model"]["parameters"]}
 
 
+def window_half_side_mm(plan: Mapping[str, Any]) -> float:
+    """Half the side of the square scan window on which the observables are read."""
+
+    return 0.5 * float(plan["geometry"]["window"]["side_mm"])
+
+
+def tip_fraction_beyond_radius(result: MyceliumResult, *, radius: Quantity) -> np.ndarray:
+    """Fraction of the tips of an axisymmetric result whose cell centre lies beyond ``radius``, per output time."""
+
+    if result.grid.geometry != "axisymmetric":
+        raise ColonyComparisonError("The tip fraction beyond a radius is defined on the axisymmetric reference only.")
+    centres_mm = np.asarray(result.grid.coordinates[0], dtype=float) * 1000.0
+    measures = np.asarray(result.grid.cell_measures, dtype=float)
+    tips = np.asarray(result.fields["tips"].to_base_units().magnitude, dtype=float).reshape(len(result.time), -1)
+    amounts = tips * measures
+    totals = amounts.sum(axis=1)
+    outside = amounts[:, centres_mm > float(radius.to("millimeter").magnitude)].sum(axis=1)
+    return np.divide(outside, totals, out=np.zeros_like(totals), where=totals > 0.0)
+
+
 def check_within_bounds(plan: Mapping[str, Any], values: Mapping[str, float]) -> None:
     bounds = plan_bounds(plan)
     for symbol in SHARED_SYMBOLS + SCALED_SYMBOLS:
@@ -279,11 +299,11 @@ def scaled_values(values: Mapping[str, float], phi: float) -> dict[str, float]:
 def colony_grid(plan: Mapping[str, Any], *, geometry: str = "axisymmetric", cells: int | None = None, source: str = CHECK_SOURCE) -> SpatialGrid:
     domain = plan["geometry"]["domain"]
     if geometry == "axisymmetric":
-        radius = Parameter(name="colony domain radius", symbol="R_domain", value=float(domain["radius_mm"]), units="millimeter", uncertainty=None, source=source, confidence_level="testing", notes="The half-diagonal of the scan window, from the plan.")
+        radius = Parameter(name="colony domain radius", symbol="R_domain", value=float(domain["radius_mm"]), units="millimeter", uncertainty=None, source=source, confidence_level="testing", notes="The radius of the dish wall declared by the plan.")
         return SpatialGrid.axisymmetric(radius, int(cells or domain["cells"]))
     if geometry == "cartesian":
-        side = 2.0 * float(domain["radius_mm"]) / np.sqrt(2.0)
-        length = Parameter(name="scan window side", symbol="L_window", value=side, units="millimeter", uncertainty=None, source=source, confidence_level="testing", notes="The scan window side, from the plan.")
+        side = 2.0 * window_half_side_mm(plan)
+        length = Parameter(name="scan window side", symbol="L_window", value=side, units="millimeter", uncertainty=None, source=source, confidence_level="testing", notes="The scan window side, from the plan; a cartesian reference grid only, its walls are not physical.")
         if cells is None:
             raise ColonyComparisonError("A cartesian grid needs an explicit cell count per axis.")
         return SpatialGrid.no_flux((length, length), (int(cells), int(cells)))
@@ -398,7 +418,7 @@ def observables(result: MyceliumResult, plan: Mapping[str, Any]) -> dict[str, np
     """The plan's operators: tip count outside the disc, mycelial area as the window-truncated hull, per output time."""
 
     disc = Q_(float(plan["geometry"]["inoculum"]["radius_mm"]), "millimeter")
-    half_side = Q_(float(plan["geometry"]["domain"]["radius_mm"]) / np.sqrt(2.0), "millimeter")
+    half_side = Q_(window_half_side_mm(plan), "millimeter")
     declared = plan["observation_operators"]["detection_density"]
     detection = Q_(float(declared["value"]), str(declared["units"]))
     tips = colony_count_outside_disc(result, field="tips", disc_radius=disc, window_half_side=half_side)
@@ -475,7 +495,7 @@ def run_stage_0(
     *,
     hours: Sequence[int] | None = None,
     radial_cells: int | None = None,
-    cartesian_cells: int | None = 80,
+    cartesian_cells: int | None | str = "declared",
     log: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Record the plan's stage 0: error models, timing, grid, solver and symmetry checks.
@@ -493,10 +513,14 @@ def run_stage_0(
     thresholds = {
         "grid": grid_threshold(plan),
         "solver": float(geometry["solver_check"]["max_relative_difference"]),
-        "symmetry": float(geometry["symmetry_threshold"]),
+        "symmetry": float(geometry["symmetry_check"]["max_relative_difference"]),
     }
     hour_list = list(hours) if hours is not None else list(range(1, 63))
     cells = int(radial_cells or geometry["domain"]["cells"])
+    declared_cartesian = int(geometry["symmetry_check"]["cartesian_cells"])
+    if cartesian_cells == "declared":
+        cartesian_cells = declared_cartesian
+    assert cartesian_cells is None or isinstance(cartesian_cells, int)
     values = dict(STAGE_0_CHECK_VALUES)
     check_within_bounds(plan, values)
     inputs: dict[str, Any] = {
@@ -508,7 +532,7 @@ def run_stage_0(
         "hours": hour_list,
         "radial_cells": cells,
         "cartesian_cells": cartesian_cells,
-        "as_declared": hours is None and radial_cells is None and cartesian_cells == 80,
+        "as_declared": hours is None and radial_cells is None and cartesian_cells == declared_cartesian,
     }
     _write_json(output / "inputs.json", inputs)
 
@@ -565,25 +589,47 @@ def run_stage_0(
     if cartesian_cells is None:
         checks["symmetry"] = {"status": "not run", "reason": "cartesian reference skipped by the caller"}
     else:
-        started = time.perf_counter()
-        planar = simulate_condition(plan, values, STAGE_0_CHECK_PHI, hours=hour_list, geometry="cartesian", cells=cartesian_cells, solver=plan_solver(plan, "check"))
-        planar_elapsed = time.perf_counter() - started
-        planar_observables = observables(planar, plan)
-        symmetry_differences = {
-            name: _relative_difference(reference_observables[name], planar_observables[name])
-            for name in ("tip_count", "mycelial_area_cm2")
-        }
-        checks["symmetry"] = {
-            "status": "run",
-            "cartesian_cells": cartesian_cells,
-            "cartesian_cell_mm": 2.0 * float(geometry["domain"]["radius_mm"]) / np.sqrt(2.0) / cartesian_cells,
-            "cartesian_seconds": planar_elapsed,
-            "cartesian_nfev": planar.solver_metadata["nfev"],
-            "relative_differences": symmetry_differences,
-            "cartesian_observables": planar_observables,
-            "passed": max(symmetry_differences.values()) <= thresholds["symmetry"],
-        }
-        say(f"symmetry check: {symmetry_differences} in {planar_elapsed:.0f} s")
+        spec = geometry["symmetry_check"]
+        tip_fraction_limit = float(spec["max_tip_fraction_beyond_window"])
+        beyond = tip_fraction_beyond_radius(reference, radius=Q_(window_half_side_mm(plan), "millimeter"))
+        compared: list[int] = []
+        for hour, fraction in zip(hour_list, beyond[1:], strict=True):
+            if fraction > tip_fraction_limit:
+                break
+            compared.append(int(hour))
+        if len(compared) < int(spec["minimum_hours"]):
+            checks["symmetry"] = {
+                "status": "not run",
+                "reason": (
+                    f"{len(compared)} leading output hours have at most {tip_fraction_limit} of the radial tips "
+                    f"beyond the window half side; the plan needs {spec['minimum_hours']}"
+                ),
+                "tip_fraction_beyond_window": beyond.tolist(),
+            }
+        else:
+            started = time.perf_counter()
+            planar = simulate_condition(plan, values, STAGE_0_CHECK_PHI, hours=compared, geometry="cartesian", cells=cartesian_cells, solver=plan_solver(plan, "check"))
+            planar_elapsed = time.perf_counter() - started
+            planar_observables = observables(planar, plan)
+            rows = list(range(1, len(compared) + 1))
+            symmetry_differences = {
+                name: _relative_difference(np.asarray(reference_observables[name])[rows], np.asarray(planar_observables[name])[1:])
+                for name in OBSERVABLE_NAMES
+            }
+            checks["symmetry"] = {
+                "status": "run",
+                "cartesian_cells": cartesian_cells,
+                "cartesian_cell_mm": 2.0 * window_half_side_mm(plan) / cartesian_cells,
+                "compared_hours": compared,
+                "tip_fraction_beyond_window": beyond.tolist(),
+                "max_tip_fraction_beyond_window": tip_fraction_limit,
+                "cartesian_seconds": planar_elapsed,
+                "cartesian_nfev": planar.solver_metadata["nfev"],
+                "relative_differences": symmetry_differences,
+                "cartesian_observables": planar_observables,
+                "passed": max(symmetry_differences.values()) <= thresholds["symmetry"],
+            }
+            say(f"symmetry check over hours {compared[0]} to {compared[-1]}: {symmetry_differences} in {planar_elapsed:.0f} s")
     _write_json(output / "checks.json", checks)
     return {"inputs": inputs, "checks": checks, "error_models": error_models}
 
@@ -617,5 +663,7 @@ __all__ = [
     "plan_solver",
     "run_stage_0",
     "scaled_values",
+    "tip_fraction_beyond_radius",
+    "window_half_side_mm",
     "simulate_condition",
 ]

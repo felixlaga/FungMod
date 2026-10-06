@@ -87,10 +87,10 @@ assumption, not a measurement.
 
 ## COLONY-001 Frozen Plan For The De Ligne 2019 Colony Comparison
 
-Status: `partial` (plan frozen 2026-10-06 and amended once the same day, before any check was recorded, to make the area operator's detection density a grid-independent constant; stage 0 core pieces built under SPATIAL-002, the runner and the recorded checks not; no fit run).
+Status: `partial` (plan frozen 2026-10-06 and amended three times the same day before any fit: amendment 1 made the area operator's detection density a grid-independent constant, amendment 2 removed the ill-posed active translocation term and added a grid guard, amendment 3 moved the radial wall to the dish and set the symmetry check's comparison window by the tips; stage 0 software built under SPATIAL-002; stage 0 recorded under amendments 1 and 2, both superseded, and re-recorded under amendment 3 (COLONY-002); no fit run).
 
 `data/benchmarks/de_ligne_2019_colony/plan.json` (SHA-256
-`ca0e016cf22652c3d44bcfad49ac64f706eeea2f78a459470b11722c6f495103`, pinned by
+`2ce70b6b21b2d254f4d01d3fb5ec1523442299f2ed6ce2853c270fab712acd9d`, pinned by
 `tests/test_colony_comparison_plan.py`) declares the within-study transfer test
 of the continuum mycelium (SPATIAL-001) against DATA-003 before anything is
 run: an axisymmetric geometry on the scan window with the inoculum disc, the

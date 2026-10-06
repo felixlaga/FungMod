@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "benchmark_id": "de_ligne_2019_colony_comparison_v1",
-  "status": "plan frozen 2026-10-06, amended twice the same day before any fit; stage 0 recorded once under amendment 1 (superseded) and re-run under amendment 2; no fit has been run",
+  "status": "plan frozen 2026-10-06, amended three times the same day before any fit; stage 0 recorded under amendments 1 and 2 (both superseded) and re-run under amendment 3; no fit has been run",
   "frozen_on": "2026-10-06",
   "design_status": "Written after the dataset was digitized and inspected (final values and the article's stated optima were read while verifying the extraction) but before any model was run against it or any parameter fitted. Not blind, not registered with a third party, not a validation of biology: a declared contract for a within-study transfer test of one model family on one experiment.",
   "question": "Can the continuum mycelium of SPATIAL-001 (tip density, hyphal length density, an internal reserve carried by the mycelium and the inoculum reserve it draws on), with one dimensionless environment activity per condition multiplying tip extension and branching, reproduce the hourly mycelial area and tip count of one species across the sixteen temperature-humidity conditions of De Ligne et al. 2019, and predict four held-out conditions from the activities fitted on the other twelve through cardinal response laws?",
@@ -33,11 +33,11 @@
   "geometry": {
     "symmetry": "axisymmetric: one radial coordinate, cylindrical divergence; the colony starts as a centred disc on a uniform surface and the model has no anisotropy",
     "domain": {
-      "radius_mm": 28.3,
-      "reason": "half-diagonal of the 40 x 40 mm scan window",
-      "cells": 283,
+      "radius_mm": 45.0,
+      "cells": 450,
       "cell_mm": 0.1,
-      "boundaries": "no_flux at the centre and the outer radius"
+      "boundaries": "no_flux at the centre and at the dish wall",
+      "reason": "the wall of a 9 cm Petri dish; the article does not state the experimental dish diameter, so 9 cm is a declared assumption: it is the diameter of the mother-culture dishes the article names, and six such dishes, the number the article scanned at once in two rows of three, fit the scan bed of the Epson Perfection V750 Pro it names"
     },
     "inoculum": {
       "radius_mm": 5.0,
@@ -49,9 +49,19 @@
       ],
       "fields_outside": "zero"
     },
-    "window": "observables are evaluated on the intersection of the colony disc with the 40 x 40 mm square window centred on the inoculum",
-    "symmetry_check": "stage 0 must show that the axisymmetric model and the two-dimensional Cartesian model of SPATIAL-001 (80 x 80 cells of 0.5 mm) agree on both observables within 3 percent over 62 h for one declared parameter set before any fit is run",
-    "grid_check": "0.1 mm against 0.05 mm cells within 2 percent on both observables for the same parameter set",
+    "window": {
+      "side_mm": 40.0,
+      "description": "observables are evaluated on the intersection of the colony with the 40 x 40 mm square scan window centred on the inoculum; the window is the scanner's field of view, not a boundary of the colony"
+    },
+    "symmetry_check": {
+      "description": "the axisymmetric model on the dish domain against the two-dimensional cartesian model on the window square, compared only at the leading output hours at which at most max_tip_fraction_beyond_window of the radial reference's tips lie beyond the window half side, because the cartesian reference's walls lie on the window and are not physical; the radial tip front leads the detected hull by several millimetres, so a hull margin would not keep tips off those walls; the cartesian reference runs only to the last compared hour",
+      "cartesian_cells": 160,
+      "cartesian_cell_mm": 0.25,
+      "max_tip_fraction_beyond_window": 0.001,
+      "minimum_hours": 8,
+      "max_relative_difference": 0.03
+    },
+    "grid_check": "0.1 mm against 0.05 mm radial cells within the well-posedness guard's threshold on both observables for the stage 0 check values",
     "solver_check": {
       "primary": {
         "method": "LSODA",
@@ -65,10 +75,9 @@
       },
       "max_relative_difference": 0.005
     },
-    "symmetry_threshold": 0.03,
     "well_posedness_guard": {
       "max_relative_difference": 0.02,
-      "definition": "re-solve on the doubled radial grid (566 cells) and compare both observables at every output time; the largest relative difference must not exceed max_relative_difference",
+      "definition": "re-solve on the doubled radial grid (900 cells) and compare both observables at every output time; the largest relative difference must not exceed max_relative_difference",
       "applies_to": [
         "the stage 0 check values",
         "every stage A optimum, for each training condition",
@@ -386,6 +395,11 @@
       "date": "2026-10-06",
       "previous_sha256": "ea6e2e7270b809fee092655f7e6882cf266e16d86d955c276ba5e2edc5ad959e",
       "reason": "The first recorded stage 0 (kept in results/stage_0_superseded_ea6e2e72) failed its grid check (largest relative difference 0.574 in tip count, 0.102 in area, threshold 0.02) and its symmetry check (0.760 and 0.192, threshold 0.03) while the solver check passed (3.6e-6). A probe traced the failure to the model: the active translocation term D_a s grad(n) carries internal reserve up the tip-density gradient and branching makes tips where the reserve is, a chemotaxis-like positive feedback that concentrates tips into a spike whose height grows without bound as the cell shrinks (24 h tip count 27669, 64922, 146399 on 141, 283, 566 radial cells at D_a = 1; 1434, 1301, 1161 with the peak density quadrupling per halving at D_a = 0.1); with D_a = 1e-4 the same model converges (9617, 9531, 9531). A fit over the declared D_a bounds could exploit that grid artifact. Amendment 2, before any fit: the active term and its parameter D_a are removed from colony_reserve_v1 (translocation is diffusive only); a well-posedness guard re-solves every scored solution on the doubled radial grid with the grid threshold, and decision rule R0 makes a failure 'not run (not grid converged)'; the symmetry threshold the plan already stated in prose (3 percent) is made machine-readable. No other model term, bound, operator, hold-out, stage or rule changed."
+    },
+    {
+      "date": "2026-10-06",
+      "previous_sha256": "ca0e016cf22652c3d44bcfad49ac64f706eeea2f78a459470b11722c6f495103",
+      "reason": "The stage 0 re-run under amendment 2 (kept in results/stage_0_superseded_ca0e016c) passed its grid check (5.3e-05 in tip count, 0.0056 in area) and its solver check (1.1e-07) and failed its symmetry check (0.382 in tip count, 0.059 in area against 0.03). The radial and cartesian models agreed within 1 to 3 percent until the colony reached the window edge at about 12 h and then diverged, because the two domains differ there: the cartesian reference was the 40 mm window with walls that reflect tips back into it, and the radial domain ended at the window's half-diagonal, 28.3 mm, with a wall of its own. Neither wall is physical: the window is the scanner's field of view inside a larger dish. A probe showed the 28.3 mm wall changes the window tip count by 0.46 relative to a 45 mm domain, while a 90 mm domain differs from the 45 mm one by less than 0.001 in tips until 36 h and by at most 0.041 (tips, at 62 h, as tips reach the dish wall) and 0.0052 (area), so the declared dish wall matters only late in the 62 h. The radial tip front leads the detected hull by about 4.7 mm (99.9 percent of tips within 21.35 mm when the hull is at 16.65 mm, 14 h), so the comparison window is set by the tips: at most 0.1 percent of the radial tips beyond the window half side, which on the 45 mm reference admits hours 1 to 12; this criterion was recorded before any cartesian result at a finer cell was available. Over those hours the 0.5 mm cartesian reference differs from the radial model by up to 0.027 in tip count and 0.058 in area, the area difference largest at 2 h when the colony is smallest, consistent with the hull being quantised to cell centres, which scales with the cell; the reference cell is therefore halved to 0.25 mm, and the comparison at 0.25 mm is the re-recorded stage 0 result, not evidence for this amendment. Amendment 3, before any fit: the radial domain ends at the wall of a 9 cm dish (a declared assumption, reasons in geometry.domain) with 450 cells of 0.1 mm; the window is declared separately as a 40 mm square on which the observables are read; the symmetry check compares the radial model with a 0.25 mm cartesian reference on the window over the leading hours at which at most 0.1 percent of the radial tips lie beyond the window half side, with at least eight compared hours and the unchanged 3 percent threshold. No model term, parameter, bound, operator, hold-out, stage or decision rule changed."
     }
   ],
   "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason and the previous sha256, recorded before the affected stage is run; the ledger records the file's sha256 at freezing and after each amendment"
