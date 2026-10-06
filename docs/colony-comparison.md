@@ -15,12 +15,15 @@ file and a new digest in the test and the ledger.
 any check was recorded: the first draft tied the area operator's detection
 density to the model cell, which would have made the plan's own
 grid-convergence check ill-posed; the amendment declares it as a constant
-(the file's amendment log records the previous digest and the reason). Of the
-stage 0 software, the
-axisymmetric grid, the observation operators and the cardinal water-activity
-law exist (SPATIAL-002); the error-model fit, the study runner and the
-recorded stage 0 checks do not, and no fit has been run. Nothing on this page
-is a result.
+(the file's amendment log records the previous digest and the reason). The
+stage 0 software exists (SPATIAL-002): the axisymmetric grid, the observation
+operators, the cardinal water-activity law, and the study module
+`fungal_model.research.colony_comparison` with its runner
+`scripts/run_de_ligne_2019_colony_comparison.py` (plan and dataset digest
+checks, the per-series error-model fit, the `colony_reserve_v1` model on
+either geometry, the two observables and `run_stage_0`). No stage 0 record
+is committed under `data/benchmarks/de_ligne_2019_colony/`, and
+no fit has been run. Nothing on this page is a result.
 
 ## The question
 

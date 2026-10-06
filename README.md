@@ -85,7 +85,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
 | Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests ([user-supplied data](docs/user-data.md)) |
-| Uncertainty | Monte Carlo propagation, local sensitivity, and variance-based global sensitivity |
+| Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
 
@@ -202,7 +202,8 @@ each implementation:
   assembly,
 - environment-driven temperature, pH, water-activity, oxygen, and product
   inhibition modifiers, including the Rosso cardinal temperature (CTMI) and
-  cardinal pH (CPM) growth-response laws,
+  cardinal pH (CPM) growth-response laws and the Rosso and Robinson cardinal
+  water-activity law,
 - a pH-ionization Michaelis-Menten process law (diprotic ionization of `kcat`
   and `Km`, the SABIO-RK pH-dependent law form) and a first-order Arrhenius
   thermal-inactivation process law, both compiled to numeric kernels,
@@ -374,11 +375,13 @@ validated biology is forbidden.
 
 ## Development
 
-Before changing the codebase, read the active source-of-truth chain:
+Before changing the codebase, read the active source-of-truth chain; the full
+order, including `progress.md` and `ARCHITECTURE_DEBT.md`, is in `AGENTS.md`:
 
 1. [`AGENTS.md`](AGENTS.md)
 2. [`foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md`](foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md)
 3. [`foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md`](foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md)
+4. [`foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`](foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md)
 
 Historical foundation-first plans under `old_progress/` are non-binding. The
 active goal is degradation dynamics over time without hiding assumptions,
@@ -391,6 +394,9 @@ dependencies:
 python3 -m pip install -e ".[dev,docs,notebooks]"
 ```
 
+Add the `standards` and `copasi` extras, as CI does, to run the SBML, SED-ML,
+PEtab and COPASI tests; without them those tests are skipped.
+
 ## Test
 
 ```bash
@@ -399,8 +405,10 @@ pytest
 
 ## Quality Gates
 
-CI is required before merging. The CI workflow installs `.[dev]` and runs the
-package-quality gates below:
+CI is required before merging. The lint, type and test jobs install
+`.[dev,standards,copasi]`, the documentation job installs `.[docs]`, and the
+workflow runs the package-quality gates below (plus release-notebook execution
+and an offline installed-wheel smoke test):
 
 ```bash
 python -m ruff check src tests scripts/run_*.py
@@ -427,16 +435,22 @@ up-to-date branches, no force pushes, and no unaudited direct bypass.
 <details>
 <summary><strong>Open the advanced SABIO-RK curation and registry-promotion workflow</strong></summary>
 
-Researchers can create a review-only SABIO-RK registry proposal with one
-scientific identifier. SABIO-RK does not require an API key, so no credential
+Researchers can create a review-only SABIO-RK registry proposal from
+scientific identifiers. SABIO-RK does not require an API key, so no credential
 is supplied or read from an environment variable:
 
 ```python
 from fungal_model import source_proposal
 
-proposal = source_proposal(provider="sabiork", reaction_id="618")
+proposal = source_proposal(provider="sabiork", reaction_id="618", entry_id="35622")
 proposal.write("data/proposed_records/sabiork/reaction_618")
 ```
+
+The example selects kinetic-law entry 35622, the entry the review below
+decides on. A proposal for all of Reaction 618 can be created and written, but
+`review_source_proposal(...)` currently rejects it with a duplicate record ID:
+the frozen snapshot's pH-dependent entries (for example 38522) carry four
+`pKa` parameters each, and their proposed parameter IDs collide.
 
 `source_proposal(...)` also accepts friendly `ec_number`, `enzyme`, `substrate`,
 `organism`/`source`, and `entry_id` selectors. It does not expose raw Solr syntax.
@@ -1122,8 +1136,10 @@ independent validation. The source does not state the commercial formulation's
 organism, its parameter uncertainties are unavailable, and the stored 0.6 mM
 uncertainty is digitization resolution rather than experimental variability.
 
-The literature collection now contains seven series from three papers. The
-additional Alvarez-Gonzalez conditions support within-source comparisons;
+The enzyme-hydrolysis part of the literature collection contains seven series
+from three papers; the collection also holds the Gelain 2020 whole-culture and
+De Ligne 2019 colony-growth sources (`data/experiments/literature/README.md`).
+The additional Alvarez-Gonzalez conditions support within-source comparisons;
 Ariaeenejad and Cao supply different enzyme preparations and are fitted
 separately. `scripts/run_alvarez_gonzalez_2022_stage2_calibration.py` estimates
 parameters from the reference series and predicts the other conditions.
@@ -1140,6 +1156,27 @@ partially missing or invalid uncertainty is rejected rather than averaged or
 filled in. Digitization resolution remains distinct from experimental noise.
 See [calibration evidence](docs/calibration-evidence.md) for the interpretation
 and remaining evidence requirements.
+
+### Cross-solver reproduction and research export
+
+Cross-solver reproduction (recorded 2026-10-05, second run): the Gelain 2020
+registry case is exported as a multi-condition PEtab problem and reproduced in
+COPASI under a frozen plan (`docs/gelain-cross-solver.md`). The recorded
+outcome is `reproduced`: at FungMod's least-squares optimum the worst
+|COPASI − FungMod| difference is 1.6e-8 of sigma and the objectives agree to
+2e-8, and COPASI's best fit lies 2.5e-8 (relative) below FungMod's objective,
+inside the 0.1 percent gate. A first run against the earlier stage A fit found
+an objective 1.3 percent lower; that was traced to the default finite-difference
+step of FungMod's optimiser, and stage A was re-run with a declared step. This
+is agreement between two solvers on one retrospective fit, not biological
+validation or evidence that the optimum is unique.
+
+Research export and calibration hardening (2026-09-28): mixed-unit SBML exports
+preserve native trajectories; PEtab keeps validation/holdout rows outside fitting
+and rejects missing noise scales. Configured calibration offers optional
+profile-likelihood grids. An explicit frozen-prediction/raw-replicate evaluation
+workflow is documented in `docs/independent-validation.md`; independent biological
+validation still requires external data.
 
 ## Notebooks
 
@@ -1338,10 +1375,12 @@ boundaries. CURATION-001 is complete for that defined curation workflow, not
 for scientific validation or automatic simulation authorization.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
-The current library provides factories for first-order, mass-action,
-homogeneous Michaelis-Menten, and generic surface-catalysis benchmark
-processes. These are framework mechanisms, not organism- or substrate-specific
-biology.
+The current library provides factories for thirteen generic process types:
+first-order, mass-action, homogeneous and pH-ionization Michaelis-Menten,
+proportional synthesis, substrate transglycosylation, surface catalysis,
+thermal inactivation, resource-limited growth and maintenance, costed
+secretion, dilution exchange and gas transfer. These are framework mechanisms,
+not organism- or substrate-specific biology.
 
 Assembled process models now support native well-mixed execution through
 `AssembledModel.run()`. The method delegates to `ProcessODESolver`, returns a
@@ -1455,20 +1494,6 @@ machine-readable citation is in [`CITATION.cff`](CITATION.cff); GitHub renders a
 [citing guide](https://fungmod.readthedocs.io/citing/) for BibTeX export and DOI
 details.
 
-Cross-solver reproduction (2026-10-05): the Gelain 2020 registry case is
-exported as a multi-condition PEtab problem and reproduced in COPASI under a
-frozen plan (`docs/gelain-cross-solver.md`). The two simulators agree to 1.7e-8
-of sigma at FungMod's optimum; COPASI then finds an objective 1.3 percent
-lower, which FungMod evaluates to the same value, so FungMod's recorded
-least-squares optimum is an optimiser stopping point and is reported as such.
-
-Research export and calibration hardening (2026-09-28): mixed-unit SBML exports
-preserve native trajectories; PEtab keeps validation/holdout rows outside fitting
-and rejects missing noise scales. Configured calibration offers optional
-profile-likelihood grids. An explicit frozen-prediction/raw-replicate evaluation
-workflow is documented in `docs/independent-validation.md`; independent biological
-validation still requires external data.
-
 ## Current Limitations
 
 Current capability labels mean:
@@ -1489,8 +1514,20 @@ Current capability labels mean:
 - Michaelis-Menten kinetics currently means homogeneous dissolved-substrate kinetics only.
 - PET surface hydrolysis currently uses a minimal equilibrium Langmuir coverage model with constant accessible surface area.
 - PET product release is represented as a lumped mass-equivalent hydrolysate in the Stage 4 example, not resolved MHET/BHET/TPA/EG chemistry.
-- Temperature scaling currently uses Arrhenius acceleration only; enzyme thermal deactivation is recorded as a limitation and is not implemented.
-- pH activity currently uses an empirical Gaussian profile; mechanistic ionization chemistry is not implemented.
+- Temperature and pH act on rates only through explicit laws, read once from a
+  static environment; there are no temperature or pH dynamics
+  (`docs/environment-response.md`). Temperature: the Arrhenius reference and
+  Rosso cardinal (CTMI) modifiers and a first-order Arrhenius
+  `thermal_inactivation` process law (irreversible single-exponential loss; no
+  reversible unfolding, proteolysis or stabilizer protection). pH: the
+  empirical Gaussian and Rosso cardinal (CPM) modifiers and the
+  diprotic-ionization Michaelis-Menten process law (SABIO-RK law type 24), an
+  empirical fit of a measured profile that does not represent buffer identity,
+  ionic strength or pH-dependent stability. Only the ionization law is bound to
+  a shipped registry case (*P. chrysosporium* BGL1A on cellobiose, pH 4 to 8,
+  exploratory mode only); the other laws act only where a config or template
+  binds them explicitly, and the repository holds no sourced cardinal values or
+  inactivation energies.
 - `FungalCouplingModel` can compose explicit capability-matched extracellular
   degradation, secretion, enzyme decay, secretion cost, assimilable-product
   uptake, biomass yield, and maintenance in one well-mixed ODE system. It is an
@@ -1518,6 +1555,13 @@ Current capability labels mean:
   implement irregular/curvilinear meshes, advection, porous-medium closures,
   adaptive mesh refinement, moving colony boundaries, morphology, or true
   surface/volume coupling.
+- `fungal_model.mycelium` is an exploratory continuum (density) mycelium on
+  uniform Cartesian or axisymmetric grids (`docs/spatial-mycelium.md`). It has
+  no individual hyphae, moving colony boundary or morphology, no organism
+  parameters, and is not reachable from the registry, the configured workflow
+  or `VirtualExperiment`. The colony comparison against De Ligne 2019 has a
+  frozen plan and stage 0 software (`docs/colony-comparison.md`); no fit to
+  colony data has been run.
 - PET is marked `partial`. Cellulose has narrow registry-backed exploratory
   BIO-001/BIO-002 surface and enzyme-chain paths, but the generic
   `CelluloseSubstrate` class remains Stage 9 placeholder metadata and is not a
@@ -1525,8 +1569,10 @@ Current capability labels mean:
   remain Stage 9 placeholder metadata classes with unknown physical parameters
   and no default degradation model.
 - Universal substrate modules record bond classes, required enzyme classes, and product classes, but they do not implement substrate-specific kinetics, accessibility models, thermodynamic constraints, or assimilation evidence.
-- Calibration utilities are generic least-squares tools; no parameters are
-  calibrated by default. `audit_calibration_evidence(...)` checks a completed
+- Calibration utilities are generic least-squares and posterior-sampling tools;
+  nothing is fitted during a virtual-experiment run. The only registry
+  parameters labelled `calibrated` are the nine *T. harzianum* constants, a
+  frozen retrospective fit. `audit_calibration_evidence(...)` checks a completed
   fit against caller-supplied provenance-bearing criteria and external-evidence
   metadata, but `publication_claim_authorized` is always false. The bundled
   same-source literature comparison is not a calibration or independent
@@ -1537,24 +1583,40 @@ Current capability labels mean:
   designs, reports Saltelli first-order and Jansen total-order estimates, can
   bootstrap intervals, records exact evaluation counts and seeds, fails on any
   model-evaluation error, and does not clip finite-sample indices. Independent
-  inputs are required; correlated-input sensitivity and full Bayesian
-  calibration are not implemented.
+  inputs are required; correlated-input sensitivity is not implemented.
+- Posterior sampling (`fungal_model.calibration.bayesian`,
+  `docs/bayesian-calibration.md`) is limited to bounded uniform or log-uniform
+  priors, explicit Gaussian observation-error models and a gradient-free
+  affine-invariant ensemble sampler. Its identifiability verdicts are
+  conditional on the declared prior box, the error model and a finite chain;
+  the one recorded study (*T. harzianum*) assumes its error model because no
+  replicate-level data exist, and no verdict is validation.
 - `AssembledModel.run()` currently supports well-mixed process ODE execution;
   unsupported geometry fails before simulation. The run compiles the model to a
   numeric stoichiometric right-hand side with units resolved at build time and
   records every process's kernel kind in `solver_metadata["kernel"]`
   (`docs/compiled-core.md`). Rates are evaluated at `max(state, 0)` so pools
   can deplete without clipping the trajectory; the `non_negative` validator
-  reports accepted states below tolerance. The legacy `SimulationEngine`, the
-  spatial engines and the Pirt/Monod culture closures are not on the compiled
-  core yet.
+  reports accepted states below tolerance. The legacy
+  `Reaction`/`SimulationEngine` path and the 1D and N-D reaction-diffusion
+  engines still integrate their own right-hand sides (`FD-009` in
+  `ARCHITECTURE_DEBT.md`). The Pirt/Monod culture closures are compiled
+  processes: `ResourceLimitedCulture`, `DegradingCulture` and
+  `FungalCouplingModel` run on the compiled core through `simulate_compiled`,
+  while `ResourceLimitedCulture.simulate`, `DegradingCulture.simulate` and
+  `FungalCouplingModel.build_engine()` keep their native right-hand sides. The
+  spatial mycelium compiles its own field kernels.
 - The registry's one whole-organism case (*T. harzianum* P49P11 on Celufloc
   200 cellulose, `docs/organism-physiology.md`) composes generic process laws
   through a `culture_physiology` template. Its nine constants are a frozen
   retrospective fit to published duplicate means; three sit at fitting bounds.
   It runs in `scientific` mode because it is exact and implemented, not because
   it is validated. Nutrient, oxygen, maintenance, soluble-intermediate, pH and
-  morphology physiology are absent, and no other organism record is runnable.
+  morphology physiology are absent. No other organism record reaches organism
+  physiology: the other named-organism record, *P. chrysosporium* K-3, reaches
+  only the recombinant BGL1A enzyme-kinetics case on cellobiose (exploratory
+  mode), and strains from user-supplied tables (`docs/user-data.md`) reach only
+  homogeneous Michaelis-Menten enzyme cases.
 - The generic configured workflow currently supports foundation process
   factories and well-mixed execution; unsupported process types and geometry
   fail before simulation.

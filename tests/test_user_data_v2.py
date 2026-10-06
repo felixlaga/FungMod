@@ -378,8 +378,10 @@ def _normalized(value: Any, root: str) -> Any:
         return {key: _normalized(item, root) for key, item in value.items()}
     if isinstance(value, list):
         return [_normalized(item, root) for item in value]
-    if isinstance(value, str):
-        return value.replace(root, "<OUTPUT_ROOT>")
+    if isinstance(value, str) and root in value:
+        # Paths under the temporary output root use the platform separator;
+        # the snapshot stores them with forward slashes.
+        return value.replace(root, "<OUTPUT_ROOT>").replace("\\", "/")
     return value
 
 

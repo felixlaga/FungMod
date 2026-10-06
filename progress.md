@@ -242,6 +242,107 @@ Recommended next task: user time-course tables (`timecourse.csv`) compared
 against the simulated trajectories with the existing comparison metrics, then
 fitting of user kinetic constants to them.
 
+## DOCS-001 README And Docs Accuracy Audit
+
+Status: `complete` for the stated scope (2026-10-06). Documentation only: no
+file under `src/`, `tests/`, `data/` or `data_registry/` changed, and no
+scientific or numerical behaviour changed.
+
+`README.md` and the MkDocs pages in `mkdocs.yml` were checked against the code.
+Corrected claims, each with the code that proves it:
+
+- README limitations, temperature: "Arrhenius acceleration only; thermal
+  deactivation not implemented" now lists the Arrhenius and Rosso CTMI
+  modifiers and the first-order `thermal_inactivation` process law
+  (`kinetics/cardinal.py`, `kinetics/inactivation.py`,
+  `processes/inactivation.py`, `ThermalInactivationFactory` in
+  `processes/factories.py`), static per case.
+- README limitations, pH: "empirical Gaussian only; ionization chemistry not
+  implemented" now lists the Gaussian and CPM modifiers and the diprotic
+  `ph_ionization_michaelis_menten` law (`kinetics/ionization.py`,
+  `processes/ionization.py`), bound only to the *P. chrysosporium* BGL1A
+  template (`data_registry/case_templates/case_templates.yml`); no registry
+  record binds a cardinal law or thermal inactivation.
+- README limitations: "correlated-input sensitivity and full Bayesian
+  calibration are not implemented" split into correlated-input sensitivity
+  (still absent; independent pick-freeze in
+  `uncertainty/global_sensitivity.py`) and a bullet bounding the implemented
+  posterior sampler (`calibration/bayesian.py`: uniform or log-uniform
+  `PriorSpecification`, `GaussianObservationError`, `run_ensemble_sampler`).
+  `docs/capabilities.md` "not supported" list corrected the same way.
+- README limitations: "the spatial engines and the Pirt/Monod culture
+  closures are not on the compiled core" now matches FD-009: the culture
+  closures are compiled processes with `simulate_compiled` on
+  `ResourceLimitedCulture`, `DegradingCulture` and `FungalCouplingModel`
+  (`fungi/respiration.py`, `fungi/degradation.py`, `fungi/coupling.py`); the
+  legacy `Reaction` engine and the reaction-diffusion engines remain outside.
+- README limitations: "no other organism record is runnable" replaced; a
+  registry-wide preflight shows *P. chrysosporium* K-3 on cellobiose runnable
+  in exploratory mode (enzyme kinetics only) and user-data strains reach only
+  homogeneous Michaelis-Menten cases (`api/user_data.py`).
+- README limitations: new bullet for the exploratory `fungal_model.mycelium`
+  (Cartesian or axisymmetric `SpatialGrid`, unreachable from registry and
+  `VirtualExperiment`, no colony fit).
+- README calibration bullet: the nine `calibrated` *T. harzianum* records
+  (`data_registry/parameters/parameter_records.yml`) are named instead of "no
+  parameters are calibrated by default".
+- README cross-solver paragraph described the first COPASI run
+  (`copasi_improves`); the recorded outcome is `reproduced`, 1.6e-8 of sigma,
+  optimum within 2.5e-8 (`data/benchmarks/gelain_2020_petab/results/comparison.json`).
+  The paragraph and the 2026-09-28 research-export note moved from "Citation"
+  into the time-course comparison section.
+- README source-proposal example: `source_proposal(provider="sabiork",
+  reaction_id="618")` followed by `review_source_proposal` raised
+  `CurationError` (duplicate `proposed_sabiork_parameter_618_38522_pka`);
+  the example now selects `entry_id="35622"` and the README states the
+  limitation.
+- README: CI installs `.[dev,standards,copasi]`, not `.[dev]`
+  (`.github/workflows/ci.yml`); `ProcessLibrary.default_foundation()` has
+  thirteen factories, not four (`default_foundation_factories`); the
+  literature collection also holds the Gelain and De Ligne sources; the
+  source-of-truth list adds the 2026-10-04 state document (`AGENTS.md`).
+- `docs/capabilities.md`: the modifier row adds the Rosso and Robinson
+  water-activity law (`modifiers/cardinal.py`); the mycelium row names the
+  axisymmetric grid (`mycelium/grid.py`) and the COLONY-001 status.
+- `docs/compiled-core.md`: "five process classes and eight modifiers" is
+  thirteen process types (`SHIPPED_PROCESS_TYPES` in
+  `tests/test_compiled_process_models.py`) and twelve modifiers with
+  `compile_activity`; "the compiled Jacobian below" is above.
+- `docs/colony-comparison.md` and `docs/spatial-mycelium.md`: the study runner
+  and error-model fit exist (`research/colony_comparison.py`,
+  `scripts/run_de_ligne_2019_colony_comparison.py`); no stage 0 record is
+  committed and no fit has been run.
+- `docs/environment-response.md`: the unbound-law list includes the cardinal
+  water-activity law; "the two cardinal laws" is "the cardinal laws".
+- `docs/quickstart.md`: preflight statuses are the four of
+  `ModelabilityStatus` (`screening/modelability.py`); "incompatible" is an
+  item kind, not a status.
+- `docs/user-guide.md`: adds posterior sampling; signatures are optional
+  Ed25519; SBML export includes `proportional_synthesis`
+  (`SBML_EXPORTABLE_PROCESS_TYPES`) and PEtab/COPASI exist.
+- `docs/standards.md`: every rate-modifier wrapper is refused, not only
+  inhibition (`standards/sbml.py`).
+- `docs/bayesian-calibration.md`: the compiled Jacobian is opt-in
+  (`SolverSettings.jacobian`), so "still integrates with finite differences"
+  holds by default only.
+- `docs/paper-readiness.md`: the colony dataset is ingested with pinned
+  digests and a frozen plan exists.
+- `docs/install.md`: ruff scope matches CI; extras note.
+- `docs/release-notes.md`: marked as a partial summary of `CHANGELOG.md`.
+- `docs/reproducing-the-paper.md`: `paper/paper.pdf` and its auxiliary files
+  are tracked (commit `94c407f`) although `.gitignore` lists them.
+
+Examples executed in scratch directories with `PYTHONPATH=src`: every Python
+and shell block of `README.md`, `docs/index.md` and `docs/quickstart.md`, plus
+`docs/user-guide.md` and the `docs/organism-physiology.md` run. Placeholder
+paths were substituted (the esterase user-data fixture, a copied registry, a
+toy config); the author/sign blocks were given an accepted-review fixture and
+an Ed25519 key. All ran after the `entry_id` fix. Notebooks were not changed.
+
+Recommended next task: fix proposal record IDs for SABIO-RK entries with
+repeated parameter names (four `pKa` per pH-dependent entry) so the unfiltered
+Reaction 618 proposal can be reviewed.
+
 ## USERDATA-001 User-Supplied Enzyme And Kinetics Tables Into Virtual Experiments
 
 Status: `complete` for the stated scope (2026-10-06); the first increment of
