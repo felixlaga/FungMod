@@ -77,7 +77,8 @@ To keep the exported model faithful, FungMod **refuses** to export (raising
 `SbmlExportError`) rather than emit an inexact model when it encounters:
 
 - an unsupported process (surface catalysis, transglycosylation, …);
-- a rate-modifier wrapper (competitive, substrate, or product inhibition);
+- a rate-modifier wrapper of any kind (inhibition, substrate reactivity, or a
+  temperature, pH, oxygen or water-activity response);
 - a dynamic thermodynamic constraint that gates the rate at solver time.
 
 ## SED-ML simulation export
