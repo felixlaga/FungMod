@@ -26,6 +26,101 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CLI-001 Command-Line Virtual Experiments
+
+Status: `complete` for the stated scope (2026-10-06); the command-line form of
+the product goal ("fungus X on substrate Y in conditions Z, and the software
+calculates") over the existing virtual-experiment API.
+
+Changed:
+
+- `fungal_model.cli` (`main(argv=None) -> int`, `build_parser()`), registered
+  as the console script `fungmod = "fungal_model.cli:main"` in
+  `[project.scripts]` (setup.py keeps only the resource-staging build step and
+  declares no entry points), and `fungal_model/__main__.py` for
+  `python -m fungal_model`. argparse, four subcommands:
+  - `run`: `--fungus`, `--substrate` (repeatable names, aliases or ids);
+    conditions as `--environment`/`--condition` (registry environments or a
+    user-data `condition_id`) or a `--temperature-c`/`--ph`/`--oxygen` grid
+    (`environment_grid`); `--user-data DIR`, `--registry PATH` (default: the
+    packaged registry, printed); `--mode` required; `--samples` and `--seed`
+    required in exploratory mode and refused in scientific mode;
+    `--output DIR` required, new or empty; `--report` adds the HTML report and
+    `index.html`; `--no-plots`. It prints the resolved names, the preflight
+    table with missing items and their suggested experiments, simulates
+    through `VirtualExperiment.simulate`, always writes the Markdown report,
+    and prints per case the environment effect and guardrail, the final
+    metrics and threshold times (median and 5th to 95th percentile from
+    `summary_metrics.csv`, statuses from `final_metrics.csv` and
+    `threshold_times.csv`), then the output directory, manifest, report,
+    limitations count by severity and the provenance and limitations paths.
+  - `preflight`: the same selection, no simulation, optional `--output` for
+    the preflight tables (`write_preflight_report`).
+  - `check-data DIR`: dataset id, digest, directory, time grid, generated
+    record counts, kinetic values and gaps with each measurement request.
+  - `list`: registry fungi, substrates and environments with id, name and
+    maturity, `--aliases`, `--user-data` overlay.
+  - Exit codes: 0 success; 1 the simulation failed after a passing preflight;
+    2 usage or input errors (argparse errors, unknown or ambiguous names, an
+    invalid registry, a non-empty output directory, `UserDataError` with every
+    issue as `file:row:column: message`); 3 the preflight blocks a requested
+    case in the requested mode (nothing is simulated or written; the blocked
+    cases, the API's scientific-mode wording and the measurement requests are
+    printed).
+- API, no behaviour change: `DegradationScreenResult.case_summary()` and
+  `summary_metrics()` read the existing tables; `preflight_policy(report)` in
+  `fungal_model.api.result_tables` (previously `_preflight_policy`) is public
+  so that the command line uses the same per-mode simulation rule as
+  `modelability_preflight.csv`.
+- CI: the installed-wheel smoke also runs `fungmod --version` and
+  `fungmod list`.
+- Docs: `docs/cli.md` (in the nav after the quickstart; every subcommand, the
+  "fungus X on substrate Y at 30 °C and pH 5" example with its real output,
+  modes, user data, exit codes), README "Command line" subsection and
+  capability row, API reference section, install, quickstart and home links,
+  changelog.
+
+Tests: `tests/test_cli.py` (30 tests): Reaction 618 exploratory run with the
+default packaged registry (manifest, report files, figures, printed metrics
+matching `summary_metrics.csv`, limitations count and table paths); the
+T. harzianum culture case in scientific mode (run label, printed threshold
+time matching `threshold_times.csv`); a temperature/pH grid in exploratory
+mode and the same grid blocked in scientific mode with the registry
+suggestions; the esterase fixture in exploratory mode (dataset id and digest
+in output and manifest) and blocked in scientific mode; the literature
+re-entry in scientific mode; a kcat gap exiting 3 from `preflight` and `run`
+with the measurement request printed and in the preflight tables;
+`check-data` success, gaps, and bad units (both issues as
+`kinetics.csv:row:units:`, exit 2); `list` with and without user data and
+aliases; nine `run` usage errors and seven selection input errors (exit 2,
+nothing written); a non-empty output directory; help texts with the API's
+scientific-mode wording; `--version`; the pyproject console script; and
+`python -m fungal_model --version` in a subprocess. Guardrails now cover
+`cli.py` and `__main__.py` (no-hardcoding paths and an organism/substrate/
+enzyme token test, no-shortcut patterns, no low-level solver construction,
+complete public entry point using the public API); the release-configuration
+test pins `[project.scripts]` and the wheel smoke; the API test covers the
+two accessors and `preflight_policy`.
+
+Not changed: no process law, solver, registry record, output table or schema
+(still `1.8.0`), preflight status, simulation rule or numerical result. The
+command line adds no default for any scientific value.
+
+Scientific impact: none on results; the same simulations become reachable
+from a shell, with the mode, sample count and seed always stated by the user
+and the environment-effect guardrail, limitations and provenance printed with
+the numbers.
+
+Limitations: one invocation simulates only when every requested case passes
+the preflight (the API rule), so a mixed request must be split; the printed
+numbers are four significant figures of the tables, which hold full
+precision; no JSON output mode; `python -m fungmod` is not provided (the
+`fungmod` namespace has no real submodules).
+
+Recommended next task: a machine-readable `--json` summary for `run` and
+`preflight`, then per-case selection so that runnable cases of a mixed
+request can be simulated while the blocked ones are reported.
+
 ## FIX-DOCS001 Two Defects Found By The Documentation Audit
 
 Date: 2026-10-06

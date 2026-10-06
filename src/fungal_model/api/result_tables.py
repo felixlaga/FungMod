@@ -548,7 +548,7 @@ def _sample_context(context: Mapping[str, Any], sample: EnsembleSample) -> dict[
 
 
 def _preflight_row(context: Mapping[str, Any], report: ModelabilityReport) -> dict[str, Any]:
-    policy = _preflight_policy(report)
+    policy = preflight_policy(report)
     return {
         **_case_columns(context),
         "assessment_mode": report.mode,
@@ -565,7 +565,16 @@ def _preflight_row(context: Mapping[str, Any], report: ModelabilityReport) -> di
     }
 
 
-def _preflight_policy(report: ModelabilityReport) -> dict[str, Any]:
+def preflight_policy(report: ModelabilityReport) -> dict[str, Any]:
+    """Return whether a preflight report allows simulation in its mode, and why not.
+
+    The mapping holds ``simulation_allowed_for_mode`` (scientific mode
+    simulates only ``modelable`` cases; exploratory mode also simulates
+    ``exploratory`` cases; toy mode never simulates), ``blocking_reason`` and
+    ``recommended_next_action``, the same values as the columns of
+    ``modelability_preflight.csv``.
+    """
+
     if report.mode == "scientific":
         if report.status == "modelable":
             return {
@@ -2891,4 +2900,4 @@ def _float_or_blank(value: Any) -> Any:
     return "" if number is None else number
 
 
-__all__ = ["WrittenTables", "write_standard_tables"]
+__all__ = ["WrittenTables", "preflight_policy", "write_standard_tables"]
