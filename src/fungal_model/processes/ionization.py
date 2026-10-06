@@ -35,6 +35,8 @@ from fungal_model.processes.base import (
 from fungal_model.processes.homogeneous import homogeneous_process_assumption
 
 PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE = "ph_ionization_michaelis_menten"
+#: Environment conditions the law reads at run time; each must have one exact value.
+PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS = ("ph",)
 
 
 @dataclass(frozen=True, init=False)
@@ -294,7 +296,7 @@ class PHIonizationMichaelisMentenProcess(Process):
                 "complex_upper_pk_symbol": self.complex_upper_pk_symbol,
                 "minimum_ph_symbol": self.minimum_ph_symbol,
                 "maximum_ph_symbol": self.maximum_ph_symbol,
-                "environment_conditions_read": ["ph"],
+                "environment_conditions_read": list(PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS),
             }
         )
         return data
