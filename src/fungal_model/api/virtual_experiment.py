@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import product
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid
 from fungal_model.api.output_schema import OUTPUT_SCHEMA_VERSION
@@ -26,6 +26,9 @@ from fungal_model.screening import (
     assess_modelability,
     simulate_screen,
 )
+
+if TYPE_CHECKING:
+    from fungal_model.api.user_data_fit import TimecourseComparison
 
 VirtualExperimentMode = Literal["exploratory", "scientific"]
 DEFAULT_REGISTRY_REFERENCE = "data_registry/registry_index.yml"
@@ -53,6 +56,8 @@ class VirtualExperiment:
     user_dataset_id: str | None = None
     user_dataset_digest: str | None = None
     user_dataset_summary: Mapping[str, Any] | None = None
+    # The overlaid user dataset itself, kept for comparisons with its time courses.
+    user_dataset: UserDataset | None = field(default=None, repr=False, compare=False)
 
     @classmethod
     def from_registry(
@@ -122,6 +127,7 @@ class VirtualExperiment:
             user_dataset_id=None if user_dataset is None else user_dataset.dataset_id,
             user_dataset_digest=None if user_dataset is None else user_dataset.digest,
             user_dataset_summary=None if user_dataset is None else user_dataset.summary(),
+            user_dataset=user_dataset,
         )
 
     @classmethod
@@ -352,6 +358,34 @@ class DegradationScreenResult:
         """Load trajectory quantile bands without rerunning simulation."""
 
         return self._table_rows("trajectory_quantiles", "trajectory_quantiles.csv")
+
+    def compare_with_timecourses(self, output_dir: str | Path | None = None) -> "TimecourseComparison":
+        """Compare the simulated trajectories with the time courses of the experiment's user dataset.
+
+        Writes ``timecourse_comparison.csv`` (by default into the output
+        directory, where it joins the tables and the manifest) and returns the
+        ``TimecourseComparison``; see ``compare_with_timecourses`` in
+        ``fungal_model.api.user_data_fit``. The agreement is in-sample, not
+        validation.
+        """
+
+        from fungal_model.api.user_data_fit import compare_with_timecourses
+
+        dataset = self.experiment.user_dataset
+        if dataset is None:
+            raise VirtualExperimentError(
+                "This virtual experiment was built without user_data, so it has no time courses to compare with."
+            )
+        if not dataset.timecourses:
+            raise VirtualExperimentError(
+                f"User dataset {dataset.dataset_id!r} has no timecourse.csv, so there are no time courses to compare with."
+            )
+        return compare_with_timecourses(self, dataset, output_dir=output_dir)
+
+    def timecourse_comparison(self) -> list[dict[str, str]]:
+        """Load ``timecourse_comparison.csv`` written by ``compare_with_timecourses``."""
+
+        return self._table_rows("timecourse_comparison", "timecourse_comparison.csv")
 
     def conservation_diagnostics(self) -> list[dict[str, str]]:
         """Load configured conservation diagnostics copied from existing sample artifacts."""

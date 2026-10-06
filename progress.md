@@ -26,6 +26,130 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## USERDATA-004 Time Courses: Compare And Fit
+
+Status: `complete` for the stated scope (2026-10-06); the fourth increment of
+the user-supplied-data route. A user's own time courses (substrate remaining
+and product formed over time) can now be compared with a virtual experiment,
+and selected kinetic constants of a case can be fitted to them with the
+existing least-squares calibration. The fit returns a new user dataset whose
+fitted constants are labelled `fitted`: in-sample estimates, limited to
+exploratory screening and refused by scientific mode, never validated values.
+
+Changed:
+
+- `api/user_data.py`: optional `timecourse.csv` (`strain_id`,
+  `enzyme_class`, `substrate_id`, `condition_id`, `observable` = `substrate`
+  or `product`, `time`, `time_units`, `value`, `units`, optional `sd`,
+  `replicates`, `source`, `method`). References must be declared (the class
+  for the strain, a substrate the class acts on); times finite and nonnegative
+  in a time unit; values finite in amount per volume, the kind of the case's
+  states (wrong dimensions and mass concentrations are refused with the
+  case's units in the message); `sd` positive; one time unit, one value unit
+  and one row per time per series. `UserDataset.timecourses` holds
+  `UserTimecourse` series keyed by the generated case id; `to_dict()` and
+  `summary()` list them; the file enters the digest; no record is generated.
+  `timecourse.csv` is no longer refused as an unsupported table. New evidence
+  type `fitted` (maturity `user_fitted`, allowed use exploratory screening,
+  `km`, `kcat` or `vmax`, exact only), accepted only with the manifest `fit`
+  block that lists its case, condition, quantity, value and units and a fit
+  report file whose SHA-256 matches (its bytes enter the digest). The fitted
+  record's provenance carries the fit method, objective, error model, input
+  digest, data rows, bounds, starting value, identifiability verdict, method
+  and interval, and the scientific-mode boundary.
+- `api/user_data_fit.py` (new): `compare_with_timecourses` interpolates the
+  `trajectory_quantiles` median and 5-95 % band linearly to the observed times
+  (substrate state; `product_formed`), refuses observations outside the
+  simulated range, computes residuals with `residuals_between`, RMSE, mean
+  residual, fraction inside the band and observations with sd, and writes
+  `timecourse_comparison.csv` (added to the result's tables and manifest).
+  `fit_user_dataset` fits `km` with `kcat` or `vmax` of one case across
+  conditions of one known temperature and pH: the case is rebuilt for every
+  candidate by the registry assembler from the records the screen resolves
+  (the fitted roles start from a working copy of the dataset with the
+  starting values) and integrated by `ConfiguredConditionPredictor`; the
+  optimizer is `fit_least_squares` on ln(value) with a declared
+  finite-difference step of 1e-3. Bounds are required; residuals are divided
+  by the reported sd, or, only with an explicit `error_model="unweighted"`,
+  left raw. Identifiability: profile likelihood (`profile_likelihood`, chi-
+  square one-dof threshold at `confidence_level`, crossings bisected ten times)
+  for sd weighting; local information (`local_information_analysis`) with
+  linearized intervals for the unweighted objective. Unidentified quantities
+  refuse the fit unless `allow_unidentified=True` (rows then labelled "NOT
+  IDENTIFIED"); non-converged fits are always refused; fits are not chained.
+  `UserDatasetFit.write` writes the input files byte for byte except
+  `kinetics.csv` (fitted rows replace the fitted quantities, and a fitted
+  `vmax` the whole Vmax route, at the fitted conditions) and the manifest (new
+  dataset id and `fit` block), plus `fit_report.json`.
+- `api/virtual_experiment.py`: `VirtualExperiment.user_dataset` (the overlaid
+  dataset); `DegradationScreenResult.compare_with_timecourses()` and
+  `timecourse_comparison()`.
+- `api/output_schema.py`: table `timecourse_comparison`, schema `1.8.0` ->
+  `1.9.0` (a new table is a minor bump); the table is written only on request.
+- `api/result_tables.py`: `user_fitted` is a user maturity (source class
+  `user_fitted_exact_value`); a case with a fitted value reports mechanism
+  maturity `software_tested_user_fitted_in_sample_unvalidated`.
+- `calibration/profile.py`: optional `diff_step` passed to nuisance refits
+  (default unchanged). `screening/ensemble.py`: public
+  `resolve_screen_role_records` wrapping the screen's existing role
+  resolution.
+- Docs: `docs/user-data.md` time-course, comparison and fitting section with
+  the in-sample honesty note; `docs/api.md`; `docs/concepts/outputs.md`;
+  README user-data subsection, capability row and public API list;
+  changelog.
+
+Tests: `tests/test_user_data_timecourse.py` (31 tests). (a) Synthetic recovery
+on the non-specific esterase case at three initial substrate concentrations:
+time courses from a FungMod simulation with km 150 µM and kcat 30 1/min plus
+seeded noise, labelled synthetic; from starting values 1000 µM and 5 1/min the
+fit identifies both, with the truth inside the profile intervals; the fitted
+dataset reloads, its rows are `fitted`/`user_fitted` with the fit provenance,
+exploratory preflight is modelable and scientific preflight and simulation
+are refused. A second, materially different case fits km and vmax of the
+oxidase case (Vmax form from specific activity and enzyme loading, with
+cardinal laws) and replaces the Vmax route. (b) On the literature re-entry
+with the integrated Michaelis-Menten (Lambert W) solution as observations the
+RMSE is below 1e-5 mM, the fraction inside the band and the observations with
+sd are reported, off-grid times match linear interpolation, and observations
+beyond 10 h are refused by row. (c) Product observed only at 20000 µM
+substrate: km is not identified and the fit is refused; kcat is identified
+with an interval covering the truth; with `allow_unidentified=True` the km
+rows are labelled. (d) Wrong dimension, mass/molar mismatch, duplicate time,
+negative time, undeclared strain, condition and class, non-time units,
+non-finite value, unknown observable, non-positive sd, mixed units and a
+missing method are refused by file, row and column; missing sd refuses the fit
+unless `error_model="unweighted"`; bounds, units, starting values, cases,
+forms, conditions and settings are validated; hand-typed or edited fitted rows,
+a changed report and a fit of a fitted dataset are refused. (e) Datasets
+without time courses keep their record digests (the USERDATA-002 snapshot test
+passes unchanged). `tests/test_user_data_import.py` uses `growth_curve.csv` as
+the unsupported-table example; the no-hardcoding guardrail covers the new
+module; `tests/test_virtual_experiment_api.py` expects schema `1.9.0`.
+
+Not changed: no process law, modifier, solver, registry record or shipped
+case; the standard tables of every run are unchanged except their
+`output_schema_version` value; time courses never reach `data_registry`;
+fitted values never reach scientific mode.
+
+Scientific impact: user time courses become a first-class, validated input,
+and their agreement with a simulation is quantified with explicit
+interpolation and no extrapolation. Kinetic constants can be estimated from
+progress curves with identifiability made explicit and unidentified constants
+refused or labelled, and every fitted value is traceable to the rows, bounds,
+error model and report that produced it. None of this is validation.
+
+Limitations: one case per fit, constants shared only across conditions of one
+temperature and pH; km, kcat and vmax only; one starting point; independent
+Gaussian errors with the reported sd (or equal variances when unweighted);
+verdicts conditional on the bounds and a finite grid; substrate and product
+observables only; exploratory bands collapse to zero width when every input
+is exact.
+
+Recommended next task: hold-out comparison of a fitted dataset against time
+courses that were not used in the fit (a second assay or substrate
+concentration), reported through the existing independent-validation
+contract.
+
 ## USERDATA-003 Enzyme Repertoire From A Genome Annotation
 
 Status: `complete` for the stated scope (2026-10-06); the third increment of

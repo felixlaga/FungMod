@@ -17,7 +17,19 @@
       members:
         - load_user_dataset
         - UserDataset
+        - UserTimecourse
+        - TimecoursePoint
         - UserDataError
+
+::: fungal_model.api.user_data_fit
+    options:
+      members:
+        - compare_with_timecourses
+        - TimecourseComparison
+        - fit_user_dataset
+        - UserDatasetFit
+        - FittedQuantity
+        - UserDataFitError
 
 ## Environment grids
 

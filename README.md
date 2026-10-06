@@ -84,7 +84,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
-| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests ([user-supplied data](docs/user-data.md)) |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values ([user-supplied data](docs/user-data.md)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
@@ -840,7 +840,8 @@ configured conservation diagnostics copied from existing per-sample
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
-In output schema `1.8.0`, `time_series_long.csv` retains legacy
+Since output schema `1.8.0` (current: `1.9.0`, which adds the on-request
+`timecourse_comparison.csv`), `time_series_long.csv` retains legacy
 `degradation_rate`/`product_release_rate` presentation aliases and also writes
 authoritative `process_rate.<process_id>` rows for every configured process.
 Persisted `derived_quantities.csv` values are copied under the collision-safe
@@ -1043,6 +1044,15 @@ its dbCAN genome annotation: classes with a registry record join the
 strain, classes without one and unmapped families are reported, and every
 resolved class that can act on a dataset substrate but has no kinetics becomes
 a named measurement request, since no rate is ever taken from a genome.
+An optional `timecourse.csv` of measured substrate remaining and product
+formed over time can be compared with a simulation
+(`result.compare_with_timecourses()` writes `timecourse_comparison.csv` with
+the median and 5-95 % band at the observed times, residuals and RMSE), and
+`fit_user_dataset` fits `km` with `kcat` or `vmax` to it with the existing
+least-squares calibration, required bounds, sd-weighted residuals and a
+profile-likelihood identifiability verdict, returning a new dataset whose
+values are labelled `fitted`: in-sample estimates that stay exploratory and
+are refused by scientific mode, never validated values.
 
 ## Public API
 
@@ -1069,6 +1079,11 @@ assembly, execution, and result inspection:
 - `load_user_dataset`
 - `UserDataset`
 - `UserDataError`
+- `compare_with_timecourses`
+- `TimecourseComparison`
+- `fit_user_dataset`
+- `UserDatasetFit`
+- `UserDataFitError`
 - `review_source_proposal`
 - `CurationDecision`
 - `CurationResult`

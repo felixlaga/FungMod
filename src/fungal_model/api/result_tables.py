@@ -24,7 +24,7 @@ from fungal_model.api.output_schema import (
     output_schema_document,
     table_fieldnames,
 )
-from fungal_model.api.user_data import USER_DATASET_PARAMETER_MATURITIES
+from fungal_model.api.user_data import USER_DATASET_MATURITY_FITTED, USER_DATASET_PARAMETER_MATURITIES
 from fungal_model.registry.records import (
     ParameterRecord,
     RegistryRecord,
@@ -939,6 +939,9 @@ def _mechanism_maturity(process_type: str, role_records: Mapping[str, ParameterR
         return "software_tested_literature_parameterized"
     if "exploratory_prior" in maturities:
         return "software_tested_exploratory_parameterized"
+    if USER_DATASET_MATURITY_FITTED in maturities:
+        # A value fitted to the user's own time courses: in-sample, not independent evidence.
+        return "software_tested_user_fitted_in_sample_unvalidated"
     if maturities <= USER_DATASET_PARAMETER_MATURITIES:
         return "software_tested_user_supplied_parameterized"
     if maturities <= {"literature_processed", "calibrated"} and "calibrated" in maturities:

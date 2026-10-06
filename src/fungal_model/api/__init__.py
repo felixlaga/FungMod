@@ -63,6 +63,13 @@ from fungal_model.api.source_provider import (
     source_proposal,
 )
 from fungal_model.api.user_data import UserDataError, UserDataset, load_user_dataset
+from fungal_model.api.user_data_fit import (
+    TimecourseComparison,
+    UserDataFitError,
+    UserDatasetFit,
+    compare_with_timecourses,
+    fit_user_dataset,
+)
 from fungal_model.api.virtual_experiment import (
     DegradationScreenResult,
     VirtualExperiment,
@@ -126,6 +133,11 @@ __all__ = [
     "UserDataError",
     "UserDataset",
     "load_user_dataset",
+    "TimecourseComparison",
+    "UserDataFitError",
+    "UserDatasetFit",
+    "compare_with_timecourses",
+    "fit_user_dataset",
     "VirtualExperiment",
     "VirtualExperimentError",
     "VirtualExperimentMode",

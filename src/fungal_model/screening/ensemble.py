@@ -410,6 +410,39 @@ def _environment_response(config: ModelConfig) -> dict[str, Any]:
     return dict(response) if isinstance(response, Mapping) else {}
 
 
+def resolve_screen_role_records(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    mode: ScreenSimulationMode,
+) -> Mapping[str, ParameterRecord]:
+    """Return the role-to-record mapping a screen in ``mode`` uses for one case, before any sampling.
+
+    This is the resolution ``simulate_screen`` performs; calibration code that
+    rebuilds a case's config for candidate values uses it so that every role it
+    does not vary carries the record the screen would use.
+    """
+
+    assembler = get_registry_process_assembler(compatibility.process_type)
+    if assembler is None:
+        raise RegistryScreenSimulationError(
+            f"{mode.capitalize()} screen does not support process_type {compatibility.process_type!r}."
+        )
+    resolve = _resolve_scientific_role_records if mode == "scientific" else _resolve_role_records
+    return resolve(
+        registry=registry,
+        compatibility=compatibility,
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        environment_id=environment_id,
+        required_roles=assembler.parameter_roles_for(compatibility),
+        process_label=assembler.process_label,
+    )
+
+
 def _resolve_role_records(
     *,
     registry: FungModRegistry,
@@ -997,5 +1030,6 @@ __all__ = [
     "RegistryScreenResult",
     "RegistryScreenSimulationError",
     "ScreenSimulationMode",
+    "resolve_screen_role_records",
     "simulate_screen",
 ]

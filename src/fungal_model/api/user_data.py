@@ -36,6 +36,16 @@ resolved classes without a record and unmapped families are reported, never
 turned into records. A genome states which classes a strain can encode, not a
 rate: every resolved class without kinetics becomes the usual explicit gaps,
 whose measurement requests name the annotation.
+
+An optional ``timecourse.csv`` holds measured substrate remaining and product
+formed over time for declared cases. Time courses are validated (references,
+units of the case's kind, finite values, nonnegative times, one row per time)
+and kept on ``UserDataset.timecourses``; they never become registry records.
+``fungal_model.api.user_data_fit`` compares simulations with them and fits
+kinetic constants to them; a fitted value returns as a ``kinetics.csv`` row of
+evidence type ``fitted`` (maturity ``user_fitted``, exploratory screening
+only), accepted only together with the manifest ``fit`` block and the fit
+report that describe it.
 """
 
 from __future__ import annotations
@@ -114,24 +124,63 @@ USER_DATASET_MATURITY_LITERATURE = "user_reported_literature"
 USER_DATASET_MATURITY_DESIGN = "user_design_value"
 USER_DATASET_MATURITY_ESTIMATE = "exploratory_prior"
 USER_DATASET_MATURITY_GAP = "user_dataset_gap"
+# A kinetic constant fitted by ``fit_user_dataset`` to the dataset's own time courses.
+USER_DATASET_MATURITY_FITTED = "user_fitted"
 USER_DATASET_RECORD_MATURITY = "user_supplied_metadata"
 USER_DATASET_PARAMETER_MATURITIES = frozenset(
     {
         USER_DATASET_MATURITY_MEASURED,
         USER_DATASET_MATURITY_LITERATURE,
         USER_DATASET_MATURITY_DESIGN,
+        USER_DATASET_MATURITY_FITTED,
     }
 )
 
-EVIDENCE_TYPES = ("measured", "literature", "design", "estimate")
+FITTED_EVIDENCE_TYPE = "fitted"
+EVIDENCE_TYPES = ("measured", "literature", "design", "estimate", FITTED_EVIDENCE_TYPE)
 RESPONSE_EVIDENCE_TYPES = ("measured", "literature", "estimate")
 _EVIDENCE_MATURITY = {
     "measured": USER_DATASET_MATURITY_MEASURED,
     "literature": USER_DATASET_MATURITY_LITERATURE,
     "design": USER_DATASET_MATURITY_DESIGN,
     "estimate": USER_DATASET_MATURITY_ESTIMATE,
+    FITTED_EVIDENCE_TYPE: USER_DATASET_MATURITY_FITTED,
 }
-_EVIDENCE_REQUIRES_METHOD = frozenset({"measured", "literature", "design"})
+_EVIDENCE_REQUIRES_METHOD = frozenset({"measured", "literature", "design", FITTED_EVIDENCE_TYPE})
+# Kinetic constants ``fit_user_dataset`` can fit, and so the only quantities a ``fitted`` row may carry.
+FITTABLE_QUANTITIES = ("km", "kcat", "vmax")
+FIT_ERROR_MODELS = ("sd_weighted", "unweighted")
+FIT_IDENTIFIED = "identified"
+FIT_NOT_IDENTIFIED = "not_identified_within_bounds"
+# The one-sided classes reuse the names of ``fungal_model.calibration.bayesian``.
+FIT_IDENTIFIABILITY_CLASSES = (FIT_IDENTIFIED, "bounded_above_only", "bounded_below_only", FIT_NOT_IDENTIFIED)
+_FIT_BLOCK_FIELDS = frozenset(
+    {
+        "kind",
+        "method",
+        "objective",
+        "error_model",
+        "input_dataset_id",
+        "input_dataset_digest",
+        "report_file",
+        "report_sha256",
+        "case",
+        "conditions",
+        "timecourse_rows",
+        "quantities",
+        "allow_unidentified",
+        "claim_boundary",
+    }
+)
+_FIT_QUANTITY_FIELDS = frozenset(
+    {"quantity", "value", "units", "bounds", "initial", "identifiability", "identifiability_method", "interval"}
+)
+FIT_BLOCK_KIND = "fungmod_user_dataset_fit"
+_FITTED_SCIENTIFIC_BOUNDARY = (
+    "A fitted value is estimated from the dataset's own time courses; agreement with those time courses is "
+    "in-sample by construction and is not independent evidence, so the record is limited to exploratory "
+    "screening and scientific mode refuses it."
+)
 # Weakest first. A record derived from several user rows, and every parameter
 # of one response law, takes the weakest maturity of its inputs.
 USER_DATASET_MATURITY_ORDER = (
@@ -212,8 +261,12 @@ _GENOME_CLAIM_BOUNDARY = (
     "expresses, secretes or how fast; no rate, kinetic constant or expression level is taken from the genome."
 )
 
+TIMECOURSE_TABLE = "timecourse.csv"
+# Measured observables of a time course and the case-template state role each one measures.
+TIMECOURSE_OBSERVABLES = ("substrate", "product")
+
 _REQUIRED_TABLES = ("strains.csv", "enzymes.csv", "substrates.csv", "conditions.csv", "kinetics.csv")
-_OPTIONAL_TABLES = ("enzyme_classes.csv", "responses.csv", GENOME_TABLE)
+_OPTIONAL_TABLES = ("enzyme_classes.csv", "responses.csv", GENOME_TABLE, TIMECOURSE_TABLE)
 _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "strains.csv": (("strain_id", "name"), ("scientific_name", "aliases")),
     "enzymes.csv": (("strain_id", "enzyme_class", "evidence", "source"), ()),
@@ -235,9 +288,25 @@ _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("method", "reference_tolerance", "kinetics_at_reference"),
     ),
     GENOME_TABLE: (("strain_id", "annotation_file", "annotation_tool", "source"), ("min_tools_agreeing",)),
+    TIMECOURSE_TABLE: (
+        (
+            "strain_id",
+            "enzyme_class",
+            "substrate_id",
+            "condition_id",
+            "observable",
+            "time",
+            "time_units",
+            "value",
+            "units",
+            "source",
+            "method",
+        ),
+        ("sd", "replicates"),
+    ),
 }
 _TABLES_WITH_ROWS_REQUIRED = ("strains.csv", "enzymes.csv", "substrates.csv", "conditions.csv")
-_MANIFEST_FIELDS = frozenset({"dataset_id", "contributor", "date", "source", "notes", "simulation"})
+_MANIFEST_FIELDS = frozenset({"dataset_id", "contributor", "date", "source", "notes", "simulation", "fit"})
 _SIMULATION_FIELDS = frozenset({"duration", "units", "points"})
 _USER_SUBSTRATE_FIELDS = ("name", "substrate_class", "physical_state", "bond_classes")
 
@@ -382,6 +451,85 @@ class UserDataError(ValueError):
 
 
 @dataclass(frozen=True)
+class TimecoursePoint:
+    """One observation of a user time course: one ``timecourse.csv`` row."""
+
+    row: int
+    time: float
+    value: float
+    sd: float | None
+    replicates: int | None
+    source: str
+    method: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "file": TIMECOURSE_TABLE,
+            "row": self.row,
+            "time": self.time,
+            "value": self.value,
+            "sd": self.sd,
+            "replicates": self.replicates,
+            "source": self.source,
+            "method": self.method,
+        }
+
+
+@dataclass(frozen=True)
+class UserTimecourse:
+    """The observations of one observable of one case, in one time unit and one value unit.
+
+    A case is one strain, enzyme class, substrate and condition; ``case_id``
+    is the generated identifier ``<dataset_id>__<strain>__<class>__<substrate>__<condition>``,
+    and ``fungus_id``, ``enzyme_class_id``, ``substrate_record_id`` and
+    ``environment_id`` are the generated (or referenced registry) record ids a
+    virtual experiment simulates. ``observable`` is ``substrate`` (substrate
+    remaining) or ``product`` (product formed since time zero). Points are
+    sorted by time. Time courses are observations, never registry records.
+    """
+
+    case_id: str
+    strain_id: str
+    class_key: str
+    substrate_id: str
+    condition_id: str
+    fungus_id: str
+    enzyme_class_id: str
+    substrate_record_id: str
+    environment_id: str
+    observable: str
+    time_units: str
+    units: str
+    points: tuple[TimecoursePoint, ...]
+
+    @property
+    def series_id(self) -> str:
+        return f"{self.case_id}__{self.observable}"
+
+    @property
+    def rows(self) -> tuple[int, ...]:
+        return tuple(point.row for point in self.points)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "case_id": self.case_id,
+            "series_id": self.series_id,
+            "strain_id": self.strain_id,
+            "enzyme_class": self.class_key,
+            "substrate_id": self.substrate_id,
+            "condition_id": self.condition_id,
+            "fungus_id": self.fungus_id,
+            "enzyme_class_id": self.enzyme_class_id,
+            "substrate_record_id": self.substrate_record_id,
+            "environment_id": self.environment_id,
+            "observable": self.observable,
+            "time_units": self.time_units,
+            "units": self.units,
+            "points": [point.to_dict() for point in self.points],
+        }
+
+
+@dataclass(frozen=True)
 class UserDataset:
     """A validated user dataset and the registry mappings generated from it.
 
@@ -400,6 +548,12 @@ class UserDataset:
     record (reported, never generated) and ``unmapped_families`` the families
     the CAZy family map assigns to no class. All four are empty without a
     ``genomes.csv``.
+
+    With a ``timecourse.csv``, ``timecourses`` maps each generated case id to
+    the case's ``UserTimecourse`` series (one per observable); it is empty
+    without one. Time courses are kept beside the records and never become
+    registry records. A dataset written by ``fit_user_dataset`` carries the
+    fit description under ``manifest["fit"]``.
     """
 
     dataset_id: str
@@ -413,6 +567,11 @@ class UserDataset:
     genome_resolved_classes: tuple[Mapping[str, Any], ...] = ()
     unmodellable_enzyme_classes: tuple[Mapping[str, Any], ...] = ()
     unmapped_families: tuple[Mapping[str, Any], ...] = ()
+    timecourses: Mapping[str, tuple[UserTimecourse, ...]] = field(default_factory=dict)
+    # The bytes of every input file (tables, manifest, annotation and fit-report files) by relative
+    # path, and the parsed rows; ``fit_user_dataset`` writes its copies of the dataset from them.
+    _raw_files: Mapping[str, bytes] = field(default_factory=dict, repr=False, compare=False)
+    _parsed: Any = field(default=None, repr=False, compare=False)
     _record_objects: Mapping[str, tuple[RegistryRecord, ...]] = field(
         default_factory=dict, repr=False, compare=False
     )
@@ -499,16 +658,20 @@ class UserDataset:
             "base_registry_id": self.base_registry_id,
             "records": {name: [_plain(mapping) for mapping in self.records.get(name, ())] for name in _RECORD_TYPES},
             **self._genome_lists(),
+            "timecourses": {
+                case_id: [item.to_dict() for item in series] for case_id, series in self.timecourses.items()
+            },
         }
 
     def summary(self) -> dict[str, Any]:
-        """Return the dataset id, digest, generated record counts and the genome-resolution lists."""
+        """Return the dataset id, digest, generated record counts, genome-resolution lists and time-course cases."""
 
         return {
             "dataset_id": self.dataset_id,
             "digest": self.digest,
             "record_counts": {name: len(self.records.get(name, ())) for name in _RECORD_TYPES},
             **self._genome_lists(),
+            "timecourse_case_ids": list(self.timecourses),
         }
 
     def _genome_lists(self) -> dict[str, list[Any]]:
@@ -559,6 +722,8 @@ def load_user_dataset(
         _cross_validate(parsed, context)
         # Annotation files are inputs like the tables: their bytes enter the digest.
         raw_files = {**raw_files, **parsed.annotation_files}
+        # So is the report of a fit, which the fitted rows' provenance cites.
+        raw_files = {**raw_files, **_validate_fit_block(parsed, manifest, directory=directory, context=context)}
     digest = _dataset_digest(raw_files)
     dataset_id = str(manifest.get("dataset_id", "")) if manifest else ""
     if issues or parsed is None or manifest is None:
@@ -585,6 +750,9 @@ def load_user_dataset(
         genome_resolved_classes=genome_report["genome_resolved_classes"],
         unmodellable_enzyme_classes=genome_report["unmodellable_enzyme_classes"],
         unmapped_families=genome_report["unmapped_families"],
+        timecourses=_timecourse_series(parsed, dataset_id=dataset_id),
+        _raw_files=MappingProxyType(dict(raw_files)),
+        _parsed=parsed,
         _record_objects=MappingProxyType({name: tuple(generated.objects[name]) for name in _RECORD_TYPES}),
         _base_references=MappingProxyType(dict(generated.base_references)),
         _origins=MappingProxyType(dict(generated.origins)),
@@ -794,6 +962,32 @@ class _Response:
         return (self.strain_id, self.class_key, self.substrate_id)
 
 
+@dataclass(frozen=True)
+class _TimecourseRow:
+    row: int
+    strain_id: str
+    class_key: str
+    substrate_id: str
+    condition_id: str
+    observable: str
+    time: float
+    time_units: str
+    value: float
+    units: str
+    sd: float | None
+    replicates: int | None
+    source: str
+    method: str
+
+    @property
+    def case_key(self) -> tuple[str, str, str, str]:
+        return (self.strain_id, self.class_key, self.substrate_id, self.condition_id)
+
+    @property
+    def series_key(self) -> tuple[str, str, str, str, str]:
+        return (*self.case_key, self.observable)
+
+
 @dataclass
 class _Parsed:
     strains: dict[str, _Strain]
@@ -803,6 +997,7 @@ class _Parsed:
     conditions: dict[str, _Condition]
     kinetics: list[_Kinetics]
     responses: list[_Response] = field(default_factory=list)
+    timecourses: list[_TimecourseRow] = field(default_factory=list)
     # (class, substrate) -> rate form, set by cross-validation; absent when no case started a form.
     pair_forms: dict[tuple[str, str], str] = field(default_factory=dict)
     # (strain, class, substrate) -> law -> parameter -> row, set by cross-validation for valid laws.
@@ -851,7 +1046,7 @@ def _read_dataset_files(directory: Path, issues: list[dict[str, Any]]) -> dict[s
                     None,
                     None,
                     f"Unsupported table {entry.name!r} in this version; supported tables are "
-                    f"{', '.join(sorted(known))}. Time-course data and other tables are not imported yet.",
+                    f"{', '.join(sorted(known))}. Other tables are not imported.",
                 )
             )
     if USER_DATASET_MANIFEST not in raw:
@@ -902,6 +1097,10 @@ def _parse_manifest(raw: bytes | None, issues: list[dict[str, Any]]) -> dict[str
     for key in ("contributor", "source", "notes"):
         if key in data and not _is_text(data[key]):
             issues.append(_issue(file, None, key, f"{key} must be nonblank text when given."))
+    if "fit" in data and not isinstance(data["fit"], Mapping):
+        issues.append(
+            _issue(file, None, "fit", "fit must be the mapping fit_user_dataset writes to describe a fit.")
+        )
     if "date" in data:
         value = data["date"]
         if isinstance(value, date) and not isinstance(value, datetime):
@@ -1051,6 +1250,22 @@ def _parse_rows(tables: Mapping[str, _Table | None], context: _Context, *, direc
             context=context,
         )
     )
+    timecourse_table = tables.get(TIMECOURSE_TABLE)
+    timecourses = (
+        []
+        if timecourse_table is None
+        else _parse_timecourses(
+            timecourse_table,
+            strains=strains,
+            classes=classes,
+            strain_classes=strain_classes,
+            substrates=substrates,
+            conditions=conditions,
+            kinetics=kinetics,
+            resolver=resolver,
+            context=context,
+        )
+    )
     return _Parsed(
         strains=strains,
         classes=classes,
@@ -1059,6 +1274,7 @@ def _parse_rows(tables: Mapping[str, _Table | None], context: _Context, *, direc
         conditions=conditions,
         kinetics=kinetics,
         responses=responses,
+        timecourses=timecourses,
         genomes=genomes.annotations,
         annotation_files=genomes.files,
         genome_rows=genomes.rows,
@@ -1813,6 +2029,24 @@ def _parse_kinetics(
         if evidence_type is not None and evidence_type not in EVIDENCE_TYPES:
             context.add(file, line, "evidence_type", f"evidence_type must be one of {', '.join(EVIDENCE_TYPES)}.")
             evidence_type = None
+        if evidence_type == FITTED_EVIDENCE_TYPE and quantity is not None:
+            if quantity not in FITTABLE_QUANTITIES:
+                context.add(
+                    file,
+                    line,
+                    "evidence_type",
+                    f"evidence_type {FITTED_EVIDENCE_TYPE!r} is written by fit_user_dataset for "
+                    f"{', '.join(FITTABLE_QUANTITIES)} only; {quantity} is not a fitted quantity.",
+                )
+                evidence_type = None
+            elif values is not None and values[0] is None:
+                context.add(
+                    file,
+                    line,
+                    "value",
+                    f"A {FITTED_EVIDENCE_TYPE!r} row holds the exact fitted value; a range is not a fit result.",
+                )
+                evidence_type = None
         method = row.get("method", "")
         if quantity == "vmax" and not method:
             context.add(
@@ -2016,6 +2250,458 @@ def _parse_responses(
             )
         )
     return rows
+
+
+def _parse_timecourses(
+    table: _Table,
+    *,
+    strains: Mapping[str, _Strain],
+    classes: dict[str, _EnzymeClassInfo],
+    strain_classes: Sequence[_StrainClass],
+    substrates: Mapping[str, _Substrate],
+    conditions: Mapping[str, _Condition],
+    kinetics: Sequence[_Kinetics],
+    resolver: RegistryResolver,
+    context: _Context,
+) -> list[_TimecourseRow]:
+    """Read timecourse.csv: substrate remaining or product formed over time in declared cases.
+
+    Every reference must be declared, and the enzyme class must be declared for
+    the strain and able to act on the substrate. Times are finite, zero or
+    positive, in a time unit; values are finite concentrations in amount per
+    volume, the kind of the case's state units (the mol/mol yield works on
+    amounts, so a mass concentration would need a molar mass). ``sd`` is
+    positive when given, in the row's units. One series (case and observable)
+    uses one time unit and one value unit and lists each time once.
+    """
+
+    file = table.name
+    declared = {(item.strain_id, item.class_key) for item in strain_classes}
+    case_rows: dict[tuple[str, str, str, str], _Kinetics] = {}
+    for kinetic in kinetics:
+        if kinetic.quantity in _CONCENTRATION_QUANTITIES:
+            case_rows.setdefault(kinetic.case_key, kinetic)
+    rows: list[_TimecourseRow] = []
+    for line, row in table.rows:
+        strain_id = _reference(row, "strain_id", strains, "strains.csv", file=file, line=line, context=context)
+        substrate_id = _reference(row, "substrate_id", substrates, "substrates.csv", file=file, line=line, context=context)
+        condition_id = _reference(row, "condition_id", conditions, "conditions.csv", file=file, line=line, context=context)
+        class_text = _required_text(row, "enzyme_class", file=file, line=line, context=context)
+        class_key = (
+            None
+            if class_text is None
+            else _resolve_class(class_text, classes=classes, resolver=resolver, file=file, line=line, context=context)
+        )
+        if strain_id is not None and class_key is not None and (strain_id, class_key) not in declared:
+            context.add(
+                file,
+                line,
+                "enzyme_class",
+                f"Strain {strain_id!r} does not declare enzyme class {class_key!r} in enzymes.csv or genomes.csv.",
+            )
+            class_key = None
+        if class_key is not None and substrate_id is not None and _shared_bonds(classes[class_key], substrates[substrate_id]) is None:
+            context.add(
+                file,
+                line,
+                "substrate_id",
+                f"Enzyme class {class_key!r} cannot act on substrate {substrate_id!r}, so no simulated case can "
+                "produce this time course.",
+            )
+            substrate_id = None
+        observable = _required_text(row, "observable", file=file, line=line, context=context)
+        if observable is not None and observable not in TIMECOURSE_OBSERVABLES:
+            context.add(
+                file,
+                line,
+                "observable",
+                f"observable must be one of {', '.join(TIMECOURSE_OBSERVABLES)} (substrate remaining or product "
+                "formed since time zero).",
+            )
+            observable = None
+        time = _required_number(row, "time", file=file, line=line, context=context)
+        if time is not None and time < 0.0:
+            context.add(file, line, "time", "time must be zero or positive; time zero is the start of the assay.")
+            time = None
+        time_units = _required_text(row, "time_units", file=file, line=line, context=context)
+        if time_units is not None and _unit_dimension_error(time_units, _TIME_REFERENCE_UNITS) is not None:
+            context.add(
+                file, line, "time_units", f"time_units {time_units!r} must be a time unit such as second, minute or hour."
+            )
+            time_units = None
+        value = _required_number(row, "value", file=file, line=line, context=context)
+        units = _required_text(row, "units", file=file, line=line, context=context)
+        if units is not None:
+            case_row = (
+                None
+                if strain_id is None or class_key is None or substrate_id is None or condition_id is None
+                else case_rows.get((strain_id, class_key, substrate_id, condition_id))
+            )
+            problem = _timecourse_units_problem(units, case_row)
+            if problem is not None:
+                context.add(file, line, "units", problem)
+                units = None
+        sd: float | None = None
+        sd_ok = True
+        sd_text = row.get("sd", "")
+        if sd_text:
+            sd = _number(sd_text)
+            if sd is None or sd <= 0.0:
+                context.add(
+                    file,
+                    line,
+                    "sd",
+                    "sd must be a finite positive standard deviation in the row's units when given; it weights the "
+                    "observation in a fit.",
+                )
+                sd_ok = False
+        replicates = _optional_positive_int(row, "replicates", file=file, line=line, context=context)
+        source = _required_text(row, "source", file=file, line=line, context=context)
+        method = _required_text(row, "method", file=file, line=line, context=context)
+        if (
+            strain_id is None
+            or class_key is None
+            or substrate_id is None
+            or condition_id is None
+            or observable is None
+            or time is None
+            or time_units is None
+            or value is None
+            or units is None
+            or not sd_ok
+            or replicates is False
+            or source is None
+            or method is None
+        ):
+            continue
+        rows.append(
+            _TimecourseRow(
+                row=line,
+                strain_id=strain_id,
+                class_key=class_key,
+                substrate_id=substrate_id,
+                condition_id=condition_id,
+                observable=observable,
+                time=time,
+                time_units=time_units,
+                value=value,
+                units=units,
+                sd=sd,
+                replicates=replicates if isinstance(replicates, int) and not isinstance(replicates, bool) else None,
+                source=source,
+                method=method,
+            )
+        )
+    by_series: dict[tuple[str, str, str, str, str], list[_TimecourseRow]] = {}
+    for item in rows:
+        by_series.setdefault(item.series_key, []).append(item)
+    for (strain_id, class_key, substrate_id, condition_id, observable), items in by_series.items():
+        where = (
+            f"{observable} of strain {strain_id!r}, class {class_key!r}, substrate {substrate_id!r}, "
+            f"condition {condition_id!r}"
+        )
+        first = items[0]
+        seen: dict[float, int] = {}
+        for item in items:
+            for column, value, expected in (
+                ("time_units", item.time_units, first.time_units),
+                ("units", item.units, first.units),
+            ):
+                if value != expected:
+                    context.add(
+                        file,
+                        item.row,
+                        column,
+                        f"Row {item.row} gives {where} in {column} {value!r} while row {first.row} uses "
+                        f"{expected!r}; one series uses one time unit and one value unit.",
+                    )
+            if item.time in seen:
+                context.add(
+                    file,
+                    item.row,
+                    "time",
+                    f"Rows {seen[item.time]} and {item.row} both give {where} at time {_number_text(item.time)} "
+                    f"{item.time_units}; give each time once per series (report replicates as their mean with sd "
+                    "and replicates).",
+                )
+            else:
+                seen[item.time] = item.row
+    return rows
+
+
+def _timecourse_units_problem(units: str, case_row: _Kinetics | None) -> str | None:
+    """Refuse time-course units that are not an amount per volume, the kind of the case's states."""
+
+    error = _unit_parse_error(units)
+    if error is not None:
+        return f"units {units!r} cannot be parsed: {error}"
+    kind = _concentration_kind(units)
+    case_text = (
+        ""
+        if case_row is None
+        else f" (the case states {case_row.quantity} in {case_row.units!r}, kinetics.csv row {case_row.row})"
+    )
+    if kind is None:
+        return (
+            f"units {units!r} are not a concentration. A time course measures substrate remaining or product "
+            f"formed as an amount per volume, the units of the case's states{case_text}, for example uM or mM."
+        )
+    if kind == "mass":
+        return (
+            f"units {units!r} are a mass concentration, but the case's states are amounts per volume{case_text} "
+            f"and the product yield is {_YIELD_BASIS}; comparing a mass concentration would need a molar mass, "
+            "which FungMod does not assume."
+        )
+    return None
+
+
+def _timecourse_series(parsed: _Parsed, *, dataset_id: str) -> Mapping[str, tuple[UserTimecourse, ...]]:
+    """Group time-course rows into series keyed by the generated case id, observables in a fixed order."""
+
+    grouped: dict[tuple[str, str, str, str, str], list[_TimecourseRow]] = {}
+    for item in parsed.timecourses:
+        grouped.setdefault(item.series_key, []).append(item)
+    by_case: dict[str, list[UserTimecourse]] = {}
+    for key, items in grouped.items():
+        strain_id, class_key, substrate_id, condition_id, observable = key
+        substrate = parsed.substrates[substrate_id]
+        ordered = sorted(items, key=lambda item: item.time)
+        case_id = "__".join((dataset_id, strain_id, class_key, substrate_id, condition_id))
+        by_case.setdefault(case_id, []).append(
+            UserTimecourse(
+                case_id=case_id,
+                strain_id=strain_id,
+                class_key=class_key,
+                substrate_id=substrate_id,
+                condition_id=condition_id,
+                fungus_id="__".join((dataset_id, strain_id)),
+                enzyme_class_id="__".join((dataset_id, class_key)),
+                substrate_record_id=substrate.registry_id or "__".join((dataset_id, substrate_id)),
+                environment_id="__".join((dataset_id, condition_id)),
+                observable=observable,
+                time_units=ordered[0].time_units,
+                units=ordered[0].units,
+                points=tuple(
+                    TimecoursePoint(
+                        row=item.row,
+                        time=item.time,
+                        value=item.value,
+                        sd=item.sd,
+                        replicates=item.replicates,
+                        source=item.source,
+                        method=item.method,
+                    )
+                    for item in ordered
+                ),
+            )
+        )
+    return MappingProxyType(
+        {
+            case_id: tuple(sorted(series, key=lambda item: TIMECOURSE_OBSERVABLES.index(item.observable)))
+            for case_id, series in by_case.items()
+        }
+    )
+
+
+def _validate_fit_block(
+    parsed: _Parsed,
+    manifest: Mapping[str, Any] | None,
+    *,
+    directory: Path,
+    context: _Context,
+) -> dict[str, bytes]:
+    """Check the manifest's fit block against the ``fitted`` kinetics rows; return the fit report's bytes.
+
+    A ``fitted`` row is accepted only when the manifest carries the block that
+    ``fit_user_dataset`` writes (method, objective, error model, input dataset
+    digest, data rows, bounds and identifiability per quantity) and the block
+    lists that row's case, condition, quantity, value and units; every listed
+    value must have its row. The fit report file named by the block must exist
+    beside the manifest with the recorded SHA-256; its bytes enter the dataset
+    digest.
+    """
+
+    fitted = [row for row in parsed.kinetics if row.evidence_type == FITTED_EVIDENCE_TYPE]
+    block = None if manifest is None else manifest.get("fit")
+    if not isinstance(block, Mapping):
+        if manifest is not None:
+            for row in fitted:
+                context.add(
+                    "kinetics.csv",
+                    row.row,
+                    "evidence_type",
+                    f"evidence_type {FITTED_EVIDENCE_TYPE!r} is reserved for rows written by fit_user_dataset; the "
+                    "manifest has no fit block describing the fit (method, objective, data rows, bounds and "
+                    "identifiability), so the value cannot be traced to a fit.",
+                )
+        return {}
+    file = USER_DATASET_MANIFEST
+    count = len(context.issues)
+
+    def add(column: str, message: str) -> None:
+        context.add(file, None, f"fit.{column}" if column else "fit", message)
+
+    keys = {str(key) for key in block}
+    unknown = sorted(keys.difference(_FIT_BLOCK_FIELDS))
+    if unknown:
+        add("", f"Unsupported fit field(s): {', '.join(unknown)}.")
+    missing = sorted(_FIT_BLOCK_FIELDS.difference(keys))
+    if missing:
+        add("", f"fit is missing {', '.join(missing)}; the block written by fit_user_dataset must stay complete.")
+        return {}
+    if block["kind"] != FIT_BLOCK_KIND:
+        add("kind", f"kind must be {FIT_BLOCK_KIND!r}.")
+    for key in ("method", "objective", "input_dataset_id", "claim_boundary"):
+        if not _is_text(block[key]):
+            add(key, f"{key} must be nonblank text.")
+    if block["error_model"] not in FIT_ERROR_MODELS:
+        add("error_model", f"error_model must be one of {', '.join(FIT_ERROR_MODELS)}.")
+    if not _is_sha256(block["input_dataset_digest"]):
+        add("input_dataset_digest", "input_dataset_digest must be the SHA-256 digest of the fitted input dataset.")
+    allow_unidentified = block["allow_unidentified"]
+    if not isinstance(allow_unidentified, bool):
+        add("allow_unidentified", "allow_unidentified must be true or false.")
+    case = block["case"]
+    case_key: tuple[str, str, str] | None = None
+    if (
+        not isinstance(case, Mapping)
+        or set(map(str, case)) != {"strain_id", "enzyme_class", "substrate_id"}
+        or not all(_is_text(case[key]) for key in ("strain_id", "enzyme_class", "substrate_id"))
+    ):
+        add("case", "case must name strain_id, enzyme_class and substrate_id.")
+    else:
+        case_key = (str(case["strain_id"]), str(case["enzyme_class"]), str(case["substrate_id"]))
+    conditions = block["conditions"]
+    if (
+        not isinstance(conditions, list)
+        or not conditions
+        or not all(isinstance(item, str) and item in parsed.conditions for item in conditions)
+    ):
+        add("conditions", "conditions must list the condition_ids of conditions.csv the fit used.")
+        conditions = []
+    timecourse_rows = block["timecourse_rows"]
+    known_rows = {item.row for item in parsed.timecourses}
+    if (
+        not isinstance(timecourse_rows, list)
+        or not timecourse_rows
+        or not all(isinstance(item, int) and not isinstance(item, bool) and item in known_rows for item in timecourse_rows)
+    ):
+        add("timecourse_rows", f"timecourse_rows must list the {TIMECOURSE_TABLE} rows the fit used.")
+    entries: dict[str, Mapping[str, Any]] = {}
+    quantities = block["quantities"]
+    if not isinstance(quantities, list) or not quantities:
+        add("quantities", "quantities must list each fitted quantity.")
+        quantities = []
+    for entry in quantities:
+        problem = _fit_entry_problem(entry, allow_unidentified=allow_unidentified is True)
+        if problem is not None:
+            add("quantities", problem)
+            continue
+        assert isinstance(entry, Mapping)
+        if entry["quantity"] in entries:
+            add("quantities", f"quantity {entry['quantity']!r} is listed twice.")
+            continue
+        entries[str(entry["quantity"])] = entry
+    report_bytes = _fit_report_bytes(block, directory=directory, add=add)
+    if len(context.issues) > count or case_key is None:
+        return {}
+    expected = {(condition, quantity): entry for condition in conditions for quantity, entry in entries.items()}
+    matched: set[tuple[str, str]] = set()
+    for row in fitted:
+        key = (row.condition_id, row.quantity)
+        entry = expected.get(key)
+        if (row.strain_id, row.class_key, row.substrate_id) != case_key or entry is None:
+            context.add(
+                "kinetics.csv",
+                row.row,
+                "evidence_type",
+                f"This {FITTED_EVIDENCE_TYPE!r} row ({row.quantity} at condition {row.condition_id!r}) is not "
+                "described by the manifest's fit block.",
+            )
+            continue
+        if row.value != float(entry["value"]) or row.units != entry["units"]:
+            context.add(
+                "kinetics.csv",
+                row.row,
+                "value",
+                f"This {FITTED_EVIDENCE_TYPE!r} row gives {row.quantity} = {row.value!r} {row.units} but the fit "
+                f"block records {entry['value']!r} {entry['units']}; a fitted value is not edited by hand.",
+            )
+        matched.add(key)
+    for condition, quantity in sorted(set(expected).difference(matched)):
+        add(
+            "quantities",
+            f"The fit block lists {quantity} at condition {condition!r} but kinetics.csv has no "
+            f"{FITTED_EVIDENCE_TYPE!r} row for it.",
+        )
+    return report_bytes
+
+
+def _fit_entry_problem(entry: Any, *, allow_unidentified: bool) -> str | None:
+    if not isinstance(entry, Mapping) or {str(key) for key in entry} != _FIT_QUANTITY_FIELDS:
+        return f"each quantities entry must give exactly {', '.join(sorted(_FIT_QUANTITY_FIELDS))}."
+    if entry["quantity"] not in FITTABLE_QUANTITIES:
+        return f"quantity must be one of {', '.join(FITTABLE_QUANTITIES)}."
+    for key in ("value", "initial"):
+        value = entry[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0.0:
+            return f"{entry['quantity']}: {key} must be a finite positive number."
+    if not _is_text(entry["units"]) or _quantity_units_error(str(entry["quantity"]), str(entry["units"])) is not None:
+        return f"{entry['quantity']}: units must be valid units for the quantity."
+    if not _is_number_pair(entry["bounds"], positive=True):
+        return f"{entry['quantity']}: bounds must be [lower, upper] with 0 < lower < upper."
+    if entry["interval"] is not None and not _is_number_pair(entry["interval"], positive=True):
+        return f"{entry['quantity']}: interval must be [lower, upper] or null."
+    if entry["identifiability"] not in FIT_IDENTIFIABILITY_CLASSES:
+        return f"{entry['quantity']}: identifiability must be one of {', '.join(FIT_IDENTIFIABILITY_CLASSES)}."
+    if not _is_text(entry["identifiability_method"]):
+        return f"{entry['quantity']}: identifiability_method must be nonblank text."
+    if entry["identifiability"] != FIT_IDENTIFIED and not allow_unidentified:
+        return (
+            f"{entry['quantity']} is {entry['identifiability']}, but allow_unidentified is false; fit_user_dataset "
+            "writes an unidentified value only when allow_unidentified is true."
+        )
+    return None
+
+
+def _fit_report_bytes(block: Mapping[str, Any], *, directory: Path, add: Any) -> dict[str, bytes]:
+    name = block["report_file"]
+    if (
+        not isinstance(name, str)
+        or not name
+        or "/" in name
+        or "\\" in name
+        or name in {USER_DATASET_MANIFEST, *_TABLE_COLUMNS}
+        or name.lower().endswith(".csv")
+    ):
+        add("report_file", "report_file must name the fit report file beside the manifest, such as fit_report.json.")
+        return {}
+    path = directory / name
+    if not path.is_file():
+        add("report_file", f"The fit report {name!r} named by the fit block is missing from the dataset directory.")
+        return {}
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != block["report_sha256"]:
+        add(
+            "report_sha256",
+            f"The fit report {name!r} does not match report_sha256; the report and the fitted rows must stay as "
+            "fit_user_dataset wrote them.",
+        )
+        return {}
+    return {name: data}
+
+
+def _is_sha256(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdef" for char in value)
+
+
+def _is_number_pair(value: Any, *, positive: bool) -> bool:
+    if not isinstance(value, list) or len(value) != 2:
+        return False
+    if any(isinstance(item, bool) or not isinstance(item, (int, float)) or not math.isfinite(item) for item in value):
+        return False
+    lower, upper = float(value[0]), float(value[1])
+    return lower < upper and (lower > 0.0 or not positive)
 
 
 def _response_value_problem(value: float, units: str, spec: ResponseLawParameter) -> str | None:
@@ -3326,6 +4012,9 @@ def _parameter_mapping(
         value["lower"] = row.lower
         value["upper"] = row.upper
     extra: dict[str, Any] = {} if route is None else {"vmax_route": dict(route)}
+    fit = _fit_provenance(namespace.manifest.get("fit"), row) if row.evidence_type == FITTED_EVIDENCE_TYPE else None
+    if fit is not None:
+        extra["fit"] = fit
     provenance: dict[str, Any] = {
         "source": row.source,
         "confidence_level": confidence,
@@ -3345,7 +4034,23 @@ def _parameter_mapping(
     }
     if row.evidence_type == "estimate":
         provenance["exploratory_prior"] = True
-    if route is None:
+    if fit is not None:
+        verdict = fit.get("identifiability")
+        name = (
+            f"Fitted {_QUANTITY_LABEL[quantity]} for {info.name} from {strain.name} on {substrate.name} at "
+            f"{condition.condition_id} ({namespace.dataset_id})"
+        )
+        notes = (
+            f"{row.quantity} fitted by fit_user_dataset to the time courses of dataset {fit.get('input_dataset_id')} "
+            f"(kinetics.csv row {row.row}); evidence type {row.evidence_type}; identifiability {verdict}"
+            f" ({fit.get('identifiability_method')}). {_FITTED_SCIENTIFIC_BOUNDARY}"
+        )
+        if verdict != FIT_IDENTIFIED:
+            notes = (
+                f"NOT IDENTIFIED by the time courses ({verdict}); written only because the fit ran with "
+                f"allow_unidentified=True. {notes}"
+            )
+    elif route is None:
         name = (
             f"{_QUANTITY_LABEL[quantity]} for {info.name} from {strain.name} on {substrate.name} at "
             f"{condition.condition_id} ({namespace.dataset_id})"
@@ -3388,9 +4093,48 @@ def _parameter_mapping(
 def _allowed_use(evidence_type: str, *, exact: bool) -> str:
     if evidence_type == "estimate":
         return PARAMETER_ALLOWED_USE_EXPLORATORY
+    if evidence_type == FITTED_EVIDENCE_TYPE:
+        # In-sample fits are not independent evidence; there is no relabelling route to scientific use.
+        return PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING
     if exact:
         return PARAMETER_ALLOWED_USE_SCIENTIFIC
     return PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING
+
+
+def _fit_provenance(block: Any, row: _Kinetics) -> dict[str, Any]:
+    """The fit description a fitted record carries: method, objective, data rows, bounds and identifiability."""
+
+    if not isinstance(block, Mapping):
+        return {}
+    entry = next(
+        (
+            item
+            for item in block.get("quantities", [])
+            if isinstance(item, Mapping) and item.get("quantity") == row.quantity
+        ),
+        {},
+    )
+    return {
+        "method": block.get("method"),
+        "objective": block.get("objective"),
+        "error_model": block.get("error_model"),
+        "input_dataset_id": block.get("input_dataset_id"),
+        "input_dataset_digest": block.get("input_dataset_digest"),
+        "report_file": block.get("report_file"),
+        "report_sha256": block.get("report_sha256"),
+        "conditions": _plain(block.get("conditions", [])),
+        "timecourse_file": TIMECOURSE_TABLE,
+        "timecourse_rows": _plain(block.get("timecourse_rows", [])),
+        "units": entry.get("units"),
+        "bounds": _plain(entry.get("bounds")),
+        "initial": entry.get("initial"),
+        "identifiability": entry.get("identifiability"),
+        "identifiability_method": entry.get("identifiability_method"),
+        "interval": _plain(entry.get("interval")),
+        "allow_unidentified": block.get("allow_unidentified"),
+        "claim_boundary": block.get("claim_boundary"),
+        "scientific_mode": _FITTED_SCIENTIFIC_BOUNDARY,
+    }
 
 
 def _confidence(evidence_type: str) -> str:
@@ -4148,6 +4892,65 @@ def _registry_clash(resolver: RegistryResolver, record_type: str, term: str) -> 
 
 
 # ---------------------------------------------------------------------------
+# Dataset copies
+
+
+def _dataset_files_with_kinetics(
+    dataset: UserDataset,
+    *,
+    drop_rows: Sequence[int],
+    new_rows: Sequence[Mapping[str, str]],
+    manifest: Mapping[str, Any],
+    extra_files: Mapping[str, bytes] | None = None,
+) -> dict[str, bytes]:
+    """Return a copy of a dataset's input files with kinetics rows replaced and a new manifest.
+
+    ``drop_rows`` are kinetics.csv spreadsheet lines left out; ``new_rows`` are
+    appended (missing cells are blank, and their columns are added to the
+    header when the input lacks them). Every other file, annotation files
+    included, is copied byte for byte.
+    """
+
+    files = dict(dataset._raw_files)
+    text = files["kinetics.csv"].decode("utf-8-sig")
+    reader = csv.reader(io.StringIO(text, newline=""))
+    header = [cell.strip() for cell in next(reader)]
+    columns = [*header, *(column for row in new_rows for column in row if column not in header)]
+    columns = list(dict.fromkeys(columns))
+    dropped = set(drop_rows)
+    output = io.StringIO()
+    writer = csv.writer(output, lineterminator="\n")
+    writer.writerow(columns)
+    for cells in reader:
+        line = reader.line_num
+        if not any(cell.strip() for cell in cells) or line in dropped:
+            continue
+        values = {column: (cells[index].strip() if index < len(cells) else "") for index, column in enumerate(header)}
+        writer.writerow([values.get(column, "") for column in columns])
+    for row in new_rows:
+        writer.writerow([row.get(column, "") for column in columns])
+    files["kinetics.csv"] = output.getvalue().encode("utf-8")
+    files[USER_DATASET_MANIFEST] = yaml.safe_dump(_plain(manifest), sort_keys=False, allow_unicode=True).encode("utf-8")
+    files.update(extra_files or {})
+    return files
+
+
+def _write_dataset_files(files: Mapping[str, bytes], directory: Path) -> None:
+    """Write dataset files (relative paths, ``/``-separated) into ``directory``, which must be new or empty."""
+
+    if directory.exists() and (not directory.is_dir() or any(directory.iterdir())):
+        raise UserDataError(
+            f"Refusing to write a user dataset into {str(directory)!r}: the path exists and is not an empty directory.",
+            issues=[_issue(str(directory), None, None, "Choose a new or empty directory; nothing is overwritten.")],
+        )
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, data in sorted(files.items()):
+        path = directory / PurePosixPath(name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+
+# ---------------------------------------------------------------------------
 # Cell helpers
 
 
@@ -4328,6 +5131,13 @@ def _objects_of(
 
 __all__ = [
     "EVIDENCE_TYPES",
+    "FITTABLE_QUANTITIES",
+    "FITTED_EVIDENCE_TYPE",
+    "FIT_BLOCK_KIND",
+    "FIT_ERROR_MODELS",
+    "FIT_IDENTIFIABILITY_CLASSES",
+    "FIT_IDENTIFIED",
+    "FIT_NOT_IDENTIFIED",
     "GENOME_ANNOTATION_TOOLS",
     "GENOME_TABLE",
     "KINETIC_QUANTITIES",
@@ -4337,9 +5147,13 @@ __all__ = [
     "RESPONSE_LAWS",
     "ResponseLaw",
     "ResponseLawParameter",
+    "TIMECOURSE_OBSERVABLES",
+    "TIMECOURSE_TABLE",
+    "TimecoursePoint",
     "USER_DATASET_MANIFEST",
     "USER_DATASET_MATURITY_DESIGN",
     "USER_DATASET_MATURITY_ESTIMATE",
+    "USER_DATASET_MATURITY_FITTED",
     "USER_DATASET_MATURITY_GAP",
     "USER_DATASET_MATURITY_LITERATURE",
     "USER_DATASET_MATURITY_MEASURED",
@@ -4349,6 +5163,7 @@ __all__ = [
     "USER_DATASET_SCHEMA_VERSION",
     "UserDataError",
     "UserDataset",
+    "UserTimecourse",
     "VMAX_ROUTES",
     "load_user_dataset",
 ]
