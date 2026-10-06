@@ -271,17 +271,21 @@ class MyceliumResult:
     def ndim(self) -> int:
         return self.grid.ndim
 
+    @property
+    def measure_dimension(self) -> int:
+        return self.grid.measure_dimension
+
     def field_at_final_time(self, name: str) -> Quantity:
         values = self.fields[name]
         return Q_(np.asarray(values.magnitude)[-1], values.units)
 
     def spatial_integral(self, name: str) -> Quantity:
-        """Integral of the field over the grid at every output time (units times metre to the dimension)."""
+        """Integral of the field over the grid at every output time (units times metre to the measure dimension)."""
 
         values = self.fields[name]
         magnitudes = np.asarray(values.magnitude, dtype=float)
         integrals = np.array([spatial_integral(magnitudes[step], grid=self.grid) for step in range(magnitudes.shape[0])])
-        return Q_(integrals, f"({values.units}) * meter ** {self.ndim}")
+        return Q_(integrals, f"({values.units}) * meter ** {self.measure_dimension}")
 
     def occupied_measure(self, name: str, threshold: Quantity) -> Quantity:
         """Length, area or volume where the field is at or above ``threshold``, at every output time."""
@@ -289,8 +293,9 @@ class MyceliumResult:
         values = self.fields[name]
         level = float(assert_compatible(require_quantity(threshold, name="threshold"), str(values.units), name="threshold").magnitude)
         magnitudes = np.asarray(values.magnitude, dtype=float)
-        counts = (magnitudes >= level).reshape(magnitudes.shape[0], -1).sum(axis=1)
-        return Q_(counts * self.grid.cell_measure, f"meter ** {self.ndim}")
+        measures = self.grid.cell_measures.reshape(-1)
+        occupied = ((magnitudes >= level).reshape(magnitudes.shape[0], -1) * measures).sum(axis=1)
+        return Q_(occupied, f"meter ** {self.measure_dimension}")
 
     def front_position(self, name: str, threshold: Quantity, *, axis: int = 0) -> Quantity:
         """Largest coordinate along ``axis`` where the field (maximised over the other axes) reaches ``threshold``.

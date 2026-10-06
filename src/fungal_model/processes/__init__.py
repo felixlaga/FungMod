@@ -69,6 +69,7 @@ from .physiology import (
 from .rate_modifiers import (
     RateModifierProcess,
     cardinal_ph_modifier_from_config,
+    cardinal_water_activity_modifier_from_config,
     cardinal_temperature_modifier_from_config,
     competitive_inhibition_modifier_from_config,
     coupled_substrate_product_inhibition_modifier_from_config,
@@ -153,6 +154,7 @@ __all__ = [
     "ProportionalSynthesisProcess",
     "RateModifierProcess",
     "cardinal_ph_modifier_from_config",
+    "cardinal_water_activity_modifier_from_config",
     "cardinal_temperature_modifier_from_config",
     "competitive_inhibition_modifier_from_config",
     "coupled_substrate_product_inhibition_modifier_from_config",

@@ -295,3 +295,79 @@ def test_result_api_reports_integrals_extent_front_and_summary() -> None:
     assert summary["solver_metadata"]["jacobian_structure"] == "backend_default" and summary["steps"] == 3
     assert {assumption for assumption in summary["assumptions"]} == {"tip_extension_lays_down_hyphae", "dichotomous_branching_proportional_to_tips"}
     assert any("Exploratory" in limitation for limitation in result.limitations)
+
+
+# ---------------------------------------------------------------------------
+# Axisymmetric geometry
+# ---------------------------------------------------------------------------
+
+
+def _radial(radius_mm: float, cells: int) -> SpatialGrid:
+    return SpatialGrid.axisymmetric(artificial_parameter("R", radius_mm, "millimeter"), cells)
+
+
+def test_axisymmetric_grid_has_annular_cells_and_refuses_other_shapes() -> None:
+    grid = _radial(4.0, 8)
+    width = 4e-3 / 8
+    radii = (np.arange(8) + 0.5) * width
+    assert grid.geometry == "axisymmetric" and grid.ndim == 1 and grid.measure_dimension == 2
+    assert np.allclose(grid.cell_measures, 2.0 * np.pi * radii * width)
+    assert grid.total_measure == pytest.approx(np.pi * (4e-3) ** 2)
+    lower, upper = grid.face_weights(0)
+    assert lower[0] == 0.0  # the axis carries no flux
+    assert np.allclose(upper * radii * width, radii + 0.5 * width)
+    assert grid.to_dict()["geometry"] == "axisymmetric" and grid.to_dict()["measure_dimension"] == 2
+    with pytest.raises(ValueError, match="single cell measure"):
+        _ = grid.cell_measure
+    with pytest.raises(ValueError, match="one axis"):
+        SpatialGrid((artificial_parameter("a", 1.0, "millimeter"),) * 2, (4, 4), (BoundaryConditions1D.no_flux(),) * 2, geometry="axisymmetric")
+    with pytest.raises(ValueError, match="no_flux"):
+        SpatialGrid((artificial_parameter("a", 1.0, "millimeter"),), (4,), (BoundaryConditions1D.periodic(),), geometry="axisymmetric")
+    with pytest.raises(ValueError, match="geometries"):
+        SpatialGrid((artificial_parameter("a", 1.0, "millimeter"),), (4,), (BoundaryConditions1D.no_flux(),), geometry="spherical")
+
+
+def test_axisymmetric_diffusion_conserves_the_integral_and_matches_the_radial_gaussian() -> None:
+    """On the radial grid ``D laplacian`` is ``(1/r) d/dr (r D du/dr)``; the planar Gaussian is its exact solution."""
+
+    grid = _radial(10.0, 400)
+    radii = grid.coordinates[0]
+    diffusivity = 1e-7  # m^2 / s
+    t0 = 20.0
+    initial = np.exp(-(radii**2) / (4.0 * diffusivity * t0)) / (4.0 * np.pi * diffusivity * t0)
+    tendency = diffusive_tendency(initial, grid=grid, diffusivity=diffusivity)
+    assert spatial_integral(tendency, grid=grid) == pytest.approx(0.0, abs=1e-9 * abs(tendency).max() * grid.total_measure)
+    exact = (initial * (radii**2 / (4.0 * diffusivity * t0**2) - 1.0 / t0))
+    inner = radii < 4e-3  # away from the no-flux outer wall, where the Gaussian is already tiny
+    assert np.max(np.abs(tendency[inner] - exact[inner])) < 2e-3 * np.max(np.abs(exact))
+    # The divergence with the grid agrees with the cartesian form only on a cartesian grid.
+    line = _grid((400,), side_mm=10.0)
+    flux = -diffusivity * face_gradient(initial, axis=0, cell_width=line.cell_widths[0], periodic=False)
+    assert np.allclose(divergence([flux], grid=line), divergence([flux], cell_widths=line.cell_widths))
+    with pytest.raises(ValueError, match="exactly one"):
+        divergence([flux], grid=line, cell_widths=line.cell_widths)
+
+
+def test_axisymmetric_model_integrals_carry_area_units() -> None:
+    grid = _radial(2.0, 20)
+    model = MyceliumModel(
+        grid=grid,
+        fields=(FieldSpec("tips", TIP_UNITS, "tip density", "tips"),),
+        processes=(FieldDiffusion(name="spread", field="tips", field_units=TIP_UNITS, diffusivity_symbol="D"),),
+        parameters=ParameterSet([artificial_parameter("D", 0.01, "millimeter ** 2 / hour")]),
+        time_units="hour",
+    )
+    compiled = model.compile()
+    inside = grid.coordinates[0] < 0.5e-3
+    result = compiled.simulate(
+        initial_fields={"tips": Q_(np.where(inside, 1.0, 0.0), TIP_UNITS)},
+        t_span=(Q_(0.0, "hour"), Q_(2.0, "hour")),
+        t_eval=Q_(np.linspace(0.0, 2.0, 5), "hour"),
+        solver_settings=SolverSettings(method="LSODA", rtol=1e-8, atol=1e-12),
+        record_rates=False,
+    )
+    totals = result.spatial_integral("tips").to("dimensionless").magnitude
+    assert totals[0] == pytest.approx(np.pi * (0.5) ** 2, rel=0.05)  # a count: density per mm^2 times mm^2
+    assert np.allclose(totals, totals[0], rtol=1e-6)
+    occupied = result.occupied_measure("tips", Q_(1e-3, TIP_UNITS)).to("millimeter ** 2").magnitude
+    assert occupied[-1] > occupied[0] and result.measure_dimension == 2

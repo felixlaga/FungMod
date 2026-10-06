@@ -13,6 +13,8 @@ from .cardinal import (
     cardinal_ph_assumption,
     cardinal_temperature_activity,
     cardinal_temperature_assumption,
+    cardinal_water_activity_activity,
+    cardinal_water_activity_assumption,
 )
 from .inactivation import (
     arrhenius_inactivation_rate_constant,
@@ -60,6 +62,8 @@ __all__ = [
     "cardinal_ph_assumption",
     "cardinal_temperature_activity",
     "cardinal_temperature_assumption",
+    "cardinal_water_activity_activity",
+    "cardinal_water_activity_assumption",
     "diprotic_ionization_factor",
     "enzyme_explicit_michaelis_menten_rate",
     "gaussian_ph_activity",

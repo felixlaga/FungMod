@@ -53,8 +53,9 @@ def artificial_colony_model(
     side_mm: float = 10.0,
     cells: int = 40,
     overrides: Mapping[str, float] | None = None,
+    geometry: str = "cartesian",
 ) -> MyceliumModel:
-    """A two-dimensional colony with every continuum process on abstract fields.
+    """A colony with every continuum process on abstract fields.
 
     Fields: tips (per area), hyphae (length per area), internal and external
     substrate (mass per area). The extension speed saturates in the internal
@@ -62,6 +63,11 @@ def artificial_colony_model(
     away from dense hyphae; lateral branching needs internal substrate;
     anastomosis and tip death remove tips; hyphae take up external substrate
     where they are; internal substrate diffuses and is carried towards tips.
+
+    ``geometry="cartesian"`` builds the square ``side_mm`` window with
+    ``cells`` cells per axis; ``geometry="axisymmetric"`` builds the radial
+    grid out to the half-diagonal of that window with ``cells`` cells, the
+    same physics on a colony with circular symmetry.
     """
 
     values = {
@@ -91,10 +97,13 @@ def artificial_colony_model(
         "Di": "millimeter ** 2 / hour",
         "Da": "millimeter ** 4 / hour",
     }
-    grid = SpatialGrid.no_flux(
-        (artificial_parameter("L_x", side_mm, "millimeter"), artificial_parameter("L_y", side_mm, "millimeter")),
-        (cells, cells),
-    )
+    if geometry == "axisymmetric":
+        grid = SpatialGrid.axisymmetric(artificial_parameter("R", side_mm / np.sqrt(2.0), "millimeter"), cells)
+    else:
+        grid = SpatialGrid.no_flux(
+            (artificial_parameter("L_x", side_mm, "millimeter"), artificial_parameter("L_y", side_mm, "millimeter")),
+            (cells, cells),
+        )
     fields = (
         FieldSpec("tips", TIP_UNITS, "hyphal tip density", "tips"),
         FieldSpec("hyphae", HYPHA_UNITS, "active hyphal length density", "hyphae"),
@@ -131,11 +140,18 @@ def artificial_colony_model(
 
 
 def central_inoculum(grid: SpatialGrid, *, radius_mm: float = 0.7, external_mass_per_area: float = 3.0) -> dict[str, Quantity]:
-    """Initial fields: tips, hyphae and internal substrate inside a central disc, external substrate everywhere."""
+    """Initial fields: tips, hyphae and internal substrate inside a central disc, external substrate everywhere.
 
-    axes = np.meshgrid(*[axis * 1e3 for axis in grid.coordinates], indexing="ij")
-    centre = [0.5 * float(length.quantity.to("millimeter").magnitude) for length in grid.axis_lengths if length.quantity is not None]
-    squared = sum((axis - origin) ** 2 for axis, origin in zip(axes, centre, strict=True))
+    The disc is centred on the window of a cartesian grid and on the axis of
+    an axisymmetric one.
+    """
+
+    if grid.geometry == "axisymmetric":
+        squared = (grid.coordinates[0] * 1e3) ** 2
+    else:
+        axes = np.meshgrid(*[axis * 1e3 for axis in grid.coordinates], indexing="ij")
+        centre = [0.5 * float(length.quantity.to("millimeter").magnitude) for length in grid.axis_lengths if length.quantity is not None]
+        squared = sum((axis - origin) ** 2 for axis, origin in zip(axes, centre, strict=True))
     inside = squared < radius_mm**2
     return {
         "tips": Q_(np.where(inside, 1.0, 0.0), TIP_UNITS),

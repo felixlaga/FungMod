@@ -14,6 +14,7 @@ from fungal_model.core.units import Quantity
 from fungal_model.modifiers import (
     CardinalPHModifier,
     CardinalTemperatureModifier,
+    CardinalWaterActivityModifier,
     CompetitiveInhibitionModifier,
     CoupledSubstrateProductInhibitionModifier,
     OxygenModifier,
@@ -534,6 +535,33 @@ def oxygen_modifier_from_config(modifier_config: Mapping[str, Any]) -> OxygenMod
     )
 
 
+def cardinal_water_activity_modifier_from_config(
+    modifier_config: Mapping[str, Any],
+) -> CardinalWaterActivityModifier:
+    """Build a Rosso and Robinson cardinal water-activity modifier from explicit config fields."""
+
+    modifier_type = "water_activity_cardinal_rosso_robinson"
+    return CardinalWaterActivityModifier(
+        minimum_water_activity_symbol=_required_symbol(
+            modifier_config,
+            "minimum_water_activity_symbol",
+            "minimum_water_activity",
+            field_name="minimum_water_activity_symbol",
+            modifier_type=modifier_type,
+        ),
+        optimum_water_activity_symbol=_required_symbol(
+            modifier_config,
+            "optimum_water_activity_symbol",
+            "optimum_water_activity",
+            field_name="optimum_water_activity_symbol",
+            modifier_type=modifier_type,
+        ),
+        source=_modifier_source(
+            modifier_config, "Explicit configured Rosso and Robinson cardinal water-activity modifier."
+        ),
+    )
+
+
 def water_activity_modifier_from_config(modifier_config: Mapping[str, Any]) -> WaterActivityModifier:
     """Build a binary water-activity threshold modifier from explicit config fields."""
 
@@ -1010,5 +1038,6 @@ __all__ = [
     "substrate_reactivity_modifier_from_config",
     "substrate_inhibition_modifier_from_config",
     "temperature_modifier_from_config",
+    "cardinal_water_activity_modifier_from_config",
     "water_activity_modifier_from_config",
 ]

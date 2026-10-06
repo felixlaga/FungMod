@@ -262,3 +262,66 @@ def test_cardinal_modifier_configs_require_all_three_cardinal_symbols() -> None:
         cardinal_ph_modifier_from_config(
             {"type": "ph_cardinal_rosso", "minimum_ph_symbol": "pH_min", "optimum_ph_symbol": "pH_opt"}
         )
+
+
+# ---------------------------------------------------------------------------
+# Cardinal water activity (Rosso and Robinson 2001)
+# ---------------------------------------------------------------------------
+
+
+def test_cardinal_water_activity_is_the_ctmi_shape_with_the_maximum_fixed_at_one() -> None:
+    from fungal_model.kinetics import cardinal_water_activity_activity
+
+    values = np.array([0.5, 0.8, 0.85, 0.9, 0.95, 0.97, 1.0])
+    activity = cardinal_water_activity_activity(
+        water_activity=Q_(values, "dimensionless"),
+        minimum_water_activity=Q_(0.8, "dimensionless"),
+        optimum_water_activity=Q_(0.97, "dimensionless"),
+        source=SOURCE,
+    )
+    np.testing.assert_allclose(activity.magnitude, _ctmi(values, 0.8, 0.97, 1.0), rtol=1e-12)
+    assert activity.magnitude[5] == pytest.approx(1.0)
+    assert activity.magnitude[[0, 1, 6]].tolist() == [0.0, 0.0, 0.0]
+    assert np.all(np.diff(activity.magnitude[1:6]) > 0.0)
+    kwargs = {"water_activity": Q_(0.9, "dimensionless"), "source": SOURCE}
+    with pytest.raises(ValueError, match="minimum < optimum < 1"):
+        cardinal_water_activity_activity(minimum_water_activity=Q_(0.97, "dimensionless"), optimum_water_activity=Q_(0.9, "dimensionless"), **kwargs)
+    with pytest.raises(ValueError, match="minimum < optimum < 1"):
+        cardinal_water_activity_activity(minimum_water_activity=Q_(0.8, "dimensionless"), optimum_water_activity=Q_(1.0, "dimensionless"), **kwargs)
+    with pytest.raises(ValueError, match="midpoint"):
+        cardinal_water_activity_activity(minimum_water_activity=Q_(0.6, "dimensionless"), optimum_water_activity=Q_(0.7, "dimensionless"), **kwargs)
+    with pytest.raises(ValueError, match="between zero and one"):
+        cardinal_water_activity_activity(water_activity=Q_(1.2, "dimensionless"), minimum_water_activity=Q_(0.8, "dimensionless"), optimum_water_activity=Q_(0.97, "dimensionless"), source=SOURCE)
+    with pytest.raises(ValueError, match="source"):
+        cardinal_water_activity_activity(minimum_water_activity=Q_(0.8, "dimensionless"), optimum_water_activity=Q_(0.97, "dimensionless"), water_activity=Q_(0.9, "dimensionless"), source=" ")
+
+
+def test_cardinal_water_activity_modifier_reads_the_environment_folds_and_builds_from_config() -> None:
+    from fungal_model.modifiers import CardinalWaterActivityModifier
+    from fungal_model.processes import cardinal_water_activity_modifier_from_config
+    from fungal_model.screening.template_environment_modifiers import ENVIRONMENT_MODIFIER_CONDITIONS
+
+    parameters = ParameterSet(
+        [_parameter("aw_min", 0.8, "dimensionless"), _parameter("aw_opt", 0.97, "dimensionless")]
+    )
+    environment = Environment(name="e", water_activity=Q_(0.9, "dimensionless"), source="test")
+    modifier = CardinalWaterActivityModifier("aw_min", "aw_opt", SOURCE)
+    expected = float(_ctmi(0.9, 0.8, 0.97, 1.0))
+    assert modifier.activity(parameters=parameters, environment=environment).magnitude == pytest.approx(expected)
+    scaled = modifier.scale(rate=Q_(2.0, "mole / second"), parameters=parameters, environment=environment)
+    assert scaled.to("mole / second").magnitude == pytest.approx(2.0 * expected)
+    context = KernelContext(
+        state_index={"A": 0}, state_units={"A": "millimolar"}, time_units="second", parameters=parameters, environment=environment
+    )
+    kernel = modifier.compile_activity(context)
+    assert kernel is not None and kernel(0.0, np.zeros(1)) == pytest.approx(expected)
+    assert modifier.to_dict()["type"] == "water_activity_cardinal_rosso_robinson"
+    assert {assumption.name for assumption in modifier.assumptions} == {"Rosso and Robinson cardinal water-activity model"}
+    assert "Rosso, Robinson (2001)" in modifier.assumptions[0].source
+    built = cardinal_water_activity_modifier_from_config(
+        {"type": "water_activity_cardinal_rosso_robinson", "minimum_water_activity_symbol": "aw_min", "optimum_water_activity_symbol": "aw_opt", "source": SOURCE}
+    )
+    assert built.minimum_water_activity_symbol == "aw_min" and built.optimum_water_activity_symbol == "aw_opt"
+    with pytest.raises(ValueError, match="optimum_water_activity_symbol"):
+        cardinal_water_activity_modifier_from_config({"type": "water_activity_cardinal_rosso_robinson", "minimum_water_activity_symbol": "aw_min"})
+    assert ENVIRONMENT_MODIFIER_CONDITIONS["water_activity_cardinal_rosso_robinson"] == "water_activity"

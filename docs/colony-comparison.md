@@ -11,8 +11,11 @@ conditions. The test is declared before anything is run, in
 a change to the plan is impossible without a dated amendment inside the
 file and a new digest in the test and the ledger.
 
-**Status:** plan frozen on 2026-10-06. The software the plan needs (stage 0)
-is not built yet and no fit has been run. Nothing on this page is a result.
+**Status:** plan frozen on 2026-10-06. Of the stage 0 software, the
+axisymmetric grid, the observation operators and the cardinal water-activity
+law exist (SPATIAL-002); the error-model fit, the study runner and the
+recorded stage 0 checks do not, and no fit has been run. Nothing on this page
+is a result.
 
 ## The question
 

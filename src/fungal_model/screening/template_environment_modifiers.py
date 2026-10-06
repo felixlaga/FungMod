@@ -23,6 +23,7 @@ ENVIRONMENT_MODIFIER_CONDITIONS: Mapping[str, str] = {
     "ph_cardinal_rosso": "ph",
     "oxygen_monod": "oxygen_concentration",
     "water_activity_threshold": "water_activity",
+    "water_activity_cardinal_rosso_robinson": "water_activity",
 }
 ENVIRONMENT_MODIFIER_TYPES = frozenset(ENVIRONMENT_MODIFIER_CONDITIONS)
 
@@ -155,6 +156,16 @@ def build_template_environment_modifier(
                 role_field="half_saturation_role", **role_arguments
             ),
             "oxygen_units": oxygen_units,
+        }
+    if modifier_type == "water_activity_cardinal_rosso_robinson":
+        return {
+            "type": modifier_type,
+            "minimum_water_activity_symbol": _required_modifier_role_symbol(
+                role_field="minimum_water_activity_role", **role_arguments
+            ),
+            "optimum_water_activity_symbol": _required_modifier_role_symbol(
+                role_field="optimum_water_activity_role", **role_arguments
+            ),
         }
     return {
         "type": modifier_type,

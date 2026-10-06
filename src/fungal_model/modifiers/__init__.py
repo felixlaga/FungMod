@@ -6,6 +6,7 @@ from .cardinal import (
     CARDINAL_TEMPERATURE_MODIFIER_TYPE,
     CardinalPHModifier,
     CardinalTemperatureModifier,
+    CardinalWaterActivityModifier,
 )
 from .enzyme_inhibition import (
     CompetitiveInhibitionModifier,
@@ -28,6 +29,7 @@ __all__ = [
     "CARDINAL_TEMPERATURE_MODIFIER_TYPE",
     "CardinalPHModifier",
     "CardinalTemperatureModifier",
+    "CardinalWaterActivityModifier",
     "EnvironmentalModifier",
     "CompetitiveInhibitionModifier",
     "CoupledSubstrateProductInhibitionModifier",

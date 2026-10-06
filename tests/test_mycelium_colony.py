@@ -138,3 +138,36 @@ def test_translocation_conserves_substrate_and_the_active_term_carries_it_toward
         assert final.min() >= -1e-12
     assert outputs[False] > float(np.sum(substrate * x) / np.sum(substrate))  # diffusion spreads it to the right
     assert outputs[True] > outputs[False] + 1.0  # the active term carries it up the tip gradient (0.2 mm/h for 20 h)
+
+
+def test_axisymmetric_colony_agrees_with_the_cartesian_colony_on_the_window_observables() -> None:
+    """The same physics on the radial grid reproduces the two-dimensional colony's counts and hull area."""
+
+    from fungal_model.mycelium import colony_count_outside_disc, colony_hull_area
+
+    side, disc, detection = 10.0, 0.7, Q_(0.05, HYPHA_UNITS)
+    times = Q_(np.linspace(0.0, 10.0, 5), "hour")
+    observed = {}
+    for geometry, cells in (("cartesian", 40), ("axisymmetric", 141)):
+        model = artificial_colony_model(side_mm=side, cells=cells, geometry=geometry, overrides={"v": 1.0, "b": 0.1})
+        result = model.compile().simulate(
+            initial_fields=central_inoculum(model.grid, radius_mm=disc),
+            t_span=(Q_(0.0, "hour"), Q_(10.0, "hour")),
+            t_eval=times,
+            solver_settings=SolverSettings(method="LSODA", rtol=1e-7, atol=1e-10),
+            record_rates=False,
+        )
+        count = colony_count_outside_disc(result, field="tips", disc_radius=Q_(disc, "millimeter"), window_half_side=Q_(side / 2, "millimeter"))
+        area = colony_hull_area(result, field="hyphae", detection_density=detection, disc_radius=Q_(disc, "millimeter"), window_half_side=Q_(side / 2, "millimeter"))
+        observed[geometry] = (count.to("dimensionless").magnitude, area.to("millimeter ** 2").magnitude)
+    counts_2d, areas_2d = observed["cartesian"]
+    counts_r, areas_r = observed["axisymmetric"]
+    assert counts_2d[-1] > counts_2d[0] and areas_2d[-1] > areas_2d[0]
+    # The cartesian colony lives on 0.25 mm cells with a pixelated 0.7 mm inoculum; the
+    # radial grid resolves it with 0.05 mm cells. Counts integrate the fields and agree
+    # closely; the hull of cartesian cell centres sits up to half a cell inside the true
+    # extent, so the areas agree to within one ring of cells, 2 pi R h, around the colony.
+    assert np.allclose(counts_r[1:], counts_2d[1:], rtol=0.08)
+    radii = np.sqrt(areas_r[1:] / np.pi)
+    assert np.all(np.abs(areas_r[1:] - areas_2d[1:]) <= 2.0 * np.pi * radii * 0.25)
+    assert np.all(areas_2d[1:] <= areas_r[1:] * 1.02)

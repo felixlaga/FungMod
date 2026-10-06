@@ -320,7 +320,7 @@ class TipMotion(FieldProcess):
                     flux = flux + upwind_face_flux(tips, velocities[axis], axis=axis, periodic=wrap)
                 fluxes.append(flux)
             out = np.zeros_like(fields)
-            out[tip_row] = divergence(fluxes, cell_widths=widths)
+            out[tip_row] = divergence(fluxes, grid=grid)
             return out
 
         return tendency
@@ -719,7 +719,7 @@ class Translocation(FieldProcess):
                     flux = flux + upwind_face_flux(substrate, velocities[axis], axis=axis, periodic=wrap)
                 fluxes.append(flux)
             out = np.zeros_like(fields)
-            out[internal_row] = divergence(fluxes, cell_widths=widths)
+            out[internal_row] = divergence(fluxes, grid=grid)
             return out
 
         return tendency

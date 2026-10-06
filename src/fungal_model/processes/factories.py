@@ -45,6 +45,7 @@ from fungal_model.processes.physiology import (
 from fungal_model.processes.rate_modifiers import (
     RateModifierProcess,
     cardinal_ph_modifier_from_config,
+    cardinal_water_activity_modifier_from_config,
     cardinal_temperature_modifier_from_config,
     competitive_inhibition_modifier_from_config,
     coupled_substrate_product_inhibition_modifier_from_config,
@@ -912,6 +913,8 @@ def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> 
         return oxygen_modifier_from_config(mapping)
     if modifier_type == "water_activity_threshold":
         return water_activity_modifier_from_config(mapping)
+    if modifier_type == "water_activity_cardinal_rosso_robinson":
+        return cardinal_water_activity_modifier_from_config(mapping)
     raise ValueError(f"Unsupported rate modifier type: {modifier_type!r}.")
 
 
