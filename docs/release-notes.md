@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+This list is a partial summary. The complete unreleased record, including the
+compiled model core, environment response laws, the whole-organism and
+pH-response registry cases, Bayesian calibration, the PEtab/COPASI
+cross-solver route, the spatial mycelium and user-supplied data, is the
+Unreleased section of
+[`CHANGELOG.md`](https://github.com/felixlaga/FungMod/blob/main/CHANGELOG.md).
+
 - Fixed mixed-unit SBML trajectories, preserved PEtab training/validation/holdout separation, and rejected missing or zero export noise scales. Packaged PEtab examples resolve outside the checkout. Regenerate older affected exports.
 - Fixed thermodynamic scalar typing and pinned the checked Pyright version for local/CI parity.
 - Consolidated exploratory inhibition runners through shared unit-aware package integration and the configured inhibition kernel (FD-008 resolved).
