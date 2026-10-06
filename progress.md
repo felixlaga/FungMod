@@ -254,6 +254,13 @@ Changed:
   the held-out condition and scores it apart), `tests/test_gelain_criticism_study.py`
   (the override and the holdout settings resolve from the plan; a tiny
   holdout study end to end records the held-out id and both coverages).
+- `data/benchmarks/gelain_2020_petab/plan.json`: a second dated amendment
+  (`cfb8c9a6...` to `11dfe158...`) re-pins the criticism plan's digest; the
+  sections the PEtab study reads are unchanged, so it records
+  `results_remain_valid` and the PEtab results stand.
+  `tests/test_gelain_petab.py` pins the new digest and accepts a recorded
+  result only under a digest that every later amendment declares still
+  valid; the PEtab README and `docs/gelain-cross-solver.md` describe it.
 
 Not changed: any rule, bound, prior, error model or threshold of the plan;
 stage A; the M1 and M3 chains; BAYES-001; any registry record. Scientific

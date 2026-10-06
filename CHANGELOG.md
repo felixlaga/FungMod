@@ -39,6 +39,8 @@ All notable public releases of FungMod are documented here.
   stage-b --hold-out` with the held-out loading scored by posterior
   predictive coverage (held-out coverage 22/32, 69 percent with 10 g/L held out, 32/32, 100 percent with 20 g/L held out, 19/32, 59 percent with 30 g/L held out, none of the three fold chains converged). `posterior_predictive_coverage`
   takes an explicit condition list; table 4 and the manifests regenerated.
+  The PEtab cross-solver plan re-pins the amended criticism plan in a second
+  dated amendment that keeps its recorded results valid.
 - The software paper is a LaTeX manuscript, `paper/paper.tex` (it replaces
   the Markdown draft; `make paper-pdf` builds it with latexmk). The paper
   tables are now also written as LaTeX fragments (`paper/tables/*.tex`,

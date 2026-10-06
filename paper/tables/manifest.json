@@ -263,7 +263,7 @@
       "title": "Cross-solver reproduction of the baseline optimum in COPASI through PEtab (PETAB-001, second run)",
       "sources": {
         "data/benchmarks/gelain_2020_petab/results/comparison.json": "3e86a1214d46bb1debd7d74a60d57ad62550e837d16333d8b904de73e4cfb498",
-        "data/benchmarks/gelain_2020_petab/plan.json": "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628"
+        "data/benchmarks/gelain_2020_petab/plan.json": "11dfe15850b80c3217dd821547613365cb77c88d39a007f65cd954ae1706d320"
       },
       "key_numbers": {
         "outcome": "reproduced",

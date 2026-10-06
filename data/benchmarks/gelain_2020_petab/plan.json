@@ -25,7 +25,7 @@
   "sources": {
     "criticism_plan": {
       "path": "data/benchmarks/gelain_2020_criticism/plan.json",
-      "sha256": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7"
+      "sha256": "7952e010b55f55887e22025c22a192fb1c7f2eb3f61fc130b71af2a019a98672"
     },
     "bayesian_plan": {
       "path": "data/benchmarks/gelain_2020_bayesian/plan.json",
@@ -85,6 +85,12 @@
       "date": "2026-10-05",
       "previous_sha256": "a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a",
       "reason": "sources.criticism_plan.sha256 and sources.reference_fit (sha256 and note) updated before any re-run, because the criticism plan's amendment 3 (digest 9897ab11) added the stage A optimiser settings that this study's first run (outcome copasi_improves under a0f8abe9) showed to be missing, and stage A was re-run under them; the reference fit is the new M0_baseline primary all-condition fit. The question, the problem, the COPASI settings, the gates and the outcome vocabulary are unchanged; the reproduction is re-run under this digest and the earlier result files are replaced."
+    },
+    {
+      "date": "2026-10-06",
+      "previous_sha256": "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628",
+      "results_remain_valid": true,
+      "reason": "sources.criticism_plan.sha256 updated from 9897ab11 to 7952e010 because the criticism plan's amendment 4 changed only its stage_B_posterior section (the sampler, the compute cap and the new holdout sampler) and its amendment log. Every section this reproduction reads (models, data, shared_structure, stage_A_least_squares) is unchanged, as are the Bayesian plan, the observations and the reference fit, so the exported problem and the recorded reproduction are unchanged and stay valid under this digest without a re-run; results recorded under the previous digest are accepted for that reason only."
     }
   ],
   "amendment_rule": "any change to this file after freezing is a dated entry in 'amendments' with its reason, recorded before the affected run; the ledger records the file's sha256 at freezing and after each amendment"

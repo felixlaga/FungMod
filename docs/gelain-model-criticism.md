@@ -13,7 +13,7 @@ independent and validates no biology.
 ## The frozen plan
 
 `data/benchmarks/gelain_2020_criticism/plan.json` (SHA-256
-`9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7`) declares
+`7952e010b55f55887e22025c22a192fb1c7f2eb3f61fc130b71af2a019a98672`, after amendment 4) declares
 everything before any fit: the data digests, four models with every parameter's
 bounds, units and role, the shared assumed error model with one sampled noise
 multiplier, the two stages, the decision rules, the outcome vocabulary, the
