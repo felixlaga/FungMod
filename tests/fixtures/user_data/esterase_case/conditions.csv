@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c37_ph7_5,37,degC,7.5,Illustrative assay condition for the import fixture

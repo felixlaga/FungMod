@@ -62,6 +62,7 @@ from fungal_model.api.source_provider import (
     SourceProviderError,
     source_proposal,
 )
+from fungal_model.api.user_data import UserDataError, UserDataset, load_user_dataset
 from fungal_model.api.virtual_experiment import (
     DegradationScreenResult,
     VirtualExperiment,
@@ -122,6 +123,9 @@ __all__ = [
     "review_source_proposal",
     "source_proposal",
     "SourceProviderError",
+    "UserDataError",
+    "UserDataset",
+    "load_user_dataset",
     "VirtualExperiment",
     "VirtualExperimentError",
     "VirtualExperimentMode",

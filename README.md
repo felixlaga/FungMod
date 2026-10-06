@@ -968,6 +968,36 @@ artifact inspection, report/index links, and the header-only/no-metadata
 guardrail, see
 `notebooks/examples/19_solver_diagnostics_example.ipynb`.
 
+### Simulate From Your Own Tables
+
+A directory with a `user_dataset.yml` manifest and CSV tables of strains,
+their enzyme classes, substrates, conditions and kinetics reaches a virtual
+experiment without editing the registry:
+
+```python
+import fungmod as fm
+
+dataset = fm.load_user_dataset("path/to/my_dataset")  # raises fm.UserDataError listing every issue
+study = fm.virtual_experiment(
+    fungi="my strain name",
+    substrates="my substrate",
+    environments="my_condition_id",
+    user_data=dataset,
+)
+result = study.simulate(mode="exploratory", n_samples=32)
+```
+
+`load_user_dataset` returns a `UserDataset` whose records are namespaced by
+the dataset id and overlaid on the registry in memory; every parameter record
+keeps its source, units, condition, file and row and the dataset digest.
+`measured`, `literature` and `design` values reach scientific mode when they
+are exact; `estimate` values stay exploratory; a missing kinetic role becomes
+an explicit unknown carrying a measurement request that preflight quotes as
+the suggested experiment. This increment covers dissolved substrates and
+homogeneous Michaelis-Menten kinetics with `kcat` and an enzyme
+concentration only; see `docs/user-data.md` for the table formats and
+limitations.
+
 ## Public API
 
 `fungmod` is the canonical import namespace:
@@ -990,6 +1020,9 @@ assembly, execution, and result inspection:
 - `VirtualExperimentError`
 - `source_proposal`
 - `SourceProviderError`
+- `load_user_dataset`
+- `UserDataset`
+- `UserDataError`
 - `review_source_proposal`
 - `CurationDecision`
 - `CurationResult`

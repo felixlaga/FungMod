@@ -1,0 +1,2 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
+cellobiose,cellobiose,,,,,beta_D_glucose,2,mol/mol,"SABIO-RK Reaction 618 equation: Cellobiose + H2O = 2 beta-D-Glucose"
