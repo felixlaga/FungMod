@@ -18,7 +18,7 @@ Exportable processes (`fungmod.standards.SBML_EXPORTABLE_PROCESS_TYPES`):
 | FungMod process | Kinetic law |
 | --- | --- |
 | `first_order_decay` | `k · S` |
-| `mass_action` | `k · ∏ Sᵢ^(orderᵢ)` |
+| `mass_action` | `k · ∏ Sᵢ^(orderᵢ)` over reactants and catalysts; catalysts are listed as modifiers |
 | `homogeneous_michaelis_menten` | `Vmax · S / (Km + S)` or `kcat · E · S / (Km + S)` |
 | `proportional_synthesis` | `q · P` or `q · P · I / (K_I + I)` (a source reaction; producer and inducer are modifiers) |
 

@@ -20,12 +20,33 @@ import numpy as np
 
 from fungal_model.chemistry.macrochemistry import MacrochemicalBalance, MacrochemicalSolution, MacrochemicalSpecies
 from fungal_model.core.numerics import IntegrationError, SolverSettings, solve_checked
-from fungal_model.core.parameters import Parameter
+from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.provenance import ProvenanceError, has_text
-from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
-from fungal_model.fungi.respiration import CONCENTRATION_UNITS, RATE_UNITS, ResourceLimitedCulture, _number, _parameter
+from fungal_model.core.units import Q_, Quantity
+from fungal_model.fungi.respiration import (
+    CONCENTRATION_UNITS,
+    NATIVE_ENGINE,
+    RATE_UNITS,
+    TIME_UNITS,
+    ResourceLimitedCulture,
+    _dynamic_stoichiometry,
+    _number,
+    _parameter,
+    _parameter_set,
+    _run_compiled,
+    _time_grid,
+)
+from fungal_model.processes.base import Process
+from fungal_model.processes.culture import (
+    CostedSecretionProcess,
+    ResourceLimitedGrowthProcess,
+    ResourceLimitedMaintenanceProcess,
+)
+from fungal_model.processes.homogeneous import HomogeneousMichaelisMentenProcess, MassActionProcess
 
 DEGRADING_CULTURE_MATURITY = "exploratory_software_tested"
+SECRETION_YIELD_SYMBOL = "secretion_yield"
+EXTENT_RATE_UNITS = f"({CONCENTRATION_UNITS}) / ({TIME_UNITS})"
 
 
 def secretion_allocation(*, protein_per_biomass: Parameter, biomass_formula_mass: Parameter,
@@ -112,6 +133,11 @@ class DegradingCulture:
     formula. All kinetics and allocation parameters must be explicit and sourced.
     Extracellular pools follow the same dilution as the well-mixed culture;
     attached/retained solids are outside this model's scope.
+
+    ``compiled_processes`` and ``compiled_parameters`` express the five
+    pathways and the boundary exchanges as generic processes, which
+    ``simulate_compiled`` integrates on the compiled process core; ``simulate``
+    keeps the native right-hand side with its analytic piecewise Jacobian.
     """
 
     culture: ResourceLimitedCulture
@@ -251,13 +277,106 @@ class DegradingCulture:
         flux, _ = self._rate_kernel()(self._initial(concentrations))
         return {n: Q_(v, "mol/L/h") for n, v in zip(self.processes, flux, strict=True)}
 
+    def _ledger_names(self) -> tuple[str, ...]:
+        names = (*self.names, *(f"extent:{n}" for n in self.processes), *(f"boundary:{n}" for n in self.names))
+        if len(set(names)) != len(names):
+            raise ValueError("Pool names collide with reserved ledger names.")
+        return names
+
+    def _pathway_source(self, pathway: MacrochemicalSolution) -> str:
+        """The solved pathway's own balance source, or the class source when the balance carries none."""
+        source = pathway.balance.source
+        if isinstance(source, str) and has_text(source):
+            return source
+        return self.source
+
+    def _feed(self) -> dict[str, Quantity | None]:
+        """Declared feed of every pool; ``None`` marks pools without external supply."""
+        return {n: self.culture.feed[n] if n in self.culture.feed else
+                self.feed_substrate if n == self.degradable_substrate.name else None for n in self.names}
+
+    def compiled_processes(self) -> tuple[Process, ...]:
+        """The five pathways and the boundary exchanges as generic processes.
+
+        Growth, maintenance and secretion are the Pirt/Monod closure processes
+        with the dynamic-pool stoichiometry of the solved pathways; hydrolysis
+        is enzyme-explicit Michaelis-Menten in the degradable substrate;
+        inactivation is first-order mass action from the active to the inactive
+        pool. Each carries an extent ledger and every exchange a boundary ledger,
+        so the compiled run integrates the same 19 states as ``simulate``.
+        """
+        culture = self.culture
+        kwargs = culture._closure_kwargs()
+        fraction = self.allocation_fraction.symbol
+        polymer, enzyme, inactive = self.degradable_substrate.name, self.active_enzyme.name, self.inactive_enzyme.name
+        growth = ResourceLimitedGrowthProcess(
+            name="growth", stoichiometry=_dynamic_stoichiometry(culture.metabolism.growth_reaction.coefficients, self.names),
+            extent_state="extent:growth", allocation_fraction_symbol=fraction, source=culture.source,
+            notes="Biomass-forming share of the post-maintenance budget; reservoir species are ledgered, not integrated.",
+            **kwargs)
+        maintenance = ResourceLimitedMaintenanceProcess(
+            name="maintenance",
+            stoichiometry=_dynamic_stoichiometry(culture.metabolism.maintenance_reaction.coefficients, self.names),
+            extent_state="extent:maintenance", source=culture.source,
+            notes="Maintenance extent of the solved maintenance pathway; unmet demand is reported, not consumed.", **kwargs)
+        secretion = CostedSecretionProcess(
+            name="secretion", stoichiometry=_dynamic_stoichiometry(self.secretion.coefficients, self.names),
+            extent_state="extent:secretion", allocation_fraction_symbol=fraction,
+            secretion_yield_symbol=SECRETION_YIELD_SYMBOL, source=self._pathway_source(self.secretion),
+            notes="Secreted share of the post-maintenance budget in protein formula units of the solved secretion pathway.",
+            **kwargs)
+        hydrolysis = HomogeneousMichaelisMentenProcess(
+            name="hydrolysis", substrate_state=polymer, km_symbol=self.substrate_half_saturation.symbol,
+            rate_units=EXTENT_RATE_UNITS, substrate_units=CONCENTRATION_UNITS, enzyme_state=enzyme,
+            enzyme_units=CONCENTRATION_UNITS, kcat_symbol=self.catalytic_capacity.symbol,
+            product_coefficients={**_dynamic_stoichiometry(self.hydrolysis.coefficients, [n for n in self.names if n != polymer]),
+                                  "extent:hydrolysis": 1.0},
+            source=self._pathway_source(self.hydrolysis),
+            notes="Effective saturation in the degradable substrate catalysed by the active enzyme pool; "
+                  "reservoir exchanges stay in the ledger.")
+        inactivation = MassActionProcess(
+            name="inactivation", reactants={enzyme: 1.0}, products={inactive: 1.0, "extent:inactivation": 1.0},
+            state_units={enzyme: CONCENTRATION_UNITS, inactive: CONCENTRATION_UNITS, "extent:inactivation": CONCENTRATION_UNITS},
+            rate_constant_symbol=self.enzyme_inactivation_rate.symbol, rate_constant_units=f"1 / ({TIME_UNITS})",
+            rate_units=EXTENT_RATE_UNITS, source=self.source,
+            notes="First-order inactivation moving active protein to the chemically identical inactive pool.")
+        return (growth, maintenance, secretion, hydrolysis, inactivation, *culture._exchange_processes(self.names))
+
+    def compiled_parameters(self) -> ParameterSet:
+        """The two classes' parameters, the secretion yield of the solved pathway and one feed parameter per pool."""
+        secretion_yield = Parameter(
+            "protein formula units per assimilable-substrate formula unit of the secretion pathway", SECRETION_YIELD_SYMBOL,
+            Q_(self._secretion_yield, "dimensionless"), "dimensionless", None, self._pathway_source(self.secretion), "high",
+            "Derived from the solved secretion stoichiometry as -1 / (substrate coefficient per protein formula unit); "
+            "a chemical conversion, not a measured yield.")
+        return _parameter_set((*self.culture._closure_parameters(), self.allocation_fraction, self.catalytic_capacity,
+                               self.substrate_half_saturation, self.enzyme_inactivation_rate, secretion_yield,
+                               *self.culture._exchange_parameters(self._feed())), owner=type(self).__name__)
+
     def simulate(self, *, initial_state: Mapping[str, Quantity], times: Quantity,
                  solver_settings: SolverSettings | None = None) -> DegradingCultureTrajectory:
+        """Integrate the native right-hand side with its analytic piecewise Jacobian."""
         initial = self._initial(initial_state)
-        grid = np.asarray(assert_compatible(require_quantity(times, name="times"), "hour").magnitude, dtype=float)
-        if grid.ndim != 1 or grid.size < 2 or not np.isfinite(grid).all() or np.any(np.diff(grid) <= 0):
-            raise ValueError("At least two finite strictly increasing times are required.")
+        grid = _time_grid(times)
         settings = solver_settings or SolverSettings()
+        values, diagnostics = self._integrate_native(grid, initial, settings)
+        return self._trajectory(grid, values, initial, settings, diagnostics)
+
+    def simulate_compiled(self, *, initial_state: Mapping[str, Quantity], times: Quantity,
+                          solver_settings: SolverSettings | None = None) -> DegradingCultureTrajectory:
+        """Integrate ``compiled_processes`` on the compiled process core; same trajectory type as ``simulate``."""
+        initial = self._initial(initial_state)
+        grid = _time_grid(times)
+        settings = solver_settings or SolverSettings()
+        names = self._ledger_names()
+        values, diagnostics = _run_compiled(self.compiled_processes(), self.compiled_parameters(),
+                                            pools=dict(zip(self.names, initial.tolist(), strict=True)),
+                                            ledgers=names[len(self.names):], grid=grid, settings=settings,
+                                            name="degrading_culture")
+        return self._trajectory(grid, values, initial, settings, diagnostics)
+
+    def _integrate_native(self, grid: np.ndarray, initial: np.ndarray,
+                          settings: SolverSettings) -> tuple[np.ndarray, dict[str, Any]]:
         rates = self._rate_kernel()
         rate_jacobian = self._rate_jacobian_kernel()
         species_names = tuple(s.name for s in self._balance.species)
@@ -266,13 +385,8 @@ class DegradingCulture:
         dilution = _parameter(self.culture.dilution_rate, RATE_UNITS)
         transfer = _parameter(self.culture.gas_transfer_rate, RATE_UNITS)
         saturation = _parameter(self.culture.oxidant_saturation, CONCENTRATION_UNITS)
-        feed = np.array([_number(self.culture.feed[n], CONCENTRATION_UNITS, n) if n in self.culture.feed else
-                         _number(self.feed_substrate, CONCENTRATION_UNITS, n) if n == self.degradable_substrate.name
-                         else 0. for n in self.names])
-        ledger_names = (*self.names, *(f"extent:{n}" for n in self.processes), *(f"boundary:{n}" for n in self.names))
-        if len(set(ledger_names)) != len(ledger_names):
-            raise ValueError("Pool names collide with reserved ledger names.")
-        units = dict.fromkeys(ledger_names, CONCENTRATION_UNITS)
+        feed = np.array([0. if q is None else _number(q, CONCENTRATION_UNITS, n) for n, q in self._feed().items()])
+        units = dict.fromkeys(self._ledger_names(), CONCENTRATION_UNITS)
 
         def rhs(_time, state):
             flux, _ = rates(state)
@@ -291,12 +405,21 @@ class DegradingCulture:
             matrix[12:, :7] = boundary_jacobian
             return matrix
 
-        options = settings.scipy_options(units, time_units="hour")
+        options = settings.scipy_options(units, time_units=TIME_UNITS)
         if settings.method in {"BDF", "Radau", "LSODA"}:
             options["jac"] = jacobian
         result = solve_checked(rhs, (grid[0], grid[-1]), np.r_[initial, np.zeros(12)], t_eval=grid,
                                **options)
-        values = result.y
+        return result.y, {"nfev": int(result.nfev),
+                          "jacobian": "analytic piecewise" if "jac" in options else "unused by explicit method",
+                          "engine": NATIVE_ENGINE}
+
+    def _trajectory(self, grid: np.ndarray, values: np.ndarray, initial: np.ndarray, settings: SolverSettings,
+                    diagnostics: Mapping[str, Any]) -> DegradingCultureTrajectory:
+        rates = self._rate_kernel()
+        species_names = tuple(s.name for s in self._balance.species)
+        indices = [species_names.index(n) for n in self.names]
+        units = dict.fromkeys(self._ledger_names(), CONCENTRATION_UNITS)
         atols = np.broadcast_to(settings.absolute_tolerances(units), (len(units),))
         if np.any(values[:7] < -10 * atols[:7, None]):
             raise IntegrationError("Integrated culture returned a negative pool beyond 10 absolute tolerances.")
@@ -316,10 +439,10 @@ class DegradingCulture:
             {n: Q_(np.asarray(fluxes)[:, i], "mol/L/h") for i, n in enumerate(self.processes)},
             {n: Q_(exchanges[i], CONCENTRATION_UNITS) for i, n in enumerate(species_names)},
             {n: Q_(boundary[i], CONCENTRATION_UNITS) for i, n in enumerate(species_names)}, Q_(np.array(unmet), RATE_UNITS),
-            {"maturity": self.maturity, "empirical_validation": False, "dilution_rate_per_h": dilution,
+            {"maturity": self.maturity, "empirical_validation": False,
+             "dilution_rate_per_h": _parameter(self.culture.dilution_rate, RATE_UNITS),
              "maximum_absolute_balance_residual_mol_L": {n: float(np.abs(r).max()) for n, r in zip(labels, residual, strict=True)},
-             "minimum_pool_mol_L": float(values[:7].min()), "nfev": int(result.nfev), "solver_settings": settings.to_dict(),
-             "jacobian": "analytic piecewise" if "jac" in options else "unused by explicit method",
+             "minimum_pool_mol_L": float(values[:7].min()), **dict(diagnostics), "solver_settings": settings.to_dict(),
              "thermodynamics": "Unavailable in this trajectory: no activity model or complete common-state formation-energy set is assumed."},
             self.to_dict(),
         )
@@ -339,4 +462,5 @@ class DegradingCulture:
                     "Nonliving inactive protein is retained chemically; it is not an active enzyme or biomass."}
 
 
-__all__ = ["DegradingCulture", "DegradingCultureTrajectory", "DEGRADING_CULTURE_MATURITY", "secretion_allocation"]
+__all__ = ["DegradingCulture", "DegradingCultureTrajectory", "DEGRADING_CULTURE_MATURITY", "SECRETION_YIELD_SYMBOL",
+           "secretion_allocation"]

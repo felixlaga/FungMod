@@ -313,6 +313,16 @@ Ordered work, each with an exit gate:
    every parameter to better than 1e-4. Outcome `reproduced`. Gate met.
 5. **Unify the three whole-fungus classes** before adding any physiology, as
    section 6 already demands.
+   Status 2026-10-05 (UNIFY-001): the Pirt/Monod closure and the chemostat
+   exchanges of `ResourceLimitedCulture` and `DegradingCulture` are generic
+   processes with factories on the compiled core; `FungalCouplingModel`
+   composes existing generic processes (mass action with catalysts, first-order
+   decay, proportional synthesis); all three classes run on the compiled core
+   through `simulate_compiled` with parity tests against their native paths.
+   Gate met. Open: the native paths stay until the compiled core supplies a
+   Jacobian (the Pirt/Monod classes) and the legacy engine is retired (the
+   coupling model's `Reaction` path); no organism record parameterizes the
+   closure yet.
 6. **Reproducibility package and preprint.** One command regenerates every
    table and figure; a pinned environment; a PyPI wheel with an offline install
    test; a tagged release with a DOI; AI assistance disclosed; a domain

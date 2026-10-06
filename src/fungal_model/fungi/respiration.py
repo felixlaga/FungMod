@@ -14,7 +14,7 @@ carbon mole for biomass whose formula contains one carbon atom).
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -22,13 +22,24 @@ import numpy as np
 
 from fungal_model.chemistry.macrochemistry import MacrochemicalBalance, MacrochemicalSolution
 from fungal_model.core.numerics import IntegrationError, SolverSettings, solve_checked
-from fungal_model.core.parameters import Parameter
+from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.provenance import ProvenanceError, has_text
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
+from fungal_model.processes.base import Process
+from fungal_model.processes.culture import (
+    DilutionExchangeProcess,
+    GasTransferProcess,
+    ResourceLimitedGrowthProcess,
+    ResourceLimitedMaintenanceProcess,
+)
 
 RESPIRATION_MATURITY = "exploratory_software_tested"
 RATE_UNITS = "1 / hour"
 CONCENTRATION_UNITS = "mole / liter"
+TIME_UNITS = "hour"
+NATIVE_ENGINE = "native_right_hand_side"
+COMPILED_ENGINE = "compiled_process_core"
+FEED_SYMBOL_PREFIX = "feed:"
 
 
 def _number(value: Quantity, units: str, name: str, *, positive: bool = False) -> float:
@@ -43,6 +54,59 @@ def _parameter(value: Parameter, units: str, *, positive: bool = False) -> float
     value.validate_value()
     assert value.quantity is not None
     return _number(value.quantity, units, value.symbol, positive=positive)
+
+
+def _time_grid(times: Quantity) -> np.ndarray:
+    grid = np.asarray(assert_compatible(require_quantity(times, name="times"), TIME_UNITS).magnitude, dtype=float)
+    if grid.ndim != 1 or grid.size < 2 or not np.isfinite(grid).all() or np.any(np.diff(grid) <= 0):
+        raise ValueError("At least two finite strictly increasing times are required.")
+    return grid
+
+
+def _dynamic_stoichiometry(coefficients: Mapping[str, float], pools: Sequence[str]) -> dict[str, float]:
+    """Coefficients of one pathway restricted to the dynamic pools; exact zeros are dropped.
+
+    Reservoir species are not model states: their exchanges are reconstructed
+    from the integrated extents by the trajectory, exactly as ``simulate`` does.
+    """
+    return {name: float(coefficients[name]) for name in pools if float(coefficients.get(name, 0.0)) != 0.0}
+
+
+def _parameter_set(parameters: Iterable[Parameter], *, owner: str) -> ParameterSet:
+    collected = ParameterSet()
+    for parameter in parameters:
+        if parameter.symbol in collected:
+            raise ValueError(f"{owner}: parameter symbol {parameter.symbol!r} is used twice; "
+                             "the compiled representation needs one symbol per parameter.")
+        collected.add(parameter)
+    return collected
+
+
+def _run_compiled(processes: Sequence[Process], parameters: ParameterSet, *, pools: Mapping[str, float],
+                  ledgers: Sequence[str], grid: np.ndarray, settings: SolverSettings,
+                  name: str) -> tuple[np.ndarray, dict[str, Any]]:
+    """Integrate ``processes`` on the compiled process core from zero ledgers.
+
+    Returns the trajectory (states x times) in ``(*pools, *ledgers)`` order and
+    the diagnostics the native path records (``nfev``, ``jacobian``) plus the
+    engine and the kernel summary of the compiled model.
+    """
+    from fungal_model.processes.assembly import ModelBuilder
+    from fungal_model.processes.registry import ProcessRegistry
+    from fungal_model.solvers.process_ode import ProcessODESolver, RunRequest
+
+    model = ModelBuilder(process_library=ProcessRegistry(processes), requested_processes=tuple(p.name for p in processes),
+                         parameters=parameters, solver_settings=settings).assemble()
+    names = (*pools, *ledgers)
+    initial = {n: Q_(v, CONCENTRATION_UNITS) for n, v in pools.items()}
+    initial.update({n: Q_(0.0, CONCENTRATION_UNITS) for n in ledgers})
+    result = ProcessODESolver(model).run(RunRequest(
+        initial_state=initial, t_span=(Q_(float(grid[0]), TIME_UNITS), Q_(float(grid[-1]), TIME_UNITS)),
+        t_eval=Q_(grid, TIME_UNITS), name=name, label="exploratory"))
+    kernel = dict(result.solver_metadata["kernel"])
+    values = np.vstack([np.asarray(result.states[n].to(CONCENTRATION_UNITS).magnitude, dtype=float) for n in names])
+    return values, {"nfev": int(result.solver_metadata["nfev"]), "jacobian": str(kernel["jacobian"]),
+                    "engine": COMPILED_ENGINE, "kernel": kernel}
 
 
 @dataclass(frozen=True)
@@ -151,6 +215,12 @@ class ResourceLimitedCulture:
     to a reservoir: e.g. CO2 export, water solvent and buffered protons. Their
     signed exchanges close the matter/charge ledger; their concentrations and
     activities are not predictions. No external source supplies biomass.
+
+    The same closure is available as generic processes (``compiled_processes``
+    and ``compiled_parameters``) that ``simulate_compiled`` integrates on the
+    compiled process core; ``simulate`` keeps the native right-hand side with
+    its analytic piecewise Jacobian. Both return the same trajectory type and
+    are tested for parity.
     """
 
     metabolism: RespiratoryGrowthModel
@@ -246,14 +316,108 @@ class ResourceLimitedCulture:
         return {"growth": Q_(growth, RATE_UNITS), "maintenance": Q_(maintenance, RATE_UNITS),
                 "unmet_maintenance": Q_(unmet, RATE_UNITS)}
 
+    def _ledger_names(self) -> tuple[str, ...]:
+        names = (*self.names, "extent:growth", "extent:maintenance", *(f"boundary:{n}" for n in self.names))
+        if len(set(names)) != len(names):
+            raise ValueError("Species names collide with reserved ledger names.")
+        return names
+
+    def _closure_kwargs(self) -> dict[str, str]:
+        """Pool names, units and parameter symbols shared by the closure processes."""
+        return {"substrate_state": self.metabolism.substrate, "biomass_state": self.metabolism.biomass,
+                "nutrient_state": self.nitrogen, "oxidant_state": self.oxidant,
+                "concentration_units": CONCENTRATION_UNITS, "time_units": TIME_UNITS,
+                "true_yield_symbol": self.metabolism.true_yield.symbol,
+                "maintenance_demand_symbol": self.metabolism.maintenance_demand.symbol,
+                "uptake_capacity_symbol": self.uptake_capacity.symbol,
+                "substrate_half_saturation_symbol": self.substrate_half_saturation.symbol,
+                "nutrient_half_saturation_symbol": self.nitrogen_half_saturation.symbol,
+                "oxidant_half_saturation_symbol": self.oxidant_half_saturation.symbol}
+
+    def _closure_parameters(self) -> tuple[Parameter, ...]:
+        return (self.metabolism.true_yield, self.metabolism.maintenance_demand, self.uptake_capacity,
+                self.substrate_half_saturation, self.nitrogen_half_saturation, self.oxidant_half_saturation)
+
+    def _exchange_processes(self, pools: Sequence[str]) -> tuple[Process, ...]:
+        """Dilution of every pool against its feed symbol and gas transfer into the oxidant, with boundary ledgers."""
+        processes: list[Process] = [DilutionExchangeProcess(
+            name=f"dilution:{n}", pool_state=n, concentration_units=CONCENTRATION_UNITS, time_units=TIME_UNITS,
+            dilution_rate_symbol=self.dilution_rate.symbol, feed_symbol=f"{FEED_SYMBOL_PREFIX}{n}",
+            ledger_state=f"boundary:{n}", source=self.source,
+            notes="Every pool of the well-mixed culture leaves with the effluent and enters with its declared feed.")
+            for n in pools]
+        processes.append(GasTransferProcess(
+            name=f"gas_transfer:{self.oxidant}", pool_state=self.oxidant, concentration_units=CONCENTRATION_UNITS,
+            time_units=TIME_UNITS, transfer_rate_symbol=self.gas_transfer_rate.symbol,
+            saturation_symbol=self.oxidant_saturation.symbol, ledger_state=f"boundary:{self.oxidant}",
+            source=self.source, notes="Gas transfer into the dissolved oxidant shares the oxidant's boundary ledger with its dilution."))
+        return tuple(processes)
+
+    def _exchange_parameters(self, feed: Mapping[str, Quantity | None]) -> tuple[Parameter, ...]:
+        """The exchange constants plus one feed parameter per pool (``None``: no external supply)."""
+        declared = []
+        for name, quantity in feed.items():
+            if quantity is None:
+                value = 0.0
+                note = "No external supply of this pool: it only leaves with the effluent (assumption of the class)."
+            else:
+                value = _number(quantity, CONCENTRATION_UNITS, f"feed[{name}]")
+                note = "Feed concentration declared by the caller, restated as a parameter for the compiled representation."
+            declared.append(Parameter(f"feed concentration of {name}", f"{FEED_SYMBOL_PREFIX}{name}",
+                                      Q_(value, CONCENTRATION_UNITS), CONCENTRATION_UNITS, None, self.source, "high", note))
+        return (self.dilution_rate, self.gas_transfer_rate, self.oxidant_saturation, *declared)
+
+    def compiled_processes(self) -> tuple[Process, ...]:
+        """The closure as generic processes: growth, maintenance, dilution of every pool, gas transfer.
+
+        Growth and maintenance carry the dynamic-pool stoichiometry of the
+        solved macrochemical pathways and an extent ledger each; every exchange
+        process carries a boundary ledger, so the compiled run integrates the
+        same 10 states as ``simulate``.
+        """
+        kwargs = self._closure_kwargs()
+        growth = ResourceLimitedGrowthProcess(
+            name="growth", stoichiometry=_dynamic_stoichiometry(self.metabolism.growth_reaction.coefficients, self.names),
+            extent_state="extent:growth", source=self.source,
+            notes="Biomass-forming extent of the solved growth pathway; reservoir species are ledgered, not integrated.", **kwargs)
+        maintenance = ResourceLimitedMaintenanceProcess(
+            name="maintenance",
+            stoichiometry=_dynamic_stoichiometry(self.metabolism.maintenance_reaction.coefficients, self.names),
+            extent_state="extent:maintenance", source=self.source,
+            notes="Maintenance extent of the solved maintenance pathway; unmet demand is reported, not consumed.", **kwargs)
+        return (growth, maintenance, *self._exchange_processes(self.names))
+
+    def compiled_parameters(self) -> ParameterSet:
+        """The class's own parameters plus one feed parameter per pool, keyed by their symbols."""
+        feed: dict[str, Quantity | None] = {n: None if n == self.metabolism.biomass else self.feed[n] for n in self.names}
+        return _parameter_set((*self._closure_parameters(), *self._exchange_parameters(feed)), owner=type(self).__name__)
+
     def simulate(self, *, initial_state: Mapping[str, Quantity], times: Quantity,
                  solver_settings: SolverSettings | None = None) -> CultureTrajectory:
+        """Integrate the native right-hand side with its analytic piecewise Jacobian."""
         self.rates(initial_state)  # Validate every initial value and name.
-        grid = np.asarray(assert_compatible(require_quantity(times, name="times"), "hour").magnitude, dtype=float)
-        if grid.ndim != 1 or grid.size < 2 or not np.isfinite(grid).all() or np.any(np.diff(grid) <= 0):
-            raise ValueError("At least two finite strictly increasing times are required.")
+        grid = _time_grid(times)
         settings = solver_settings or SolverSettings()
         initial = np.array([_number(initial_state[n], CONCENTRATION_UNITS, n) for n in self.names])
+        values, diagnostics = self._integrate_native(grid, initial, settings)
+        return self._trajectory(grid, values, initial, settings, diagnostics)
+
+    def simulate_compiled(self, *, initial_state: Mapping[str, Quantity], times: Quantity,
+                          solver_settings: SolverSettings | None = None) -> CultureTrajectory:
+        """Integrate ``compiled_processes`` on the compiled process core; same trajectory type as ``simulate``."""
+        self.rates(initial_state)
+        grid = _time_grid(times)
+        settings = solver_settings or SolverSettings()
+        initial = np.array([_number(initial_state[n], CONCENTRATION_UNITS, n) for n in self.names])
+        names = self._ledger_names()
+        values, diagnostics = _run_compiled(self.compiled_processes(), self.compiled_parameters(),
+                                            pools=dict(zip(self.names, initial.tolist(), strict=True)),
+                                            ledgers=names[len(self.names):], grid=grid, settings=settings,
+                                            name="resource_limited_culture")
+        return self._trajectory(grid, values, initial, settings, diagnostics)
+
+    def _integrate_native(self, grid: np.ndarray, initial: np.ndarray,
+                          settings: SolverSettings) -> tuple[np.ndarray, dict[str, Any]]:
         constants = self._constants()
         growth = np.array([self.metabolism.growth_reaction.coefficients[n] for n in self.names])
         maintenance = np.array([self.metabolism.maintenance_reaction.coefficients[n] for n in self.names])
@@ -264,10 +428,7 @@ class ResourceLimitedCulture:
                          _number(self.feed[n], CONCENTRATION_UNITS, n) for n in self.names])
         # Separate integrated boundary flows and reaction extents provide an
         # open-system conservation check, including exported reservoir species.
-        state_names = (*self.names, "extent:growth", "extent:maintenance", *(f"boundary:{n}" for n in self.names))
-        if len(set(state_names)) != len(state_names):
-            raise ValueError("Species names collide with reserved ledger names.")
-        units = dict.fromkeys(state_names, CONCENTRATION_UNITS)
+        units = dict.fromkeys(self._ledger_names(), CONCENTRATION_UNITS)
 
         def rhs(_time, state):
             mu, m, _ = self._rates(state, constants)
@@ -289,12 +450,19 @@ class ResourceLimitedCulture:
             matrix[6:, :4] = boundary_jacobian
             return matrix
 
-        options = settings.scipy_options(units, time_units="hour")
+        options = settings.scipy_options(units, time_units=TIME_UNITS)
         if settings.method in {"BDF", "Radau", "LSODA"}:
             options["jac"] = jacobian
         result = solve_checked(rhs, (grid[0], grid[-1]), np.r_[initial, np.zeros(6)], t_eval=grid,
                                **options)
-        values = result.y
+        return result.y, {"nfev": int(result.nfev),
+                          "jacobian": "analytic piecewise" if "jac" in options else "unused by explicit method",
+                          "engine": NATIVE_ENGINE}
+
+    def _trajectory(self, grid: np.ndarray, values: np.ndarray, initial: np.ndarray, settings: SolverSettings,
+                    diagnostics: Mapping[str, Any]) -> CultureTrajectory:
+        constants = self._constants()
+        units = dict.fromkeys(self._ledger_names(), CONCENTRATION_UNITS)
         atol = np.broadcast_to(settings.absolute_tolerances(units), (len(units),))
         if np.any(values[:4] < -10 * atol[:4, None]):
             raise IntegrationError("Culture integration returned a negative pool beyond 10 absolute tolerances.")
@@ -317,8 +485,7 @@ class ResourceLimitedCulture:
             {n: Q_(v, CONCENTRATION_UNITS) for n, v in boundary.items()},
             {"maximum_absolute_balance_residual_mol_L": {n: float(np.max(np.abs(v)))
                 for n, v in zip(labels, residuals, strict=True)}, "minimum_dynamic_pool_mol_L": float(np.min(values[:4])),
-             "maximum_unmet_maintenance_per_h": float(np.max(rates[2])), "nfev": int(result.nfev),
-             "jacobian": "analytic piecewise" if "jac" in options else "unused by explicit method",
+             "maximum_unmet_maintenance_per_h": float(np.max(rates[2])), **dict(diagnostics),
              "solver_settings": settings.to_dict(), "empirical_validation": False},
             self.to_dict(),
         )
@@ -336,4 +503,5 @@ class ResourceLimitedCulture:
                     "Unmet maintenance is a missing-physiology diagnostic, not predicted viability."}
 
 
-__all__ = ["RESPIRATION_MATURITY", "RespiratoryGrowthModel", "ResourceLimitedCulture", "CultureTrajectory"]
+__all__ = ["RESPIRATION_MATURITY", "COMPILED_ENGINE", "NATIVE_ENGINE", "RespiratoryGrowthModel",
+           "ResourceLimitedCulture", "CultureTrajectory"]

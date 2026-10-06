@@ -72,6 +72,18 @@ implicitly. Without either seed enzyme or usable nutrient, digestion cannot
 bootstrap itself. Active extracellular enzyme can continue digestion without
 living biomass, which is a separate case from ongoing synthesis.
 
+`compiled_processes()` returns the five pathways and the boundary exchanges as
+generic processes (`resource_limited_growth`, `resource_limited_maintenance`,
+`costed_secretion`, enzyme-explicit `homogeneous_michaelis_menten` hydrolysis,
+`mass_action` inactivation, `dilution_exchange` of every pool, `gas_transfer`
+of the oxidant) with extent and boundary ledgers; `compiled_parameters()`
+collects the two classes' parameters, the secretion yield of the solved
+pathway and one feed parameter per pool under their own symbols (a symbol used
+twice refuses). `simulate_compiled()` integrates them on the compiled process
+core and returns the same `DegradingCultureTrajectory`; the trajectory's
+`diagnostics["engine"]` says which path produced it, and
+`tests/test_culture_processes.py` pins the two paths to each other.
+
 The research example can be run as follows; its function names and provenance
 explicitly identify its assumptions:
 

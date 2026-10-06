@@ -6,6 +6,25 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Culture physiology as generic processes on the compiled core
+  (`fungal_model.processes.culture`): `resource_limited_growth`,
+  `resource_limited_maintenance` and `costed_secretion` express the Pirt/Monod
+  closure with explicit stoichiometry and optional extent ledgers;
+  `dilution_exchange` and `gas_transfer` express the chemostat boundary with
+  optional boundary ledgers; all five have numeric kernels, factories and
+  config support (`stoichiometry` on `ProcessConfig`), and the packaged
+  `toy_resource_limited_chemostat.yml` runs them on abstract pools.
+  `ResourceLimitedCulture` and `DegradingCulture` gain `compiled_processes()`,
+  `compiled_parameters()` and `simulate_compiled()`, which return the classes'
+  own trajectory types from the compiled core; `simulate` keeps the native
+  right-hand side (analytic piecewise Jacobian) and both paths name their
+  engine in `diagnostics["engine"]`. Parity tests pin the two paths to 1e-6
+  relative (`tests/test_culture_processes.py`). `FungalCouplingModel` gains
+  `compiled_processes(degradation)`, `compiled_parameters()` (with the derived
+  secretion-cost rate constant `alpha_E_c_E`) and `simulate_compiled()`, pinned
+  to its legacy engine (`tests/test_coupling_compiled.py`); `MassActionProcess`
+  accepts `catalysts` (species in the rate law that are not consumed; config key
+  `states.catalysts`; SBML modifiers).
 - Reproducibility package for the software paper
   (`docs/reproducing-the-paper.md`): `fungal_model.research.paper_tables`
   generates the paper's five tables under `paper/tables/` from the recorded
