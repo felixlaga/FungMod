@@ -26,12 +26,71 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## SPATIAL-002 Axisymmetric Geometry, Colony Observables And The Cardinal Water-Activity Law
+
+Status: `complete` for the stated scope (2026-10-06); the first three items of
+stage 0 of the colony comparison plan (COLONY-001).
+
+- `SpatialGrid.axisymmetric(radius, cells)`: a one-axis radial grid for a
+  colony with circular symmetry; cells are annuli (`cell_measures`,
+  `measure_dimension` 2), the divergence takes per-face weights
+  (`face_weights`), the axis face carries no flux, `spatial_integral` and
+  `occupied_measure` use the per-cell measures. Every continuum process runs
+  unchanged on either geometry; the artificial colony builder takes
+  `geometry="axisymmetric"`.
+- `fungal_model.mycelium.observation`: `colony_count_outside_disc`,
+  `colony_hull_radius`, `colony_hull_area`, `disc_area_in_square`,
+  `circle_length_in_square`; the hull radius is the farthest detected cell
+  centre in both geometries so that they agree to within a cell.
+- `cardinal_water_activity_activity` and `CardinalWaterActivityModifier`
+  (`water_activity_cardinal_rosso_robinson`): the cardinal family with
+  inflection on water activity with the maximum fixed at one (Rosso and
+  Robinson 2001), the CTMI arithmetic shared with the temperature law; factory,
+  template roles, configured-output row and docs table.
+- Jacobians: LSODA on a one-axis grid integrates in cell-major order with a
+  banded Jacobian (half-bandwidth `2 F - 1`), the same trajectory at a
+  fraction of the cost (the plan's radial model: about 220 s to 4 s per 62 h
+  solve); BDF and Radau receive a coloured finite-difference sparse Jacobian
+  on the nearest-neighbour pattern with a fixed step, after scipy's adaptive
+  estimator overflowed and failed on the clipped fields.
+- `fungal_model.research.colony_comparison` and
+  `scripts/run_de_ligne_2019_colony_comparison.py`: stage 0 of COLONY-001;
+  plan loading with digest verification, observations under the row rules,
+  the per-series error model (pooled below fifteen readable rows), the plan's
+  `colony_reserve_v1` model built from a caller's parameter values on either
+  geometry with the inoculum-only initial fields, the two observables, and
+  `run_stage_0` recording error models, timing, grid, solver and symmetry
+  checks that cite the plan digest; `check` recomputes the error models.
+- Tests: `tests/test_mycelium_core.py` (annular cells and refusals; radial
+  diffusion conserves and matches the planar Gaussian; area units),
+  `tests/test_colony_comparison_stage0.py` (digest verification refuses a
+  tampered dataset; observations follow the row rules; error models fit,
+  floor and pool; the model builds on both geometries with the inoculum
+  only; observables start at the disc; a reduced stage 0 records checks
+  citing the plan),
+  `tests/test_mycelium_colony.py` (radial colony against the two-dimensional
+  colony on the window observables), `tests/test_colony_observation.py`
+  (closed forms, counts, hull radius and area in both geometries),
+  `tests/test_cardinal_response_laws.py` (the law's shape and refusals; the
+  modifier reads the environment, folds into a constant kernel, builds from
+  config and refuses a missing cardinal symbol).
+
+Measured: the two-dimensional artificial colony on 80 x 80 cells of 0.125 mm
+takes minutes per 10 h with LSODA's dense backend Jacobian, the radial colony
+on 283 cells of 0.025 mm under half a minute; the plan's calibration grid is
+the radial one.
+
+What it is not: no fit, no data comparison, no organism parameter; the
+water-activity law's exponent is the CTMI's and the equality of a surface
+water activity with an equilibrium relative humidity is the plan's declared
+assumption, not a measurement.
+
 ## COLONY-001 Frozen Plan For The De Ligne 2019 Colony Comparison
 
-Status: `partial` (plan frozen 2026-10-06; stage 0 software not built; no fit run).
+Status: `partial` (plan frozen 2026-10-06 and amended once the same day, before any check was recorded, to make the area operator's detection density a grid-independent constant; stage 0 core pieces built under SPATIAL-002, the runner and the recorded checks not; no fit run).
 
 `data/benchmarks/de_ligne_2019_colony/plan.json` (SHA-256
-`e7a8706e85fef7739e96c7fe21d8aac0cbf2e4719201b1c203c9296d033066e4`, pinned by
+`ea6e2e7270b809fee092655f7e6882cf266e16d86d955c276ba5e2edc5ad959e`, pinned by
 `tests/test_colony_comparison_plan.py`) declares the within-study transfer test
 of the continuum mycelium (SPATIAL-001) against DATA-003 before anything is
 run: an axisymmetric geometry on the scan window with the inoculum disc, the

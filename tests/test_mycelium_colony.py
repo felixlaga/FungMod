@@ -10,6 +10,7 @@ import pytest
 from fungal_model.core.numerics import SolverSettings
 from fungal_model.core.units import Q_
 from fungal_model.mycelium import FieldSpec, MyceliumModel, SpatialGrid, TipMotion, Translocation, total_amount
+from fungal_model.mycelium.model import JACOBIAN_STRUCTURE
 from fungal_model.mycelium.benchmarks import (
     HYPHA_UNITS,
     SUBSTRATE_UNITS,
@@ -44,7 +45,7 @@ def test_edelstein_front_spreads_at_the_pulled_front_speed() -> None:
     assert np.all(np.diff(speeds[2:]) > 0.0)  # and keeps approaching it
     assert speeds[-1] == pytest.approx(analytic, rel=0.05)
     assert result.fields["tips"].magnitude.min() >= -1e-9 and result.fields["hyphae"].magnitude.min() >= 0.0
-    assert result.solver_metadata["jacobian_structure"] == "cartesian_sparse_nearest_neighbour"
+    assert result.solver_metadata["jacobian_structure"] == JACOBIAN_STRUCTURE
 
 
 def _colony(cells: int = 24, hours: float = 12.0, method: str = "LSODA", **overrides: float):
@@ -81,7 +82,7 @@ def test_explicit_implicit_and_sparse_methods_agree_on_the_colony() -> None:
     reference = _colony(cells=16, hours=6.0, method="LSODA")
     sparse = _colony(cells=16, hours=6.0, method="BDF")
     explicit = _colony(cells=16, hours=6.0, method="RK45")
-    assert sparse.solver_metadata["jacobian_structure"] == "cartesian_sparse_nearest_neighbour"
+    assert sparse.solver_metadata["jacobian_structure"] == JACOBIAN_STRUCTURE
     for name in reference.fields:
         np.testing.assert_allclose(sparse.fields[name].magnitude, reference.fields[name].magnitude, rtol=2e-4, atol=1e-7, err_msg=name)
         np.testing.assert_allclose(explicit.fields[name].magnitude, reference.fields[name].magnitude, rtol=2e-4, atol=1e-7, err_msg=name)
@@ -138,3 +139,36 @@ def test_translocation_conserves_substrate_and_the_active_term_carries_it_toward
         assert final.min() >= -1e-12
     assert outputs[False] > float(np.sum(substrate * x) / np.sum(substrate))  # diffusion spreads it to the right
     assert outputs[True] > outputs[False] + 1.0  # the active term carries it up the tip gradient (0.2 mm/h for 20 h)
+
+
+def test_axisymmetric_colony_agrees_with_the_cartesian_colony_on_the_window_observables() -> None:
+    """The same physics on the radial grid reproduces the two-dimensional colony's counts and hull area."""
+
+    from fungal_model.mycelium import colony_count_outside_disc, colony_hull_area
+
+    side, disc, detection = 10.0, 0.7, Q_(0.05, HYPHA_UNITS)
+    times = Q_(np.linspace(0.0, 10.0, 5), "hour")
+    observed = {}
+    for geometry, cells in (("cartesian", 40), ("axisymmetric", 141)):
+        model = artificial_colony_model(side_mm=side, cells=cells, geometry=geometry, overrides={"v": 1.0, "b": 0.1})
+        result = model.compile().simulate(
+            initial_fields=central_inoculum(model.grid, radius_mm=disc),
+            t_span=(Q_(0.0, "hour"), Q_(10.0, "hour")),
+            t_eval=times,
+            solver_settings=SolverSettings(method="LSODA", rtol=1e-7, atol=1e-10),
+            record_rates=False,
+        )
+        count = colony_count_outside_disc(result, field="tips", disc_radius=Q_(disc, "millimeter"), window_half_side=Q_(side / 2, "millimeter"))
+        area = colony_hull_area(result, field="hyphae", detection_density=detection, disc_radius=Q_(disc, "millimeter"), window_half_side=Q_(side / 2, "millimeter"))
+        observed[geometry] = (count.to("dimensionless").magnitude, area.to("millimeter ** 2").magnitude)
+    counts_2d, areas_2d = observed["cartesian"]
+    counts_r, areas_r = observed["axisymmetric"]
+    assert counts_2d[-1] > counts_2d[0] and areas_2d[-1] > areas_2d[0]
+    # The cartesian colony lives on 0.25 mm cells with a pixelated 0.7 mm inoculum; the
+    # radial grid resolves it with 0.05 mm cells. Counts integrate the fields and agree
+    # closely; the hull of cartesian cell centres sits up to half a cell inside the true
+    # extent, so the areas agree to within one ring of cells, 2 pi R h, around the colony.
+    assert np.allclose(counts_r[1:], counts_2d[1:], rtol=0.08)
+    radii = np.sqrt(areas_r[1:] / np.pi)
+    assert np.all(np.abs(areas_r[1:] - areas_2d[1:]) <= 2.0 * np.pi * radii * 0.25)
+    assert np.all(areas_2d[1:] <= areas_r[1:] * 1.02)

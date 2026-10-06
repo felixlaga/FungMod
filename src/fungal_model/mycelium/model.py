@@ -32,7 +32,8 @@ from fungal_model.transport._sparsity import cartesian_jacobian_sparsity
 
 MODEL_REPRESENTATION = "compiled_mycelium_fields"
 NEGATIVE_FIELD_POLICY = "kernels evaluated at max(field, 0); integrated fields never clipped"
-JACOBIAN_STRUCTURE = "cartesian_sparse_nearest_neighbour"
+JACOBIAN_STRUCTURE = "coloured_finite_difference_on_the_nearest_neighbour_pattern"
+BANDED_JACOBIAN_STRUCTURE = "one_axis_banded_cell_major"
 MATURITY_LABEL = "exploratory"
 
 
@@ -159,6 +160,51 @@ class CompiledMyceliumModel:
     def jacobian_sparsity(self):
         return cartesian_jacobian_sparsity(self.shape, self.field_count, local_reactions=True)
 
+    def jacobian_colours(self) -> np.ndarray:
+        """A colour per state such that no two states of one colour share a row of the Jacobian.
+
+        Every process couples a cell to itself and its nearest neighbours only,
+        so ``(cell index modulo three per axis, field)`` separates every pair of
+        states that can share a row: ``3 ** ndim * F`` colours on any grid.
+        """
+
+        field_count = self.field_count
+        cell_colour = np.zeros(self.shape, dtype=int)
+        for axis, extent in enumerate(self.shape):
+            index = np.arange(extent) % 3
+            cell_colour = cell_colour * 3 + index.reshape([-1 if k == axis else 1 for k in range(len(self.shape))])
+        return (cell_colour[np.newaxis] * field_count + np.arange(field_count).reshape([-1] + [1] * len(self.shape))).ravel()
+
+    def jacobian(self, time: float, state: np.ndarray):
+        """Sparse finite-difference Jacobian on the nearest-neighbour pattern, one right-hand side per colour.
+
+        Forward differences with the step ``sqrt(eps) * max(|y_j|, 1)``; the
+        fixed rule has no adaptive factor to overflow where a state is inert,
+        which scipy's own estimator does on these clipped fields. Entries are
+        kept only on the declared pattern, so a perturbation of several states
+        of one colour never mixes their columns.
+        """
+
+        from scipy import sparse
+
+        state = np.asarray(state, dtype=float)
+        colours = self.jacobian_colours()
+        pattern = sparse.csc_matrix(self.jacobian_sparsity())
+        base = self.rhs(time, state)
+        steps = np.sqrt(np.finfo(float).eps) * np.maximum(np.abs(state), 1.0)
+        values = np.zeros(pattern.nnz, dtype=float)
+        rows = pattern.indices
+        pointers = pattern.indptr
+        for colour in np.unique(colours):
+            members = np.flatnonzero(colours == colour)
+            perturbed = state.copy()
+            perturbed[members] += steps[members]
+            difference = (self.rhs(time, perturbed) - base)
+            for column in members:
+                start, stop = pointers[column], pointers[column + 1]
+                values[start:stop] = difference[rows[start:stop]] / steps[column]
+        return sparse.csc_matrix((values, rows.copy(), pointers.copy()), shape=pattern.shape)
+
     def summary(self) -> dict[str, Any]:
         return {
             "representation": MODEL_REPRESENTATION,
@@ -206,9 +252,31 @@ class CompiledMyceliumModel:
         state0 = self.initial_state(initial_fields)
         options = settings.scipy_options(self.model.field_units, time_units, cells=self.model.grid.cell_count)
         if settings.uses_jacobian and settings.method != "LSODA":
-            options["jac_sparsity"] = self.jacobian_sparsity()
-        result = solve_checked(self.rhs, (span[0], span[1]), state0, t_eval=grid_times, **options)
-        trajectory = np.asarray(result.y, dtype=float).T.reshape((grid_times.size, self.field_count, *self.shape))
+            options["jac"] = self.jacobian
+        banded = settings.method == "LSODA" and self.model.grid.ndim == 1
+        if banded:
+            # On a one-axis grid a cell-major ordering (cell, field) keeps every coupling
+            # within 2 F - 1 of the diagonal, so LSODA can difference and factor a banded
+            # Jacobian instead of a dense one: 2 (2 F - 1) + 1 right-hand sides per
+            # Jacobian instead of one per state.
+            field_count, cell_count = self.field_count, self.model.grid.cell_count
+            permutation = np.arange(field_count * cell_count).reshape(field_count, cell_count).T.ravel()
+            inverse = np.argsort(permutation)
+            bandwidth = 2 * field_count - 1
+            options["lband"] = bandwidth
+            options["uband"] = bandwidth
+            if isinstance(options.get("atol"), np.ndarray):
+                options["atol"] = np.asarray(options["atol"], dtype=float)[permutation]
+
+            def cell_major_rhs(time: float, state: np.ndarray) -> np.ndarray:
+                return self.rhs(time, state[inverse])[permutation]
+
+            result = solve_checked(cell_major_rhs, (span[0], span[1]), state0[permutation], t_eval=grid_times, **options)
+            solution = np.asarray(result.y, dtype=float)[inverse]
+        else:
+            result = solve_checked(self.rhs, (span[0], span[1]), state0, t_eval=grid_times, **options)
+            solution = np.asarray(result.y, dtype=float)
+        trajectory = solution.T.reshape((grid_times.size, self.field_count, *self.shape))
         fields = {
             name: Q_(np.array(trajectory[:, index]), units)
             for index, (name, units) in enumerate(self.model.field_units.items())
@@ -226,7 +294,10 @@ class CompiledMyceliumModel:
             "nfev": int(result.nfev),
             "njev": int(getattr(result, "njev", 0) or 0),
             "nlu": int(getattr(result, "nlu", 0) or 0),
-            "jacobian_structure": JACOBIAN_STRUCTURE if "jac_sparsity" in options else "backend_default",
+            "jacobian_structure": (
+                JACOBIAN_STRUCTURE if "jac" in options else (BANDED_JACOBIAN_STRUCTURE if banded else "backend_default")
+            ),
+            "jacobian_bandwidth": options.get("lband"),
             "kernel": self.summary(),
         }
         assumptions = list(self.model.assumptions)
@@ -271,17 +342,21 @@ class MyceliumResult:
     def ndim(self) -> int:
         return self.grid.ndim
 
+    @property
+    def measure_dimension(self) -> int:
+        return self.grid.measure_dimension
+
     def field_at_final_time(self, name: str) -> Quantity:
         values = self.fields[name]
         return Q_(np.asarray(values.magnitude)[-1], values.units)
 
     def spatial_integral(self, name: str) -> Quantity:
-        """Integral of the field over the grid at every output time (units times metre to the dimension)."""
+        """Integral of the field over the grid at every output time (units times metre to the measure dimension)."""
 
         values = self.fields[name]
         magnitudes = np.asarray(values.magnitude, dtype=float)
         integrals = np.array([spatial_integral(magnitudes[step], grid=self.grid) for step in range(magnitudes.shape[0])])
-        return Q_(integrals, f"({values.units}) * meter ** {self.ndim}")
+        return Q_(integrals, f"({values.units}) * meter ** {self.measure_dimension}")
 
     def occupied_measure(self, name: str, threshold: Quantity) -> Quantity:
         """Length, area or volume where the field is at or above ``threshold``, at every output time."""
@@ -289,8 +364,9 @@ class MyceliumResult:
         values = self.fields[name]
         level = float(assert_compatible(require_quantity(threshold, name="threshold"), str(values.units), name="threshold").magnitude)
         magnitudes = np.asarray(values.magnitude, dtype=float)
-        counts = (magnitudes >= level).reshape(magnitudes.shape[0], -1).sum(axis=1)
-        return Q_(counts * self.grid.cell_measure, f"meter ** {self.ndim}")
+        measures = self.grid.cell_measures.reshape(-1)
+        occupied = ((magnitudes >= level).reshape(magnitudes.shape[0], -1) * measures).sum(axis=1)
+        return Q_(occupied, f"meter ** {self.measure_dimension}")
 
     def front_position(self, name: str, threshold: Quantity, *, axis: int = 0) -> Quantity:
         """Largest coordinate along ``axis`` where the field (maximised over the other axes) reaches ``threshold``.
@@ -361,6 +437,7 @@ def total_amount(result: MyceliumResult, contributions: Sequence[tuple[str, Quan
 
 
 __all__ = [
+    "BANDED_JACOBIAN_STRUCTURE",
     "JACOBIAN_STRUCTURE",
     "MATURITY_LABEL",
     "MODEL_REPRESENTATION",

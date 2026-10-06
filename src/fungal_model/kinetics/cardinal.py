@@ -1,4 +1,4 @@
-"""Cardinal (Rosso-type) temperature and pH response laws.
+"""Cardinal (Rosso-type) temperature, pH and water-activity response laws.
 
 Equations
 ---------
@@ -37,6 +37,12 @@ sub-lethal injury, adaptation, thermal history, or temperature-pH interaction
 beyond the product of the two activities. The CTMI denominator is non-zero on
 the open interval ``(T_min, T_max)`` only when ``T_opt >= (T_min + T_max) / 2``;
 parameter sets outside that domain are rejected rather than evaluated.
+
+Cardinal water-activity model (Rosso and Robinson 2001), the CTMI shape with the
+maximum fixed at a water activity of one::
+
+    gamma_aw(a) = CTMI form with (a_min, a_opt, 1); zero for a <= a_min and at a = 1
+
 """
 
 from __future__ import annotations
@@ -93,6 +99,46 @@ def cardinal_ph_assumption() -> Assumption:
     )
 
 
+def cardinal_water_activity_assumption() -> Assumption:
+    """Return the Rosso and Robinson cardinal water-activity response assumption."""
+
+    return Assumption(
+        name="Rosso and Robinson cardinal water-activity model",
+        description=(
+            "A rate scales with a dimensionless activity of the cardinal family with inflection that is one "
+            "at the optimum water activity, zero at or below the minimum water activity, and defined with "
+            "the maximum fixed at a water activity of one."
+        ),
+        justification=(
+            "Two cardinal water activities and the optimal rate describe the moisture response of moulds "
+            "with the same inflected shape as the cardinal temperature model; the source fitted it to "
+            "Aspergillus, Eurotium and Xeromyces growth."
+        ),
+        known_limitations=(
+            "Empirical shape with the exponent of the cardinal family taken as two (the CTMI shape); the "
+            "activity vanishes at a water activity of one by construction of the family, there is no "
+            "hysteresis, substrate water binding, solute-specific effect or spatial moisture gradient, and "
+            "the cardinal values are organism- and substrate-specific. Equating a surface water activity "
+            "with an equilibrium relative humidity is the caller's declared assumption."
+        ),
+        source="Rosso, Robinson (2001) Int J Food Microbiol 63:265-273.",
+    )
+
+
+def _cardinal_model_with_inflection(flat: np.ndarray, minimum: float, optimum: float, maximum: float) -> np.ndarray:
+    """The cardinal family with inflection (exponent two) on values already checked for order and midpoint."""
+
+    inside = (flat > minimum) & (flat < maximum)
+    activity = np.zeros_like(flat, dtype=float)
+    values_inside = flat[inside]
+    numerator = (values_inside - maximum) * (values_inside - minimum) ** 2
+    bracket = (optimum - minimum) * (values_inside - optimum) - (optimum - maximum) * (
+        optimum + minimum - 2.0 * values_inside
+    )
+    activity[inside] = numerator / ((optimum - minimum) * bracket)
+    return activity
+
+
 def cardinal_temperature_activity(
     *,
     temperature: Quantity,
@@ -120,16 +166,42 @@ def cardinal_temperature_activity(
             "so that the denominator keeps one sign on the cardinal range; got optimum "
             f"{optimum} K against midpoint {0.5 * (minimum + maximum)} K."
         )
-    flat = np.atleast_1d(values)
-    inside = (flat > minimum) & (flat < maximum)
-    activity = np.zeros_like(flat, dtype=float)
-    temperature_inside = flat[inside]
-    numerator = (temperature_inside - maximum) * (temperature_inside - minimum) ** 2
-    bracket = (optimum - minimum) * (temperature_inside - optimum) - (optimum - maximum) * (
-        optimum + minimum - 2.0 * temperature_inside
-    )
-    denominator = (optimum - minimum) * bracket
-    activity[inside] = numerator / denominator
+    activity = _cardinal_model_with_inflection(np.atleast_1d(values), minimum, optimum, maximum)
+    return Q_(_shaped(activity, values), "dimensionless")
+
+
+MAXIMUM_WATER_ACTIVITY = 1.0
+
+
+def cardinal_water_activity_activity(
+    *,
+    water_activity: Quantity,
+    minimum_water_activity: Quantity,
+    optimum_water_activity: Quantity,
+    source: str,
+) -> Quantity:
+    """Compute the dimensionless cardinal water-activity activity ``gamma_aw`` (maximum fixed at one)."""
+
+    if not has_text(source):
+        raise ValueError("A source is required for cardinal water-activity activity.")
+    values = _dimensionless_values(water_activity, "water_activity")
+    if np.any((values < 0.0) | (values > MAXIMUM_WATER_ACTIVITY)):
+        raise ValueError("water_activity must lie between zero and one.")
+    minimum = _dimensionless_scalar(minimum_water_activity, "minimum_water_activity")
+    optimum = _dimensionless_scalar(optimum_water_activity, "optimum_water_activity")
+    maximum = MAXIMUM_WATER_ACTIVITY
+    if not 0.0 <= minimum < optimum < maximum:
+        raise ValueError(
+            "Cardinal water activities must satisfy 0 <= minimum < optimum < 1; got "
+            f"{minimum}, {optimum}."
+        )
+    if optimum < 0.5 * (minimum + maximum):
+        raise ValueError(
+            "The cardinal water-activity model requires optimum_water_activity >= (minimum_water_activity + 1) / 2 "
+            f"so that the denominator keeps one sign on the cardinal range; got optimum {optimum} against "
+            f"midpoint {0.5 * (minimum + maximum)}."
+        )
+    activity = _cardinal_model_with_inflection(np.atleast_1d(values), minimum, optimum, maximum)
     return Q_(_shaped(activity, values), "dimensionless")
 
 
@@ -198,8 +270,11 @@ def _dimensionless_scalar(quantity: Quantity, name: str) -> float:
 
 
 __all__ = [
+    "MAXIMUM_WATER_ACTIVITY",
     "cardinal_ph_activity",
     "cardinal_ph_assumption",
     "cardinal_temperature_activity",
     "cardinal_temperature_assumption",
+    "cardinal_water_activity_activity",
+    "cardinal_water_activity_assumption",
 ]

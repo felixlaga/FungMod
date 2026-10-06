@@ -6,6 +6,12 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Axisymmetric grid geometry for the spatial mycelium core, colony observables
+  (counts outside an inoculum disc, window-truncated hull radius and area) and the
+  Rosso and Robinson cardinal water-activity law and modifier (SPATIAL-002);
+  banded LSODA on one-axis grids and a coloured finite-difference sparse
+  Jacobian for the implicit methods; the COLONY-001 stage 0 study module and
+  runner (error models and recorded software checks, no fit).
 - Frozen plan for the colony comparison (COLONY-001): the within-study
   transfer test of the continuum mycelium against the De Ligne 2019 curves,
   declared with its geometry, observation operators, error model, hold-outs,

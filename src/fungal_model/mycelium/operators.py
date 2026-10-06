@@ -76,20 +76,38 @@ def upwind_face_flux(values: np.ndarray, velocity_faces: np.ndarray, *, axis: in
     return flux
 
 
-def divergence(face_fluxes: Sequence[np.ndarray], *, cell_widths: Sequence[float]) -> np.ndarray:
-    """Cell tendency ``-sum_axis (F_upper - F_lower) / dx`` of outward face fluxes.
+def divergence(
+    face_fluxes: Sequence[np.ndarray],
+    *,
+    grid: SpatialGrid | None = None,
+    cell_widths: Sequence[float] | None = None,
+) -> np.ndarray:
+    """Cell tendency of outward face fluxes under the conservation law ``du/dt = -div F``.
 
-    The sign convention is that of a conservation law ``du/dt = -div F``:
-    the returned array is the rate of change of the cell value.
+    With ``grid`` the geometry's face weights are used (``1 / dx`` per axis on a
+    cartesian grid, ``r_face / (r_centre dr)`` on an axisymmetric one); with
+    ``cell_widths`` alone the cartesian form ``-sum_axis (F_upper - F_lower) / dx``.
     """
 
+    if (grid is None) == (cell_widths is None):
+        raise ValueError("divergence takes exactly one of grid or cell_widths.")
     tendency: np.ndarray | None = None
-    for axis, (flux, width) in enumerate(zip(face_fluxes, cell_widths, strict=True)):
+    for axis, flux in enumerate(face_fluxes):
         ndim = flux.ndim
-        change = -(flux[_axis_slices(ndim, axis, slice(1, None))] - flux[_axis_slices(ndim, axis, slice(0, -1))]) / width
+        lower = flux[_axis_slices(ndim, axis, slice(0, -1))]
+        upper = flux[_axis_slices(ndim, axis, slice(1, None))]
+        if grid is not None:
+            weight_lower, weight_upper = grid.face_weights(axis)
+            change = -(weight_upper * upper - weight_lower * lower)
+        else:
+            assert cell_widths is not None
+            change = -(upper - lower) / cell_widths[axis]
         tendency = change if tendency is None else tendency + change
     if tendency is None:
         raise ValueError("divergence needs at least one axis of face fluxes.")
+    expected = len(grid.shape) if grid is not None else len(cell_widths or ())
+    if len(face_fluxes) != expected:
+        raise ValueError(f"divergence received {len(face_fluxes)} face-flux arrays for {expected} axes.")
     return tendency
 
 
@@ -100,7 +118,7 @@ def diffusive_tendency(values: np.ndarray, *, grid: SpatialGrid, diffusivity: fl
         -diffusivity * face_gradient(values, axis=axis, cell_width=width, periodic=periodic)
         for axis, (width, periodic) in enumerate(zip(grid.cell_widths, grid.periodic_axes, strict=True))
     ]
-    return divergence(fluxes, cell_widths=grid.cell_widths)
+    return divergence(fluxes, grid=grid)
 
 
 def drift_face_velocities(potential: np.ndarray, *, grid: SpatialGrid, mobility: float) -> list[np.ndarray]:
@@ -113,12 +131,12 @@ def drift_face_velocities(potential: np.ndarray, *, grid: SpatialGrid, mobility:
 
 
 def spatial_integral(values: np.ndarray, *, grid: SpatialGrid) -> float:
-    """Finite-volume integral over the whole grid (value units times metre to the dimension)."""
+    """Finite-volume integral over the whole grid (value units times metre to the measure dimension)."""
 
     array = np.asarray(values, dtype=float)
     if array.shape[-grid.ndim :] != grid.shape:
         raise ValueError(f"Field shape {array.shape} does not end with the grid shape {grid.shape}.")
-    return float(np.sum(array)) * grid.cell_measure
+    return float(np.sum(array * grid.cell_measures))
 
 
 __all__ = [

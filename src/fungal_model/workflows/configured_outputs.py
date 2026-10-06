@@ -496,6 +496,28 @@ def _configured_process_modifier_row(
                 ),
             }
         )
+    elif modifier_type == "water_activity_cardinal_rosso_robinson":
+        row.update(
+            {
+                "environment_value": "water_activity",
+                "minimum_water_activity_symbol": modifier.get(
+                    "minimum_water_activity_symbol", modifier.get("minimum_water_activity", "")
+                ),
+                "optimum_water_activity_symbol": modifier.get(
+                    "optimum_water_activity_symbol", modifier.get("optimum_water_activity", "")
+                ),
+                "maturity": "configured_water_activity_response_law",
+                "equation": (
+                    "gamma_aw = (aw-1)(aw-aw_min)^2 / {(aw_opt-aw_min)[(aw_opt-aw_min)(aw-aw_opt) - (aw_opt-1)(aw_opt+aw_min-2aw)]}"
+                ),
+                "limitation": (
+                    "Rosso and Robinson cardinal water-activity scaling only, with the maximum fixed at one; "
+                    "configured only when environment water activity and two explicit cardinal values are "
+                    "present. Zero activity at or below the minimum and at one; no hysteresis, water binding "
+                    "or spatial moisture model."
+                ),
+            }
+        )
     elif modifier_type == "water_activity_threshold":
         row.update(
             {

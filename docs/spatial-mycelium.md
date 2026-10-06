@@ -49,6 +49,31 @@ a substrate-limited extension could never leave the inoculum, and the
 process records that choice as a limitation. Kernels are evaluated at `max(field, 0)` and the integrated
 fields are never clipped, the policy of the well-mixed compiled core.
 
+Two grid geometries exist. A `cartesian` grid has one to three axes with
+equal cells. An `axisymmetric` grid (`SpatialGrid.axisymmetric(radius,
+cells)`, SPATIAL-002) has one axis, the radius of a colony with circular
+symmetry: a cell is the annulus between two radii, its measure is
+`2 pi r dr`, the divergence weights each face by `r_face / (r_centre dr)`,
+the face on the axis carries no flux, and every integral is an area
+integral (`measure_dimension` is two). The same processes run unchanged on
+either geometry; the radial grid resolves a centred colony at a small
+fraction of the cost of the two-dimensional one and is the calibration
+grid of the colony comparison plan (`docs/colony-comparison.md`).
+
+## Colony observables
+
+`fungal_model.mycelium.observation` evaluates image-derived colony measures
+on a result, for a square scan window and an inoculum disc declared by the
+caller: `colony_count_outside_disc` (a per-area field integrated over the
+window outside the disc, as a tip count is read after the inoculum is
+removed from the images), `colony_hull_radius` (the farthest detected cell
+centre at a declared detection density, never inside the disc) and
+`colony_hull_area` (the window-truncated disc of that radius on an
+axisymmetric grid, the convex hull of the detected cells and the disc
+boundary on a cartesian one), with the closed forms `disc_area_in_square`
+and `circle_length_in_square`. They are geometry, not biology: the
+detection density and the disc are declared constants of a plan.
+
 ## How a model is built and run
 
 ```python
@@ -104,13 +129,33 @@ confidence, refused by scientific mode.
   declared units, including a cost declared in a different mass unit;
 - the right-hand side of a 50 x 50 grid with four fields takes well under
   a millisecond per evaluation (about 0.4 ms on the development container,
-  against 66 ms per evaluation at 200 cells for the unit-aware engines).
+  against 66 ms per evaluation at 200 cells for the unit-aware engines);
+- on the axisymmetric grid the cells are annuli whose measures sum to the
+  disc area, the axis face carries no flux, diffusion conserves the integral
+  and matches the time derivative of the planar Gaussian to 2e-3 of its
+  peak, a model's integrals carry area units, and the artificial colony on
+  the radial grid agrees with the two-dimensional colony on the window
+  count and hull area within the cartesian discretisation
+  (`tests/test_mycelium_colony.py`);
+- the colony observables reproduce their closed forms, agree between the
+  two geometries for a uniform density, and follow the outermost detected
+  cell (`tests/test_colony_observation.py`).
 
-Measured on the development container (one core): the 40 x 40 artificial
-colony over 24 hours takes about 19 s with LSODA (20 000 right-hand sides,
-dense backend Jacobian) and 39 s with BDF on the sparse pattern; the
-right-hand side itself is 7 s of that. A compiled sparse Jacobian for the
-spatial core is the next performance step.
+Two Jacobian paths exist (SPATIAL-002). On a one-axis grid LSODA integrates
+the state in cell-major order with a banded Jacobian of half-bandwidth
+`2 F - 1` for `F` fields, so a Jacobian costs a few right-hand sides instead
+of one per state: the radial colony comparison model (283 cells, four
+fields, 62 hours) went from about 220 s to 4 s with the same trajectory.
+The implicit methods (BDF, Radau) receive a sparse finite-difference
+Jacobian on the nearest-neighbour pattern, built with one right-hand side
+per colour (`3 ** ndim * F` colours, cells coloured by index modulo three
+per axis) and a fixed step `sqrt(eps) * max(|y|, 1)`: scipy's own adaptive
+estimator overflowed on these clipped fields and failed the integration,
+and the fixed rule does not. Measured on the development container (one
+core): the 40 x 40 artificial colony over 24 hours takes about 19 s with
+LSODA (dense backend Jacobian) and 39 s with BDF on the sparse pattern. A
+compiled analytic sparse Jacobian remains the next performance step for
+two- and three-dimensional grids.
 
 ## What it is not
 

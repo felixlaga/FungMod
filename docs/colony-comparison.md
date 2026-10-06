@@ -7,12 +7,20 @@ puteana* and *Rhizoctonia solani* under sixteen temperature-humidity
 conditions. The test is declared before anything is run, in
 `data/benchmarks/de_ligne_2019_colony/plan.json`, and
 `tests/test_colony_comparison_plan.py` pins that file's SHA-256
-(`e7a8706e85fef7739e96c7fe21d8aac0cbf2e4719201b1c203c9296d033066e4`), so
+(`ea6e2e7270b809fee092655f7e6882cf266e16d86d955c276ba5e2edc5ad959e`), so
 a change to the plan is impossible without a dated amendment inside the
 file and a new digest in the test and the ledger.
 
-**Status:** plan frozen on 2026-10-06. The software the plan needs (stage 0)
-is not built yet and no fit has been run. Nothing on this page is a result.
+**Status:** plan frozen on 2026-10-06 and amended once the same day, before
+any check was recorded: the first draft tied the area operator's detection
+density to the model cell, which would have made the plan's own
+grid-convergence check ill-posed; the amendment declares it as a constant
+(the file's amendment log records the previous digest and the reason). Of the
+stage 0 software, the
+axisymmetric grid, the observation operators and the cardinal water-activity
+law exist (SPATIAL-002); the error-model fit, the study runner and the
+recorded stage 0 checks do not, and no fit has been run. Nothing on this page
+is a result.
 
 ## The question
 
@@ -48,7 +56,9 @@ through cardinal response laws in temperature and water activity?
   the colony outside the disc and inside the window, because the source
   counted graph nodes of degree one after removing the disc. Mycelial area
   is the window-truncated disc of the outermost hyphae whose length density
-  reaches one segment per model cell, never smaller than the inoculum disc,
+  reaches the declared detection density of one millimetre per square
+  millimetre (a grid-independent operator constant), never smaller than the
+  inoculum disc,
   because the source's area is the convex hull of all graph nodes
   including the artificial nodes on the disc boundary. Neither observable
   is biomass or hyphal length.

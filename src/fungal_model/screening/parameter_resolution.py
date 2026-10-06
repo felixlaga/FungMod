@@ -65,6 +65,10 @@ _MODIFIER_COMPATIBILITY_ROLE_BY_FIELD = {
     "water_activity_threshold": {
         "minimum_water_activity_role": "minimum_water_activity",
     },
+    "water_activity_cardinal_rosso_robinson": {
+        "minimum_water_activity_role": "minimum_water_activity",
+        "optimum_water_activity_role": "optimum_water_activity",
+    },
 }
 _DIRECT_PROCESS_PARAMETER_FIELDS = {
     "surface_catalysis": (
