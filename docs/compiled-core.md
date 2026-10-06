@@ -55,11 +55,14 @@ it:
 | `quantity_wrapped` | The process offered no kernel; its unit-aware `rate` runs on a reconstructed state. Exact, slow. |
 | `quantity_wrapped_thermodynamic` | Wrapped evaluation followed by the constraint's unit-aware `enforce`. |
 
-All five shipped process classes (`FirstOrderDecayProcess`,
-`MassActionProcess`, `HomogeneousMichaelisMentenProcess`,
-`SurfaceCatalysisProcess`, `SubstrateTransglycosylationProcess`) and all eight
-modifiers compile to numeric kernels; `tests/test_compiled_process_models.py`
-fails if any shipped mechanism falls back. A third-party `Process` that only
+All thirteen shipped process types (those of
+`ProcessLibrary.default_foundation()`: first-order decay, mass action,
+homogeneous and pH-ionization Michaelis-Menten, proportional synthesis,
+substrate transglycosylation, surface catalysis, thermal inactivation and the
+five culture closure and exchange types below) compile to numeric kernels, and
+all twelve configurable rate modifiers compile their activity;
+`tests/test_compiled_process_models.py` fails if any shipped process type
+falls back. A third-party `Process` that only
 implements `rate`/`contributions` keeps working through the wrapped path.
 
 Kernels raise the same parameter errors as the unit-aware path (a non-positive
@@ -182,7 +185,7 @@ culture classes' analytic-Jacobian trajectories with it.
   well-mixed `Process` kernels per cell.
 - By default stiff methods still use the backend's finite differences,
   recorded as `"jacobian": "finite_difference_by_backend"`; the compiled
-  Jacobian below is opt-in so that recorded results stay byte-stable.
+  Jacobian above is opt-in so that recorded results stay byte-stable.
 
 ## Reproduce
 

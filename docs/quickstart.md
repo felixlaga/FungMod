@@ -25,9 +25,11 @@ for report in study.preflight(mode="exploratory"):
     print(report.summary())
 ```
 
-Preflight classifies cases as modelable, exploratory, underparameterized,
-unsupported, or incompatible. It is a guardrail—not the final scientific
-output.
+Preflight classifies each case as `modelable`, `exploratory`,
+`underparameterized` or `unsupported`, and lists its known, uncertain, missing
+and incompatible inputs. A case without a compatible process is `unsupported`;
+otherwise any missing or incompatible input makes it `underparameterized`. It
+is a guardrail—not the final scientific output.
 
 ## 3. Simulate
 
