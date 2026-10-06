@@ -1024,7 +1024,11 @@ cardinal pH or Arrhenius law to a strain, enzyme and substrate through the
 template modifiers, so an `EnvironmentGrid` over temperature or pH changes the
 rate through the law; the kinetic constants must then be stated at the law's
 reference condition. See `docs/user-data.md` for the table formats and
-limitations.
+limitations. An optional `genomes.csv` takes a strain's enzyme classes from
+its dbCAN genome annotation: classes with a registry record join the
+strain, classes without one and unmapped families are reported, and every
+resolved class that can act on a dataset substrate but has no kinetics becomes
+a named measurement request, since no rate is ever taken from a genome.
 
 ## Public API
 

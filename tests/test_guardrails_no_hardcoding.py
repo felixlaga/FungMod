@@ -100,6 +100,12 @@ def test_user_data_import_has_no_organism_substrate_or_enzyme_specific_tokens() 
         "oryza",
         "laccase",
         "syringaldazine",
+        # USERDATA-003 genome-route fixture: the classes and substrates come from the family map and tables.
+        "maltose",
+        "glucoamylase",
+        "xylanase",
+        "cellobiohydrolase",
+        "synthetic_g",
     ):
         assert forbidden not in user_data, forbidden
 

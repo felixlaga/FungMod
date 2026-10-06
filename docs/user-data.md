@@ -37,16 +37,19 @@ A loaded `UserDataset` can be passed as `user_data=` as well; it carries the
 `dataset_id`, a SHA-256 `digest` over the manifest and table bytes, the
 generated registry mappings (`records`) and `to_dict()`.
 
-Three complete examples live in the test fixtures:
+Four complete examples live in the test fixtures:
 `tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on a
 user-defined aryl ester, `kcat` form, estimates only),
 `tests/fixtures/user_data/literature_reentry/` (the published SABIO-RK Reaction
 618 selected entry typed in as literature values against the registry's
-`cellobiose` and `beta_glucosidase`) and
+`cellobiose` and `beta_glucosidase`),
 `tests/fixtures/user_data/oxidase_case/` (a user-defined laccase-like oxidase on
 a dissolved phenolic substrate, Vmax from a specific activity and an enzyme
 loading, with cardinal temperature and pH laws in `responses.csv`; estimates
-only).
+only) and `tests/fixtures/user_data/genome_case/` (a strain whose enzyme
+classes come only from a hand-written dbCAN overview in `genomes.csv`; a format
+fixture with synthetic gene identifiers, not a real genome, and no kinetic
+values, so every resolved class is a gap).
 
 ## Directory layout
 
@@ -60,6 +63,8 @@ only).
 | `conditions.csv` | yes | Assay conditions (temperature and pH). |
 | `kinetics.csv` | yes | Kinetic values, one row per quantity and case. |
 | `responses.csv` | no | Temperature and pH response laws bound to a strain, enzyme class and substrate. |
+| `genomes.csv` | no | A dbCAN genome annotation per strain, from which enzyme classes are resolved. |
+| annotation files | with `genomes.csv` | The dbCAN `overview.txt` files that `genomes.csv` names, anywhere inside the directory. |
 
 Any other CSV file in the directory (for example a time-course table) is
 refused as unsupported in this version rather than ignored. Columns not listed
@@ -109,7 +114,9 @@ strain_e1,carboxylesterase,activity assay,Lab notebook LN-42 p. 10
 `enzyme_class` is either a registry enzyme class (its ID, name, alias or EC
 number, resolved on the registry) or a `class_id` from `enzyme_classes.csv`.
 `evidence` is free text such as "secretome proteomics" or "activity assay".
-Every strain must declare at least one class.
+Every strain must declare at least one class, here or through its genome
+annotation in `genomes.csv` (see [below](#genomescsv-optional-enzyme-classes-from-a-genome-annotation));
+with a `genomes.csv` this table may hold only its header.
 
 ### `enzyme_classes.csv` (optional)
 
@@ -324,6 +331,109 @@ a law on that condition. Otherwise the dataset is refused with a message
 naming the condition, the reference value and the difference. Concentrations
 and `enzyme_loading` are amounts, not rates, and are not checked or rescaled.
 
+### `genomes.csv` (optional): enzyme classes from a genome annotation
+
+Columns: `strain_id`\*, `annotation_file`\*, `annotation_tool`\*, `source`\*,
+`min_tools_agreeing`.
+
+```text
+strain_id,annotation_file,annotation_tool,source
+strain_g1,annotations/strain_g1_overview.txt,dbCAN 4.1.4,"run_dbcan on the predicted proteome of assembly <accession>, 2026-09-30"
+```
+
+Instead of (or besides) listing a strain's enzyme classes by hand, point it to
+the dbCAN annotation of its genome or proteome. FungMod resolves the
+annotation to enzyme classes with its existing capability resolver and curated
+CAZy family map (`data_registry/cazyme_families/cazyme_family_map.yml`). A
+genome states which classes a strain can encode, never a rate: no kinetic
+constant, enzyme concentration, expression level or secretion is taken from
+it, and every resolved class that can act on a dataset substrate but has no
+kinetics becomes the explicit gaps described
+[below](#gaps-and-measurement-requests).
+
+- `annotation_file` is a path relative to the dataset directory, separated by
+  `/`, to a dbCAN `overview.txt`: tab-separated, with the column `Gene ID` and
+  at least one of the tool columns `HMMER`, `dbCAN_sub`, `DIAMOND`, `eCAMI` and
+  `Hotpep` (other columns such as `EC#` and `#ofTools` are not read). Absolute
+  paths, paths with `..` and paths that leave the directory through a symbolic
+  link are refused, and so are a missing file, a header without `Gene ID` or a
+  tool column, a repeated gene identifier and a file without any family call.
+  The file's bytes enter the dataset `digest` and `file_digests` (under its
+  relative path), so changing the annotation changes the digest.
+- `annotation_tool` is `dbCAN` (or `dbCAN3`, `run_dbcan`) followed by the
+  version you ran, which is recorded as written; the overview file does not
+  record the version, so a tool without one is refused. Other annotation
+  tools are refused.
+- `source` says which genome or proteome was annotated, ideally with its
+  accession and the run.
+- One row per strain; the strain must be in `strains.csv`.
+
+**Families and the consensus rule.** Each tool cell is read as in
+`fungal_model.capability.families_from_overview`: subfamily suffixes and
+residue ranges are dropped (`GH5_5(35-320)` counts as `GH5`). With
+`min_tools_agreeing` blank, a family counts for a gene when any tool column
+calls it, which is the existing rule of that function; FungMod has no
+multi-tool threshold of its own and does not choose one for you. With
+`min_tools_agreeing` = *m*, a family counts for a gene only when at least *m*
+of the tool columns present call it for that gene; *m* must be a positive
+integer no larger than the number of tool columns in the file. The gene count
+of a family or class is the number of genes that carry it under the rule.
+
+**Three outcomes.** The resolver maps families to classes and labels a class
+`family_diagnostic` when any supporting family is diagnostic, otherwise
+`family_polyspecific` (a candidate capability). Then:
+
+1. *A resolved class with a record in the base registry* joins the strain's
+   declared classes, exactly as if `enzymes.csv` had listed it, with the
+   evidence `genome annotation (dbCAN, 3 genes, families GH1, GH3)` and the
+   row's source. If `enzymes.csv` already declares that class for the strain,
+   the explicit row wins and the genome evidence is recorded beside it; both
+   appear in the fungus record under
+   `provenance.enzyme_class_evidence.<class>` (the annotation under
+   `genome_annotation`, with the file digest, the families, the gene
+   identifiers and the consensus rule).
+2. *A resolved class without a registry record* is listed in
+   `unmodellable_enzyme_classes` (class, families, gene count, specificity and
+   the reason). No enzyme-class record, case or gap is generated for it.
+3. *A family the map assigns to no class* is listed in `unmapped_families`.
+
+`kinetics.csv` and `responses.csv` rows may name a class the annotation
+declared; the case then behaves like any other. A strain whose `enzymes.csv`
+rows are absent and whose annotation resolves no class with a registry record
+is refused with the classes found and the unmapped families.
+
+The gap requests of a class that only the annotation declares say so:
+
+> Measure km of beta-glucosidase from Genome-annotated strain G1 on Cellobiose
+> at 30 degC, pH 5.0 (concentration units); the class was inferred from the
+> dbCAN annotation (families GH1, GH3; family membership is polyspecific, so
+> the activity itself needs confirming).
+
+Such a class reaches scientific mode only through kinetics you supply: with
+the annotation alone its roles are `user_dataset_gap` unknowns, preflight is
+`underparameterized` in both modes, and simulation is refused.
+
+`UserDataset.genome_annotations` (file, digest, tool and version, tool columns,
+consensus rule, gene rows, family gene counts and the family map's digest and
+sources), `genome_resolved_classes`, `unmodellable_enzyme_classes` and
+`unmapped_families` appear in `UserDataset.to_dict()` and
+`UserDataset.summary()` and are empty without a `genomes.csv`.
+
+Limits of the genome route:
+
+- dbCAN `overview.txt` only, read from the dataset directory; no other
+  annotation format and no download at run time.
+- Family-level mapping: the curated map covers 18 CAZy families, a
+  polyspecific family gives only a candidate class, and the `EC#` column is not
+  used. With the shipped registry only `beta_glucosidase` and
+  `cellulase_generic` among the mapped classes have a record, so most resolved
+  classes are reported as unmodellable; the resolver's `require_diagnostic`
+  filter is not exposed.
+- Gene counts are annotated genes, not active enzymes, copy numbers or
+  expression.
+- The test fixture is a format fixture written by hand; no real genome
+  annotation is bundled.
+
 ## Evidence types, maturity and modes
 
 | `evidence_type` | Record maturity | Exact value | Range |
@@ -367,7 +477,7 @@ out of data you intend to simulate.
 
 | Record | Identifier |
 | --- | --- |
-| Fungus per strain, listing its namespaced classes | `<dataset_id>__<strain_id>` |
+| Fungus per strain, listing its namespaced classes (from `enzymes.csv` and `genomes.csv`) | `<dataset_id>__<strain_id>` |
 | Enzyme class per declared class, limited to homogeneous Michaelis-Menten | `<dataset_id>__<class>` |
 | Substrate per user-defined substrate (registry substrates are referenced) | `<dataset_id>__<substrate_id>` |
 | Environment per condition | `<dataset_id>__<condition_id>` |
@@ -428,6 +538,11 @@ a stated row). When a law is bound to an enzyme class and substrate for one
 strain, every other strain of that pair gets a gap per law parameter (with
 no condition), asking for that parameter of that law.
 
+When the class of the case comes only from the strain's genome annotation,
+every request ends with the families it was inferred from (see
+[`genomes.csv`](#genomescsv-optional-enzyme-classes-from-a-genome-annotation)),
+and the gap's provenance carries `class_evidence: genome_annotation`.
+
 Preflight reports such a case as `underparameterized`, names the namespaced
 symbol among the missing items, and quotes the request in the report's
 `suggested_experiments` and in `modelability_preflight.csv`; the standard
@@ -438,7 +553,13 @@ text. Registry records without a request keep the existing suggestion text.
 
 `VirtualExperiment` keeps `user_dataset_id` and `user_dataset_digest`, and
 both appear in `virtual_experiment_summary.json` (under `experiment`) and in
-`output_manifest.json` (`null` without user data). In the standard tables,
+`output_manifest.json` (`null` without user data). Beside them,
+`virtual_experiment_summary.json` lists `genome_resolved_classes`,
+`unmodellable_enzyme_classes` and `unmapped_families` (empty lists for a
+dataset without `genomes.csv`, `null` without user data), and
+`VirtualExperiment.write_preflight_report` writes
+`user_dataset_genome_resolution.json` with these lists and the annotations
+read when the dataset has a `genomes.csv`. In the standard tables,
 `parameter_source_class` reads `user_measured_exact_value`,
 `user_reported_literature_range`, `user_design_value_exact_value` and so on,
 estimates read `user_supplied_exploratory_prior`, and the mechanism maturity
@@ -464,6 +585,9 @@ unchanged.
   case reports the roles as missing.
 - No enzyme cocktails or multi-step chains, no time-course responses or
   fitting, no growth, secretion or uptake.
+- A genome annotation adds enzyme classes, never rates; only dbCAN
+  `overview.txt` files are read, and only classes with a registry record are
+  added (see the limits of the genome route above).
 - One substrate per substrate class for each enzyme class, because FungMod
   selects a process by enzyme class and substrate class.
 - A namespaced copy of a registry class keeps the parent's EC number, so

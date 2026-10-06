@@ -3,7 +3,15 @@
 Answers which capabilities an organism plausibly encodes, never at what rate.
 """
 
-from .dbcan import TOOL_COLUMNS, annotation_from_overview, families_from_overview
+from .dbcan import (
+    GENE_ID_COLUMN,
+    TOOL_COLUMNS,
+    DbcanOverview,
+    OverviewGene,
+    annotation_from_overview,
+    families_from_overview,
+    parse_overview,
+)
 from .resolution import (
     DIAGNOSTIC,
     POLYSPECIFIC,
@@ -15,12 +23,18 @@ from .resolution import (
     CazymeFamilyMap,
     FamilyMapping,
     ResolvedCapability,
+    default_family_map_path,
 )
 
 __all__ = [
+    "GENE_ID_COLUMN",
     "TOOL_COLUMNS",
+    "DbcanOverview",
+    "OverviewGene",
     "annotation_from_overview",
     "families_from_overview",
+    "parse_overview",
+    "default_family_map_path",
     "DIAGNOSTIC",
     "POLYSPECIFIC",
     "SPECIFICITY_LEVELS",
