@@ -31,6 +31,11 @@ result.write_report(
 )
 ```
 
+With your own measurements, describe them in a folder of small CSV tables
+(strains, their enzyme classes, substrates, conditions and kinetics) and pass
+`user_data="that/folder"` to `virtual_experiment`; see
+[user-supplied data](user-data.md).
+
 ## What you get
 
 - modelability preflight before execution;

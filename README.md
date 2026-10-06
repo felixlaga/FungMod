@@ -51,6 +51,26 @@ import fungal_model
 print(fungmod.__version__)
 ```
 
+Name a fungus or enzyme source, a substrate and the conditions, and FungMod
+assembles the model from its records and simulates degradation over time:
+
+```python
+import fungmod as fm
+
+study = fm.virtual_experiment(
+    fungi="beta-glucosidase source",
+    substrates="cellobiose",
+    environments="SABIO-RK Reaction 618 selected assay conditions",
+)
+result = study.simulate(mode="exploratory", n_samples=32, seed=618)
+```
+
+With your own measurements, put them in a folder of small CSV tables
+(strains, their enzymes, substrates, conditions and kinetics) and pass
+`user_data="that/folder"`; FungMod checks every table, keeps each value's
+source and units, and turns anything missing into a named measurement request
+([user-supplied data](docs/user-data.md)).
+
 Start with the [installation guide](https://fungmod.readthedocs.io/en/latest/install/),
 run a complete workflow in
 [`20_zero_to_complete_virtual_experiment.ipynb`](notebooks/examples/20_zero_to_complete_virtual_experiment.ipynb),
@@ -64,6 +84,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests ([user-supplied data](docs/user-data.md)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, and variance-based global sensitivity |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
