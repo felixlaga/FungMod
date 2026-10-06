@@ -40,7 +40,7 @@ All notable public releases of FungMod are documented here.
   `compiled_parameters()` and `simulate_compiled()`, which return the classes'
   own trajectory types from the compiled core; `simulate` keeps the native
   right-hand side (analytic piecewise Jacobian) and both paths name their
-  engine in `diagnostics["engine"]`. Parity tests pin the two paths to 1e-7
+  engine in `diagnostics["engine"]`. Parity tests pin the two paths to 1e-6
   relative (`tests/test_culture_processes.py`). `FungalCouplingModel` gains
   `compiled_processes(degradation)`, `compiled_parameters()` (with the derived
   secretion-cost rate constant `alpha_E_c_E`) and `simulate_compiled()`, pinned

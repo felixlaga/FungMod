@@ -107,7 +107,7 @@ the solved pathways' dynamic-pool stoichiometry and extent ledgers, plus a
 boundary ledger; `compiled_parameters()` restates the feed as parameters;
 `simulate_compiled()` integrates them and returns the same `CultureTrajectory`
 with `diagnostics["engine"]` naming the path. `simulate` keeps the native
-right-hand side for its analytic piecewise Jacobian; the two agree to 1e-7
+right-hand side for its analytic piecewise Jacobian; the two agree to 1e-6
 relative at tight tolerances (`tests/test_culture_processes.py`).
 
 Entropy production is available through `RespiratoryGrowthModel.entropy_production`
