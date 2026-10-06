@@ -6,6 +6,66 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- The software paper is a LaTeX manuscript, `paper/paper.tex` (it replaces
+  the Markdown draft; `make paper-pdf` builds it with latexmk). The paper
+  tables are now also written as LaTeX fragments (`paper/tables/*.tex`,
+  captioned full-width floats generated next to the Markdown copies by the
+  same command and checked the same way; `latex_inline` escapes cell text)
+  and the figures also as PDF (`paper/figures/*.pdf`, generator marker, no
+  date); the manifests name the new files and `check` covers them.
+- The compiled process core assembles a Jacobian (`CompiledModel.jacobian`)
+  from per-process gradient kernels: analytic through the new
+  `Process.compile_jacobian` for `first_order_decay`, `mass_action`,
+  `homogeneous_michaelis_menten`, `proportional_synthesis`, the three
+  resource-limited closure processes and the two exchanges; central finite
+  differences of the process's own rate kernel otherwise, with every kind
+  recorded in the kernel summary (`jacobian_kernels`,
+  `analytic_jacobian_count`). `SolverSettings(jacobian="compiled")` hands it
+  to the implicit methods; the default (`finite_difference_by_backend`) and
+  every recorded result are unchanged.
+- The software paper's figures (`paper/figures/`): `fungal_model.research.paper_figures`
+  draws the cellulose holdouts, the posterior predictive bands, the stage A
+  screen and the cross-solver objectives from the recorded results, writes
+  the plotted numbers as JSON next to each SVG and a manifest with source
+  digests and key numbers; `scripts/reproduce_paper.py tables` and `check`
+  (and `make paper-tables`, `paper-check`) now cover tables and figures.
+- `fit_least_squares` accepts `diff_step`, `ftol`, `xtol` and `gtol`
+  (each `None` by default, leaving scipy's value) and records the declared
+  values in `optimizer_metadata`, so a calibration whose predictions come
+  from an adaptive integrator can declare a finite-difference step above the
+  integrator's step noise, as the model-criticism study does through its
+  plan (CRIT-003). Default behaviour is unchanged.
+- Culture physiology as generic processes on the compiled core
+  (`fungal_model.processes.culture`): `resource_limited_growth`,
+  `resource_limited_maintenance` and `costed_secretion` express the Pirt/Monod
+  closure with explicit stoichiometry and optional extent ledgers;
+  `dilution_exchange` and `gas_transfer` express the chemostat boundary with
+  optional boundary ledgers; all five have numeric kernels, factories and
+  config support (`stoichiometry` on `ProcessConfig`), and the packaged
+  `toy_resource_limited_chemostat.yml` runs them on abstract pools.
+  `ResourceLimitedCulture` and `DegradingCulture` gain `compiled_processes()`,
+  `compiled_parameters()` and `simulate_compiled()`, which return the classes'
+  own trajectory types from the compiled core; `simulate` keeps the native
+  right-hand side (analytic piecewise Jacobian) and both paths name their
+  engine in `diagnostics["engine"]`. Parity tests pin the two paths to 1e-6
+  relative (`tests/test_culture_processes.py`). `FungalCouplingModel` gains
+  `compiled_processes(degradation)`, `compiled_parameters()` (with the derived
+  secretion-cost rate constant `alpha_E_c_E`) and `simulate_compiled()`, pinned
+  to its legacy engine (`tests/test_coupling_compiled.py`); `MassActionProcess`
+  accepts `catalysts` (species in the rate law that are not consumed; config key
+  `states.catalysts`; SBML modifiers).
+- Reproducibility package for the software paper
+  (`docs/reproducing-the-paper.md`): `fungal_model.research.paper_tables`
+  generates the paper's five tables under `paper/tables/` from the recorded
+  study results with a manifest of source files, SHA-256 digests and key
+  numbers; `scripts/reproduce_paper.py` offers the tiers `tables`, `check`,
+  `verify` (digest chains, the compiled-core objective at the recorded
+  cross-solver optimum, the stationarity of the recorded baseline fit),
+  `stage-a` (re-run and compare) and `full` (every study, compared on
+  verdict-level fields); `make paper-tables`, `paper-check`, `paper-verify`,
+  `paper-stage-a`, `paper-full`, `wheelhouse` and `install-offline`; CI
+  installs the built wheel with network access disabled from a wheelhouse of
+  the pinned runtime closure.
 - Gelain 2020 cross-solver reproduction (`docs/gelain-cross-solver.md`): the
   registry hydrolysis candidate exported as a three-condition PEtab problem and
   reproduced in COPASI under a frozen plan. COPASI's time courses agree with

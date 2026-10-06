@@ -96,16 +96,89 @@ per-sample output bundle, chiefly three matplotlib figures per sample
 (about 0.55 s), not by integration. Reducing that is a separate, non-numerical
 change to the screening output policy.
 
+## Culture physiology on the compiled core
+
+The well-mixed Pirt/Monod closure of the opt-in physiology classes and the
+chemostat boundary exchanges are generic processes
+(`fungal_model.processes.culture`), each with a numeric kernel, a factory and
+config support:
+
+| Process type | Rate (extent per volume and time) | Parameters |
+| --- | --- | --- |
+| `resource_limited_growth` | `(1 - f) Y max(q S/(K_S+S) O/(K_O+O) - m, 0) N/(K_N+N) X` | yield, maintenance demand, uptake capacity, three half-saturations, optional allocation fraction `f` |
+| `resource_limited_maintenance` | `min(m, q S/(K_S+S) O/(K_O+O)) X` | the same closure constants |
+| `costed_secretion` | `f max(capacity - m, 0) N/(K_N+N) y X` | the closure constants, `f`, the secretion yield `y` |
+| `dilution_exchange` | `D (c_feed - c)` | dilution rate, feed concentration |
+| `gas_transfer` | `k_La (c_sat - c)` | transfer coefficient, saturation concentration |
+
+Every extent changes the pools through an explicit `stoichiometry` (formula
+units per unit extent, supplied from a macrochemical balance; reservoir
+species that are not states stay out of it) and may feed an `extent` ledger;
+exchanges may feed a boundary `ledger`. The packaged
+`data/model_configs/toy_resource_limited_chemostat.yml` runs the five types on
+abstract pools. `ResourceLimitedCulture.simulate_compiled` and
+`DegradingCulture.simulate_compiled` build these processes from the classes'
+own parameters and balances (`compiled_processes`, `compiled_parameters`) and
+return the same trajectory types as `simulate`; the parity tests agree to
+1e-6 relative at tight tolerances (macOS and Linux differ by about 1e-7 on
+single elements), and each trajectory names its engine in
+`diagnostics["engine"]`. The five types are not SBML-exportable yet; the
+exporter refuses them explicitly rather than guessing a kinetic law.
+
+`FungalCouplingModel`, the third opt-in whole-fungus class, composes
+`mass_action` (now with catalysts: species that enter the rate law without
+being consumed, exported to SBML as modifiers), `first_order_decay` and
+`proportional_synthesis` processes through `compiled_processes(degradation)`,
+where the caller supplies the extracellular degradation as processes;
+`simulate_compiled` runs them on the compiled core and the parity test pins
+the result to the legacy `build_engine().simulate` to 1e-7 relative. The
+secretion cost needs one derived rate constant (`alpha_E_c_E`, the product
+of the secretion coefficient and the secretion cost), carried by
+`compiled_parameters` with its provenance.
+
+## The compiled Jacobian
+
+A compiled model can assemble `d(dy/dt)/dy` itself:
+`CompiledModel.jacobian(t, y)` sums, over processes, the stoichiometric
+column times the gradient of the process rate with respect to the state
+vector. A process may offer that gradient analytically through
+`Process.compile_jacobian`; `first_order_decay`, `mass_action` (with
+catalysts), `homogeneous_michaelis_menten`, `proportional_synthesis`, the
+three resource-limited closure processes and the two exchanges do. Every
+other process (and any process behind a rate modifier or a dynamic
+thermodynamic constraint) is differentiated by central finite differences of
+its own rate kernel over the states it declares, and the kind of every
+process is recorded in the kernel summary under `jacobian_kernels` with
+`analytic_jacobian_count`. Gradients are evaluated at the same projected
+state as the rates and multiplied by the projection's derivative, so the
+matrix is the exact derivative of the right-hand side wherever it is
+differentiable; at the closure's kink the one-sided derivative the classes
+use applies.
+
+`SolverSettings(jacobian="compiled")` makes the implicit methods (`LSODA`,
+`BDF`, `Radau`) take that matrix instead of differentiating the right-hand
+side themselves; explicit methods ignore the option. The default stays
+`"finite_difference_by_backend"`, so no recorded result changes unless a
+run declares otherwise; the run's `solver_metadata["kernel"]["jacobian"]`
+says which was used, and `SolverSettings.to_dict()` records the option only
+when it is set. `tests/test_compiled_jacobian.py` checks the assembled
+matrix against finite differences of the compiled right-hand side on every
+packaged config and reproduces the backend-difference trajectories and the
+culture classes' analytic-Jacobian trajectories with it.
+
 ## What is not on the compiled core yet
 
 - The legacy `Reaction`/`SimulationEngine` path, the 1D and N-D
-  reaction-diffusion engines, the opt-in physiology classes
-  (`FungalCouplingModel`, `ResourceLimitedCulture`, `DegradingCulture`) and
-  the research culture models still integrate their own right-hand sides.
+  reaction-diffusion engines and the research culture models still integrate
+  their own right-hand sides. `ResourceLimitedCulture.simulate` and
+  `DegradingCulture.simulate` keep their native right-hand side for its
+  analytic piecewise Jacobian, and `FungalCouplingModel.reactions()` keeps
+  `Reaction` objects for caller-supplied Python rate laws, which cannot be
+  compiled; `simulate_compiled` is the compiled path of all three classes.
   They are tracked as `FD-009` in `ARCHITECTURE_DEBT.md`.
-- No analytic Jacobian is generated for compiled models; stiff methods use the
-  backend's finite differences, recorded as
-  `"jacobian": "finite_difference_by_backend"`.
+- By default stiff methods still use the backend's finite differences,
+  recorded as `"jacobian": "finite_difference_by_backend"`; the compiled
+  Jacobian below is opt-in so that recorded results stay byte-stable.
 
 ## Reproduce
 

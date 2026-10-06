@@ -9,7 +9,7 @@ from typing import cast
 import numpy as np
 
 from fungal_model.core.assumptions import Assumption
-from fungal_model.core.kernels import KernelContext, RateKernel, conversion_factor
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel, conversion_factor
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.kinetics.michaelis_menten import (
@@ -129,6 +129,21 @@ class FirstOrderDecayProcess(Process):
 
         return kernel
 
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        index, to_state = context.state_slot(self.substrate_state, self.state_units)
+        rate_constant = context.parameter(self.rate_constant_symbol, "1 / second")
+        scale = conversion_factor(f"{self.state_units} / second", self.rate_units, name=f"{self.name} rate")
+        size = len(context.state_index)
+        derivative = rate_constant * to_state * scale
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time, state
+            result = np.zeros(size, dtype=float)
+            result[index] = derivative
+            return result
+
+        return gradient
+
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
         contributions: dict[str, Quantity] = {self.substrate_state: cast(Quantity, -value)}
@@ -139,10 +154,16 @@ class FirstOrderDecayProcess(Process):
 
 @dataclass(frozen=True, init=False)
 class MassActionProcess(Process):
-    """Generic homogeneous mass-action process."""
+    """Generic homogeneous mass-action process, ``k * prod(S_i^order_i)``.
+
+    ``catalysts`` are species that enter the rate law with the given order but
+    are not consumed (SBML modifiers); a catalyst may also be a product, which
+    is autocatalysis, but never a reactant.
+    """
 
     reactants: dict[str, float]
     products: dict[str, float]
+    catalysts: dict[str, float]
     state_units: dict[str, str]
     rate_constant_symbol: str
     rate_constant_units: str
@@ -158,10 +179,16 @@ class MassActionProcess(Process):
         rate_constant_symbol: str,
         rate_constant_units: str,
         rate_units: str,
+        catalysts: Mapping[str, float] | None = None,
         source: str = "Generic mass-action homogeneous process.",
         notes: str = "",
     ) -> None:
-        all_species = set(reactants) | set(products)
+        catalysed = {str(species): float(order) for species, order in (catalysts or {}).items()}
+        overlap = sorted(set(catalysed).intersection(reactants))
+        if overlap:
+            raise ValueError(f"Catalysts cannot also be reactants (they are not consumed): {overlap}")
+        changed_species = tuple(dict.fromkeys((*reactants, *products)))
+        all_species = set(changed_species) | set(catalysed)
         missing_units = all_species.difference(state_units)
         if missing_units:
             raise ValueError(f"Missing state units for species: {sorted(missing_units)}")
@@ -169,13 +196,13 @@ class MassActionProcess(Process):
             self,
             name=name,
             process_type="mass_action",
-            required_state_variables=tuple(
-                StateVariableSpec(species, state_units[species], role="reactant")
-                for species in reactants
+            required_state_variables=(
+                *(StateVariableSpec(species, state_units[species], role="reactant") for species in reactants),
+                *(StateVariableSpec(species, state_units[species], role="catalyst") for species in catalysed),
             ),
             changed_state_variables=tuple(
                 StateVariableSpec(species, state_units[species])
-                for species in all_species
+                for species in changed_species
             ),
             required_parameters=(
                 ParameterRequirement(
@@ -195,6 +222,7 @@ class MassActionProcess(Process):
         )
         object.__setattr__(self, "reactants", dict(reactants))
         object.__setattr__(self, "products", dict(products))
+        object.__setattr__(self, "catalysts", catalysed)
         object.__setattr__(self, "state_units", dict(state_units))
         object.__setattr__(self, "rate_constant_symbol", rate_constant_symbol)
         object.__setattr__(self, "rate_constant_units", rate_constant_units)
@@ -210,20 +238,26 @@ class MassActionProcess(Process):
     ) -> Quantity:
         del time, environment, geometry
         rate = parameters.require_quantity(self.rate_constant_symbol, self.rate_constant_units)
-        for species, order in self.reactants.items():
+        for species, order in self._rate_orders().items():
             quantity = assert_compatible(state[species], self.state_units[species], name=species)
             _ensure_non_negative(quantity, species)
             rate *= quantity ** float(order)
         return assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
 
+    def _rate_orders(self) -> dict[str, float]:
+        """Reaction orders of every species in the rate law: reactants first, then catalysts."""
+
+        return {**self.reactants, **self.catalysts}
+
     def compile_rate(self, context: KernelContext) -> RateKernel | None:
         rate_constant = context.parameter(self.rate_constant_symbol, self.rate_constant_units)
+        orders = self._rate_orders()
         slots = tuple(
             (species, *context.state_slot(species, self.state_units[species]), float(order))
-            for species, order in self.reactants.items()
+            for species, order in orders.items()
         )
         probe = Q_(1.0, self.rate_constant_units)
-        for species, order in self.reactants.items():
+        for species, order in orders.items():
             probe = probe * Q_(1.0, self.state_units[species]) ** float(order)
         scale = float(assert_compatible(probe, self.rate_units, name=f"{self.name} rate").magnitude)
 
@@ -238,6 +272,51 @@ class MassActionProcess(Process):
             return rate * scale
 
         return kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        """Product rule over reactants and catalysts.
+
+        For a reaction order below one the derivative at a zero state is
+        unbounded; the kernel returns zero there, the only finite choice, and
+        the rate kernel itself is unaffected.
+        """
+
+        rate_constant = context.parameter(self.rate_constant_symbol, self.rate_constant_units)
+        orders = self._rate_orders()
+        slots = tuple(
+            (species, *context.state_slot(species, self.state_units[species]), float(order))
+            for species, order in orders.items()
+        )
+        probe = Q_(1.0, self.rate_constant_units)
+        for species, order in orders.items():
+            probe = probe * Q_(1.0, self.state_units[species]) ** float(order)
+        scale = float(assert_compatible(probe, self.rate_units, name=f"{self.name} rate").magnitude)
+        size = len(context.state_index)
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            quantities = []
+            for species, index, to_state, order in slots:
+                quantity = state[index] * to_state
+                if quantity < 0:
+                    raise ValueError(f"{species} must be non-negative.")
+                quantities.append((index, quantity, order, to_state))
+            result = np.zeros(size, dtype=float)
+            for position, (index, quantity, order, to_state) in enumerate(quantities):
+                if order == 1.0:
+                    own = 1.0
+                elif quantity == 0.0:
+                    own = 0.0
+                else:
+                    own = order * quantity ** (order - 1.0)
+                partial = rate_constant * scale * to_state * own
+                for other, (_, other_quantity, other_order, _) in enumerate(quantities):
+                    if other != position:
+                        partial *= other_quantity ** other_order
+                result[index] += partial
+            return result
+
+        return gradient
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
@@ -423,6 +502,48 @@ class HomogeneousMichaelisMentenProcess(Process):
             return ((kcat * enzyme) * (substrate / (km + substrate))) * scale
 
         return enzyme_kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        substrate_index, to_substrate = context.state_slot(self.substrate_state, self.substrate_units)
+        km = context.parameter(self.km_symbol, self.substrate_units)
+        if km <= 0:
+            raise ValueError("km must be positive for Michaelis-Menten kinetics.")
+        size = len(context.state_index)
+        if self.vmax_symbol is not None:
+            vmax = context.parameter(self.vmax_symbol, self.rate_units)
+
+            def vmax_gradient(time: float, state: np.ndarray) -> np.ndarray:
+                del time
+                substrate = state[substrate_index] * to_substrate
+                if substrate < 0:
+                    raise ValueError("substrate must be non-negative for Michaelis-Menten kinetics.")
+                result = np.zeros(size, dtype=float)
+                result[substrate_index] = vmax * km / (km + substrate) ** 2 * to_substrate
+                return result
+
+            return vmax_gradient
+        assert self.enzyme_state is not None
+        assert self.enzyme_units is not None
+        assert self.kcat_symbol is not None
+        enzyme_index, to_enzyme = context.state_slot(self.enzyme_state, self.enzyme_units)
+        kcat_units = f"{self.rate_units} / ({self.enzyme_units})"
+        kcat = context.parameter(self.kcat_symbol, kcat_units)
+        scale = float(
+            assert_compatible(Q_(1.0, kcat_units) * Q_(1.0, self.enzyme_units), self.rate_units, name=f"{self.name} rate").magnitude
+        )
+
+        def enzyme_gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            substrate = state[substrate_index] * to_substrate
+            enzyme = state[enzyme_index] * to_enzyme
+            if enzyme < 0 or substrate < 0:
+                raise ValueError("substrate and enzyme must be non-negative for Michaelis-Menten kinetics.")
+            result = np.zeros(size, dtype=float)
+            result[substrate_index] = kcat * enzyme * km / (km + substrate) ** 2 * scale * to_substrate
+            result[enzyme_index] += kcat * substrate / (km + substrate) * scale * to_enzyme
+            return result
+
+        return enzyme_gradient
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")

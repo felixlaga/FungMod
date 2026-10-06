@@ -26,6 +26,366 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PAPER-002 The Manuscript In LaTeX With Generated Table Fragments And PDF Figures
+
+Date: 2026-10-06
+
+Status: complete. The software paper is a LaTeX manuscript that includes
+its tables and figures from generated files; the Markdown draft is replaced,
+not kept in parallel, so there is one manuscript to edit.
+
+Changed:
+
+- `paper/paper.tex` (new, replaces `paper/paper.md`): the same text as the
+  Markdown draft, converted (natbib author-year citations from
+  `paper/paper.bib`, `\texttt` for identifiers, math for the tolerances
+  and the ODE), with the five tables pulled in by `\input` from
+  `paper/tables/*.tex` and the four figures by `\includegraphics` from
+  `paper/figures/*.pdf`, each referenced by label in the text. The
+  reproducibility section now says that the tables and figures are
+  generated LaTeX fragments and PDFs and that the test suite fails when
+  the manuscript stops including one. Draft-status note dated 2026-10-06.
+- `research/paper_tables.py`: `latex_escape`, `latex_inline` (Markdown
+  code spans become `\texttt`, underscores may break inside narrow
+  columns), `PaperTable.latex_file_name` and `rendered_latex` (a `table`
+  float with `\footnotesize`, `\tabcolsep` 4pt, the title as caption,
+  the label `tab:<name>`, one full-width `tabularx` per pipe table whose
+  columns with cells longer than 11 characters wrap with widths
+  proportional to their content between a floor and a cap, and the notes
+  as a paragraph); `write_tables` writes the `.tex` next to the `.md`,
+  `check_tables` checks it, the manifest names it (`latex_file`).
+  `MARKDOWN_MARKER`, `LATEX_MARKER`.
+- `research/paper_figures.py`: `PaperFigure.pdf_file_name`, `render` with
+  `fmt="pdf"` (creator marker, no creation or modification date),
+  `write_figures` writes the PDF, `check_figures` requires it with the
+  marker (`PDF_MARKER`, the module name, because PDF string literals
+  escape the parentheses of the full generator string), the manifest names
+  it (`pdf_file`).
+- `paper/tables/*.tex` (new, five), `paper/figures/*.pdf` (new, four), both
+  manifests regenerated.
+- `Makefile`: `paper-pdf` (latexmk in `paper/`); `.gitignore`: the LaTeX
+  build products; `scripts/reproduce_paper.py` help text;
+  `docs/reproducing-the-paper.md` (manuscript, both table formats, both
+  figure formats, a section on building the manuscript, CI wording);
+  `CHANGELOG.md`; the state document (item 6).
+- Tests: `tests/test_paper_tables.py` (regeneration byte-identical for the
+  `.tex` too; the manuscript includes and references every table and does
+  not mention the Markdown draft; `latex_inline` escapes every special
+  character and sets code spans in typewriter; every LaTeX table is a
+  captioned float with one `tabularx` per pipe table whose `hsize` factors
+  sum to the X count; a tampered or missing `.tex` is reported; both
+  formats carry their marker); `tests/test_paper_figures.py` (the PDF is
+  regenerated with the marker and without dates; the manuscript includes
+  and references every figure's PDF; a tampered or missing PDF is
+  reported).
+
+Not changed: any recorded result, table content, figure data or study; the
+Markdown tables and SVG figures are still written and checked. Scientific
+impact: none. Backward compatibility: the manifests gain one key per entry
+(`latex_file`, `pdf_file`); `paper/paper.md` no longer exists.
+
+Commands run (venv, Python 3.11, TeX Live 2023 with latexmk): `ruff check`
+on the changed modules, tests and script: passed; `pyright` on them: 0
+errors; `python scripts/reproduce_paper.py tables`; `make paper-pdf`
+(latexmk): 13 pages, no overfull or underfull boxes after the column
+weighting; `pytest tests/test_paper_tables.py tests/test_paper_figures.py`:
+17 passed; the whole-package gates are reported in the PR.
+
+Remaining ambiguities: the PDF and SVG bytes depend on the matplotlib
+version and are compared for presence and marker only, like the SVG
+before; the manuscript's narrative sentences are still not checked word by
+word.
+
+Recommended next task: finish the amendment 4 M2 chain and its holdout
+posteriors, then refresh the tables, figures and the manuscript text that
+depend on the M2 stage B verdict (the amendment-4 branch must merge this
+one first, since it edits the manuscript).
+
+## CORE-002 Compiled Jacobian From Per-Process Gradients
+
+Date: 2026-10-05
+
+Status: complete, opt-in. The FD-009 exit item "compiled models can supply
+a Jacobian" is met without moving any recorded result.
+
+Changed:
+
+- `core/kernels.py`: `JacobianKernel`. `processes/base.py`:
+  `Process.compile_jacobian(context)` returning the gradient of the rate
+  kernel with respect to the numeric state vector, or `None`.
+- `solvers/compiled.py`: `CompiledProcess.gradient` and `jacobian_kind`
+  (`analytic` or `finite_difference`); `CompiledModel.jacobian(t, y)` sums
+  stoichiometric column times gradient, evaluated at the projected state and
+  masked by the projection's derivative; the finite-difference fallback
+  perturbs only the states a process declares, one-sided at the
+  non-negative boundary, relative step 1e-6; the kernel summary records
+  `jacobian_kernels` and `analytic_jacobian_count`. A thermodynamically
+  constrained or quantity-wrapped rate is always differentiated numerically.
+- Analytic gradients: `FirstOrderDecayProcess`, `MassActionProcess`
+  (reactants and catalysts by the product rule; an order below one at a zero
+  state returns zero, documented), `HomogeneousMichaelisMentenProcess` (both
+  forms), `ProportionalSynthesisProcess` (constitutive and induced),
+  `ResourceLimitedGrowthProcess`, `ResourceLimitedMaintenanceProcess`,
+  `CostedSecretionProcess` (the classes' one-sided derivatives at the
+  capacity-equals-demand kink, through `ClosureConstants.capacity_gradient`
+  and `budget_gradient`), `DilutionExchangeProcess`, `GasTransferProcess`.
+- `core/numerics.py`: `SolverSettings.jacobian`
+  (`finite_difference_by_backend`, the default, or `compiled`), validated,
+  serialised only when set; `uses_jacobian`. `solvers/process_ode.py`: the
+  implicit methods receive `compiled.jacobian` when asked and the run
+  records `kernel["jacobian"] = "compiled_process_gradients"`.
+- `docs/compiled-core.md` (new section), `ARCHITECTURE_DEBT.md` (FD-009
+  exit item), `CHANGELOG.md`.
+- Tests: `tests/test_compiled_jacobian.py` (new): the assembled matrix
+  equals finite differences of the compiled right-hand side on every
+  packaged config at the initial state and random perturbations; the simple
+  laws and the closure report analytic kinds, modifier-wrapped and
+  constrained processes finite differences; catalysed mass action with a
+  fractional order; integration with the compiled Jacobian reproduces the
+  backend-difference trajectory on the toy chemostat (BDF) and the
+  `DegradingCulture` native analytic-Jacobian trajectory to 1e-7; explicit
+  methods ignore the option; settings validation and serialisation; a
+  process offering only a rate is differentiated numerically and recorded.
+
+Not changed: any default, any recorded result, any rate law. Scientific
+impact: none. Backward compatibility: additive (`SolverSettings` gains a
+defaulted field; the kernel summary gains two keys). Risk: low.
+
+Remaining ambiguities: making the compiled Jacobian the default for implicit
+methods would move trajectories within solver tolerance and therefore the
+recorded study artifacts; that is a decision for a dated re-run, not a
+code default. Rate modifiers have no gradient hooks yet (finite differences
+apply).
+
+Recommended next task: finish the amendment 4 M2 chain; then decide whether
+a future study plan declares `jacobian: compiled`.
+
+## REPRO-002 The Paper's Figures From The Recorded Results
+
+Date: 2026-10-05
+
+Status: complete. The reproducibility package now regenerates the paper's
+figures as well as its tables with one command.
+
+Changed:
+
+- `research/paper_figures.py` (new): `PaperFigure` (the plotted numbers, a
+  draw callable, sources with digests, key numbers); builders for the
+  whole-condition holdouts on the three cellulose loadings (published means
+  against the frozen held-out predictions of the hydrolysis candidate and
+  the re-fitted published equations, v2 primary scenario), the posterior
+  predictive bands of BAYES-001 (median and 5 to 95 percent band per
+  loading and observable with the published means), the stage A screen of
+  the criticism study (change in pooled held-out error per observable and
+  pooled, relative to M0, against the plan's thresholds, both scenarios)
+  and the cross-solver objectives (recorded optimum, COPASI's local fit,
+  ten random starts); `write_figures`, `check_figures`, `manifest_for`,
+  `render` (SVG with the generator as creator and no date).
+- `paper/figures/` (new): four SVGs, four data JSONs and `manifest.json`.
+- `scripts/reproduce_paper.py`: `tables` writes the figures too
+  (`--figures-directory`), `check` checks them; `Makefile` help text;
+  `paper/paper.md` cites each figure next to its table;
+  `docs/reproducing-the-paper.md`; `CHANGELOG.md`.
+- `tests/test_paper_figures.py` (new): committed data and manifest match
+  the recorded results; regeneration elsewhere is byte-identical for the
+  data and the manifest and produces SVGs with the marker; manifest digests
+  name the files on disk; every figure is cited by the paper; key numbers
+  agree with the data; builders refuse missing results; a tampered data
+  file or SVG is reported.
+
+Not changed: any recorded result, table or study. The figures plot recorded
+numbers; the measured points come from the reviewed literature datasets.
+Scientific impact: none. Backward compatibility: additive. Risk: low.
+
+Remaining ambiguities: SVG bytes are not compared across matplotlib
+versions; the data files are the reproducible artifact.
+
+Recommended next task: finish the amendment 4 M2 chain and its holdout
+posteriors, then refresh the tables, figures and paper text that depend on
+the M2 stage B verdict.
+
+## CAL-002 Declared Finite-Difference Step In The Public Least-Squares API
+
+Date: 2026-10-05
+
+Status: complete. The follow-up recorded in CRIT-003: `fit_least_squares`
+gains `diff_step`, `ftol`, `xtol` and `gtol` (default `None`, scipy's
+values, so no existing calibration changes) with validation and the declared
+values recorded in `optimizer_metadata` (`finite_difference_step`, the three
+tolerances, `method`, and a note that undeclared options are scipy's
+defaults). The docstring states why an adaptive integrator's step noise
+needs a declared step. Tests: the declared options are passed and recorded,
+the default path records `None`, and non-positive, non-finite or too-large
+values refuse. No recorded result uses the public function with these
+options; the model-criticism study keeps its own plan-declared settings.
+
+## UNIFY-001 Culture Physiology As Generic Processes On The Compiled Core
+
+Date: 2026-10-05
+
+Status: complete for step 5 item 5. The closure and the chemostat exchanges
+of `ResourceLimitedCulture` and `DegradingCulture` are generic, registrable
+processes with numeric kernels; `FungalCouplingModel` composes existing
+generic processes; all three classes integrate on the compiled core with
+parity against their native right-hand sides, which they keep (an analytic
+Jacobian for the two Pirt/Monod classes; `Reaction` objects with Python rate
+laws for the coupling model's legacy path).
+
+Changed:
+
+- `processes/culture.py` (new): `ResourceLimitedGrowthProcess`
+  (`(1-f) Y max(capacity-m, 0) N/(K_N+N) X`), `ResourceLimitedMaintenanceProcess`
+  (`min(m, capacity) X`), `CostedSecretionProcess`
+  (`f max(capacity-m, 0) N/(K_N+N) y X`) with `capacity = q S/(K_S+S) O/(K_O+O)`,
+  explicit `stoichiometry` (formula units per unit extent) and an optional
+  extent ledger; `DilutionExchangeProcess` (`D (c_feed - c)`) and
+  `GasTransferProcess` (`k_La (c_sat - c)`) with an optional boundary ledger.
+  Every process has a unit-aware `rate`, a numeric `compile_rate`, linear
+  `contributions`, assumptions, validity labels and failure modes; half-
+  saturations must be positive, fractions in [0, 1], pools non-negative.
+- `processes/factories.py`: five factories reading `states`, `parameters`
+  and `stoichiometry` from config, reporting missing fields and unit
+  mismatches; registered in `default_foundation_factories` (13 types).
+  `io/model_config.py`: `ProcessConfig.stoichiometry` (serialized only when
+  present, so existing configs round-trip unchanged).
+- `data/model_configs/toy_resource_limited_chemostat.yml` (new): the five
+  types on abstract pools (resource, cells, nutrient, acceptor, product) in
+  millimolar and hours, picked up by the compiled-core parity and
+  shipped-kernel tests like every packaged config.
+- `fungi/respiration.py`, `fungi/degradation.py`: `compiled_processes()`,
+  `compiled_parameters()` (the classes' own `Parameter` objects, the
+  secretion yield of the solved pathway and one `feed:<pool>` parameter per
+  pool; a symbol used twice refuses), `simulate_compiled()`; `simulate`
+  refactored into integration and trajectory construction so both paths
+  share the ledger, conservation residual and diagnostics code; trajectory
+  diagnostics gain `engine` (`native_right_hand_side` or
+  `compiled_process_core`) and, for the compiled path, the kernel summary.
+  Hydrolysis maps to enzyme-explicit `HomogeneousMichaelisMentenProcess`,
+  inactivation to `MassActionProcess`; both carry their extent ledger as a
+  product with coefficient one.
+- `processes/homogeneous.py`: `MassActionProcess(catalysts=...)`, species
+  that enter the rate law with an order but are not consumed (a catalyst may
+  also be a product; never a reactant); the factory reads
+  `states.catalysts`; `standards/sbml.py` lists catalysts as modifiers and
+  includes them in the kinetic law and its unit conversion.
+- `fungi/coupling.py`: `compiled_processes(degradation)` (secretion as
+  `proportional_synthesis`, decay as `first_order_decay`, the secretion cost
+  and maintenance as first-order `mass_action` conversions of active into
+  inactive biomass, uptake as `mass_action` in the product catalysed by
+  active biomass with the declared yield; the degradation is supplied as
+  processes because `Reaction` rate laws are Python callables),
+  `compiled_parameters()` (the union plus the derived `alpha_E_c_E` with the
+  weaker confidence of its two inputs and both sources), `simulate_compiled()`.
+- `ARCHITECTURE_DEBT.md` (FD-009 narrowed), `docs/compiled-core.md`,
+  `docs/degrading-culture.md`, `docs/respiration-benchmark.md`,
+  `docs/organism-physiology.md`, `CHANGELOG.md`, the state document (item 5).
+- Tests: `tests/test_coupling_compiled.py` (new; catalysed mass action:
+  rate, contributions, kernel in another unit system, autocatalysis allowed
+  and catalytic reactants refused, analytic solution, factory config, SBML
+  modifiers with a cross-engine trajectory check; the coupling model's
+  compiled path against the legacy engine with non-zero secretion cost and
+  maintenance, its refusals, and the zero-cost benchmark);
+  `tests/test_culture_processes.py` (new; kernels equal unit-aware
+  rates on abstract pools in two unit systems, shared post-maintenance
+  budget, analytic mixed steady state of the exchanges, refusals, factories
+  from config and their missing-field reports, the packaged config through
+  the configured workflow, native-versus-compiled parity for both classes in
+  batch and chemostat operation and for the alternative chemistry at 1e-6
+  relative (macOS differed from Linux by 1.6e-7 on one cumulative-exchange
+  element at 1e-7), duplicate symbols refuse);
+  `tests/test_process_factory_library.py` and
+  `tests/test_compiled_process_models.py` expect the five new types.
+
+Not changed: any rate law, constant, recorded result or the native
+`simulate` trajectories (the existing 83 culture tests pass unchanged apart
+from the added diagnostics key). No organism record binds the new processes;
+the registry template families are untouched.
+
+Scientific impact: none on recorded results; the closure now has one
+implementation usable by configs, the registry and the classes. Backward
+compatibility: additive (`ProcessConfig` gains an optional field; trajectory
+diagnostics gain keys). Risk: low.
+
+Remaining ambiguities: the compiled core has no analytic Jacobian, so the
+two Pirt/Monod classes keep their native path for stiff methods; the
+coupling model's legacy `reactions()` path stays for caller-supplied
+`Reaction` laws until the legacy engine is retired.
+
+Recommended next task: a Jacobian for compiled models (process kernels
+supplying partial derivatives, finite differences otherwise, recorded in the
+kernel summary), after which the classes' native paths can go; then the
+first organism record that parameterizes the closure.
+
+## REPRO-001 Reproducibility Package For The Software Paper
+
+Date: 2026-10-05
+
+Status: complete for the tooling half of step 5 item 6. The paper's five
+tables are generated from the recorded study results by one command with a
+digest manifest; the same command offers tiers of reproduction up to a full
+re-run; the runtime closure is pinned and CI installs the built wheel with
+network access disabled. The tagged release with a DOI, the domain review
+and an independent walkthrough remain open and need people.
+
+Changed:
+
+- `research/paper_tables.py` (new): one builder per table (joint holdouts
+  of v2, BAYES-001 identifiability, criticism stage A, criticism stage B,
+  cross-solver), each returning the Markdown, its source files with SHA-256
+  digests and the key numbers the text quotes; `write_tables`,
+  `check_tables` (committed tables and manifest against the recorded
+  results and the sources' digests); `verify_recorded_results` (digest
+  chains of every study against its plan and amendment log, frozen held-out
+  predictions, stage B artifacts, the cross-solver plan's sources, the
+  compiled-core objective at the recorded cross-solver optimum to 1e-7, the
+  projected gradient of the recorded baseline fit below 1e-2 in log space);
+  `projected_gradient_norm`.
+- `paper/tables/` (new): the five tables and `manifest.json`, generated, with
+  a do-not-edit marker on each.
+- `scripts/reproduce_paper.py` (new): tiers `tables`, `check`, `verify`
+  (seconds to a minute), `stage-a` (re-run stage A and the COPASI
+  reproduction into `outputs/paper_reproduction/`, compare held-out errors to
+  1e-6, screens, outcome and objectives; about two hours) and `full` (every
+  study through its own script, compared on verdict-level fields; a day).
+- `Makefile`: `paper-tables`, `paper-check`, `paper-verify`,
+  `paper-stage-a`, `paper-full`, `wheelhouse`, `install-offline`;
+  `.github/workflows/ci.yml` package job downloads the pinned closure into a
+  wheelhouse and installs the wheel with `--no-index`; `.gitignore` ignores
+  `wheelhouse/`.
+- `paper/paper.md`: every results section cites its table; the
+  reproducibility section describes the command, its tiers and the offline
+  install, and leaves the DOI pending.
+- `docs/reproducing-the-paper.md` (new, in the navigation),
+  `docs/paper-readiness.md` (item 6 status), `CHANGELOG.md`, the state
+  document (item 6 status).
+- `tests/test_paper_tables.py` (new): committed tables and manifest match
+  the recorded results; regeneration elsewhere is byte-identical; manifest
+  digests name the files on disk; every table is cited by the paper; key
+  numbers agree with the tables; missing results refuse; a tampered table is
+  reported; the generator marker is present.
+
+Not changed: any recorded result, plan, rate law or constant. The tables
+format recorded numbers; the verification recomputes two quantities from
+recorded artifacts and otherwise checks digests.
+
+Commands: `ruff check` passed; `pyright` 0 errors on the new module and
+script; `mkdocs build --strict` passed; `pytest tests/test_paper_tables.py
+tests/test_repository_hygiene.py tests/test_quality_config.py
+tests/test_release_configuration.py`: 24 passed; `scripts/reproduce_paper.py
+verify`: 9 of 9 checks passed in 2 s on this container. The `stage-a` and
+`full` tiers were not run here (they re-run studies recorded in CRIT-003
+and earlier on the same code); the offline wheel install runs in CI.
+Scientific impact: none. Backward compatibility: additive. Risk: low.
+
+Remaining ambiguities: the lock file was generated on CPython 3.13 macOS;
+`pip download` on the CI interpreter resolves the pinned versions to that
+platform's wheels, so the offline install proves installability from a
+pinned closure, not bit-for-bit identity across platforms.
+
+Recommended next task: step 5 item 5 (unify the three whole-fungus classes)
+while the amendment 4 M2 chain runs; then the preprint's figures through the
+same generator.
+
 ## CRIT-003 Stage A Optimiser Declared, Stage A Re-Run, Cross-Solver Outcome Reproduced
 
 Date: 2026-10-05

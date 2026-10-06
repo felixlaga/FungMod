@@ -58,6 +58,11 @@ SHIPPED_PROCESS_TYPES = {
     "surface_catalysis",
     "substrate_transglycosylation",
     "thermal_inactivation",
+    "resource_limited_growth",
+    "resource_limited_maintenance",
+    "costed_secretion",
+    "dilution_exchange",
+    "gas_transfer",
 }
 
 

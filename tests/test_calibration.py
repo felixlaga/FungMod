@@ -136,6 +136,34 @@ def test_least_squares_fit_recovers_slope_and_records_validation_split() -> None
     assert result.confidence_intervals is not None
 
 
+def test_declared_optimizer_options_are_passed_and_recorded() -> None:
+    x_values = Q_(np.linspace(0.0, 5.0, 6), "second")
+    observations = {"y": Q_(2.0 * x_values.magnitude, "dimensionless")}
+    base = ParameterSet([parameter(name="test slope", symbol="k", value=1.0, units="1 / second")])
+    fittable = FittableParameter(
+        symbol="k",
+        lower_bound=parameter(name="lower slope bound", symbol="k_min", value=0.0, units="1 / second"),
+        upper_bound=parameter(name="upper slope bound", symbol="k_max", value=5.0, units="1 / second"),
+    )
+    common = dict(base_parameters=base, fittable_parameters=[fittable], predict=line_predictor(x_values),
+                  observations=observations, calibration_source="Artificial optimizer-option test.")
+
+    default = fit_least_squares(**common)
+    assert default.optimizer_metadata["finite_difference_step"] is None
+    assert default.optimizer_metadata["ftol"] is None and default.optimizer_metadata["undeclared_options"].startswith("scipy")
+
+    declared = fit_least_squares(**common, diff_step=1e-3, ftol=1e-12, xtol=1e-12, gtol=1e-12)
+    assert declared.success
+    assert declared.fitted_parameters.get("k").quantity.to("1 / second").magnitude == pytest.approx(2.0)
+    assert declared.optimizer_metadata["finite_difference_step"] == 1e-3
+    assert declared.optimizer_metadata["ftol"] == declared.optimizer_metadata["xtol"] == declared.optimizer_metadata["gtol"] == 1e-12
+    assert declared.optimizer_metadata["method"] == "trf"
+
+    for options in ({"diff_step": 0.0}, {"diff_step": 1.5}, {"ftol": -1e-8}, {"xtol": float("nan")}, {"gtol": float("inf")}):
+        with pytest.raises(ValueError, match="must be|below one"):
+            fit_least_squares(**common, **options)
+
+
 def test_fit_reports_when_validation_reuses_training_data() -> None:
     x_values = Q_(np.arange(4.0), "second")
     observations = {"y": Q_(3.0 * x_values.magnitude, "dimensionless")}

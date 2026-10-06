@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "generator": "fungal_model.research.paper_figures (scripts/reproduce_paper.py tables)",
+  "figures": {
+    "figure_1_cellulose_holdouts": {
+      "file": "figure_1_cellulose_holdouts.svg",
+      "pdf_file": "figure_1_cellulose_holdouts.pdf",
+      "data_file": "figure_1_cellulose_holdouts.json",
+      "title": "Whole-condition holdouts of the joint benchmark on the three cellulose loadings",
+      "caption": "Published means (points) against the frozen held-out predictions (lines) of the activity-driven hydrolysis candidate and the re-fitted published equations, each loading predicted from a fit to the other two (primary scenario). Measurement error is unknown; the points are published means.",
+      "sources": {
+        "data/benchmarks/gelain_2020_v2/results/folds.json": "91f37075f7f144fed2bdb3cf82af7e7e906292b9333c55c26ef20b4db9b6c2cc",
+        "data/benchmarks/gelain_2020_v2/results/frozen_predictions/gelain_2020_cellulose_10gl_hydrolysis_primary.json": "6dfb0b6f2d6aab7a6756f13fa88e1daca0fb007b3e44c30de9e355d5cad91866",
+        "data/benchmarks/gelain_2020_v2/results/frozen_predictions/gelain_2020_cellulose_10gl_published_primary.json": "637b3fea819a83190fd06ed6065c2bab97aa13c07a15cd68424edb0a98883241",
+        "data/benchmarks/gelain_2020_v2/results/frozen_predictions/gelain_2020_cellulose_20gl_hydrolysis_primary.json": "b836aa904558f94cba170f6218a6f12faa987429cd548923cbcff3311dfb182b",
+        "data/benchmarks/gelain_2020_v2/results/frozen_predictions/gelain_2020_cellulose_20gl_published_primary.json": "ab43760ab47f0e7cab25c35c0d703590f8f945ba3efb60630d30764f93b88355",
+        "data/benchmarks/gelain_2020_v2/results/frozen_predictions/gelain_2020_cellulose_30gl_hydrolysis_primary.json": "3bd62a29b2513d41e09a6772b0e0fea82daba958f39e6f1b1f8cd777f962e4c4",
+        "data/benchmarks/gelain_2020_v2/results/frozen_predictions/gelain_2020_cellulose_30gl_published_primary.json": "e3fd74e479e462d29d05846792d578bee9203813212d87bae9a8b5ea9b524030",
+        "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_10gl.yml": "3493c4406cdbd85c53ca0dea5847f18faf47c4ab9f5f3a8bccadfbb747e9cd6f",
+        "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_20gl.yml": "abdda826247d691b7d209f6799256a5cce9acf9b1410e8bb3f20b4f9bb4ab3c3",
+        "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_30gl.yml": "38aecbbdd875d0ebc92fb9d859cfd162f4e6bb2299afca6ed5a9a8d46cc255a1"
+      },
+      "key_numbers": {
+        "conditions": 3,
+        "models": [
+          "hydrolysis",
+          "published"
+        ],
+        "mean_normalized_mse_by_model": {
+          "hydrolysis": {
+            "gelain_2020_cellulose_10gl": {
+              "biomass": 0.05895486963867837,
+              "substrate": 0.0016297838863710598,
+              "cellulase_activity": 0.23184475752004588,
+              "beta_glucosidase_activity": 0.11810171017443938
+            },
+            "gelain_2020_cellulose_20gl": {
+              "biomass": 0.07096763487388691,
+              "substrate": 0.0025178753297043837,
+              "cellulase_activity": 0.007496214734758437,
+              "beta_glucosidase_activity": 0.019851988407201072
+            },
+            "gelain_2020_cellulose_30gl": {
+              "biomass": 0.1057355896115208,
+              "substrate": 0.03556269509009657,
+              "cellulase_activity": 0.24165598506421743,
+              "beta_glucosidase_activity": 0.20763532959753758
+            }
+          },
+          "published": {
+            "gelain_2020_cellulose_10gl": {
+              "biomass": 0.005529246126565124,
+              "substrate": 0.0006481184397925296,
+              "cellulase_activity": 0.017924201129010872,
+              "beta_glucosidase_activity": 0.006118071536277792
+            },
+            "gelain_2020_cellulose_20gl": {
+              "biomass": 0.004762100566464351,
+              "substrate": 0.000812639066531601,
+              "cellulase_activity": 0.003848245259108434,
+              "beta_glucosidase_activity": 0.0035225343101563432
+            },
+            "gelain_2020_cellulose_30gl": {
+              "biomass": 0.012281994087122631,
+              "substrate": 0.006584151852665018,
+              "cellulase_activity": 0.006747340061483229,
+              "beta_glucosidase_activity": 0.0054449971595983875
+            }
+          }
+        }
+      }
+    },
+    "figure_2_posterior_predictive": {
+      "file": "figure_2_posterior_predictive.svg",
+      "pdf_file": "figure_2_posterior_predictive.pdf",
+      "data_file": "figure_2_posterior_predictive.json",
+      "title": "Posterior predictive bands of the hydrolysis candidate on the cellulose loadings",
+      "caption": "Posterior median and the 5 to 95 percent band of the model prediction over the posterior samples of the nine registry constants (all three loadings fitted; the bands exclude measurement noise), with the published means as points.",
+      "sources": {
+        "data/benchmarks/gelain_2020_bayesian/results/bayesian_calibration.json": "57fac5c9ee2cb74282ef9094286318045abf41dcd5d502b8ed0608da00c9be97",
+        "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_10gl.yml": "3493c4406cdbd85c53ca0dea5847f18faf47c4ab9f5f3a8bccadfbb747e9cd6f",
+        "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_20gl.yml": "abdda826247d691b7d209f6799256a5cce9acf9b1410e8bb3f20b4f9bb4ab3c3",
+        "data/experiments/literature/gelain_2020_t_harzianum/gelain_2020_cellulose_30gl.yml": "38aecbbdd875d0ebc92fb9d859cfd162f4e6bb2299afca6ed5a9a8d46cc255a1"
+      },
+      "key_numbers": {
+        "draws": 400,
+        "quantiles": [
+          0.05,
+          0.5,
+          0.95
+        ],
+        "includes_measurement_noise": false,
+        "successful_draws": {
+          "gelain_2020_cellulose_10gl": 400,
+          "gelain_2020_cellulose_20gl": 400,
+          "gelain_2020_cellulose_30gl": 400
+        }
+      }
+    },
+    "figure_3_criticism_screen": {
+      "file": "figure_3_criticism_screen.svg",
+      "pdf_file": "figure_3_criticism_screen.pdf",
+      "data_file": "figure_3_criticism_screen.json",
+      "title": "Stage A holdout screen of the model-criticism study",
+      "caption": "Change in the pooled held-out normalised error of each candidate mechanism relative to the baseline M0, per observable and pooled, in both error scenarios; the dashed lines are the plan's screen thresholds (at least 10 percent pooled improvement, no observable more than 10 percent worse).",
+      "sources": {
+        "data/benchmarks/gelain_2020_criticism/results/stage_a/comparison.json": "0460f164324c825d080bbc5db003dd13a604ffda0300574d155f377aee5f3b3b",
+        "data/benchmarks/gelain_2020_criticism/plan.json": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7"
+      },
+      "key_numbers": {
+        "reference": "M0_baseline",
+        "passed": {
+          "primary": {
+            "M1_induction_state": false,
+            "M2_soluble_product_pool": true,
+            "M3_conversion_dependent_accessibility": false
+          },
+          "correlated_assumption": {
+            "M1_induction_state": false,
+            "M2_soluble_product_pool": true,
+            "M3_conversion_dependent_accessibility": false
+          }
+        },
+        "relative_improvement": {
+          "primary": {
+            "M1_induction_state": 0.0012213008879334852,
+            "M2_soluble_product_pool": 0.23449676301471278,
+            "M3_conversion_dependent_accessibility": -0.0018756810590441209
+          },
+          "correlated_assumption": {
+            "M1_induction_state": -0.0303359264658134,
+            "M2_soluble_product_pool": 0.2610272106968716,
+            "M3_conversion_dependent_accessibility": -0.05005729702264938
+          }
+        }
+      }
+    },
+    "figure_4_cross_solver": {
+      "file": "figure_4_cross_solver.svg",
+      "pdf_file": "figure_4_cross_solver.pdf",
+      "data_file": "figure_4_cross_solver.json",
+      "title": "Cross-solver check of the recorded optimum in COPASI",
+      "caption": "Objective of the exported three-condition PEtab problem at FungMod's recorded optimum, after COPASI's local fit from that point, and at the end of COPASI's fits from ten random starts (log axis). The recorded outcome is quoted in the manifest.",
+      "sources": {
+        "data/benchmarks/gelain_2020_petab/results/comparison.json": "3e86a1214d46bb1debd7d74a60d57ad62550e837d16333d8b904de73e4cfb498"
+      },
+      "key_numbers": {
+        "outcome": "reproduced",
+        "reference_objective": 3.9760718986316803,
+        "copasi_best_objective": 3.976071799013196,
+        "relative_difference": 2.505449767211456e-08,
+        "starts": 10,
+        "simulation_worst_abs_difference_over_sigma": 1.6373477546054917e-08
+      }
+    }
+  }
+}

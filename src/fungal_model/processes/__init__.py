@@ -16,6 +16,11 @@ from .base import (
     ValidityDomain,
 )
 from .factories import (
+    CostedSecretionFactory,
+    DilutionExchangeFactory,
+    GasTransferFactory,
+    ResourceLimitedGrowthFactory,
+    ResourceLimitedMaintenanceFactory,
     BuildDecision,
     FirstOrderFactory,
     HomogeneousMichaelisMentenFactory,
@@ -42,6 +47,19 @@ from .inactivation import (
 from .ionization import (
     PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE,
     PHIonizationMichaelisMentenProcess,
+)
+from .culture import (
+    COSTED_SECRETION_PROCESS_TYPE,
+    DILUTION_EXCHANGE_PROCESS_TYPE,
+    GAS_TRANSFER_PROCESS_TYPE,
+    RESOURCE_LIMITED_GROWTH_PROCESS_TYPE,
+    RESOURCE_LIMITED_MAINTENANCE_PROCESS_TYPE,
+    ClosureConstants,
+    CostedSecretionProcess,
+    DilutionExchangeProcess,
+    GasTransferProcess,
+    ResourceLimitedGrowthProcess,
+    ResourceLimitedMaintenanceProcess,
 )
 from .physiology import (
     PROPORTIONAL_SYNTHESIS_PROCESS_TYPE,
@@ -80,6 +98,22 @@ from .transglycosylation import (
 )
 
 __all__ = [
+    "COSTED_SECRETION_PROCESS_TYPE",
+    "DILUTION_EXCHANGE_PROCESS_TYPE",
+    "GAS_TRANSFER_PROCESS_TYPE",
+    "RESOURCE_LIMITED_GROWTH_PROCESS_TYPE",
+    "RESOURCE_LIMITED_MAINTENANCE_PROCESS_TYPE",
+    "ClosureConstants",
+    "CostedSecretionFactory",
+    "CostedSecretionProcess",
+    "DilutionExchangeFactory",
+    "DilutionExchangeProcess",
+    "GasTransferFactory",
+    "GasTransferProcess",
+    "ResourceLimitedGrowthFactory",
+    "ResourceLimitedGrowthProcess",
+    "ResourceLimitedMaintenanceFactory",
+    "ResourceLimitedMaintenanceProcess",
     "AccessibleSitePool",
     "AccessibleSurfaceAreaModel",
     "AssembledModel",

@@ -57,22 +57,24 @@ Tests protecting it:
 
 ## FD-009 Model representations and engines outside the compiled core
 
-Status: active, contained since 2026-10-04 (CORE-001); narrowed 2026-10-05 (ORG-001)
+Status: active, contained since 2026-10-04 (CORE-001); narrowed 2026-10-05 (ORG-001, UNIFY-001)
 
 Reason: `ProcessODESolver` now compiles `Process` models to a numeric
-stoichiometric right-hand side with build-time unit resolution. Four other
+stoichiometric right-hand side with build-time unit resolution. Other
 integration paths still own their own right-hand sides: the legacy
 `Reaction`/`SimulationEngine` engine, the 1D and N-D reaction-diffusion
 engines (which evaluate `Reaction` rate laws on unit-bearing quantities per
-cell or per field), the opt-in physiology classes (`FungalCouplingModel`,
-`ResourceLimitedCulture`, `DegradingCulture`) and the research culture models.
-They predate the compiled core and are not reachable from the registry-backed
-`VirtualExperiment` path.
+cell or per field), the research culture models, the legacy
+`reactions()`/`build_engine()` path of `FungalCouplingModel` (kept for
+caller-supplied `Reaction` rate laws), and the native `simulate` of
+`ResourceLimitedCulture` and `DegradingCulture`, which the classes keep for
+its analytic piecewise Jacobian. They predate the compiled core and are not
+reachable from the registry-backed `VirtualExperiment` path.
 
-Risk: scientific logic can drift between representations; the resource-limited
-growth, maintenance and costed secretion closures of `DegradingCulture` cannot
-yet be registered as processes; spatial runs stay too slow for calibration; a
-process without a numeric kernel could silently keep the slow path.
+Risk: scientific logic can drift between representations; spatial runs stay
+too slow for calibration; a process without a numeric kernel could silently
+keep the slow path; the two culture classes carry a second right-hand side
+until the compiled core supplies a Jacobian.
 
 Narrowing (ORG-001, 2026-10-05): the registry now reaches whole-organism
 physiology through the generic `culture_physiology` template family and the
@@ -83,16 +85,42 @@ still owns its own right-hand side for the other candidates (published,
 effective, retained); the Pirt/Monod closures with nitrogen and oxygen
 limitation remain class-bound because no organism record parameterizes them.
 
+Narrowing (UNIFY-001, 2026-10-05): the Pirt/Monod closure (growth after a
+maintenance demand, capped maintenance, costed secretion sharing the
+post-maintenance budget) and the chemostat exchanges (dilution against a feed,
+gas transfer towards saturation) are generic processes in
+`processes/culture.py` with factories and config support (`stoichiometry` on
+`ProcessConfig`), exercised by the packaged
+`toy_resource_limited_chemostat.yml` on abstract pools. `ResourceLimitedCulture`
+and `DegradingCulture` emit them (`compiled_processes`, `compiled_parameters`)
+and `simulate_compiled` integrates them on the compiled core; the parity
+tests pin the compiled trajectories, extents, boundary ledgers and process
+rates to the native `simulate` to 1e-7 relative and 1e-11 mol/L absolute at
+tight tolerances. The classes keep `simulate` because its analytic piecewise
+Jacobian is the one thing the compiled core cannot yet provide; both paths
+name their engine in the trajectory diagnostics. `FungalCouplingModel`
+composes `mass_action` (extended with catalysts), `first_order_decay` and
+`proportional_synthesis` processes in `compiled_processes(degradation)` and
+runs them through `simulate_compiled`, pinned to its legacy engine by
+`tests/test_coupling_compiled.py`; the degradation must be supplied as
+processes because a `Reaction`'s Python rate law cannot be compiled.
+
 Containment: every shipped process and modifier compiles to a numeric kernel
 and `tests/test_compiled_process_models.py` fails if one falls back; the
 fallback path is recorded in `solver_metadata["kernel"]`, never silent; the
 compiled path is tested for identical trajectories and evaluation counts
-against the unit-aware evaluation on every packaged config.
+against the unit-aware evaluation on every packaged config; the culture
+classes' compiled path is tested against their native path.
 
 Exit condition: `Reaction` rate laws and the physiology classes are expressed
 as processes (or builders) that emit the compiled representation; the spatial
 engines apply compiled kernels per cell with vectorized diffusion; the legacy
-`SimulationEngine` is retired; compiled models can supply a Jacobian.
+`SimulationEngine` is retired; compiled models can supply a Jacobian (met,
+opt-in, CORE-002: `CompiledModel.jacobian` from per-process gradients,
+analytic for the simple laws and the closure, finite differences otherwise,
+every kind recorded; the default stays the backend's differences so recorded
+results do not move, which is also why the culture classes keep their native
+path for now).
 
 Removal milestone: completion of step 1 in
 `foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`; step 2
@@ -103,7 +131,12 @@ Tests protecting it: `tests/test_compiled_process_models.py`
 (`test_shipped_process_types_all_compile_to_numeric_kernels`,
 `test_process_without_kernel_uses_recorded_quantity_wrapped_path_exactly`),
 `tests/test_organism_registry_case.py`
-(`test_configured_model_reproduces_the_frozen_research_candidate`).
+(`test_configured_model_reproduces_the_frozen_research_candidate`),
+`tests/test_culture_processes.py`
+(`test_resource_limited_culture_compiled_path_matches_the_native_right_hand_side`,
+`test_degrading_culture_compiled_path_matches_the_native_right_hand_side`),
+`tests/test_coupling_compiled.py`
+(`test_coupling_compiled_path_matches_the_legacy_engine`).
 
 ## FD-008 Exploratory research-runner rate-law duplication
 

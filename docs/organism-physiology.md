@@ -151,6 +151,9 @@ and ABGT1026 (Jørgensen 2009) and an endpoint secretome composition for
 template today: the registry's organism records require enzyme classes with a
 process compatibility, and the data carry no enzyme-class evidence
 (*A. niger*) or no time courses (*T. reesei*). They are the next intake
-targets, together with the resource-limited growth, maintenance and costed
-secretion closures of `DegradingCulture`, which no organism in the repository
-yet parameterizes.
+targets. The resource-limited growth, maintenance and costed secretion
+closures of `DegradingCulture` are now generic processes with factories
+(`resource_limited_growth`, `resource_limited_maintenance`, `costed_secretion`,
+with `dilution_exchange` and `gas_transfer`; see `docs/compiled-core.md`), but
+no organism record in the repository parameterizes them yet, so no template
+family binds them.

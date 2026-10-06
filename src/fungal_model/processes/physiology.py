@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 
 from fungal_model.core.assumptions import Assumption
-from fungal_model.core.kernels import KernelContext, RateKernel
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.processes.base import (
@@ -246,6 +246,50 @@ class ProportionalSynthesisProcess(Process):
             return ((specific_rate * producer) * (inducer / (half_saturation + inducer))) * scale
 
         return induced_kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        producer_index, to_producer = context.state_slot(self.producer_state, self.producer_units)
+        specific_rate = context.parameter(self.specific_rate_symbol, self.specific_rate_units)
+        if specific_rate < 0:
+            raise ValueError("specific production rate must be non-negative for proportional synthesis.")
+        scale = float(
+            assert_compatible(
+                Q_(1.0, self.specific_rate_units) * Q_(1.0, self.producer_units),
+                self.rate_units,
+                name=f"{self.name} rate",
+            ).magnitude
+        )
+        size = len(context.state_index)
+        if not self.induced:
+            derivative = specific_rate * scale * to_producer
+
+            def constitutive_gradient(time: float, state: np.ndarray) -> np.ndarray:
+                del time, state
+                result = np.zeros(size, dtype=float)
+                result[producer_index] = derivative
+                return result
+
+            return constitutive_gradient
+        assert self.inducer_state is not None
+        assert self.inducer_units is not None
+        assert self.induction_half_saturation_symbol is not None
+        inducer_index, to_inducer = context.state_slot(self.inducer_state, self.inducer_units)
+        half_saturation = context.parameter(self.induction_half_saturation_symbol, self.inducer_units)
+        if half_saturation <= 0:
+            raise ValueError("induction half-saturation constant must be positive for induced synthesis.")
+
+        def induced_gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            producer = state[producer_index] * to_producer
+            inducer = state[inducer_index] * to_inducer
+            if producer < 0 or inducer < 0:
+                raise ValueError("producer and inducer must be non-negative for induced synthesis.")
+            result = np.zeros(size, dtype=float)
+            result[producer_index] = specific_rate * inducer / (half_saturation + inducer) * scale * to_producer
+            result[inducer_index] += specific_rate * producer * half_saturation / (half_saturation + inducer) ** 2 * scale * to_inducer
+            return result
+
+        return induced_gradient
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
