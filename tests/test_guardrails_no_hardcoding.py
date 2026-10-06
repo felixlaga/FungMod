@@ -81,32 +81,47 @@ def test_registry_case_builder_has_no_reaction_specific_onboarding_tokens() -> N
         assert forbidden not in case_builder
 
 
+USER_DATA_FORBIDDEN_TOKENS = (
+    "reaction_618",
+    "reaction 618",
+    "glucosidase",
+    "cellobiose",
+    "glucose",
+    "cellulose",
+    "cellulase",
+    "esterase",
+    "nitrophenyl",
+    "trichoderma",
+    "harzianum",
+    "oryza",
+    "laccase",
+    "syringaldazine",
+    # USERDATA-003 genome-route fixture: the classes and substrates come from the family map and tables.
+    "maltose",
+    "glucoamylase",
+    "xylanase",
+    "cellobiohydrolase",
+    "synthetic_g",
+    # USERDATA-005: organisms and hosts of the Reaction 618 snapshot come from the source entries.
+    "phanerochaete",
+    "hordeum",
+    "escherichia",
+    "bacteroides",
+)
+
+
+def test_user_data_sources_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
+    """The SABIO-RK drafting module names its source, never an organism, substrate or enzyme."""
+
+    module = (ROOT / "src" / "fungal_model" / "api" / "user_data_sources.py").read_text(encoding="utf-8").lower()
+    for forbidden in USER_DATA_FORBIDDEN_TOKENS:
+        assert forbidden not in module, forbidden
+
+
 def test_user_data_import_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
     user_data = (ROOT / "src" / "fungal_model" / "api" / "user_data.py").read_text(encoding="utf-8").lower()
 
-    for forbidden in (
-        "reaction_618",
-        "reaction 618",
-        "sabio",
-        "glucosidase",
-        "cellobiose",
-        "glucose",
-        "cellulose",
-        "cellulase",
-        "esterase",
-        "nitrophenyl",
-        "trichoderma",
-        "harzianum",
-        "oryza",
-        "laccase",
-        "syringaldazine",
-        # USERDATA-003 genome-route fixture: the classes and substrates come from the family map and tables.
-        "maltose",
-        "glucoamylase",
-        "xylanase",
-        "cellobiohydrolase",
-        "synthetic_g",
-    ):
+    for forbidden in (*USER_DATA_FORBIDDEN_TOKENS, "sabio"):
         assert forbidden not in user_data, forbidden
 
 

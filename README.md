@@ -1042,7 +1042,13 @@ limitations. An optional `genomes.csv` takes a strain's enzyme classes from
 its dbCAN genome annotation: classes with a registry record join the
 strain, classes without one and unmapped families are reported, and every
 resolved class that can act on a dataset substrate but has no kinetics becomes
-a named measurement request, since no rate is ever taken from a genome.
+a named measurement request, since no rate is ever taken from a genome. Public
+kinetics reach these tables with the user in the loop: `user_tables_from_sabiork`
+drafts them from SABIO-RK kinetic-law entries (a `source_proposal`, a frozen
+snapshot or an export you downloaded) with a `review.md` of every mapping
+decision and everything not converted, and `load_user_dataset` refuses the
+draft until every `REVIEW:` field is filled
+([starting from SABIO-RK](docs/user-data.md#starting-from-sabio-rk)).
 
 ## Public API
 
@@ -1069,6 +1075,9 @@ assembly, execution, and result inspection:
 - `load_user_dataset`
 - `UserDataset`
 - `UserDataError`
+- `user_tables_from_sabiork`
+- `UserTablesDraft`
+- `UserTablesSourceError`
 - `review_source_proposal`
 - `CurationDecision`
 - `CurationResult`

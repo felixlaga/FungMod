@@ -6,6 +6,34 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Public kinetics into user tables (USERDATA-005): `user_tables_from_sabiork`
+  drafts the user-dataset tables (strains, enzymes, optional enzyme classes,
+  substrates, conditions, kinetics) and a `user_dataset.yml` from SABIO-RK
+  kinetic-law entries given as a `RegistryProposal` from `source_proposal`, a
+  downloaded export JSON or a reaction ID read from the local snapshots;
+  nothing is fetched while drafting. `UserTablesDraft.write` adds a
+  `review.md` listing every mapping decision and every entry or parameter not
+  converted, with the reason, and writes byte-identical files for the same
+  input. One strain per organism and expression host (or
+  `strain_id_for_organism`); EC numbers resolved against the registry (an
+  unresolved one is listed, and an `enzyme_classes.csv` row with `REVIEW:`
+  bond and substrate classes is drafted only with
+  `propose_enzyme_classes=True`); substrates resolved by name or alias, product
+  and mol/mol yield from the reaction stoichiometry; one condition per
+  temperature and pH with the buffer in notes; Km, kcat, Vmax (as `vmax` or
+  `specific_activity` by dimension) and the assay concentrations copied as
+  `literature` values with `sd`, source (EntryID, first author, year, PubMed
+  ID) and method (kinetic law), units kept when the unit registry parses them
+  or mapped through the explicit `SABIORK_UNIT_SPELLINGS` table, otherwise
+  listed. Mutant enzymes, isoenzyme conflicts on one case, kcat/Km, pKa and
+  other parameters are listed, not converted; laws with pKa parameters are
+  listed as pH-ionization laws and only their Km and kcat are converted. The
+  `design` argument states the virtual assay's substrate and enzyme
+  concentrations and enzyme loading. `load_user_dataset` now refuses any table
+  cell or manifest value beginning with `REVIEW:`, naming each such field,
+  before interpreting the tables; the simulation time grid of a draft is such
+  a field (`docs/user-data.md#starting-from-sabio-rk`).
+
 - Enzyme repertoire from a genome annotation in user data (USERDATA-003): an
   optional `genomes.csv` (`strain_id`, `annotation_file`, `annotation_tool`,
   `source`, optional `min_tools_agreeing`) points a strain to a dbCAN
