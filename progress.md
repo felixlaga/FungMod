@@ -97,8 +97,10 @@ Changed:
   budget, analytic mixed steady state of the exchanges, refusals, factories
   from config and their missing-field reports, the packaged config through
   the configured workflow, native-versus-compiled parity for both classes in
-  batch and chemostat operation and for the alternative chemistry, duplicate
-  symbols refuse); `tests/test_process_factory_library.py` and
+  batch and chemostat operation and for the alternative chemistry at 1e-6
+  relative (macOS differed from Linux by 1.6e-7 on one cumulative-exchange
+  element at 1e-7), duplicate symbols refuse);
+  `tests/test_process_factory_library.py` and
   `tests/test_compiled_process_models.py` expect the five new types.
 
 Not changed: any rate law, constant, recorded result or the native
