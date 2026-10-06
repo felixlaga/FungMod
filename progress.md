@@ -26,6 +26,152 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## USERDATA-006 pH-Ionization Kinetics In User Data
+
+Status: `complete` for the stated scope (2026-10-06). The shipped registry
+could model pH-dependent kinetics with the diprotic ionization law (the BGL1A
+case); user data could not, and the SABIO-RK converter listed such entries as
+"not importable" and wrote their limiting constants as `km` and `kcat`. User
+data now has a third rate form for a (class, substrate) pair that binds the
+existing `ph_ionization_michaelis_menten` process law, and the converter
+drafts SABIO-RK's diprotic law in that form.
+
+Changed:
+
+- `api/user_data.py`: new `kinetics.csv` quantities `kcat_limiting` (1/time),
+  `km_limiting` (concentration, positive), `pk_free_lower`, `pk_free_upper`,
+  `pk_complex_lower`, `pk_complex_upper`, `ph_min`, `ph_max` (dimensionless),
+  used with `substrate_initial_concentration` and `enzyme_concentration`.
+  Role mapping, as in the registry BGL1A records: `kcat_limiting` ->
+  `turnover` (k0), `km_limiting` -> `michaelis_constant` (Km0),
+  `pk_free_lower`/`upper` -> `free_enzyme_lower_pk`/`upper_pk` (pKe1/pKe2),
+  `pk_complex_lower`/`upper` -> `complex_lower_pk`/`upper_pk` (pKes1/pKes2),
+  `ph_min`/`ph_max` -> `minimum_ph`/`maximum_ph`, the concentrations to the
+  initial-state roles. kcat(pH) = kcat_limiting / f_es(pH) and Km(pH) =
+  km_limiting f_e(pH) / f_es(pH), so the limiting constants are plateau values
+  of the fit, never the kcat or Km at one pH. Constants `RATE_FORM_PH_IONIZATION`,
+  `PH_IONIZATION_QUANTITIES`, `USER_DATASET_PH_IONIZATION_PROCESS_TYPE`.
+- Validation: the form is exclusive with the kcat and Vmax forms in a case and
+  in a pair (refused as v2 refuses kcat/Vmax mixing); an enzyme class uses it on
+  all of its substrates or on none, because the generated class lists one
+  process law and preflight looks for every listed law on each substrate (a
+  pair without rate rows of such a class takes the pH-ionization form); pK
+  values finite and nonnegative, each lower pK below its upper pK (for sampled
+  ranges the whole lower range below the whole upper range); `ph_min` and
+  `ph_max` exact, within 0 to 14, `ph_min < ph_max`; every condition with
+  pH-ionization rows has an exact pH inside `[ph_min, ph_max]` (an `unknown`
+  pH or a pH outside the range is refused on its `conditions.csv` row with the
+  reason); a response law on a condition the process law reads (the cardinal
+  pH law) is refused as double-counting, using
+  `PROCESS_ENVIRONMENT_CONDITIONS`; temperature laws bind as before and
+  `kcat_limiting`/`km_limiting` must be stated at their reference temperature.
+- Generated records: per pair a `<class>__<substrate>__ph_ionization_mm`
+  compatibility and `..._ph_ionization_mm_template` case template built like
+  the registry BGL1A template (substrate, product and enzyme states; enzyme
+  initial state; process type `ph_ionization_michaelis_menten`; limitations
+  stating the law, the fit constants and the static pH; a validity note on the
+  fitted range), parameter records with that process type, gap records and
+  measurement requests (fit the law over a pH series at the condition's
+  temperature; state the fitted pH range). Records of the kcat and Vmax forms
+  are byte-identical to before (the assembled-config snapshot test is
+  unchanged and passes).
+- `api/user_data_sources.py`: an entry whose kinetic law is SABIO-RK's
+  diprotic "Michaelis-Menten (pH-dependent)" law, recognised by its formula
+  (`PH_IONIZATION_LAW_FORMULA`, whitespace removed) and the parameter names
+  `k0`, `Km0`, `pKe1`, `pKe2`, `pKes1`, `pKes2` (`PH_IONIZATION_LAW_PARAMETERS`),
+  is drafted in the pH-ionization form as `literature` rows with `sd`;
+  SABIO-RK's `-` unit of a pKa becomes `dimensionless`. `ph_min`/`ph_max` come
+  from the pH range the entry states (the law's pH variable, else the assay
+  pH); with none, or two different ones, they are `REVIEW:` fields. The
+  condition pH stays a `REVIEW:` field when SABIO-RK gives a range (and also
+  when it gives none for this form). A pH law of another formula or parameter
+  set is listed, not converted, and none of its constants is written. Where
+  the selected entries give the same class in the kcat or Vmax form, the
+  pH-ionization entries are listed (select them alone with `entry_ids`).
+  `review.md` "pH-ionization laws" now describes the mapping and marks each
+  entry "pH-ionization form" or not converted; the "not importable" wording is
+  gone.
+- New fixture `tests/fixtures/user_data/bgl1a_ph_ionization/`: SABIO-RK entry
+  38522 (Tsukada 2008) re-entered from the registry records as literature rows,
+  with design loadings equal to the registry case's exploratory loadings.
+- Docs: `docs/user-data.md` "Three rate forms" (law, role table, example,
+  checks), quantities table, responses and reference-condition notes,
+  generated records, gap requests, the SABIO-RK mapping table and
+  "pH-dependent laws" paragraph with an example, limitations;
+  `docs/capabilities.md`, `docs/environment-response.md`, README, changelog.
+
+Tests: new `tests/test_user_data_ph_ionization.py` (29 tests). (a) The
+fixture's records equal the registry BGL1A records role by role; the user case
+is `modelable` in scientific mode and its substrate and product trajectories
+equal the registry case's (exploratory, one sample of exact values; the
+registry case is not scientific-eligible because its loadings are
+exploratory priors) in the Tsukada pH 5 assay within the solver tolerance (the
+observed difference is zero), and match the law integrated independently in
+the test; the assembled process matches the registry config in the snapshot.
+(b) An `EnvironmentGrid` over pH 4 to 8 in scientific mode gives initial rates
+whose ratios equal the law's factors computed in the test (rel 1e-9); a grid
+pH of 9 warns `above pH 8.0`. (c) A missing pK or pH bound of a started pair is an explicit gap with a
+request that preflight quotes. Refusals with file, row, column and reason:
+a ranged pH cell, an unknown pH, a pH outside `[ph_min, ph_max]`, pK ordering
+(exact and overlapping ranges), `ph_min >= ph_max`, `ph_max` above 14, a range
+for `ph_min`, wrong units, a non-finite pK, mixed forms in a case, across
+strains and across the substrates of a class, a cardinal pH law on the pair;
+a temperature law binds and enforces its reference temperature; an environment
+with a pH range that reaches assembly is refused there. (d) Entry 38522 of the
+frozen Reaction 618 snapshot drafts in this form (values and `sd` equal the
+raw export, `ph_min` 4 and `ph_max` 8 from the law's pH variable, the
+condition pH a `REVIEW:` field), loads once reviewed and simulates the same
+trajectory as the fixture; without design the loadings are gaps with requests;
+derived copies of entry 38522 test a foreign formula (listed) and a missing pH
+range (`REVIEW:` bounds); with 38521 the kcat form is kept and 38522 listed.
+(e) A user-defined acid phosphatase-like class on a user-defined aryl
+phosphate with estimate rows (sampled `kcat_limiting` and pK ranges) runs in
+exploratory mode over a pH grid and is refused in scientific mode; a second,
+unstarted substrate of that class takes the pH-ionization form with
+pH-ionization gap requests. `tests/test_user_data_sources.py`: the two tests
+that encoded "not importable" and the `km`/`kcat` conversion of 38522 now
+check the new section wording and the pH-ionization rows.
+
+Gates: `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`
+clean; `pyright` on the four changed source and test files 0 errors;
+`mkdocs build --strict` clean; all `tests/test_user_data_*.py`, the BGL1A,
+pH-ionization and Reaction 618 registry tests, the guardrails, documentation
+sync, hygiene and the ledger-reading tests: 260 passed after the final edits;
+the full suite 2158 passed (run before the final started-pair gap test, the
+two `__all__` exports and this ledger entry; the targeted set above was re-run
+after them).
+
+Not changed: no process law, assembler, solver, registry record, snapshot,
+curated record or output schema; the kcat and Vmax forms, their records and
+messages; the converted entries of the whole Reaction 618 (still 38521, 39245,
+44879, 44888, 60725, since every pH-dependent entry there is a mutant or in
+the 38522/38534 conflict).
+
+Scientific impact: a published diprotic pH law reaches a simulation as
+reviewed user data with its own constants and fitted range, instead of being
+dropped or having its limiting constants read as single-pH constants; the rate
+then follows the environment pH through the existing law. No new biology: the
+law, its assumptions and its limitations are those of the registry case.
+
+Non-specific coverage: the (e) case is a user-defined class and substrate,
+not a beta-glucosidase on cellobiose, with estimates, ranges and a second
+substrate.
+
+Limitations: the pH is read once from the environment (no pH dynamics, buffer
+identity, ionic strength or pH-dependent stability); the pK values and the
+fitted range are not rescaled with temperature; a grid pH outside the fitted
+range warns rather than being refused; a class uses the form on all of its
+substrates or on none; preflight on this branch has no check that the
+environment pH is exact (`PROCESS_ENVIRONMENT_CONDITIONS` is used by assembly
+in `screening/template_environment_modifiers.py`, not by `modelability.py`),
+but user conditions and grid values cannot be pH ranges and assembly refuses
+one that arrives otherwise; the converter recognises only SABIO-RK's type-24
+formula with its standard parameter names.
+
+Next: a preflight check of `PROCESS_ENVIRONMENT_CONDITIONS` in
+`screening/modelability.py`, so a case whose environment lacks an exact pH is
+reported before assembly.
+
 ## USERDATA-005 Public Kinetics Into User Tables
 
 Status: `complete` for the stated scope (2026-10-06). Kinetics fetched from a

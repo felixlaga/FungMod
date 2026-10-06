@@ -4,28 +4,33 @@ A user directory holds a manifest (``user_dataset.yml``) and CSV tables of
 strains, their enzyme classes, substrates, assay conditions and kinetic values.
 ``load_user_dataset`` validates every table, collects every problem before it
 raises, and turns the tables into production registry mappings: one fungus per
-strain, one namespaced enzyme class per declared class, one homogeneous
-Michaelis-Menten compatibility and case template per compatible class and
-substrate pair, one parameter record per kinetics row, and one explicit
-unknown parameter record (a gap) for every required role that has no row.
+strain, one namespaced enzyme class per declared class, one Michaelis-Menten
+compatibility and case template per compatible class and substrate pair, one
+parameter record per kinetics row, and one explicit unknown parameter record (a
+gap) for every required role that has no row.
 
 Every generated identifier carries the ``<dataset_id>__`` prefix and every
 parameter record carries the reserved ``fungmod_user_dataset`` provenance
 namespace (dataset, digest, file and row). Nothing is written to the shared
 registry: ``UserDataset.overlay`` returns a new in-memory registry.
 
-Scope: dissolved substrates and homogeneous Michaelis-Menten kinetics in one
-of two rate forms per enzyme class and substrate, either ``kcat`` with an
-enzyme concentration or a maximum rate ``Vmax`` for the simulated system.
-``Vmax`` comes from exactly one route per case: an explicit ``vmax`` row, a
-specific activity times an enzyme loading (a derived record whose maturity is
-the weaker input's), or an assay activity measured on the case substrate at
-saturation. Products are stoichiometric with an explicit mol/mol yield. An
-optional ``responses.csv`` binds the parameters of an existing temperature or
-pH response law (cardinal temperature, cardinal pH, Arrhenius) to a strain,
-enzyme class and substrate; the law enters the generated case template as a
-process modifier, and the kinetic constants of that case must be stated at the
-law's reference condition.
+Scope: dissolved substrates and Michaelis-Menten kinetics in one of three rate
+forms per enzyme class and substrate: ``kcat`` with an enzyme concentration, a
+maximum rate ``Vmax`` for the simulated system, or the diprotic pH-ionization
+form (a pH-independent limiting turnover and Michaelis constant, the two pK
+values of the free enzyme and of the enzyme-substrate complex, the pH range of
+the fit, and an enzyme concentration), which binds the existing
+``ph_ionization_michaelis_menten`` process law so that the rate follows the
+environment pH. ``Vmax`` comes from exactly one route per case: an explicit
+``vmax`` row, a specific activity times an enzyme loading (a derived record
+whose maturity is the weaker input's), or an assay activity measured on the
+case substrate at saturation. Products are stoichiometric with an explicit
+mol/mol yield. An optional ``responses.csv`` binds the parameters of an
+existing temperature or pH response law (cardinal temperature, cardinal pH,
+Arrhenius) to a strain, enzyme class and substrate; the law enters the
+generated case template as a process modifier, and the kinetic constants of
+that case must be stated at the law's reference condition. A pH law on a
+pH-ionization pair is refused, since the ionization law already reads the pH.
 
 An optional ``genomes.csv`` points each strain to a dbCAN ``overview.txt``
 inside the dataset directory. The annotation is resolved to enzyme classes
@@ -102,10 +107,13 @@ from fungal_model.resources import default_registry_path
 from fungal_model.screening.case_builder import (
     HOMOGENEOUS_MM_PARAMETER_ROLES,
     HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES,
+    PH_IONIZATION_MM_PARAMETER_ROLES,
+    PH_IONIZATION_MM_PROCESS_TYPE,
 )
 from fungal_model.screening.template_environment_modifiers import (
     ENVIRONMENT_MODIFIER_CONDITIONS,
     ENVIRONMENT_MODIFIER_TYPES,
+    PROCESS_ENVIRONMENT_CONDITIONS,
 )
 
 _RecordT = TypeVar("_RecordT", bound=RegistryRecord)
@@ -113,6 +121,8 @@ _RecordT = TypeVar("_RecordT", bound=RegistryRecord)
 USER_DATASET_SCHEMA_VERSION = "1"
 USER_DATASET_MANIFEST = "user_dataset.yml"
 USER_DATASET_PROCESS_TYPE = "homogeneous_michaelis_menten"
+# The process law of the pH-ionization rate form; it reads the environment pH itself.
+USER_DATASET_PH_IONIZATION_PROCESS_TYPE = PH_IONIZATION_MM_PROCESS_TYPE
 
 USER_DATASET_MATURITY_MEASURED = "user_measured"
 USER_DATASET_MATURITY_LITERATURE = "user_reported_literature"
@@ -156,6 +166,29 @@ KINETIC_QUANTITIES = (
     "specific_activity",
     "enzyme_loading",
     "assay_activity",
+    "kcat_limiting",
+    "km_limiting",
+    "pk_free_lower",
+    "pk_free_upper",
+    "pk_complex_lower",
+    "pk_complex_upper",
+    "ph_min",
+    "ph_max",
+)
+# The quantities only the pH-ionization rate form has; its enzyme concentration
+# and initial substrate are shared with the kcat form. The roles are those of the
+# ``ph_ionization_michaelis_menten`` assembler: kcat(pH) = kcat_limiting / f_es(pH)
+# and Km(pH) = km_limiting x f_e(pH) / f_es(pH), so the limiting constants are
+# the plateau values of the fit, not the kcat or Km at any one pH.
+PH_IONIZATION_QUANTITIES = (
+    "kcat_limiting",
+    "km_limiting",
+    "pk_free_lower",
+    "pk_free_upper",
+    "pk_complex_lower",
+    "pk_complex_upper",
+    "ph_min",
+    "ph_max",
 )
 _QUANTITY_ROLE = {
     "km": "km",
@@ -163,12 +196,33 @@ _QUANTITY_ROLE = {
     "substrate_initial_concentration": "substrate_initial_concentration",
     "enzyme_concentration": "enzyme_initial_concentration",
     "vmax": "vmax",
+    "kcat_limiting": "turnover",
+    "km_limiting": "michaelis_constant",
+    "pk_free_lower": "free_enzyme_lower_pk",
+    "pk_free_upper": "free_enzyme_upper_pk",
+    "pk_complex_lower": "complex_lower_pk",
+    "pk_complex_upper": "complex_upper_pk",
+    "ph_min": "minimum_ph",
+    "ph_max": "maximum_ph",
 }
 _ROLE_QUANTITY = {role: quantity for quantity, role in _QUANTITY_ROLE.items()}
-_CONCENTRATION_QUANTITIES = ("substrate_initial_concentration", "km", "enzyme_concentration")
+_CONCENTRATION_QUANTITIES = ("substrate_initial_concentration", "km", "enzyme_concentration", "km_limiting")
 # Quantities that are kinetic constants measured at a condition; a bound
 # response law rescales them, so they must be stated at its reference condition.
-_KINETIC_CONSTANT_QUANTITIES = frozenset({"km", "kcat", "vmax", "specific_activity", "assay_activity"})
+_KINETIC_CONSTANT_QUANTITIES = frozenset(
+    {"km", "kcat", "vmax", "specific_activity", "assay_activity", "kcat_limiting", "km_limiting"}
+)
+# The two ionizations of the diprotic law: (lower pK, upper pK, what ionizes).
+_PK_PAIRS = (
+    ("pk_free_lower", "pk_free_upper", "free enzyme"),
+    ("pk_complex_lower", "pk_complex_upper", "enzyme-substrate complex"),
+)
+# The pH range over which the law was fitted; exact values only, never sampled.
+_PH_RANGE_QUANTITIES = ("ph_min", "ph_max")
+_DIMENSIONLESS_QUANTITIES = frozenset({*(name for pair in _PK_PAIRS for name in pair[:2]), *_PH_RANGE_QUANTITIES})
+_RATE_CONSTANT_QUANTITIES = frozenset({"kcat", "kcat_limiting"})
+_POSITIVE_QUANTITIES = frozenset({"km", "km_limiting"})
+_PH_SCALE = (0.0, 14.0)
 _YIELD_BASIS = "mol/mol"
 _UNKNOWN_CELL = "unknown"
 # A cell or manifest value starting with this marker is a field a drafted
@@ -182,9 +236,34 @@ _NO = "no"
 # generates records for, in record order.
 RATE_FORM_KCAT = "kcat_enzyme"
 RATE_FORM_VMAX = "vmax"
-_FORM_QUANTITIES = {
-    RATE_FORM_KCAT: tuple(_ROLE_QUANTITY[role] for role in HOMOGENEOUS_MM_PARAMETER_ROLES),
-    RATE_FORM_VMAX: tuple(_ROLE_QUANTITY[role] for role in HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES),
+RATE_FORM_PH_IONIZATION = "ph_ionization"
+_FORM_ROLES = {
+    RATE_FORM_KCAT: HOMOGENEOUS_MM_PARAMETER_ROLES,
+    RATE_FORM_VMAX: HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES,
+    RATE_FORM_PH_IONIZATION: PH_IONIZATION_MM_PARAMETER_ROLES,
+}
+_FORM_QUANTITIES = {form: tuple(_ROLE_QUANTITY[role] for role in roles) for form, roles in _FORM_ROLES.items()}
+_FORM_PROCESS_TYPE = {
+    RATE_FORM_KCAT: USER_DATASET_PROCESS_TYPE,
+    RATE_FORM_VMAX: USER_DATASET_PROCESS_TYPE,
+    RATE_FORM_PH_IONIZATION: USER_DATASET_PH_IONIZATION_PROCESS_TYPE,
+}
+# Forms in the order a pair-level conflict names them: the first present is the reference.
+_FORM_ORDER = (RATE_FORM_KCAT, RATE_FORM_VMAX, RATE_FORM_PH_IONIZATION)
+_FORM_LABEL = {RATE_FORM_KCAT: "kcat", RATE_FORM_VMAX: "Vmax", RATE_FORM_PH_IONIZATION: "pH-ionization"}
+# Forms with an explicit enzyme state.
+_ENZYME_FORMS = frozenset({RATE_FORM_KCAT, RATE_FORM_PH_IONIZATION})
+_PROCESS_LABEL = {
+    USER_DATASET_PROCESS_TYPE: "homogeneous Michaelis-Menten",
+    USER_DATASET_PH_IONIZATION_PROCESS_TYPE: "pH-ionization Michaelis-Menten",
+}
+_PROCESS_SENTENCE_LABEL = {
+    USER_DATASET_PROCESS_TYPE: "Homogeneous Michaelis-Menten",
+    USER_DATASET_PH_IONIZATION_PROCESS_TYPE: "pH-ionization Michaelis-Menten",
+}
+_PROCESS_ID_SUFFIX = {
+    USER_DATASET_PROCESS_TYPE: "homogeneous_mm",
+    USER_DATASET_PH_IONIZATION_PROCESS_TYPE: "ph_ionization_mm",
 }
 _KCAT_FORM_QUANTITIES = ("kcat", "enzyme_concentration")
 # Routes to Vmax; one case uses exactly one.
@@ -821,6 +900,8 @@ class _Parsed:
     responses: list[_Response] = field(default_factory=list)
     # (class, substrate) -> rate form, set by cross-validation; absent when no case started a form.
     pair_forms: dict[tuple[str, str], str] = field(default_factory=dict)
+    # Enzyme classes whose started pairs all use the pH-ionization form; their unstarted pairs use it too.
+    ionization_classes: set[str] = field(default_factory=set)
     # (strain, class, substrate) -> law -> parameter -> row, set by cross-validation for valid laws.
     laws: dict[tuple[str, str, str], dict[str, dict[str, _Response]]] = field(default_factory=dict)
     # Resolved genome annotations, the annotation files read (relative path -> bytes), and the
@@ -2211,16 +2292,28 @@ def _kinetic_values(
     if not ok:
         return None
     if "value" in parsed:
-        if quantity == "km" and parsed["value"] <= 0.0:
-            context.add(file, line, "value", "km must be positive.")
+        if quantity in _POSITIVE_QUANTITIES and parsed["value"] <= 0.0:
+            context.add(file, line, "value", f"{quantity} must be positive.")
+            return None
+        if quantity in _PH_RANGE_QUANTITIES and parsed["value"] > _PH_SCALE[1]:
+            context.add(file, line, "value", f"{quantity} {raw['value']} is outside pH 0 to 14.")
             return None
         return parsed["value"], None, None
+    if quantity in _PH_RANGE_QUANTITIES:
+        context.add(
+            file,
+            line,
+            "lower",
+            f"{quantity} bounds the pH range over which the pH-ionization law was fitted; give it as an exact value, "
+            "not a range.",
+        )
+        return None
     lower, upper = parsed["lower"], parsed["upper"]
     if not lower < upper:
         context.add(file, line, "upper", "lower must be smaller than upper.")
         return None
-    if quantity == "km" and lower <= 0.0:
-        context.add(file, line, "lower", "km must be positive.")
+    if quantity in _POSITIVE_QUANTITIES and lower <= 0.0:
+        context.add(file, line, "lower", f"{quantity} must be positive.")
         return None
     return None, lower, upper
 
@@ -2229,9 +2322,13 @@ def _quantity_units_error(quantity: str, units: str) -> str | None:
     error = _unit_parse_error(units)
     if error is not None:
         return f"units {units!r} cannot be parsed: {error}"
-    if quantity == "kcat":
+    if quantity in _RATE_CONSTANT_QUANTITIES:
         if _unit_dimension_error(units, _RATE_CONSTANT_REFERENCE_UNITS) is not None:
-            return f"kcat units {units!r} must have the dimension 1/time (for example 1/s or 1/min)."
+            return f"{quantity} units {units!r} must have the dimension 1/time (for example 1/s or 1/min)."
+        return None
+    if quantity in _DIMENSIONLESS_QUANTITIES:
+        if _unit_dimension_error(units, _DIMENSIONLESS_REFERENCE_UNITS) is not None:
+            return f"{quantity} units {units!r} must be dimensionless (write dimensionless); a pK or pH has no unit."
         return None
     if quantity in {"vmax", "assay_activity"}:
         if units_are_compatible(units, _MOLAR_RATE_REFERENCE_UNITS):
@@ -2343,6 +2440,7 @@ def _cross_validate(parsed: _Parsed, context: _Context) -> None:
                 f"{_YIELD_BASIS}; applying it would need molar masses. Use amount-per-volume units (for example mM).",
             )
     _validate_rate_forms(parsed, context)
+    _validate_ph_ionization(parsed, context)
     _validate_responses(parsed, context)
     _validate_pairs(parsed, context)
 
@@ -2354,8 +2452,14 @@ def _rows_text(rows: Sequence[Any]) -> str:
     return f"rows {', '.join(str(number) for number in numbers)}"
 
 
-def _case_form_rows(rows: Sequence[_Kinetics]) -> tuple[list[_Kinetics], dict[str, list[_Kinetics]]]:
-    """Split a case's rows into kcat-form rows and Vmax-route rows (route name to rows)."""
+def _case_form_rows(
+    rows: Sequence[_Kinetics],
+) -> tuple[list[_Kinetics], dict[str, list[_Kinetics]], list[_Kinetics]]:
+    """Split a case's rows into kcat-form rows, Vmax-route rows (route name to rows) and pH-ionization rows.
+
+    The enzyme concentration is listed with the kcat-form rows; the pH-ionization
+    form uses it too, which ``_validate_rate_forms`` takes into account.
+    """
 
     kcat_rows = [row for row in rows if row.quantity in _KCAT_FORM_QUANTITIES]
     routes: dict[str, list[_Kinetics]] = {}
@@ -2363,18 +2467,53 @@ def _case_form_rows(rows: Sequence[_Kinetics]) -> tuple[list[_Kinetics], dict[st
         route = _QUANTITY_VMAX_ROUTE.get(row.quantity)
         if route is not None:
             routes.setdefault(route, []).append(row)
-    return kcat_rows, routes
+    ionization_rows = [row for row in rows if row.quantity in PH_IONIZATION_QUANTITIES]
+    return kcat_rows, routes, ionization_rows
+
+
+def _form_rows(rows: Sequence[_Kinetics], form: str) -> list[_Kinetics]:
+    """The rows of one case that set ``form``."""
+
+    kcat_rows, routes, ionization_rows = _case_form_rows(rows)
+    if form == RATE_FORM_KCAT:
+        return kcat_rows
+    if form == RATE_FORM_VMAX:
+        return [row for route_rows in routes.values() for row in route_rows]
+    return ionization_rows
+
+
+def _pair_form(parsed: _Parsed, pair: tuple[str, str]) -> str:
+    """The rate form of an enzyme class and substrate.
+
+    A pair whose cases give rate rows has the form they started. A pair without
+    rate rows takes the pH-ionization form when its enzyme class uses that form
+    on its other substrates (a class runs one process law), otherwise the kcat
+    form, whose gap requests name every form.
+    """
+
+    form = parsed.pair_forms.get(pair)
+    if form is not None:
+        return form
+    return RATE_FORM_PH_IONIZATION if pair[0] in parsed.ionization_classes else RATE_FORM_KCAT
+
+
+def _class_process_type(parsed: _Parsed, class_key: str) -> str:
+    return _FORM_PROCESS_TYPE[RATE_FORM_PH_IONIZATION if class_key in parsed.ionization_classes else RATE_FORM_KCAT]
 
 
 def _validate_rate_forms(parsed: _Parsed, context: _Context) -> None:
-    """Check that each case and each enzyme class and substrate pair uses one rate form.
+    """Check that each case, each enzyme class and substrate pair, and each enzyme class uses one rate form.
 
     A case is one strain, enzyme class, substrate and condition. It uses the
-    kcat form (kcat and an enzyme concentration) or the Vmax form, and the
-    Vmax form takes exactly one route. All cases of one enzyme class and
-    substrate share one generated process, so they share one form. The form of
-    a pair is stored in ``parsed.pair_forms``; a pair without any rate row has
-    no entry.
+    kcat form (kcat and an enzyme concentration), the Vmax form, which takes
+    exactly one route, or the pH-ionization form (limiting constants, four pK
+    values and the fitted pH range, with an enzyme concentration). All cases of
+    one enzyme class and substrate share one generated process, so they share
+    one form. The form of a pair is stored in ``parsed.pair_forms``; a pair
+    without any rate row has no entry. An enzyme class runs one process law on
+    all of its substrates, so the pH-ionization form and the two homogeneous
+    forms are not mixed across the substrates of one class; the classes that use
+    the pH-ionization form are stored in ``parsed.ionization_classes``.
     """
 
     file = "kinetics.csv"
@@ -2383,7 +2522,27 @@ def _validate_rate_forms(parsed: _Parsed, context: _Context) -> None:
         by_case.setdefault(row.case_key, []).append(row)
     case_forms: dict[tuple[str, str, str, str], str] = {}
     for case_key, rows in by_case.items():
-        kcat_rows, routes = _case_form_rows(rows)
+        kcat_rows, routes, ionization_rows = _case_form_rows(rows)
+        if ionization_rows:
+            others = [
+                *(row for row in kcat_rows if row.quantity == "kcat"),
+                *(row for route_rows in routes.values() for row in route_rows),
+            ]
+            for row in sorted(others, key=lambda item: item.row):
+                context.add(
+                    file,
+                    row.row,
+                    "quantity",
+                    f"Row {row.row} gives {row.quantity} while {_rows_text(ionization_rows)} give the pH-ionization "
+                    f"quantities ({', '.join(dict.fromkeys(item.quantity for item in ionization_rows))}) for the same "
+                    "strain, class, substrate and condition: the pH-ionization form (kcat_limiting, km_limiting, four "
+                    "pK values, ph_min and ph_max, with an enzyme concentration) is a rate form of its own, and one case "
+                    "uses one form. Its limiting constants are not the kcat, Km or Vmax at any one pH, and FungMod "
+                    "does not derive one form from another.",
+                )
+            if not others:
+                case_forms[case_key] = RATE_FORM_PH_IONIZATION
+            continue
         consistent = True
         if kcat_rows and routes:
             kcat_quantities = " and ".join(dict.fromkeys(row.quantity for row in kcat_rows))
@@ -2435,19 +2594,140 @@ def _validate_rate_forms(parsed: _Parsed, context: _Context) -> None:
         if len(forms) == 1:
             parsed.pair_forms[pair] = next(iter(forms))
             continue
-        kcat_rows = [row for case_key in forms[RATE_FORM_KCAT] for row in _case_form_rows(by_case[case_key])[0]]
-        for case_key in forms[RATE_FORM_VMAX]:
-            for route_rows in _case_form_rows(by_case[case_key])[1].values():
-                for row in route_rows:
+        reference, *others = [form for form in _FORM_ORDER if form in forms]
+        reference_rows = [row for case_key in forms[reference] for row in _form_rows(by_case[case_key], reference)]
+        for form in others:
+            for case_key in forms[form]:
+                for row in _form_rows(by_case[case_key], form):
                     context.add(
                         file,
                         row.row,
                         "quantity",
-                        f"Enzyme class {pair[0]!r} on substrate {pair[1]!r} uses the kcat form in "
-                        f"{_rows_text(kcat_rows)} and the Vmax form in row {row.row}. All strains and conditions "
-                        "of one enzyme class and substrate share one generated process (FungMod selects a process "
-                        "by enzyme class and substrate class), so they must use one rate form.",
+                        f"Enzyme class {pair[0]!r} on substrate {pair[1]!r} uses the {_FORM_LABEL[reference]} form in "
+                        f"{_rows_text(reference_rows)} and the {_FORM_LABEL[form]} form in row {row.row}. All strains "
+                        "and conditions of one enzyme class and substrate share one generated process (FungMod "
+                        "selects a process by enzyme class and substrate class), so they must use one rate form.",
                     )
+    _validate_class_processes(parsed, context)
+
+
+def _validate_class_processes(parsed: _Parsed, context: _Context) -> None:
+    """Refuse an enzyme class that uses the pH-ionization form on some substrates and another form on others."""
+
+    by_class: dict[str, dict[str, list[tuple[str, str]]]] = {}
+    for pair, form in parsed.pair_forms.items():
+        by_class.setdefault(pair[0], {}).setdefault(_FORM_PROCESS_TYPE[form], []).append(pair)
+    for class_key, processes in by_class.items():
+        ionization_pairs = processes.get(USER_DATASET_PH_IONIZATION_PROCESS_TYPE, [])
+        if not ionization_pairs:
+            continue
+        if len(processes) == 1:
+            parsed.ionization_classes.add(class_key)
+            continue
+        others = "; ".join(
+            f"{pair[1]!r} ({_FORM_LABEL[parsed.pair_forms[pair]]} form)"
+            for process_type, pairs in processes.items()
+            if process_type != USER_DATASET_PH_IONIZATION_PROCESS_TYPE
+            for pair in pairs
+        )
+        for pair in ionization_pairs:
+            rows = [row for row in parsed.kinetics if row.pair_key == pair and row.quantity in PH_IONIZATION_QUANTITIES]
+            context.add(
+                "kinetics.csv",
+                min(row.row for row in rows),
+                "quantity",
+                f"Enzyme class {class_key!r} uses the pH-ionization form on substrate {pair[1]!r} ({_rows_text(rows)}) "
+                f"and another form on {others}. The generated enzyme class lists the process laws it runs, and "
+                "preflight looks for a compatibility of every listed law on each substrate of the class, so in this "
+                "version a class uses the pH-ionization form on all of its substrates or on none.",
+            )
+
+
+def _validate_ph_ionization(parsed: _Parsed, context: _Context) -> None:
+    """Check the pK ordering, the fitted pH range and the condition pH of every pH-ionization case.
+
+    The diprotic law needs each lower pK below its upper pK; with ranges, the
+    whole lower range must lie below the whole upper range, so that every
+    sampled pair is ordered. ``ph_min`` must be below ``ph_max``. The law reads
+    the condition pH, so the condition of every case with pH-ionization rows
+    needs an exact pH inside the case's ``ph_min`` to ``ph_max``: FungMod does
+    not extrapolate the law beyond the range it was fitted over.
+    """
+
+    file = "kinetics.csv"
+    by_case: dict[tuple[str, str, str, str], list[_Kinetics]] = {}
+    for row in parsed.kinetics:
+        if parsed.pair_forms.get(row.pair_key) == RATE_FORM_PH_IONIZATION:
+            by_case.setdefault(row.case_key, []).append(row)
+    for case_key, rows in by_case.items():
+        if not any(row.quantity in PH_IONIZATION_QUANTITIES for row in rows):
+            continue
+        quantities: dict[str, _Kinetics] = {}
+        for row in rows:
+            quantities.setdefault(row.quantity, row)
+        binding = _binding_text((case_key[0], case_key[1], case_key[2]))
+        for lower_name, upper_name, label in _PK_PAIRS:
+            lower, upper = quantities.get(lower_name), quantities.get(upper_name)
+            if lower is None or upper is None:
+                continue
+            lower_top = lower.value if lower.value is not None else lower.upper
+            upper_bottom = upper.value if upper.value is not None else upper.lower
+            assert lower_top is not None and upper_bottom is not None
+            if lower_top < upper_bottom:
+                continue
+            ranged = "" if lower.is_exact and upper.is_exact else (
+                " over the whole of both ranges, so that every sampled pair is ordered"
+            )
+            context.add(
+                file,
+                upper.row,
+                "value",
+                f"{lower_name} ({_kinetics_value_text(lower)}, row {lower.row}) must lie below {upper_name} "
+                f"({_kinetics_value_text(upper)}, row {upper.row}) for {binding}: the diprotic law needs the lower "
+                f"ionization of the {label} below the upper one{ranged}.",
+            )
+        ph_min, ph_max = quantities.get("ph_min"), quantities.get("ph_max")
+        range_known = ph_min is not None and ph_max is not None
+        if ph_min is not None and ph_max is not None:
+            assert ph_min.value is not None and ph_max.value is not None
+            if not ph_min.value < ph_max.value:
+                context.add(
+                    file,
+                    ph_max.row,
+                    "value",
+                    f"ph_min ({_number_text(ph_min.value)}, row {ph_min.row}) must be smaller than ph_max "
+                    f"({_number_text(ph_max.value)}, row {ph_max.row}) for {binding}.",
+                )
+                range_known = False
+        condition = parsed.conditions[case_key[3]]
+        if condition.ph is None:
+            context.add(
+                "conditions.csv",
+                condition.row,
+                "ph",
+                f"Condition {condition.condition_id!r} has an unknown pH, but kinetics.csv {_rows_text(rows)} give the "
+                f"pH-ionization form for {binding} there. The law reads the pH, so the condition needs one exact pH "
+                "inside the case's ph_min to ph_max.",
+            )
+        elif range_known:
+            assert ph_min is not None and ph_max is not None and ph_min.value is not None and ph_max.value is not None
+            if not ph_min.value <= condition.ph <= ph_max.value:
+                context.add(
+                    "conditions.csv",
+                    condition.row,
+                    "ph",
+                    f"Condition {condition.condition_id!r} has pH {condition.ph_text}, outside the pH range "
+                    f"{_number_text(ph_min.value)} to {_number_text(ph_max.value)} (ph_min and ph_max, kinetics.csv rows "
+                    f"{ph_min.row} and {ph_max.row}) over which the pH-ionization law of {binding} was fitted. FungMod "
+                    "does not extrapolate the law beyond its fitted range; run the case at a pH inside it.",
+                )
+
+
+def _kinetics_value_text(row: _Kinetics) -> str:
+    if row.value is not None:
+        return _number_text(row.value)
+    assert row.lower is not None and row.upper is not None
+    return f"{_number_text(row.lower)} to {_number_text(row.upper)}"
 
 
 def _validate_responses(parsed: _Parsed, context: _Context) -> None:
@@ -2498,6 +2778,7 @@ def _validate_responses(parsed: _Parsed, context: _Context) -> None:
                 )
                 continue
             valid.setdefault(binding, {})[law_name] = chosen
+    _refuse_laws_read_by_the_process(parsed, valid, context)
     for binding, laws in valid.items():
         by_condition: dict[str, list[str]] = {}
         for law_name in laws:
@@ -2516,6 +2797,35 @@ def _validate_responses(parsed: _Parsed, context: _Context) -> None:
         for law_name, chosen in laws.items():
             _validate_reference_condition(parsed, binding, RESPONSE_LAWS[law_name], chosen, context)
     parsed.laws = valid
+
+
+def _refuse_laws_read_by_the_process(
+    parsed: _Parsed,
+    valid: dict[tuple[str, str, str], dict[str, dict[str, _Response]]],
+    context: _Context,
+) -> None:
+    """Refuse a response law on a condition the pair's own process law already reads.
+
+    The pH-ionization law makes the rate depend on pH through its pK values; a
+    pH response law on the same pair would apply the pH effect a second time.
+    Refused laws are removed from ``valid``.
+    """
+
+    for binding, laws in valid.items():
+        process_type = _FORM_PROCESS_TYPE[_pair_form(parsed, (binding[1], binding[2]))]
+        read = PROCESS_ENVIRONMENT_CONDITIONS.get(process_type, ())
+        for law_name in [name for name in laws if RESPONSE_LAWS[name].condition in read]:
+            law = RESPONSE_LAWS[law_name]
+            context.add(
+                "responses.csv",
+                min(row.row for row in laws[law_name].values()),
+                "law",
+                f"{law_name} binds a {law.condition} response to {_binding_text(binding)}, whose kinetics use the "
+                f"{_FORM_LABEL[RATE_FORM_PH_IONIZATION]} form: that process law already makes the rate depend on "
+                f"{law.condition} through its pK values, so {law_name} would count the {law.condition} effect twice. "
+                f"Remove the {law_name} rows, or give this pair's kinetics in the kcat or Vmax form.",
+            )
+            del laws[law_name]
 
 
 def _validate_pair_laws(
@@ -2691,11 +3001,7 @@ def _validate_pairs(parsed: _Parsed, context: _Context) -> None:
                 )
                 continue
             by_substrate_class[substrate.substrate_class] = substrate
-            states = _state_names(
-                class_key,
-                substrate,
-                form=parsed.pair_forms.get((class_key, substrate.substrate_id), RATE_FORM_KCAT),
-            )
+            states = _state_names(class_key, substrate, form=_pair_form(parsed, (class_key, substrate.substrate_id)))
             if len(set(states.values())) != len(states):
                 context.add(
                     "substrates.csv",
@@ -2741,7 +3047,9 @@ def _generate_records(
             generated,
             context,
             "enzyme_classes",
-            _enzyme_class_mapping(parsed.classes[class_key], namespace),
+            _enzyme_class_mapping(
+                parsed.classes[class_key], namespace, process_type=_class_process_type(parsed, class_key)
+            ),
             origin=("enzyme_classes.csv", parsed.classes[class_key].row, "class_id")
             if parsed.classes[class_key].origin == "user"
             else (*_first_class_row(parsed, class_key), "enzyme_class"),
@@ -2791,7 +3099,8 @@ def _generate_records(
     for class_key, substrate in pairs:
         pair = (class_key, substrate.substrate_id)
         started = pair in parsed.pair_forms
-        form = parsed.pair_forms.get(pair, RATE_FORM_KCAT)
+        form = _pair_form(parsed, pair)
+        process_type = _FORM_PROCESS_TYPE[form]
         laws = _pair_laws(parsed, pair)
         info = parsed.classes[class_key]
         pair_records: list[ParameterRecord] = []
@@ -2811,6 +3120,7 @@ def _generate_records(
                     case_rows=case_rows,
                     form_started=started,
                     laws=tuple(strain_laws),
+                    form=form,
                     genome=item.genome if item.genome_only else None,
                 )
                 for quantity in _FORM_QUANTITIES[form]:
@@ -2831,6 +3141,7 @@ def _generate_records(
                             substrate=substrate,
                             namespace=namespace,
                             reference_conditions=_reference_conditions(parsed, response.binding_key),
+                            process_type=process_type,
                         )
                         origin: tuple[str, int | None, str | None] = ("responses.csv", response.row, "parameter")
                     else:
@@ -2842,6 +3153,7 @@ def _generate_records(
                             substrate=substrate,
                             namespace=namespace,
                             genome=item.genome if item.genome_only else None,
+                            process_type=process_type,
                         )
                         origin = ("responses.csv", None, "parameter")
                     record = _emit(generated, context, "parameter_records", mapping, origin=origin)
@@ -2880,8 +3192,13 @@ class _CaseContext:
     case_rows: Mapping[str, _Kinetics]
     form_started: bool
     laws: tuple[str, ...]
+    form: str
     # Set when the class of this strain comes from its genome annotation alone.
     genome: _GenomeClassEvidence | None = None
+
+    @property
+    def process_type(self) -> str:
+        return _FORM_PROCESS_TYPE[self.form]
 
 
 def _pair_laws(parsed: _Parsed, pair: tuple[str, str]) -> tuple[ResponseLaw, ...]:
@@ -2977,7 +3294,7 @@ def _first_class_row(parsed: _Parsed, class_key: str) -> tuple[str, int | None]:
     )
 
 
-def _enzyme_class_mapping(info: _EnzymeClassInfo, namespace: _Namespace) -> dict[str, Any]:
+def _enzyme_class_mapping(info: _EnzymeClassInfo, namespace: _Namespace, *, process_type: str) -> dict[str, Any]:
     if info.origin == "registry":
         provenance: dict[str, Any] = {
             "source": f"Registry enzyme class {info.key} attributes reused for user dataset {namespace.dataset_id}",
@@ -2989,7 +3306,7 @@ def _enzyme_class_mapping(info: _EnzymeClassInfo, namespace: _Namespace) -> dict
         notes = (
             f"Namespaced copy of registry enzyme class {info.key} for user dataset {namespace.dataset_id}; "
             "bond and substrate-class compatibility come from the registry record, the strain assignment "
-            "from the user's enzymes.csv. Restricted to homogeneous Michaelis-Menten kinetics."
+            f"from the user's enzymes.csv. Restricted to {_PROCESS_LABEL[process_type]} kinetics."
         )
     else:
         provenance = {
@@ -2999,7 +3316,7 @@ def _enzyme_class_mapping(info: _EnzymeClassInfo, namespace: _Namespace) -> dict
         }
         notes = (
             f"User-defined enzyme class {info.key} from dataset {namespace.dataset_id}; "
-            "restricted to homogeneous Michaelis-Menten kinetics."
+            f"restricted to {_PROCESS_LABEL[process_type]} kinetics."
         )
     mapping: dict[str, Any] = {
         "record_id": namespace.id(info.key),
@@ -3009,7 +3326,7 @@ def _enzyme_class_mapping(info: _EnzymeClassInfo, namespace: _Namespace) -> dict
         "notes": notes,
         "target_bond_classes": list(info.target_bond_classes),
         "compatible_substrate_classes": list(info.compatible_substrate_classes),
-        "compatible_processes": [USER_DATASET_PROCESS_TYPE],
+        "compatible_processes": [process_type],
     }
     if info.ec_number:
         mapping["ec_number"] = info.ec_number
@@ -3162,16 +3479,20 @@ def _compatibility_mapping(
     laws: Sequence[ResponseLaw],
 ) -> dict[str, Any]:
     shared = _shared_bonds(info, substrate) or ()
-    roles = HOMOGENEOUS_MM_PARAMETER_ROLES if form == RATE_FORM_KCAT else HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES
+    process_type = _FORM_PROCESS_TYPE[form]
     symbols = {
-        role: _parameter_symbol(namespace, _ROLE_QUANTITY[role], info.key, substrate.substrate_id) for role in roles
+        role: _parameter_symbol(namespace, _ROLE_QUANTITY[role], info.key, substrate.substrate_id)
+        for role in _FORM_ROLES[form]
     }
     for law in laws:
         for parameter in law.parameters:
+            # Law parameters never share a name with a form role: a law on a condition the
+            # form's process law reads (a pH law on a pH-ionization pair) is refused at load.
+            assert parameter.name not in symbols, parameter.name
             symbols[parameter.name] = _law_symbol(namespace, law, parameter, info.key, substrate.substrate_id)
     return {
-        "record_id": namespace.id(info.key, substrate.substrate_id, "homogeneous_mm"),
-        "name": f"{info.name} on {substrate.name} homogeneous Michaelis-Menten ({namespace.dataset_id})",
+        "record_id": namespace.id(info.key, substrate.substrate_id, _PROCESS_ID_SUFFIX[process_type]),
+        "name": f"{info.name} on {substrate.name} {_PROCESS_LABEL[process_type]} ({namespace.dataset_id})",
         "maturity": USER_DATASET_RECORD_MATURITY,
         "provenance": {
             "source": namespace.source,
@@ -3181,20 +3502,21 @@ def _compatibility_mapping(
         "enzyme_class": namespace.id(info.key),
         "substrate_class": substrate.substrate_class,
         "required_bond_classes": list(shared),
-        "process_type": USER_DATASET_PROCESS_TYPE,
+        "process_type": process_type,
         "required_parameters": list(symbols.values()),
         "parameter_roles": dict(symbols),
         "product_map_required": True,
-        "case_template_id": _template_id(namespace, info, substrate),
+        "case_template_id": _template_id(namespace, info, substrate, form=form),
         "notes": (
-            f"Homogeneous Michaelis-Menten compatibility generated from user dataset {namespace.dataset_id}; "
-            "the enzyme class and substrate share the listed bond classes."
+            f"{_PROCESS_SENTENCE_LABEL[process_type]} compatibility generated from user dataset "
+            f"{namespace.dataset_id}; the enzyme class and substrate share the listed bond classes."
         ),
     }
 
 
-def _template_id(namespace: _Namespace, info: _EnzymeClassInfo, substrate: _Substrate) -> str:
-    return namespace.id(info.key, substrate.substrate_id, "homogeneous_mm_template")
+def _template_id(namespace: _Namespace, info: _EnzymeClassInfo, substrate: _Substrate, *, form: str) -> str:
+    suffix = _PROCESS_ID_SUFFIX[_FORM_PROCESS_TYPE[form]]
+    return namespace.id(info.key, substrate.substrate_id, f"{suffix}_template")
 
 
 def _template_mapping(
@@ -3206,7 +3528,9 @@ def _template_mapping(
     form: str,
     laws: Sequence[ResponseLaw],
 ) -> dict[str, Any]:
-    template_id = _template_id(namespace, info, substrate)
+    template_id = _template_id(namespace, info, substrate, form=form)
+    process_type = _FORM_PROCESS_TYPE[form]
+    process_label = _PROCESS_LABEL[process_type]
     states = _state_names(info.key, substrate, form=form)
     simulation = namespace.manifest["simulation"]
     mode = "scientific" if scientific else "exploratory"
@@ -3218,20 +3542,17 @@ def _template_mapping(
         },
         "product": {"value": 0.0, "units_from_role": "substrate_initial_concentration"},
     }
-    if form == RATE_FORM_KCAT:
+    if form in _ENZYME_FORMS:
         initial_state_mapping["enzyme"] = {
             "parameter_role": "enzyme_initial_concentration",
             "units_from_role": "enzyme_initial_concentration",
         }
     observable_roles = [*states, "degradation_rate", "product_release_rate"]
     process_state_metadata: dict[str, Any] = {
-        "config_name": (
-            f"User dataset {namespace.dataset_id}: {info.name} on {substrate.name} "
-            "homogeneous Michaelis-Menten"
-        ),
+        "config_name": f"User dataset {namespace.dataset_id}: {info.name} on {substrate.name} {process_label}",
         "config_mode": mode,
         "config_maturity": mode,
-        "process_id": namespace.id(info.key, substrate.substrate_id, "homogeneous_mm"),
+        "process_id": namespace.id(info.key, substrate.substrate_id, _PROCESS_ID_SUFFIX[process_type]),
         "parameter_set_id": namespace.id(info.key, substrate.substrate_id, "parameters"),
         "product_map_name": f"{substrate.name} to {substrate.product} product map ({namespace.dataset_id})",
         "public_path": True,
@@ -3241,24 +3562,29 @@ def _template_mapping(
             {"type": law.law, **{f"{parameter.name}_role": parameter.name for parameter in law.parameters}}
             for law in laws
         ]
-    rate_limitation = (
-        "Homogeneous Michaelis-Menten in the Vmax form: Vmax is a rate for the simulated system and no enzyme "
-        "state is represented, so enzyme loss or dilution cannot be simulated."
-        if form == RATE_FORM_VMAX
-        else None
-    )
-    law_limitation = (
-        "No temperature or pH response law is bound; values apply at their stated condition only."
-        if not laws
-        else "Response laws from responses.csv scale the rate: "
-        + "; ".join(f"{law.law} ({law.formula})" for law in laws)
-        + ". Kinetic constants are reference values at each law's reference condition; Km and the "
-        "concentrations are not rescaled, and no other condition acts on the rate."
-    )
+    rate_limitation = _RATE_FORM_LIMITATION.get(form)
+    if form == RATE_FORM_PH_IONIZATION:
+        law_limitation = (
+            "No temperature response law is bound; the constants apply at the temperature of their condition only."
+            if not laws
+            else "Response laws from responses.csv scale the rate: "
+            + "; ".join(f"{law.law} ({law.formula})" for law in laws)
+            + ". Kinetic constants are reference values at each law's reference condition; the pK values, the "
+            "fitted pH range and the concentrations are not rescaled."
+        )
+    else:
+        law_limitation = (
+            "No temperature or pH response law is bound; values apply at their stated condition only."
+            if not laws
+            else "Response laws from responses.csv scale the rate: "
+            + "; ".join(f"{law.law} ({law.formula})" for law in laws)
+            + ". Kinetic constants are reference values at each law's reference condition; Km and the "
+            "concentrations are not rescaled, and no other condition acts on the rate."
+        )
     return {
         "record_id": template_id,
         "case_template_id": template_id,
-        "name": f"{info.name} on {substrate.name} homogeneous Michaelis-Menten template ({namespace.dataset_id})",
+        "name": f"{info.name} on {substrate.name} {process_label} template ({namespace.dataset_id})",
         "maturity": USER_DATASET_RECORD_MATURITY,
         "provenance": {
             "source": namespace.source,
@@ -3274,7 +3600,7 @@ def _template_mapping(
             ),
         },
         "schema_version": CASE_TEMPLATE_SCHEMA_VERSION,
-        "process_type": USER_DATASET_PROCESS_TYPE,
+        "process_type": process_type,
         "state_roles": dict(states),
         "initial_state_mapping": initial_state_mapping,
         "product_map": {
@@ -3300,7 +3626,7 @@ def _template_mapping(
         "output_state_roles": dict(states),
         "process_state_metadata": process_state_metadata,
         "limitations": [
-            f"Dissolved homogeneous Michaelis-Menten kinetics from user dataset {namespace.dataset_id}.",
+            f"Dissolved {process_label} kinetics from user dataset {namespace.dataset_id}.",
             "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or uptake model.",
             law_limitation,
             *([rate_limitation] if rate_limitation is not None else []),
@@ -3309,12 +3635,33 @@ def _template_mapping(
             f"Values come from user dataset {namespace.dataset_id} (sha256 {namespace.digest}); "
             "FungMod did not check them against an external source.",
             f"Product formation uses the user-stated yield of {_number_text(yield_value)} mol/mol.",
+            *([_PH_IONIZATION_VALIDITY_NOTE] if form == RATE_FORM_PH_IONIZATION else []),
         ],
         "notes": (
             f"Assembly template generated from user dataset {namespace.dataset_id} for enzyme class "
             f"{info.key} on substrate {substrate.substrate_id}."
         ),
     }
+
+
+_RATE_FORM_LIMITATION = {
+    RATE_FORM_VMAX: (
+        "Homogeneous Michaelis-Menten in the Vmax form: Vmax is a rate for the simulated system and no enzyme "
+        "state is represented, so enzyme loss or dilution cannot be simulated."
+    ),
+    RATE_FORM_PH_IONIZATION: (
+        "Michaelis-Menten with the diprotic pH-ionization law: kcat(pH) = kcat_limiting / f_es(pH) and "
+        "Km(pH) = km_limiting x f_e(pH) / f_es(pH), with f(pH) = (10^(pK_lower - pH) + 1)(10^(pH - pK_upper) + 1) "
+        "for the free enzyme (f_e) and the enzyme-substrate complex (f_es). The limiting constants are plateau "
+        "values of the fit, not the kcat or Km at any one pH. The pH is read once from the environment; no pH "
+        "dynamics, buffer identity, ionic strength or pH-dependent enzyme stability is represented."
+    ),
+}
+_PH_IONIZATION_VALIDITY_NOTE = (
+    "The pH of every condition with pH-ionization values lies within that case's ph_min to ph_max (checked when "
+    "the dataset is loaded); an EnvironmentGrid pH outside the fitted range runs with an environmental validity "
+    "warning from the law."
+)
 
 
 def _parameter_mapping(
@@ -3359,7 +3706,7 @@ def _parameter_mapping(
         "source": row.source,
         "confidence_level": confidence,
         "measurement_method": row.method or "user estimate without a stated method",
-        "validity_range": _validity_range(condition, case.laws),
+        "validity_range": _validity_range(condition, case.laws, form=case.form),
         USER_DATASET_PROVENANCE_KEY: namespace.provenance(
             "kinetics.csv",
             row.row,
@@ -3400,7 +3747,7 @@ def _parameter_mapping(
         "maturity": maturity,
         "provenance": provenance,
         "notes": notes,
-        **_selectors(namespace, strain, info, substrate, condition, quantity),
+        **_selectors(namespace, strain, info, substrate, condition, quantity, process_type=case.process_type),
         "value": value,
         "allowed_use": allowed_use,
     }
@@ -3518,7 +3865,7 @@ def _derived_vmax_mapping(activity: _Kinetics, loading: _Kinetics, *, case: _Cas
         "source": source,
         "confidence_level": confidence,
         "measurement_method": method,
-        "validity_range": _validity_range(condition, case.laws),
+        "validity_range": _validity_range(condition, case.laws, form=case.form),
         USER_DATASET_PROVENANCE_KEY: namespace.provenance(
             "kinetics.csv",
             None,
@@ -3546,7 +3893,7 @@ def _derived_vmax_mapping(activity: _Kinetics, loading: _Kinetics, *, case: _Cas
             f"Derived Vmax in dataset {namespace.dataset_id}: specific_activity (kinetics.csv row {activity.row}) "
             f"x enzyme_loading (row {loading.row}); maturity {maturity} is the weaker input's."
         ),
-        **_selectors(namespace, strain, info, substrate, condition, "vmax"),
+        **_selectors(namespace, strain, info, substrate, condition, "vmax", process_type=case.process_type),
         "value": value,
         "allowed_use": _allowed_use(evidence_type, exact=exact),
     }
@@ -3615,7 +3962,7 @@ def _gap_mapping(quantity: str, *, case: _CaseContext) -> dict[str, Any]:
             ),
         },
         "notes": notes,
-        **_selectors(namespace, strain, info, substrate, condition, quantity),
+        **_selectors(namespace, strain, info, substrate, condition, quantity, process_type=case.process_type),
         "value": {
             "kind": "unknown",
             "units": units,
@@ -3630,10 +3977,14 @@ def _gap_mapping(quantity: str, *, case: _CaseContext) -> dict[str, Any]:
 _GAP_DIMENSION = {
     "kcat": "1/time",
     "vmax": "concentration per time (amount per volume per time)",
+    "kcat_limiting": "1/time",
+    **{quantity: "dimensionless" for quantity in sorted(_DIMENSIONLESS_QUANTITIES)},
 }
 _GAP_UNITS_TEXT = {
     "kcat": "units of 1/time",
     "vmax": "concentration per time",
+    "kcat_limiting": "units of 1/time",
+    **{quantity: "dimensionless" for quantity in sorted(_DIMENSIONLESS_QUANTITIES)},
 }
 
 
@@ -3643,6 +3994,23 @@ _QUANTITY_LABEL = {
     "substrate_initial_concentration": "initial substrate concentration",
     "enzyme_concentration": "enzyme concentration",
     "vmax": "Vmax",
+    "kcat_limiting": "limiting turnover kcat_limiting",
+    "km_limiting": "limiting Michaelis constant km_limiting",
+    "pk_free_lower": "lower free-enzyme pK pk_free_lower",
+    "pk_free_upper": "upper free-enzyme pK pk_free_upper",
+    "pk_complex_lower": "lower enzyme-substrate complex pK pk_complex_lower",
+    "pk_complex_upper": "upper enzyme-substrate complex pK pk_complex_upper",
+    "ph_min": "lowest fitted pH ph_min",
+    "ph_max": "highest fitted pH ph_max",
+}
+# What a measurement request asks for, per pH-ionization quantity.
+_PH_IONIZATION_REQUEST = {
+    "kcat_limiting": "the limiting turnover (kcat_limiting, the plateau kcat)",
+    "km_limiting": "the limiting Michaelis constant (km_limiting)",
+    "pk_free_lower": "the lower pK of the free enzyme (pk_free_lower)",
+    "pk_free_upper": "the upper pK of the free enzyme (pk_free_upper)",
+    "pk_complex_lower": "the lower pK of the enzyme-substrate complex (pk_complex_lower)",
+    "pk_complex_upper": "the upper pK of the enzyme-substrate complex (pk_complex_upper)",
 }
 
 
@@ -3676,7 +4044,20 @@ def _measurement_request(quantity: str, *, case: _CaseContext, units_text: str) 
 def _measurement_request_text(quantity: str, *, case: _CaseContext, units_text: str) -> str:
     strain, info, substrate, condition = case.strain, case.info, case.substrate, case.condition
     where = _condition_text(condition)
-    if quantity in _KCAT_FORM_QUANTITIES and not case.form_started:
+    if quantity in _PH_IONIZATION_REQUEST:
+        return (
+            f"Measure {_PH_IONIZATION_REQUEST[quantity]} of {info.name} from {strain.name} on {substrate.name} "
+            f"({units_text}) by fitting the diprotic pH-ionization law to initial rates over a pH series at the "
+            f"temperature of condition {condition.condition_id} ({_temperature_text(condition)})."
+        )
+    if quantity in _PH_RANGE_QUANTITIES:
+        bound = "lowest" if quantity == "ph_min" else "highest"
+        return (
+            f"State the {bound} pH of the pH series the pH-ionization law of {info.name} from {strain.name} on "
+            f"{substrate.name} was fitted over ({quantity}, {units_text}); the pH of condition "
+            f"{condition.condition_id} must lie inside the fitted range."
+        )
+    if quantity in _KCAT_FORM_QUANTITIES and not case.form_started and case.form != RATE_FORM_PH_IONIZATION:
         return (
             f"Measure kcat and the enzyme concentration of {info.name} from {strain.name} on {substrate.name} "
             f"at {where}, or Vmax (or a specific activity and enzyme loading)."
@@ -3722,6 +4103,7 @@ def _response_mapping(
     substrate: _Substrate,
     namespace: _Namespace,
     reference_conditions: Sequence[str],
+    process_type: str,
 ) -> dict[str, Any]:
     """Map one responses.csv row to an exact, condition-independent law parameter record.
 
@@ -3795,7 +4177,7 @@ def _response_mapping(
         "maturity": maturity,
         "provenance": provenance,
         "notes": notes,
-        **_law_selectors(namespace, law, spec, strain, info, substrate),
+        **_law_selectors(namespace, law, spec, strain, info, substrate, process_type=process_type),
         "value": {
             "kind": "exact",
             "value": stored_value,
@@ -3816,6 +4198,7 @@ def _response_gap_mapping(
     info: _EnzymeClassInfo,
     substrate: _Substrate,
     namespace: _Namespace,
+    process_type: str,
     genome: _GenomeClassEvidence | None = None,
 ) -> dict[str, Any]:
     request = _with_genome_note(
@@ -3852,7 +4235,7 @@ def _response_gap_mapping(
             ),
         },
         "notes": notes,
-        **_law_selectors(namespace, law, parameter, strain, info, substrate),
+        **_law_selectors(namespace, law, parameter, strain, info, substrate, process_type=process_type),
         "value": {
             "kind": "unknown",
             "units": None,
@@ -3871,12 +4254,14 @@ def _law_selectors(
     strain: _Strain,
     info: _EnzymeClassInfo,
     substrate: _Substrate,
+    *,
+    process_type: str,
 ) -> dict[str, Any]:
     """Selectors of a law parameter: like kinetics, but valid at every environment of the case."""
 
     return {
         "parameter_symbol": _law_symbol(namespace, law, parameter, info.key, substrate.substrate_id),
-        "process_type": USER_DATASET_PROCESS_TYPE,
+        "process_type": process_type,
         "enzyme_class": namespace.id(info.key),
         "substrate_class": substrate.substrate_class,
         "fungus_id": namespace.id(strain.strain_id),
@@ -3902,10 +4287,12 @@ def _selectors(
     substrate: _Substrate,
     condition: _Condition,
     quantity: str,
+    *,
+    process_type: str,
 ) -> dict[str, Any]:
     return {
         "parameter_symbol": _parameter_symbol(namespace, quantity, info.key, substrate.substrate_id),
-        "process_type": USER_DATASET_PROCESS_TYPE,
+        "process_type": process_type,
         "enzyme_class": namespace.id(info.key),
         "substrate_class": substrate.substrate_class,
         "fungus_id": namespace.id(strain.strain_id),
@@ -3937,7 +4324,18 @@ def _row_value_notes(row: _Kinetics, namespace: _Namespace) -> str:
     return " ".join(parts)
 
 
-def _validity_range(condition: _Condition, laws: Sequence[str] = ()) -> str:
+def _validity_range(condition: _Condition, laws: Sequence[str] = (), *, form: str = RATE_FORM_KCAT) -> str:
+    if form == RATE_FORM_PH_IONIZATION:
+        text = (
+            f"Condition {condition.condition_id}: {_condition_text(condition)}; the diprotic pH-ionization law reads "
+            "the environment pH and holds within the case's ph_min to ph_max"
+        )
+        if not laws:
+            return f"{text}; no temperature response law is attached."
+        return (
+            f"{text}; the response law(s) {', '.join(laws)} from responses.csv rescale the rate away from their "
+            "reference condition."
+        )
     if not laws:
         return (
             f"Condition {condition.condition_id}: {_condition_text(condition)}; "
@@ -3950,13 +4348,14 @@ def _validity_range(condition: _Condition, laws: Sequence[str] = ()) -> str:
 
 
 def _condition_text(condition: _Condition) -> str:
-    temperature = (
-        "unknown temperature"
-        if condition.temperature_kelvin is None
-        else f"{condition.temperature_text} {condition.temperature_units}"
-    )
     ph = "unknown pH" if condition.ph is None else f"pH {condition.ph_text}"
-    return f"{temperature}, {ph}"
+    return f"{_temperature_text(condition)}, {ph}"
+
+
+def _temperature_text(condition: _Condition) -> str:
+    if condition.temperature_kelvin is None:
+        return "unknown temperature"
+    return f"{condition.temperature_text} {condition.temperature_units}"
 
 
 def _state_names(class_key: str, substrate: _Substrate, *, form: str) -> dict[str, str]:
@@ -3965,7 +4364,7 @@ def _state_names(class_key: str, substrate: _Substrate, *, form: str) -> dict[st
         "substrate": f"{substrate_key}_concentration",
         "product": f"{substrate.product}_concentration",
     }
-    if form == RATE_FORM_KCAT:
+    if form in _ENZYME_FORMS:
         names["enzyme"] = f"{class_key}_concentration"
     return names
 
@@ -4384,7 +4783,9 @@ __all__ = [
     "GENOME_ANNOTATION_TOOLS",
     "GENOME_TABLE",
     "KINETIC_QUANTITIES",
+    "PH_IONIZATION_QUANTITIES",
     "RATE_FORM_KCAT",
+    "RATE_FORM_PH_IONIZATION",
     "RATE_FORM_VMAX",
     "RESPONSE_EVIDENCE_TYPES",
     "RESPONSE_LAWS",
@@ -4399,6 +4800,7 @@ __all__ = [
     "USER_DATASET_MATURITY_MEASURED",
     "USER_DATASET_MATURITY_ORDER",
     "USER_DATASET_PARAMETER_MATURITIES",
+    "USER_DATASET_PH_IONIZATION_PROCESS_TYPE",
     "USER_DATASET_RECORD_MATURITY",
     "USER_DATASET_SCHEMA_VERSION",
     "UserDataError",

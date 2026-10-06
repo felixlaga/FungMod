@@ -39,8 +39,12 @@ Mapping rules (each application is recorded in ``review.md``):
 - units are kept as written when the unit registry parses them, otherwise
   mapped through ``SABIORK_UNIT_SPELLINGS``; any other unit is listed and its
   value not converted. Values are never converted between units;
-- a law with pKa parameters is listed as a pH-ionization law that user data
-  cannot import yet; only its Km and kcat are converted, at the entry's pH.
+- SABIO-RK's diprotic "Michaelis-Menten (pH-dependent)" law, recognised by its
+  formula and its parameters ``k0``, ``Km0``, ``pKe1``, ``pKe2``, ``pKes1`` and
+  ``pKes2``, becomes the pH-ionization rate form of user data: ``kcat_limiting``,
+  ``km_limiting``, the four pK values, and ``ph_min`` and ``ph_max`` from the pH
+  range the entry states (``REVIEW:`` fields when it states none). A law with
+  pKa parameters in any other form is listed, not converted.
 """
 
 from __future__ import annotations
@@ -194,18 +198,48 @@ _QUANTITY_ORDER = (
     "vmax",
     "specific_activity",
     "enzyme_loading",
+    "kcat_limiting",
+    "km_limiting",
+    "pk_free_lower",
+    "pk_free_upper",
+    "pk_complex_lower",
+    "pk_complex_upper",
+    "ph_min",
+    "ph_max",
     "substrate_initial_concentration",
     "enzyme_concentration",
 )
-_CONSTANTS = frozenset({"km", "kcat", "vmax", "specific_activity"})
+_CONSTANTS = frozenset({"km", "kcat", "vmax", "specific_activity", "kcat_limiting", "km_limiting"})
 _VMAX_QUANTITIES = frozenset({"vmax", "specific_activity"})
 _REVIEW_MD = "review.md"
 
-_PH_LAW_REASON = "pH-ionization law not importable as user data yet"
+# SABIO-RK's diprotic pH-dependent Michaelis-Menten law (kinetic-law type 24), whitespace removed. Only an
+# entry whose formula is exactly this law, with these parameter names, is mapped onto the roles of the
+# pH-ionization form: kcat(pH) = k0 / f_es(pH), (kcat/Km)(pH) = (k0 / Km0) / f_e(pH).
+PH_IONIZATION_LAW_FORMULA = (
+    "E*((k0)/((10^(pKes1-pH)+1)*(10^(pH-pKes2)+1)))*S/(((k0)/((10^(pKes1-pH)+1)*(10^(pH-pKes2)+1)))"
+    "/(((k0)/(Km0))/((10^(pKe1-pH)+1)*(10^(pH-pKe2)+1)))+S)"
+)
+# Parameter name in that formula -> (SABIO-RK parameter type, user-data quantity).
+PH_IONIZATION_LAW_PARAMETERS: Mapping[str, tuple[str, str]] = MappingProxyType(
+    {
+        "k0": ("kcat", "kcat_limiting"),
+        "Km0": ("km", "km_limiting"),
+        "pKe1": ("pka", "pk_free_lower"),
+        "pKe2": ("pka", "pk_free_upper"),
+        "pKes1": ("pka", "pk_complex_lower"),
+        "pKes2": ("pka", "pk_complex_upper"),
+    }
+)
+_DIMENSIONLESS_QUANTITIES = frozenset(
+    {"pk_free_lower", "pk_free_upper", "pk_complex_lower", "pk_complex_upper", "ph_min", "ph_max"}
+)
+_DIMENSIONLESS = "dimensionless"
+_PH_RANGE_SCALE = (0.0, 14.0)
 _LIMITATIONS = (
-    "Only homogeneous Michaelis-Menten constants (Km, kcat, Vmax) and the assay's substrate and enzyme "
-    "concentrations are converted; inhibition constants, kcat/Km, Hill coefficients and pH-ionization "
-    "constants are listed, not converted.",
+    "Homogeneous Michaelis-Menten constants (Km, kcat, Vmax), the constants and fitted pH range of the diprotic "
+    "pH-dependent Michaelis-Menten law, and the assay's substrate and enzyme concentrations are converted; "
+    "inhibition constants, kcat/Km, Hill coefficients and pH laws of any other form are listed, not converted.",
     "Values are copied as SABIO-RK reports them; no value is converted between units, and SABIO-RK's "
     "normalised values are not used.",
     "A SABIO-RK concentration range is the range tested in the assay. It is written as a range, which "
@@ -735,6 +769,7 @@ class _DraftBuilder:
         self._substrate_cache: dict[str, _SubstrateChoice] = {}
         self._proposed_classes: dict[str, dict[str, str]] = {}
         self._unit_mappings: dict[str, str] = {}
+        self._dimensionless_dash = False
         self._pair_forms: dict[tuple[str, str], str] = {}
 
     # -- orchestration -----------------------------------------------------
@@ -753,8 +788,9 @@ class _DraftBuilder:
         self._apply_rate_forms([plan for plan in plans if not plan.reasons])
         for plan in plans:
             if not plan.reasons and not any(quantity in _CONSTANTS for quantity in plan.rows):
+                constants = "k0 or Km0 of the pH-ionization law" if plan.ph_law else "Km, kcat or Vmax"
                 plan.reasons.append(
-                    "no Km, kcat or Vmax could be converted (its parameters are listed under Parameters not converted)"
+                    f"no {constants} could be converted (its parameters are listed under Parameters not converted)"
                 )
                 plan.parameters_failed = True
         converted = [plan for plan in plans if not plan.reasons]
@@ -796,14 +832,19 @@ class _DraftBuilder:
                 "Michaelis-Menten constants"
             )
         if plan.ph_law:
-            pkas = ", ".join(p.name for p in record.parameters if p.parameter_type.strip().casefold() == "pka")
-            plan.notes.append(
-                (
-                    "Kinetic values",
-                    f"EntryID {entry.entry_id}: kinetic law {law or 'unnamed'} has pKa parameters ({pkas}): "
-                    f"{_PH_LAW_REASON}. Only its Km and kcat are converted, at the entry's condition.",
+            problem = _ph_law_problem(entry)
+            if problem:
+                plan.reasons.append(problem)
+            else:
+                mapping = ", ".join(f"{name} -> {quantity}" for name, (_kind, quantity) in PH_IONIZATION_LAW_PARAMETERS.items())
+                plan.notes.append(
+                    (
+                        "Kinetic values",
+                        f"EntryID {entry.entry_id}: kinetic law {law} is the diprotic pH-ionization law; it is "
+                        f"converted to the pH-ionization rate form ({mapping}; its fitted pH range -> ph_min and "
+                        "ph_max). k0 and Km0 are the limiting constants of the law, not the kcat and Km at any one pH.",
+                    )
                 )
-            )
         class_choice = self._enzyme_class(record)
         if class_choice.reason:
             plan.reasons.append(class_choice.reason)
@@ -821,7 +862,7 @@ class _DraftBuilder:
                 incompatible = self._incompatible(class_choice.class_id, substrate.registry_id)
                 if incompatible:
                     plan.reasons.append(incompatible)
-        plan.condition = _condition(raw)
+        plan.condition = _condition(raw, ph_law=plan.ph_law)
         plan.strain_key = (organism, _text(enzyme.get("expressed_in")).strip())
         self._parameters(plan, comments=_raw_parameter_comments(raw, len(record.parameters)))
         return plan
@@ -830,40 +871,9 @@ class _DraftBuilder:
         record = plan.entry.record
         candidates: dict[str, list[tuple[SabioRKKineticParameter, dict[str, str]]]] = {}
         for parameter, comment in zip(record.parameters, comments, strict=True):
-            kind = parameter.parameter_type.strip().casefold()
-            if kind == "pka" or (plan.ph_law and kind == "ph"):
-                plan.skip(parameter, f"parameter of the pH-ionization law; {_PH_LAW_REASON}")
+            quantity = self._quantity(plan, parameter)
+            if quantity is None:
                 continue
-            if kind == "kcat/km":
-                plan.skip(parameter, "kcat/Km is not a user-data quantity; FungMod never derives Km or kcat from it")
-                continue
-            if kind == "km":
-                quantity = "km"
-            elif kind == "kcat":
-                quantity = "kcat"
-            elif kind == "vmax":
-                quantity = "vmax"
-            elif kind == "concentration":
-                compound, role = _species_parts(parameter.species)
-                if role == "catalyst":
-                    quantity = "enzyme_concentration"
-                elif role == "substrate" and compound.casefold() == plan.substrate_name.casefold() and compound:
-                    quantity = "substrate_initial_concentration"
-                else:
-                    plan.skip(
-                        parameter,
-                        f"concentration of {compound or 'an unnamed species'}, which is neither the case substrate "
-                        "nor the enzyme",
-                    )
-                    continue
-            else:
-                plan.skip(parameter, f"parameter type {parameter.parameter_type or 'not given'!r} is not a user-data quantity")
-                continue
-            if quantity == "km":
-                compound, role = _species_parts(parameter.species)
-                if compound and compound.casefold() != plan.substrate_name.casefold():
-                    plan.skip(parameter, f"Km of {compound}, not of the case substrate {plan.substrate_name}")
-                    continue
             row = self._value_row(plan, parameter, quantity, comment)
             if row is not None:
                 candidates.setdefault(row["quantity"], []).append((parameter, row))
@@ -877,6 +887,9 @@ class _DraftBuilder:
                     )
                 continue
             plan.rows[quantity] = items[0][1]
+        if plan.ph_law:
+            self._ph_range_rows(plan)
+            return
         if "kcat" in plan.rows:
             for quantity in sorted(_VMAX_QUANTITIES & plan.rows.keys()):
                 dropped = plan.rows.pop(quantity)
@@ -887,6 +900,104 @@ class _DraftBuilder:
                     name=f"Vmax ({_row_amount(dropped)} {dropped['units']})",
                     kind=quantity,
                 )
+
+    def _quantity(self, plan: _Plan, parameter: SabioRKKineticParameter) -> str | None:
+        """The user-data quantity of one parameter, or None after listing why it is not converted."""
+
+        kind = parameter.parameter_type.strip().casefold()
+        if plan.ph_law:
+            law_parameter = PH_IONIZATION_LAW_PARAMETERS.get(parameter.name.strip())
+            if law_parameter is not None:
+                quantity = law_parameter[1]
+                if quantity == "km_limiting" and not self._km_of_case_substrate(plan, parameter):
+                    return None
+                return quantity
+            if kind == "ph":
+                # The law's pH variable: its range becomes ph_min and ph_max (see _ph_range_rows).
+                return None
+            if kind != "concentration":
+                plan.skip(
+                    parameter,
+                    f"parameter type {parameter.parameter_type or 'not given'!r} is not a quantity of the "
+                    "pH-ionization form",
+                )
+                return None
+        if kind == "kcat/km":
+            plan.skip(parameter, "kcat/Km is not a user-data quantity; FungMod never derives Km or kcat from it")
+            return None
+        if kind == "km":
+            return "km" if self._km_of_case_substrate(plan, parameter) else None
+        if kind == "kcat":
+            return "kcat"
+        if kind == "vmax":
+            return "vmax"
+        if kind == "concentration":
+            compound, role = _species_parts(parameter.species)
+            if role == "catalyst":
+                return "enzyme_concentration"
+            if role == "substrate" and compound and compound.casefold() == plan.substrate_name.casefold():
+                return "substrate_initial_concentration"
+            plan.skip(
+                parameter,
+                f"concentration of {compound or 'an unnamed species'}, which is neither the case substrate nor the "
+                "enzyme",
+            )
+            return None
+        plan.skip(parameter, f"parameter type {parameter.parameter_type or 'not given'!r} is not a user-data quantity")
+        return None
+
+    def _km_of_case_substrate(self, plan: _Plan, parameter: SabioRKKineticParameter) -> bool:
+        compound, _role = _species_parts(parameter.species)
+        if compound and compound.casefold() != plan.substrate_name.casefold():
+            plan.skip(parameter, f"Km of {compound}, not of the case substrate {plan.substrate_name}")
+            return False
+        return True
+
+    def _ph_range_rows(self, plan: _Plan) -> None:
+        """ph_min and ph_max rows from the pH range the entry states, or REVIEW rows when it states none."""
+
+        record = plan.entry.record
+        fitted, origin, problem = _ph_fit_range(plan.entry)
+        law = record.kinetic_law_type.strip()
+        for index, quantity in enumerate(("ph_min", "ph_max")):
+            bound = "lowest" if quantity == "ph_min" else "highest"
+            if fitted is not None:
+                value = _number_cell(fitted[index])
+                method = f"SABIO-RK kinetic law {record.entry_id}, {law}; {bound} pH of the {origin}"
+            else:
+                value = (
+                    f"{REVIEW_MARKER} {bound} pH of the pH series the law was fitted over ({problem}); the condition "
+                    "pH must lie inside the range"
+                )
+                method = (
+                    f"SABIO-RK kinetic law {record.entry_id}, {law}; {bound} pH of the fitted pH series, not stated by "
+                    "the entry and supplied at review"
+                )
+            plan.rows[quantity] = _kinetics_row(
+                strain_id="",
+                enzyme_class=plan.class_id,
+                substrate_id=plan.substrate_id,
+                condition_id="",
+                quantity=quantity,
+                value=value,
+                lower="",
+                upper="",
+                units=_DIMENSIONLESS,
+                evidence_type=_EVIDENCE,
+                method=method,
+                source=_source_text(record),
+                sd="",
+            )
+        if fitted is not None:
+            plan.notes.append(
+                (
+                    "Kinetic values",
+                    f"EntryID {record.entry_id}: ph_min {_number_cell(fitted[0])} and ph_max {_number_cell(fitted[1])} "
+                    f"from the {origin}.",
+                )
+            )
+        else:
+            plan.notes.append(("Kinetic values", f"EntryID {record.entry_id}: ph_min and ph_max are REVIEW fields; {problem}."))
 
     def _value_row(
         self,
@@ -903,7 +1014,7 @@ class _DraftBuilder:
         if start is None or (parameter.end_value is not None and end is None):
             plan.skip(parameter, "the value is not a finite number")
             return None
-        units = self._units(plan, parameter)
+        units = self._units(plan, parameter, quantity)
         if units is None:
             return None
         quantity, problem = _route_quantity(quantity, units)
@@ -915,7 +1026,9 @@ class _DraftBuilder:
             plan.skip(parameter, "the end value is below the start value")
             return None
         values = (start,) if exact else (start, end)
-        if any(value is not None and value < 0.0 for value in values) or (quantity == "km" and start <= 0.0):
+        if any(value is not None and value < 0.0 for value in values) or (
+            quantity in {"km", "km_limiting"} and start <= 0.0
+        ):
             plan.skip(parameter, "km must be positive and other values nonnegative")
             return None
         sd = _finite(parameter.standard_deviation)
@@ -947,8 +1060,12 @@ class _DraftBuilder:
             sd=sd_text,
         )
 
-    def _units(self, plan: _Plan, parameter: SabioRKKineticParameter) -> str | None:
+    def _units(self, plan: _Plan, parameter: SabioRKKineticParameter, quantity: str) -> str | None:
         units = parameter.units.strip()
+        if units in _MISSING_TEXT and quantity in _DIMENSIONLESS_QUANTITIES:
+            # SABIO-RK writes "-" for the unit of a pKa; a pK has no unit.
+            self._dimensionless_dash = True
+            return _DIMENSIONLESS
         if units in _MISSING_TEXT:
             plan.skip(parameter, "SABIO-RK gives no units")
             return None
@@ -1153,10 +1270,14 @@ class _DraftBuilder:
                 )
 
     def _apply_rate_forms(self, plans: Sequence[_Plan]) -> None:
+        plans = self._separate_ph_ionization_forms(plans)
         by_pair: dict[tuple[str, str], list[_Plan]] = {}
         for plan in plans:
             by_pair.setdefault((plan.class_id, plan.substrate_id), []).append(plan)
         for pair, group in by_pair.items():
+            if all(plan.ph_law for plan in group):
+                self._pair_forms[pair] = "ph_ionization"
+                continue
             kcat = [plan.entry.entry_id for plan in group if "kcat" in plan.rows]
             vmax = [plan.entry.entry_id for plan in group if _VMAX_QUANTITIES & plan.rows.keys()]
             form = "kcat" if kcat else ("vmax" if vmax else "")
@@ -1188,6 +1309,41 @@ class _DraftBuilder:
                         kind="concentration",
                     )
 
+    def _separate_ph_ionization_forms(self, plans: Sequence[_Plan]) -> list[_Plan]:
+        """Keep pH-ionization entries only where their class uses no other rate form; return the plans left.
+
+        All cases of one enzyme class and substrate share one rate form, and in
+        user data an enzyme class uses the pH-ionization form on all of its
+        substrates or on none. An entry with a pH-ionization law converts only to
+        that form, so where its class has entries of the kcat or Vmax form those
+        are kept and the pH-ionization entries are listed with the reason.
+        """
+
+        other_forms: dict[str, list[_Plan]] = {}
+        for plan in plans:
+            if not plan.ph_law:
+                other_forms.setdefault(plan.class_id, []).append(plan)
+        kept: list[_Plan] = []
+        for plan in plans:
+            others = other_forms.get(plan.class_id, [])
+            if not plan.ph_law or not others:
+                kept.append(plan)
+                continue
+            same_pair = [other for other in others if other.substrate_id == plan.substrate_id]
+            listed = same_pair or others
+            where = (
+                f"on substrate {plan.substrate_id!r}"
+                if same_pair
+                else f"on substrate(s) {', '.join(dict.fromkeys(repr(other.substrate_id) for other in others))}"
+            )
+            plan.reasons.append(
+                f"enzyme class {plan.class_id!r} uses the kcat or Vmax form {where} in EntryIDs "
+                f"{', '.join(other.entry.entry_id for other in listed)}; a pH-ionization law converts only to the "
+                "pH-ionization form, and one enzyme class uses one process law (select the pH-ionization entries "
+                "alone with entry_ids)"
+            )
+        return kept
+
     # -- assembly ------------------------------------------------------------
 
     def _assemble(self, plans: Sequence[_Plan], converted: Sequence[_Plan], loaded: _Loaded) -> UserTablesDraft:
@@ -1200,6 +1356,12 @@ class _DraftBuilder:
         if self._unit_mappings:
             for original, mapped in sorted(self._unit_mappings.items()):
                 self._note("Units", f"{original!r} is written as {mapped!r} (SABIO-RK unit table; the same unit).")
+        if self._dimensionless_dash:
+            self._note(
+                "Units",
+                "SABIO-RK writes '-' as the unit of a pKa and of the pH; pK values and the fitted pH range are written "
+                f"as {_DIMENSIONLESS!r}.",
+            )
         manifest = self._manifest(converted, loaded)
         tables = {
             "strains.csv": strains,
@@ -1585,14 +1747,17 @@ class _DraftBuilder:
         ph_laws = [plan for plan in plans if plan.ph_law]
         lines.extend(["", "## pH-ionization laws", ""])
         if ph_laws:
+            mapping = ", ".join(f"{name} -> {quantity}" for name, (_kind, quantity) in PH_IONIZATION_LAW_PARAMETERS.items())
             lines.extend(
                 [
-                    "pH-ionization laws are not importable as user data yet: FungMod implements such a law for "
-                    "registry cases (the process law ph_ionization_michaelis_menten), but user data binds only the "
-                    "cardinal temperature, cardinal pH and Arrhenius laws, and a law with pKa parameters is not "
-                    "converted into a cardinal one. Of these entries only Km and kcat are converted, at the entry's "
-                    "pH; they are constants of a law that also contains pH terms, so they need not equal the Km and "
-                    "kcat observed at any single pH. A pH given as a range is left as a REVIEW field.",
+                    "A kinetic law with pKa parameters is converted to the pH-ionization rate form of user data when "
+                    "it is SABIO-RK's diprotic pH-dependent Michaelis-Menten law, recognised by its formula "
+                    f"`{PH_IONIZATION_LAW_FORMULA}`: {mapping}. The pH range the entry states (the start and end of "
+                    "the law's pH variable, or of the assay pH) becomes ph_min and ph_max; without one they are REVIEW "
+                    "fields. k0 and Km0 are the limiting constants of the law, not the kcat and Km at any one pH, so "
+                    "they are never written as kcat or km. The condition pH is the pH the case runs at: a pH the entry "
+                    "gives as a range is a REVIEW field, to be filled with one pH inside ph_min to ph_max. A law with "
+                    "pKa parameters in any other form is listed, not converted.",
                     "",
                     "| EntryID | Kinetic law | pKa parameters | Converted |",
                     "| --- | --- | --- | --- |",
@@ -1605,7 +1770,7 @@ class _DraftBuilder:
                     for p in record.parameters
                     if p.parameter_type.strip().casefold() == "pka"
                 )
-                status = "Km and kcat" if not plan.reasons else "no (see Entries not converted)"
+                status = "pH-ionization form" if not plan.reasons else "no (see Entries not converted)"
                 lines.append(f"| {plan.entry.entry_id} | {_md(record.kinetic_law_type)} | {_md(pkas)} | {status} |")
         else:
             lines.append("None in the selected entries.")
@@ -1650,7 +1815,8 @@ _RULES = (
     "is resolved against the registry by name or alias; otherwise a substrates.csv row with REVIEW categorical "
     "fields is drafted. Product and mol/mol yield come from the reaction stoichiometry when it names one product.",
     "Condition: one condition per distinct temperature and pH; the buffer goes into notes. A missing value is "
-    "written as unknown, a range as a REVIEW field.",
+    "written as unknown, a range as a REVIEW field; the pH of a pH-ionization law, which the case runs at, is a "
+    "REVIEW field when SABIO-RK gives a range or none.",
     "Kinetics: Km -> km, kcat -> kcat, Vmax -> vmax (amount per volume per time) or specific_activity (amount per "
     "time per enzyme mass, with an enzyme_loading from design or a REVIEW row); the substrate and enzyme "
     "concentrations -> substrate_initial_concentration and enzyme_concentration; evidence literature. Start and end "
@@ -1658,7 +1824,11 @@ _RULES = (
     "first author, year and PubMed ID; method: SABIO-RK kinetic law with its rate-law name.",
     "Units: kept as written when the unit registry parses them, otherwise mapped through the SABIO-RK unit table; "
     "any other unit is listed and its value not converted.",
-    "Kinetic laws with pKa parameters are listed as pH-ionization laws; only their Km and kcat are converted.",
+    "pH-ionization laws: SABIO-RK's diprotic pH-dependent Michaelis-Menten law becomes the pH-ionization rate "
+    "form (k0 -> kcat_limiting, Km0 -> km_limiting, pKe1, pKe2, pKes1, pKes2 -> the four pK values, the stated pH "
+    "range -> ph_min and ph_max, or REVIEW fields); a law with pKa parameters in any other form is listed. One "
+    "enzyme class uses the pH-ionization form on all of its substrates or on none, so where entries of the kcat "
+    "or Vmax form share the class, the pH-ionization entries are listed.",
 )
 
 
@@ -1703,10 +1873,14 @@ def _species_parts(species: str) -> tuple[str, str]:
 def _route_quantity(quantity: str, units: str) -> tuple[str, str]:
     """Check the dimension of ``units`` for ``quantity`` (and route Vmax); return (quantity, problem)."""
 
-    if quantity == "kcat":
+    if quantity in {"kcat", "kcat_limiting"}:
         if units_are_compatible(units, _RATE_CONSTANT):
             return quantity, ""
-        return quantity, f"kcat units {units!r} are not 1/time"
+        return quantity, f"{quantity} units {units!r} are not 1/time"
+    if quantity in _DIMENSIONLESS_QUANTITIES:
+        if units_are_compatible(units, _DIMENSIONLESS):
+            return quantity, ""
+        return quantity, f"{quantity} units {units!r} are not dimensionless"
     if quantity == "vmax":
         if units_are_compatible(units, _MOLAR_RATE):
             return "vmax", ""
@@ -1740,8 +1914,12 @@ class _ConditionCells:
     notes: tuple[str, ...]
 
 
-def _condition(raw: Mapping[str, Any]) -> _ConditionCells:
-    """conditions.csv cells for an entry's temperature and pH, and the condition ID they give."""
+def _condition(raw: Mapping[str, Any], *, ph_law: bool = False) -> _ConditionCells:
+    """conditions.csv cells for an entry's temperature and pH, and the condition ID they give.
+
+    For a pH-ionization law the pH is the one the case runs at, so a range or a
+    missing pH is a REVIEW field to be filled with one pH inside ph_min to ph_max.
+    """
 
     conditions = _mapping(raw.get("experimental_conditions"))
     temperature = _mapping(conditions.get("envvar_temperature"))
@@ -1760,8 +1938,15 @@ def _condition(raw: Mapping[str, Any]) -> _ConditionCells:
         if not t_cell.startswith(REVIEW_MARKER):
             t_cell = f"{REVIEW_MARKER} SABIO-RK gives {t_cell} {unit_text}; restate it in degC or kelvin"
     ph_cell, ph_numbers = _condition_value(
-        ph.get("start_value"), ph.get("end_value"), label="pH", unit_text="", notes=notes
+        ph.get("start_value"),
+        ph.get("end_value"),
+        label="pH",
+        unit_text="",
+        notes=notes,
+        single=_PH_LAW_CONDITION if ph_law else "",
     )
+    if ph_law and ph_cell == _UNKNOWN:
+        ph_cell = f"{REVIEW_MARKER} SABIO-RK gives no pH; {_PH_LAW_CONDITION}"
     prefix = {"degC": "c", "kelvin": "k"}.get(units, "t")
     t_part = "tunknown" if t_cell == _UNKNOWN else prefix + ("_to_".join(t_numbers) or "review")
     ph_part = "phunknown" if ph_cell == _UNKNOWN else "ph" + ("_to_".join(ph_numbers) or "review")
@@ -1781,8 +1966,12 @@ def _condition_value(
     label: str,
     unit_text: str,
     notes: list[str],
+    single: str = "",
 ) -> tuple[str, list[str]]:
-    """The cell for one condition variable and the numbers its condition ID is built from."""
+    """The cell for one condition variable and the numbers its condition ID is built from.
+
+    ``single`` replaces the request written into the REVIEW cell of a range.
+    """
 
     first = _finite(start)
     last = None if end is None else _finite(end)
@@ -1794,12 +1983,86 @@ def _condition_value(
     if last is not None and last != first:
         unit = f" {unit_text}" if unit_text else ""
         notes.append(f"SABIO-RK gives {label} {_number_cell(first)} to {_number_cell(last)}{unit} (a range)")
-        cell = (
-            f"{REVIEW_MARKER} SABIO-RK gives {label} {_number_cell(first)} to {_number_cell(last)}{unit}, a range; "
-            f"state the single {label} these values apply at, or unknown"
-        )
+        request = single or f"state the single {label} these values apply at, or unknown"
+        cell = f"{REVIEW_MARKER} SABIO-RK gives {label} {_number_cell(first)} to {_number_cell(last)}{unit}, a range; {request}"
         return cell, [_id_number(first), _id_number(last)]
     return _number_cell(first), [_id_number(first)]
+
+
+_PH_LAW_CONDITION = (
+    "state the single pH the pH-ionization case runs at, inside ph_min to ph_max in kinetics.csv (the law reads it)"
+)
+
+
+def _ph_law_problem(entry: _Entry) -> str:
+    """Why an entry with pKa parameters cannot be mapped onto the pH-ionization form, or an empty string."""
+
+    record = entry.record
+    law = record.kinetic_law_type.strip() or "unnamed"
+    pkas = [parameter.name.strip() for parameter in record.parameters if parameter.parameter_type.strip().casefold() == "pka"]
+    formula = _text(_mapping(entry.raw.get("kineticlaw")).get("formula"))
+    if "".join(formula.split()) != PH_IONIZATION_LAW_FORMULA:
+        shown = "".join(formula.split()) or "no formula"
+        return (
+            f"kinetic law {law!r} has pKa parameters ({', '.join(pkas)}), but its formula ({shown}) is not the diprotic "
+            "pH-ionization law FungMod implements, so its constants are not mapped onto that law's roles"
+        )
+    names: dict[str, list[SabioRKKineticParameter]] = {}
+    for parameter in record.parameters:
+        names.setdefault(parameter.name.strip(), []).append(parameter)
+    problems: list[str] = []
+    for name, (kind, _quantity) in PH_IONIZATION_LAW_PARAMETERS.items():
+        found = names.get(name, [])
+        if len(found) != 1:
+            problems.append(f"{len(found)} parameters named {name}")
+        elif found[0].parameter_type.strip().casefold() != kind:
+            problems.append(f"{name} has type {found[0].parameter_type!r}")
+    extra = [name for name in pkas if name not in PH_IONIZATION_LAW_PARAMETERS]
+    if extra:
+        problems.append(f"pKa parameters outside the law ({', '.join(extra)})")
+    if problems:
+        return (
+            f"kinetic law {law!r} has the diprotic pH-ionization formula but not its parameters as FungMod maps them "
+            f"({'; '.join(problems)})"
+        )
+    return ""
+
+
+def _ph_fit_range(entry: _Entry) -> tuple[tuple[float, float] | None, str, str]:
+    """The pH range an entry states for its pH-ionization law: (range, where it comes from, problem).
+
+    The range is the start and end of the law's pH variable, or else of the
+    assay pH. When both are given and differ, or neither is a range inside pH 0
+    to 14, the range is None and ``problem`` says why.
+    """
+
+    candidates: list[tuple[tuple[float, float], str]] = []
+    variables = [parameter for parameter in entry.record.parameters if parameter.parameter_type.strip().casefold() == "ph"]
+    if len(variables) == 1:
+        span = _span(variables[0].start_value, variables[0].end_value)
+        if span is not None:
+            candidates.append((span, "pH range of the law's pH variable (start and end values of parameter pH)"))
+    assay = _mapping(_mapping(entry.raw.get("experimental_conditions")).get("envvar_ph"))
+    span = _span(assay.get("start_value"), assay.get("end_value"))
+    if span is not None:
+        candidates.append((span, "assay pH range of the entry's experimental conditions"))
+    if not candidates:
+        return None, "", "SABIO-RK states no pH range for this entry"
+    spans = {span for span, _origin in candidates}
+    if len(spans) > 1:
+        described = "; ".join(f"{_number_cell(lo)} to {_number_cell(hi)} ({origin})" for (lo, hi), origin in candidates)
+        return None, "", f"SABIO-RK states two different pH ranges ({described})"
+    (lower, upper), origin = candidates[0]
+    if lower < _PH_RANGE_SCALE[0] or upper > _PH_RANGE_SCALE[1]:
+        return None, "", f"the stated pH range {_number_cell(lower)} to {_number_cell(upper)} is outside pH 0 to 14"
+    return (lower, upper), origin, ""
+
+
+def _span(start: Any, end: Any) -> tuple[float, float] | None:
+    first, last = _finite(start), _finite(end)
+    if first is None or last is None or not first < last:
+        return None
+    return first, last
 
 
 def _id_number(value: float) -> str:
@@ -2104,6 +2367,8 @@ def _csv_text(columns: Sequence[str], rows: Sequence[Mapping[str, str]]) -> str:
 
 __all__ = [
     "DESIGN_QUANTITIES",
+    "PH_IONIZATION_LAW_FORMULA",
+    "PH_IONIZATION_LAW_PARAMETERS",
     "SABIORK_TEMPERATURE_UNITS",
     "SABIORK_UNIT_SPELLINGS",
     "UserTablesDraft",

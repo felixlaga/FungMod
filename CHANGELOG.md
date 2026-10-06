@@ -6,6 +6,33 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- pH-ionization kinetics in user data (USERDATA-006): a third rate form for a
+  (class, substrate) pair in `kinetics.csv`, with the quantities
+  `kcat_limiting` (1/time), `km_limiting` (concentration), `pk_free_lower`,
+  `pk_free_upper`, `pk_complex_lower`, `pk_complex_upper`, `ph_min` and
+  `ph_max` (dimensionless) beside `substrate_initial_concentration` and
+  `enzyme_concentration`. They map to the roles of the existing
+  `ph_ionization_michaelis_menten` assembler exactly as the registry's BGL1A
+  records do (`turnover`, `michaelis_constant`, the four pK roles,
+  `minimum_ph`, `maximum_ph`), and each pair gets a `..._ph_ionization_mm`
+  compatibility and case template, gap records and measurement requests like
+  the other forms. Mixing this form with the kcat or Vmax form in a case or a
+  pair is refused, and so is an enzyme class that uses it on some substrates and
+  another form on others. Validation: finite pK values, each lower pK below its
+  upper pK (whole ranges for sampled pK values), exact `ph_min < ph_max` within
+  0 to 14, and an exact condition pH inside `[ph_min, ph_max]` for every
+  condition with pH-ionization rows; a pH response law from `responses.csv` on
+  such a pair is refused as double-counting. `user_tables_from_sabiork` now
+  drafts SABIO-RK entries of the diprotic "Michaelis-Menten (pH-dependent)"
+  law (recognised by formula and parameter names) in this form, with `ph_min`
+  and `ph_max` from the pH range the entry states (`REVIEW:` fields otherwise)
+  and the condition pH a `REVIEW:` field when SABIO-RK gives a range; the
+  `review.md` "pH-ionization laws" section no longer reports them as not
+  importable, and their limiting constants are no longer written as `km` and
+  `kcat`. New fixture `tests/fixtures/user_data/bgl1a_ph_ionization/` re-enters
+  SABIO-RK entry 38522 and reproduces the registry BGL1A trajectory at pH 5
+  (`docs/user-data.md#three-rate-forms`).
+
 - Public kinetics into user tables (USERDATA-005): `user_tables_from_sabiork`
   drafts the user-dataset tables (strains, enzymes, optional enzyme classes,
   substrates, conditions, kinetics) and a `user_dataset.yml` from SABIO-RK
