@@ -120,7 +120,8 @@ abstract pools. `ResourceLimitedCulture.simulate_compiled` and
 `DegradingCulture.simulate_compiled` build these processes from the classes'
 own parameters and balances (`compiled_processes`, `compiled_parameters`) and
 return the same trajectory types as `simulate`; the parity tests agree to
-1e-7 relative at tight tolerances, and each trajectory names its engine in
+1e-6 relative at tight tolerances (macOS and Linux differ by about 1e-7 on
+single elements), and each trajectory names its engine in
 `diagnostics["engine"]`. The five types are not SBML-exportable yet; the
 exporter refuses them explicitly rather than guessing a kinetic law.
 

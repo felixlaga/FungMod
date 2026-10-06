@@ -297,12 +297,12 @@ def test_resource_limited_culture_compiled_path_matches_the_native_right_hand_si
     native = culture.simulate(initial_state=respiring_state(), times=times, solver_settings=settings)
     compiled = culture.simulate_compiled(initial_state=respiring_state(), times=times, solver_settings=settings)
     for name in culture.names:
-        np.testing.assert_allclose(compiled.concentrations[name].magnitude, native.concentrations[name].magnitude, rtol=1e-7, atol=1e-11)
+        np.testing.assert_allclose(compiled.concentrations[name].magnitude, native.concentrations[name].magnitude, rtol=1e-6, atol=1e-11)
     for name in native.cumulative_boundary_exchange:
         np.testing.assert_allclose(compiled.cumulative_boundary_exchange[name].magnitude,
-                                   native.cumulative_boundary_exchange[name].magnitude, rtol=1e-7, atol=1e-11)
+                                   native.cumulative_boundary_exchange[name].magnitude, rtol=1e-6, atol=1e-11)
         np.testing.assert_allclose(compiled.cumulative_reaction_exchange[name].magnitude,
-                                   native.cumulative_reaction_exchange[name].magnitude, rtol=1e-7, atol=1e-11)
+                                   native.cumulative_reaction_exchange[name].magnitude, rtol=1e-6, atol=1e-11)
     np.testing.assert_allclose(compiled.specific_growth_rate.magnitude, native.specific_growth_rate.magnitude, rtol=1e-6, atol=1e-12)
     assert max(compiled.diagnostics["maximum_absolute_balance_residual_mol_L"].values()) < 1e-10
     assert compiled.diagnostics["engine"] == COMPILED_ENGINE and native.diagnostics["engine"] == NATIVE_ENGINE
@@ -325,12 +325,12 @@ def test_degrading_culture_compiled_path_matches_the_native_right_hand_side(alte
     native = culture.simulate(initial_state=degrading_state(), times=times, solver_settings=settings)
     compiled = culture.simulate_compiled(initial_state=degrading_state(), times=times, solver_settings=settings)
     for name in culture.names:
-        np.testing.assert_allclose(compiled.concentrations[name].magnitude, native.concentrations[name].magnitude, rtol=1e-7, atol=1e-11)
+        np.testing.assert_allclose(compiled.concentrations[name].magnitude, native.concentrations[name].magnitude, rtol=1e-6, atol=1e-11)
     for name in culture.processes:
         np.testing.assert_allclose(compiled.process_rates[name].magnitude, native.process_rates[name].magnitude, rtol=1e-6, atol=1e-11)
     for name in native.cumulative_boundary_exchange:
         np.testing.assert_allclose(compiled.cumulative_boundary_exchange[name].magnitude,
-                                   native.cumulative_boundary_exchange[name].magnitude, rtol=1e-7, atol=1e-11)
+                                   native.cumulative_boundary_exchange[name].magnitude, rtol=1e-6, atol=1e-11)
     assert max(compiled.diagnostics["maximum_absolute_balance_residual_mol_L"].values()) < 1e-10
     assert compiled.diagnostics["minimum_pool_mol_L"] > -1e-12
     kernel = compiled.diagnostics["kernel"]
