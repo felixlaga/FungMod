@@ -191,7 +191,9 @@ def test_recorded_m0_primary_fit_is_stationary_within_its_bounds(registry, plan,
     if not fit_path.exists():
         pytest.skip("no stage A results recorded yet")
     fit = json.loads(fit_path.read_text(encoding="utf-8"))
-    assert fit["success"] and fit["plan_sha256"] == hashlib.sha256((ROOT / study.PLAN_PATH).read_bytes()).hexdigest()
+    current = hashlib.sha256((ROOT / study.PLAN_PATH).read_bytes()).hexdigest()
+    since_amendment_3 = {current, *(entry["previous_sha256"] for entry in plan["amendments"][3:])}
+    assert fit["success"] and fit["plan_sha256"] in since_amendment_3
     variant = study.model_variants(plan)["M0_baseline"]
     predictor = study.build_predictor(registry, plan, "M0_baseline", bayesian_plan=bayesian_plan)
     scales = study.training_scales(conditions)
@@ -286,6 +288,55 @@ def test_posterior_study_is_finite_at_a_candidate_for_variants_with_fixed_consta
     vector = posterior.problem.coordinates_from_values(posterior.center)
     assert posterior.problem.inside(vector)
     assert np.isfinite(posterior.problem.log_posterior(vector))
+
+
+def test_sampler_settings_apply_the_declared_overrides(plan) -> None:
+    base = study.sampler_settings(plan, dimension=10)
+    assert (base.n_steps, base.burn_in, base.n_walkers) == (8000, 2000, 24)
+    m2 = study.sampler_settings(plan, dimension=14, model_id="M2_soluble_product_pool")
+    assert (m2.n_steps, m2.burn_in, m2.n_walkers) == (36000, 8000, 28)
+    m1 = study.sampler_settings(plan, dimension=11, model_id="M1_induction_state")
+    assert (m1.n_steps, m1.burn_in) == (8000, 2000)
+    holdout = study.sampler_settings(plan, dimension=14, model_id="M2_soluble_product_pool", holdout=True)
+    assert (holdout.n_steps, holdout.burn_in, holdout.n_walkers) == (8000, 2000, 28)
+    development = study.sampler_settings(plan, dimension=14, model_id="M2_soluble_product_pool", n_steps=6, burn_in=2)
+    assert (development.n_steps, development.burn_in) == (6, 2)
+    stripped = {**plan, "stage_B_posterior": {k: v for k, v in plan["stage_B_posterior"].items() if k != "holdout_sampler"}}
+    with pytest.raises(CultureBenchmarkError, match="holdout_sampler"):
+        study.sampler_settings(stripped, dimension=14, holdout=True)
+
+
+def test_holdout_posterior_study_scores_the_held_out_loading(tmp_path: Path, registry, plan) -> None:
+    """A holdout study fits two loadings, keeps the third apart and reports its coverage separately (tiny budget)."""
+
+    model_id = "M3_conversion_dependent_accessibility"
+    variant = study.model_variants(plan)[model_id]
+    center = candidate_values(variant)
+    held = "gelain_2020_cellulose_20gl"
+    posterior = study.build_posterior_study(ROOT, model_id, center, registry=registry, held_out=held, n_steps=6, burn_in=2)
+    assert [condition.condition_id for condition in posterior.problem.conditions] == [
+        "gelain_2020_cellulose_10gl", "gelain_2020_cellulose_30gl"
+    ]
+    assert [condition.condition_id for condition in posterior.held_out] == [held]
+    with pytest.raises(CultureBenchmarkError, match="held-out"):
+        study.build_posterior_study(ROOT, model_id, center, registry=registry, held_out="nope")
+    output = tmp_path / "stage_b" / model_id / f"holdout_{held}"
+    run = study.sample_posterior_study(posterior, output, checkpoint_every=3, resume=False)
+    assert run.chain.shape[1] == 6
+    result, coverage = study.analyze_posterior_study(posterior, run, draws=4)
+    assert coverage is not None and coverage["held_out"] == [] and set(coverage["conditions"]) == {
+        "gelain_2020_cellulose_10gl", "gelain_2020_cellulose_30gl"
+    }
+    held_coverage = coverage["held_out_coverage"]
+    assert held_coverage["held_out"] == [held] and set(held_coverage["conditions"]) == {held}
+    assert held_coverage["overall"]["all_observables"]["observations"] == 32
+    assert result.posterior_predictive is not None and result.posterior_predictive["held_out"] == [held]
+    paths = study.write_posterior_outputs(posterior, result, coverage, output, root=ROOT)
+    inputs = json.loads(paths["inputs"].read_text(encoding="utf-8"))
+    assert inputs["held_out_conditions"] == [held] and held not in inputs["fitted_conditions"]
+    report = paths["report"].read_text(encoding="utf-8")
+    assert "Holdout posterior" in report and "Held-out posterior predictive coverage" in report
+    assert "provisional" in report
 
 
 def test_stage_b_verdicts_follow_the_plan_rules(plan) -> None:

@@ -347,6 +347,97 @@ supplies the De Ligne et al. 2019 time series and the Boswell 2003
 parameter table, a registry-parameterised *R. solani* case under a frozen
 plan comparing colony area and tip counts over time.
 
+## CRIT-004 Amendment 4: The M2 Chain From The Converged Fit And Its Holdout Posteriors
+
+Date: 2026-10-06
+
+Status: complete. The criticism plan's fourth dated amendment (digest
+`9897ab11...` to `7952e010...`) gives the soluble-product-pool chain the
+length and the starting point its first run lacked and gives the plan's
+holdout posteriors sampler settings and an output convention; both were run
+and recorded. The scientific outcome for M2 does not change: it improves
+the fit but its constants stay unidentified, and its chain still misses the
+convergence rule.
+
+Finding: the M2 all-condition chain re-run from the converged stage A fit
+(28 walkers, 36000 steps, 8000 burn-in, 7.7 hours across five resumed runs)
+does not converge by the declared rule. Its integrated autocorrelation times
+grew to 824 to 1393 steps (first chain: 368 to 529) against 28000
+post-burn-in steps, while every effective sample size (563 to 951) passes;
+mean acceptance 0.194; 431 641 of 1 008 028 posterior evaluations (43
+percent) failed to integrate and were rejected. The shared noise multiplier's
+interval is [1.63, 2.23] (median 1.89): below the baseline's 2.25, still
+excluding 1.0 (R2 fails). The added constants: `mu` bounded below only, `Ks`
+and `Ki` prior dominated, `P0` bounded below only (R3 fails). The nine
+common constants keep their BAYES-001 classes, which the first chain (yield
+0.18 at its centre) had degraded. Coverage with measurement noise 91 of 96.
+Outcome: improves fit but unidentified (R1, not R3), provisional.
+
+Holdout posteriors (amendment 4, recorded 2026-10-06): three M2 chains of 8000 steps (2000 burn-in, 28 walkers) with one cellulose loading held out of the likelihood, each centred on the fold's stage A fit; held-out posterior predictive coverage at 95 percent with measurement noise (400 draws): 10 g/L held out 22/32, 69 percent (biomass 8/8, substrate 8/8, FPase 2/8, beta-glucosidase 4/8; multiplier [1.23, 1.78]; acceptance 0.214; largest tau 500 of 6000 post-burn-in steps); 20 g/L held out 32/32, 100 percent (biomass 8/8, substrate 8/8, FPase 8/8, beta-glucosidase 8/8; multiplier [1.87, 2.90]; acceptance 0.182; largest tau 565 of 6000 post-burn-in steps); 30 g/L held out 19/32, 59 percent (biomass 5/8, substrate 8/8, FPase 3/8, beta-glucosidase 3/8; multiplier [1.26, 1.86]; acceptance 0.203; largest tau 491 of 6000 post-burn-in steps). No fold converges by the declared rule; the added constants keep their one-sided or prior-dominated classes in every fold. Verdict unchanged: improves fit but unidentified, provisional.
+
+Changed:
+
+- `data/benchmarks/gelain_2020_criticism/plan.json`: amendment 4
+  (`stage_B_posterior.sampler.model_overrides` for M2, `holdout_sampler`,
+  the compute cap); `tests/test_gelain_criticism_plan.py` pins the new digest
+  and the amendment chain, checks the override and the holdout settings and
+  the internal consistency of every `holdout_<condition>/` folder (held-out
+  condition recorded, fitted and held-out coverage kept apart).
+- `calibration/bayesian.py`: the posterior predictive and the coverage take
+  an explicit list of conditions that may include held-out ones and list
+  them in the output. `research/gelain_criticism.py`: `sampler_settings`
+  reads the per-model override and the holdout sampler; the study builder
+  takes a held-out condition, trains on the others, centres on that fold's
+  stage A fit, scores the held-out loading by coverage and records the
+  fitted and held-out ids and both coverages apart; the runner script gains
+  `--hold-out`.
+- `results/stage_b/M2_soluble_product_pool/`: the chain re-recorded (the
+  first chain's summary stays in CRIT-002 and CRIT-003);
+  `holdout_gelain_2020_cellulose_{10,20,30}gl/` (new).
+- `paper/tables/table_4_criticism_stage_b.{md,tex}` and both manifests
+  regenerated (the plan digest with amendment 4 enters the figure manifest);
+  `paper/paper.tex` (stage B paragraph and the limitations bullet);
+  `docs/gelain-model-criticism.md` (amendment 4, the M2 chain, the holdout
+  posteriors, the summary); the study README; `CHANGELOG.md`; the state
+  document (item 2).
+- Tests: `tests/test_bayesian_calibration.py` (toy held-out coverage lists
+  the held-out condition and scores it apart), `tests/test_gelain_criticism_study.py`
+  (the override and the holdout settings resolve from the plan; a tiny
+  holdout study end to end records the held-out id and both coverages).
+- `data/benchmarks/gelain_2020_petab/plan.json`: a second dated amendment
+  (`cfb8c9a6...` to `11dfe158...`) re-pins the criticism plan's digest; the
+  sections the PEtab study reads are unchanged, so it records
+  `results_remain_valid` and the PEtab results stand.
+  `tests/test_gelain_petab.py` pins the new digest and accepts a recorded
+  result only under a digest that every later amendment declares still
+  valid; the PEtab README and `docs/gelain-cross-solver.md` describe it.
+
+Not changed: any rule, bound, prior, error model or threshold of the plan;
+stage A; the M1 and M3 chains; BAYES-001; any registry record. Scientific
+impact: the M2 verdict stays "improves fit but unidentified (R1, not R3)"
+and provisional; the inadequacy factor it leaves is now 1.89 rather than
+1.94; the holdout posteriors add the per-fold coverage the plan declared.
+Backward compatibility: `posterior_predictive_coverage` and the study
+builder gain optional arguments; recorded M2 files are replaced under the
+amendment rule. Risk: low for code; the scientific finding is the point.
+
+Commands run (venv, Python 3.11): `ruff check src tests scripts/run_*.py
+scripts/reproduce_paper.py`; `pyright` (whole package); `mkdocs build
+--strict`; `python scripts/reproduce_paper.py tables` and `check`;
+`pytest` on the criticism, Bayesian, paper and hygiene modules; the M2
+chain (5 resumed runs) and three holdout chains through
+`scripts/run_gelain_2020_model_criticism.py stage-b`; results in the PR.
+
+Remaining ambiguities: 43 percent of the M2 chain's proposals failed to
+integrate; the sampler rejects them as non-finite, which is correct for the
+posterior but slows mixing, and the failing region of the added constants is
+not characterised. The M2 chain would need about 70000 post-burn-in steps
+for the rule if the autocorrelation did not grow further.
+
+Recommended next task: step 5 item 3, cross-study transfer, once the owner
+verifies a second dataset; until then the paper's limitations name the
+single dataset and the provisional M2 verdicts.
+
 ## PAPER-002 The Manuscript In LaTeX With Generated Table Fragments And PDF Figures
 
 Date: 2026-10-06

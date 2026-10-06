@@ -4,7 +4,7 @@
 | Model | Chain | Converged | R1 holdout | R2 multiplier interval | R3 added-parameter classes | Coverage (95%, with noise) | Outcome |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | M1_induction_state | 24 walkers x 8000 steps | False | False | [1.87, 2.53] | `kz_loss` weakly_identified | 91/96 | not supported (fails R1) (provisional) |
-| M2_soluble_product_pool | 28 walkers x 8000 steps | False | True | [1.65, 2.87] | `mu` prior_dominated, `Ks` prior_dominated, `Ki` prior_dominated, `P0` bounded_below_only | 95/96 | improves fit but unidentified (R1, not R3) (provisional) |
+| M2_soluble_product_pool | 28 walkers x 36000 steps | False | True | [1.63, 2.23] | `mu` bounded_below_only, `Ks` prior_dominated, `Ki` prior_dominated, `P0` bounded_below_only | 91/96 | improves fit but unidentified (R1, not R3) (provisional) |
 | M3_conversion_dependent_accessibility | 24 walkers x 8000 steps | False | False | [1.94, 2.62] | `n` bounded_above_only | 91/96 | not supported (fails R1) (provisional) |
 
 M0 is the baseline: its all-condition posterior is BAYES-001 (Table 2), which R1 and R3 do not address.

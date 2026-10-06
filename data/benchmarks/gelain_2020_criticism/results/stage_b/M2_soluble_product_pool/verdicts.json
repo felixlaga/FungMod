@@ -3,12 +3,12 @@
   "R1_holdout_support": true,
   "R2_adequacy": false,
   "R2_multiplier_interval": [
-    1.6508059240578155,
-    2.866098022775914
+    1.6344227088550727,
+    2.2281845007666607
   ],
   "R3_identification": false,
   "added_parameter_classes": {
-    "mu": "prior_dominated",
+    "mu": "bounded_below_only",
     "Ks": "prior_dominated",
     "Ki": "prior_dominated",
     "P0": "bounded_below_only"

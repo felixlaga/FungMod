@@ -1,0 +1,154 @@
+{
+  "draws": 400,
+  "credible_mass": 0.95,
+  "seed": 20261006,
+  "includes_measurement_noise": true,
+  "conditions": {
+    "gelain_2020_cellulose_10gl": {
+      "successful_draws": 400,
+      "per_observable": {
+        "biomass": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "substrate": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "cellulase_activity": {
+          "inside": 6,
+          "observations": 8,
+          "fraction": 0.75
+        },
+        "beta_glucosidase_activity": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        }
+      },
+      "fraction": 0.9375
+    },
+    "gelain_2020_cellulose_20gl": {
+      "successful_draws": 400,
+      "per_observable": {
+        "biomass": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "substrate": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "cellulase_activity": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        },
+        "beta_glucosidase_activity": {
+          "inside": 8,
+          "observations": 8,
+          "fraction": 1.0
+        }
+      },
+      "fraction": 1.0
+    }
+  },
+  "held_out": [],
+  "failed_draws": 0,
+  "overall": {
+    "biomass": {
+      "inside": 16,
+      "observations": 16,
+      "fraction": 1.0
+    },
+    "substrate": {
+      "inside": 16,
+      "observations": 16,
+      "fraction": 1.0
+    },
+    "cellulase_activity": {
+      "inside": 14,
+      "observations": 16,
+      "fraction": 0.875
+    },
+    "beta_glucosidase_activity": {
+      "inside": 16,
+      "observations": 16,
+      "fraction": 1.0
+    },
+    "all_observables": {
+      "inside": 62,
+      "observations": 64,
+      "fraction": 0.96875
+    }
+  },
+  "held_out_coverage": {
+    "draws": 400,
+    "credible_mass": 0.95,
+    "seed": 20261006,
+    "includes_measurement_noise": true,
+    "conditions": {
+      "gelain_2020_cellulose_30gl": {
+        "successful_draws": 400,
+        "per_observable": {
+          "biomass": {
+            "inside": 5,
+            "observations": 8,
+            "fraction": 0.625
+          },
+          "substrate": {
+            "inside": 8,
+            "observations": 8,
+            "fraction": 1.0
+          },
+          "cellulase_activity": {
+            "inside": 3,
+            "observations": 8,
+            "fraction": 0.375
+          },
+          "beta_glucosidase_activity": {
+            "inside": 3,
+            "observations": 8,
+            "fraction": 0.375
+          }
+        },
+        "fraction": 0.59375
+      }
+    },
+    "held_out": [
+      "gelain_2020_cellulose_30gl"
+    ],
+    "failed_draws": 0,
+    "overall": {
+      "biomass": {
+        "inside": 5,
+        "observations": 8,
+        "fraction": 0.625
+      },
+      "substrate": {
+        "inside": 8,
+        "observations": 8,
+        "fraction": 1.0
+      },
+      "cellulase_activity": {
+        "inside": 3,
+        "observations": 8,
+        "fraction": 0.375
+      },
+      "beta_glucosidase_activity": {
+        "inside": 3,
+        "observations": 8,
+        "fraction": 0.375
+      },
+      "all_observables": {
+        "inside": 19,
+        "observations": 32,
+        "fraction": 0.59375
+      }
+    }
+  }
+}
