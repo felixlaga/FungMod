@@ -26,6 +26,21 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CAL-002 Declared Finite-Difference Step In The Public Least-Squares API
+
+Date: 2026-10-05
+
+Status: complete. The follow-up recorded in CRIT-003: `fit_least_squares`
+gains `diff_step`, `ftol`, `xtol` and `gtol` (default `None`, scipy's
+values, so no existing calibration changes) with validation and the declared
+values recorded in `optimizer_metadata` (`finite_difference_step`, the three
+tolerances, `method`, and a note that undeclared options are scipy's
+defaults). The docstring states why an adaptive integrator's step noise
+needs a declared step. Tests: the declared options are passed and recorded,
+the default path records `None`, and non-positive, non-finite or too-large
+values refuse. No recorded result uses the public function with these
+options; the model-criticism study keeps its own plan-declared settings.
+
 ## UNIFY-001 Culture Physiology As Generic Processes On The Compiled Core
 
 Date: 2026-10-05
