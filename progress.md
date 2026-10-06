@@ -26,6 +26,289 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## COLONY-002 Stage 0 Of The Colony Comparison Recorded Under Amendments 2 And 3
+
+Date: 2026-10-06
+
+Status: complete for stage 0 (software checks, no fit). Stage A not run.
+
+Stage 0 was recorded three times, each under the plan as it then stood, and
+failed twice; each failure was traced, the plan was amended before any fit,
+and the superseded record is kept as the amendment's evidence.
+
+- Under amendment 1 (`results/stage_0_superseded_ea6e2e72/`): grid 0.574 /
+  0.102 and symmetry 0.760 / 0.192 failed, solver passed. Cause: the active
+  translocation term aggregates tips like Keller-Segel chemotaxis (the spike
+  grows without bound with refinement). Amendment 2 removed the term, added a
+  well-posedness guard and decision rule R0.
+- Under amendment 2 (`results/stage_0_superseded_ca0e016c/`): grid (5.3e-5,
+  0.0056) and solver (1.1e-7) passed, symmetry (0.382, 0.059) failed. Cause:
+  the radial wall at the window's half-diagonal (28.3 mm) and the cartesian
+  walls on the window differ, and neither is physical; the radial tip front
+  also leads the detected hull by about 4.7 mm. Amendment 3 moved the radial
+  wall to a 9 cm dish (declared assumption), declared the window separately,
+  and set the symmetry comparison to the leading hours with at most 0.1
+  percent of radial tips beyond the window half side, with a 0.25 mm cartesian
+  reference; that window rule was recorded before any finer cartesian result.
+- Under amendment 3 (`results/stage_0/`, plan `2ce70b6b...`): grid 4.0e-5
+  (tips) and 0.0054 (area) against 0.02; solver 1.7e-8 and 0 against 0.005;
+  symmetry over hours 1 to 12, 0.026 and 0.016 against 0.03. All passed. The
+  radial model runs 62 h in 0.8 s; the cartesian reference took 4.1 hours.
+  An independent probe confirmed the numbers and showed that the tip
+  difference at 12 to 14 h does not change between 0.5 and 0.25 mm cells
+  (wall reflection, not discretisation).
+
+Changed: `data/benchmarks/de_ligne_2019_colony/plan.json` (amendments 2 and
+3); `results/stage_0/` and the two superseded records with READMEs;
+`research/colony_comparison.py` (no active term, the grid guard, the window
+and dish domain from the plan, `tip_fraction_beyond_radius`, the
+plan-declared cartesian grid and comparison window); `mycelium/hyphae.py`
+(the aggregation failure mode declared on active translocation);
+`scripts/run_de_ligne_2019_colony_comparison.py` (the plan's cartesian grid by
+default); `docs/colony-comparison.md` (amendments 2 and 3, the stage 0
+record), `docs/spatial-mycelium.md`, `docs/capabilities.md`,
+`docs/paper-readiness.md`, `README.md`, `CHANGELOG.md`, the state document.
+
+Tests: the plan test pins the amendment chain and digest, the amendment
+contents and the superseded records' verdicts; the stage 0 test records a
+run on small grids with the comparison window and the minimum-hours rule;
+`tip_fraction_beyond_radius` is tested on the radial reference and refused on
+a cartesian grid.
+
+Not changed: any data, observation operator, hold-out, bound or decision
+rule. Scientific impact: none on biology; stage 0 shows the radial model is
+grid- and solver-converged and agrees with the two-dimensional model while
+the colony is inside the window, at artificial check values.
+
+
+## FIX-DOCS001 Two Defects Found By The Documentation Audit
+
+Date: 2026-10-06
+
+Status: complete. The README and docs audit (DOCS-001) ran every documented
+example and found two code defects; both are fixed with regression tests.
+
+- SABIO-RK proposals: `_proposed_parameter_symbol` mapped every parameter of a
+  type it does not special-case to the bare type token, so the four `pKa`
+  parameters of the pH-dependent entries (38522 and seven others in Reaction
+  618) all became `pka` and `review_source_proposal` refused the whole
+  reaction with a duplicate record ID. The parameter's SABIO-RK name now
+  completes the symbol when it differs from the type (`pka_pke1`, `pka_pke2`,
+  `pka_pkes1`, `pka_pkes2`); `Km_<species>`, `kcat_<substrate>`, the
+  concentration symbols and types whose name adds nothing (`ph`) are unchanged.
+- Preflight: `assess_modelability` now checks the environment conditions the
+  selected process law reads at run time, declared by the law modules
+  (`PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS = ("ph",)`,
+  `THERMAL_INACTIVATION_ENVIRONMENT_CONDITIONS = ("temperature",)`, collected
+  in `PROCESS_ENVIRONMENT_CONDITIONS`). A missing or unknown value is a
+  missing item; a range or distribution is incompatible ("the law needs one
+  value per run; use an environment with an exact pH, or an EnvironmentGrid
+  point"). The *P. chrysosporium* K-3 case in `toy_lab_environment` (pH range)
+  is therefore no longer modelable; in the Tsukada assay environments and
+  EnvironmentGrid points it is unchanged.
+
+Tests: `tests/test_preflight_fixes_docs001.py` (distinct symbols in every
+Reaction 618 entry, the whole proposal reviewable, ranged pH blocking in both
+modes, exact pH unchanged, the declared conditions, processes without
+environment reads unaffected).
+
+Not changed: any rate law, parameter record or registry record; the
+homogeneous Michaelis-Menten and culture cases. Scientific impact: a case that
+could only fail at run time is now refused at preflight.
+
+
+## DOCS-001 README And Docs Accuracy Audit
+
+Status: `complete` for the stated scope (2026-10-06). Documentation only: no
+file under `src/`, `tests/`, `data/` or `data_registry/` changed, and no
+scientific or numerical behaviour changed.
+
+`README.md` and the MkDocs pages in `mkdocs.yml` were checked against the code.
+Corrected claims, each with the code that proves it:
+
+- README limitations, temperature: "Arrhenius acceleration only; thermal
+  deactivation not implemented" now lists the Arrhenius and Rosso CTMI
+  modifiers and the first-order `thermal_inactivation` process law
+  (`kinetics/cardinal.py`, `kinetics/inactivation.py`,
+  `processes/inactivation.py`, `ThermalInactivationFactory` in
+  `processes/factories.py`), static per case.
+- README limitations, pH: "empirical Gaussian only; ionization chemistry not
+  implemented" now lists the Gaussian and CPM modifiers and the diprotic
+  `ph_ionization_michaelis_menten` law (`kinetics/ionization.py`,
+  `processes/ionization.py`), bound only to the *P. chrysosporium* BGL1A
+  template (`data_registry/case_templates/case_templates.yml`); no registry
+  record binds a cardinal law or thermal inactivation.
+- README limitations: "correlated-input sensitivity and full Bayesian
+  calibration are not implemented" split into correlated-input sensitivity
+  (still absent; independent pick-freeze in
+  `uncertainty/global_sensitivity.py`) and a bullet bounding the implemented
+  posterior sampler (`calibration/bayesian.py`: uniform or log-uniform
+  `PriorSpecification`, `GaussianObservationError`, `run_ensemble_sampler`).
+  `docs/capabilities.md` "not supported" list corrected the same way.
+- README limitations: "the spatial engines and the Pirt/Monod culture
+  closures are not on the compiled core" now matches FD-009: the culture
+  closures are compiled processes with `simulate_compiled` on
+  `ResourceLimitedCulture`, `DegradingCulture` and `FungalCouplingModel`
+  (`fungi/respiration.py`, `fungi/degradation.py`, `fungi/coupling.py`); the
+  legacy `Reaction` engine and the reaction-diffusion engines remain outside.
+- README limitations: "no other organism record is runnable" replaced; a
+  registry-wide preflight shows *P. chrysosporium* K-3 on cellobiose runnable
+  in exploratory mode (enzyme kinetics only) and user-data strains reach only
+  homogeneous Michaelis-Menten cases (`api/user_data.py`).
+- README limitations: new bullet for the exploratory `fungal_model.mycelium`
+  (Cartesian or axisymmetric `SpatialGrid`, unreachable from registry and
+  `VirtualExperiment`, no colony fit).
+- README calibration bullet: the nine `calibrated` *T. harzianum* records
+  (`data_registry/parameters/parameter_records.yml`) are named instead of "no
+  parameters are calibrated by default".
+- README cross-solver paragraph described the first COPASI run
+  (`copasi_improves`); the recorded outcome is `reproduced`, 1.6e-8 of sigma,
+  optimum within 2.5e-8 (`data/benchmarks/gelain_2020_petab/results/comparison.json`).
+  The paragraph and the 2026-09-28 research-export note moved from "Citation"
+  into the time-course comparison section.
+- README source-proposal example: `source_proposal(provider="sabiork",
+  reaction_id="618")` followed by `review_source_proposal` raised
+  `CurationError` (duplicate `proposed_sabiork_parameter_618_38522_pka`);
+  the example now selects `entry_id="35622"` and the README states the
+  limitation.
+- README: CI installs `.[dev,standards,copasi]`, not `.[dev]`
+  (`.github/workflows/ci.yml`); `ProcessLibrary.default_foundation()` has
+  thirteen factories, not four (`default_foundation_factories`); the
+  literature collection also holds the Gelain and De Ligne sources; the
+  source-of-truth list adds the 2026-10-04 state document (`AGENTS.md`).
+- `docs/capabilities.md`: the modifier row adds the Rosso and Robinson
+  water-activity law (`modifiers/cardinal.py`); the mycelium row names the
+  axisymmetric grid (`mycelium/grid.py`) and the COLONY-001 status.
+- `docs/compiled-core.md`: "five process classes and eight modifiers" is
+  thirteen process types (`SHIPPED_PROCESS_TYPES` in
+  `tests/test_compiled_process_models.py`) and twelve modifiers with
+  `compile_activity`; "the compiled Jacobian below" is above.
+- `docs/colony-comparison.md` and `docs/spatial-mycelium.md`: the study runner
+  and error-model fit exist (`research/colony_comparison.py`,
+  `scripts/run_de_ligne_2019_colony_comparison.py`); no stage 0 record is
+  committed and no fit has been run.
+- `docs/environment-response.md`: the unbound-law list includes the cardinal
+  water-activity law; "the two cardinal laws" is "the cardinal laws".
+- `docs/quickstart.md`: preflight statuses are the four of
+  `ModelabilityStatus` (`screening/modelability.py`); "incompatible" is an
+  item kind, not a status.
+- `docs/user-guide.md`: adds posterior sampling; signatures are optional
+  Ed25519; SBML export includes `proportional_synthesis`
+  (`SBML_EXPORTABLE_PROCESS_TYPES`) and PEtab/COPASI exist.
+- `docs/standards.md`: every rate-modifier wrapper is refused, not only
+  inhibition (`standards/sbml.py`).
+- `docs/bayesian-calibration.md`: the compiled Jacobian is opt-in
+  (`SolverSettings.jacobian`), so "still integrates with finite differences"
+  holds by default only.
+- `docs/paper-readiness.md`: the colony dataset is ingested with pinned
+  digests and a frozen plan exists.
+- `docs/install.md`: ruff scope matches CI; extras note.
+- `docs/release-notes.md`: marked as a partial summary of `CHANGELOG.md`.
+- `docs/reproducing-the-paper.md`: `paper/paper.pdf` and its auxiliary files
+  are tracked (commit `94c407f`) although `.gitignore` lists them.
+
+Examples executed in scratch directories with `PYTHONPATH=src`: every Python
+and shell block of `README.md`, `docs/index.md` and `docs/quickstart.md`, plus
+`docs/user-guide.md` and the `docs/organism-physiology.md` run. Placeholder
+paths were substituted (the esterase user-data fixture, a copied registry, a
+toy config); the author/sign blocks were given an accepted-review fixture and
+an Ed25519 key. All ran after the `entry_id` fix. Notebooks were not changed.
+
+Recommended next task: fix proposal record IDs for SABIO-RK entries with
+repeated parameter names (four `pKa` per pH-dependent entry) so the unfiltered
+Reaction 618 proposal can be reviewed.
+
+## USERDATA-001 User-Supplied Enzyme And Kinetics Tables Into Virtual Experiments
+
+Status: `complete` for the stated scope (2026-10-06); the first increment of
+the user-supplied-data route of the product goal ("the user names fungus X,
+substrate Y and conditions Z, and FungMod assembles the enzymes and kinetic
+parameters from stored data, from user-supplied data, or fetched, and
+simulates").
+
+Changed:
+
+- `fungal_model.api.user_data`: `load_user_dataset(path, registry=...)`,
+  `UserDataset` (`dataset_id`, `digest`, `records`, `overlay(base)`,
+  `to_dict()`) and `UserDataError` (`issues`: file, spreadsheet row, column,
+  message; every issue is collected before raising). A directory holds
+  `user_dataset.yml` (dataset id, contributor, date, source, required time
+  grid) and `strains.csv`, `enzymes.csv`, optional `enzyme_classes.csv`,
+  `substrates.csv`, `conditions.csv`, `kinetics.csv`; any other CSV is refused.
+  Validation covers units (pint), the dimension of each quantity, molar versus
+  mass concentrations (a molar mass would be needed), finite nonnegative
+  values with positive `km`, ranges, duplicate and exact-versus-range
+  conflicts, undeclared references, registry name collisions, pH 0 to 14,
+  dissolved substrates, explicit mol/mol yields, and `vmax`/activity rows
+  (refused, never converted).
+- Generated records, all `<dataset_id>__`-prefixed and built through
+  `load_registry_record_mapping`: a fungus per strain; a namespaced enzyme
+  class per declared class (a registry parent's bond classes, substrate classes
+  and EC number copied, the parent ID in provenance only); user substrates
+  (registry substrates are referenced, not copied); an environment per
+  condition (kelvin with the original value in the notes); a homogeneous
+  Michaelis-Menten compatibility and case template per compatible class and
+  substrate, mirroring the Reaction 618 template, `scientific` only when every
+  bound parameter record is exact and scientific-eligible; a parameter record
+  per kinetics row (`user_measured`, `user_reported_literature`,
+  `user_design_value` with scientific use when exact and exploratory screening
+  when a range; `estimate` rows as `exploratory_prior`); and a
+  `user_dataset_gap` unknown with a `measurement_request` for every missing
+  role of every strain, class, substrate and condition.
+- `fungal_model.provenance`: the reserved `fungmod_user_dataset` namespace
+  (curator authoring refuses it; `classify_parameter_provenance` still
+  returns `generic`).
+- `VirtualExperiment.from_registry`, `from_names` and `virtual_experiment`
+  take `user_data` (directory or `UserDataset`): the base registry is loaded,
+  the dataset overlaid, names resolved on the overlay, then any
+  `EnvironmentGrid` overlay applied. `user_dataset_id` and
+  `user_dataset_digest` are kept on the experiment and written to
+  `virtual_experiment_summary.json` and `output_manifest.json` (`null` without
+  user data). Exported from `fungal_model.api`, `fungal_model` and `fungmod`.
+- Generic: a missing parameter whose record carries a `measurement_request`
+  is suggested with that text by `assess_modelability` and the standard table
+  writer (`missing_item_suggestion`); shipped behaviour is unchanged.
+  `parameter_source_class` and mechanism maturity label the new maturities.
+- Docs: `docs/user-data.md` (in the nav), README subsection and public API
+  list, capability row, API reference section, changelog.
+
+Tests: `tests/test_user_data_import.py` (28 tests) with fixtures
+`tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on
+a user-defined aryl ester, estimates only: exploratory preflight modelable,
+scientific blocked, exploratory simulation degrades substrate and releases
+product) and `tests/fixtures/user_data/literature_reentry/` (the SABIO-RK
+Reaction 618 selected entry re-entered as literature values with design
+concentrations: scientific simulation satisfies the integrated
+Michaelis-Menten relation within a solver-tolerance bound and product equals
+twice the substrate consumed); a gap case; eleven validation cases plus
+collection of all issues at once; registry bytes unchanged; production-factory
+round trips; digest stability; the shipped registry's preflight suggestions
+unchanged. Guardrail tests now cover `api/user_data.py` (no-hardcoding,
+no-shortcuts, no organism/substrate/enzyme tokens), the public API lists the
+new names, and the reserved-key authoring test includes the new namespace.
+
+Not changed: no process law, solver, registry file, shipped record, output
+table schema (still `1.8.0`), simulation authorization rule or shipped
+preflight text. User data never reaches `data_registry`.
+
+Scientific impact: users can now simulate their own enzyme kinetics with
+provenance per value. Scientific mode on user data means exact inputs with
+the stated evidence types, not validation; FungMod does not verify user
+values against any source.
+
+Limitations: homogeneous Michaelis-Menten on dissolved substrates only; `kcat`
+and an enzyme concentration are required (no `vmax`, no activity units); no
+molar/mass conversion and mol/mol yields only; no response laws, cocktails,
+chains, time-course data or fitting; one substrate per substrate class for
+each enzyme class; the standard deviation is provenance, not a sampling
+distribution; a copied registry EC number makes EC resolution of enzyme
+classes ambiguous on the overlaid registry; no promotion into the shared
+registry.
+
+Recommended next task: accept `vmax` with an explicit, sourced enzyme amount
+or a specific-activity conversion record, then response-law tables
+(temperature and pH) bound through the existing template modifiers.
+
 ## SPATIAL-002 Axisymmetric Geometry, Colony Observables And The Cardinal Water-Activity Law
 
 Status: `complete` for the stated scope (2026-10-06); the first three items of
@@ -255,6 +538,97 @@ that colony solves are fast enough for calibration; then, once the owner
 supplies the De Ligne et al. 2019 time series and the Boswell 2003
 parameter table, a registry-parameterised *R. solani* case under a frozen
 plan comparing colony area and tip counts over time.
+
+## CRIT-004 Amendment 4: The M2 Chain From The Converged Fit And Its Holdout Posteriors
+
+Date: 2026-10-06
+
+Status: complete. The criticism plan's fourth dated amendment (digest
+`9897ab11...` to `7952e010...`) gives the soluble-product-pool chain the
+length and the starting point its first run lacked and gives the plan's
+holdout posteriors sampler settings and an output convention; both were run
+and recorded. The scientific outcome for M2 does not change: it improves
+the fit but its constants stay unidentified, and its chain still misses the
+convergence rule.
+
+Finding: the M2 all-condition chain re-run from the converged stage A fit
+(28 walkers, 36000 steps, 8000 burn-in, 7.7 hours across five resumed runs)
+does not converge by the declared rule. Its integrated autocorrelation times
+grew to 824 to 1393 steps (first chain: 368 to 529) against 28000
+post-burn-in steps, while every effective sample size (563 to 951) passes;
+mean acceptance 0.194; 431 641 of 1 008 028 posterior evaluations (43
+percent) failed to integrate and were rejected. The shared noise multiplier's
+interval is [1.63, 2.23] (median 1.89): below the baseline's 2.25, still
+excluding 1.0 (R2 fails). The added constants: `mu` bounded below only, `Ks`
+and `Ki` prior dominated, `P0` bounded below only (R3 fails). The nine
+common constants keep their BAYES-001 classes, which the first chain (yield
+0.18 at its centre) had degraded. Coverage with measurement noise 91 of 96.
+Outcome: improves fit but unidentified (R1, not R3), provisional.
+
+Holdout posteriors (amendment 4, recorded 2026-10-06): three M2 chains of 8000 steps (2000 burn-in, 28 walkers) with one cellulose loading held out of the likelihood, each centred on the fold's stage A fit; held-out posterior predictive coverage at 95 percent with measurement noise (400 draws): 10 g/L held out 22/32, 69 percent (biomass 8/8, substrate 8/8, FPase 2/8, beta-glucosidase 4/8; multiplier [1.23, 1.78]; acceptance 0.214; largest tau 500 of 6000 post-burn-in steps); 20 g/L held out 32/32, 100 percent (biomass 8/8, substrate 8/8, FPase 8/8, beta-glucosidase 8/8; multiplier [1.87, 2.90]; acceptance 0.182; largest tau 565 of 6000 post-burn-in steps); 30 g/L held out 19/32, 59 percent (biomass 5/8, substrate 8/8, FPase 3/8, beta-glucosidase 3/8; multiplier [1.26, 1.86]; acceptance 0.203; largest tau 491 of 6000 post-burn-in steps). No fold converges by the declared rule; the added constants keep their one-sided or prior-dominated classes in every fold. Verdict unchanged: improves fit but unidentified, provisional.
+
+Changed:
+
+- `data/benchmarks/gelain_2020_criticism/plan.json`: amendment 4
+  (`stage_B_posterior.sampler.model_overrides` for M2, `holdout_sampler`,
+  the compute cap); `tests/test_gelain_criticism_plan.py` pins the new digest
+  and the amendment chain, checks the override and the holdout settings and
+  the internal consistency of every `holdout_<condition>/` folder (held-out
+  condition recorded, fitted and held-out coverage kept apart).
+- `calibration/bayesian.py`: the posterior predictive and the coverage take
+  an explicit list of conditions that may include held-out ones and list
+  them in the output. `research/gelain_criticism.py`: `sampler_settings`
+  reads the per-model override and the holdout sampler; the study builder
+  takes a held-out condition, trains on the others, centres on that fold's
+  stage A fit, scores the held-out loading by coverage and records the
+  fitted and held-out ids and both coverages apart; the runner script gains
+  `--hold-out`.
+- `results/stage_b/M2_soluble_product_pool/`: the chain re-recorded (the
+  first chain's summary stays in CRIT-002 and CRIT-003);
+  `holdout_gelain_2020_cellulose_{10,20,30}gl/` (new).
+- `paper/tables/table_4_criticism_stage_b.{md,tex}` and both manifests
+  regenerated (the plan digest with amendment 4 enters the figure manifest);
+  `paper/paper.tex` (stage B paragraph and the limitations bullet);
+  `docs/gelain-model-criticism.md` (amendment 4, the M2 chain, the holdout
+  posteriors, the summary); the study README; `CHANGELOG.md`; the state
+  document (item 2).
+- Tests: `tests/test_bayesian_calibration.py` (toy held-out coverage lists
+  the held-out condition and scores it apart), `tests/test_gelain_criticism_study.py`
+  (the override and the holdout settings resolve from the plan; a tiny
+  holdout study end to end records the held-out id and both coverages).
+- `data/benchmarks/gelain_2020_petab/plan.json`: a second dated amendment
+  (`cfb8c9a6...` to `11dfe158...`) re-pins the criticism plan's digest; the
+  sections the PEtab study reads are unchanged, so it records
+  `results_remain_valid` and the PEtab results stand.
+  `tests/test_gelain_petab.py` pins the new digest and accepts a recorded
+  result only under a digest that every later amendment declares still
+  valid; the PEtab README and `docs/gelain-cross-solver.md` describe it.
+
+Not changed: any rule, bound, prior, error model or threshold of the plan;
+stage A; the M1 and M3 chains; BAYES-001; any registry record. Scientific
+impact: the M2 verdict stays "improves fit but unidentified (R1, not R3)"
+and provisional; the inadequacy factor it leaves is now 1.89 rather than
+1.94; the holdout posteriors add the per-fold coverage the plan declared.
+Backward compatibility: `posterior_predictive_coverage` and the study
+builder gain optional arguments; recorded M2 files are replaced under the
+amendment rule. Risk: low for code; the scientific finding is the point.
+
+Commands run (venv, Python 3.11): `ruff check src tests scripts/run_*.py
+scripts/reproduce_paper.py`; `pyright` (whole package); `mkdocs build
+--strict`; `python scripts/reproduce_paper.py tables` and `check`;
+`pytest` on the criticism, Bayesian, paper and hygiene modules; the M2
+chain (5 resumed runs) and three holdout chains through
+`scripts/run_gelain_2020_model_criticism.py stage-b`; results in the PR.
+
+Remaining ambiguities: 43 percent of the M2 chain's proposals failed to
+integrate; the sampler rejects them as non-finite, which is correct for the
+posterior but slows mixing, and the failing region of the added constants is
+not characterised. The M2 chain would need about 70000 post-burn-in steps
+for the rule if the autocorrelation did not grow further.
+
+Recommended next task: step 5 item 3, cross-study transfer, once the owner
+verifies a second dataset; until then the paper's limitations name the
+single dataset and the provisional M2 verdicts.
 
 ## PAPER-002 The Manuscript In LaTeX With Generated Table Fragments And PDF Figures
 

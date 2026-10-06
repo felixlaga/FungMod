@@ -1007,23 +1007,49 @@ class PosteriorStudy:
     problem: BayesianProblem
     settings: SamplerSettings
     center: dict[str, float]
+    held_out: tuple[ObservedCondition, ...] = ()
+    """Conditions the likelihood never saw; scored by held-out posterior predictive coverage (holdout posteriors)."""
 
 
 def sampler_settings(
-    plan: Mapping[str, Any], *, dimension: int, n_steps: int | None = None, burn_in: int | None = None, n_walkers: int | None = None
+    plan: Mapping[str, Any],
+    *,
+    dimension: int,
+    n_steps: int | None = None,
+    burn_in: int | None = None,
+    n_walkers: int | None = None,
+    model_id: str | None = None,
+    holdout: bool = False,
 ) -> SamplerSettings:
-    """Planned sampler settings; the walker count follows the plan's rule of at least two per dimension."""
+    """Planned sampler settings; the walker count follows the plan's rule of at least two per dimension.
 
-    spec = dict(plan["stage_B_posterior"]["sampler"])
-    criteria = plan["stage_B_posterior"]["identifiability"]
+    ``model_id`` applies the plan's declared per-model override of steps and
+    burn-in (``sampler.model_overrides``, amendment 4); ``holdout`` selects the
+    plan's ``holdout_sampler`` steps and burn-in instead. Explicit ``n_steps``
+    and ``burn_in`` arguments (development overrides) win over both.
+    """
+
+    stage = plan["stage_B_posterior"]
+    spec = dict(stage["sampler"])
+    criteria = stage["identifiability"]
     planned = int(spec["walkers"])
     minimum = 2 * int(dimension)
     minimum += minimum % 2
     walkers = int(n_walkers) if n_walkers is not None else max(planned, minimum)
+    declared_steps, declared_burn_in = int(spec["steps"]), int(spec["burn_in"])
+    if holdout:
+        holdout_spec = stage.get("holdout_sampler")
+        if holdout_spec is None:
+            raise CultureBenchmarkError("The plan declares no holdout_sampler block; holdout posteriors cannot run under it.")
+        declared_steps, declared_burn_in = int(holdout_spec["steps"]), int(holdout_spec["burn_in"])
+    elif model_id is not None:
+        override = spec.get("model_overrides", {}).get(model_id)
+        if override is not None:
+            declared_steps, declared_burn_in = int(override["steps"]), int(override["burn_in"])
     return SamplerSettings(
         n_walkers=walkers,
-        n_steps=int(n_steps if n_steps is not None else spec["steps"]),
-        burn_in=int(burn_in if burn_in is not None else spec["burn_in"]),
+        n_steps=int(n_steps if n_steps is not None else declared_steps),
+        burn_in=int(burn_in if burn_in is not None else declared_burn_in),
         seed=int(spec["seed"]),
         stretch_scale=float(spec["stretch_scale"]),
         initial_spread=float(spec["initial_spread_fraction_of_prior_width"]),
@@ -1044,15 +1070,29 @@ def build_posterior_study(
     n_steps: int | None = None,
     burn_in: int | None = None,
     n_walkers: int | None = None,
+    held_out: str | None = None,
 ) -> PosteriorStudy:
-    """Priors from the plan's bounds, the shared noise multiplier and the predictor for one model."""
+    """Priors from the plan's bounds, the shared noise multiplier and the predictor for one model.
+
+    With ``held_out`` (a condition id) the likelihood uses the other
+    conditions only and the study scores that condition by held-out posterior
+    predictive coverage: the plan's holdout posterior for one fold.
+    """
 
     plan = load_plan(root, plan_path)
     bayesian_plan = gelain_bayesian.load_plan(root)
     store = registry if registry is not None else load_registry(root / REGISTRY_INDEX)
     variant = model_variants(plan)[model_id]
     predictor = build_predictor(store, plan, model_id, bayesian_plan=bayesian_plan)
-    conditions = observed_conditions(root, plan)
+    every_condition = observed_conditions(root, plan)
+    excluded: tuple[ObservedCondition, ...] = ()
+    if held_out is not None:
+        excluded = tuple(condition for condition in every_condition if condition.condition_id == held_out)
+        if len(excluded) != 1:
+            raise CultureBenchmarkError(f"Unknown held-out condition {held_out!r}.")
+        if len(every_condition) < 2:
+            raise CultureBenchmarkError("A holdout posterior needs at least one training condition.")
+    conditions = [condition for condition in every_condition if condition.condition_id != held_out]
     source = f"{plan['benchmark_id']}: {plan['shared_structure']['priors']}"
     priors = [
         PriorSpecification(
@@ -1087,8 +1127,11 @@ def build_posterior_study(
     )
     full_center = dict(config_center)
     full_center[f"noise_scale:{noise['label']}"] = 1.0
-    settings = sampler_settings(plan, dimension=problem.dimension, n_steps=n_steps, burn_in=burn_in, n_walkers=n_walkers)
-    return PosteriorStudy(model_id, plan, predictor, problem, settings, full_center)
+    settings = sampler_settings(
+        plan, dimension=problem.dimension, n_steps=n_steps, burn_in=burn_in, n_walkers=n_walkers,
+        model_id=model_id, holdout=held_out is not None,
+    )
+    return PosteriorStudy(model_id, plan, predictor, problem, settings, full_center, held_out=excluded)
 
 
 CHECKPOINT_NAME = gelain_bayesian.CHECKPOINT_NAME
@@ -1150,7 +1193,17 @@ def sample_posterior_study(
     return combined
 
 
-def analyze_posterior_study(study: PosteriorStudy, run: EnsembleRun, *, with_predictive: bool = True) -> tuple[BayesianCalibrationResult, dict[str, Any] | None]:
+def analyze_posterior_study(
+    study: PosteriorStudy, run: EnsembleRun, *, with_predictive: bool = True, draws: int | None = None
+) -> tuple[BayesianCalibrationResult, dict[str, Any] | None]:
+    """Diagnostics, identifiability, posterior predictive bands and coverage for a sampled study.
+
+    For a holdout study the bands and the coverage also address the held-out
+    condition, listed under ``held_out`` in both outputs; its coverage is the
+    plan's held-out predictive check and is kept apart from the fitted-data
+    coverage. ``draws`` overrides the plan's draw count (development only).
+    """
+
     plan = study.plan
     stage = plan["stage_B_posterior"]
     result = analyze_run(
@@ -1165,13 +1218,16 @@ def analyze_posterior_study(study: PosteriorStudy, run: EnsembleRun, *, with_pre
     coverage = None
     if with_predictive:
         predictive_spec = stage["posterior_predictive"]
+        n_draws = int(draws if draws is not None else predictive_spec["draws"])
         grid = np.arange(0.0, 96.0 + 1e-9, 2.0)
+        scored = (*study.problem.conditions, *study.held_out)
         predictive = posterior_predictive(
             result,
-            times_by_condition={condition.condition_id: grid for condition in study.problem.conditions},
-            draws=int(predictive_spec["draws"]),
+            times_by_condition={condition.condition_id: grid for condition in scored},
+            draws=n_draws,
             quantiles=tuple(float(q) for q in predictive_spec["quantiles"]),
             seed=int(stage["sampler"]["seed"]),
+            conditions=scored,
         )
         result = BayesianCalibrationResult(
             problem=result.problem, run=result.run, settings=result.settings, criteria=result.criteria, source=result.source,
@@ -1179,9 +1235,13 @@ def analyze_posterior_study(study: PosteriorStudy, run: EnsembleRun, *, with_pre
             local_information=result.local_information, best_sample=result.best_sample, noise_evidence=result.noise_evidence,
             data_digest=result.data_digest, posterior_predictive=predictive, notes=result.notes,
         )
-        coverage = posterior_predictive_coverage(
-            result, draws=int(predictive_spec["draws"]), credible_mass=float(stage["identifiability"]["credible_mass"]), seed=int(stage["sampler"]["seed"])
-        )
+        credible_mass = float(stage["identifiability"]["credible_mass"])
+        seed = int(stage["sampler"]["seed"])
+        coverage = posterior_predictive_coverage(result, draws=n_draws, credible_mass=credible_mass, seed=seed)
+        if study.held_out:
+            coverage["held_out_coverage"] = posterior_predictive_coverage(
+                result, draws=n_draws, credible_mass=credible_mass, seed=seed, conditions=study.held_out
+            )
     return result, coverage
 
 
@@ -1197,6 +1257,8 @@ def write_posterior_outputs(
         "predictor": study.predictor.to_dict(),
         "data_sha256": result.data_digest,
         "center": study.center,
+        "fitted_conditions": [condition.condition_id for condition in study.problem.conditions],
+        "held_out_conditions": [condition.condition_id for condition in study.held_out],
     }
     inputs_path = output_dir / "inputs.json"
     inputs_path.write_text(json.dumps(inputs, indent=2, allow_nan=False) + "\n", encoding="utf-8")
@@ -1391,6 +1453,16 @@ def render_stage_b_report(
         )
     if verdicts is not None:
         lines.extend(["", *_verdict_lines(verdicts)])
+    if study.held_out:
+        lines.extend(
+            [
+                "",
+                "Holdout posterior: the likelihood used "
+                + ", ".join(f"`{condition.condition_id}`" for condition in study.problem.conditions)
+                + " only; " + ", ".join(f"`{condition.condition_id}`" for condition in study.held_out)
+                + " is held out and scored below by held-out posterior predictive coverage.",
+            ]
+        )
     if coverage is not None and "overall" in coverage:
         overall = coverage["overall"]
         lines.extend(
@@ -1403,6 +1475,18 @@ def render_stage_b_report(
         )
         for name, item in overall.items():
             lines.append(f"- {name}: {item['inside']}/{item['observations']} inside ({item['fraction']:.0%})")
+        held = coverage.get("held_out_coverage")
+        if held is not None and "overall" in held:
+            lines.extend(
+                [
+                    "",
+                    "Held-out posterior predictive coverage (" + ", ".join(f"`{name}`" for name in held.get("held_out", [])) + ", "
+                    f"{held['draws']} draws, {held.get('failed_draws', 0)} failed; the likelihood never saw these observations):",
+                    "",
+                ]
+            )
+            for name, item in held["overall"].items():
+                lines.append(f"- {name}: {item['inside']}/{item['observations']} inside ({item['fraction']:.0%})")
     lines.extend(["", "Claims excluded by the plan: " + "; ".join(plan["reporting"]["claims_excluded"]) + ".", ""])
     return "\n".join(lines)
 

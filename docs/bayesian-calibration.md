@@ -75,9 +75,11 @@ substitutes values into a config's inline parameters;
 from its resolved records so that an overridden symbol reaches every place the
 template binds it, including product-map coefficients derived from it.
 
-Jacobians are not part of this step: the compiled core still integrates with
-finite-difference Jacobians by the backend, the sampler is gradient-free, and
-the local information uses finite differences of the residuals.
+Jacobians are not part of this step: the compiled core integrates with the
+backend's finite-difference Jacobians unless a run opts into the compiled
+state Jacobian ([compiled core](compiled-core.md)), no parameter sensitivities
+are computed, the sampler is gradient-free, and the local information uses
+finite differences of the residuals.
 
 ## The recorded study: T. harzianum P49P11 on cellulose
 

@@ -30,6 +30,8 @@ from fungal_model.processes.base import (
 )
 
 THERMAL_INACTIVATION_PROCESS_TYPE = "thermal_inactivation"
+#: Environment conditions the law reads at run time; each must have one exact value.
+THERMAL_INACTIVATION_ENVIRONMENT_CONDITIONS = ("temperature",)
 
 
 @dataclass(frozen=True, init=False)
@@ -208,7 +210,7 @@ class ThermalInactivationProcess(Process):
                 "reference_temperature_symbol": self.reference_temperature_symbol,
                 "minimum_temperature_symbol": self.minimum_temperature_symbol,
                 "maximum_temperature_symbol": self.maximum_temperature_symbol,
-                "environment_conditions_read": ["temperature"],
+                "environment_conditions_read": list(THERMAL_INACTIVATION_ENVIRONMENT_CONDITIONS),
             }
         )
         return data

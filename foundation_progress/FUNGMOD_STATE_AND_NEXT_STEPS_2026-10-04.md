@@ -276,8 +276,14 @@ Ordered work, each with an exit gate:
    while M1 and M3 still fail it. M2's stage B posterior (unchanged,
    provisional) leaves its four constants prior dominated or bounded on one
    side, so its outcome is "improves fit but unidentified (R1, not R3)";
-   nothing restores adequacy. Gate still met with the provisional label; the
-   M2 chain centred on the new fit is the next study task.
+   nothing restores adequacy. Gate still met with the provisional label.
+   Re-recorded 2026-10-06 (CRIT-004, amendment 4): the M2 chain centred on
+   the converged fit with 36000 steps still misses the convergence rule
+   (autocorrelation times grew to 824 to 1393 steps); its multiplier
+   interval [1.63, 2.23] lies below the baseline's 2.25 and excludes 1.0,
+   its four constants stay bounded on one side or prior dominated, so the
+   outcome is unchanged and provisional; the plan's holdout posteriors ran
+   per fold (10 g/L held out 22/32, 69 percent, 20 g/L held out 32/32, 100 percent, 30 g/L held out 19/32, 59 percent; all three provisional). Gate still met with the provisional label.
 3. **Cross-study transfer from the literature (the intended headline).** Find a
    second published submerged cellulose-culture time course, preferring the
    same organism from another laboratory, then the same genus. Freeze the
@@ -370,8 +376,10 @@ with both panel readings and every limitation flagged
 comparison is declared in a frozen plan (COLONY-001,
 `docs/colony-comparison.md`): observation operators, error model, four
 held-out conditions, stages and decision rules, pinned by digest before any
-software or fit. Open: stage 0 of that plan (axisymmetric grid, operators,
-the cardinal water-activity law, the runner), then the fits; organism
+software or fit. Stage 0 is recorded (2026-10-06, under the plan's third
+amendment, which moved the radial wall to the dish and limited the symmetry
+comparison to the hours before tips reach the window walls): grid, solver
+and symmetry checks passed. Open: the fits (stage A); organism
 parameters from the literature (Boswell et al. 2003, *Rhizoctonia
 solani*); a sparse compiled Jacobian for calibration speed; lifting
 well-mixed process kernels per cell; registry and configured-workflow

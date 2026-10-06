@@ -24,6 +24,7 @@ from fungal_model.api.output_schema import (
     output_schema_document,
     table_fieldnames,
 )
+from fungal_model.api.user_data import USER_DATASET_PARAMETER_MATURITIES
 from fungal_model.registry.records import (
     ParameterRecord,
     RegistryRecord,
@@ -43,6 +44,7 @@ from fungal_model.screening.case_builder import (
     get_registry_process_assembler,
     select_registry_case_compatibility,
 )
+from fungal_model.screening.modelability import missing_item_suggestion
 from fungal_model.screening.parameter_resolution import (
     ExactTemplateParameterError,
     resolve_exact_template_parameter_records,
@@ -937,6 +939,8 @@ def _mechanism_maturity(process_type: str, role_records: Mapping[str, ParameterR
         return "software_tested_literature_parameterized"
     if "exploratory_prior" in maturities:
         return "software_tested_exploratory_parameterized"
+    if maturities <= USER_DATASET_PARAMETER_MATURITIES:
+        return "software_tested_user_supplied_parameterized"
     if maturities <= {"literature_processed", "calibrated"} and "calibrated" in maturities:
         return "software_tested_retrospectively_calibrated_unvalidated"
     return "software_tested_mixed_parameter_maturity"
@@ -2537,13 +2541,15 @@ def _case_template_suggested_experiment_rows(
 
 def _suggestion_for_missing_item(item: Any) -> str:
     if getattr(item, "item_type", "") == "parameter":
-        return f"Measure or curate {item.item_id} for the selected registry case."
+        return missing_item_suggestion(item)
     return f"Resolve missing or incompatible {item.item_type}: {item.item_id}."
 
 
 def _parameter_symbol_for_suggestion(suggestion: str, report: ModelabilityReport) -> str:
     for item in tuple(report.missing) + tuple(report.incompatible):
-        if item.item_type == "parameter" and item.item_id in suggestion:
+        if item.item_type != "parameter":
+            continue
+        if item.item_id in suggestion or item.details.get("measurement_request") == suggestion:
             return item.item_id
     return ""
 
@@ -2808,6 +2814,8 @@ def _parameter_source_class(record: ParameterRecord | None) -> str:
         return "unknown"
     if _is_exploratory_record(record):
         return "user_supplied_exploratory_prior"
+    if record.maturity in USER_DATASET_PARAMETER_MATURITIES:
+        return f"{record.maturity}_{'exact_value' if record.value.kind == 'exact' else 'range'}"
     if record.maturity == "literature_range" or record.value.kind == "range":
         return "literature_range"
     if record.maturity == "literature_processed" and record.value.kind == "exact":

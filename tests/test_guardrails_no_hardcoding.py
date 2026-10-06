@@ -14,6 +14,7 @@ GENERIC_SOURCE_PATHS = (
     "src/fungal_model/modifiers",
     "src/fungal_model/io",
     "src/fungal_model/workflows",
+    "src/fungal_model/api/user_data.py",
 )
 
 ALLOWED_DOMAIN_SPECIFIC_PATHS = (
@@ -78,6 +79,27 @@ def test_registry_case_builder_has_no_reaction_specific_onboarding_tokens() -> N
         "SABIO-RK",
     ):
         assert forbidden not in case_builder
+
+
+def test_user_data_import_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
+    user_data = (ROOT / "src" / "fungal_model" / "api" / "user_data.py").read_text(encoding="utf-8").lower()
+
+    for forbidden in (
+        "reaction_618",
+        "reaction 618",
+        "sabio",
+        "glucosidase",
+        "cellobiose",
+        "glucose",
+        "cellulose",
+        "cellulase",
+        "esterase",
+        "nitrophenyl",
+        "trichoderma",
+        "harzianum",
+        "oryza",
+    ):
+        assert forbidden not in user_data, forbidden
 
 
 def _python_files(paths: tuple[str, ...]) -> tuple[Path, ...]:

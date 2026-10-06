@@ -1,0 +1,2 @@
+strain_id,enzyme_class,evidence,source
+os3bglu6_source,beta_glucosidase,"purified recombinant enzyme kinetics (Os3BGlu6 expressed in Escherichia coli Origami (DE3))","SABIO-RK Reaction 618 selected kinetic law, EntryID 35622 (Seshadri et al. 2009, Plant Physiol, PubMed 19587102)"

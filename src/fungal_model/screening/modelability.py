@@ -5,6 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
+from fungal_model.processes.inactivation import (
+    THERMAL_INACTIVATION_ENVIRONMENT_CONDITIONS,
+    THERMAL_INACTIVATION_PROCESS_TYPE,
+)
+from fungal_model.processes.ionization import (
+    PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS,
+    PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE,
+)
 from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
@@ -270,6 +278,12 @@ def assess_modelability(
         incompatible.extend(selected["incompatible"])
         selected_required_parameters = tuple(selected["required_parameters"])
         selected_processes = (selected["compatibility"].process_type,)
+        condition_missing, condition_incompatible = _environment_condition_items(
+            process_type=selected["compatibility"].process_type,
+            environment=environment,
+        )
+        missing.extend(condition_missing)
+        incompatible.extend(condition_incompatible)
 
     status = _status(
         compatibility_records=tuple(compatibility_records),
@@ -439,12 +453,16 @@ def _classify_parameter(
         )
         return
     if record.value.is_unknown:
+        details: dict[str, Any] = {"record_id": record.record_id, "value": record.value.to_dict()}
+        request = record.provenance.get("measurement_request")
+        if isinstance(request, str) and request.strip():
+            details["measurement_request"] = request.strip()
         missing.append(
             _item(
                 "parameter",
                 record.parameter_symbol,
                 "Required parameter is explicitly unknown.",
-                {"record_id": record.record_id, "value": record.value.to_dict()},
+                details,
             )
         )
         return
@@ -540,6 +558,45 @@ def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
 
 
+#: Environment conditions each process law reads at run time, as the law
+#: modules declare them. The law needs one value per run, so a range, a
+#: distribution or an unknown here would fail every simulation sample.
+PROCESS_ENVIRONMENT_CONDITIONS: Mapping[str, tuple[str, ...]] = {
+    PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE: PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS,
+    THERMAL_INACTIVATION_PROCESS_TYPE: THERMAL_INACTIVATION_ENVIRONMENT_CONDITIONS,
+}
+
+
+def _environment_condition_items(*, process_type: str, environment: Any) -> tuple[list[ReportItem], list[ReportItem]]:
+    missing: list[ReportItem] = []
+    incompatible: list[ReportItem] = []
+    for condition in PROCESS_ENVIRONMENT_CONDITIONS.get(process_type, ()):
+        value = environment.conditions.get(condition)
+        item_id = f"{environment.record_id}:{condition}"
+        if value is None or value.is_unknown:
+            missing.append(
+                _item(
+                    "environment_condition",
+                    item_id,
+                    f"Process law {process_type!r} reads the environment condition {condition!r}, "
+                    "which this environment does not give.",
+                    {"process_type": process_type, "condition": condition},
+                )
+            )
+        elif value.kind != "exact":
+            incompatible.append(
+                _item(
+                    "environment_condition",
+                    item_id,
+                    f"Process law {process_type!r} reads the environment condition {condition!r}, which is a "
+                    f"{value.kind} in this environment; the law needs one value per run. Use an environment "
+                    f"with an exact {condition}, or an EnvironmentGrid point.",
+                    {"process_type": process_type, "condition": condition, "value": value.to_dict()},
+                )
+            )
+    return missing, incompatible
+
+
 def _status(
     *,
     compatibility_records: tuple[ProcessCompatibilityRecord, ...],
@@ -562,8 +619,22 @@ def _suggested_experiments(missing: list[ReportItem]) -> tuple[str, ...]:
     suggestions: list[str] = []
     for item in missing:
         if item.item_type == "parameter":
-            suggestions.append(f"Measure or curate {item.item_id} for the selected registry case.")
+            suggestions.append(missing_item_suggestion(item))
     return tuple(dict.fromkeys(suggestions))
+
+
+def missing_item_suggestion(item: ReportItem) -> str:
+    """Return the suggested experiment for one missing parameter item.
+
+    A parameter record that states its own ``measurement_request`` (carried in
+    the item details) is quoted verbatim; otherwise the generic sentence names
+    the parameter symbol.
+    """
+
+    request = item.details.get("measurement_request")
+    if isinstance(request, str) and request.strip():
+        return request.strip()
+    return f"Measure or curate {item.item_id} for the selected registry case."
 
 
 def _validate_mode(mode: str) -> None:
@@ -586,4 +657,5 @@ __all__ = [
     "ModelabilityStatus",
     "ReportItem",
     "assess_modelability",
+    "missing_item_suggestion",
 ]

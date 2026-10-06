@@ -17,8 +17,15 @@ and its reason. Amendment 1 made the area operator's detection density a
 grid-independent constant. Amendments 2 and 3 followed recorded stage 0 checks
 that failed, and the superseded records are kept as their evidence
 (`results/stage_0_superseded_ea6e2e72/`, `results/stage_0_superseded_ca0e016c/`).
-The stage 0 software exists (SPATIAL-002); stage 0 is re-recorded under
-amendment 3, and no fit has been run. Nothing on this page is a result.
+The stage 0 software is the study module
+`fungal_model.research.colony_comparison` with its runner
+`scripts/run_de_ligne_2019_colony_comparison.py` (plan and dataset digest
+checks, the per-series error-model fit, the `colony_reserve_v1` model on
+either geometry, the two observables and `run_stage_0`), on the axisymmetric
+grid, observation operators and cardinal water-activity law of SPATIAL-002.
+Stage 0 is recorded under amendment 3 in `results/stage_0/` and passed all
+three checks (see "Stage 0 record" below); no fit has been run. Nothing on
+this page is a fit result.
 
 ## The question
 
@@ -174,6 +181,37 @@ No model term, parameter, bound, operator, hold-out, stage or decision rule
 changed. The cartesian reference is costly: about 4 minutes at 0.5 mm and
 several hours at 0.25 mm, because the stiff two-dimensional solve
 refactorises a 102 400-state sparse Jacobian.
+
+## Stage 0 record
+
+Recorded 2026-10-06 under amendment 3 (plan digest `2ce70b6b...`) in
+`results/stage_0/` (`inputs.json`, `checks.json`, `error_models.json`), as
+declared: 450 radial cells of 0.1 mm to the 45 mm dish wall, the stage 0
+check values (artificial, declared for the checks only, no estimate of either
+species) and the 62 output hours. `scripts/run_de_ligne_2019_colony_comparison.py
+check` recomputes the error models and verifies the digests.
+
+| Check | Largest relative difference | Threshold | Verdict |
+| --- | --- | --- | --- |
+| Grid: 0.1 mm against 0.05 mm radial cells, 62 h | 4.0e-5 (tip count), 0.0054 (area) | 0.02 | passed |
+| Solver: LSODA against BDF, 62 h | 1.7e-8 (tip count), 0 (area) | 0.005 | passed |
+| Symmetry: radial against the 0.25 mm cartesian window reference, hours 1 to 12 | 0.026 (tip count), 0.016 (area) | 0.03 | passed |
+
+The symmetry comparison covered the twelve leading hours at which at most
+0.1 percent of the radial tips lay beyond the window half side (7.6e-4 at
+12 h, 1.5e-3 at 13 h). An independent probe at the same settings gave the
+same differences, and showed that the tip-count difference at 12 and 14 h
+(0.027 and 0.053) is the same at 0.5 and 0.25 mm cells: it comes from tips
+reflected by the cartesian reference's non-physical walls, not from the
+discretisation, which is what the comparison window excludes. The radial
+model takes 0.8 s per condition over 62 h (1972 right-hand sides); the 0.25 mm
+cartesian reference took 4.1 hours. The error models: 17 of 32 *C. puteana*
+and 23 of 32 *R. solani* series are pooled for having too few readable rows.
+
+Passing stage 0 means the software is fit for the comparison: the radial
+reduction is converged and agrees with the two-dimensional model while the
+colony is inside the window. It says nothing about either fungus. Stage A
+(the fits) has not been run.
 
 ## What it is not
 

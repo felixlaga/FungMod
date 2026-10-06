@@ -14,6 +14,8 @@ from fungal_model import (
     Parameter,
     ParameterSet,
     SourceProviderError,
+    UserDataError,
+    UserDataset,
     VirtualExperiment,
     VirtualExperimentError,
     environment_grid,
@@ -22,6 +24,7 @@ from fungal_model import (
     load_parameter_set,
     load_product_map,
     load_substrate,
+    load_user_dataset,
     run_configured_model,
     source_proposal,
     virtual_experiment,
@@ -68,6 +71,9 @@ RESEARCHER_PUBLIC_API = {
     "VirtualExperimentError": VirtualExperimentError,
     "source_proposal": source_proposal,
     "SourceProviderError": SourceProviderError,
+    "load_user_dataset": load_user_dataset,
+    "UserDataset": UserDataset,
+    "UserDataError": UserDataError,
 }
 
 PET_PLUGIN_ONLY_NAMES = (
@@ -107,6 +113,8 @@ def test_current_researcher_public_api_is_exported() -> None:
         "DegradationScreenResult",
         "VirtualExperimentError",
         "SourceProviderError",
+        "UserDataset",
+        "UserDataError",
     }
     for name, expected in RESEARCHER_PUBLIC_API.items():
         assert name in fungal_model.__all__

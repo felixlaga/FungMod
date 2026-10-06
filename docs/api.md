@@ -10,6 +10,15 @@
         - VirtualExperimentError
         - virtual_experiment
 
+## User-supplied data
+
+::: fungal_model.api.user_data
+    options:
+      members:
+        - load_user_dataset
+        - UserDataset
+        - UserDataError
+
 ## Environment grids
 
 ::: fungal_model.api.environment_grid

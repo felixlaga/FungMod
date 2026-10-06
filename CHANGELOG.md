@@ -6,6 +6,32 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Colony comparison stage 0 recorded (COLONY-002) under the plan's third
+  dated amendment, before any fit: the radial domain ends at a 9 cm dish wall
+  (a declared assumption), the 40 mm scan window is declared separately, and
+  the symmetry check compares the radial model with a 0.25 mm cartesian
+  reference over the hours before the radial tips reach the window walls.
+  Grid (4.0e-5, 0.0054), solver (1.7e-8) and symmetry (0.026, 0.016 against
+  0.03) checks passed; the two superseded stage 0 records are kept as the
+  evidence for amendments 2 and 3. `tip_fraction_beyond_radius` and the
+  plan-declared window and symmetry window in the study module. No fit.
+- User-supplied enzyme and kinetics tables into virtual experiments
+  (USERDATA-001): `load_user_dataset` reads a directory with
+  `user_dataset.yml` and CSV tables of strains, enzyme classes, substrates,
+  conditions and kinetics, collects every validation issue (file, row, column,
+  message) into one `UserDataError`, and returns a `UserDataset` of
+  `<dataset_id>__`-namespaced production registry mappings with a SHA-256
+  digest. `VirtualExperiment.from_registry`, `from_names` and
+  `virtual_experiment` take `user_data=` and overlay the records in memory
+  before name resolution; the summary and output manifest record
+  `user_dataset_id` and `user_dataset_digest`. Evidence types map to the
+  maturities `user_measured`, `user_reported_literature`, `user_design_value`
+  and `exploratory_prior`; missing roles become `user_dataset_gap` unknowns
+  whose `measurement_request` provenance preflight now quotes as the suggested
+  experiment. `fungmod_user_dataset` is a reserved provenance namespace.
+  Homogeneous Michaelis-Menten on dissolved substrates only
+  (`docs/user-data.md`).
+
 - Axisymmetric grid geometry for the spatial mycelium core, colony observables
   (counts outside an inoculum disc, window-truncated hull radius and area) and the
   Rosso and Robinson cardinal water-activity law and modifier (SPATIAL-002);
@@ -36,6 +62,17 @@ All notable public releases of FungMod are documented here.
   the pulled-front speed of the Edelstein system, conservation, symmetry,
   solver agreement and two unit systems (`docs/spatial-mycelium.md`). No
   organism parameters and no colony data yet.
+- Gelain model-criticism study, amendment 4 (CRIT-004): the
+  `M2_soluble_product_pool` all-condition posterior is re-recorded from the
+  converged stage A fit with 36000 steps (still not converged; multiplier
+  interval [1.63, 2.23], added constants bounded on one side or prior
+  dominated, outcome unchanged and provisional), and the plan's holdout
+  posteriors run per fold through `run_gelain_2020_model_criticism.py
+  stage-b --hold-out` with the held-out loading scored by posterior
+  predictive coverage (held-out coverage 22/32, 69 percent with 10 g/L held out, 32/32, 100 percent with 20 g/L held out, 19/32, 59 percent with 30 g/L held out, none of the three fold chains converged). `posterior_predictive_coverage`
+  takes an explicit condition list; table 4 and the manifests regenerated.
+  The PEtab cross-solver plan re-pins the amended criticism plan in a second
+  dated amendment that keeps its recorded results valid.
 - The software paper is a LaTeX manuscript, `paper/paper.tex` (it replaces
   the Markdown draft; `make paper-pdf` builds it with latexmk). The paper
   tables are now also written as LaTeX fragments (`paper/tables/*.tex`,
@@ -264,6 +301,14 @@ All notable public releases of FungMod are documented here.
 
 ### Changed
 
+- README and documentation accuracy audit (DOCS-001): the README's current
+  limitations now describe the implemented temperature and pH laws, thermal
+  inactivation, posterior sampling, the compiled culture closures, the
+  exploratory spatial mycelium and the runnable organism records; the
+  cross-solver summary reports the recorded `reproduced` outcome; the source
+  proposal example selects entry 35622 so the review step runs; the capability
+  map, compiled-core, colony, quickstart, user-guide, standards, install and
+  paper pages were corrected against the code. Documentation only.
 - Gelain model-criticism stage A (`fungal_model.research.gelain_criticism`):
   the least-squares optimiser reads its finite-difference step, tolerances
   and restart rule from the plan's new `stage_A_least_squares.optimiser`
@@ -311,6 +356,18 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- SABIO-RK proposals gave every parameter of one type the same proposed symbol
+  when its species did not distinguish them, so the four pKa values of a
+  pH-dependent kinetic law collided (`proposed_sabiork_parameter_618_38522_pka`)
+  and the whole Reaction 618 proposal could not be reviewed. The SABIO-RK
+  parameter name now completes such symbols (`pka_pke1`, `pka_pkes2`); symbols
+  whose name adds nothing are unchanged (FIX-DOCS001).
+- Preflight reported the pH-ionization Michaelis-Menten case as modelable in an
+  environment whose pH is a range, after which every simulation sample failed.
+  Preflight now checks the environment conditions each process law reads
+  (`PROCESS_ENVIRONMENT_CONDITIONS`: pH for the ionization law, temperature for
+  thermal inactivation) and reports a range or unknown as blocking, with the
+  remedy (FIX-DOCS001).
 - Importing the COPASI stack through `fungal_model.standards.copasi` no longer
   leaves the process in the C locale. COPASI's static initialiser calls
   `setlocale(LC_ALL, "C")`, which switched Python's preferred text encoding to

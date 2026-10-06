@@ -17,12 +17,13 @@ independent and validates no biology.
   sampling, identifiability, posterior predictive coverage), the decision rules
   R1 to R4, the outcome vocabulary, the claims excluded and the amendment rule.
   Frozen on 2026-10-05; current SHA-256
-  `9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7` after
-  three dated amendments (machine-readable error-model fields; the walker
+  `7952e010b55f55887e22025c22a192fb1c7f2eb3f61fc130b71af2a019a98672` after
+  four dated amendments (machine-readable error-model fields; the walker
   rule; the stage A optimiser settings added after PETAB-001 found the
   optimiser stopping above the minimum: log-space difference step 1e-3,
-  tolerances 1e-10, up to three restarts). `tests/test_gelain_criticism_plan.py`
-  pins it.
+  tolerances 1e-10, up to three restarts; the M2 all-condition sampler
+  override, the holdout sampler and its output convention, and the 12 hour
+  cap for that chain). `tests/test_gelain_criticism_plan.py` pins it.
 - `results/stage_a/`: re-recorded 2026-10-05 under amendment 3 (the
   declared optimiser; `inputs.json` records the settings, every fit records
   its starts and restarts; per-model `full_fit_*.json`, `folds_*.json`,
@@ -38,13 +39,19 @@ independent and validates no biology.
 - `results/stage_b/<model>/`: all-condition posteriors as they complete
   (`bayesian_calibration.json`, thinned `posterior_samples.csv`,
   `coverage.json`, `verdicts.json` with R1 to R3 and the outcome,
-  `report.md`, `inputs.json`, `artifacts.json`). M2 recorded 2026-10-05: not
-  converged by the declared rule, so its verdicts are provisional; R2 and R3
-  fail (multiplier [1.65, 2.87]; `mu`, `Ks`, `Ki` prior dominated, `P0`
-  bounded below only); outcome improves fit but unidentified (R1, not R3)
-  after its R1 component was refreshed against the amendment 3 stage A
-  screen (the chain itself, centred on the first stage A fit, was not
-  re-run). M1 recorded
+  `report.md`, `inputs.json`, `artifacts.json`). M2 re-recorded 2026-10-06
+  under amendment 4 (centred on the converged stage A fit, 36000 steps,
+  8000 burn-in): still not converged by the declared rule (autocorrelation
+  times 824 to 1393 steps against 28000 post-burn-in), so its verdicts are
+  provisional; R2 and R3 fail (multiplier [1.63, 2.23]; `mu` and `P0`
+  bounded below only, `Ks` and `Ki` prior dominated); outcome improves fit
+  but unidentified (R1, not R3). The first M2 chain (2026-10-05, centred on
+  the superseded fit, multiplier [1.65, 2.87]) is summarised in the ledger
+  (CRIT-002, CRIT-003). `holdout_<condition>/` under the M2 folder: the
+  plan's per-fold posteriors (8000 steps, 2000 burn-in, likelihood on the
+  two training loadings, centred on the fold's stage A fit) with the
+  fitted-data and the held-out coverage kept apart (recorded 2026-10-06: held-out coverage 22/32, 69 percent for 10 g/L, 32/32, 100 percent for 20 g/L, 19/32, 59 percent for 30 g/L; no fold chain converged).
+  M1 recorded
   2026-10-05: not converged, provisional; R2 fails (multiplier [1.87, 2.53]),
   R3 passes (`kz_loss` weakly identified); outcome not supported (fails R1).
   M3 recorded 2026-10-05: not converged, provisional; R2 fails (multiplier
