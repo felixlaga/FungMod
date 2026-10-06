@@ -14,10 +14,18 @@ parameter record carries the reserved ``fungmod_user_dataset`` provenance
 namespace (dataset, digest, file and row). Nothing is written to the shared
 registry: ``UserDataset.overlay`` returns a new in-memory registry.
 
-Scope of this increment: dissolved substrates, enzyme-explicit homogeneous
-Michaelis-Menten kinetics (``km``, ``kcat``, initial substrate and enzyme
-concentrations), stoichiometric products with an explicit mol/mol yield, and
-conditions stated as temperature and pH without any response law.
+Scope: dissolved substrates and homogeneous Michaelis-Menten kinetics in one
+of two rate forms per enzyme class and substrate, either ``kcat`` with an
+enzyme concentration or a maximum rate ``Vmax`` for the simulated system.
+``Vmax`` comes from exactly one route per case: an explicit ``vmax`` row, a
+specific activity times an enzyme loading (a derived record whose maturity is
+the weaker input's), or an assay activity measured on the case substrate at
+saturation. Products are stoichiometric with an explicit mol/mol yield. An
+optional ``responses.csv`` binds the parameters of an existing temperature or
+pH response law (cardinal temperature, cardinal pH, Arrhenius) to a strain,
+enzyme class and substrate; the law enters the generated case template as a
+process modifier, and the kinetic constants of that case must be stated at the
+law's reference condition.
 """
 
 from __future__ import annotations
@@ -37,6 +45,8 @@ from typing import Any, TypeVar, cast
 import yaml
 
 from fungal_model.core.units import Q_, units_are_compatible
+from fungal_model.kinetics.arrhenius import arrhenius_reference_scaled_rate
+from fungal_model.kinetics.cardinal import cardinal_ph_activity, cardinal_temperature_activity
 from fungal_model.provenance import USER_DATASET_PROVENANCE_KEY
 from fungal_model.registry.loaders import (
     RegistryLoadError,
@@ -63,7 +73,14 @@ from fungal_model.registry.records import (
 from fungal_model.registry.resolver import AmbiguousResolutionError, RegistryResolver, ResolutionError
 from fungal_model.registry.store import FungModRegistry, RegistryValidationError
 from fungal_model.resources import default_registry_path
-from fungal_model.screening.case_builder import HOMOGENEOUS_MM_PARAMETER_ROLES
+from fungal_model.screening.case_builder import (
+    HOMOGENEOUS_MM_PARAMETER_ROLES,
+    HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES,
+)
+from fungal_model.screening.template_environment_modifiers import (
+    ENVIRONMENT_MODIFIER_CONDITIONS,
+    ENVIRONMENT_MODIFIER_TYPES,
+)
 
 _RecordT = TypeVar("_RecordT", bound=RegistryRecord)
 
@@ -86,6 +103,7 @@ USER_DATASET_PARAMETER_MATURITIES = frozenset(
 )
 
 EVIDENCE_TYPES = ("measured", "literature", "design", "estimate")
+RESPONSE_EVIDENCE_TYPES = ("measured", "literature", "estimate")
 _EVIDENCE_MATURITY = {
     "measured": USER_DATASET_MATURITY_MEASURED,
     "literature": USER_DATASET_MATURITY_LITERATURE,
@@ -93,21 +111,78 @@ _EVIDENCE_MATURITY = {
     "estimate": USER_DATASET_MATURITY_ESTIMATE,
 }
 _EVIDENCE_REQUIRES_METHOD = frozenset({"measured", "literature", "design"})
+# Weakest first. A record derived from several user rows, and every parameter
+# of one response law, takes the weakest maturity of its inputs.
+USER_DATASET_MATURITY_ORDER = (
+    USER_DATASET_MATURITY_ESTIMATE,
+    USER_DATASET_MATURITY_DESIGN,
+    USER_DATASET_MATURITY_LITERATURE,
+    USER_DATASET_MATURITY_MEASURED,
+)
+_MATURITY_ORDER_TEXT = " < ".join(USER_DATASET_MATURITY_ORDER)
 
-KINETIC_QUANTITIES = ("km", "kcat", "substrate_initial_concentration", "enzyme_concentration")
+KINETIC_QUANTITIES = (
+    "km",
+    "kcat",
+    "substrate_initial_concentration",
+    "enzyme_concentration",
+    "vmax",
+    "specific_activity",
+    "enzyme_loading",
+    "assay_activity",
+)
 _QUANTITY_ROLE = {
     "km": "km",
     "kcat": "kcat",
     "substrate_initial_concentration": "substrate_initial_concentration",
     "enzyme_concentration": "enzyme_initial_concentration",
+    "vmax": "vmax",
 }
-_UNSUPPORTED_RATE_QUANTITIES = frozenset({"vmax", "enzyme_activity"})
+_ROLE_QUANTITY = {role: quantity for quantity, role in _QUANTITY_ROLE.items()}
 _CONCENTRATION_QUANTITIES = ("substrate_initial_concentration", "km", "enzyme_concentration")
+# Quantities that are kinetic constants measured at a condition; a bound
+# response law rescales them, so they must be stated at its reference condition.
+_KINETIC_CONSTANT_QUANTITIES = frozenset({"km", "kcat", "vmax", "specific_activity", "assay_activity"})
 _YIELD_BASIS = "mol/mol"
 _UNKNOWN_CELL = "unknown"
+_YES = "yes"
+_NO = "no"
+
+# Rate forms of homogeneous Michaelis-Menten kinetics and the quantities each
+# generates records for, in record order.
+RATE_FORM_KCAT = "kcat_enzyme"
+RATE_FORM_VMAX = "vmax"
+_FORM_QUANTITIES = {
+    RATE_FORM_KCAT: tuple(_ROLE_QUANTITY[role] for role in HOMOGENEOUS_MM_PARAMETER_ROLES),
+    RATE_FORM_VMAX: tuple(_ROLE_QUANTITY[role] for role in HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES),
+}
+_KCAT_FORM_QUANTITIES = ("kcat", "enzyme_concentration")
+# Routes to Vmax; one case uses exactly one.
+VMAX_ROUTES = ("vmax", "specific_activity", "assay_activity")
+_VMAX_ROUTE_QUANTITIES = {
+    "vmax": ("vmax",),
+    "specific_activity": ("specific_activity", "enzyme_loading"),
+    "assay_activity": ("assay_activity",),
+}
+_QUANTITY_VMAX_ROUTE = {
+    quantity: route for route, quantities in _VMAX_ROUTE_QUANTITIES.items() for quantity in quantities
+}
+_VMAX_ROUTE_LABEL = {
+    "vmax": "an explicit vmax row",
+    "specific_activity": "specific_activity x enzyme_loading",
+    "assay_activity": "a saturating assay_activity on the case substrate",
+}
+_ACTIVITY_COLUMNS = ("activity_substrate", "activity_saturating")
+_RETIRED_QUANTITY_HINTS = {
+    "enzyme_activity": (
+        "quantity 'enzyme_activity' is ambiguous; use specific_activity (amount per time per enzyme mass, "
+        "with an enzyme_loading row) or assay_activity (amount per time per volume of the simulated system, "
+        "measured on the case substrate at saturation)."
+    ),
+}
 
 _REQUIRED_TABLES = ("strains.csv", "enzymes.csv", "substrates.csv", "conditions.csv", "kinetics.csv")
-_OPTIONAL_TABLES = ("enzyme_classes.csv",)
+_OPTIONAL_TABLES = ("enzyme_classes.csv", "responses.csv")
 _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "strains.csv": (("strain_id", "name"), ("scientific_name", "aliases")),
     "enzymes.csv": (("strain_id", "enzyme_class", "evidence", "source"), ()),
@@ -122,7 +197,11 @@ _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "conditions.csv": (("condition_id", "temperature", "temperature_units", "ph"), ("notes",)),
     "kinetics.csv": (
         ("strain_id", "enzyme_class", "substrate_id", "condition_id", "quantity", "units", "evidence_type", "source"),
-        ("value", "lower", "upper", "method", "sd", "replicates"),
+        ("value", "lower", "upper", "method", "sd", "replicates", *_ACTIVITY_COLUMNS),
+    ),
+    "responses.csv": (
+        ("strain_id", "enzyme_class", "substrate_id", "law", "parameter", "value", "units", "evidence_type", "source"),
+        ("method", "reference_tolerance", "kinetics_at_reference"),
     ),
 }
 _TABLES_WITH_ROWS_REQUIRED = ("strains.csv", "enzymes.csv", "substrates.csv", "conditions.csv")
@@ -139,6 +218,105 @@ _MOLAR_REFERENCE_UNITS = "mol / liter"
 _MASS_REFERENCE_UNITS = "gram / liter"
 _RATE_CONSTANT_REFERENCE_UNITS = "1 / second"
 _TIME_REFERENCE_UNITS = "second"
+_MOLAR_RATE_REFERENCE_UNITS = "mol / liter / second"
+_MASS_RATE_REFERENCE_UNITS = "gram / liter / second"
+_SPECIFIC_ACTIVITY_REFERENCE_UNITS = "mol / second / gram"
+_TEMPERATURE_REFERENCE_UNITS = "kelvin"
+_DIMENSIONLESS_REFERENCE_UNITS = "dimensionless"
+_MOLAR_ENERGY_REFERENCE_UNITS = "joule / mole"
+
+
+@dataclass(frozen=True)
+class ResponseLawParameter:
+    """One parameter of an importable environment-response law."""
+
+    name: str
+    label: str
+    reference_units: str
+    dimension_text: str
+
+
+@dataclass(frozen=True)
+class ResponseLaw:
+    """An existing environment-response law that ``responses.csv`` may bind.
+
+    ``law`` is the process-modifier type the case-template machinery already
+    implements; ``parameters`` are its template roles, each bound through the
+    modifier field ``<name>_role``; ``reference_parameter`` names the parameter
+    at whose value the law's activity is one, so kinetic constants scaled by
+    the law must be stated there.
+    """
+
+    law: str
+    label: str
+    parameters: tuple[ResponseLawParameter, ...]
+    reference_parameter: str
+    formula: str
+
+    @property
+    def condition(self) -> str:
+        return ENVIRONMENT_MODIFIER_CONDITIONS[self.law]
+
+    @property
+    def parameter_names(self) -> tuple[str, ...]:
+        return tuple(parameter.name for parameter in self.parameters)
+
+    def parameter(self, name: str) -> ResponseLawParameter:
+        return next(parameter for parameter in self.parameters if parameter.name == name)
+
+
+def _temperature_parameter(name: str, label: str) -> ResponseLawParameter:
+    return ResponseLawParameter(name, label, _TEMPERATURE_REFERENCE_UNITS, "a temperature (degC or kelvin)")
+
+
+def _ph_parameter(name: str, label: str) -> ResponseLawParameter:
+    return ResponseLawParameter(name, label, _DIMENSIONLESS_REFERENCE_UNITS, "a pH value (units dimensionless)")
+
+
+RESPONSE_LAWS: Mapping[str, ResponseLaw] = MappingProxyType(
+    {
+        law.law: law
+        for law in (
+            ResponseLaw(
+                law="temperature_cardinal_rosso",
+                label="cardinal temperature law (Rosso CTMI)",
+                parameters=(
+                    _temperature_parameter("minimum_temperature", "minimum temperature"),
+                    _temperature_parameter("optimum_temperature", "optimum temperature"),
+                    _temperature_parameter("maximum_temperature", "maximum temperature"),
+                ),
+                reference_parameter="optimum_temperature",
+                formula="rate(T) = rate(T_opt) x gamma_T(T); gamma_T is one at T_opt and zero at and beyond T_min and T_max",
+            ),
+            ResponseLaw(
+                law="ph_cardinal_rosso",
+                label="cardinal pH law (Rosso CPM)",
+                parameters=(
+                    _ph_parameter("minimum_ph", "minimum pH"),
+                    _ph_parameter("optimum_ph", "optimum pH"),
+                    _ph_parameter("maximum_ph", "maximum pH"),
+                ),
+                reference_parameter="optimum_ph",
+                formula="rate(pH) = rate(pH_opt) x gamma_pH(pH); gamma_pH is one at pH_opt and zero at and beyond pH_min and pH_max",
+            ),
+            ResponseLaw(
+                law="temperature_arrhenius_reference",
+                label="Arrhenius reference-temperature law",
+                parameters=(
+                    ResponseLawParameter(
+                        "activation_energy",
+                        "activation energy",
+                        _MOLAR_ENERGY_REFERENCE_UNITS,
+                        "an energy per amount (for example kJ/mol)",
+                    ),
+                    _temperature_parameter("reference_temperature", "reference temperature"),
+                ),
+                reference_parameter="reference_temperature",
+                formula="rate(T) = rate(T_ref) x exp(-Ea / R x (1/T - 1/T_ref))",
+            ),
+        )
+    }
+)
 
 _RECORD_TYPES = (
     "fungi",
@@ -421,10 +599,41 @@ class _Kinetics:
     source: str
     sd: float | None
     replicates: int | None
+    activity_substrate: str = ""
+    activity_saturating: str = ""
 
     @property
     def case_key(self) -> tuple[str, str, str, str]:
         return (self.strain_id, self.class_key, self.substrate_id, self.condition_id)
+
+    @property
+    def pair_key(self) -> tuple[str, str]:
+        return (self.class_key, self.substrate_id)
+
+    @property
+    def is_exact(self) -> bool:
+        return self.value is not None
+
+
+@dataclass(frozen=True)
+class _Response:
+    row: int
+    strain_id: str
+    class_key: str
+    substrate_id: str
+    law: str
+    parameter: str
+    value: float
+    units: str
+    evidence_type: str
+    method: str
+    source: str
+    reference_tolerance: float | None
+    kinetics_at_reference: bool
+
+    @property
+    def binding_key(self) -> tuple[str, str, str]:
+        return (self.strain_id, self.class_key, self.substrate_id)
 
 
 @dataclass
@@ -435,6 +644,11 @@ class _Parsed:
     substrates: dict[str, _Substrate]
     conditions: dict[str, _Condition]
     kinetics: list[_Kinetics]
+    responses: list[_Response] = field(default_factory=list)
+    # (class, substrate) -> rate form, set by cross-validation; absent when no case started a form.
+    pair_forms: dict[tuple[str, str], str] = field(default_factory=dict)
+    # (strain, class, substrate) -> law -> parameter -> row, set by cross-validation for valid laws.
+    laws: dict[tuple[str, str, str], dict[str, dict[str, _Response]]] = field(default_factory=dict)
 
 
 @dataclass
@@ -474,8 +688,7 @@ def _read_dataset_files(directory: Path, issues: list[dict[str, Any]]) -> dict[s
                     None,
                     None,
                     f"Unsupported table {entry.name!r} in this version; supported tables are "
-                    f"{', '.join(sorted(known))}. Response laws, time-course responses and other "
-                    "tables are not imported yet.",
+                    f"{', '.join(sorted(known))}. Time-course data and other tables are not imported yet.",
                 )
             )
     if USER_DATASET_MANIFEST not in raw:
@@ -648,6 +861,20 @@ def _parse_rows(tables: Mapping[str, _Table | None], context: _Context) -> _Pars
         resolver=resolver,
         context=context,
     )
+    responses_table = tables.get("responses.csv")
+    responses = (
+        []
+        if responses_table is None
+        else _parse_responses(
+            responses_table,
+            strains=strains,
+            classes=classes,
+            strain_classes=strain_classes,
+            substrates=substrates,
+            resolver=resolver,
+            context=context,
+        )
+    )
     return _Parsed(
         strains=strains,
         classes=classes,
@@ -655,6 +882,7 @@ def _parse_rows(tables: Mapping[str, _Table | None], context: _Context) -> _Pars
         substrates=substrates,
         conditions=conditions,
         kinetics=kinetics,
+        responses=responses,
     )
 
 
@@ -1052,18 +1280,14 @@ def _parse_kinetics(
     for line, row in table.rows:
         quantity = _required_text(row, "quantity", file=file, line=line, context=context)
         if quantity is not None and quantity not in KINETIC_QUANTITIES:
-            if quantity in _UNSUPPORTED_RATE_QUANTITIES:
-                context.add(
-                    file,
-                    line,
-                    "quantity",
-                    f"quantity {quantity!r} is not supported yet: this increment needs kcat and an enzyme "
-                    "concentration; vmax and enzyme activity units are not supported and are never converted.",
-                )
-            else:
-                context.add(
-                    file, line, "quantity", f"quantity {quantity!r} is not one of {', '.join(KINETIC_QUANTITIES)}."
-                )
+            context.add(
+                file,
+                line,
+                "quantity",
+                _RETIRED_QUANTITY_HINTS.get(
+                    quantity, f"quantity {quantity!r} is not one of {', '.join(KINETIC_QUANTITIES)}."
+                ),
+            )
             quantity = None
         strain_id = _reference(row, "strain_id", strains, "strains.csv", file=file, line=line, context=context)
         substrate_id = _reference(row, "substrate_id", substrates, "substrates.csv", file=file, line=line, context=context)
@@ -1107,14 +1331,32 @@ def _parse_kinetics(
             context.add(file, line, "evidence_type", f"evidence_type must be one of {', '.join(EVIDENCE_TYPES)}.")
             evidence_type = None
         method = row.get("method", "")
-        if evidence_type in _EVIDENCE_REQUIRES_METHOD and not method:
+        if quantity == "vmax" and not method:
+            context.add(
+                file,
+                line,
+                "method",
+                "method is required for vmax rows: state how the maximum rate of the simulated system was "
+                "obtained (for example an initial-rate fit at saturating substrate in this assay).",
+            )
+            evidence_type = None
+        elif evidence_type in _EVIDENCE_REQUIRES_METHOD and not method:
             context.add(file, line, "method", f"method is required for evidence_type {evidence_type!r}.")
             evidence_type = None
+        activity_ok = _activity_columns_ok(
+            row,
+            quantity=quantity,
+            substrate_id=substrate_id,
+            file=file,
+            line=line,
+            context=context,
+        )
         source = _required_text(row, "source", file=file, line=line, context=context)
         sd = _optional_nonnegative(row, "sd", file=file, line=line, context=context)
         replicates = _optional_positive_int(row, "replicates", file=file, line=line, context=context)
         if (
-            quantity is None
+            not activity_ok
+            or quantity is None
             or strain_id is None
             or class_key is None
             or substrate_id is None
@@ -1145,9 +1387,282 @@ def _parse_kinetics(
                 source=source,
                 sd=sd if isinstance(sd, float) else None,
                 replicates=replicates if isinstance(replicates, int) and not isinstance(replicates, bool) else None,
+                activity_substrate=row.get("activity_substrate", ""),
+                activity_saturating=row.get("activity_saturating", ""),
             )
         )
     return rows
+
+
+def _parse_responses(
+    table: _Table,
+    *,
+    strains: Mapping[str, _Strain],
+    classes: dict[str, _EnzymeClassInfo],
+    strain_classes: Sequence[_StrainClass],
+    substrates: Mapping[str, _Substrate],
+    resolver: RegistryResolver,
+    context: _Context,
+) -> list[_Response]:
+    file = table.name
+    declared = {(item.strain_id, item.class_key) for item in strain_classes}
+    rows: list[_Response] = []
+    for line, row in table.rows:
+        strain_id = _reference(row, "strain_id", strains, "strains.csv", file=file, line=line, context=context)
+        substrate_id = _reference(row, "substrate_id", substrates, "substrates.csv", file=file, line=line, context=context)
+        class_text = _required_text(row, "enzyme_class", file=file, line=line, context=context)
+        class_key = (
+            None
+            if class_text is None
+            else _resolve_class(class_text, classes=classes, resolver=resolver, file=file, line=line, context=context)
+        )
+        if strain_id is not None and class_key is not None and (strain_id, class_key) not in declared:
+            context.add(
+                file,
+                line,
+                "enzyme_class",
+                f"Strain {strain_id!r} does not declare enzyme class {class_key!r} in enzymes.csv.",
+            )
+            class_key = None
+        if class_key is not None and substrate_id is not None and _shared_bonds(classes[class_key], substrates[substrate_id]) is None:
+            context.add(
+                file,
+                line,
+                "substrate_id",
+                f"Enzyme class {class_key!r} cannot act on substrate {substrate_id!r}, so no response law can be "
+                "bound to that pair.",
+            )
+            substrate_id = None
+        law = _required_text(row, "law", file=file, line=line, context=context)
+        if law is not None and law not in RESPONSE_LAWS:
+            if law in ENVIRONMENT_MODIFIER_TYPES:
+                message = (
+                    f"law {law!r} is an environment law FungMod implements, but responses.csv supports only "
+                    f"{', '.join(RESPONSE_LAWS)} in this version."
+                )
+            else:
+                message = (
+                    f"law {law!r} is not an environment-response law FungMod implements; responses.csv supports "
+                    f"{', '.join(RESPONSE_LAWS)}. FungMod does not create new response laws from user tables."
+                )
+            context.add(file, line, "law", message)
+            law = None
+        parameter = _required_text(row, "parameter", file=file, line=line, context=context)
+        spec: ResponseLawParameter | None = None
+        if parameter is not None and law is not None:
+            if parameter not in RESPONSE_LAWS[law].parameter_names:
+                context.add(
+                    file,
+                    line,
+                    "parameter",
+                    f"parameter {parameter!r} is not a parameter of {law}; it takes "
+                    f"{', '.join(RESPONSE_LAWS[law].parameter_names)}.",
+                )
+                parameter = None
+            else:
+                spec = RESPONSE_LAWS[law].parameter(parameter)
+        units = _required_text(row, "units", file=file, line=line, context=context)
+        if units is not None and spec is not None:
+            error = _unit_dimension_error(units, spec.reference_units)
+            if error is not None:
+                context.add(
+                    file,
+                    line,
+                    "units",
+                    f"{parameter} of {law} must be {spec.dimension_text}; units {units!r} do not fit ({error}).",
+                )
+                units = None
+        value = _required_number(row, "value", file=file, line=line, context=context)
+        if value is not None and units is not None and spec is not None:
+            problem = _response_value_problem(value, units, spec)
+            if problem is not None:
+                context.add(file, line, "value", problem)
+                value = None
+        evidence_type = _required_text(row, "evidence_type", file=file, line=line, context=context)
+        if evidence_type is not None and evidence_type not in RESPONSE_EVIDENCE_TYPES:
+            context.add(
+                file,
+                line,
+                "evidence_type",
+                f"evidence_type must be one of {', '.join(RESPONSE_EVIDENCE_TYPES)}; a response law is "
+                "measured, taken from the literature or estimated, not a design choice.",
+            )
+            evidence_type = None
+        method = row.get("method", "")
+        if evidence_type in _EVIDENCE_REQUIRES_METHOD and not method:
+            context.add(file, line, "method", f"method is required for evidence_type {evidence_type!r}.")
+            evidence_type = None
+        source = _required_text(row, "source", file=file, line=line, context=context)
+        reference_ok, tolerance, at_reference = _reference_columns(
+            row,
+            law=law,
+            parameter=parameter,
+            units=units,
+            file=file,
+            line=line,
+            context=context,
+        )
+        if (
+            strain_id is None
+            or class_key is None
+            or substrate_id is None
+            or law is None
+            or parameter is None
+            or units is None
+            or value is None
+            or evidence_type is None
+            or source is None
+            or not reference_ok
+        ):
+            continue
+        rows.append(
+            _Response(
+                row=line,
+                strain_id=strain_id,
+                class_key=class_key,
+                substrate_id=substrate_id,
+                law=law,
+                parameter=parameter,
+                value=value,
+                units=units,
+                evidence_type=evidence_type,
+                method=method,
+                source=source,
+                reference_tolerance=tolerance,
+                kinetics_at_reference=at_reference,
+            )
+        )
+    return rows
+
+
+def _response_value_problem(value: float, units: str, spec: ResponseLawParameter) -> str | None:
+    if spec.reference_units == _TEMPERATURE_REFERENCE_UNITS:
+        if float(Q_(value, units).to(_TEMPERATURE_REFERENCE_UNITS).magnitude) <= 0.0:
+            return f"{spec.name} must be above absolute zero."
+        return None
+    if spec.reference_units == _DIMENSIONLESS_REFERENCE_UNITS:
+        ph = float(Q_(value, units).to(_DIMENSIONLESS_REFERENCE_UNITS).magnitude)
+        if not 0.0 <= ph <= 14.0:
+            return f"{spec.name} {_number_text(value)} is outside pH 0 to 14."
+        return None
+    if value < 0.0:
+        return f"{spec.name} must be nonnegative."
+    return None
+
+
+def _reference_columns(
+    row: Mapping[str, str],
+    *,
+    law: str | None,
+    parameter: str | None,
+    units: str | None,
+    file: str,
+    line: int,
+    context: _Context,
+) -> tuple[bool, float | None, bool]:
+    """Read reference_tolerance and kinetics_at_reference, allowed only on a law's reference parameter row."""
+
+    tolerance_text = row.get("reference_tolerance", "")
+    marker_text = row.get("kinetics_at_reference", "").lower()
+    if not tolerance_text and not marker_text:
+        return True, None, False
+    if law is None or parameter is None:
+        return False, None, False
+    reference = RESPONSE_LAWS[law].reference_parameter
+    ok = True
+    if parameter != reference:
+        for column, text in (("reference_tolerance", tolerance_text), ("kinetics_at_reference", marker_text)):
+            if text:
+                context.add(
+                    file,
+                    line,
+                    column,
+                    f"{column} belongs on the {reference} row of {law}, the law's reference condition.",
+                )
+        return False, None, False
+    tolerance: float | None = None
+    if tolerance_text:
+        tolerance = _number(tolerance_text)
+        if tolerance is None or tolerance < 0.0:
+            context.add(
+                file,
+                line,
+                "reference_tolerance",
+                f"reference_tolerance must be a finite nonnegative number in the row's units ({units or 'units'}).",
+            )
+            ok = False
+    if marker_text not in {"", _YES, _NO}:
+        context.add(file, line, "kinetics_at_reference", "kinetics_at_reference must be yes or no when given.")
+        ok = False
+    return ok, tolerance, marker_text == _YES
+
+
+def _activity_columns_ok(
+    row: Mapping[str, str],
+    *,
+    quantity: str | None,
+    substrate_id: str | None,
+    file: str,
+    line: int,
+    context: _Context,
+) -> bool:
+    """Check activity_substrate and activity_saturating: required on assay_activity rows, refused elsewhere.
+
+    An assay activity is the maximum rate on the case substrate only when it
+    was measured on that substrate at saturating concentration; FungMod does
+    not convert an activity between substrates or from a sub-saturating assay.
+    """
+
+    substrate_text = row.get("activity_substrate", "")
+    saturating_text = row.get("activity_saturating", "").lower()
+    if quantity != "assay_activity":
+        ok = True
+        for column in _ACTIVITY_COLUMNS:
+            if row.get(column, "") and quantity is not None:
+                context.add(file, line, column, f"{column} applies only to assay_activity rows.")
+                ok = False
+        return ok
+    ok = True
+    if not substrate_text:
+        context.add(
+            file,
+            line,
+            "activity_substrate",
+            "assay_activity rows must state activity_substrate, the substrate_id the activity was measured "
+            "on: only an activity measured on the case substrate at saturation is the Vmax on that substrate.",
+        )
+        ok = False
+    elif substrate_id is not None and substrate_text != substrate_id:
+        context.add(
+            file,
+            line,
+            "activity_substrate",
+            f"The assay activity was measured on {substrate_text!r}, not on the case substrate "
+            f"{substrate_id!r}: an activity on another substrate is not the Vmax on this substrate, and FungMod "
+            "does not convert activities between substrates. Measure the activity on this substrate at "
+            "saturation, or give vmax, or a specific activity and enzyme loading for this substrate.",
+        )
+        ok = False
+    if saturating_text == _NO:
+        context.add(
+            file,
+            line,
+            "activity_saturating",
+            "The assay activity was not measured at saturating substrate: an activity below saturation is "
+            "not the Vmax on this substrate (it depends on the assay substrate concentration through Km), and "
+            "FungMod does not extrapolate it. Give an activity measured at saturation, or vmax with its method.",
+        )
+        ok = False
+    elif saturating_text != _YES:
+        context.add(
+            file,
+            line,
+            "activity_saturating",
+            "activity_saturating must be yes or no; only an activity measured at saturating substrate "
+            "(yes) is accepted as the Vmax on the case substrate.",
+        )
+        ok = False
+    return ok
 
 
 def _kinetic_values(
@@ -1206,6 +1721,33 @@ def _quantity_units_error(quantity: str, units: str) -> str | None:
         if _unit_dimension_error(units, _RATE_CONSTANT_REFERENCE_UNITS) is not None:
             return f"kcat units {units!r} must have the dimension 1/time (for example 1/s or 1/min)."
         return None
+    if quantity in {"vmax", "assay_activity"}:
+        if units_are_compatible(units, _MOLAR_RATE_REFERENCE_UNITS):
+            return None
+        if units_are_compatible(units, _MASS_RATE_REFERENCE_UNITS):
+            return (
+                f"{quantity} units {units!r} are a mass concentration per time; the substrate concentrations "
+                f"and the {_YIELD_BASIS} yield are amounts, so this would need a molar mass, which FungMod does "
+                "not assume. Use amount per volume per time (for example uM/min or U/mL)."
+            )
+        return (
+            f"{quantity} units {units!r} must be an amount per volume per time (for example uM/min, mM/s or "
+            "U/mL, where U is one micromole per minute)."
+        )
+    if quantity == "specific_activity":
+        if units_are_compatible(units, _SPECIFIC_ACTIVITY_REFERENCE_UNITS):
+            return None
+        return (
+            f"specific_activity units {units!r} must be an amount per time per enzyme mass (for example "
+            "umol/min/mg or U/mg)."
+        )
+    if quantity == "enzyme_loading":
+        if units_are_compatible(units, _MASS_REFERENCE_UNITS):
+            return None
+        return (
+            f"enzyme_loading units {units!r} must be an enzyme mass per volume (for example mg/L); a molar "
+            "enzyme concentration belongs to the kcat form as enzyme_concentration."
+        )
     if _concentration_kind(units) is None:
         return (
             f"{quantity} units {units!r} must be a substrate concentration (amount or mass per volume, "
@@ -1271,7 +1813,333 @@ def _cross_validate(parsed: _Parsed, context: _Context) -> None:
                 f"{mass[0].quantity} in {mass[0].units!r} is a mass concentration, but the product yield is "
                 f"{_YIELD_BASIS}; applying it would need molar masses. Use amount-per-volume units (for example mM).",
             )
+    _validate_rate_forms(parsed, context)
+    _validate_responses(parsed, context)
     _validate_pairs(parsed, context)
+
+
+def _rows_text(rows: Sequence[Any]) -> str:
+    numbers = sorted({int(row.row) for row in rows})
+    if len(numbers) == 1:
+        return f"row {numbers[0]}"
+    return f"rows {', '.join(str(number) for number in numbers)}"
+
+
+def _case_form_rows(rows: Sequence[_Kinetics]) -> tuple[list[_Kinetics], dict[str, list[_Kinetics]]]:
+    """Split a case's rows into kcat-form rows and Vmax-route rows (route name to rows)."""
+
+    kcat_rows = [row for row in rows if row.quantity in _KCAT_FORM_QUANTITIES]
+    routes: dict[str, list[_Kinetics]] = {}
+    for row in rows:
+        route = _QUANTITY_VMAX_ROUTE.get(row.quantity)
+        if route is not None:
+            routes.setdefault(route, []).append(row)
+    return kcat_rows, routes
+
+
+def _validate_rate_forms(parsed: _Parsed, context: _Context) -> None:
+    """Check that each case and each enzyme class and substrate pair uses one rate form.
+
+    A case is one strain, enzyme class, substrate and condition. It uses the
+    kcat form (kcat and an enzyme concentration) or the Vmax form, and the
+    Vmax form takes exactly one route. All cases of one enzyme class and
+    substrate share one generated process, so they share one form. The form of
+    a pair is stored in ``parsed.pair_forms``; a pair without any rate row has
+    no entry.
+    """
+
+    file = "kinetics.csv"
+    by_case: dict[tuple[str, str, str, str], list[_Kinetics]] = {}
+    for row in parsed.kinetics:
+        by_case.setdefault(row.case_key, []).append(row)
+    case_forms: dict[tuple[str, str, str, str], str] = {}
+    for case_key, rows in by_case.items():
+        kcat_rows, routes = _case_form_rows(rows)
+        consistent = True
+        if kcat_rows and routes:
+            kcat_quantities = " and ".join(dict.fromkeys(row.quantity for row in kcat_rows))
+            for route_rows in routes.values():
+                for row in route_rows:
+                    context.add(
+                        file,
+                        row.row,
+                        "quantity",
+                        f"Row {row.row} gives {row.quantity} while {_rows_text(kcat_rows)} give {kcat_quantities} "
+                        "for the same strain, class, substrate and condition: the kcat form needs kcat and an "
+                        "enzyme concentration, the Vmax form needs Vmax and no enzyme concentration. One case uses "
+                        "one form, and FungMod does not derive one from the other.",
+                    )
+            consistent = False
+        if len(routes) > 1:
+            ordered = sorted(routes.items(), key=lambda item: min(row.row for row in item[1]))
+            summary = "; ".join(f"{_rows_text(route_rows)} use {_VMAX_ROUTE_LABEL[route]}" for route, route_rows in ordered)
+            for _route, route_rows in ordered[1:]:
+                for row in route_rows:
+                    context.add(
+                        file,
+                        row.row,
+                        "quantity",
+                        "Vmax for one case comes from exactly one route ("
+                        f"{', '.join(_VMAX_ROUTE_LABEL[name] for name in VMAX_ROUTES)}); {summary}.",
+                    )
+            consistent = False
+        activity_rows = routes.get("specific_activity", [])
+        if consistent and len(activity_rows) == 2 and not any(row.is_exact for row in activity_rows):
+            context.add(
+                file,
+                max(row.row for row in activity_rows),
+                "value",
+                f"specific_activity and enzyme_loading ({_rows_text(activity_rows)}) are both ranges; their "
+                "product is not a uniform range, so FungMod does not form it. Give one of them as an exact value.",
+            )
+            consistent = False
+        if not consistent:
+            continue
+        if kcat_rows:
+            case_forms[case_key] = RATE_FORM_KCAT
+        elif routes:
+            case_forms[case_key] = RATE_FORM_VMAX
+    by_pair: dict[tuple[str, str], dict[str, list[tuple[str, str, str, str]]]] = {}
+    for case_key, form in case_forms.items():
+        by_pair.setdefault((case_key[1], case_key[2]), {}).setdefault(form, []).append(case_key)
+    for pair, forms in by_pair.items():
+        if len(forms) == 1:
+            parsed.pair_forms[pair] = next(iter(forms))
+            continue
+        kcat_rows = [row for case_key in forms[RATE_FORM_KCAT] for row in _case_form_rows(by_case[case_key])[0]]
+        for case_key in forms[RATE_FORM_VMAX]:
+            for route_rows in _case_form_rows(by_case[case_key])[1].values():
+                for row in route_rows:
+                    context.add(
+                        file,
+                        row.row,
+                        "quantity",
+                        f"Enzyme class {pair[0]!r} on substrate {pair[1]!r} uses the kcat form in "
+                        f"{_rows_text(kcat_rows)} and the Vmax form in row {row.row}. All strains and conditions "
+                        "of one enzyme class and substrate share one generated process (FungMod selects a process "
+                        "by enzyme class and substrate class), so they must use one rate form.",
+                    )
+
+
+def _validate_responses(parsed: _Parsed, context: _Context) -> None:
+    """Check response-law rows and the reference-condition rule; store valid laws in ``parsed.laws``."""
+
+    file = "responses.csv"
+    groups: dict[tuple[str, str, str], dict[str, dict[str, list[_Response]]]] = {}
+    for response in parsed.responses:
+        groups.setdefault(response.binding_key, {}).setdefault(response.law, {}).setdefault(
+            response.parameter, []
+        ).append(response)
+    valid: dict[tuple[str, str, str], dict[str, dict[str, _Response]]] = {}
+    for binding, laws in groups.items():
+        where = _binding_text(binding)
+        for law_name, parameters in laws.items():
+            law = RESPONSE_LAWS[law_name]
+            ok = True
+            for name, rows in parameters.items():
+                for row in rows[1:]:
+                    context.add(
+                        file,
+                        row.row,
+                        "parameter",
+                        f"{_rows_text(rows)} give {name} of {law_name} for {where}; give each parameter once.",
+                    )
+                    ok = False
+            first_row = min(row.row for rows in parameters.values() for row in rows)
+            missing = [name for name in law.parameter_names if name not in parameters]
+            if missing:
+                context.add(
+                    file,
+                    first_row,
+                    "parameter",
+                    f"{law_name} for {where} needs {', '.join(law.parameter_names)}; missing: {', '.join(missing)}.",
+                )
+                ok = False
+            if not ok:
+                continue
+            chosen = {name: rows[0] for name, rows in parameters.items()}
+            problem = _law_domain_problem(law, chosen)
+            if problem is not None:
+                context.add(
+                    file,
+                    first_row,
+                    "value",
+                    f"The {law_name} parameters for {where} ({_rows_text(list(chosen.values()))}) are outside "
+                    f"the law's domain: {problem}",
+                )
+                continue
+            valid.setdefault(binding, {})[law_name] = chosen
+    for binding, laws in valid.items():
+        by_condition: dict[str, list[str]] = {}
+        for law_name in laws:
+            by_condition.setdefault(RESPONSE_LAWS[law_name].condition, []).append(law_name)
+        for condition, names in by_condition.items():
+            for law_name in names[1:]:
+                context.add(
+                    file,
+                    min(row.row for row in laws[law_name].values()),
+                    "law",
+                    f"{_binding_text(binding)} binds {' and '.join(names)} to {condition}; give one law per "
+                    "condition, since two laws would both rescale the same rate.",
+                )
+    _validate_pair_laws(valid, context)
+    for binding, laws in valid.items():
+        for law_name, chosen in laws.items():
+            _validate_reference_condition(parsed, binding, RESPONSE_LAWS[law_name], chosen, context)
+    parsed.laws = valid
+
+
+def _validate_pair_laws(
+    valid: Mapping[tuple[str, str, str], Mapping[str, Mapping[str, _Response]]],
+    context: _Context,
+) -> None:
+    """All strains of one enzyme class and substrate share the template, so they must agree on each condition's law."""
+
+    users: dict[tuple[str, str], dict[str, dict[str, list[_Response]]]] = {}
+    for binding, laws in valid.items():
+        for law_name, chosen in laws.items():
+            users.setdefault((binding[1], binding[2]), {}).setdefault(RESPONSE_LAWS[law_name].condition, {}).setdefault(
+                law_name, []
+            ).extend(chosen.values())
+    for pair, by_condition in users.items():
+        for condition, laws in by_condition.items():
+            if len(laws) < 2:
+                continue
+            ordered = sorted(laws.items(), key=lambda item: min(row.row for row in item[1]))
+            summary = "; ".join(f"{_rows_text(rows)} use {law_name}" for law_name, rows in ordered)
+            for _law_name, rows in ordered[1:]:
+                context.add(
+                    "responses.csv",
+                    min(row.row for row in rows),
+                    "law",
+                    f"Enzyme class {pair[0]!r} on substrate {pair[1]!r} has different {condition} laws for "
+                    f"different strains ({summary}). All strains of one enzyme class and substrate share one "
+                    "generated case template, so they must use the same law for a condition.",
+                )
+
+
+def _validate_reference_condition(
+    parsed: _Parsed,
+    binding: tuple[str, str, str],
+    law: ResponseLaw,
+    chosen: Mapping[str, _Response],
+    context: _Context,
+) -> None:
+    """Refuse kinetic constants that are not stated at the law's reference condition.
+
+    The law multiplies the configured rate by an activity that is one at its
+    reference parameter (the optimum of a cardinal law, the reference
+    temperature of Arrhenius). Kinetic constants measured elsewhere would be
+    rescaled as if they were reference values. A condition matches when it
+    equals the reference value exactly, or within the reference row's own
+    ``reference_tolerance``; ``kinetics_at_reference = yes`` records the
+    user's declaration that the values are reference values.
+    """
+
+    reference = chosen[law.reference_parameter]
+    rows_by_condition: dict[str, list[_Kinetics]] = {}
+    for row in parsed.kinetics:
+        if (row.strain_id, row.class_key, row.substrate_id) == binding and row.quantity in _KINETIC_CONSTANT_QUANTITIES:
+            rows_by_condition.setdefault(row.condition_id, []).append(row)
+    for condition_id in sorted(rows_by_condition):
+        condition = parsed.conditions[condition_id]
+        rows = rows_by_condition[condition_id]
+        current = condition.temperature_kelvin if law.condition == "temperature" else condition.ph
+        if current is None:
+            context.add(
+                "responses.csv",
+                reference.row,
+                "value",
+                f"Condition {condition_id!r} has an unknown {law.condition}, but kinetics.csv {_rows_text(rows)} give "
+                f"kinetic constants there for {_binding_text(binding)}, whose rate {law.law} scales with the "
+                f"{law.condition}. State the {law.condition} in conditions.csv.",
+            )
+            continue
+        if reference.kinetics_at_reference:
+            continue
+        # Conditions hold temperatures in kelvin and pH as a plain number, the reference units of the law.
+        base_units = law.parameter(law.reference_parameter).reference_units
+        stated = float(Q_(current, base_units).to(reference.units).magnitude)
+        difference = abs(stated - reference.value)
+        tolerance = reference.reference_tolerance
+        within = difference == 0.0 if tolerance is None else difference <= tolerance
+        if within:
+            continue
+        tolerance_text = (
+            "no reference_tolerance is given"
+            if tolerance is None
+            else f"reference_tolerance is {_number_text(tolerance)} {reference.units}"
+        )
+        context.add(
+            "responses.csv",
+            reference.row,
+            "value",
+            f"The kinetic constants of {_binding_text(binding)} at condition {condition_id!r} "
+            f"({_condition_text(condition)}; kinetics.csv {_rows_text(rows)}) are not at the reference condition "
+            f"of {law.law}, {law.reference_parameter} {_number_text(reference.value)} {reference.units} "
+            f"(differs by {_number_text(difference)} {reference.units}; {tolerance_text}). The law rescales the "
+            f"reference value ({law.formula}), so the kinetic constants it scales must be stated at its reference "
+            "condition. State the kinetics at the reference condition, give a reference_tolerance on this row that "
+            "covers the difference, or set kinetics_at_reference to yes if the values are already reference values.",
+        )
+
+
+_LAW_CHECK_SOURCE = "FungMod user-data response-law domain check"
+
+
+def _check_cardinal_temperature(values: Mapping[str, Any]) -> None:
+    cardinal_temperature_activity(
+        temperature=values["optimum_temperature"],
+        minimum_temperature=values["minimum_temperature"],
+        optimum_temperature=values["optimum_temperature"],
+        maximum_temperature=values["maximum_temperature"],
+        source=_LAW_CHECK_SOURCE,
+    )
+
+
+def _check_cardinal_ph(values: Mapping[str, Any]) -> None:
+    cardinal_ph_activity(
+        ph=values["optimum_ph"],
+        minimum_ph=values["minimum_ph"],
+        optimum_ph=values["optimum_ph"],
+        maximum_ph=values["maximum_ph"],
+        source=_LAW_CHECK_SOURCE,
+    )
+
+
+def _check_arrhenius_reference(values: Mapping[str, Any]) -> None:
+    arrhenius_reference_scaled_rate(
+        reference_rate=Q_(1.0, _DIMENSIONLESS_REFERENCE_UNITS),
+        activation_energy=values["activation_energy"],
+        temperature=values["reference_temperature"],
+        reference_temperature=values["reference_temperature"],
+        source=_LAW_CHECK_SOURCE,
+    )
+
+
+# Each check evaluates the implemented law at its reference value, so the law's
+# own domain rules (ordering of cardinal values, the CTMI midpoint condition,
+# nonnegative activation energy) decide; nothing is re-implemented here.
+_LAW_DOMAIN_CHECKS = {
+    "temperature_cardinal_rosso": _check_cardinal_temperature,
+    "ph_cardinal_rosso": _check_cardinal_ph,
+    "temperature_arrhenius_reference": _check_arrhenius_reference,
+}
+
+
+def _law_domain_problem(law: ResponseLaw, chosen: Mapping[str, _Response]) -> str | None:
+    values = {
+        name: Q_(row.value, row.units).to(law.parameter(name).reference_units) for name, row in chosen.items()
+    }
+    try:
+        _LAW_DOMAIN_CHECKS[law.law](values)
+    except ValueError as exc:
+        return str(exc)
+    return None
+
+
+def _binding_text(binding: tuple[str, str, str]) -> str:
+    return f"strain {binding[0]!r}, enzyme class {binding[1]!r}, substrate {binding[2]!r}"
 
 
 def _validate_pairs(parsed: _Parsed, context: _Context) -> None:
@@ -1294,7 +2162,11 @@ def _validate_pairs(parsed: _Parsed, context: _Context) -> None:
                 )
                 continue
             by_substrate_class[substrate.substrate_class] = substrate
-            states = _state_names(class_key, substrate)
+            states = _state_names(
+                class_key,
+                substrate,
+                form=parsed.pair_forms.get((class_key, substrate.substrate_id), RATE_FORM_KCAT),
+            )
             if len(set(states.values())) != len(states):
                 context.add(
                     "substrates.csv",
@@ -1382,36 +2254,59 @@ def _generate_records(
         if _shared_bonds(parsed.classes[class_key], substrate) is not None
     ]
     for class_key, substrate in pairs:
+        pair = (class_key, substrate.substrate_id)
+        started = pair in parsed.pair_forms
+        form = parsed.pair_forms.get(pair, RATE_FORM_KCAT)
+        laws = _pair_laws(parsed, pair)
+        info = parsed.classes[class_key]
         pair_records: list[ParameterRecord] = []
         for item in parsed.strain_classes:
             if item.class_key != class_key:
                 continue
             strain = parsed.strains[item.strain_id]
+            strain_laws = parsed.laws.get((strain.strain_id, class_key, substrate.substrate_id), {})
             for condition in parsed.conditions.values():
                 case_rows = rows_by_case.get((strain.strain_id, class_key, substrate.substrate_id, condition.condition_id), {})
-                for quantity in KINETIC_QUANTITIES:
-                    row = case_rows.get(quantity)
-                    if row is not None:
-                        mapping = _parameter_mapping(
-                            row,
+                case = _CaseContext(
+                    strain=strain,
+                    info=info,
+                    substrate=substrate,
+                    condition=condition,
+                    namespace=namespace,
+                    case_rows=case_rows,
+                    form_started=started,
+                    laws=tuple(strain_laws),
+                )
+                for quantity in _FORM_QUANTITIES[form]:
+                    mapping, origin = _role_mapping(quantity, case)
+                    record = _emit(generated, context, "parameter_records", mapping, origin=origin)
+                    if isinstance(record, ParameterRecord):
+                        pair_records.append(record)
+            for law in laws:
+                for parameter in law.parameters:
+                    response = strain_laws.get(law.law, {}).get(parameter.name)
+                    if response is not None:
+                        mapping = _response_mapping(
+                            response,
+                            law=law,
+                            law_rows=strain_laws[law.law],
                             strain=strain,
-                            info=parsed.classes[class_key],
+                            info=info,
                             substrate=substrate,
-                            condition=condition,
                             namespace=namespace,
+                            reference_conditions=_reference_conditions(parsed, response.binding_key),
                         )
-                        origin: tuple[str, int | None, str | None] = ("kinetics.csv", row.row, "quantity")
+                        origin: tuple[str, int | None, str | None] = ("responses.csv", response.row, "parameter")
                     else:
-                        mapping = _gap_mapping(
-                            quantity,
-                            case_rows=case_rows,
+                        mapping = _response_gap_mapping(
+                            law,
+                            parameter,
                             strain=strain,
-                            info=parsed.classes[class_key],
+                            info=info,
                             substrate=substrate,
-                            condition=condition,
                             namespace=namespace,
                         )
-                        origin = ("kinetics.csv", None, "quantity")
+                        origin = ("responses.csv", None, "parameter")
                     record = _emit(generated, context, "parameter_records", mapping, origin=origin)
                     if isinstance(record, ParameterRecord):
                         pair_records.append(record)
@@ -1419,22 +2314,70 @@ def _generate_records(
             record.value.is_exact and parameter_record_is_mode_eligible(record, mode="scientific")
             for record in pair_records
         )
-        info = parsed.classes[class_key]
         _emit(
             generated,
             context,
             "case_templates",
-            _template_mapping(info, substrate, namespace, scientific=scientific),
+            _template_mapping(info, substrate, namespace, scientific=scientific, form=form, laws=laws),
             origin=("substrates.csv", substrate.row, "substrate_id"),
         )
         _emit(
             generated,
             context,
             "process_compatibility",
-            _compatibility_mapping(info, substrate, namespace),
+            _compatibility_mapping(info, substrate, namespace, form=form, laws=laws),
             origin=("substrates.csv", substrate.row, "substrate_id"),
         )
     return generated
+
+
+@dataclass(frozen=True)
+class _CaseContext:
+    """One strain, enzyme class, substrate and condition during record generation."""
+
+    strain: _Strain
+    info: _EnzymeClassInfo
+    substrate: _Substrate
+    condition: _Condition
+    namespace: _Namespace
+    case_rows: Mapping[str, _Kinetics]
+    form_started: bool
+    laws: tuple[str, ...]
+
+
+def _pair_laws(parsed: _Parsed, pair: tuple[str, str]) -> tuple[ResponseLaw, ...]:
+    """Laws bound by any strain to one enzyme class and substrate, in ``RESPONSE_LAWS`` order."""
+
+    used = {
+        law_name
+        for binding, laws in parsed.laws.items()
+        if (binding[1], binding[2]) == pair
+        for law_name in laws
+    }
+    return tuple(law for name, law in RESPONSE_LAWS.items() if name in used)
+
+
+def _reference_conditions(parsed: _Parsed, binding: tuple[str, str, str]) -> list[str]:
+    """Conditions at which the binding has kinetic constants, all checked against the law's reference."""
+
+    return sorted(
+        {
+            row.condition_id
+            for row in parsed.kinetics
+            if (row.strain_id, row.class_key, row.substrate_id) == binding and row.quantity in _KINETIC_CONSTANT_QUANTITIES
+        }
+    )
+
+
+def _role_mapping(quantity: str, case: _CaseContext) -> tuple[dict[str, Any], tuple[str, int | None, str | None]]:
+    """Return the parameter or gap mapping of one role quantity of a case, with its origin."""
+
+    if quantity == "vmax":
+        return _vmax_mapping(case)
+    row = case.case_rows.get(quantity)
+    if row is not None:
+        return _parameter_mapping(row, case=case), ("kinetics.csv", row.row, "quantity")
+    return _gap_mapping(quantity, case=case), ("kinetics.csv", None, "quantity")
 
 
 @dataclass(frozen=True)
@@ -1648,12 +2591,22 @@ def _environment_mapping(condition: _Condition, namespace: _Namespace) -> dict[s
     }
 
 
-def _compatibility_mapping(info: _EnzymeClassInfo, substrate: _Substrate, namespace: _Namespace) -> dict[str, Any]:
+def _compatibility_mapping(
+    info: _EnzymeClassInfo,
+    substrate: _Substrate,
+    namespace: _Namespace,
+    *,
+    form: str,
+    laws: Sequence[ResponseLaw],
+) -> dict[str, Any]:
     shared = _shared_bonds(info, substrate) or ()
+    roles = HOMOGENEOUS_MM_PARAMETER_ROLES if form == RATE_FORM_KCAT else HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES
     symbols = {
-        role: _parameter_symbol(namespace, quantity, info.key, substrate.substrate_id)
-        for quantity, role in _QUANTITY_ROLE.items()
+        role: _parameter_symbol(namespace, _ROLE_QUANTITY[role], info.key, substrate.substrate_id) for role in roles
     }
+    for law in laws:
+        for parameter in law.parameters:
+            symbols[parameter.name] = _law_symbol(namespace, law, parameter, info.key, substrate.substrate_id)
     return {
         "record_id": namespace.id(info.key, substrate.substrate_id, "homogeneous_mm"),
         "name": f"{info.name} on {substrate.name} homogeneous Michaelis-Menten ({namespace.dataset_id})",
@@ -1667,8 +2620,8 @@ def _compatibility_mapping(info: _EnzymeClassInfo, substrate: _Substrate, namesp
         "substrate_class": substrate.substrate_class,
         "required_bond_classes": list(shared),
         "process_type": USER_DATASET_PROCESS_TYPE,
-        "required_parameters": [symbols[role] for role in HOMOGENEOUS_MM_PARAMETER_ROLES],
-        "parameter_roles": {role: symbols[role] for role in HOMOGENEOUS_MM_PARAMETER_ROLES},
+        "required_parameters": list(symbols.values()),
+        "parameter_roles": dict(symbols),
         "product_map_required": True,
         "case_template_id": _template_id(namespace, info, substrate),
         "notes": (
@@ -1688,12 +2641,58 @@ def _template_mapping(
     namespace: _Namespace,
     *,
     scientific: bool,
+    form: str,
+    laws: Sequence[ResponseLaw],
 ) -> dict[str, Any]:
     template_id = _template_id(namespace, info, substrate)
-    states = _state_names(info.key, substrate)
+    states = _state_names(info.key, substrate, form=form)
     simulation = namespace.manifest["simulation"]
     mode = "scientific" if scientific else "exploratory"
     yield_value = float(substrate.product_yield)
+    initial_state_mapping: dict[str, Any] = {
+        "substrate": {
+            "parameter_role": "substrate_initial_concentration",
+            "units_from_role": "substrate_initial_concentration",
+        },
+        "product": {"value": 0.0, "units_from_role": "substrate_initial_concentration"},
+    }
+    if form == RATE_FORM_KCAT:
+        initial_state_mapping["enzyme"] = {
+            "parameter_role": "enzyme_initial_concentration",
+            "units_from_role": "enzyme_initial_concentration",
+        }
+    observable_roles = [*states, "degradation_rate", "product_release_rate"]
+    process_state_metadata: dict[str, Any] = {
+        "config_name": (
+            f"User dataset {namespace.dataset_id}: {info.name} on {substrate.name} "
+            "homogeneous Michaelis-Menten"
+        ),
+        "config_mode": mode,
+        "config_maturity": mode,
+        "process_id": namespace.id(info.key, substrate.substrate_id, "homogeneous_mm"),
+        "parameter_set_id": namespace.id(info.key, substrate.substrate_id, "parameters"),
+        "product_map_name": f"{substrate.name} to {substrate.product} product map ({namespace.dataset_id})",
+        "public_path": True,
+    }
+    if laws:
+        process_state_metadata["process_modifiers"] = [
+            {"type": law.law, **{f"{parameter.name}_role": parameter.name for parameter in law.parameters}}
+            for law in laws
+        ]
+    rate_limitation = (
+        "Homogeneous Michaelis-Menten in the Vmax form: Vmax is a rate for the simulated system and no enzyme "
+        "state is represented, so enzyme loss or dilution cannot be simulated."
+        if form == RATE_FORM_VMAX
+        else None
+    )
+    law_limitation = (
+        "No temperature or pH response law is bound; values apply at their stated condition only."
+        if not laws
+        else "Response laws from responses.csv scale the rate: "
+        + "; ".join(f"{law.law} ({law.formula})" for law in laws)
+        + ". Kinetic constants are reference values at each law's reference condition; Km and the "
+        "concentrations are not rescaled, and no other condition acts on the rate."
+    )
     return {
         "record_id": template_id,
         "case_template_id": template_id,
@@ -1715,17 +2714,7 @@ def _template_mapping(
         "schema_version": CASE_TEMPLATE_SCHEMA_VERSION,
         "process_type": USER_DATASET_PROCESS_TYPE,
         "state_roles": dict(states),
-        "initial_state_mapping": {
-            "substrate": {
-                "parameter_role": "substrate_initial_concentration",
-                "units_from_role": "substrate_initial_concentration",
-            },
-            "product": {"value": 0.0, "units_from_role": "substrate_initial_concentration"},
-            "enzyme": {
-                "parameter_role": "enzyme_initial_concentration",
-                "units_from_role": "enzyme_initial_concentration",
-            },
-        },
+        "initial_state_mapping": initial_state_mapping,
         "product_map": {
             "id": namespace.id(info.key, substrate.substrate_id, "product_map"),
             "product_map_type": "stoichiometric",
@@ -1745,24 +2734,14 @@ def _template_mapping(
             "units": str(simulation["units"]),
             "notes": f"From the simulation block of user dataset {namespace.dataset_id}.",
         },
-        "observable_roles": ["substrate", "product", "enzyme", "degradation_rate", "product_release_rate"],
+        "observable_roles": observable_roles,
         "output_state_roles": dict(states),
-        "process_state_metadata": {
-            "config_name": (
-                f"User dataset {namespace.dataset_id}: {info.name} on {substrate.name} "
-                "homogeneous Michaelis-Menten"
-            ),
-            "config_mode": mode,
-            "config_maturity": mode,
-            "process_id": namespace.id(info.key, substrate.substrate_id, "homogeneous_mm"),
-            "parameter_set_id": namespace.id(info.key, substrate.substrate_id, "parameters"),
-            "product_map_name": f"{substrate.name} to {substrate.product} product map ({namespace.dataset_id})",
-            "public_path": True,
-        },
+        "process_state_metadata": process_state_metadata,
         "limitations": [
             f"Dissolved homogeneous Michaelis-Menten kinetics from user dataset {namespace.dataset_id}.",
             "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or uptake model.",
-            "No temperature or pH response law is bound; values apply at their stated condition only.",
+            law_limitation,
+            *([rate_limitation] if rate_limitation is not None else []),
         ],
         "validity_notes": [
             f"Values come from user dataset {namespace.dataset_id} (sha256 {namespace.digest}); "
@@ -1779,21 +2758,28 @@ def _template_mapping(
 def _parameter_mapping(
     row: _Kinetics,
     *,
-    strain: _Strain,
-    info: _EnzymeClassInfo,
-    substrate: _Substrate,
-    condition: _Condition,
-    namespace: _Namespace,
+    case: _CaseContext,
+    role_quantity: str | None = None,
+    route: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """Map one kinetics row to a parameter record of ``role_quantity`` (the row's own quantity by default).
+
+    ``route`` carries the provenance of a row re-expressed as another role
+    (an assay activity used as Vmax); it is added under the dataset namespace.
+    """
+
+    strain, info, substrate, condition, namespace = (
+        case.strain,
+        case.info,
+        case.substrate,
+        case.condition,
+        case.namespace,
+    )
+    quantity = role_quantity or row.quantity
     exact = row.value is not None
-    if row.evidence_type == "estimate":
-        allowed_use = PARAMETER_ALLOWED_USE_EXPLORATORY
-    elif exact:
-        allowed_use = PARAMETER_ALLOWED_USE_SCIENTIFIC
-    else:
-        allowed_use = PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING
+    allowed_use = _allowed_use(row.evidence_type, exact=exact)
     maturity = _EVIDENCE_MATURITY[row.evidence_type]
-    confidence = "exploratory_assumption" if row.evidence_type == "estimate" else maturity
+    confidence = _confidence(row.evidence_type)
     value: dict[str, Any] = {
         "kind": "exact" if exact else "range",
         "units": row.units,
@@ -1806,11 +2792,12 @@ def _parameter_mapping(
     else:
         value["lower"] = row.lower
         value["upper"] = row.upper
+    extra: dict[str, Any] = {} if route is None else {"vmax_route": dict(route)}
     provenance: dict[str, Any] = {
         "source": row.source,
         "confidence_level": confidence,
         "measurement_method": row.method or "user estimate without a stated method",
-        "validity_range": _validity_range(condition),
+        "validity_range": _validity_range(condition, case.laws),
         USER_DATASET_PROVENANCE_KEY: namespace.provenance(
             "kinetics.csv",
             row.row,
@@ -1820,23 +2807,38 @@ def _parameter_mapping(
             sd=row.sd,
             replicates=row.replicates,
             condition_id=condition.condition_id,
+            **extra,
         ),
     }
     if row.evidence_type == "estimate":
         provenance["exploratory_prior"] = True
-    mapping: dict[str, Any] = {
-        "record_id": namespace.id(
-            strain.strain_id, info.key, substrate.substrate_id, condition.condition_id, row.quantity
-        ),
-        "name": f"{_QUANTITY_LABEL[row.quantity]} for {info.name} from {strain.name} on {substrate.name} at "
-        f"{condition.condition_id} ({namespace.dataset_id})",
-        "maturity": maturity,
-        "provenance": provenance,
-        "notes": (
+    if route is None:
+        name = (
+            f"{_QUANTITY_LABEL[quantity]} for {info.name} from {strain.name} on {substrate.name} at "
+            f"{condition.condition_id} ({namespace.dataset_id})"
+        )
+        notes = (
             f"User-supplied {row.quantity} from dataset {namespace.dataset_id} (kinetics.csv row {row.row}); "
             f"evidence type {row.evidence_type}."
+        )
+    else:
+        name = (
+            f"{_QUANTITY_LABEL[quantity]} from a saturating {row.quantity} for {info.name} from {strain.name} on "
+            f"{substrate.name} at {condition.condition_id} ({namespace.dataset_id})"
+        )
+        notes = (
+            f"User-supplied {row.quantity} from dataset {namespace.dataset_id} (kinetics.csv row {row.row}) used "
+            f"as {quantity}: {route['rule']} Evidence type {row.evidence_type}."
+        )
+    mapping: dict[str, Any] = {
+        "record_id": namespace.id(
+            strain.strain_id, info.key, substrate.substrate_id, condition.condition_id, quantity
         ),
-        **_selectors(namespace, strain, info, substrate, condition, row.quantity),
+        "name": name,
+        "maturity": maturity,
+        "provenance": provenance,
+        "notes": notes,
+        **_selectors(namespace, strain, info, substrate, condition, quantity),
         "value": value,
         "allowed_use": allowed_use,
     }
@@ -1850,22 +2852,182 @@ def _parameter_mapping(
     return mapping
 
 
-def _gap_mapping(
-    quantity: str,
-    *,
-    case_rows: Mapping[str, _Kinetics],
-    strain: _Strain,
-    info: _EnzymeClassInfo,
-    substrate: _Substrate,
-    condition: _Condition,
-    namespace: _Namespace,
-) -> dict[str, Any]:
-    units = _gap_units(quantity, case_rows)
-    dimension = "1/time" if quantity == "kcat" else "substrate concentration (amount per volume)"
-    units_text = units if units is not None else (
-        "units of 1/time" if quantity == "kcat" else "concentration units"
+def _allowed_use(evidence_type: str, *, exact: bool) -> str:
+    if evidence_type == "estimate":
+        return PARAMETER_ALLOWED_USE_EXPLORATORY
+    if exact:
+        return PARAMETER_ALLOWED_USE_SCIENTIFIC
+    return PARAMETER_ALLOWED_USE_EXPLORATORY_SCREENING
+
+
+def _confidence(evidence_type: str) -> str:
+    return "exploratory_assumption" if evidence_type == "estimate" else _EVIDENCE_MATURITY[evidence_type]
+
+
+def _weakest_evidence(evidence_types: Sequence[str]) -> str:
+    """Return the evidence type of lowest maturity in ``USER_DATASET_MATURITY_ORDER``."""
+
+    return min(evidence_types, key=lambda item: USER_DATASET_MATURITY_ORDER.index(_EVIDENCE_MATURITY[item]))
+
+
+_ASSAY_VMAX_RULE = (
+    "an activity measured on the case substrate at saturating substrate concentration, stated per volume of "
+    "the simulated system, is the maximum rate Vmax of that system."
+)
+
+
+def _vmax_mapping(case: _CaseContext) -> tuple[dict[str, Any], tuple[str, int | None, str | None]]:
+    """Map the Vmax role of a case from its single route, or to a gap when no route is complete."""
+
+    rows = case.case_rows
+    explicit = rows.get("vmax")
+    if explicit is not None:
+        return _parameter_mapping(explicit, case=case), ("kinetics.csv", explicit.row, "quantity")
+    assay = rows.get("assay_activity")
+    if assay is not None:
+        route = {
+            "route": "assay_activity",
+            "activity_substrate": assay.activity_substrate,
+            "activity_saturating": True,
+            "rule": _ASSAY_VMAX_RULE[0].upper() + _ASSAY_VMAX_RULE[1:],
+        }
+        mapping = _parameter_mapping(assay, case=case, role_quantity="vmax", route=route)
+        return mapping, ("kinetics.csv", assay.row, "quantity")
+    activity, loading = rows.get("specific_activity"), rows.get("enzyme_loading")
+    if activity is not None and loading is not None:
+        return _derived_vmax_mapping(activity, loading, case=case), ("kinetics.csv", activity.row, "quantity")
+    return _gap_mapping("vmax", case=case), ("kinetics.csv", None, "quantity")
+
+
+def _derived_vmax_mapping(activity: _Kinetics, loading: _Kinetics, *, case: _CaseContext) -> dict[str, Any]:
+    """Vmax = specific activity x enzyme loading, converted with pint, as a derived parameter record.
+
+    The maturity is the weaker input's. When one input is a range and the
+    other exact, the product is the range scaled by the exact value, which is
+    again uniform; two ranges are refused during validation.
+    """
+
+    strain, info, substrate, condition, namespace = (
+        case.strain,
+        case.info,
+        case.substrate,
+        case.condition,
+        case.namespace,
     )
-    request = _measurement_request(quantity, strain=strain, info=info, substrate=substrate, condition=condition, units_text=units_text)
+    product_units = Q_(1.0, activity.units) * Q_(1.0, loading.units)
+    units = str(product_units.to_reduced_units().units)
+    factor = float(product_units.to(units).magnitude)
+    evidence_type = _weakest_evidence((activity.evidence_type, loading.evidence_type))
+    maturity = _EVIDENCE_MATURITY[evidence_type]
+    confidence = _confidence(evidence_type)
+    exact = activity.is_exact and loading.is_exact
+    source = activity.source if activity.source == loading.source else f"{activity.source}; {loading.source}"
+    value: dict[str, Any] = {
+        "kind": "exact" if exact else "range",
+        "units": units,
+        "source": source,
+        "confidence_level": confidence,
+        "notes": (
+            f"Derived in user dataset {namespace.dataset_id} as specific_activity (kinetics.csv row "
+            f"{activity.row}) x enzyme_loading (row {loading.row}); ({activity.units}) x ({loading.units}) "
+            f"converted to {units} with factor {_number_text(factor)}."
+        ),
+    }
+    if exact:
+        assert activity.value is not None and loading.value is not None
+        value["value"] = activity.value * loading.value * factor
+    else:
+        ranged, fixed = (activity, loading) if activity.value is None else (loading, activity)
+        assert ranged.lower is not None and ranged.upper is not None and fixed.value is not None
+        value["lower"] = ranged.lower * fixed.value * factor
+        value["upper"] = ranged.upper * fixed.value * factor
+    derivation = {
+        "route": "specific_activity",
+        "formula": "vmax = specific_activity x enzyme_loading",
+        "units_conversion": f"({activity.units}) x ({loading.units}) -> {units}, factor {_number_text(factor)} (pint)",
+        "maturity_rule": f"weakest input in the order {_MATURITY_ORDER_TEXT}",
+        "inputs": [_input_summary(activity), _input_summary(loading)],
+    }
+    method = (
+        f"Derived: vmax = specific_activity x enzyme_loading from kinetics.csv rows {activity.row} and "
+        f"{loading.row} (pint unit conversion)"
+    )
+    provenance: dict[str, Any] = {
+        "source": source,
+        "confidence_level": confidence,
+        "measurement_method": method,
+        "validity_range": _validity_range(condition, case.laws),
+        USER_DATASET_PROVENANCE_KEY: namespace.provenance(
+            "kinetics.csv",
+            None,
+            rows=[activity.row, loading.row],
+            source=source,
+            method=method,
+            evidence_type=evidence_type,
+            sd=None,
+            replicates=None,
+            condition_id=condition.condition_id,
+            derivation=derivation,
+        ),
+    }
+    if evidence_type == "estimate":
+        provenance["exploratory_prior"] = True
+    mapping: dict[str, Any] = {
+        "record_id": namespace.id(strain.strain_id, info.key, substrate.substrate_id, condition.condition_id, "vmax"),
+        "name": (
+            f"Vmax from specific activity and enzyme loading for {info.name} from {strain.name} on "
+            f"{substrate.name} at {condition.condition_id} ({namespace.dataset_id})"
+        ),
+        "maturity": maturity,
+        "provenance": provenance,
+        "notes": (
+            f"Derived Vmax in dataset {namespace.dataset_id}: specific_activity (kinetics.csv row {activity.row}) "
+            f"x enzyme_loading (row {loading.row}); maturity {maturity} is the weaker input's."
+        ),
+        **_selectors(namespace, strain, info, substrate, condition, "vmax"),
+        "value": value,
+        "allowed_use": _allowed_use(evidence_type, exact=exact),
+    }
+    if not exact:
+        mapping["range_scope"] = "user_supplied_range"
+        mapping["range_interpretation"] = (
+            "user_supplied_exploratory_prior_not_literature_curated"
+            if evidence_type == "estimate"
+            else "user_stated_bounds_not_calibrated_uncertainty"
+        )
+    return mapping
+
+
+def _input_summary(row: _Kinetics) -> dict[str, Any]:
+    return {
+        "file": "kinetics.csv",
+        "row": row.row,
+        "quantity": row.quantity,
+        "value": row.value,
+        "lower": row.lower,
+        "upper": row.upper,
+        "units": row.units,
+        "evidence_type": row.evidence_type,
+        "maturity": _EVIDENCE_MATURITY[row.evidence_type],
+        "method": row.method or None,
+        "source": row.source,
+        "sd": row.sd,
+        "replicates": row.replicates,
+    }
+
+
+def _gap_mapping(quantity: str, *, case: _CaseContext) -> dict[str, Any]:
+    strain, info, substrate, condition, namespace = (
+        case.strain,
+        case.info,
+        case.substrate,
+        case.condition,
+        case.namespace,
+    )
+    units = _gap_units(quantity, case.case_rows)
+    dimension = _GAP_DIMENSION.get(quantity, "substrate concentration (amount per volume)")
+    units_text = units if units is not None else _GAP_UNITS_TEXT.get(quantity, "concentration units")
+    request = _measurement_request(quantity, case=case, units_text=units_text)
     notes = f"No kinetics.csv row gives {quantity} for this case in dataset {namespace.dataset_id}."
     if units is None:
         notes = f"{notes} The value requires the dimension {dimension}."
@@ -1902,24 +3064,51 @@ def _gap_mapping(
     }
 
 
+_GAP_DIMENSION = {
+    "kcat": "1/time",
+    "vmax": "concentration per time (amount per volume per time)",
+}
+_GAP_UNITS_TEXT = {
+    "kcat": "units of 1/time",
+    "vmax": "concentration per time",
+}
+
+
 _QUANTITY_LABEL = {
     "km": "km",
     "kcat": "kcat",
     "substrate_initial_concentration": "initial substrate concentration",
     "enzyme_concentration": "enzyme concentration",
+    "vmax": "Vmax",
 }
 
 
-def _measurement_request(
-    quantity: str,
-    *,
-    strain: _Strain,
-    info: _EnzymeClassInfo,
-    substrate: _Substrate,
-    condition: _Condition,
-    units_text: str,
-) -> str:
+def _measurement_request(quantity: str, *, case: _CaseContext, units_text: str) -> str:
+    strain, info, substrate, condition = case.strain, case.info, case.substrate, case.condition
     where = _condition_text(condition)
+    if quantity in _KCAT_FORM_QUANTITIES and not case.form_started:
+        return (
+            f"Measure kcat and the enzyme concentration of {info.name} from {strain.name} on {substrate.name} "
+            f"at {where}, or Vmax (or a specific activity and enzyme loading)."
+        )
+    if quantity == "vmax":
+        activity, loading = case.case_rows.get("specific_activity"), case.case_rows.get("enzyme_loading")
+        if activity is not None and loading is None:
+            return (
+                f"Measure or specify the enzyme loading (enzyme mass per volume) of {info.name} from {strain.name} "
+                f"in the {substrate.name} assay at {where} to derive Vmax from the specific activity in "
+                f"kinetics.csv row {activity.row}."
+            )
+        if loading is not None and activity is None:
+            return (
+                f"Measure the specific activity (amount per time per enzyme mass) of {info.name} from "
+                f"{strain.name} on {substrate.name} at {where} to derive Vmax with the enzyme loading in "
+                f"kinetics.csv row {loading.row}."
+            )
+        return (
+            f"Measure Vmax of {info.name} from {strain.name} on {substrate.name} at {where} ({units_text}), "
+            "or a specific activity and enzyme loading."
+        )
     if quantity in {"km", "kcat"}:
         return f"Measure {quantity} of {info.name} from {strain.name} on {substrate.name} at {where} ({units_text})."
     if quantity == "substrate_initial_concentration":
@@ -1931,6 +3120,186 @@ def _measurement_request(
         f"Measure or specify the {info.name} concentration from {strain.name} in the {substrate.name} assay "
         f"at {where} ({units_text})."
     )
+
+
+def _response_mapping(
+    response: _Response,
+    *,
+    law: ResponseLaw,
+    law_rows: Mapping[str, _Response],
+    strain: _Strain,
+    info: _EnzymeClassInfo,
+    substrate: _Substrate,
+    namespace: _Namespace,
+    reference_conditions: Sequence[str],
+) -> dict[str, Any]:
+    """Map one responses.csv row to an exact, condition-independent law parameter record.
+
+    Every parameter of one law takes the weakest maturity among the law's rows,
+    so one estimated parameter makes the whole law an exploratory prior.
+    Temperatures are stored in kelvin with the original value in the notes.
+    """
+
+    spec = law.parameter(response.parameter)
+    evidence_type = _weakest_evidence([row.evidence_type for row in law_rows.values()])
+    maturity = _EVIDENCE_MATURITY[evidence_type]
+    confidence = _confidence(evidence_type)
+    if spec.reference_units == _TEMPERATURE_REFERENCE_UNITS:
+        stored_value = float(Q_(response.value, response.units).to(_TEMPERATURE_REFERENCE_UNITS).magnitude)
+        stored_units = _TEMPERATURE_REFERENCE_UNITS
+        conversion = (
+            f" Original value {_number_text(response.value)} {response.units} converted to kelvin."
+            if response.units != _TEMPERATURE_REFERENCE_UNITS
+            else ""
+        )
+    else:
+        stored_value, stored_units, conversion = response.value, response.units, ""
+    rows_text = _rows_text(list(law_rows.values()))
+    notes = (
+        f"User-supplied {response.parameter} of {law.law} from dataset {namespace.dataset_id} (responses.csv row "
+        f"{response.row}); evidence type {response.evidence_type}; law maturity {maturity} (weakest of {rows_text}).{conversion}"
+    )
+    extra: dict[str, Any] = {}
+    if response.parameter == law.reference_parameter:
+        extra["reference_condition"] = {
+            "rule": (
+                "kinetic constants of this strain, enzyme class and substrate must be stated at this reference "
+                "value, exactly or within the row's reference_tolerance, or be declared reference values"
+            ),
+            "kinetics_conditions": list(reference_conditions),
+            "reference_tolerance": response.reference_tolerance,
+            "tolerance_units": response.units if response.reference_tolerance is not None else None,
+            "kinetics_at_reference_declared": response.kinetics_at_reference,
+        }
+    provenance: dict[str, Any] = {
+        "source": response.source,
+        "confidence_level": confidence,
+        "measurement_method": response.method or "user estimate without a stated method",
+        "validity_range": (
+            f"{law.label} for {info.name} from {strain.name} on {substrate.name}: {law.formula}; it applies at "
+            "every condition of the case and rescales the reference kinetic constants."
+        ),
+        USER_DATASET_PROVENANCE_KEY: namespace.provenance(
+            "responses.csv",
+            response.row,
+            source=response.source,
+            method=response.method or None,
+            evidence_type=response.evidence_type,
+            law=law.law,
+            parameter=response.parameter,
+            original_value=response.value,
+            original_units=response.units,
+            law_rows=sorted(row.row for row in law_rows.values()),
+            law_maturity_rule=f"weakest row of the law in the order {_MATURITY_ORDER_TEXT}",
+            **extra,
+        ),
+    }
+    if evidence_type == "estimate":
+        provenance["exploratory_prior"] = True
+    return {
+        "record_id": namespace.id(strain.strain_id, info.key, substrate.substrate_id, law.law, response.parameter),
+        "name": (
+            f"{spec.label} of the {law.label} for {info.name} from {strain.name} on {substrate.name} "
+            f"({namespace.dataset_id})"
+        ),
+        "maturity": maturity,
+        "provenance": provenance,
+        "notes": notes,
+        **_law_selectors(namespace, law, spec, strain, info, substrate),
+        "value": {
+            "kind": "exact",
+            "value": stored_value,
+            "units": stored_units,
+            "source": response.source,
+            "confidence_level": confidence,
+            "notes": notes,
+        },
+        "allowed_use": _allowed_use(evidence_type, exact=True),
+    }
+
+
+def _response_gap_mapping(
+    law: ResponseLaw,
+    parameter: ResponseLawParameter,
+    *,
+    strain: _Strain,
+    info: _EnzymeClassInfo,
+    substrate: _Substrate,
+    namespace: _Namespace,
+) -> dict[str, Any]:
+    request = (
+        f"Measure the {parameter.label} of the {law.label} for {info.name} from {strain.name} on {substrate.name} "
+        f"({parameter.dimension_text}); responses.csv binds this law to {info.name} on {substrate.name} for "
+        "another strain."
+    )
+    notes = (
+        f"No responses.csv row gives {parameter.name} of {law.law} for this strain in dataset "
+        f"{namespace.dataset_id}; the value requires {parameter.dimension_text}."
+    )
+    return {
+        "record_id": namespace.id(
+            strain.strain_id, info.key, substrate.substrate_id, law.law, parameter.name, "gap"
+        ),
+        "name": (
+            f"Missing {parameter.label} of the {law.label} for {info.name} from {strain.name} on "
+            f"{substrate.name} ({namespace.dataset_id})"
+        ),
+        "maturity": USER_DATASET_MATURITY_GAP,
+        "provenance": {
+            "source": f"User dataset {namespace.dataset_id} gap analysis",
+            "confidence_level": "missing_from_user_dataset",
+            "measurement_request": request,
+            USER_DATASET_PROVENANCE_KEY: namespace.provenance(
+                "responses.csv",
+                None,
+                evidence_type="gap",
+                law=law.law,
+                parameter=parameter.name,
+                required_dimension=parameter.dimension_text,
+            ),
+        },
+        "notes": notes,
+        **_law_selectors(namespace, law, parameter, strain, info, substrate),
+        "value": {
+            "kind": "unknown",
+            "units": None,
+            "source": f"User dataset {namespace.dataset_id} gap analysis",
+            "confidence_level": "missing_from_user_dataset",
+            "notes": notes,
+        },
+        "allowed_use": PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY,
+    }
+
+
+def _law_selectors(
+    namespace: _Namespace,
+    law: ResponseLaw,
+    parameter: ResponseLawParameter,
+    strain: _Strain,
+    info: _EnzymeClassInfo,
+    substrate: _Substrate,
+) -> dict[str, Any]:
+    """Selectors of a law parameter: like kinetics, but valid at every environment of the case."""
+
+    return {
+        "parameter_symbol": _law_symbol(namespace, law, parameter, info.key, substrate.substrate_id),
+        "process_type": USER_DATASET_PROCESS_TYPE,
+        "enzyme_class": namespace.id(info.key),
+        "substrate_class": substrate.substrate_class,
+        "fungus_id": namespace.id(strain.strain_id),
+        "substrate_id": substrate.registry_id or namespace.id(substrate.substrate_id),
+        "environment_id": None,
+    }
+
+
+def _law_symbol(
+    namespace: _Namespace,
+    law: ResponseLaw,
+    parameter: ResponseLawParameter,
+    class_key: str,
+    substrate_id: str,
+) -> str:
+    return namespace.id(law.law, parameter.name, class_key, substrate_id)
 
 
 def _selectors(
@@ -1957,7 +3326,7 @@ def _parameter_symbol(namespace: _Namespace, quantity: str, class_key: str, subs
 
 
 def _gap_units(quantity: str, case_rows: Mapping[str, _Kinetics]) -> str | None:
-    if quantity == "kcat":
+    if quantity in _GAP_DIMENSION:
         return None
     for other in _CONCENTRATION_QUANTITIES:
         row = case_rows.get(other)
@@ -1975,10 +3344,15 @@ def _row_value_notes(row: _Kinetics, namespace: _Namespace) -> str:
     return " ".join(parts)
 
 
-def _validity_range(condition: _Condition) -> str:
+def _validity_range(condition: _Condition, laws: Sequence[str] = ()) -> str:
+    if not laws:
+        return (
+            f"Condition {condition.condition_id}: {_condition_text(condition)}; "
+            "no temperature or pH response law is attached."
+        )
     return (
-        f"Condition {condition.condition_id}: {_condition_text(condition)}; "
-        "no temperature or pH response law is attached."
+        f"Condition {condition.condition_id}: {_condition_text(condition)}; the response law(s) "
+        f"{', '.join(laws)} from responses.csv rescale the rate away from their reference condition."
     )
 
 
@@ -1992,13 +3366,15 @@ def _condition_text(condition: _Condition) -> str:
     return f"{temperature}, {ph}"
 
 
-def _state_names(class_key: str, substrate: _Substrate) -> dict[str, str]:
+def _state_names(class_key: str, substrate: _Substrate, *, form: str) -> dict[str, str]:
     substrate_key = substrate.registry_id or substrate.substrate_id
-    return {
+    names = {
         "substrate": f"{substrate_key}_concentration",
         "product": f"{substrate.product}_concentration",
-        "enzyme": f"{class_key}_concentration",
     }
+    if form == RATE_FORM_KCAT:
+        names["enzyme"] = f"{class_key}_concentration"
+    return names
 
 
 def _shared_bonds(info: _EnzymeClassInfo, substrate: _Substrate) -> tuple[str, ...] | None:
@@ -2308,16 +3684,24 @@ def _objects_of(
 __all__ = [
     "EVIDENCE_TYPES",
     "KINETIC_QUANTITIES",
+    "RATE_FORM_KCAT",
+    "RATE_FORM_VMAX",
+    "RESPONSE_EVIDENCE_TYPES",
+    "RESPONSE_LAWS",
+    "ResponseLaw",
+    "ResponseLawParameter",
     "USER_DATASET_MANIFEST",
     "USER_DATASET_MATURITY_DESIGN",
     "USER_DATASET_MATURITY_ESTIMATE",
     "USER_DATASET_MATURITY_GAP",
     "USER_DATASET_MATURITY_LITERATURE",
     "USER_DATASET_MATURITY_MEASURED",
+    "USER_DATASET_MATURITY_ORDER",
     "USER_DATASET_PARAMETER_MATURITIES",
     "USER_DATASET_RECORD_MATURITY",
     "USER_DATASET_SCHEMA_VERSION",
     "UserDataError",
     "UserDataset",
+    "VMAX_ROUTES",
     "load_user_dataset",
 ]

@@ -2572,10 +2572,14 @@ def _role_parameter_records(
     assembler = get_registry_process_assembler(compatibility.process_type)
     if assembler is None:
         return {}
+    try:
+        required_roles = assembler.parameter_roles_for(compatibility)
+    except RegistryCaseBuildError:
+        return {}
     explicit_records = _exact_template_role_records(
         registry=registry,
         compatibility=compatibility,
-        required_roles=assembler.required_parameter_roles,
+        required_roles=required_roles,
         fungus_id=case.fungus_id,
         substrate_id=case.substrate_id,
         environment_id=case.environment_id,
@@ -2584,7 +2588,7 @@ def _role_parameter_records(
     if explicit_records is not None:
         return dict(explicit_records)
     records: dict[str, ParameterRecord] = {}
-    roles = tuple(dict.fromkeys((*assembler.required_parameter_roles, *compatibility.parameter_roles.keys())))
+    roles = tuple(dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys())))
     for role in roles:
         symbol = compatibility.parameter_roles.get(role)
         if symbol is None:

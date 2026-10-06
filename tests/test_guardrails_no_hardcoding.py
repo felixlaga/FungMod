@@ -98,6 +98,8 @@ def test_user_data_import_has_no_organism_substrate_or_enzyme_specific_tokens() 
         "trichoderma",
         "harzianum",
         "oryza",
+        "laccase",
+        "syringaldazine",
     ):
         assert forbidden not in user_data, forbidden
 

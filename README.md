@@ -84,7 +84,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
-| Your own data | Strain, enzyme, substrate, condition and kinetics tables overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests ([user-supplied data](docs/user-data.md)) |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests ([user-supplied data](docs/user-data.md)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, and variance-based global sensitivity |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
@@ -1014,9 +1014,16 @@ keeps its source, units, condition, file and row and the dataset digest.
 `measured`, `literature` and `design` values reach scientific mode when they
 are exact; `estimate` values stay exploratory; a missing kinetic role becomes
 an explicit unknown carrying a measurement request that preflight quotes as
-the suggested experiment. This increment covers dissolved substrates and
-homogeneous Michaelis-Menten kinetics with `kcat` and an enzyme
-concentration only; see `docs/user-data.md` for the table formats and
+the suggested experiment. Kinetics are homogeneous Michaelis-Menten on
+dissolved substrates, either `kcat` with an enzyme concentration or a Vmax
+taken from exactly one route: a `vmax` row with its method, a
+`specific_activity` times an `enzyme_loading` (a derived record whose maturity
+is the weaker input's), or an `assay_activity` measured on the case substrate
+at saturation. An optional `responses.csv` binds the cardinal temperature,
+cardinal pH or Arrhenius law to a strain, enzyme and substrate through the
+template modifiers, so an `EnvironmentGrid` over temperature or pH changes the
+rate through the law; the kinetic constants must then be stated at the law's
+reference condition. See `docs/user-data.md` for the table formats and
 limitations.
 
 ## Public API
