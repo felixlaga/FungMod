@@ -4,6 +4,7 @@
   "figures": {
     "figure_1_cellulose_holdouts": {
       "file": "figure_1_cellulose_holdouts.svg",
+      "pdf_file": "figure_1_cellulose_holdouts.pdf",
       "data_file": "figure_1_cellulose_holdouts.json",
       "title": "Whole-condition holdouts of the joint benchmark on the three cellulose loadings",
       "caption": "Published means (points) against the frozen held-out predictions (lines) of the activity-driven hydrolysis candidate and the re-fitted published equations, each loading predicted from a fit to the other two (primary scenario). Measurement error is unknown; the points are published means.",
@@ -71,6 +72,7 @@
     },
     "figure_2_posterior_predictive": {
       "file": "figure_2_posterior_predictive.svg",
+      "pdf_file": "figure_2_posterior_predictive.pdf",
       "data_file": "figure_2_posterior_predictive.json",
       "title": "Posterior predictive bands of the hydrolysis candidate on the cellulose loadings",
       "caption": "Posterior median and the 5 to 95 percent band of the model prediction over the posterior samples of the nine registry constants (all three loadings fitted; the bands exclude measurement noise), with the published means as points.",
@@ -97,6 +99,7 @@
     },
     "figure_3_criticism_screen": {
       "file": "figure_3_criticism_screen.svg",
+      "pdf_file": "figure_3_criticism_screen.pdf",
       "data_file": "figure_3_criticism_screen.json",
       "title": "Stage A holdout screen of the model-criticism study",
       "caption": "Change in the pooled held-out normalised error of each candidate mechanism relative to the baseline M0, per observable and pooled, in both error scenarios; the dashed lines are the plan's screen thresholds (at least 10 percent pooled improvement, no observable more than 10 percent worse).",
@@ -134,6 +137,7 @@
     },
     "figure_4_cross_solver": {
       "file": "figure_4_cross_solver.svg",
+      "pdf_file": "figure_4_cross_solver.pdf",
       "data_file": "figure_4_cross_solver.json",
       "title": "Cross-solver check of the recorded optimum in COPASI",
       "caption": "Objective of the exported three-condition PEtab problem at FungMod's recorded optimum, after COPASI's local fit from that point, and at the end of COPASI's fits from ten random starts (log axis). The recorded outcome is quoted in the manifest.",

@@ -8,7 +8,7 @@ PIP ?= $(PYTHON) -m pip
 
 .PHONY: help install install-dev lint type test test-cov docs docs-serve \
         build package-check wheelhouse install-offline reproduce reproduce-quick \
-        paper-tables paper-check paper-verify paper-stage-a paper-full check clean container
+        paper-tables paper-check paper-verify paper-stage-a paper-full paper-pdf check clean container
 
 help: ## Show this help.
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -69,6 +69,9 @@ paper-stage-a: ## Re-run stage A and the COPASI reproduction into outputs/ and c
 
 paper-full: ## Re-run every study behind the paper's tables and compare (a day of compute).
 	$(PYTHON) scripts/reproduce_paper.py full
+
+paper-pdf: ## Build paper/paper.pdf from the LaTeX manuscript with latexmk (needs a TeX distribution).
+	cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
 
 reproduce: ## Deterministically regenerate the headline scientific artifacts.
 	$(PYTHON) scripts/reproduce.py
