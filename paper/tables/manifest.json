@@ -74,7 +74,7 @@
       "title": "Stage A of the preregistered model-criticism study: whole-condition holdouts and the R1 screen",
       "sources": {
         "data/benchmarks/gelain_2020_criticism/results/stage_a/comparison.json": "0460f164324c825d080bbc5db003dd13a604ffda0300574d155f377aee5f3b3b",
-        "data/benchmarks/gelain_2020_criticism/plan.json": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7"
+        "data/benchmarks/gelain_2020_criticism/plan.json": "7952e010b55f55887e22025c22a192fb1c7f2eb3f61fc130b71af2a019a98672"
       },
       "key_numbers": {
         "plan_sha256": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7",
@@ -183,13 +183,13 @@
       "latex_file": "table_4_criticism_stage_b.tex",
       "title": "Stage B of the model-criticism study: adequacy, identification and coverage per added mechanism",
       "sources": {
-        "data/benchmarks/gelain_2020_criticism/plan.json": "9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7",
+        "data/benchmarks/gelain_2020_criticism/plan.json": "7952e010b55f55887e22025c22a192fb1c7f2eb3f61fc130b71af2a019a98672",
         "data/benchmarks/gelain_2020_criticism/results/stage_b/M1_induction_state/verdicts.json": "aeedaa057102203c14c6d45e74fe297a1c00135eff837da2aa00ed4fb479dba8",
         "data/benchmarks/gelain_2020_criticism/results/stage_b/M1_induction_state/bayesian_calibration.json": "076601b27ce478195d513d8d4b6412139c3a48d2fd478c2c4503477a18903f8f",
         "data/benchmarks/gelain_2020_criticism/results/stage_b/M1_induction_state/coverage.json": "2d7216ebc18573caeafe28a3498538b32931414f1a8a5cd5bfe3ca5881de0e74",
-        "data/benchmarks/gelain_2020_criticism/results/stage_b/M2_soluble_product_pool/verdicts.json": "439234b9bc279547c68b35ab3d97246518a45af97d321316d4170c7ff37c34a1",
-        "data/benchmarks/gelain_2020_criticism/results/stage_b/M2_soluble_product_pool/bayesian_calibration.json": "584a42f233b7715afb1800113cc85eb04769345752a64f0dba485d280893527f",
-        "data/benchmarks/gelain_2020_criticism/results/stage_b/M2_soluble_product_pool/coverage.json": "4511748782e2719feb7095993a4aefe13c9919cf603292481ec6d47ce6259160",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M2_soluble_product_pool/verdicts.json": "ed127ecda9a8c33412d4c63b23043298e03f8b4d252935ef3dc5d0b0e13670b6",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M2_soluble_product_pool/bayesian_calibration.json": "216e6a565143dcc07212a63aca94251a4f33eddfbc9127d28a47f44037b888f0",
+        "data/benchmarks/gelain_2020_criticism/results/stage_b/M2_soluble_product_pool/coverage.json": "42db5659cf7b88340e1bf0464d8eb23701ed51728a7df8e70d60f2018b2059d8",
         "data/benchmarks/gelain_2020_criticism/results/stage_b/M3_conversion_dependent_accessibility/verdicts.json": "7cde95106c0ca49428a6ce92bc29128b4c7497bb1e9ac2f2c30dbc5ab76f3fc1",
         "data/benchmarks/gelain_2020_criticism/results/stage_b/M3_conversion_dependent_accessibility/bayesian_calibration.json": "01bca67c41834fbb32f0809f07c64909bb8f4aab0aacd36e3a23915f30071dc5",
         "data/benchmarks/gelain_2020_criticism/results/stage_b/M3_conversion_dependent_accessibility/coverage.json": "2d7216ebc18573caeafe28a3498538b32931414f1a8a5cd5bfe3ca5881de0e74"
@@ -220,20 +220,20 @@
           "R1_holdout_support": true,
           "R2_adequacy": false,
           "R2_multiplier_interval": [
-            1.6508059240578155,
-            2.866098022775914
+            1.6344227088550727,
+            2.2281845007666607
           ],
           "R3_identification": false,
           "added_parameter_classes": {
-            "mu": "prior_dominated",
+            "mu": "bounded_below_only",
             "Ks": "prior_dominated",
             "Ki": "prior_dominated",
             "P0": "bounded_below_only"
           },
-          "coverage_inside": 95,
+          "coverage_inside": 91,
           "coverage_observations": 96,
-          "largest_autocorrelation_time": 528.6981320376518,
-          "post_burn_in_steps": 6000,
+          "largest_autocorrelation_time": 1393.426281833549,
+          "post_burn_in_steps": 28000,
           "outcome": "improves fit but unidentified (R1, not R3)"
         },
         "M3_conversion_dependent_accessibility": {
@@ -263,7 +263,7 @@
       "title": "Cross-solver reproduction of the baseline optimum in COPASI through PEtab (PETAB-001, second run)",
       "sources": {
         "data/benchmarks/gelain_2020_petab/results/comparison.json": "3e86a1214d46bb1debd7d74a60d57ad62550e837d16333d8b904de73e4cfb498",
-        "data/benchmarks/gelain_2020_petab/plan.json": "cfb8c9a651240081b3bcd7a0b82a7c2fc3853c1b3d9f2d01218eff23fff64628"
+        "data/benchmarks/gelain_2020_petab/plan.json": "11dfe15850b80c3217dd821547613365cb77c88d39a007f65cd954ae1706d320"
       },
       "key_numbers": {
         "outcome": "reproduced",

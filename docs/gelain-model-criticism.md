@@ -13,7 +13,7 @@ independent and validates no biology.
 ## The frozen plan
 
 `data/benchmarks/gelain_2020_criticism/plan.json` (SHA-256
-`9897ab11026a81794a27f512264afa5ed70f341f23f1d73264076956497d43d7`) declares
+`7952e010b55f55887e22025c22a192fb1c7f2eb3f61fc130b71af2a019a98672`, after amendment 4) declares
 everything before any fit: the data digests, four models with every parameter's
 bounds, units and role, the shared assumed error model with one sampled noise
 multiplier, the two stages, the decision rules, the outcome vocabulary, the
@@ -21,7 +21,7 @@ excluded claims and an amendment rule. `tests/test_gelain_criticism_plan.py`
 pins the digest, so a change to the plan is impossible without a dated
 amendment inside the file and a new digest in the test and the ledger.
 
-Three dated amendments are recorded in the file. The first two (digests
+Four dated amendments are recorded in the file. The first two (digests
 `8b368ac8...` to `9bb36f8d...` to `6849c8b3...`) added machine-readable
 error-model fields and the walker rule before the runs they affect. The third
 (`6849c8b3...` to the current digest) added the stage A optimiser settings
@@ -42,6 +42,19 @@ digest; the stage B chains were not re-run (their initial centre is a starting
 point, and they are already reported as unconverged and provisional), and
 their R1 component is checked against the new screen by
 `tests/test_gelain_criticism_plan.py`.
+
+The fourth (`9897ab11...` to the current digest `7952e010...`), dated
+2026-10-05, was added after stage A was re-recorded and before any chain it
+governs ran. It gives the `M2_soluble_product_pool` all-condition chain a
+sampler override (36000 steps, 8000 burn-in, centred on the converged stage A
+fit, a 12 hour cap across resumed runs; the recorded M2 folder is replaced
+and the first chain's summary stays in the ledger under CRIT-002), gives the
+plan's holdout posteriors the sampler settings and output convention they
+had lacked (8000 steps, 2000 burn-in per fold, centred on the fold's stage A
+fit, outputs under `results/stage_b/<model>/holdout_<condition>/` with the
+fitted and the held-out coverage kept apart), and applies them to the one
+model that passes the R1 screen. No rule, bound, prior, error model or
+threshold changed.
 
 | Model | Mechanism added to the baseline | Added parameters |
 | --- | --- | --- |
@@ -173,7 +186,7 @@ had traded biomass for the other three observables and the converged one
 does not. The first run's files are not kept; its numbers survive in the
 ledger (CRIT-001) and in the amendment log.
 
-## Stage B results (recorded 2026-10-05)
+## Stage B results (recorded 2026-10-05; M2 re-recorded 2026-10-06 under amendment 4)
 
 Each addition gets one all-condition posterior under the plan's sampler
 settings (24 walkers or twice the dimension, 8000 steps, 2000 burn-in, the
@@ -185,30 +198,35 @@ Outputs live in `results/stage_b/<model>/` (`bayesian_calibration.json`,
 `posterior_samples.csv`, `coverage.json`, `verdicts.json`, `report.md`,
 `inputs.json`, `artifacts.json`).
 
-- `M2_soluble_product_pool` (28 walkers, 14 coordinates): **not converged**,
-  verdicts **provisional**. Integrated autocorrelation times 368 to 529 steps
-  against 6000 post-burn-in steps (the rule needs more than 50 tau), effective
-  sample sizes 318 to 457, mean acceptance 0.174 (minimum 0.071), two hours
-  and thirty-five minutes of wall-clock across two resumed runs against the
-  plan's two-hour cap. R2 fails: the shared noise multiplier's 95 percent
-  interval is [1.65, 2.87] (median 1.94), which does not contain 1.0, so the
-  soluble pool does not make the candidate adequate at the assumed 10 percent
-  error (M0: 2.25, [1.95, 2.63]). R3 fails: the added uptake rate `mu`,
-  half-saturation `Ks` and inhibition constant `Ki` are prior dominated
-  (credible intervals 79 to 94 percent of their prior width) and the initial
-  pool `P0` is bounded below only (median 2.8 g/L against an upper bound of
-  3 g/L). Of the nine common constants, `qF` and `qB` stay identified,
-  `k_h` and `kd` fall to weakly identified, and `Y` and `kF` become prior
-  dominated; the pool absorbs what BAYES-001 identified. Posterior predictive
-  coverage with measurement noise is 95 of 96 observations (biomass,
-  substrate and beta-glucosidase 24 of 24, cellulase 23 of 24). Outcome in the
-  plan's vocabulary: **improves fit but unidentified (R1, not R3)**, with the
-  provisional R2 and R3 verdicts recorded alongside. The chain was centred on
-  the first stage A fit (yield 0.18, biomass loss near zero) and is not
-  re-run under amendment 3; its R1 component was refreshed against the new
-  screen (`refresh-verdicts`), and a chain centred on the converged fit is
-  the next recorded task. Under the first run's screen the outcome had been
-  "not supported (fails R1)".
+- `M2_soluble_product_pool` (28 walkers, 14 coordinates; re-run under
+  amendment 4 from the converged stage A fit with 36000 steps and 8000
+  burn-in): **not converged**, verdicts **provisional**. The integrated
+  autocorrelation times grew to 824 to 1393 steps against 28000 post-burn-in
+  steps (the rule needs more than 50 tau, so they would have had to stay
+  below 560), while the effective sample sizes, 563 to 951, pass; mean
+  acceptance 0.194; 1 008 028 posterior evaluations of which 431 641 (43
+  percent) failed to integrate and were rejected; 7.7 hours of wall-clock
+  across five resumed runs against the amendment's 12 hour cap. R2 fails:
+  the shared noise multiplier's 95 percent interval is [1.63, 2.23] (median
+  1.89), below the baseline's 2.25 but still excluding 1.0, so the soluble
+  pool lowers the inadequacy factor without making the candidate adequate at
+  the assumed 10 percent error. R3 fails: the uptake rate `mu` is bounded
+  below only (median 0.63 per hour, interval [0.18, 1.9] against a prior of
+  [0.001, 2]), the half-saturation `Ks` and the inhibition constant `Ki` are
+  prior dominated (intervals 82 and 95 percent of their prior width) and the
+  initial pool `P0` is bounded below only (median 2.8 g/L against an upper
+  bound of 3 g/L). The nine common constants keep their BAYES-001 classes
+  (`k_h`, `Y`, `kd`, `qF`, `qB` identified; `Kh` bounded below only;
+  `K_ind`, `kF`, `kB` bounded above only); the first chain, centred on the
+  superseded fit with a yield of 0.18, had let the pool absorb what
+  BAYES-001 identified, and that effect is gone. Posterior predictive
+  coverage with measurement noise is 91 of 96 observations (cellulase 19 of
+  24, the other three observables 24 of 24). Outcome in the plan's
+  vocabulary: **improves fit but unidentified (R1, not R3)**, unchanged. The
+  first chain (8000 steps centred on the superseded fit; multiplier
+  [1.65, 2.87], coverage 95 of 96, `k_h` and `kd` weakly identified, `Y` and
+  `kF` prior dominated) is summarised in the ledger under CRIT-002 and
+  CRIT-003.
 - `M1_induction_state` (24 walkers, 11 coordinates): **not converged**,
   verdicts **provisional**. Autocorrelation times 267 to 340 steps against
   6000 post-burn-in steps, effective sample sizes 423 to 540, mean acceptance
@@ -239,16 +257,33 @@ Outputs live in `results/stage_b/<model>/` (`bayesian_calibration.json`,
 
 Summary across the three additions: M2 passes R1 under the amended stage A
 and M1 and M3 do not; none restores adequacy under R2 (every multiplier
-interval excludes 1.0 and overlaps the baseline's 2.25); only M1's memory
-constant is weakly identified under R3, while M2's four added constants and
-M3's exponent are not. M2 is therefore the one mechanism the holdouts
-support and the one whose constants the duplicate means do not identify,
-on a chain that started from the superseded fit. None of the three
-chains meets the convergence rule at the planned 8000 steps (the largest
-autocorrelation times are 340 to 529 steps against 6000 post-burn-in
-steps), so every stage B verdict is provisional as the plan requires;
-longer chains would need a dated amendment and more than the plan's
-two-hour compute cap per chain.
+interval excludes 1.0; M1's and M3's overlap the baseline's 2.25, M2's lies
+below it at [1.63, 2.23]); only M1's memory constant is weakly identified
+under R3, while M2's four added constants and M3's exponent are not. M2 is
+therefore the one mechanism the holdouts support and the one whose
+constants the duplicate means do not identify, now on a chain that started
+from the converged fit. None of the three chains meets the convergence
+rule: M1 and M3 at the planned 8000 steps (largest autocorrelation times 340
+and 371 steps against 6000 post-burn-in steps), and M2 at the 36000 steps
+amendment 4 allowed, where the autocorrelation times grew to 824 to 1393
+steps instead of staying near the 529 of the first chain. Every stage B
+verdict is provisional as the plan requires. A chain long enough for M2
+would need about 70000 post-burn-in steps if the autocorrelation did not
+grow further (roughly 14 hours at the recorded 0.7 seconds per step on four
+processes) and another dated amendment.
+
+### Holdout posteriors of M2 (amendment 4)
+
+Under amendment 4 the plan's holdout posteriors ran for M2 with the likelihood on two cellulose loadings and the third held out, each chain 8000 steps (2000 burn-in) of 28 walkers centred on the fold's stage A fit, scored by held-out posterior predictive coverage at 95 percent with measurement noise (400 draws). None of the three chains meets the convergence rule, so every number here is provisional.
+
+| Held-out loading | Held-out coverage (all) | biomass | substrate | FPase | beta-glucosidase | Fitted-data coverage | Multiplier interval | Acceptance | Largest tau (steps) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 10 g/L | 22/32, 69 percent | 8/8, 100 percent | 8/8, 100 percent | 2/8, 25 percent | 4/8, 50 percent | 64/64, 100 percent | [1.23, 1.78] | 0.214 | 500 |
+| 20 g/L | 32/32, 100 percent | 8/8, 100 percent | 8/8, 100 percent | 8/8, 100 percent | 8/8, 100 percent | 63/64, 98 percent | [1.87, 2.90] | 0.182 | 565 |
+| 30 g/L | 19/32, 59 percent | 5/8, 62 percent | 8/8, 100 percent | 3/8, 38 percent | 3/8, 38 percent | 62/64, 97 percent | [1.26, 1.86] | 0.203 | 491 |
+
+Held out, the 20 g/L loading is predicted inside the band at every observation, while the two outer loadings are not: with 10 g/L held out the FPase and beta-glucosidase activities fall outside at 6 and 4 of 8 times, and with 30 g/L held out the activities miss at 5 of 8 times each and biomass at 3 of 8. Substrate is inside the band in every fold. Interpolating to the middle loading therefore works and extrapolating to either end does not, which is what a mechanism fitted on two loadings without identified added constants is expected to do. The fitted-data coverage of each fold is read on the two loadings the chain saw and is kept apart from the held-out score. The added constants keep their one-sided or prior-dominated classes in every fold, so the holdout posteriors change no verdict: M2 improves fit but is unidentified, provisionally.
+
 A posterior-study bug surfaced on M1: the sampler supplies only the fitted
 symbols, and the variant factory dropped M1's fixed constant `k_z`, so every
 starting walker had a non-finite posterior. The factory now merges the

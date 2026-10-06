@@ -12,6 +12,11 @@ Stage B (posterior sampling of one model, centred on its stage A all-condition f
 Stage B checkpoints its chain in ``<output>/stage_b/<model>/`` and resumes
 from it when restarted with the same plan.
 
+Holdout posterior for one fold of a model that passes the screen (amendment 4):
+
+    python scripts/run_gelain_2020_model_criticism.py stage-b --model M2_soluble_product_pool \\
+        --hold-out gelain_2020_cellulose_10gl --processes 4
+
 Refreshing recorded stage B verdicts after stage A was re-run under an amendment:
 
     python scripts/run_gelain_2020_model_criticism.py refresh-verdicts --output data/benchmarks/gelain_2020_criticism/results
@@ -63,22 +68,35 @@ def _stage_a(args: argparse.Namespace, log: Any) -> int:
 
 def _stage_b(args: argparse.Namespace, log: Any) -> int:
     global _STUDY
-    fit_path = args.output / "stage_a" / args.model / "full_fit_primary.json"
-    if not fit_path.exists():
-        raise SystemExit(f"Stage A all-condition fit not found at {fit_path}; run stage-a first.")
-    fit = json.loads(fit_path.read_text(encoding="utf-8"))
-    if not fit.get("success"):
-        raise SystemExit(f"Stage A all-condition fit for {args.model} did not succeed; stage B needs a centre.")
+    held_out = getattr(args, "hold_out", None)
+    if held_out is None:
+        fit_path = args.output / "stage_a" / args.model / "full_fit_primary.json"
+        if not fit_path.exists():
+            raise SystemExit(f"Stage A all-condition fit not found at {fit_path}; run stage-a first.")
+        fit = json.loads(fit_path.read_text(encoding="utf-8"))
+        if not fit.get("success"):
+            raise SystemExit(f"Stage A all-condition fit for {args.model} did not succeed; stage B needs a centre.")
+    else:
+        folds_path = args.output / "stage_a" / args.model / "folds_primary.json"
+        if not folds_path.exists():
+            raise SystemExit(f"Stage A folds not found at {folds_path}; run stage-a first.")
+        folds = [fold for fold in json.loads(folds_path.read_text(encoding="utf-8")) if fold["condition"] == held_out]
+        if len(folds) != 1 or not folds[0]["fit"].get("success"):
+            raise SystemExit(f"No successful stage A fold holding out {held_out!r} for {args.model}.")
+        fit = folds[0]["fit"]
     center = {entry["symbol"]: float(entry["value"]) for entry in fit["parameters"]}
     _STUDY = gelain_criticism.build_posterior_study(
-        ROOT, args.model, center, n_steps=args.steps, burn_in=args.burn_in, n_walkers=args.walkers
+        ROOT, args.model, center, n_steps=args.steps, burn_in=args.burn_in, n_walkers=args.walkers, held_out=held_out
     )
     study = _STUDY
     log(
-        f"{args.model}: {study.problem.dimension} coordinates, {len(study.problem.conditions)} conditions, "
-        f"{study.settings.n_walkers} walkers x {study.settings.n_steps} steps"
+        f"{args.model}: {study.problem.dimension} coordinates, {len(study.problem.conditions)} conditions"
+        + (f" (holding out {held_out})" if held_out else "")
+        + f", {study.settings.n_walkers} walkers x {study.settings.n_steps} steps"
     )
     output = args.output / "stage_b" / args.model
+    if held_out is not None:
+        output = output / f"holdout_{held_out}"
     if args.processes > 1:
         context = multiprocessing.get_context("fork")
         with context.Pool(args.processes) as pool:
@@ -98,6 +116,9 @@ def _stage_b(args: argparse.Namespace, log: Any) -> int:
         log(f"  {symbol}: {verdict['class']} {verdict['credible_interval']}")
     if coverage is not None:
         log(f"coverage: {coverage['overall']['all_observables']['fraction']:.0%} of observations inside the band")
+        held = coverage.get("held_out_coverage")
+        if held is not None:
+            log(f"held-out coverage: {held['overall']['all_observables']['fraction']:.0%} of the held-out observations inside the band")
     log(f"wrote {sorted(str(path.relative_to(output)) for path in paths.values())}")
     return 0
 
@@ -133,6 +154,10 @@ def main(argv: list[str] | None = None) -> int:
     stage_b.add_argument("--checkpoint-every", type=int, default=250)
     stage_b.add_argument("--no-resume", action="store_true")
     stage_b.add_argument("--skip-predictive", action="store_true")
+    stage_b.add_argument(
+        "--hold-out", default=None, metavar="CONDITION",
+        help="Run the plan's holdout posterior for this condition: the likelihood uses the other conditions and the centre is that fold's stage A fit.",
+    )
     refresh = subparsers.add_parser(
         "refresh-verdicts", help="recompute every recorded stage B verdict against the stage A comparison on disk"
     )

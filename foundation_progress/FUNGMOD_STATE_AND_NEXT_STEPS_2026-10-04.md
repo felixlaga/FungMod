@@ -276,8 +276,14 @@ Ordered work, each with an exit gate:
    while M1 and M3 still fail it. M2's stage B posterior (unchanged,
    provisional) leaves its four constants prior dominated or bounded on one
    side, so its outcome is "improves fit but unidentified (R1, not R3)";
-   nothing restores adequacy. Gate still met with the provisional label; the
-   M2 chain centred on the new fit is the next study task.
+   nothing restores adequacy. Gate still met with the provisional label.
+   Re-recorded 2026-10-06 (CRIT-004, amendment 4): the M2 chain centred on
+   the converged fit with 36000 steps still misses the convergence rule
+   (autocorrelation times grew to 824 to 1393 steps); its multiplier
+   interval [1.63, 2.23] lies below the baseline's 2.25 and excludes 1.0,
+   its four constants stay bounded on one side or prior dominated, so the
+   outcome is unchanged and provisional; the plan's holdout posteriors ran
+   per fold (10 g/L held out 22/32, 69 percent, 20 g/L held out 32/32, 100 percent, 30 g/L held out 19/32, 59 percent; all three provisional). Gate still met with the provisional label.
 3. **Cross-study transfer from the literature (the intended headline).** Find a
    second published submerged cellulose-culture time course, preferring the
    same organism from another laboratory, then the same genus. Freeze the

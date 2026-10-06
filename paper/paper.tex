@@ -289,21 +289,24 @@ its declared range. In the first run \texttt{M2} had failed the screen
 because biomass worsened by 31 percent; that was the stalled optimiser, not
 the mechanism, and the plan's outcome for \texttt{M2} changed from ``not
 supported'' to ``improves fit but unidentified'' when the screen was
-recomputed. Stage B sampled one all-condition posterior per addition (24 or
-28 walkers, 8000 steps, the noise multiplier sampled jointly), each centred
-on the first-run fit; the chains were not re-run after the amendment
-because the centre is a starting point, not a result. None of the three
-chains met the declared convergence rule at that length, so the plan labels
-their verdicts provisional. Under those labels no addition restores
-adequacy (every multiplier interval excludes 1.0 and overlaps the
-baseline's 2.25); only the induction memory constant of \texttt{M1} is
-weakly identified, while the four constants of \texttt{M2} are prior
-dominated or bounded on one side and the exponent of \texttt{M3} is bounded
-above only, driven towards the baseline; posterior predictive coverage with
-measurement noise is 91 to 95 of 96 observations. The soluble pool is the
-one addition the holdouts support, and the one whose constants the
-duplicate means do not identify; a chain centred on its new fit is the next
-recorded task.
+recomputed. Stage B sampled one all-condition posterior per addition (24
+or 28 walkers, the noise multiplier sampled jointly). \texttt{M1} and
+\texttt{M3} ran the planned 8000 steps centred on their first-run fits;
+\texttt{M2}, the one addition that passes the screen, was re-run under a
+fourth dated amendment from the converged fit with 36000 steps. None of the
+three chains met the declared convergence rule, \texttt{M2}'s because its
+autocorrelation times grew to 824 to 1393 steps against 28000 post-burn-in
+steps, so the plan labels every verdict provisional. Under those labels no
+addition restores adequacy: every multiplier interval excludes 1.0, those
+of \texttt{M1} and \texttt{M3} overlap the baseline's 2.25 and that of
+\texttt{M2} lies below it (1.63 to 2.23, median 1.89). Only the induction
+memory constant of \texttt{M1} is weakly identified, while the four
+constants of \texttt{M2} are prior dominated or bounded on one side and
+the exponent of \texttt{M3} is bounded above only, driven towards the
+baseline; posterior predictive coverage with measurement noise is 91 of 96
+observations for each. The soluble pool is the one addition the holdouts
+support, and the one whose constants the duplicate means do not identify.
+The plan's holdout posteriors (amendment 4) sample \texttt{M2} with one cellulose loading held out of the likelihood and score it by held-out posterior predictive coverage at 95 percent with measurement noise: 10 g/L held out, 22 of 32 observations inside; 20 g/L held out, 32 of 32 observations inside; 30 g/L held out, 19 of 32 observations inside. The middle loading is interpolated inside the band; the outer loadings are extrapolated poorly, mainly in the enzyme activities (and in biomass at 30 g/L), and none of the three chains meets the convergence rule, so these are provisional like the rest of stage B.
 
 \input{tables/table_3_criticism_stage_a}
 
@@ -402,7 +405,8 @@ attached.
   minimum; the public calibration API still uses scipy's default step and
   is not used by any recorded result in this paper.
 \item The stage B chains did not reach the declared convergence rule within
-  the plan's compute cap; their verdicts are provisional.
+  the plan's compute cap, the \texttt{M2} chain not even at the 36000 steps
+  its amendment allowed; their verdicts are provisional.
 \item Software verification (parity tests, reference simulators,
   cross-solver agreement) is not empirical validation, and this paper makes
   no predictive biological claim.
