@@ -22,7 +22,7 @@ a sourced law today.
 | `ph_ionization_michaelis_menten` | process law | pH | `v = E kcat(pH) S / (Km(pH) + S)` with `kcat(pH) = k0 / f_es(pH)`, `Km(pH) = Km0 f_e(pH) / f_es(pH)`, `f(pH) = (10^(pK_low - pH) + 1)(10^(pH - pK_high) + 1)` | `turnover`, `michaelis_constant`, `free_enzyme_lower_pk`, `free_enzyme_upper_pk`, `complex_lower_pk`, `complex_upper_pk`, `minimum_ph`, `maximum_ph` | diprotic ionization model; the SABIO-RK "Michaelis-Menten (pH-dependent)" law type 24 |
 | `thermal_inactivation` | process law | temperature | `dA/dt = -k_d,ref exp(-(E_d/R)(1/T - 1/T_ref)) A`, optionally routed to an inactive pool | `reference_rate_constant`, `inactivation_energy`, `reference_temperature`, optional measured bounds | first-order inactivation with Arrhenius dependence |
 
-Modifiers multiply the rate of the process they are attached to; the two
+Modifiers multiply the rate of the process they are attached to; the
 cardinal laws follow the multiplicative gamma concept of Rosso et al. (1995).
 Process laws own their rate expression. Every law validates its parameters
 (ordering of cardinal values, the CTMI condition `T_opt >= (T_min + T_max)/2`,
@@ -135,10 +135,10 @@ a statement about buffer or ionic-strength effects.
 
 ## What is implemented but not yet bound to an organism
 
-The cardinal temperature and pH laws and the thermal inactivation law are
-implemented, compiled and tested with artificial values, but no shipped case
-binds them. The repository holds no sourced cardinal temperatures, cardinal pH
-values, or inactivation energies for *T. harzianum* P49P11 or for the
+The cardinal temperature, pH and water-activity laws and the thermal
+inactivation law are implemented, compiled and tested with artificial values,
+but no shipped case binds them. The repository holds no sourced cardinal
+temperatures, cardinal pH values, or inactivation energies for *T. harzianum* P49P11 or for the
 cellulase and beta-glucosidase activity pools of the Gelain 2020 cultures:
 the Gelain fit sits at one condition (29 degrees Celsius, pH 5) and its
 activity-loss constants are effective losses at that condition, not thermal

@@ -64,10 +64,13 @@ source .venv/bin/activate
 python -m pip install -e ".[dev,docs,notebooks]"
 ```
 
+Add the `standards` and `copasi` extras, as CI does, to run the SBML, SED-ML,
+PEtab and COPASI tests; without them those tests are skipped.
+
 Run the gates:
 
 ```bash
-python -m ruff check src tests
+python -m ruff check src tests scripts/run_*.py
 python -m pyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"
 MPLCONFIGDIR=/tmp/fungmod-mpl python -m pytest --cov=fungal_model
 python -m mkdocs build --strict

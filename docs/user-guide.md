@@ -145,6 +145,11 @@ from fungmod import uncertainty, calibration, transport
   (`fit_least_squares`, `FittableParameter`) and a publication-oriented
   **calibration evidence audit** (`audit_calibration_evidence`) whose software
   pass never authorizes a publication claim.
+- **Bayesian calibration** (`fungmod.calibration.bayesian`): posterior
+  sampling over explicit bounded priors and explicit Gaussian error models,
+  with identifiability verdicts and posterior predictive bands that are
+  conditional on those declarations, not validation. See
+  [Bayesian calibration](bayesian-calibration.md).
 - **Transport** (`fungmod.transport`): 1D and uniform-Cartesian 2D/3D
   finite-volume reaction–diffusion engines.
 
@@ -154,7 +159,8 @@ Exact signatures and options are in the [API reference](api.md). See also the
 ## 8. Sourcing and curating parameters
 
 FungMod separates *proposing* candidate parameters from *promoting* them into the
-trusted registry, with cryptographic curator signatures in between:
+trusted registry, with explicit curator review and optional Ed25519 curator
+signatures in between:
 
 ```python
 import fungmod as fm
@@ -202,9 +208,11 @@ docker run --rm -v "$PWD/outputs:/opt/fungmod/outputs" fungmod
 ## 10. Exporting to standards (SBML)
 
 FungMod can export its supported well-mixed kinetic models (first-order,
-mass action, and Michaelis-Menten) to **SBML**, **SED-ML**, and **COMBINE
-archives** for use with other tools, and can verify the export with a
-cross-engine trajectory check:
+mass action, homogeneous Michaelis-Menten and proportional synthesis) to
+**SBML**, **SED-ML**, and **COMBINE archives**, and estimation problems to
+**PEtab**, for use with other tools. It can verify the export with a
+cross-engine trajectory check and, with the `copasi` extra, reproduce a PEtab
+problem in COPASI:
 
 ```python
 from fungmod.standards import write_model_config_sbml, model_config_to_combine_archive

@@ -316,6 +316,14 @@ All notable public releases of FungMod are documented here.
 
 ### Changed
 
+- README and documentation accuracy audit (DOCS-001): the README's current
+  limitations now describe the implemented temperature and pH laws, thermal
+  inactivation, posterior sampling, the compiled culture closures, the
+  exploratory spatial mycelium and the runnable organism records; the
+  cross-solver summary reports the recorded `reproduced` outcome; the source
+  proposal example selects entry 35622 so the review step runs; the capability
+  map, compiled-core, colony, quickstart, user-guide, standards, install and
+  paper pages were corrected against the code. Documentation only.
 - Gelain model-criticism stage A (`fungal_model.research.gelain_criticism`):
   the least-squares optimiser reads its finite-difference step, tolerances
   and restart rule from the plan's new `stage_A_least_squares.optimiser`
