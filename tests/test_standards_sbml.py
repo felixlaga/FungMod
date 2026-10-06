@@ -16,6 +16,8 @@ from fungal_model.processes.homogeneous import (
     HomogeneousMichaelisMentenProcess,
     MassActionProcess,
 )
+from fungal_model.processes.physiology import ProportionalSynthesisProcess
+from fungal_model.processes.surface import CoefficientBinding
 from fungal_model.resources import example_data_path
 from fungal_model.standards import (
     SBML_EXPORTABLE_PROCESS_TYPES,
@@ -97,11 +99,57 @@ def _mm_enzyme() -> tuple[AssembledModel, dict]:
     return model, {"S": Q_(10.0, "millimolar"), "Prod": Q_(0.0, "millimolar"), "E": Q_(5.0, "nanomolar")}
 
 
+def _synthesis() -> tuple[AssembledModel, dict]:
+    process = ProportionalSynthesisProcess(
+        name="induced synthesis", producer_state="P", producer_units="gram/liter",
+        product_state="E", product_units="millimolar", rate_units="millimolar/second",
+        specific_rate_symbol="q", inducer_state="I", inducer_units="gram/liter",
+        induction_half_saturation_symbol="K_I",
+    )
+    model = _model(
+        process,
+        [_parameter("q", 0.002, "millimolar/second/(gram/liter)"), _parameter("K_I", 0.5, "gram/liter")],
+    )
+    return model, {"P": Q_(3.0, "gram/liter"), "I": Q_(2.0, "gram/liter"), "E": Q_(0.0, "millimolar")}
+
+
+def _bound_yield(yield_value: float = 0.35) -> tuple[AssembledModel, dict]:
+    """``S -> Y P + (1 - Y) W`` with the coefficients bound to the parameter ``Y``."""
+
+    process = HomogeneousMichaelisMentenProcess(
+        name="split conversion", substrate_state="S", km_symbol="Km", rate_units="millimolar/second",
+        substrate_units="millimolar", vmax_symbol="Vmax",
+        product_coefficients={"P": yield_value, "W": 1.0 - yield_value},
+        product_coefficient_bindings={"P": CoefficientBinding("Y"), "W": CoefficientBinding("Y", complement=True)},
+    )
+    model = _model(
+        process,
+        [
+            _parameter("Km", 3.0, "millimolar"),
+            _parameter("Vmax", 0.4, "millimolar/second"),
+            _parameter("Y", yield_value, "dimensionless"),
+        ],
+    )
+    return model, {"S": Q_(10.0, "millimolar"), "P": Q_(0.0, "millimolar"), "W": Q_(0.0, "millimolar")}
+
+
+def _assay_decay() -> tuple[AssembledModel, dict]:
+    process = FirstOrderDecayProcess(
+        name="activity loss", substrate_state="activity", rate_constant_symbol="k",
+        state_units="filter_paper_unit / liter",
+    )
+    model = _model(process, [_parameter("k", 0.02, "1/second")])
+    return model, {"activity": Q_(120.0, "filter_paper_unit / liter")}
+
+
 ALL_BUILDERS = {
     "first_order": _first_order,
     "mass_action": _mass_action,
     "mm_vmax": _mm_vmax,
     "mm_enzyme": _mm_enzyme,
+    "synthesis": _synthesis,
+    "bound_yield": _bound_yield,
+    "assay_decay": _assay_decay,
 }
 
 
@@ -122,7 +170,8 @@ def test_export_is_valid_sbml(name: str) -> None:
     assert document.getLevel() == 3 and document.getVersion() == 2
     assert _error_count(document) == 0
     sbml_model = document.getModel()
-    assert sbml_model.getNumReactions() == 1
+    # A process with parameter-bound product coefficients exports one reaction per bound product.
+    assert sbml_model.getNumReactions() == (3 if name == "bound_yield" else 1)
     assert sbml_model.getNumSpecies() == len(initial_state)
 
 
@@ -210,6 +259,7 @@ def test_exportable_process_types_are_stable() -> None:
         "first_order_decay",
         "mass_action",
         "homogeneous_michaelis_menten",
+        "proportional_synthesis",
     )
 
 
@@ -275,3 +325,129 @@ def test_cross_engine_check_survives_libsedml_proxy_registration() -> None:
         model, initial_state=initial_state, times=Q_(np.linspace(0.0, 120.0, 41), "second")
     )
     assert comparison.agrees(atol=1e-5), comparison.max_absolute_difference
+
+
+def _reaction_formulas(xml: str) -> dict[str, str]:
+    model = libsbml.readSBMLFromString(xml).getModel()
+    return {
+        model.getReaction(i).getId(): libsbml.formulaToL3String(model.getReaction(i).getKineticLaw().getMath())
+        for i in range(model.getNumReactions())
+    }
+
+
+def test_induced_synthesis_exports_as_a_source_reaction_with_modifiers():
+    model, initial = _synthesis()
+    xml = to_sbml(model, initial_state=initial, model_id="synthesis")
+    sbml_model = libsbml.readSBMLFromString(xml).getModel()
+    reaction = sbml_model.getReaction(0)
+    assert reaction.getNumReactants() == 0 and reaction.getNumProducts() == 1
+    assert {reaction.getModifier(i).getSpecies() for i in range(reaction.getNumModifiers())} == {"P", "I"}
+    assert _reaction_formulas(xml)[reaction.getId()] == "q * P * I / (K_I + I)"
+    seconds = np.linspace(0.0, 30.0, 7)
+    reference = simulate_reference_sbml(xml, times=seconds)
+    expected = 0.002 * 3.0 * 2.0 / (0.5 + 2.0) * seconds
+    assert np.allclose(reference["E"], expected, rtol=1e-8, atol=1e-10)
+    assert np.allclose(reference["P"], 3.0) and np.allclose(reference["I"], 2.0)
+
+
+def test_bound_product_coefficients_stay_symbolic_in_the_export():
+    model, initial = _bound_yield(0.35)
+    xml = to_sbml(model, initial_state=initial, model_id="bound")
+    formulas = _reaction_formulas(xml)
+    assert set(formulas) == {
+        "split_conversion__reaction_0",
+        "split_conversion__P__reaction_0",
+        "split_conversion__W__reaction_0",
+    }
+    assert formulas["split_conversion__P__reaction_0"] == "Y * (Vmax * S / (Km + S))"
+    assert formulas["split_conversion__W__reaction_0"] == "(1 - Y) * (Vmax * S / (Km + S))"
+    sbml_model = libsbml.readSBMLFromString(xml).getModel()
+    main = sbml_model.getReaction("split_conversion__reaction_0")
+    assert main.getNumProducts() == 0 and main.getReactant(0).getSpecies() == "S"
+    split = sbml_model.getReaction("split_conversion__P__reaction_0")
+    assert split.getProduct(0).getStoichiometry() == 1.0
+    assert [split.getModifier(i).getSpecies() for i in range(split.getNumModifiers())] == ["S"]
+    comparison = cross_engine_trajectory_check(
+        model, initial_state=initial, times=Q_(np.linspace(0, 60, 13), "second")
+    )
+    assert comparison.agrees(atol=1e-7), comparison.max_absolute_difference
+
+    # Changing Y in the SBML alone reproduces FungMod rebuilt with the new coefficients.
+    rebuilt, _ = _bound_yield(0.8)
+    changed = xml.replace('value="0.35"', 'value="0.8"')
+    assert changed != xml
+    seconds = np.linspace(0, 60, 13)
+    reference = simulate_reference_sbml(changed, times=seconds)
+    result = rebuilt.run(
+        initial_state=initial, t_span=(Q_(0, "second"), Q_(60, "second")), t_eval=Q_(seconds, "second"), label="y"
+    )
+    for name in ("S", "P", "W"):
+        assert np.allclose(reference[name], result.state(name).to("millimolar").magnitude, rtol=1e-7, atol=1e-9)
+
+
+def test_bound_coefficient_export_refuses_a_coefficient_that_disagrees_with_its_parameter():
+    process = HomogeneousMichaelisMentenProcess(
+        name="split conversion", substrate_state="S", km_symbol="Km", rate_units="millimolar/second",
+        substrate_units="millimolar", vmax_symbol="Vmax",
+        product_coefficients={"P": 0.35, "W": 0.65},
+        product_coefficient_bindings={"P": CoefficientBinding("Y"), "W": CoefficientBinding("Y", complement=True)},
+    )
+    model = _model(
+        process,
+        [_parameter("Km", 3.0, "millimolar"), _parameter("Vmax", 0.4, "millimolar/second"), _parameter("Y", 0.5, "dimensionless")],
+    )
+    initial = {"S": Q_(10.0, "millimolar"), "P": Q_(0.0, "millimolar"), "W": Q_(0.0, "millimolar")}
+    with pytest.raises(SbmlExportError, match="evaluates to"):
+        to_sbml(model, initial_state=initial, model_id="bound")
+    missing = _model(process, [_parameter("Km", 3.0, "millimolar"), _parameter("Vmax", 0.4, "millimolar/second")])
+    with pytest.raises(SbmlExportError, match="does not carry"):
+        to_sbml(missing, initial_state=initial, model_id="bound")
+
+
+def test_bindings_must_name_product_states():
+    with pytest.raises(ValueError, match="unknown: Q"):
+        HomogeneousMichaelisMentenProcess(
+            name="split", substrate_state="S", km_symbol="Km", rate_units="millimolar/second",
+            substrate_units="millimolar", vmax_symbol="Vmax", product_coefficients={"P": 1.0},
+            product_coefficient_bindings={"Q": CoefficientBinding("Y")},
+        )
+
+
+def test_assay_units_export_as_named_dimensionless_definitions():
+    model, initial = _assay_decay()
+    xml = to_sbml(model, initial_state=initial, model_id="assay")
+    sbml_model = libsbml.readSBMLFromString(xml).getModel()
+    species = sbml_model.getSpecies("activity")
+    definition = sbml_model.getUnitDefinition(species.getSubstanceUnits())
+    assert definition.getName() == "filter_paper_unit / liter"
+    kinds = {definition.getUnit(i).getKind() for i in range(definition.getNumUnits())}
+    assert libsbml.UNIT_KIND_DIMENSIONLESS in kinds and libsbml.UNIT_KIND_METRE in kinds
+    assert "filter_paper_unit" in sbml_model.getNotesString()
+    assert "no SI equivalent is implied" in sbml_model.getNotesString()
+    comparison = cross_engine_trajectory_check(
+        model, initial_state=initial, times=Q_(np.linspace(0, 100, 11), "second")
+    )
+    # Activity values are of order 100 FPU/L; FungMod integrates at rtol 1e-8.
+    assert comparison.agrees(atol=1e-5), comparison.max_absolute_difference
+
+
+def test_export_without_assay_units_has_no_unit_caveat():
+    model, initial = _first_order()
+    xml = to_sbml(model, initial_state=initial, model_id="plain")
+    assert "no SI equivalent" not in libsbml.readSBMLFromString(xml).getModel().getNotesString()
+
+
+def test_names_as_ids_option_repeats_identifiers_as_parameter_names():
+    process = FirstOrderDecayProcess(
+        name="decay", substrate_state="A", rate_constant_symbol="k", state_units="millimolar",
+    )
+    parameter = Parameter(
+        name="first-order loss constant (descriptive)", symbol="k", value=0.1, units="1/second",
+        uncertainty=None, source="unit test", confidence_level="unknown", notes="",
+    )
+    model = _model(process, [parameter])
+    initial = {"A": Q_(1.0, "millimolar")}
+    default = libsbml.readSBMLFromString(to_sbml(model, initial_state=initial)).getModel()
+    assert default.getParameter("k").getName() == "first-order loss constant (descriptive)"
+    renamed = libsbml.readSBMLFromString(to_sbml(model, initial_state=initial, names_as_ids=True)).getModel()
+    assert renamed.getParameter("k").getName() == "k"

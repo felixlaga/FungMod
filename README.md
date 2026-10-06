@@ -1381,6 +1381,13 @@ machine-readable citation is in [`CITATION.cff`](CITATION.cff); GitHub renders a
 [citing guide](https://fungmod.readthedocs.io/citing/) for BibTeX export and DOI
 details.
 
+Cross-solver reproduction (2026-10-05): the Gelain 2020 registry case is
+exported as a multi-condition PEtab problem and reproduced in COPASI under a
+frozen plan (`docs/gelain-cross-solver.md`). The two simulators agree to 1.7e-8
+of sigma at FungMod's optimum; COPASI then finds an objective 1.3 percent
+lower, which FungMod evaluates to the same value, so FungMod's recorded
+least-squares optimum is an optimiser stopping point and is reported as such.
+
 Research export and calibration hardening (2026-09-28): mixed-unit SBML exports
 preserve native trajectories; PEtab keeps validation/holdout rows outside fitting
 and rejects missing noise scales. Configured calibration offers optional

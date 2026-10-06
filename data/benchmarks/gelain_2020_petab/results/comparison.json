@@ -1,0 +1,122 @@
+{
+  "outcome": "copasi_improves",
+  "cross_check_at_copasi_best": {
+    "fungmod_objective": 3.9768232076180348,
+    "copasi_objective": 3.9768232362016986,
+    "relative_difference": 7.187562077200983e-09
+  },
+  "simulation_gate": {
+    "passed": true,
+    "worst_abs_difference_over_sigma": 1.6546225897527232e-08,
+    "per_observable": {
+      "observable_biomass": 1.6546225897527232e-08,
+      "observable_substrate": 1.526908779845278e-08,
+      "observable_cellulase_activity": 1.1446637028171996e-08,
+      "observable_beta_glucosidase_activity": 1.0979611063388301e-08
+    },
+    "objective_relative_difference": 5.055742533253273e-10,
+    "copasi_objective": 4.0306626538689585,
+    "fungmod_objective": 4.030662655906758
+  },
+  "optimum_gate": {
+    "passed": false,
+    "reference_objective": 4.030662655906759,
+    "copasi_best_objective": 3.9768232362016986,
+    "copasi_best_source": "start_1",
+    "relative_difference": 0.013357461117754599,
+    "copasi_improves": true,
+    "local_fit_objective": 3.9802922625222403,
+    "start_objectives": [
+      3.981006625373243,
+      3.9768232362016986,
+      3.9794241908714203,
+      3.984975600357918,
+      3.9806354185369752,
+      3.976951625996874,
+      3.9836803669768117,
+      3.9771786110634086,
+      4.080031525581181,
+      3.9807397342977415
+    ]
+  },
+  "parameters": [
+    {
+      "symbol": "k_h",
+      "config_symbol": "gelain_hydrolysis_k_h",
+      "fungmod": 0.012681776898273303,
+      "copasi": 0.018043883509711877,
+      "relative_difference": 0.42281981889845854
+    },
+    {
+      "symbol": "Kh",
+      "config_symbol": "gelain_hydrolysis_Kh",
+      "fungmod": 10.531997452512396,
+      "copasi": 16.330164674598855,
+      "relative_difference": 0.5505287338161398
+    },
+    {
+      "symbol": "Y",
+      "config_symbol": "gelain_hydrolysis_Y",
+      "fungmod": 0.3717013528543743,
+      "copasi": 0.4062450773067665,
+      "relative_difference": 0.0929340832018059
+    },
+    {
+      "symbol": "kd",
+      "config_symbol": "gelain_hydrolysis_kd",
+      "fungmod": 0.01792003976241154,
+      "copasi": 0.019250371724804566,
+      "relative_difference": 0.07423710996353287
+    },
+    {
+      "symbol": "K_ind",
+      "config_symbol": "gelain_hydrolysis_K_ind",
+      "fungmod": 0.01008756701679325,
+      "copasi": 0.01,
+      "relative_difference": 0.008680687488615672
+    },
+    {
+      "symbol": "qF",
+      "config_symbol": "gelain_hydrolysis_qF",
+      "fungmod": 6.883661290386444,
+      "copasi": 5.9121855563444035,
+      "relative_difference": 0.14112776516165607
+    },
+    {
+      "symbol": "kF",
+      "config_symbol": "gelain_hydrolysis_kF",
+      "fungmod": 3.9039181234178865e-05,
+      "copasi": 1.0000148349465366e-06,
+      "relative_difference": 0.974384328683845
+    },
+    {
+      "symbol": "qB",
+      "config_symbol": "gelain_hydrolysis_qB",
+      "fungmod": 15.992526926418924,
+      "copasi": 14.138015680162159,
+      "relative_difference": 0.11596111451237871
+    },
+    {
+      "symbol": "kB",
+      "config_symbol": "gelain_hydrolysis_kB",
+      "fungmod": 1.2427357609841935e-06,
+      "copasi": 1e-06,
+      "relative_difference": 0.19532371128674791
+    }
+  ],
+  "plan_sha256": "a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a",
+  "sources": {
+    "criticism_plan": "6849c8b3355d7c2f0906e8be0a3c18bab1b5c54926289573fd4e6090dc42eb86",
+    "bayesian_plan": "9574fccc809cc2a49aab2ebc9cbc8cd087d0064d26582da287915cbbce32f01a",
+    "observations": "cc8cda93a4a1a07cc73cf0c104aeaf315770aa4399e65cb2f3473e97951b699c",
+    "reference_fit": "7877ba476f65319841072184f73ea8e47cf0dd6f33a3f86f4899ca96e12879f3",
+    "plan": "a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a",
+    "sbml": "67f856b018795b40370495f1ee4d8c718684eddd2794d43e6d47607c552cd903"
+  },
+  "settings": {
+    "starts": 10,
+    "seed": 20261005,
+    "as_planned": true
+  },
+  "fungmod_objective_at_nominal": 4.030662655906758
+}

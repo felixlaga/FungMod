@@ -293,6 +293,12 @@ Ordered work, each with an exit gate:
    the existing PEtab writer, fit it in an external tool (pyPESTO or COPASI)
    and show the same optimum within a stated tolerance. Gate: one command
    reproduces the external fit and its result is checksummed.
+   Recorded 2026-10-05 (PETAB-001, `docs/gelain-cross-solver.md`): COPASI
+   reproduces FungMod's simulation to 1.7e-8 of sigma, then finds an objective
+   1.3 percent below FungMod's recorded optimum; FungMod evaluates that point to
+   the same objective. Outcome `copasi_improves` under the frozen plan: the
+   solvers agree, the stage A optimiser stopped early. Tightening it is the
+   next task before any all-condition fit is quoted as an optimum.
 5. **Unify the three whole-fungus classes** before adding any physiology, as
    section 6 already demands.
 6. **Reproducibility package and preprint.** One command regenerates every

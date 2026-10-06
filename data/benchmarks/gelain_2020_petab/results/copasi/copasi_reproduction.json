@@ -1,0 +1,486 @@
+{
+  "copasi_file": "copasi_problem.cps",
+  "versions": {
+    "copasi": "4.48.309+ (Source)",
+    "basico": "0.87",
+    "copasi_petab_importer": "1.0.9"
+  },
+  "method": {
+    "name": "Levenberg - Marquardt",
+    "settings": {
+      "Iteration Limit": 2000,
+      "Tolerance": 1e-06,
+      "name": "Levenberg - Marquardt"
+    },
+    "integrator": {
+      "Integrate Reduced Model": false,
+      "Relative Tolerance": 1e-09,
+      "Absolute Tolerance": 1e-12,
+      "Max Internal Steps": 100000,
+      "Max Internal Step Size": 0.0,
+      "name": "Deterministic (LSODA)"
+    },
+    "parameter_space": "linear (COPASI's importer ignores PEtab parameter scales)"
+  },
+  "weights": [
+    {
+      "condition": "gelain_2020_cellulose_10gl",
+      "observable": "observable_biomass",
+      "sigma": 9.40625525180876,
+      "importer_weight": 9.40625525180876,
+      "weight": 0.01130229088572282
+    },
+    {
+      "condition": "gelain_2020_cellulose_10gl",
+      "observable": "observable_substrate",
+      "sigma": 31.188432670702987,
+      "importer_weight": 31.188432670702987,
+      "weight": 0.0010280468318882943
+    },
+    {
+      "condition": "gelain_2020_cellulose_10gl",
+      "observable": "observable_cellulase_activity",
+      "sigma": 887.6433209611139,
+      "importer_weight": 887.6433209611139,
+      "weight": 1.2691794185660265e-06
+    },
+    {
+      "condition": "gelain_2020_cellulose_10gl",
+      "observable": "observable_beta_glucosidase_activity",
+      "sigma": 2150.797238431824,
+      "importer_weight": 2150.797238431824,
+      "weight": 2.161728058728527e-07
+    },
+    {
+      "condition": "gelain_2020_cellulose_20gl",
+      "observable": "observable_biomass",
+      "sigma": 9.40625525180876,
+      "importer_weight": 9.40625525180876,
+      "weight": 0.01130229088572282
+    },
+    {
+      "condition": "gelain_2020_cellulose_20gl",
+      "observable": "observable_substrate",
+      "sigma": 31.188432670702987,
+      "importer_weight": 31.188432670702987,
+      "weight": 0.0010280468318882943
+    },
+    {
+      "condition": "gelain_2020_cellulose_20gl",
+      "observable": "observable_cellulase_activity",
+      "sigma": 887.6433209611139,
+      "importer_weight": 887.6433209611139,
+      "weight": 1.2691794185660265e-06
+    },
+    {
+      "condition": "gelain_2020_cellulose_20gl",
+      "observable": "observable_beta_glucosidase_activity",
+      "sigma": 2150.797238431824,
+      "importer_weight": 2150.797238431824,
+      "weight": 2.161728058728527e-07
+    },
+    {
+      "condition": "gelain_2020_cellulose_30gl",
+      "observable": "observable_biomass",
+      "sigma": 9.40625525180876,
+      "importer_weight": 9.40625525180876,
+      "weight": 0.01130229088572282
+    },
+    {
+      "condition": "gelain_2020_cellulose_30gl",
+      "observable": "observable_substrate",
+      "sigma": 31.188432670702987,
+      "importer_weight": 31.188432670702987,
+      "weight": 0.0010280468318882943
+    },
+    {
+      "condition": "gelain_2020_cellulose_30gl",
+      "observable": "observable_cellulase_activity",
+      "sigma": 887.6433209611139,
+      "importer_weight": 887.6433209611139,
+      "weight": 1.2691794185660265e-06
+    },
+    {
+      "condition": "gelain_2020_cellulose_30gl",
+      "observable": "observable_beta_glucosidase_activity",
+      "sigma": 2150.797238431824,
+      "importer_weight": 2150.797238431824,
+      "weight": 2.161728058728527e-07
+    }
+  ],
+  "nominal": {
+    "gelain_hydrolysis_k_h": 0.012681776898273303,
+    "gelain_hydrolysis_Kh": 10.531997452512396,
+    "gelain_hydrolysis_Y": 0.3717013528543743,
+    "gelain_hydrolysis_kd": 0.01792003976241154,
+    "gelain_hydrolysis_K_ind": 0.01008756701679325,
+    "gelain_hydrolysis_qF": 6.883661290386444,
+    "gelain_hydrolysis_kF": 3.9039181234178865e-05,
+    "gelain_hydrolysis_qB": 15.992526926418924,
+    "gelain_hydrolysis_kB": 1.2427357609841935e-06
+  },
+  "simulation_at_nominal": {
+    "copasi": {
+      "objective": 4.0306626538689585,
+      "per_observable": {
+        "observable_biomass": 1.4219810742558836,
+        "observable_substrate": 0.0985563502399897,
+        "observable_cellulase_activity": 1.497689726113515,
+        "observable_beta_glucosidase_activity": 1.0124355032595693
+      },
+      "measurements": 96
+    },
+    "fungmod": {
+      "objective": 4.030662655906758,
+      "per_observable": {
+        "observable_biomass": 1.4219810865782272,
+        "observable_substrate": 0.09855634762756542,
+        "observable_cellulase_activity": 1.4976897243542464,
+        "observable_beta_glucosidase_activity": 1.012435497346719
+      },
+      "measurements": 96
+    },
+    "max_abs_difference_over_sigma": {
+      "observable_biomass": 1.6546225897527232e-08,
+      "observable_substrate": 1.526908779845278e-08,
+      "observable_cellulase_activity": 1.1446637028171996e-08,
+      "observable_beta_glucosidase_activity": 1.0979611063388301e-08
+    },
+    "objective_relative_difference": 5.055742533253273e-10
+  },
+  "local_fit": {
+    "start": {
+      "gelain_hydrolysis_k_h": 0.012681776898273303,
+      "gelain_hydrolysis_Kh": 10.531997452512396,
+      "gelain_hydrolysis_Y": 0.3717013528543743,
+      "gelain_hydrolysis_kd": 0.01792003976241154,
+      "gelain_hydrolysis_K_ind": 0.01008756701679325,
+      "gelain_hydrolysis_qF": 6.883661290386444,
+      "gelain_hydrolysis_kF": 3.9039181234178865e-05,
+      "gelain_hydrolysis_qB": 15.992526926418924,
+      "gelain_hydrolysis_kB": 1.2427357609841935e-06
+    },
+    "values": {
+      "gelain_hydrolysis_k_h": 0.016180928148221835,
+      "gelain_hydrolysis_Kh": 14.000251301597334,
+      "gelain_hydrolysis_Y": 0.41302702135015573,
+      "gelain_hydrolysis_kd": 0.019922784605114704,
+      "gelain_hydrolysis_K_ind": 0.01,
+      "gelain_hydrolysis_qF": 6.004914579798606,
+      "gelain_hydrolysis_kF": 1e-06,
+      "gelain_hydrolysis_qB": 14.337904338724652,
+      "gelain_hydrolysis_kB": 1e-06
+    },
+    "copasi_objective": 3.98029226252224,
+    "function_evaluations": 13991,
+    "failed_evaluations": 0,
+    "objective": 3.9802922625222403
+  },
+  "starts": [
+    {
+      "start": {
+        "gelain_hydrolysis_k_h": 0.00010854423143356605,
+        "gelain_hydrolysis_Kh": 0.10344658974252235,
+        "gelain_hydrolysis_Y": 0.023659796917946906,
+        "gelain_hydrolysis_kd": 0.001276312417012974,
+        "gelain_hydrolysis_K_ind": 3.2491094151322617,
+        "gelain_hydrolysis_qF": 64.01275261167547,
+        "gelain_hydrolysis_kF": 0.00040044095557928926,
+        "gelain_hydrolysis_qB": 5.285365466779826,
+        "gelain_hydrolysis_kB": 2.81347923335362e-05
+      },
+      "values": {
+        "gelain_hydrolysis_k_h": 0.016012937957693,
+        "gelain_hydrolysis_Kh": 13.796016130695092,
+        "gelain_hydrolysis_Y": 0.41256891772729365,
+        "gelain_hydrolysis_kd": 0.019892886713714676,
+        "gelain_hydrolysis_K_ind": 0.01,
+        "gelain_hydrolysis_qF": 6.022273294056177,
+        "gelain_hydrolysis_kF": 1e-06,
+        "gelain_hydrolysis_qB": 14.377969724594792,
+        "gelain_hydrolysis_kB": 1e-06
+      },
+      "copasi_objective": 3.9810066253732432,
+      "function_evaluations": 13991,
+      "failed_evaluations": 0,
+      "objective": 3.981006625373243,
+      "index": 0
+    },
+    {
+      "start": {
+        "gelain_hydrolysis_k_h": 2.3981033907714062e-05,
+        "gelain_hydrolysis_Kh": 1.0459593209026699,
+        "gelain_hydrolysis_Y": 0.012412080860620931,
+        "gelain_hydrolysis_kd": 0.00013311075356639446,
+        "gelain_hydrolysis_K_ind": 23.17287649621258,
+        "gelain_hydrolysis_qF": 0.028186537738690228,
+        "gelain_hydrolysis_kF": 0.06604587737392534,
+        "gelain_hydrolysis_qB": 0.012558283568058926,
+        "gelain_hydrolysis_kB": 0.02364915127148526
+      },
+      "values": {
+        "gelain_hydrolysis_k_h": 0.018043883509711877,
+        "gelain_hydrolysis_Kh": 16.330164674598855,
+        "gelain_hydrolysis_Y": 0.4062450773067665,
+        "gelain_hydrolysis_kd": 0.019250371724804566,
+        "gelain_hydrolysis_K_ind": 0.01,
+        "gelain_hydrolysis_qF": 5.9121855563444035,
+        "gelain_hydrolysis_kF": 1.0000148349465366e-06,
+        "gelain_hydrolysis_qB": 14.138015680162159,
+        "gelain_hydrolysis_kB": 1e-06
+      },
+      "copasi_objective": 3.976823236201698,
+      "function_evaluations": 10006,
+      "failed_evaluations": 0,
+      "objective": 3.9768232362016986,
+      "index": 1
+    },
+    {
+      "start": {
+        "gelain_hydrolysis_k_h": 0.0052475284693686095,
+        "gelain_hydrolysis_Kh": 0.011941145134648359,
+        "gelain_hydrolysis_Y": 0.5150343384780742,
+        "gelain_hydrolysis_kd": 0.0004195538537884573,
+        "gelain_hydrolysis_K_ind": 0.6642633138675818,
+        "gelain_hydrolysis_qF": 32.939931784221976,
+        "gelain_hydrolysis_kF": 4.761824401223164e-05,
+        "gelain_hydrolysis_qB": 493.18594876525907,
+        "gelain_hydrolysis_kB": 1.0082428202856958e-06
+      },
+      "values": {
+        "gelain_hydrolysis_k_h": 0.021061705891855954,
+        "gelain_hydrolysis_Kh": 20.038945314110453,
+        "gelain_hydrolysis_Y": 0.4096523771829047,
+        "gelain_hydrolysis_kd": 0.0193082847787611,
+        "gelain_hydrolysis_K_ind": 0.01,
+        "gelain_hydrolysis_qF": 5.700486890305004,
+        "gelain_hydrolysis_kF": 1e-06,
+        "gelain_hydrolysis_qB": 13.660299957341296,
+        "gelain_hydrolysis_kB": 1e-06
+      },
+      "copasi_objective": 3.979424190871422,
+      "function_evaluations": 13991,
+      "failed_evaluations": 0,
+      "objective": 3.9794241908714203,
+      "index": 2
+    },
+    {
+      "start": {
+        "gelain_hydrolysis_k_h": 0.04240899681273933,
+        "gelain_hydrolysis_Kh": 0.005221899509265462,
+        "gelain_hydrolysis_Y": 0.2811753800502011,
+        "gelain_hydrolysis_kd": 1.9017347671910126e-05,
+        "gelain_hydrolysis_K_ind": 3.2098279102516685,
+        "gelain_hydrolysis_qF": 18.759596090793657,
+        "gelain_hydrolysis_kF": 2.1899313682451214e-06,
+        "gelain_hydrolysis_qB": 0.6409350908544253,
+        "gelain_hydrolysis_kB": 0.0013892990017639573
+      },
+      "values": {
+        "gelain_hydrolysis_k_h": 0.023021974058936984,
+        "gelain_hydrolysis_Kh": 22.405351189932077,
+        "gelain_hydrolysis_Y": 0.4126331350857157,
+        "gelain_hydrolysis_kd": 0.019430438264866987,
+        "gelain_hydrolysis_K_ind": 0.01,
+        "gelain_hydrolysis_qF": 5.580492578753954,
+        "gelain_hydrolysis_kF": 1e-06,
+        "gelain_hydrolysis_qB": 13.380811337736864,
+        "gelain_hydrolysis_kB": 1e-06
+      },
+      "copasi_objective": 3.984975600357916,
+      "function_evaluations": 13991,
+      "failed_evaluations": 0,
+      "objective": 3.984975600357918,
+      "index": 3
+    },
+    {
+      "start": {
+        "gelain_hydrolysis_k_h": 2.7910517415034438e-05,
+        "gelain_hydrolysis_Kh": 0.3617930384610559,
+        "gelain_hydrolysis_Y": 0.637546045951423,
+        "gelain_hydrolysis_kd": 0.00019810058575069252,
+        "gelain_hydrolysis_K_ind": 0.0629558307900858,
+        "gelain_hydrolysis_qF": 5.970719383609213,
+        "gelain_hydrolysis_kF": 5.51431171099643e-05,
+        "gelain_hydrolysis_qB": 4.8847410582966,
+        "gelain_hydrolysis_kB": 0.0004312189195578677
+      },
+      "values": {
+        "gelain_hydrolysis_k_h": 0.01613812984453965,
+        "gelain_hydrolysis_Kh": 13.969430998816813,
+        "gelain_hydrolysis_Y": 0.4101037889336896,
+        "gelain_hydrolysis_kd": 0.01970184634008867,
+        "gelain_hydrolysis_K_ind": 0.01,
+        "gelain_hydrolysis_qF": 6.032261333382027,
+        "gelain_hydrolysis_kF": 1e-06,
+        "gelain_hydrolysis_qB": 14.402088778481076,
+        "gelain_hydrolysis_kB": 1e-06
+      },
+      "copasi_objective": 3.980635418536975,
+      "function_evaluations": 13991,
+      "failed_evaluations": 0,
+      "objective": 3.9806354185369752,
+      "index": 4
+    },
+    {
+      "start": {
+        "gelain_hydrolysis_k_h": 0.013720672564291348,
+        "gelain_hydrolysis_Kh": 0.4547208060403706,
+        "gelain_hydrolysis_Y": 0.25649602610691963,
+        "gelain_hydrolysis_kd": 3.097464112184196e-05,
+        "gelain_hydrolysis_K_ind": 9.975003671871276,
+        "gelain_hydrolysis_qF": 0.39391794681514086,
+        "gelain_hydrolysis_kF": 1.931484790170217e-06,
+        "gelain_hydrolysis_qB": 0.06700076907732926,
+        "gelain_hydrolysis_kB": 0.0002525063544081294
+      },
+      "values": {
+        "gelain_hydrolysis_k_h": 0.01768486957409815,
+        "gelain_hydrolysis_Kh": 15.874105896586833,
+        "gelain_hydrolysis_Y": 0.40803304704232213,
+        "gelain_hydrolysis_kd": 0.019413044608619527,
+        "gelain_hydrolysis_K_ind": 0.01,
+        "gelain_hydrolysis_qF": 5.923581251919993,
+        "gelain_hydrolysis_kF": 1e-06,
+        "gelain_hydrolysis_qB": 14.161915657135824,
+        "gelain_hydrolysis_kB": 1e-06
+      },
+      "copasi_objective": 3.976951625996871,
+      "function_evaluations": 13991,
+      "failed_evaluations": 0,
+      "objective": 3.976951625996874,
+      "index": 5
+    },
+    {
+      "start": {
+        "gelain_hydrolysis_k_h": 0.01849656859056106,
+        "gelain_hydrolysis_Kh": 0.025212108240929374,
+        "gelain_hydrolysis_Y": 0.0845008392569884,
+        "gelain_hydrolysis_kd": 0.0007903792321061529,
+        "gelain_hydrolysis_K_ind": 0.15936569799809616,
+        "gelain_hydrolysis_qF": 0.026843905182066755,
+        "gelain_hydrolysis_kF": 0.0026055001206471834,
+        "gelain_hydrolysis_qB": 0.40923387635399566,
+        "gelain_hydrolysis_kB": 0.004822756334414566
+      },
+      "values": {
+        "gelain_hydrolysis_k_h": 0.022614026944034322,
+        "gelain_hydrolysis_Kh": 21.920458392332502,
+        "gelain_hydrolysis_Y": 0.4101323271949972,
+        "gelain_hydrolysis_kd": 0.019265859191113486,
+        "gelain_hydrolysis_K_ind": 0.01,
+        "gelain_hydrolysis_qF": 5.6184277238847535,
+        "gelain_hydrolysis_kF": 1e-06,
+        "gelain_hydrolysis_qB": 13.467704512567817,
+        "gelain_hydrolysis_kB": 1e-06
+      },
+      "copasi_objective": 3.9836803669768113,
+      "function_evaluations": 13946,
+      "failed_evaluations": 0,
+      "objective": 3.9836803669768117,
+      "index": 6
+    },
+    {
+      "start": {
+        "gelain_hydrolysis_k_h": 0.22980614759970042,
+        "gelain_hydrolysis_Kh": 0.004777661833489182,
+        "gelain_hydrolysis_Y": 0.655105009773962,
+        "gelain_hydrolysis_kd": 0.009291460940337976,
+        "gelain_hydrolysis_K_ind": 0.01258050515723016,
+        "gelain_hydrolysis_qF": 548.5404403869975,
+        "gelain_hydrolysis_kF": 0.05996198348395121,
+        "gelain_hydrolysis_qB": 0.7660843934094851,
+        "gelain_hydrolysis_kB": 0.013720208400017923
+      },
+      "values": {
+        "gelain_hydrolysis_k_h": 0.01793490385054541,
+        "gelain_hydrolysis_Kh": 16.21225916130932,
+        "gelain_hydrolysis_Y": 0.40433380911224404,
+        "gelain_hydrolysis_kd": 0.01911320809051068,
+        "gelain_hydrolysis_K_ind": 0.01,
+        "gelain_hydrolysis_qF": 5.935748049020925,
+        "gelain_hydrolysis_kF": 1e-06,
+        "gelain_hydrolysis_qB": 14.1931437867016,
+        "gelain_hydrolysis_kB": 1e-06
+      },
+      "copasi_objective": 3.977178611063409,
+      "function_evaluations": 8431,
+      "failed_evaluations": 0,
+      "objective": 3.9771786110634086,
+      "index": 7
+    },
+    {
+      "start": {
+        "gelain_hydrolysis_k_h": 1.0402559466007474e-06,
+        "gelain_hydrolysis_Kh": 0.0015717534429814492,
+        "gelain_hydrolysis_Y": 0.07161148160716979,
+        "gelain_hydrolysis_kd": 8.298134055592905e-05,
+        "gelain_hydrolysis_K_ind": 0.1809750788614007,
+        "gelain_hydrolysis_qF": 0.010965306735304641,
+        "gelain_hydrolysis_kF": 0.01664920207634311,
+        "gelain_hydrolysis_qB": 0.01321078335638222,
+        "gelain_hydrolysis_kB": 4.7895837014103586e-06
+      },
+      "values": {
+        "gelain_hydrolysis_k_h": 0.04919665773653759,
+        "gelain_hydrolysis_Kh": 55.48321177437633,
+        "gelain_hydrolysis_Y": 0.39321667790883635,
+        "gelain_hydrolysis_kd": 0.01746330310638556,
+        "gelain_hydrolysis_K_ind": 0.01,
+        "gelain_hydrolysis_qF": 5.233212404747276,
+        "gelain_hydrolysis_kF": 1e-06,
+        "gelain_hydrolysis_qB": 12.564754034831761,
+        "gelain_hydrolysis_kB": 1e-06
+      },
+      "copasi_objective": 4.080031525581182,
+      "function_evaluations": 14000,
+      "failed_evaluations": 0,
+      "objective": 4.080031525581181,
+      "index": 8
+    },
+    {
+      "start": {
+        "gelain_hydrolysis_k_h": 0.01257545626840506,
+        "gelain_hydrolysis_Kh": 0.6257921498741659,
+        "gelain_hydrolysis_Y": 0.08135637338137294,
+        "gelain_hydrolysis_kd": 0.10155524202807081,
+        "gelain_hydrolysis_K_ind": 0.02876874132091965,
+        "gelain_hydrolysis_qF": 1.2258819512639056,
+        "gelain_hydrolysis_kF": 1.3123498884074798e-05,
+        "gelain_hydrolysis_qB": 1.9563110262959942,
+        "gelain_hydrolysis_kB": 0.013924678895611536
+      },
+      "values": {
+        "gelain_hydrolysis_k_h": 0.016072709527570932,
+        "gelain_hydrolysis_Kh": 13.870822507843577,
+        "gelain_hydrolysis_Y": 0.4127287355222915,
+        "gelain_hydrolysis_kd": 0.019908504378507663,
+        "gelain_hydrolysis_K_ind": 0.01,
+        "gelain_hydrolysis_qF": 6.0167333797685965,
+        "gelain_hydrolysis_kF": 1e-06,
+        "gelain_hydrolysis_qB": 14.364728485374854,
+        "gelain_hydrolysis_kB": 1e-06
+      },
+      "copasi_objective": 3.9807397342977393,
+      "function_evaluations": 13991,
+      "failed_evaluations": 0,
+      "objective": 3.9807397342977415,
+      "index": 9
+    }
+  ],
+  "best": {
+    "objective": 3.9768232362016986,
+    "values": {
+      "gelain_hydrolysis_k_h": 0.018043883509711877,
+      "gelain_hydrolysis_Kh": 16.330164674598855,
+      "gelain_hydrolysis_Y": 0.4062450773067665,
+      "gelain_hydrolysis_kd": 0.019250371724804566,
+      "gelain_hydrolysis_K_ind": 0.01,
+      "gelain_hydrolysis_qF": 5.9121855563444035,
+      "gelain_hydrolysis_kF": 1.0000148349465366e-06,
+      "gelain_hydrolysis_qB": 14.138015680162159,
+      "gelain_hydrolysis_kB": 1e-06
+    },
+    "source": "start_1"
+  }
+}

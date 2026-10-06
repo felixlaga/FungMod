@@ -207,7 +207,14 @@ def _parameter_entry(symbol: str, value: float, units: str, *, name: str, notes:
 
 
 def _product_map_entry(
-    template: Mapping[str, Any], *, map_id: str, name: str, reactants: Mapping[str, float], products: Mapping[str, float], notes: str
+    template: Mapping[str, Any],
+    *,
+    map_id: str,
+    name: str,
+    reactants: Mapping[str, float],
+    products: Mapping[str, float],
+    notes: str,
+    coefficient_bindings: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     entry = deepcopy(dict(template))
     entry["id"] = map_id
@@ -223,6 +230,8 @@ def _product_map_entry(
     }
     data["reactants"] = dict(reactants)
     data["products"] = dict(products)
+    # The template's bindings describe its own products; a variant map declares its own or none.
+    data["coefficient_bindings"] = {state: dict(binding) for state, binding in (coefficient_bindings or {}).items()}
     return entry
 
 
@@ -337,6 +346,10 @@ def variant_config(model_id: str, base: Mapping[str, Any], values: Mapping[str, 
                 reactants={SOLUBLE_PRODUCT_STATE: 1.0},
                 products={BIOMASS_STATE: yield_value, LEDGER_STATE: 1.0 - yield_value},
                 notes="One gram of soluble product taken up forms Y gram of biomass dry mass; (1 - Y) gram is booked to the closure ledger.",
+                coefficient_bindings={
+                    BIOMASS_STATE: {"parameter_symbol": YIELD_SYMBOL, "complement": False},
+                    LEDGER_STATE: {"parameter_symbol": YIELD_SYMBOL, "complement": True},
+                },
             ),
         ]
         hydrolysis = _process_by_id(raw, HYDROLYSIS_PROCESS)

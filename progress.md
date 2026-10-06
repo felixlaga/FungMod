@@ -26,6 +26,135 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PETAB-001 Cross-Solver Reproduction Of The Gelain Fit Through PEtab And COPASI
+
+Date: 2026-10-05
+
+Status: complete for step 5 item 4 of the software-paper plan. The registry
+hydrolysis candidate (`M0_baseline` of CRIT-001) is exported as a
+three-condition PEtab problem and reproduced in COPASI under a frozen plan.
+Outcome in the plan's vocabulary: `copasi_improves`.
+
+Changed:
+
+- `standards/sbml.py`: exports `proportional_synthesis` (a source reaction
+  with the producer and inducer as modifiers); writes product coefficients
+  bound to a parameter as separate reactions whose kinetic law multiplies the
+  rate by the parameter or its complement, refusing a coefficient that
+  disagrees with the parameter's value; writes assay-activity base units
+  (`core.units.ASSAY_BASE_UNITS`) as named dimensionless unit definitions and
+  lists them in the model notes; `to_sbml(names_as_ids=True)`.
+- `processes/surface.py`: `CoefficientBinding` and
+  `ProductReleaseMap.coefficient_bindings`; `io/registries.py` loads them;
+  `screening/culture_physiology.py` records them for every product-map
+  coefficient derived from a parameter role (`coefficient_bindings` next to
+  `coefficient_provenance`); `HomogeneousMichaelisMentenProcess` carries
+  `product_coefficient_bindings` and the factory passes them. Descriptive
+  only: every simulation still uses the numeric coefficients.
+- `standards/petab.py`: `conditions_to_petab` with `PetabCondition`,
+  `PetabObservable` and `PetabParameter`: one shared SBML model (structure
+  compared with values zeroed), condition columns for species and parameters
+  whose values differ, constant noise scales in `noiseFormula` and per-row
+  `noiseParameters` otherwise, bounds and nominal values on the linear scale.
+- `standards/copasi.py` (new, optional extra `copasi`): converts with COPASI's
+  PEtab importer in a fresh interpreter (libSBML's SWIG proxies clash with
+  libsedml's in one process), checks that every fit item addresses a model
+  value, rewrites the dependent-column weights from the importer's `sigma` to
+  `1/sigma^2` with per-experiment normalisation off, sets LSODA to relative
+  1e-9 and absolute 1e-12, simulates every condition, fits from the nominal
+  values and from log-uniform seeded starts, and re-evaluates every optimum on
+  the PEtab objective from COPASI time courses.
+- `research/gelain_petab.py`, `scripts/run_gelain_2020_petab_reproduction.py`,
+  `data/benchmarks/gelain_2020_petab/` (plan, README, results),
+  `docs/gelain-cross-solver.md`, nav, `docs/standards.md`, capability map,
+  README, `CHANGELOG.md`; `pyproject.toml` extra `copasi`, installed by CI.
+- `research/gelain_criticism.py`: variant product maps declare their own
+  coefficient bindings (M2's uptake map binds the yield; the hydrolysis map
+  has none) instead of inheriting the template's. No numerical change.
+
+Not changed: every rate law, parameter value, registry record, prior, error
+model, stage A and stage B result of CRIT-001, BAYES-001 and earlier; the
+existing single-condition PEtab export; the reference simulator.
+
+Plan: `data/benchmarks/gelain_2020_petab/plan.json`, SHA-256
+`a0f8abe9561ad1936a2ef06055cd7af8a04cf4902008790d0a14c3cb58f3184a`, frozen
+2026-10-05 before any COPASI run and pinned by `tests/test_gelain_petab.py`.
+Sources and digests: criticism plan `6849c8b3...`, Bayesian plan
+`9574fccc...`, observations `cc8cda93...`, reference fit (stage A M0 primary)
+`7877ba47...`. Gates: simulation agreement (max abs difference / sigma 1e-4,
+objective 1e-5); optimum agreement (objective 1e-3). Parameter differences
+reported, not gated. One extra reported quantity was added after the first
+run and is not a gate: FungMod's objective at COPASI's best point.
+
+Results (recorded 2026-10-05, `results/comparison.json`, `results/report.md`;
+COPASI 4.48.309, basico 0.87, importer 1.0.9):
+
+- FungMod's objective on the exported problem at the nominal values is
+  4.030662656, twice the recorded stage A cost (relative difference below
+  1e-9): the PEtab problem is the stage A primary problem.
+- Simulation at FungMod's optimum: worst |COPASI - FungMod| / sigma 1.7e-8
+  over the 96 measurements; objectives 4.030662654 and 4.030662656 (relative
+  difference 5e-10). Gate passed.
+- Optimum: COPASI's local Levenberg-Marquardt fit from FungMod's optimum
+  reaches 3.9803 (13 991 evaluations); ten random starts reach 3.9768 to
+  4.0800, best 3.9768 (start 2). FungMod's recorded optimum 4.0307 is 1.3
+  percent higher, above the 0.1 percent tolerance: outcome `copasi_improves`.
+- Cross-check: FungMod's compiled core evaluates COPASI's best point to
+  3.97682321 against COPASI's 3.97682324 (7e-9). The solvers agree; the stage
+  A optimiser (scipy `least_squares` in log space, five starts, default
+  tolerances, 30 evaluations) stopped early. COPASI's optimum sits on the
+  lower bounds of `K_ind`, `kF` and `kB` and moves along the `k_h`/`Kh`
+  direction stage A and BAYES-001 flagged as weakly determined (`k_h` 0.0127
+  to 0.0180, `Kh` 10.5 to 16.3, `Y` 0.372 to 0.406).
+
+Tests added: `tests/test_standards_sbml.py` (synthesis export and reference
+check, bound coefficients stay symbolic and respond to the parameter, refusal
+of inconsistent bindings, assay units as named dimensionless definitions,
+`names_as_ids`); `tests/test_standards_petab.py` (multi-condition export:
+condition columns, noise forms, unmeasured values, structural mismatch,
+validation, condition-specific parameters); `tests/test_standards_copasi.py`
+(toy two-condition problem: COPASI recovers the generating parameter, the
+objective agrees with FungMod and a closed form, weights rewritten, reader
+refusals); `tests/test_gelain_petab.py` (plan digest, sources, exported
+problem versus the plan and lint, FungMod objective equals the stage A
+objective, recorded results consistent with the gates, COPASI reproduction
+from the nominal values).
+
+Commands run (venv, Python 3.11): `ruff check src tests scripts/run_*.py`
+passed; `pyright` 0 errors; `mkdocs build --strict` passed; the affected test
+modules passed (see the PR for counts); the full suite result is in the PR.
+`python scripts/run_gelain_2020_petab_reproduction.py` (82 s) wrote the
+results above.
+
+Scientific impact: a cross-solver reproduction of one fit, and a finding that
+FungMod's stage A optimiser stops above the minimum on this problem. No
+verdict of CRIT-001 or BAYES-001 changes by itself: stage A compares models
+fitted with the same optimiser and BAYES-001 samples the posterior. Backward
+compatibility: `ProductReleaseMap` and `HomogeneousMichaelisMentenProcess`
+gain optional fields with empty defaults; registry-case configs gain a
+`coefficient_bindings` key on product maps; the SBML exporter accepts one more
+process type and no longer refuses assay units.
+
+Risk: low to moderate. The weight correction depends on COPASI's semantics as
+measured here (objective = sum of weight x squared residual, weight read from
+the column scale) and is tested on the toy problem against a closed form.
+
+Recommended next task: tighten the stage A optimiser (finishing step with
+tight `ftol`/`xtol`/`gtol`, more starts, or a bounded Levenberg-Marquardt
+finish) under a dated amendment of the criticism plan, re-run stage A and
+check whether any R1 verdict changes; then resume stage B (M2 chain, then M1
+and M3) and record identifiability and coverage.
+
+Addendum 2026-10-05 (hosted CI on the recorded head): importing COPASI
+resets the C locale to `C`, which switched Python's preferred text encoding to
+ASCII for the rest of the test session and failed the culture-benchmark docs
+check on Linux and macOS once the `copasi` extra was installed; the import
+helper now restores `LC_CTYPE`, the COPASI test modules skip through it, a
+regression test runs in a fresh interpreter, and the docs read names UTF-8.
+The FungMod-objective check tolerates platform floating-point differences
+(relative 1e-7; macOS differed from Linux by 1e-8). No scientific or numerical
+behaviour changed.
+
 ## CRIT-001 Gelain Model-Criticism Study: Plan Frozen
 
 Date: 2026-10-05

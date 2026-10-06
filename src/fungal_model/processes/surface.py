@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -264,8 +264,47 @@ class SurfaceCatalysisModel:
 
 
 @dataclass(frozen=True)
+class CoefficientBinding:
+    """A stoichiometric coefficient that equals a parameter, or its complement.
+
+    ``complement`` binds the coefficient to ``1 - parameter`` (a fraction that
+    closes a mass balance). The numeric coefficient stays on the product map;
+    the binding records where it came from so exporters can keep the
+    dependence symbolic.
+    """
+
+    parameter_symbol: str
+    complement: bool = False
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.parameter_symbol, str) or not self.parameter_symbol.strip():
+            raise ValueError("A coefficient binding requires a parameter symbol.")
+
+    def value(self, parameter_value: float) -> float:
+        """The coefficient implied by ``parameter_value``."""
+
+        numeric = float(parameter_value)
+        return 1.0 - numeric if self.complement else numeric
+
+    def describe(self) -> str:
+        return f"1 - {self.parameter_symbol}" if self.complement else self.parameter_symbol
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"parameter_symbol": self.parameter_symbol, "complement": self.complement}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "CoefficientBinding":
+        return cls(parameter_symbol=str(data["parameter_symbol"]), complement=bool(data.get("complement", False)))
+
+
+@dataclass(frozen=True)
 class ProductReleaseMap:
-    """Stoichiometric state mapping for a surface bond-cleavage process."""
+    """Stoichiometric state mapping for a surface bond-cleavage process.
+
+    ``coefficient_bindings`` names the parameter each product coefficient was
+    derived from, when it was derived from one. It is descriptive: the numeric
+    ``products`` entries drive every simulation.
+    """
 
     reactants: Mapping[str, float]
     products: Mapping[str, float]
@@ -273,6 +312,15 @@ class ProductReleaseMap:
     name: str | None = None
     maturity: str | None = None
     source: str | None = None
+    coefficient_bindings: Mapping[str, CoefficientBinding] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        unknown = sorted(set(self.coefficient_bindings) - set(self.products))
+        if unknown:
+            raise ValueError(
+                "Coefficient bindings must name product states of the map; unknown: " + ", ".join(unknown) + "."
+            )
+        object.__setattr__(self, "coefficient_bindings", dict(self.coefficient_bindings))
 
     @classmethod
     def one_to_one(

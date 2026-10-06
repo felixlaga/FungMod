@@ -20,6 +20,27 @@ Exportable processes (`fungmod.standards.SBML_EXPORTABLE_PROCESS_TYPES`):
 | `first_order_decay` | `k · S` |
 | `mass_action` | `k · ∏ Sᵢ^(orderᵢ)` |
 | `homogeneous_michaelis_menten` | `Vmax · S / (Km + S)` or `kcat · E · S / (Km + S)` |
+| `proportional_synthesis` | `q · P` or `q · P · I / (K_I + I)` (a source reaction; producer and inducer are modifiers) |
+
+Two representation choices keep exported models faithful where SBML has no
+direct equivalent:
+
+- **Parameter-bound stoichiometry.** A product coefficient that a registry
+  case binds to a parameter (a biomass yield `Y` and its complement `1 - Y`,
+  recorded as `coefficient_bindings` on the product map and carried by the
+  process as `product_coefficient_bindings`) is written as a separate reaction
+  whose kinetic law is `Y · rate` or `(1 - Y) · rate`, so changing `Y` in the
+  SBML changes the model exactly as it does in FungMod. The export is refused
+  if the numeric coefficient disagrees with the bound parameter's value.
+- **Assay-activity units.** `filter_paper_unit` and
+  `beta_glucosidase_assay_unit` have no SI base. They are written as named
+  dimensionless unit definitions (the name keeps the FungMod unit string), the
+  kinetic laws carry every numeric conversion explicitly, and the model notes
+  list them. No SI equivalent is implied; see
+  `fungal_model.core.units.ASSAY_BASE_UNITS`.
+
+`to_sbml(..., names_as_ids=True)` repeats each parameter's identifier as its
+SBML name, for tools that address entities by name (COPASI does).
 
 ### From a config file
 
@@ -127,6 +148,51 @@ table; and a `problem.yaml` links them. The files are written with the standard
 library, so only the `standards` extra (for the SBML model) is required. The
 result passes `petab.lint_problem`.
 
+### Multi-condition problems from assembled models
+
+`conditions_to_petab` exports an estimation problem whose conditions are built
+by code (a registry case materialised at several environments, for example)
+rather than described by one calibration config:
+
+```python
+from fungmod.standards import PetabCondition, PetabObservable, PetabParameter, conditions_to_petab
+
+export = conditions_to_petab(
+    [PetabCondition("10gl", model_10, initial_10, "hour", times_h, observed, sigma), ...],
+    observables=[PetabObservable("biomass", "biomass_dry_mass_concentration", "gram / liter"), ...],
+    parameters=[PetabParameter("gelain_hydrolysis_Y", 0.01, 1.0, 0.37, "log10", name="Y"), ...],
+    output_dir="petab_problem/",
+    model_id="gelain_2020_cellulose_hydrolysis_candidate",
+)
+```
+
+Every condition must assemble to the same model structure; species whose
+initial values differ, and parameters whose values differ, become columns of
+the condition table. Each observed value carries its noise standard deviation:
+a scale that is constant for an observable is written as a number in
+`noiseFormula` (the form COPASI's importer honours), otherwise as per-row
+`noiseParameters`. Bounds and nominal values are on the linear scale in each
+parameter's model units.
+
+## Reproduction in COPASI
+
+`fungal_model.standards.copasi` imports a PEtab problem written by
+`conditions_to_petab` into [COPASI](https://copasi.org/) through
+`copasi-petab-importer`, simulates it with tight integrator tolerances, fits
+it with Levenberg-Marquardt from the nominal values and from log-uniform random
+starts, and re-evaluates every optimum on the PEtab objective
+
+`J = Σ ((simulation − measurement) / σ)²`
+
+from COPASI's own time courses. COPASI weights a dependent column by a
+multiplier of the squared residual and the importer stores `σ` there, which
+would weight by `σ` instead of `1/σ²`; the runner rewrites every weight to
+`1/σ²`, switches off per-experiment weight normalisation, and records both
+values. The `copasi` extra (`pip install "fungmod[copasi]"`) provides
+`python-copasi`, `copasi-basico` and `copasi-petab-importer`. The Gelain
+cross-solver reproduction built on this is described in
+[the cross-solver study](gelain-cross-solver.md).
+
 ## Export correctness and migration
 
 SBML formulas contain explicit unit conversion factors. Parameter values and
@@ -231,8 +297,23 @@ subset of SBML that FungMod emits and raises on anything outside it.
     options:
       members:
         - calibration_config_to_petab
+        - conditions_to_petab
+        - PetabCondition
+        - PetabObservable
+        - PetabParameter
         - PetabExport
         - PetabExportError
+
+::: fungal_model.standards.copasi
+    options:
+      members:
+        - reproduce_in_copasi
+        - simulate_in_copasi
+        - petab_objective
+        - read_petab_tables
+        - CopasiReproduction
+        - CopasiReproductionError
+        - CopasiUnavailableError
 
 ::: fungal_model.standards.cross_engine
     options:

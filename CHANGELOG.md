@@ -6,6 +6,26 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Gelain 2020 cross-solver reproduction (`docs/gelain-cross-solver.md`): the
+  registry hydrolysis candidate exported as a three-condition PEtab problem and
+  reproduced in COPASI under a frozen plan. COPASI's time courses agree with
+  the compiled core to 1.7e-8 of sigma at FungMod's optimum; COPASI then finds
+  an objective 1.3 percent lower, which FungMod evaluates to the same value, so
+  the recorded stage A optimum is an optimiser stopping point, reported as
+  such (`copasi_improves`).
+- `fungal_model.standards.copasi`: import a FungMod PEtab problem with
+  COPASI's PEtab importer (in a fresh interpreter), rewrite the column weights
+  from sigma to `1/sigma^2`, tighten the integrator, simulate, fit locally and
+  from seeded random starts, and re-evaluate every optimum on the PEtab
+  objective. New optional extra `copasi`.
+- `conditions_to_petab`: multi-condition PEtab export from assembled models
+  with condition columns for species and parameters that differ between
+  conditions and explicit noise scales per observable.
+- SBML export of `proportional_synthesis`, of parameter-bound stoichiometric
+  coefficients (`CoefficientBinding` on product maps, written as separate
+  reactions so the parameter stays live) and of assay-activity units (named
+  dimensionless unit definitions, listed in the model notes);
+  `to_sbml(names_as_ids=True)`.
 - Gelain 2020 model-criticism study (`docs/gelain-model-criticism.md`): a
   frozen, digest-pinned plan comparing an induction state, a soluble product
   pool with Monod uptake and product inhibition, and conversion-dependent
@@ -186,6 +206,17 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- Importing the COPASI stack through `fungal_model.standards.copasi` no longer
+  leaves the process in the C locale. COPASI's static initialiser calls
+  `setlocale(LC_ALL, "C")`, which switched Python's preferred text encoding to
+  ASCII, so every later text read that named no encoding failed on non-ASCII
+  repository files once the `copasi` extra was installed (the culture-benchmark
+  docs check in CI). The import helper restores `LC_CTYPE` and keeps COPASI's
+  numeric locale; the COPASI test modules skip through that helper instead of
+  importing COPASI directly; a regression test checks the encoding in a fresh
+  interpreter. The FungMod-objective check of the cross-solver test tolerates
+  platform floating-point differences (relative 1e-7; macOS differed from
+  Linux by 1e-8).
 - The cross-engine reference simulator compiles kinetic laws from their L3
   infix text instead of libSBML `ASTNode` objects, so SBML round-trip and
   trajectory checks no longer fail once `libsedml` has been imported in the

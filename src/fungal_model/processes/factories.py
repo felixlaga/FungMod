@@ -234,11 +234,17 @@ class HomogeneousMichaelisMentenFactory:
             if isinstance(product_map_id, str) and product_map_id in context.product_maps
             else None
         )
+        product_coefficient_bindings = (
+            context.product_maps[product_map_id].coefficient_bindings
+            if isinstance(product_map_id, str) and product_map_id in context.product_maps
+            else None
+        )
         process = HomogeneousMichaelisMentenProcess(
             name=process_config.id,
             substrate_state=substrate_state,
             product_state=None if states.get("product") is None else str(states["product"]),
             product_coefficients=product_coefficients,
+            product_coefficient_bindings=product_coefficient_bindings,
             substrate_units=context.state_units[substrate_state],
             enzyme_state=enzyme_state,
             enzyme_units=None if enzyme_state is None else context.state_units[enzyme_state],
