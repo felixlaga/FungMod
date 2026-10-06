@@ -453,12 +453,16 @@ def _classify_parameter(
         )
         return
     if record.value.is_unknown:
+        details: dict[str, Any] = {"record_id": record.record_id, "value": record.value.to_dict()}
+        request = record.provenance.get("measurement_request")
+        if isinstance(request, str) and request.strip():
+            details["measurement_request"] = request.strip()
         missing.append(
             _item(
                 "parameter",
                 record.parameter_symbol,
                 "Required parameter is explicitly unknown.",
-                {"record_id": record.record_id, "value": record.value.to_dict()},
+                details,
             )
         )
         return
@@ -615,8 +619,22 @@ def _suggested_experiments(missing: list[ReportItem]) -> tuple[str, ...]:
     suggestions: list[str] = []
     for item in missing:
         if item.item_type == "parameter":
-            suggestions.append(f"Measure or curate {item.item_id} for the selected registry case.")
+            suggestions.append(missing_item_suggestion(item))
     return tuple(dict.fromkeys(suggestions))
+
+
+def missing_item_suggestion(item: ReportItem) -> str:
+    """Return the suggested experiment for one missing parameter item.
+
+    A parameter record that states its own ``measurement_request`` (carried in
+    the item details) is quoted verbatim; otherwise the generic sentence names
+    the parameter symbol.
+    """
+
+    request = item.details.get("measurement_request")
+    if isinstance(request, str) and request.strip():
+        return request.strip()
+    return f"Measure or curate {item.item_id} for the selected registry case."
 
 
 def _validate_mode(mode: str) -> None:
@@ -639,4 +657,5 @@ __all__ = [
     "ModelabilityStatus",
     "ReportItem",
     "assess_modelability",
+    "missing_item_suggestion",
 ]

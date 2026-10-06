@@ -62,6 +62,97 @@ homogeneous Michaelis-Menten and culture cases. Scientific impact: a case that
 could only fail at run time is now refused at preflight.
 
 
+## USERDATA-001 User-Supplied Enzyme And Kinetics Tables Into Virtual Experiments
+
+Status: `complete` for the stated scope (2026-10-06); the first increment of
+the user-supplied-data route of the product goal ("the user names fungus X,
+substrate Y and conditions Z, and FungMod assembles the enzymes and kinetic
+parameters from stored data, from user-supplied data, or fetched, and
+simulates").
+
+Changed:
+
+- `fungal_model.api.user_data`: `load_user_dataset(path, registry=...)`,
+  `UserDataset` (`dataset_id`, `digest`, `records`, `overlay(base)`,
+  `to_dict()`) and `UserDataError` (`issues`: file, spreadsheet row, column,
+  message; every issue is collected before raising). A directory holds
+  `user_dataset.yml` (dataset id, contributor, date, source, required time
+  grid) and `strains.csv`, `enzymes.csv`, optional `enzyme_classes.csv`,
+  `substrates.csv`, `conditions.csv`, `kinetics.csv`; any other CSV is refused.
+  Validation covers units (pint), the dimension of each quantity, molar versus
+  mass concentrations (a molar mass would be needed), finite nonnegative
+  values with positive `km`, ranges, duplicate and exact-versus-range
+  conflicts, undeclared references, registry name collisions, pH 0 to 14,
+  dissolved substrates, explicit mol/mol yields, and `vmax`/activity rows
+  (refused, never converted).
+- Generated records, all `<dataset_id>__`-prefixed and built through
+  `load_registry_record_mapping`: a fungus per strain; a namespaced enzyme
+  class per declared class (a registry parent's bond classes, substrate classes
+  and EC number copied, the parent ID in provenance only); user substrates
+  (registry substrates are referenced, not copied); an environment per
+  condition (kelvin with the original value in the notes); a homogeneous
+  Michaelis-Menten compatibility and case template per compatible class and
+  substrate, mirroring the Reaction 618 template, `scientific` only when every
+  bound parameter record is exact and scientific-eligible; a parameter record
+  per kinetics row (`user_measured`, `user_reported_literature`,
+  `user_design_value` with scientific use when exact and exploratory screening
+  when a range; `estimate` rows as `exploratory_prior`); and a
+  `user_dataset_gap` unknown with a `measurement_request` for every missing
+  role of every strain, class, substrate and condition.
+- `fungal_model.provenance`: the reserved `fungmod_user_dataset` namespace
+  (curator authoring refuses it; `classify_parameter_provenance` still
+  returns `generic`).
+- `VirtualExperiment.from_registry`, `from_names` and `virtual_experiment`
+  take `user_data` (directory or `UserDataset`): the base registry is loaded,
+  the dataset overlaid, names resolved on the overlay, then any
+  `EnvironmentGrid` overlay applied. `user_dataset_id` and
+  `user_dataset_digest` are kept on the experiment and written to
+  `virtual_experiment_summary.json` and `output_manifest.json` (`null` without
+  user data). Exported from `fungal_model.api`, `fungal_model` and `fungmod`.
+- Generic: a missing parameter whose record carries a `measurement_request`
+  is suggested with that text by `assess_modelability` and the standard table
+  writer (`missing_item_suggestion`); shipped behaviour is unchanged.
+  `parameter_source_class` and mechanism maturity label the new maturities.
+- Docs: `docs/user-data.md` (in the nav), README subsection and public API
+  list, capability row, API reference section, changelog.
+
+Tests: `tests/test_user_data_import.py` (28 tests) with fixtures
+`tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on
+a user-defined aryl ester, estimates only: exploratory preflight modelable,
+scientific blocked, exploratory simulation degrades substrate and releases
+product) and `tests/fixtures/user_data/literature_reentry/` (the SABIO-RK
+Reaction 618 selected entry re-entered as literature values with design
+concentrations: scientific simulation satisfies the integrated
+Michaelis-Menten relation within a solver-tolerance bound and product equals
+twice the substrate consumed); a gap case; eleven validation cases plus
+collection of all issues at once; registry bytes unchanged; production-factory
+round trips; digest stability; the shipped registry's preflight suggestions
+unchanged. Guardrail tests now cover `api/user_data.py` (no-hardcoding,
+no-shortcuts, no organism/substrate/enzyme tokens), the public API lists the
+new names, and the reserved-key authoring test includes the new namespace.
+
+Not changed: no process law, solver, registry file, shipped record, output
+table schema (still `1.8.0`), simulation authorization rule or shipped
+preflight text. User data never reaches `data_registry`.
+
+Scientific impact: users can now simulate their own enzyme kinetics with
+provenance per value. Scientific mode on user data means exact inputs with
+the stated evidence types, not validation; FungMod does not verify user
+values against any source.
+
+Limitations: homogeneous Michaelis-Menten on dissolved substrates only; `kcat`
+and an enzyme concentration are required (no `vmax`, no activity units); no
+molar/mass conversion and mol/mol yields only; no response laws, cocktails,
+chains, time-course data or fitting; one substrate per substrate class for
+each enzyme class; the standard deviation is provenance, not a sampling
+distribution; a copied registry EC number makes EC resolution of enzyme
+classes ambiguous on the overlaid registry; no promotion into the shared
+registry.
+
+Recommended next task: accept `vmax` with an explicit, sourced enzyme amount
+or a specific-activity conversion record, then response-law tables
+(temperature and pH) bound through the existing template modifiers.
+
 ## SPATIAL-002 Axisymmetric Geometry, Colony Observables And The Cardinal Water-Activity Law
 
 Status: `complete` for the stated scope (2026-10-06); the first three items of

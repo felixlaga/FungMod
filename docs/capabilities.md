@@ -14,6 +14,7 @@ resolve parameter identifiability or supply independent empirical evidence.
 | --- | --- | --- |
 | Registry-backed virtual experiments | Implemented and technically verified | Registry coverage is scoped, not a complete biological database. |
 | Researcher-facing aliases | Implemented | Ambiguous and unknown names fail explicitly. |
+| User-supplied enzyme and kinetics tables | Implemented (USERDATA-001) | `load_user_dataset` validates a manifest and CSV tables and `VirtualExperiment(user_data=...)` overlays the generated, namespaced records in memory. Dissolved substrates and homogeneous Michaelis-Menten (`km`, `kcat`, initial substrate and enzyme concentrations) only; no `vmax` or activity units, no response laws, no cocktails, no promotion into the shared registry. Missing roles become explicit unknowns with measurement requests. See [user-supplied data](user-data.md). |
 | Environment grids | Implemented | Values affect rates only through explicit laws or condition-specific records; a bound law reports `active_response_model`, and ranking is allowed only when every condition that varies across the screen is covered. See [environment response laws](environment-response.md). |
 | Exploratory ensembles | Implemented | Quantiles are conditional on explicit ranges, not calibrated posteriors. |
 | Scientific-mode exact-input gate | Implemented | Exact-input eligibility is not empirical validation. |

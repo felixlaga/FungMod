@@ -1,0 +1,17 @@
+dataset_id: reaction_618_reentry
+contributor: FungMod maintainers
+date: 2026-10-06
+source: >-
+  Re-entry of the selected SABIO-RK Reaction 618 kinetic law (EntryID 35622;
+  Seshadri et al. 2009, Plant Physiology, PubMed 19587102) as user-supplied
+  literature values, with a stated assay design for the initial substrate and
+  enzyme concentrations.
+notes: >-
+  Km and kcat are copied from the curated FungMod kinetic record
+  data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/curated/kinetic_record.yml.
+  The initial cellobiose and enzyme concentrations are design choices, not
+  values reported by the source.
+simulation:
+  duration: 10
+  units: hour
+  points: 61
