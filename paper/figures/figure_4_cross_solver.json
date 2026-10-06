@@ -1,0 +1,26 @@
+{
+  "generator": "fungal_model.research.paper_figures (scripts/reproduce_paper.py tables)",
+  "title": "Cross-solver check of the recorded optimum in COPASI",
+  "caption": "Objective of the exported three-condition PEtab problem at FungMod's recorded optimum, after COPASI's local fit from that point, and at the end of COPASI's fits from ten random starts (log axis). The recorded outcome is quoted in the manifest.",
+  "data": {
+    "outcome": "reproduced",
+    "reference_objective": 3.9760718986316803,
+    "local_fit_objective": 3.976071799013196,
+    "copasi_best_objective": 3.976071799013196,
+    "copasi_best_source": "local_fit",
+    "start_objectives": [
+      3.981006625373243,
+      3.9768232362016986,
+      3.9794241908714203,
+      3.984975600357918,
+      3.9806354185369752,
+      3.976951625996874,
+      3.9836803669768117,
+      3.9771786110634086,
+      4.080031525581181,
+      3.9807397342977415
+    ],
+    "fungmod_objective_at_copasi_best": 3.976071723809489,
+    "simulation_worst_abs_difference_over_sigma": 1.6373477546054917e-08
+  }
+}

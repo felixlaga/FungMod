@@ -20,15 +20,30 @@ fails when a committed table, the manifest or a source file drifts from the
 others, and when the paper stops citing a table.
 
 ```bash
-python scripts/reproduce_paper.py tables   # regenerate paper/tables (seconds)
-python scripts/reproduce_paper.py check    # committed tables match the recorded results (seconds)
+python scripts/reproduce_paper.py tables   # regenerate paper/tables and paper/figures (seconds)
+python scripts/reproduce_paper.py check    # committed tables and figures match the recorded results (seconds)
 ```
+
+## The figures and their manifest
+
+`paper/figures/` holds the paper's four figures, drawn by
+`fungal_model.research.paper_figures` from the same recorded files (and, for
+the measured points, the reviewed literature datasets): the whole-condition
+holdouts on the cellulose loadings, the posterior predictive bands, the stage
+A screen of the model-criticism study and the cross-solver objectives. Next
+to each SVG sits a JSON file with exactly the numbers plotted, and
+`manifest.json` records the sources with their digests and the key numbers
+the captions quote. `check` compares the data files and the manifest byte
+for byte and requires each SVG to exist and carry the generator marker; the
+SVG bytes themselves depend on the matplotlib version and are not compared.
+`tests/test_paper_figures.py` enforces the same and that the paper cites
+every figure.
 
 ## Tiers of reproduction
 
 | Tier | Command | What it recomputes | Cost |
 | --- | --- | --- | --- |
-| `check` | `make paper-check` | nothing scientific: the committed tables and manifest against the recorded result files and their digests | seconds |
+| `check` | `make paper-check` | nothing scientific: the committed tables, figure data and manifests against the recorded result files and their digests | seconds |
 | `verify` | `make paper-verify` | the digest chains of every study against its plan and amendment log; the frozen held-out predictions and stage B artifacts; the cross-solver plan's sources; the compiled-core objective at the recorded cross-solver optimum (must match to 1e-7); the projected cost gradient of the recorded baseline fit (must be below 1e-2 in log space) | about a minute |
 | `stage-a` | `make paper-stage-a` | stage A of the model-criticism study (every model and scenario, profiles for models that pass the screen) and the COPASI reproduction, into `outputs/paper_reproduction/`, compared with the recorded held-out errors (relative 1e-6), screens, cross-solver outcome and objectives | about two hours on four cores; needs the `copasi` extra |
 | `full` | `make paper-full` | `stage-a` plus the Bayesian study and the three stage B chains through their own scripts, compared on verdict-level fields (convergence flag, identifiability classes, R1 to R3, outcomes) | a day of compute |
