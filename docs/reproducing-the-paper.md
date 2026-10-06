@@ -55,13 +55,15 @@ tier changes the recorded results under `data/benchmarks/`.
 
 ## Environment and installation
 
-- `requirements-lock.txt` pins the runtime dependency closure; the
-  `Dockerfile` installs it.
+- `requirements-lock.txt` pins the runtime dependency closure, generated on
+  CPython 3.13 (its numpy pin needs Python 3.12 or later); the `Dockerfile`
+  installs it.
 - `make wheelhouse` downloads that closure into `wheelhouse/` and
   `make install-offline` installs the built wheel from it with network
   access disabled (`pip install --no-index --find-links wheelhouse`).
-  Continuous integration runs the same offline install on every push and then
-  runs a virtual experiment from outside the checkout.
+  Continuous integration runs the same offline install on every push, on the
+  lock's interpreter (CPython 3.13), and then runs a virtual experiment from
+  outside the checkout.
 - The `copasi` extra (`pip install "fungmod[standards,copasi]"`) is needed for
   the cross-solver tiers only.
 
