@@ -4,9 +4,11 @@ This folder contains provenance-complete literature datasets plus the schema
 contract and review checklist used before ingestion.
 
 Current datasets: three enzyme-hydrolysis sources (seven series, four enzyme
-preparations) plus one whole-culture source (six conditions, twelve biomass and
-substrate series). Distinct publications do not establish matched independent
-validation of any one model.
+preparations), one whole-culture source (six conditions, twelve biomass and
+substrate series) and one colony-growth source (two species, sixteen
+temperature-humidity conditions, sixty-four area and tip-count series).
+Distinct publications do not establish matched independent validation of any
+one model.
 
 - `gelain_2020_t_harzianum/`: six machine-readable batch conditions for
   *Trichoderma harzianum* P49P11 from Gelain et al. (2020),
@@ -71,6 +73,29 @@ validation of any one model.
   709 x 276 px, and the source's genuine standard-deviation error bars were not
   extracted, so the stored uncertainty is extraction resolution only. Regenerate
   with `scripts/digitize_cao_2015_figure_5a.py`.
+
+- `de_ligne_2019_colony_growth/`: four `literature_processed` datasets from the
+  supplementary figures of De Ligne et al. (2019), IMA Fungus 10:7, DOI
+  `10.1186/s43008-019-0009-3`, CC BY 4.0: mycelial area (cm2) and number of
+  hyphal tips of *Coniophora puteana* MUCL 11662 and *Rhizoctonia solani*
+  AG4-HG-I S010-1 on an inert Petri-dish surface, hourly for 62 h, under all
+  sixteen combinations of 15, 20, 25, 30 C and 65, 70, 75, 80 percent RH. Each
+  dataset holds sixteen condition series (one CSV each) of the authors' means
+  of four replicates with the plotted standard deviation where it could be
+  read. Every condition is plotted twice in the source (in a temperature panel
+  and in a humidity panel); both readings, their difference and a flag column
+  naming every reading limitation (hidden markers, unreadable bars,
+  single-panel values) are stored with each row, and the per-panel pixel
+  coordinates are preserved in `../source_intake/de_ligne_2019/digitized_panels.csv`.
+  Regenerate with `scripts/digitize_de_ligne_2019_figures.py`; verify with
+  `--check`. The extractor verifies the source digests, the legend colour order,
+  the axis fits and three prose statements of the article before writing.
+  All sixteen conditions of a species come from one experiment and one figure,
+  so agreement across them is within-study transfer and not independent
+  replication. The intended use is the colony-expansion target of the spatial
+  mycelium core under a frozen calibrate-and-hold-out plan; mycelial area and
+  tip count are graph-derived image measures that need a declared observation
+  operator before comparison with hyphal density fields.
 
 Resa and Buckin (2011) remains blocked in `candidate_reviews/`: its full text is
 paywalled and no extractable observations were found.

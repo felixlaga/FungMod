@@ -26,6 +26,177 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## COLONY-001 Frozen Plan For The De Ligne 2019 Colony Comparison
+
+Status: `partial` (plan frozen 2026-10-06; stage 0 software not built; no fit run).
+
+`data/benchmarks/de_ligne_2019_colony/plan.json` (SHA-256
+`e7a8706e85fef7739e96c7fe21d8aac0cbf2e4719201b1c203c9296d033066e4`, pinned by
+`tests/test_colony_comparison_plan.py`) declares the within-study transfer test
+of the continuum mycelium (SPATIAL-001) against DATA-003 before anything is
+run: an axisymmetric geometry on the scan window with the inoculum disc, the
+`colony_reserve_v1` model (tips, hyphae, internal reserve, inoculum reserve;
+one environment activity per condition scaling extension and branching, every
+other parameter shared; a two-activity comparison variant), the two
+observation operators (tips outside the disc; the window-truncated disc of the
+outermost detected hyphae as the convex-hull area), a per-series linear error
+model fitted to the readable bars, the four held-out conditions (each
+temperature and humidity level once), stages 0 to D, the decision rules and
+the four-phrase outcome vocabulary, the excluded claims and the amendment rule.
+`docs/colony-comparison.md` is the page. The feasibility run that sized the
+plan (the artificial colony on a 40 x 40 mm Cartesian grid, 62 h) took about
+three minutes per solve, so stage 0 starts with the axisymmetric grid.
+
+Recommended next task: stage 0 (axisymmetric grid with the Cartesian agreement
+check, observation operators, the cardinal water-activity law, the error-model
+fit, the runner with `--check`, the measured budget), then stage A for
+*C. puteana*.
+
+## DATA-003 De Ligne 2019 Colony Growth Dataset Ingested From Figures
+
+Status: `complete` for the stated scope (2026-10-06).
+
+Scope: the colony-expansion target for the spatial mycelium core (SPATIAL-001).
+De Ligne et al. 2019 (IMA Fungus 10:7, DOI `10.1186/s43008-019-0009-3`, CC BY
+4.0) measured the mycelial area and the number of hyphal tips of *Coniophora
+puteana* MUCL 11662 and *Rhizoctonia solani* AG4-HG-I S010-1 on an inert
+Petri-dish surface, hourly for 62 h, under sixteen temperature-humidity
+conditions, as the mean of four replicates with standard-deviation bars. The
+data exist only as raster panels in additional files 2 to 5.
+
+What exists:
+
+- `data/experiments/source_intake/de_ligne_2019/`: the article and the five
+  additional files downloaded by the owner, preserved with SHA-256 digests in
+  `manifest.json`, plus `digitized_panels.csv`, the per-panel extraction table.
+- `scripts/digitize_de_ligne_2019_figures.py`: verifies the digests, extracts
+  the embedded panels, verifies the legend colour order, calibrates each axis
+  from the equally spaced gridlines with the frame bottom as the verified
+  y zero, classifies the four staggered series by hue, locates the disc
+  markers with a background-penalised template so partly hidden discs still
+  give their centre, reads each error bar through occluders and accepts an end
+  only where its cap is visible, merges the two appearances of every condition
+  (temperature panel and humidity panel) and checks three prose statements of
+  the article before writing; `--check` reproduces the committed files.
+- `data/experiments/literature/de_ligne_2019_colony_growth/`: four
+  `literature_processed` datasets (species x quantity), sixteen condition
+  series each, 3954 observations in total; every row stores both panel
+  readings, their difference, the digitization resolution and a flag column
+  with a glossary in the metadata.
+- Tests: `tests/test_de_ligne_2019_dataset.py` (files, schema, loader,
+  flags, bounded panel disagreement, panel coverage, the article's statements,
+  the review record, manifest digests, documentation, and the extractor's
+  reproduction when `pypdfium2` and Pillow are installed);
+  `tests/test_literature_schema_contract.py` and
+  `tests/test_dataset_candidate_review.py` updated.
+
+What it is not: no model comparison, no observation operator from hyphal
+density fields to scanned area or graph-derived tip count, no parameters, no
+validation. The sixteen conditions of a species are one experiment; agreement
+across them is within-study transfer. Standard deviations are empty where the
+bar was hidden behind the marker or unreadable (flagged), and the small
+panels of figures S3 to S5 leave many bars unreadable because the four series
+are staggered by little more than a pixel.
+
+Recommended next task: declare the observation operator and a frozen
+calibrate-and-hold-out plan over the sixteen conditions, then run the
+continuum model against one species.
+
+## SPATIAL-001 A Continuum Mycelium On A Compiled Spatial Core
+
+Date: 2026-10-06
+
+Status: complete for the first slice of step 6 (exploratory). A fungus can
+now occupy space in FungMod: `fungal_model.mycelium` compiles field
+processes for hyphal growth on a uniform grid to numpy kernels, verified
+against analytic and conservation results. Nothing in it is parameterised
+for an organism; the owner decided to start step 6 before the transfer
+test of step 5.3, and the module says so in its maturity label.
+
+Changed:
+
+- `mycelium/grid.py`: `SpatialGrid` (one to three axes, `no_flux` or
+  `periodic` per axis, cell widths in metres, measures, coordinates).
+- `mycelium/operators.py`: conservative finite-volume operators on plain
+  arrays (face values and gradients, harmonic face mean, first-order upwind
+  advective flux, divergence, diffusive tendency, drift face velocities,
+  spatial integral).
+- `mycelium/fields.py`: `FieldSpec`, `FieldKernelContext` (field slots and
+  parameters converted once at compile time), the kernel types.
+- `mycelium/processes.py`: the `FieldProcess` contract (fields read and
+  changed, parameter requirements, assumptions, validity, failure modes,
+  `compile_tendency`, optional `compile_rate`, `to_dict`).
+- `mycelium/hyphae.py`: ten generic processes in the continuum forms of
+  Edelstein (1982) and Boswell et al. (2003), each functional form declared
+  as this implementation's choice with its limitations: `TipExtension`
+  (hyphae gain `v n`; `v` constant or saturating in an internal substrate;
+  an optional cost drawn only from that substrate, so it cannot overdraw),
+  `TipMotion` (diffusion plus drift up or down a declared field, upwind),
+  `LateralBranching` (`b rho` or `b rho s`), `DichotomousBranching`,
+  `Anastomosis` (`-a n rho`), `FirstOrderLoss` (optionally into a product
+  field), `LocalUptake` (linear or saturating), `Translocation` (diffusive
+  plus an active term up the tip-density gradient), `LocalSecretion`
+  (optionally saturating with a cost), `FieldDiffusion`;
+  `continuum_process_types()`.
+- `mycelium/model.py`: `MyceliumModel.compile` (refuses missing fields,
+  incompatible units, missing parameters, negative rates and non-positive
+  half-saturations), `CompiledMyceliumModel` (`rhs` at `max(field, 0)`,
+  `rates`, nearest-neighbour sparsity for implicit methods other than
+  LSODA, `simulate` through `solve_checked`), `MyceliumResult`
+  (`spatial_integral`, `occupied_measure`, `front_position`,
+  `results_summary` with maturity, assumptions and limitations),
+  `total_amount` for conservation ledgers.
+- `mycelium/benchmarks.py`: `artificial_colony_model` (two dimensions, all
+  substrate-coupled processes) and `artificial_front_model` (the
+  one-dimensional Edelstein system), round framework-benchmark values with
+  `testing` confidence.
+- `docs/spatial-mycelium.md` (new, in the navigation), `docs/api.md`,
+  `docs/capabilities.md`, `docs/paper-readiness.md`, `docs/compiled-core.md`,
+  `README.md`, `CHANGELOG.md`, `ARCHITECTURE_DEBT.md` (FD-009 narrowed),
+  the state document (step 6 status).
+- Tests: `tests/test_mycelium_core.py` (grid validation, operators against
+  the transport Laplacian in two and three dimensions, upwind conservation
+  and non-negativity, boundary faces, harmonic mean, process registry and
+  declarations, refusals of partial or overdrawing options, compile-time
+  checks, two unit systems against a closed form, every mechanism's
+  tendency in its declared units, negative-field policy, result API);
+  `tests/test_mycelium_colony.py` (pulled-front speed within 5 percent of
+  `2 sqrt(D alpha)` approached from below, colony conservation to 1e-7,
+  monotone expansion, symmetry to 1e-10, LSODA/BDF/RK45 agreement to 2e-4,
+  right-hand-side time bound, translocation conservation and active
+  transport towards tips).
+
+Not changed: the 1D and N-D reaction-diffusion engines, every well-mixed
+process, every registry record, every recorded study. Scientific impact:
+none; no organism or substrate is claimed and the module is exploratory.
+Backward compatibility: additive (a new package and docs page). Risk: low
+for code; the scientific risk is misuse of artificial parameters as if
+measured, which the maturity label, the `testing` confidence and the
+scientific-mode refusal guard against.
+
+Commands run (venv, Python 3.11): `ruff check src tests scripts/run_*.py
+scripts/reproduce_paper.py`; `pyright` (whole package); `mkdocs build
+--strict`; `pytest tests/test_mycelium_core.py tests/test_mycelium_colony.py`
+(18 passed) with the reaction-diffusion, hygiene and guardrail modules;
+results in the PR.
+
+Measured: 0.4 ms per right-hand side at 50 x 50 cells and four fields; the
+40 x 40 colony over 24 hours in 19 s with LSODA and 39 s with BDF on the
+sparse pattern; the unit-aware engines took 66 ms per right-hand side at
+200 cells.
+
+Remaining ambiguities: the active translocation and tropism terms are
+declared forms, not reproductions of any paper's equations; the extent of a
+colony depends on a threshold the caller declares; the harmonic-mean gating
+of translocation by hyphal density was tried and removed because it starves
+the tip zone, which the docs record.
+
+Recommended next task: a sparse compiled Jacobian for the spatial core so
+that colony solves are fast enough for calibration; then, once the owner
+supplies the De Ligne et al. 2019 time series and the Boswell 2003
+parameter table, a registry-parameterised *R. solani* case under a frozen
+plan comparing colony area and tip counts over time.
+
 ## PAPER-002 The Manuscript In LaTeX With Generated Table Fragments And PDF Figures
 
 Date: 2026-10-06

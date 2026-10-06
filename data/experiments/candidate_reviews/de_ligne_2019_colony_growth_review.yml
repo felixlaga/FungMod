@@ -1,0 +1,86 @@
+kind: dataset_candidate_review
+candidate_id: de_ligne_2019_colony_growth
+name: De Ligne 2019 mycelial area and tip counts of Rhizoctonia solani and Coniophora puteana under sixteen temperature and humidity conditions
+status: approved_for_ingestion
+dataset_maturity: literature_processed
+source:
+  type: literature
+  citation: >-
+    De Ligne L, Vidal-Diez de Ulzurrun G, Baetens JM, Van den Bulcke J, Van Acker J,
+    De Baets B (2019). Analysis of spatio-temporal fungal growth dynamics under
+    different environmental conditions. IMA Fungus 10:7.
+  doi: 10.1186/s43008-019-0009-3
+  url: https://imafungus.biomedcentral.com/articles/10.1186/s43008-019-0009-3
+  authors:
+    - Liselotte De Ligne
+    - Guillermo Vidal-Diez de Ulzurrun
+    - Jan M. Baetens
+    - Jan Van den Bulcke
+    - Joris Van Acker
+    - Bernard De Baets
+  year: 2019
+  notes: >-
+    Open access, CC BY 4.0 (licence confirmed by the repository owner on the article
+    page on 2026-10-06; the development container cannot reach the publisher). Two
+    filamentous fungi, Rhizoctonia solani AG4-HG-I and Coniophora puteana, grown on
+    Petri dishes under sixteen combinations of four temperatures (15, 20, 25, 30 C)
+    and four relative humidities (65, 70, 75, 80 percent RH), imaged hourly on a
+    flatbed scanner for 62 hours; mycelial area and number of tips extracted by the
+    authors' image analysis (Vidal-Diez de Ulzurrun et al. 2015). The article PDF and
+    its five additional files, downloaded by the owner, are preserved under
+    data/experiments/source_intake/de_ligne_2019 with SHA-256 digests. Additional
+    files 2 to 5 carry the growth curves as raster panels (mean of four replicates
+    with standard-deviation bars, hourly to 62 h); no table or machine-readable
+    series is published, and individual replicates are available from the authors
+    on request only.
+intended_use:
+  purpose: >-
+    Colony-expansion target for the spatial mycelium core (SPATIAL-001): mycelial
+    area and tip count over time per condition, to parameterise and test the
+    continuum hyphal processes under a frozen plan that calibrates on a subset of
+    temperature and humidity conditions and predicts the held-out ones, and to
+    bind the environment response of growth to temperature and humidity.
+  measured_quantities: [mycelial area, number of hyphal tips]
+  model_targets: [hyphal length density integrated over the colony, tip density integrated over the colony]
+  not_for:
+    - Transfer to submerged culture, to other strains or to other substrates
+    - Claims about individual hyphal geometry, branch angles or hyphal diameter, which the image analysis does not measure here
+    - Treating scanner-derived mycelial area as biomass or as hyphal length without a declared observation operator
+    - Any parameter of the continuum model promoted beyond retrospective fit before the frozen plan's held-out conditions are scored
+schema_gate:
+  requires_literature_schema: true
+  requires_units: true
+  requires_uncertainty: true
+  requires_preprocessing: true
+  requires_no_real_data_in_review: true
+review:
+  selected_by: Repository owner with the FungMod development session, after an abstract-level survey of open colony-growth datasets
+  review_date: 2026-10-06
+  schema_result: passed
+  decision_notes: >-
+    Ingested on 2026-10-06 as data/experiments/literature/de_ligne_2019_colony_growth
+    (four literature_processed datasets, sixty-four condition series, 3954
+    observations) by scripts/digitize_de_ligne_2019_figures.py, which reads every
+    condition from both panels that plot it, stores both readings and their
+    difference, flags every reading limitation (hidden markers, unreadable
+    standard-deviation bars, single-panel values) and verifies three prose
+    statements of the article before writing. The observation operator from mycelial
+    area and tip count to hyphal length and tip density fields is still to be
+    declared before any comparison with the continuum model is a result.
+    Selection rationale:
+    Selected over the Zenodo soil-microcosm network dataset of Fricker and Boddy (a
+    backup for network-level comparison), the microfluidic single-hypha datasets
+    (microscale parameters only) and the Postia placenta confocal study (single
+    condition) because it measures what the continuum model predicts, colony area
+    and tip counts over time, across an environment grid, for two species, one of
+    which (R. solani) is the organism of the continuum literature models. Ingestion
+    waits on the files: the article PDF and its additional files must be committed
+    under data/experiments/source_intake/de_ligne_2019/ with their SHA-256 digests
+    and the licence, the time-series layout inspected, the replicate structure and
+    the per-condition sampling recorded, and the observation operator from image
+    area to hyphal length density declared before any comparison.
+notes: >-
+  Review only; no observations are recorded here. The repository owner's first
+  commit on the literature branch (2026-10-06) carried LaTeX build products only;
+  the files arrived on the lit-correct branch the same day and were moved into the
+  source intake.

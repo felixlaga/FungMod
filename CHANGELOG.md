@@ -6,6 +6,30 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Frozen plan for the colony comparison (COLONY-001): the within-study
+  transfer test of the continuum mycelium against the De Ligne 2019 curves,
+  declared with its geometry, observation operators, error model, hold-outs,
+  stages and decision rules before any software or fit, digest-pinned.
+- De Ligne et al. 2019 colony growth dataset (DATA-003): hourly mycelial area
+  and tip counts of *Coniophora puteana* and *Rhizoctonia solani* under sixteen
+  temperature-humidity conditions, digitized from the supplementary figures by
+  `scripts/digitize_de_ligne_2019_figures.py` with the source PDFs preserved
+  under `data/experiments/source_intake/de_ligne_2019/`, both panel readings
+  of every value stored with their difference, and every reading limitation
+  flagged. `literature_processed`; no model comparison yet.
+- `fungal_model.mycelium` (SPATIAL-001, exploratory): a continuum mycelium
+  on a compiled finite-volume core in one to three dimensions. `SpatialGrid`,
+  `FieldSpec`, the `FieldProcess` contract and ten generic processes (tip
+  extension with an optional substrate-saturating speed and cost, tip motion
+  by diffusion and drift, lateral and dichotomous branching, anastomosis,
+  first-order losses, local uptake, translocation with an active term towards
+  tips, local secretion, field diffusion), each with assumptions, validity
+  labels, failure modes and literature-form provenance; `MyceliumModel.compile`
+  resolves every unit once and refuses bad declarations; `MyceliumResult`
+  reports integrals, occupied measure and front position. Verified against
+  the pulled-front speed of the Edelstein system, conservation, symmetry,
+  solver agreement and two unit systems (`docs/spatial-mycelium.md`). No
+  organism parameters and no colony data yet.
 - The software paper is a LaTeX manuscript, `paper/paper.tex` (it replaces
   the Markdown draft; `make paper-pdf` builds it with latexmk). The paper
   tables are now also written as LaTeX fragments (`paper/tables/*.tex`,

@@ -108,6 +108,28 @@
         - BoundaryConditionsND
         - ReactionDiffusionEngineND
 
+## Spatial mycelium
+
+::: fungal_model.mycelium
+    options:
+      members:
+        - SpatialGrid
+        - FieldSpec
+        - FieldProcess
+        - MyceliumModel
+        - CompiledMyceliumModel
+        - MyceliumResult
+        - TipExtension
+        - TipMotion
+        - LateralBranching
+        - DichotomousBranching
+        - Anastomosis
+        - FirstOrderLoss
+        - LocalUptake
+        - Translocation
+        - LocalSecretion
+        - FieldDiffusion
+
 ## Source proposals
 
 ::: fungal_model.api.source_provider

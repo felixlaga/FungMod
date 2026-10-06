@@ -76,6 +76,32 @@ time courses. No biological replicate columns appear in this sheet. They can
 help select enzyme classes for a later strain-specific module; they cannot be
 pooled with the different *T. harzianum* preparation as matched validation.
 
+## De Ligne 2019: colony growth under a temperature-humidity grid
+
+De Ligne L, Vidal-Diez de Ulzurrun G, Baetens JM, Van den Bulcke J, Van Acker J,
+De Baets B (2019). Analysis of spatio-temporal fungal growth dynamics under
+different environmental conditions. IMA Fungus 10:7,
+[10.1186/s43008-019-0009-3](https://doi.org/10.1186/s43008-019-0009-3), CC BY 4.0.
+
+`de_ligne_2019/article.pdf` and `de_ligne_2019/additional_file_{1..5}.pdf` are
+the owner's downloads from the article page (the development container cannot
+reach the publisher), preserved verbatim with their SHA-256 digests. Additional
+file 1 documents the image-analysis workflow; files 2 to 5 are one-page PDFs
+carrying the growth curves as embedded raster panels: mycelial area (files 2
+and 3) and number of tips (files 4 and 5) for *Coniophora puteana* and
+*Rhizoctonia solani*, hourly to 62 h, as the mean of four replicates with
+standard-deviation bars, for the sixteen combinations of four temperatures and
+four relative humidities. No table or machine-readable series is published and
+individual replicates are available from the authors on request only.
+
+`de_ligne_2019/digitized_panels.csv` is the per-panel extraction table written
+by `scripts/digitize_de_ligne_2019_figures.py`: one row per figure, panel,
+series and hour with the marker pixel position, its visible fraction, the
+error-bar extents and which caps were visible, the converted value and the
+reading flags. The merged datasets under
+`../literature/de_ligne_2019_colony_growth/` are built from it. Regenerate
+with the script; verify with `--check`.
+
 ## Reproduction and access results
 
 Run `python scripts/prepare_public_experimental_data.py --check` from the repo

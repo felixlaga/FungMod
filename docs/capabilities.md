@@ -46,6 +46,7 @@ resolve parameter identifiability or supply independent empirical evidence.
 | Genome-derived enzymatic capability resolution | Implemented | CAZy family to enzyme-class join from an offline dbCAN annotation. Presence and absence only: no rate, kinetic constant, expression level, or secretion claim. Polyspecific families are reported separately from diagnostic ones. |
 | Constant-coefficient nonideal reversible thermodynamics | Implemented as a separate low-level API | Coefficients and the forward kinetic scale must be sourced; no electrolyte model or configured assembly is inferred. |
 | 1D and uniform Cartesian 2D/3D reaction diffusion | Implemented and software-tested | No irregular mesh, porous morphology, moving boundary, or empirical spatial validation. |
+| Continuum mycelium on the compiled spatial core (tip extension, tip motion, branching, anastomosis, losses, uptake, translocation, secretion) | Exploratory, software-verified (`fungal_model.mycelium`) | Densities on a uniform grid; no individual hyphae, moving boundary or morphology; no organism parameters or colony-expansion validation yet. See [spatial mycelium](spatial-mycelium.md). |
 
 ## Data, curation, and validation
 

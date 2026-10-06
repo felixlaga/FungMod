@@ -355,6 +355,27 @@ Hyphal tip extension and branching with local uptake and secretion, coupled to
 the compiled reaction-diffusion core, validated against colony-expansion and
 microscopy data. This is a multi-year programme on its own and should not start
 until a well-mixed organism model is predictive.
+Status 2026-10-06 (SPATIAL-001, `docs/spatial-mycelium.md`), started on the
+owner's decision before the transfer test of step 5.3: `fungal_model.mycelium`
+is a compiled spatial core with generic continuum processes for tip
+extension, tip motion, branching, anastomosis, losses, local uptake,
+translocation and local secretion, verified against the analytic pulled-front
+speed, conservation, symmetry and solver agreement, exploratory and
+unparameterised. The colony-expansion dataset is ingested (DATA-003,
+2026-10-06): De Ligne et al. 2019, IMA Fungus 10:7, CC BY 4.0, hourly
+mycelial area and tip counts of *R. solani* and *C. puteana* under sixteen
+temperature-humidity conditions, digitized from the supplementary figures
+with both panel readings and every limitation flagged
+(`data/experiments/literature/de_ligne_2019_colony_growth/`). The
+comparison is declared in a frozen plan (COLONY-001,
+`docs/colony-comparison.md`): observation operators, error model, four
+held-out conditions, stages and decision rules, pinned by digest before any
+software or fit. Open: stage 0 of that plan (axisymmetric grid, operators,
+the cardinal water-activity law, the runner), then the fits; organism
+parameters from the literature (Boswell et al. 2003, *Rhizoctonia
+solani*); a sparse compiled Jacobian for calibration speed; lifting
+well-mixed process kernels per cell; registry and configured-workflow
+reachability.
 
 ### After step 6. Modelling all fungi
 

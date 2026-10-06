@@ -1,0 +1,75 @@
+\begin{thebibliography}{11}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Bergmann et~al.(2014)Bergmann, Adams, Moodie, Cooper, Glont, Golebiewski, Hucka, Laibe, Miller, Nickerson, Olivier, Rodriguez, Sauro, Scharm, Soiland-Reyes, Waltemath, Yvon, and Le~Nov{\`e}re]{bergmann2014}
+Frank~T. Bergmann, Richard Adams, Stuart Moodie, Jonathan Cooper, Mihai Glont, Martin Golebiewski, Michael Hucka, Camille Laibe, Andrew~K. Miller, David~P. Nickerson, Brett~G. Olivier, Nicolas Rodriguez, Herbert~M. Sauro, Martin Scharm, Stian Soiland-Reyes, Dagmar Waltemath, Florent Yvon, and Nicolas Le~Nov{\`e}re.
+\newblock {COMBINE} archive and {OMEX} format: one file to share all information to reproduce a modeling project.
+\newblock \emph{BMC Bioinformatics}, 15:\penalty0 369, 2014.
+\newblock \doi{10.1186/s12859-014-0369-z}.
+
+\bibitem[Gelain et~al.(2020)Gelain, van~der Wielen, van Gulik, da~Cruz~Pradella, and Carvalho~da Costa]{gelain2020}
+Lucas Gelain, Luuk van~der Wielen, Walter~M. van Gulik, Jos{\'e}~Geraldo da~Cruz~Pradella, and Aline Carvalho~da Costa.
+\newblock Mathematical modelling for the optimization of cellulase production using glycerol for cell growth and cellulose as the inducer substrate.
+\newblock \emph{Chemical Engineering Science: X}, 8:\penalty0 100085, 2020.
+\newblock \doi{10.1016/j.cesx.2020.100085}.
+\newblock Data: Gelain, L., \emph{Mathematical modelling for the optimization of cellulase production}, Mendeley Data V2, doi:10.17632/shd3wcczsr.2, CC BY 4.0.
+
+\bibitem[Goodman and Weare(2010)]{goodman2010}
+Jonathan Goodman and Jonathan Weare.
+\newblock Ensemble samplers with affine invariance.
+\newblock \emph{Communications in Applied Mathematics and Computational Science}, 5\penalty0 (1):\penalty0 65--80, 2010.
+\newblock \doi{10.2140/camcos.2010.5.65}.
+
+\bibitem[Hoops et~al.(2006)Hoops, Sahle, Gauges, Lee, Pahle, Simus, Singhal, Xu, Mendes, and Kummer]{hoops2006}
+Stefan Hoops, Sven Sahle, Ralph Gauges, Christine Lee, J{\"u}rgen Pahle, Natalia Simus, Mudita Singhal, Liang Xu, Pedro Mendes, and Ursula Kummer.
+\newblock {COPASI}---a {COmplex PAthway SImulator}.
+\newblock \emph{Bioinformatics}, 22\penalty0 (24):\penalty0 3067--3074, 2006.
+\newblock \doi{10.1093/bioinformatics/btl485}.
+
+\bibitem[Hucka et~al.(2003)Hucka, Finney, Sauro, Bolouri, Doyle, Kitano, et~al.]{hucka2003}
+Michael Hucka, Andrew Finney, Herbert~M. Sauro, Hamid Bolouri, John~C. Doyle, Hiroaki Kitano, et~al.
+\newblock The systems biology markup language ({SBML}): a medium for representation and exchange of biochemical network models.
+\newblock \emph{Bioinformatics}, 19\penalty0 (4):\penalty0 524--531, 2003.
+\newblock \doi{10.1093/bioinformatics/btg015}.
+
+\bibitem[Kadam et~al.(2004)Kadam, Rydholm, and McMillan]{kadam2004}
+Kiran~L. Kadam, Eric~C. Rydholm, and James~D. McMillan.
+\newblock Development and validation of a kinetic model for enzymatic saccharification of lignocellulosic biomass.
+\newblock \emph{Biotechnology Progress}, 20\penalty0 (3):\penalty0 698--705, 2004.
+\newblock \doi{10.1021/bp034316x}.
+
+\bibitem[Raue et~al.(2009)Raue, Kreutz, Maiwald, Bachmann, Schilling, Klingm{\"u}ller, and Timmer]{raue2009}
+Andreas Raue, Clemens Kreutz, Thomas Maiwald, Julie Bachmann, Marcel Schilling, Ursula Klingm{\"u}ller, and Jens Timmer.
+\newblock Structural and practical identifiability analysis of partially observed dynamical models by exploiting the profile likelihood.
+\newblock \emph{Bioinformatics}, 25\penalty0 (15):\penalty0 1923--1929, 2009.
+\newblock \doi{10.1093/bioinformatics/btp358}.
+
+\bibitem[Schmiester et~al.(2021)Schmiester, Sch{\"a}lte, Bergmann, Camba, Dudkin, Egert, Fr{\"o}hlich, Fuhrmann, Hauber, Kemmer, Lakrisenko, Loos, Merkt, M{\"u}ller, Pathirana, Raim{\'u}ndez, Refisch, Rosenblatt, Stapor, St{\"a}dter, Wang, Wieland, Banga, Timmer, Villaverde, Sahle, Kreutz, Hasenauer, and Weindl]{schmiester2021}
+Leonard Schmiester, Yannik Sch{\"a}lte, Frank~T. Bergmann, Tacio Camba, Erika Dudkin, Janine Egert, Fabian Fr{\"o}hlich, Lara Fuhrmann, Adrian~L. Hauber, Svenja Kemmer, Polina Lakrisenko, Carolin Loos, Simon Merkt, Wolfgang M{\"u}ller, Dilan Pathirana, Elba Raim{\'u}ndez, Lukas Refisch, Marcus Rosenblatt, Paul~L. Stapor, Philipp St{\"a}dter, Dantong Wang, Franz-Georg Wieland, Julio~R. Banga, Jens Timmer, Alejandro~F. Villaverde, Sven Sahle, Clemens Kreutz, Jan Hasenauer, and Daniel Weindl.
+\newblock {PEtab}---interoperable specification of parameter estimation problems in systems biology.
+\newblock \emph{PLOS Computational Biology}, 17\penalty0 (1):\penalty0 e1008646, 2021.
+\newblock \doi{10.1371/journal.pcbi.1008646}.
+
+\bibitem[Virtanen et~al.(2020)Virtanen, Gommers, Oliphant, et~al.]{virtanen2020}
+Pauli Virtanen, Ralf Gommers, Travis~E. Oliphant, et~al.
+\newblock {SciPy} 1.0: fundamental algorithms for scientific computing in {P}ython.
+\newblock \emph{Nature Methods}, 17:\penalty0 261--272, 2020.
+\newblock \doi{10.1038/s41592-019-0686-2}.
+
+\bibitem[Waltemath et~al.(2011)Waltemath, Adams, Bergmann, Hucka, Kolpakov, Miller, Moraru, Nickerson, Sahle, Snoep, and Le~Nov{\`e}re]{waltemath2011}
+Dagmar Waltemath, Richard Adams, Frank~T. Bergmann, Michael Hucka, Fedor Kolpakov, Andrew~K. Miller, Ion~I. Moraru, David Nickerson, Sven Sahle, Jacky~L. Snoep, and Nicolas Le~Nov{\`e}re.
+\newblock Reproducible computational biology experiments with {SED-ML}---the simulation experiment description markup language.
+\newblock \emph{BMC Systems Biology}, 5:\penalty0 198, 2011.
+\newblock \doi{10.1186/1752-0509-5-198}.
+
+\bibitem[Wittig et~al.(2012)Wittig, Kania, Golebiewski, Rey, Shi, Jong, Algaa, Weidemann, Sauer-Danzwith, Mir, Krebs, Bittkowski, Wetsch, Rojas, and M{\"u}ller]{wittig2012}
+Ulrike Wittig, Renate Kania, Martin Golebiewski, Maja Rey, Lei Shi, Lenneke Jong, Enkhjargal Algaa, Andreas Weidemann, Heidrun Sauer-Danzwith, Saqib Mir, Olga Krebs, Meik Bittkowski, Elina Wetsch, Isabel Rojas, and Wolfgang M{\"u}ller.
+\newblock {SABIO-RK}---database for biochemical reaction kinetics.
+\newblock \emph{Nucleic Acids Research}, 40\penalty0 (D1):\penalty0 D790--D796, 2012.
+\newblock \doi{10.1093/nar/gkr1046}.
+
+\end{thebibliography}
