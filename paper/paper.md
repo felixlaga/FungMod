@@ -164,7 +164,9 @@ digested result files.
 
 ## Whole-condition holdouts of the published candidate
 
-The joint benchmark compares seven model and family combinations against
+Table 1 (`paper/tables/table_1_joint_holdouts.md`) lists every model,
+family and scenario of the joint benchmark with its held-out error and
+screen verdict. The joint benchmark compares seven model and family combinations against
 144 published means (biomass, cellulose or glycerol, filter-paper activity
 and beta-glucosidase activity) with each condition held out in turn. On the
 three cellulose loadings the activity-driven hydrolysis candidate reaches a
@@ -178,7 +180,9 @@ validated.
 
 ## What the data identify
 
-Posterior sampling of the nine registry constants of the hydrolysis
+Table 2 (`paper/tables/table_2_identifiability.md`) gives the class,
+posterior median, credible interval, autocorrelation time and effective
+sample size of every constant. Posterior sampling of the nine registry constants of the hydrolysis
 candidate (24 walkers, 24 000 steps, 4 000 burn-in, log-uniform priors on
 the declared bounds, one shared noise multiplier) converges by the declared
 rule (every autocorrelation estimate reliable, effective sample sizes
@@ -196,7 +200,9 @@ read as ranges.
 
 ## Preregistered model criticism
 
-A frozen plan declared three mechanisms that could reduce the
+Tables 3 and 4 (`paper/tables/table_3_criticism_stage_a.md`,
+`paper/tables/table_4_criticism_stage_b.md`) carry the holdout screen and
+the posterior verdicts per mechanism. A frozen plan declared three mechanisms that could reduce the
 biomass-cellulose misfit, each added to the baseline with its bounds, an
 error model, whole-condition holdouts with a complexity screen (at least 10
 percent pooled held-out improvement, no observable more than 10 percent
@@ -238,7 +244,8 @@ next recorded task.
 
 ## Cross-solver reproduction
 
-The baseline problem (three loadings, four observables, 96 measurements,
+Table 5 (`paper/tables/table_5_cross_solver.md`) records the gates, the
+objectives and the parameter agreement. The baseline problem (three loadings, four observables, 96 measurements,
 nine parameters on a log10 scale with the criticism plan's bounds, sigma
 equal to each observable's maximum over the loadings) was exported as a
 PEtab problem and reproduced in COPASI 4.48 under a frozen plan. The first
@@ -307,13 +314,24 @@ attached.
 
 FungMod is MIT-licensed at https://github.com/felixlaga/FungMod with
 documentation at https://fungmod.readthedocs.io/. Each study above has a
-runner script, a frozen plan, a README and checksummed results; the
-cross-solver reproduction runs in about 90 seconds with
-`scripts/run_gelain_2020_petab_reproduction.py` and the `copasi` extra.
-A pinned runtime lock file, a wheel build with an installed-wheel smoke test
-outside the checkout, and `scripts/reproduce.py` for the headline
-artifacts exist; extending the single command to every table in this paper
-and archiving a tagged release with a DOI are *pending*.
+runner script, a frozen plan, a README and checksummed results. Every
+table in this paper is generated from those result files by one command,
+`python scripts/reproduce_paper.py tables`, which also writes a manifest
+naming each table's source files, their SHA-256 digests and the numbers
+the text quotes; the test suite fails if the committed tables, the
+manifest or the sources drift apart. The same command has costlier tiers:
+`check` and `verify` (seconds to a minute) recompute the digest chains, the
+compiled-core objective at the recorded cross-solver optimum and the
+stationarity of the recorded baseline fit without re-running any study;
+`stage-a` re-runs the least-squares stage and the COPASI reproduction
+(about two hours) and compares them with the recorded summaries; `full`
+also re-runs the Bayesian study and the posterior chains (a day of compute)
+and compares verdict-level fields, because seeded chains can differ in
+individual samples across platforms. The runtime dependency closure is
+pinned in `requirements-lock.txt`; continuous integration builds the wheel,
+downloads that closure into a wheelhouse and installs the wheel with
+network access disabled, then runs a virtual experiment from outside the
+checkout. A tagged, archived release with a DOI is *pending*.
 
 # AI assistance disclosure
 

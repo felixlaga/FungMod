@@ -7,7 +7,8 @@ PIP ?= $(PYTHON) -m pip
 .DEFAULT_GOAL := help
 
 .PHONY: help install install-dev lint type test test-cov docs docs-serve \
-        build package-check reproduce reproduce-quick check clean container
+        build package-check wheelhouse install-offline reproduce reproduce-quick \
+        paper-tables paper-check paper-verify paper-stage-a paper-full check clean container
 
 help: ## Show this help.
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -47,6 +48,27 @@ package-check: build ## Build and verify distribution metadata and resources.
 	$(PYTHON) -m twine check dist/*
 
 check: lint type test-cov docs ## Run every quality gate (lint, types, tests+coverage, docs).
+
+wheelhouse: build ## Download every pinned runtime dependency into wheelhouse/ for an offline install.
+	$(PIP) download -r requirements-lock.txt -d wheelhouse
+
+install-offline: wheelhouse ## Install the built wheel with no network access (from wheelhouse/ only).
+	$(PIP) install --no-index --find-links wheelhouse dist/fungmod-*.whl
+
+paper-tables: ## Regenerate paper/tables and its manifest from the recorded study results.
+	$(PYTHON) scripts/reproduce_paper.py tables
+
+paper-check: ## Verify that paper/tables matches the recorded study results (seconds).
+	$(PYTHON) scripts/reproduce_paper.py check
+
+paper-verify: ## Recompute cheap checks from the recorded study artifacts (about a minute).
+	$(PYTHON) scripts/reproduce_paper.py verify
+
+paper-stage-a: ## Re-run stage A and the COPASI reproduction into outputs/ and compare (about two hours).
+	$(PYTHON) scripts/reproduce_paper.py stage-a
+
+paper-full: ## Re-run every study behind the paper's tables and compare (a day of compute).
+	$(PYTHON) scripts/reproduce_paper.py full
 
 reproduce: ## Deterministically regenerate the headline scientific artifacts.
 	$(PYTHON) scripts/reproduce.py

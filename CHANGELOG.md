@@ -6,6 +6,18 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Reproducibility package for the software paper
+  (`docs/reproducing-the-paper.md`): `fungal_model.research.paper_tables`
+  generates the paper's five tables under `paper/tables/` from the recorded
+  study results with a manifest of source files, SHA-256 digests and key
+  numbers; `scripts/reproduce_paper.py` offers the tiers `tables`, `check`,
+  `verify` (digest chains, the compiled-core objective at the recorded
+  cross-solver optimum, the stationarity of the recorded baseline fit),
+  `stage-a` (re-run and compare) and `full` (every study, compared on
+  verdict-level fields); `make paper-tables`, `paper-check`, `paper-verify`,
+  `paper-stage-a`, `paper-full`, `wheelhouse` and `install-offline`; CI
+  installs the built wheel with network access disabled from a wheelhouse of
+  the pinned runtime closure.
 - Gelain 2020 cross-solver reproduction (`docs/gelain-cross-solver.md`): the
   registry hydrolysis candidate exported as a three-condition PEtab problem and
   reproduced in COPASI under a frozen plan. COPASI's time courses agree with
