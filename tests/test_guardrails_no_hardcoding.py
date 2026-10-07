@@ -97,6 +97,8 @@ ORGANISM_SUBSTRATE_ENZYME_TOKENS = (
     "trichoderma",
     "harzianum",
     "oryza",
+    "laccase",
+    "syringaldazine",
 )
 
 

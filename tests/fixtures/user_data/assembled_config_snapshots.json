@@ -1,0 +1,1149 @@
+{
+ "reaction_618": {
+  "kind": "model_config",
+  "name": "SABIO-RK Reaction 618 beta-glucosidase cellobiose homogeneous Michaelis-Menten sample sample_0000",
+  "mode": "scientific",
+  "maturity": "scientific",
+  "provenance": {
+   "source": "SABIO-RK Reaction 618 selected kinetic law",
+   "confidence_level": "literature_metadata",
+   "source_database": "SABIO-RK",
+   "source_reaction_id": "618",
+   "selected_kinlaw_entry_id": "35622",
+   "kinetic_record": "data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase/curated/kinetic_record.yml",
+   "registry_id": "toy_registry",
+   "fungus_id": "sabiork_beta_glucosidase_source",
+   "substrate_id": "cellobiose",
+   "environment_id": "sabiork_reaction_618_selected_conditions",
+   "process_compatibility_id": "beta_glucosidase_cellobiose_homogeneous_mm",
+   "case_template_id": "sabiork_reaction_618_homogeneous_mm_template",
+   "parameter_record_ids": {
+    "km": "sabiork_reaction_618_Km_cellobiose_sample_0",
+    "kcat": "sabiork_reaction_618_kcat_cellobiose_sample_0",
+    "substrate_initial_concentration": "sabiork_reaction_618_initial_cellobiose_concentration_sample_0",
+    "enzyme_initial_concentration": "exploratory_reaction_618_enzyme_concentration_beta_glucosidase_loguniform_sample_0"
+   },
+   "parameter_value_sources": {
+    "km": "SABIO-RK Reaction 618 selected kinetic law",
+    "kcat": "SABIO-RK Reaction 618 selected kinetic law",
+    "substrate_initial_concentration": "SABIO-RK Reaction 618 selected kinetic law",
+    "enzyme_initial_concentration": "user-supplied exploratory range"
+   },
+   "environment_conditions": {
+    "temperature": {
+     "kind": "exact",
+     "units": "kelvin",
+     "value": 303.15,
+     "lower": null,
+     "upper": null,
+     "distribution": null,
+     "parameters": {},
+     "source": "SABIO-RK Reaction 618 selected kinetic law",
+     "confidence_level": "literature_curated",
+     "notes": "Converted from original SABIO-RK temperature; original stored in KineticRecord."
+    },
+    "ph": {
+     "kind": "exact",
+     "units": "dimensionless",
+     "value": 5.0,
+     "lower": null,
+     "upper": null,
+     "distribution": null,
+     "parameters": {},
+     "source": "SABIO-RK Reaction 618 selected kinetic law",
+     "confidence_level": "literature_curated",
+     "notes": "SABIO-RK assay pH."
+    }
+   },
+   "notes": "Template describes how the local Reaction 618 registry case is assembled. It does not fetch SABIO-RK data and does not create parameter evidence.\n",
+   "environment_response": {
+    "status": "metadata_only",
+    "conditions": {},
+    "laws": [],
+    "notes": "Conditions listed here change rates through the named process laws or modifiers; conditions absent from this summary are metadata and do not change kinetics."
+   },
+   "screen_mode": "exploratory",
+   "sample_directory": "<OUTPUT_ROOT>/sabiork_beta_glucosidase_source__cellobiose__sabiork_reaction_618_selected_conditions/sample_0000"
+  },
+  "case_template": {
+   "case_template_id": "sabiork_reaction_618_homogeneous_mm_template",
+   "schema_version": "1",
+   "process_type": "homogeneous_michaelis_menten",
+   "state_roles": {
+    "substrate": "cellobiose_concentration",
+    "product": "beta_D_glucose_concentration",
+    "enzyme": "beta_glucosidase_concentration"
+   },
+   "observable_roles": [
+    "substrate",
+    "product",
+    "enzyme",
+    "degradation_rate",
+    "product_release_rate"
+   ],
+   "output_state_roles": {
+    "substrate": "cellobiose_concentration",
+    "product": "beta_D_glucose_concentration",
+    "enzyme": "beta_glucosidase_concentration"
+   },
+   "limitations": [
+    "Dissolved homogeneous Michaelis-Menten kinetics for the selected SABIO-RK entry.",
+    "This is an enzyme-kinetics case, not a whole-fungus growth or uptake model.",
+    "Stoichiometric yield drives product formation, but this remains an enzyme-kinetics case without growth or uptake."
+   ],
+   "validity_notes": [
+    "Template metadata does not resolve the missing selected-entry enzyme concentration.",
+    "Time-grid values preserve the pre-ASSEMBLY-001 runtime defaults for existing Reaction 618 tests and outputs."
+   ]
+  },
+  "entities": {
+   "substrates": [
+    {
+     "id": "cellobiose",
+     "loader": "generic_dissolved",
+     "data": {
+      "kind": "substrate",
+      "name": "Cellobiose",
+      "substrate_type": "generic_dissolved",
+      "chemical_class": "cellobiose",
+      "physical_state": "dissolved",
+      "bond_types": [
+       "beta_1_4_glycosidic"
+      ],
+      "accessible_bonds": [
+       "beta_1_4_glycosidic"
+      ],
+      "required_enzyme_classes": [
+       "beta_glucosidase"
+      ],
+      "degradation_products": [
+       {
+        "name": "beta_D_glucose",
+        "source": "SABIO-RK Reaction 618 selected kinetic law",
+        "notes": "Product declared by the selected registry substrate and case-template product-map contract."
+       }
+      ],
+      "completeness": "partial",
+      "default_degradation_model": "homogeneous_dissolved",
+      "water_activity_dependence": "unknown",
+      "provenance": {
+       "source": "SABIO-RK Reaction 618 selected kinetic law",
+       "confidence_level": "literature_metadata",
+       "notes": "Soluble disaccharide substrate for first SABIO-RK kinetic pilot.",
+       "validity_range": "Template metadata does not resolve the missing selected-entry enzyme concentration.; Time-grid values preserve the pre-ASSEMBLY-001 runtime defaults for existing Reaction 618 tests and outputs."
+      },
+      "parameters": []
+     }
+    }
+   ],
+   "enzymes": [
+    {
+     "id": "beta_glucosidase",
+     "data": {
+      "kind": "enzyme",
+      "name": "beta-glucosidase",
+      "enzyme_class": "beta_glucosidase",
+      "target_bond_types": [
+       "beta_1_4_glycosidic"
+      ],
+      "target_substrate_classes": [
+       "cellobiose"
+      ],
+      "target_substrate_names": [
+       "Cellobiose"
+      ],
+      "validity_labels": [
+       "literature_metadata",
+       "homogeneous_enzyme_kinetics"
+      ],
+      "provenance": {
+       "source": "SABIO-RK Reaction 618 selected kinetic law",
+       "measurement_method": "registry-backed case-template assembly",
+       "confidence_level": "literature_metadata",
+       "notes": "First real enzyme-class registry record for soluble beta-glucoside hydrolysis; not full cellulose degradation.",
+       "validity_range": "Template metadata does not resolve the missing selected-entry enzyme concentration.; Time-grid values preserve the pre-ASSEMBLY-001 runtime defaults for existing Reaction 618 tests and outputs.",
+       "units": "not_applicable"
+      },
+      "catalytic_parameters": [],
+      "adsorption_parameters": [],
+      "parameters": []
+     }
+    }
+   ],
+   "product_maps": [
+    {
+     "id": "sabiork_reaction_618_product_map",
+     "loader": "stoichiometric",
+     "data": {
+      "kind": "product_map",
+      "name": "SABIO-RK Reaction 618 cellobiose to beta-D-glucose product map",
+      "product_map_type": "stoichiometric",
+      "maturity": "literature_metadata",
+      "provenance": {
+       "source": "SABIO-RK Reaction 618 selected kinetic law",
+       "confidence_level": "literature_metadata",
+       "notes": "Reaction 618 stoichiometry; homogeneous product dynamics use this 2:1 glucose yield."
+      },
+      "notes": "Reaction 618 stoichiometry; homogeneous product dynamics use this 2:1 glucose yield.",
+      "reactants": {
+       "cellobiose_concentration": 1.0
+      },
+      "products": {
+       "beta_D_glucose_concentration": 2.0
+      }
+     }
+    }
+   ]
+  },
+  "parameters": [
+   {
+    "id": "sabiork_reaction_618_parameters",
+    "parameters": [
+     {
+      "name": "SABIO-RK Reaction 618 Km for cellobiose",
+      "symbol": "Km_cellobiose",
+      "value": 15.3,
+      "units": "millimolar",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 selected kinetic law",
+      "confidence_level": "literature_curated",
+      "notes": "Km for Cellobiose from selected SABIO-RK EntryID 35622. Sampled for exploratory registry ensemble. Registry case role: km.",
+      "measurement_method": "registry-backed exact ValueSpec",
+      "validity_range": "Linked registry record and case-template scope only."
+     },
+     {
+      "name": "SABIO-RK Reaction 618 kcat for cellobiose",
+      "symbol": "kcat_cellobiose",
+      "value": 0.13,
+      "units": "1 / second",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 selected kinetic law",
+      "confidence_level": "literature_curated",
+      "notes": "kcat for selected SABIO-RK EntryID 35622. Sampled for exploratory registry ensemble. Registry case role: kcat.",
+      "measurement_method": "registry-backed exact ValueSpec",
+      "validity_range": "Linked registry record and case-template scope only."
+     },
+     {
+      "name": "SABIO-RK Reaction 618 initial cellobiose concentration",
+      "symbol": "initial_cellobiose_concentration",
+      "value": 3.06,
+      "units": "millimolar",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 selected kinetic law",
+      "confidence_level": "literature_curated",
+      "notes": "Initial Cellobiose concentration from selected SABIO-RK EntryID 35622 kinetic-law variable S. Sampled for exploratory registry ensemble. Registry case role: substrate_initial_concentration.",
+      "measurement_method": "registry-backed exact ValueSpec",
+      "validity_range": "Linked registry record and case-template scope only."
+     },
+     {
+      "name": "Exploratory Reaction 618 beta-glucosidase concentration loguniform prior",
+      "symbol": "enzyme_concentration_beta_glucosidase",
+      "value": 1.1576540543340039e-05,
+      "units": "millimolar",
+      "uncertainty": 0.0,
+      "source": "user-supplied exploratory range",
+      "confidence_level": "exploratory_assumption",
+      "notes": "User-supplied exploratory enzyme concentration prior for Reaction 618 sensitivity analysis; not a literature-curated value. Sampled for exploratory registry ensemble. Registry case role: enzyme_initial_concentration.",
+      "measurement_method": "registry-backed exact ValueSpec",
+      "validity_range": "Linked registry record and case-template scope only."
+     }
+    ]
+   }
+  ],
+  "processes": [
+   {
+    "id": "sabiork_reaction_618_homogeneous_mm",
+    "process_type": "homogeneous_michaelis_menten",
+    "states": {
+     "substrate": "cellobiose_concentration",
+     "product": "beta_D_glucose_concentration",
+     "enzyme": "beta_glucosidase_concentration"
+    },
+    "product_map": "sabiork_reaction_618_product_map",
+    "parameters": {
+     "km": "Km_cellobiose",
+     "kcat": "kcat_cellobiose",
+     "rate_units": "millimolar / second"
+    },
+    "modifiers": [],
+    "output_state_roles": {
+     "substrate": "cellobiose_concentration",
+     "product": "beta_D_glucose_concentration",
+     "enzyme": "beta_glucosidase_concentration"
+    },
+    "assumptions": [
+     "Dissolved homogeneous Michaelis-Menten kinetics for the selected SABIO-RK entry.",
+     "This is an enzyme-kinetics case, not a whole-fungus growth or uptake model.",
+     "Stoichiometric yield drives product formation, but this remains an enzyme-kinetics case without growth or uptake."
+    ]
+   }
+  ],
+  "initial_state": {
+   "states": {
+    "cellobiose_concentration": {
+     "value": 3.06,
+     "units": "millimolar"
+    },
+    "beta_D_glucose_concentration": {
+     "value": 0.0,
+     "units": "millimolar"
+    },
+    "beta_glucosidase_concentration": {
+     "value": 1.1576540543340039e-05,
+     "units": "millimolar"
+    }
+   }
+  },
+  "time": {
+   "start": {
+    "value": 0.0,
+    "units": "second"
+   },
+   "stop": {
+    "value": 1000.0,
+    "units": "second"
+   },
+   "points": 101
+  },
+  "validators": [
+   {
+    "id": "non_negative_concentrations",
+    "validator_type": "non_negative",
+    "species": [
+     "cellobiose_concentration",
+     "beta_D_glucose_concentration",
+     "beta_glucosidase_concentration"
+    ]
+   },
+   {
+    "id": "substrate_product_balance",
+    "validator_type": "mass_balance",
+    "conserved_weights": {
+     "cellobiose_concentration": 1.0,
+     "beta_D_glucose_concentration": 0.5
+    }
+   }
+  ],
+  "outputs": {
+   "directory": "<OUTPUT_ROOT>/sabiork_beta_glucosidase_source__cellobiose__sabiork_reaction_618_selected_conditions/sample_0000/bundle",
+   "save": [
+    "record",
+    "validation_report"
+   ],
+   "plots": [
+    "state_trajectories"
+   ]
+  }
+ },
+ "bgl1a_ph5": {
+  "kind": "model_config",
+  "name": "P. chrysosporium BGL1A cellobiose pH-dependent Michaelis-Menten (Tsukada 2008 via SABIO-RK) sample sample_0000",
+  "mode": "scientific",
+  "maturity": "scientific",
+  "provenance": {
+   "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 (Tsukada et al. 2008, PMID 18023045)",
+   "confidence_level": "literature_metadata",
+   "source_database": "SABIO-RK",
+   "source_reaction_id": "618",
+   "selected_kinlaw_entry_id": "38522",
+   "kinetic_record": null,
+   "registry_id": "toy_registry",
+   "fungus_id": "phanerochaete_chrysosporium_k3",
+   "substrate_id": "cellobiose",
+   "environment_id": "tsukada_2008_bgl1a_assay_30c_ph5",
+   "process_compatibility_id": "phanerochaete_bgl1a_cellobiose_ph_ionization_mm",
+   "case_template_id": "phanerochaete_bgl1a_cellobiose_ph_ionization_template",
+   "parameter_record_ids": {
+    "turnover": "tsukada_2008_bgl1a_k0_cellobiose_sample_0",
+    "michaelis_constant": "tsukada_2008_bgl1a_Km0_cellobiose_sample_0",
+    "free_enzyme_lower_pk": "tsukada_2008_bgl1a_pKe1_sample_0",
+    "free_enzyme_upper_pk": "tsukada_2008_bgl1a_pKe2_sample_0",
+    "complex_lower_pk": "tsukada_2008_bgl1a_pKes1_sample_0",
+    "complex_upper_pk": "tsukada_2008_bgl1a_pKes2_sample_0",
+    "minimum_ph": "tsukada_2008_bgl1a_ph_series_minimum_sample_0",
+    "maximum_ph": "tsukada_2008_bgl1a_ph_series_maximum_sample_0",
+    "substrate_initial_concentration": "bgl1a_assay_initial_cellobiose_concentration_exploratory_sample_0",
+    "enzyme_initial_concentration": "bgl1a_assay_enzyme_concentration_exploratory_sample_0"
+   },
+   "parameter_value_sources": {
+    "turnover": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter k0 (kcat).",
+    "michaelis_constant": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter Km0 (Km, species cellobiose).",
+    "free_enzyme_lower_pk": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKe1 (pKa).",
+    "free_enzyme_upper_pk": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKe2 (pKa).",
+    "complex_lower_pk": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKes1 (pKa).",
+    "complex_upper_pk": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKes2 (pKa).",
+    "minimum_ph": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pH variable start_value.",
+    "maximum_ph": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pH variable end_value.",
+    "substrate_initial_concentration": "user-supplied exploratory assumption",
+    "enzyme_initial_concentration": "user-supplied exploratory assumption"
+   },
+   "environment_conditions": {
+    "temperature": {
+     "kind": "exact",
+     "units": "kelvin",
+     "value": 303.15,
+     "lower": null,
+     "upper": null,
+     "distribution": null,
+     "parameters": {},
+     "source": "SABIO-RK entry 38522 envvar_temperature 30 C (temperature given in PMID:16896601).",
+     "confidence_level": "literature_curated",
+     "notes": "Converted from the reported 30 C assay temperature."
+    },
+    "ph": {
+     "kind": "exact",
+     "units": "dimensionless",
+     "value": 5.0,
+     "lower": null,
+     "upper": null,
+     "distribution": null,
+     "parameters": {},
+     "source": "SABIO-RK entry 38522 pH variable range 4-8; 50 mM sodium acetate for pH 4.0-5.5.",
+     "confidence_level": "literature_curated",
+     "notes": "Assay pH within the source's measured range."
+    }
+   },
+   "notes": "Template describing how the BGL1A pH-response registry case is assembled. It does not fetch SABIO-RK data and does not create parameter evidence.\n",
+   "environment_response": {
+    "status": "active_response_model",
+    "conditions": {
+     "ph": {
+      "status": "active_response_model",
+      "laws": [
+       {
+        "process_id": "phanerochaete_bgl1a_ph_ionization_mm",
+        "law": "ph_ionization_michaelis_menten",
+        "binding": "process_law"
+       }
+      ]
+     }
+    },
+    "laws": [
+     {
+      "process_id": "phanerochaete_bgl1a_ph_ionization_mm",
+      "law": "ph_ionization_michaelis_menten",
+      "binding": "process_law"
+     }
+    ],
+    "notes": "Conditions listed here change rates through the named process laws or modifiers; conditions absent from this summary are metadata and do not change kinetics."
+   },
+   "screen_mode": "exploratory",
+   "sample_directory": "<OUTPUT_ROOT>/phanerochaete_chrysosporium_k3__cellobiose__tsukada_2008_bgl1a_assay_30c_ph5/sample_0000"
+  },
+  "case_template": {
+   "case_template_id": "phanerochaete_bgl1a_cellobiose_ph_ionization_template",
+   "schema_version": "1",
+   "process_type": "ph_ionization_michaelis_menten",
+   "state_roles": {
+    "substrate": "cellobiose_concentration",
+    "product": "beta_D_glucose_concentration",
+    "enzyme": "bgl1a_concentration"
+   },
+   "observable_roles": [
+    "substrate",
+    "product",
+    "enzyme",
+    "degradation_rate",
+    "product_release_rate"
+   ],
+   "output_state_roles": {
+    "substrate": "cellobiose_concentration",
+    "product": "beta_D_glucose_concentration",
+    "enzyme": "bgl1a_concentration"
+   },
+   "limitations": [
+    "Dissolved homogeneous Michaelis-Menten kinetics with the source-fitted diprotic pH dependence of kcat and Km; pH is read once from the environment.",
+    "This is an enzyme-kinetics case for recombinant BGL1A, not a whole-fungus growth, secretion, uptake, or wood-decay model.",
+    "The assay substrate and enzyme loadings are explicit exploratory assumptions because SABIO-RK entry 38522 records no concentrations; the case therefore runs in exploratory mode only.",
+    "Temperature is the 30 C set point of the source; no temperature response law is bound, so temperature stays metadata and cases at other temperatures cannot be ranked by temperature."
+   ],
+   "validity_notes": [
+    "The pH law was fitted over pH 4-8 in four buffers (sodium acetate, MES, HEPES, EPPS); the bound pH-range roles make cases outside that range warn rather than fail.",
+    "The 2:1 glucose yield is reaction stoichiometry; the source reports initial rates, not product time courses."
+   ]
+  },
+  "entities": {
+   "substrates": [
+    {
+     "id": "cellobiose",
+     "loader": "generic_dissolved",
+     "data": {
+      "kind": "substrate",
+      "name": "Cellobiose",
+      "substrate_type": "generic_dissolved",
+      "chemical_class": "cellobiose",
+      "physical_state": "dissolved",
+      "bond_types": [
+       "beta_1_4_glycosidic"
+      ],
+      "accessible_bonds": [
+       "beta_1_4_glycosidic"
+      ],
+      "required_enzyme_classes": [
+       "beta_glucosidase"
+      ],
+      "degradation_products": [
+       {
+        "name": "beta_D_glucose",
+        "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 (Tsukada et al. 2008, PMID 18023045)",
+        "notes": "Product declared by the selected registry substrate and case-template product-map contract."
+       }
+      ],
+      "completeness": "partial",
+      "default_degradation_model": "homogeneous_dissolved",
+      "water_activity_dependence": "unknown",
+      "provenance": {
+       "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 (Tsukada et al. 2008, PMID 18023045)",
+       "confidence_level": "literature_metadata",
+       "notes": "Soluble disaccharide substrate for first SABIO-RK kinetic pilot.",
+       "validity_range": "The pH law was fitted over pH 4-8 in four buffers (sodium acetate, MES, HEPES, EPPS); the bound pH-range roles make cases outside that range warn rather than fail.; The 2:1 glucose yield is reaction stoichiometry; the source reports initial rates, not product time courses."
+      },
+      "parameters": []
+     }
+    }
+   ],
+   "enzymes": [
+    {
+     "id": "beta_glucosidase",
+     "data": {
+      "kind": "enzyme",
+      "name": "beta-glucosidase",
+      "enzyme_class": "beta_glucosidase",
+      "target_bond_types": [
+       "beta_1_4_glycosidic"
+      ],
+      "target_substrate_classes": [
+       "cellobiose"
+      ],
+      "target_substrate_names": [
+       "Cellobiose"
+      ],
+      "validity_labels": [
+       "literature_metadata",
+       "homogeneous_enzyme_kinetics"
+      ],
+      "provenance": {
+       "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 (Tsukada et al. 2008, PMID 18023045)",
+       "measurement_method": "registry-backed case-template assembly",
+       "confidence_level": "literature_metadata",
+       "notes": "First real enzyme-class registry record for soluble beta-glucoside hydrolysis; not full cellulose degradation.",
+       "validity_range": "The pH law was fitted over pH 4-8 in four buffers (sodium acetate, MES, HEPES, EPPS); the bound pH-range roles make cases outside that range warn rather than fail.; The 2:1 glucose yield is reaction stoichiometry; the source reports initial rates, not product time courses.",
+       "units": "not_applicable"
+      },
+      "catalytic_parameters": [],
+      "adsorption_parameters": [],
+      "parameters": []
+     }
+    }
+   ],
+   "product_maps": [
+    {
+     "id": "phanerochaete_bgl1a_cellobiose_product_map",
+     "loader": "stoichiometric",
+     "data": {
+      "kind": "product_map",
+      "name": "BGL1A cellobiose to beta-D-glucose product map",
+      "product_map_type": "stoichiometric",
+      "maturity": "literature_metadata",
+      "provenance": {
+       "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 (Tsukada et al. 2008, PMID 18023045)",
+       "confidence_level": "literature_metadata",
+       "notes": "Reaction 618 stoichiometry (cellobiose + H2O -> 2 beta-D-glucose)."
+      },
+      "notes": "Reaction 618 stoichiometry (cellobiose + H2O -> 2 beta-D-glucose).",
+      "reactants": {
+       "cellobiose_concentration": 1.0
+      },
+      "products": {
+       "beta_D_glucose_concentration": 2.0
+      }
+     }
+    }
+   ],
+   "environment": {
+    "id": "tsukada_2008_bgl1a_assay_30c_ph5",
+    "data": {
+     "kind": "environment",
+     "name": "Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 5.0 (50 mM sodium acetate)",
+     "provenance": {
+      "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 experimental conditions (pH range 4-8 at 30 C; \"Temperature given in PMID:16896601\"), reporting Tsukada et al. (2008) Biotechnol Bioeng 99:1295-1302 (PMID 18023045).",
+      "source_database": "SABIO-RK",
+      "source_reaction_id": "618",
+      "selected_kinlaw_entry_id": "38522",
+      "confidence_level": "literature_curated",
+      "notes": "One pH point of the source's pH series with the buffer the source lists for this pH range. A case template may bind a pH response law that reads the pH condition; the temperature is a set point recorded as metadata unless a template binds a temperature law."
+     },
+     "conditions": {
+      "ph": {
+       "kind": "exact",
+       "units": "dimensionless",
+       "value": 5.0,
+       "lower": null,
+       "upper": null,
+       "distribution": null,
+       "parameters": {},
+       "source": "SABIO-RK entry 38522 pH variable range 4-8; 50 mM sodium acetate for pH 4.0-5.5.",
+       "confidence_level": "literature_curated",
+       "notes": "Assay pH within the source's measured range."
+      }
+     },
+     "notes": "Buffer 50 mM sodium acetate (pH 4.0-5.5 range of the source)."
+    }
+   }
+  },
+  "parameters": [
+   {
+    "id": "phanerochaete_bgl1a_parameters",
+    "parameters": [
+     {
+      "name": "BGL1A limiting turnover k0 for cellobiose (Tsukada 2008)",
+      "symbol": "bgl1a_k0_cellobiose",
+      "value": 1.81,
+      "units": "1 / second",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter k0 (kcat).",
+      "confidence_level": "literature_curated",
+      "notes": "Limiting turnover of the pH-dependent law; kcat(pH) = k0 / f_es(pH). It is the plateau constant of the fit, not the turnover at any single pH. Sampled for exploratory registry ensemble. Registry case role: turnover.",
+      "measurement_method": "Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).",
+      "validity_range": "Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601)."
+     },
+     {
+      "name": "BGL1A limiting Michaelis constant Km0 for cellobiose (Tsukada 2008)",
+      "symbol": "bgl1a_Km0_cellobiose",
+      "value": 6.8,
+      "units": "millimolar",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter Km0 (Km, species cellobiose).",
+      "confidence_level": "literature_curated",
+      "notes": "Limiting Michaelis constant of the pH-dependent law; Km(pH) = Km0 f_e(pH) / f_es(pH). SABIO-RK normalizes the value to 0.0068 M; the deposited millimolar value is stored. Sampled for exploratory registry ensemble. Registry case role: michaelis_constant.",
+      "measurement_method": "Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).",
+      "validity_range": "Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601)."
+     },
+     {
+      "name": "BGL1A free-enzyme lower pKa pKe1 (Tsukada 2008)",
+      "symbol": "bgl1a_pKe1",
+      "value": 4.4,
+      "units": "dimensionless",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKe1 (pKa).",
+      "confidence_level": "literature_curated",
+      "notes": "Lower ionization constant of the free enzyme acting on kcat/Km. Sampled for exploratory registry ensemble. Registry case role: free_enzyme_lower_pk.",
+      "measurement_method": "Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).",
+      "validity_range": "Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601)."
+     },
+     {
+      "name": "BGL1A free-enzyme upper pKa pKe2 (Tsukada 2008)",
+      "symbol": "bgl1a_pKe2",
+      "value": 7.7,
+      "units": "dimensionless",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKe2 (pKa).",
+      "confidence_level": "literature_curated",
+      "notes": "Upper ionization constant of the free enzyme acting on kcat/Km. Sampled for exploratory registry ensemble. Registry case role: free_enzyme_upper_pk.",
+      "measurement_method": "Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).",
+      "validity_range": "Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601)."
+     },
+     {
+      "name": "BGL1A enzyme-substrate complex lower pKa pKes1 (Tsukada 2008)",
+      "symbol": "bgl1a_pKes1",
+      "value": 4.1,
+      "units": "dimensionless",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKes1 (pKa).",
+      "confidence_level": "literature_curated",
+      "notes": "Lower ionization constant of the enzyme-substrate complex acting on kcat. Sampled for exploratory registry ensemble. Registry case role: complex_lower_pk.",
+      "measurement_method": "Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).",
+      "validity_range": "Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601)."
+     },
+     {
+      "name": "BGL1A enzyme-substrate complex upper pKa pKes2 (Tsukada 2008)",
+      "symbol": "bgl1a_pKes2",
+      "value": 7.6,
+      "units": "dimensionless",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pKes2 (pKa).",
+      "confidence_level": "literature_curated",
+      "notes": "Upper ionization constant of the enzyme-substrate complex acting on kcat. Sampled for exploratory registry ensemble. Registry case role: complex_upper_pk.",
+      "measurement_method": "Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).",
+      "validity_range": "Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601)."
+     },
+     {
+      "name": "BGL1A pH series lower bound (Tsukada 2008)",
+      "symbol": "bgl1a_ph_series_minimum",
+      "value": 4.0,
+      "units": "dimensionless",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pH variable start_value.",
+      "confidence_level": "literature_curated",
+      "notes": "Lower bound of the pH range over which the source fitted the law. Bound to the minimum_ph role so that cases below pH 4 raise an environmental validity warning. Sampled for exploratory registry ensemble. Registry case role: minimum_ph.",
+      "measurement_method": "Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).",
+      "validity_range": "Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601)."
+     },
+     {
+      "name": "BGL1A pH series upper bound (Tsukada 2008)",
+      "symbol": "bgl1a_ph_series_maximum",
+      "value": 8.0,
+      "units": "dimensionless",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 kinetic-law entry 38522 parameter pH variable end_value.",
+      "confidence_level": "literature_curated",
+      "notes": "Upper bound of the pH range over which the source fitted the law. Bound to the maximum_ph role so that cases above pH 8 raise an environmental validity warning. Sampled for exploratory registry ensemble. Registry case role: maximum_ph.",
+      "measurement_method": "Constant of the pH-dependent Michaelis-Menten law reported by the source and deposited in SABIO-RK entry 38522; the pH series was assayed in 50 mM sodium acetate (pH 4.0-5.5), MES (6.0-6.5), HEPES (7.0-7.5) and EPPS (8.0).",
+      "validity_range": "Recombinant BGL1A wild type on cellobiose, pH 4-8 at 30 C (temperature given in PMID 16896601)."
+     },
+     {
+      "name": "Exploratory BGL1A assay initial cellobiose concentration",
+      "symbol": "bgl1a_assay_initial_cellobiose_concentration",
+      "value": 5.0,
+      "units": "millimolar",
+      "uncertainty": 0.0,
+      "source": "user-supplied exploratory assumption",
+      "confidence_level": "exploratory_assumption",
+      "notes": "Exploratory initial cellobiose loading for the BGL1A pH-response case. The same value is used at every pH so that cases differ only in pH; scientific mode rejects this record. Sampled for exploratory registry ensemble. Registry case role: substrate_initial_concentration.",
+      "measurement_method": "explicit scenario assumption, not a measurement",
+      "validity_range": "Exploratory BGL1A pH-response screens only."
+     },
+     {
+      "name": "Exploratory BGL1A assay enzyme concentration",
+      "symbol": "bgl1a_assay_enzyme_concentration",
+      "value": 0.001,
+      "units": "millimolar",
+      "uncertainty": 0.0,
+      "source": "user-supplied exploratory assumption",
+      "confidence_level": "exploratory_assumption",
+      "notes": "Exploratory BGL1A enzyme loading for the pH-response case. The same value is used at every pH so that cases differ only in pH; scientific mode rejects this record. Sampled for exploratory registry ensemble. Registry case role: enzyme_initial_concentration.",
+      "measurement_method": "explicit scenario assumption, not a measurement",
+      "validity_range": "Exploratory BGL1A pH-response screens only."
+     }
+    ]
+   }
+  ],
+  "processes": [
+   {
+    "id": "phanerochaete_bgl1a_ph_ionization_mm",
+    "process_type": "ph_ionization_michaelis_menten",
+    "states": {
+     "substrate": "cellobiose_concentration",
+     "product": "beta_D_glucose_concentration",
+     "enzyme": "bgl1a_concentration"
+    },
+    "product_map": "phanerochaete_bgl1a_cellobiose_product_map",
+    "parameters": {
+     "turnover": "bgl1a_k0_cellobiose",
+     "michaelis_constant": "bgl1a_Km0_cellobiose",
+     "free_enzyme_lower_pk": "bgl1a_pKe1",
+     "free_enzyme_upper_pk": "bgl1a_pKe2",
+     "complex_lower_pk": "bgl1a_pKes1",
+     "complex_upper_pk": "bgl1a_pKes2",
+     "minimum_ph": "bgl1a_ph_series_minimum",
+     "maximum_ph": "bgl1a_ph_series_maximum",
+     "rate_units": "millimolar / second"
+    },
+    "modifiers": [],
+    "output_state_roles": {
+     "substrate": "cellobiose_concentration",
+     "product": "beta_D_glucose_concentration",
+     "enzyme": "bgl1a_concentration"
+    },
+    "assumptions": [
+     "Dissolved homogeneous Michaelis-Menten kinetics with the source-fitted diprotic pH dependence of kcat and Km; pH is read once from the environment.",
+     "This is an enzyme-kinetics case for recombinant BGL1A, not a whole-fungus growth, secretion, uptake, or wood-decay model.",
+     "The assay substrate and enzyme loadings are explicit exploratory assumptions because SABIO-RK entry 38522 records no concentrations; the case therefore runs in exploratory mode only.",
+     "Temperature is the 30 C set point of the source; no temperature response law is bound, so temperature stays metadata and cases at other temperatures cannot be ranked by temperature."
+    ]
+   }
+  ],
+  "initial_state": {
+   "states": {
+    "cellobiose_concentration": {
+     "value": 5.0,
+     "units": "millimolar"
+    },
+    "beta_D_glucose_concentration": {
+     "value": 0.0,
+     "units": "millimolar"
+    },
+    "bgl1a_concentration": {
+     "value": 0.001,
+     "units": "millimolar"
+    }
+   }
+  },
+  "time": {
+   "start": {
+    "value": 0.0,
+    "units": "second"
+   },
+   "stop": {
+    "value": 14400.0,
+    "units": "second"
+   },
+   "points": 145
+  },
+  "validators": [
+   {
+    "id": "non_negative_concentrations",
+    "validator_type": "non_negative",
+    "species": [
+     "cellobiose_concentration",
+     "beta_D_glucose_concentration",
+     "bgl1a_concentration"
+    ]
+   },
+   {
+    "id": "substrate_product_balance",
+    "validator_type": "mass_balance",
+    "conserved_weights": {
+     "cellobiose_concentration": 1.0,
+     "beta_D_glucose_concentration": 0.5
+    }
+   }
+  ],
+  "outputs": {
+   "directory": "<OUTPUT_ROOT>/phanerochaete_chrysosporium_k3__cellobiose__tsukada_2008_bgl1a_assay_30c_ph5/sample_0000/bundle",
+   "save": [
+    "record",
+    "validation_report"
+   ],
+   "plots": [
+    "state_trajectories"
+   ]
+  }
+ },
+ "user_data_literature_reentry_scientific": {
+  "kind": "model_config",
+  "name": "User dataset reaction_618_reentry: beta-glucosidase on Cellobiose homogeneous Michaelis-Menten",
+  "mode": "scientific",
+  "maturity": "scientific",
+  "provenance": {
+   "source": "Re-entry of the selected SABIO-RK Reaction 618 kinetic law (EntryID 35622; Seshadri et al. 2009, Plant Physiology, PubMed 19587102) as user-supplied literature values, with a stated assay design for the initial substrate and enzyme concentrations.",
+   "confidence_level": "user_supplied",
+   "source_database": null,
+   "source_reaction_id": null,
+   "selected_kinlaw_entry_id": null,
+   "kinetic_record": null,
+   "registry_id": "toy_registry",
+   "fungus_id": "reaction_618_reentry__os3bglu6_source",
+   "substrate_id": "cellobiose",
+   "environment_id": "reaction_618_reentry__c30_ph5",
+   "process_compatibility_id": "reaction_618_reentry__beta_glucosidase__cellobiose__homogeneous_mm",
+   "case_template_id": "reaction_618_reentry__beta_glucosidase__cellobiose__homogeneous_mm_template",
+   "parameter_record_ids": {
+    "km": "reaction_618_reentry__os3bglu6_source__beta_glucosidase__cellobiose__c30_ph5__km",
+    "kcat": "reaction_618_reentry__os3bglu6_source__beta_glucosidase__cellobiose__c30_ph5__kcat",
+    "substrate_initial_concentration": "reaction_618_reentry__os3bglu6_source__beta_glucosidase__cellobiose__c30_ph5__substrate_initial_concentration",
+    "enzyme_initial_concentration": "reaction_618_reentry__os3bglu6_source__beta_glucosidase__cellobiose__c30_ph5__enzyme_concentration"
+   },
+   "parameter_value_sources": {
+    "km": "SABIO-RK Reaction 618 selected kinetic law, EntryID 35622 (Seshadri et al. 2009, Plant Physiol, PubMed 19587102)",
+    "kcat": "SABIO-RK Reaction 618 selected kinetic law, EntryID 35622 (Seshadri et al. 2009, Plant Physiol, PubMed 19587102)",
+    "substrate_initial_concentration": "Virtual assay design for this re-entry; not reported by SABIO-RK",
+    "enzyme_initial_concentration": "Virtual assay design for this re-entry; not reported by SABIO-RK"
+   },
+   "environment_conditions": {
+    "temperature": {
+     "kind": "exact",
+     "units": "kelvin",
+     "value": 303.15,
+     "lower": null,
+     "upper": null,
+     "distribution": null,
+     "parameters": {},
+     "source": "User dataset reaction_618_reentry, conditions.csv row 2",
+     "confidence_level": "user_supplied",
+     "notes": "Original value 30 degC converted to kelvin."
+    },
+    "ph": {
+     "kind": "exact",
+     "units": "dimensionless",
+     "value": 5.0,
+     "lower": null,
+     "upper": null,
+     "distribution": null,
+     "parameters": {},
+     "source": "User dataset reaction_618_reentry, conditions.csv row 2",
+     "confidence_level": "user_supplied",
+     "notes": "Original value 5.0."
+    }
+   },
+   "notes": "Assembly template generated from user dataset reaction_618_reentry for enzyme class beta_glucosidase on substrate cellobiose.",
+   "environment_response": {
+    "status": "metadata_only",
+    "conditions": {},
+    "laws": [],
+    "notes": "Conditions listed here change rates through the named process laws or modifiers; conditions absent from this summary are metadata and do not change kinetics."
+   }
+  },
+  "case_template": {
+   "case_template_id": "reaction_618_reentry__beta_glucosidase__cellobiose__homogeneous_mm_template",
+   "schema_version": "1",
+   "process_type": "homogeneous_michaelis_menten",
+   "state_roles": {
+    "substrate": "cellobiose_concentration",
+    "product": "beta_D_glucose_concentration",
+    "enzyme": "beta_glucosidase_concentration"
+   },
+   "observable_roles": [
+    "substrate",
+    "product",
+    "enzyme",
+    "degradation_rate",
+    "product_release_rate"
+   ],
+   "output_state_roles": {
+    "substrate": "cellobiose_concentration",
+    "product": "beta_D_glucose_concentration",
+    "enzyme": "beta_glucosidase_concentration"
+   },
+   "limitations": [
+    "Dissolved homogeneous Michaelis-Menten kinetics from user dataset reaction_618_reentry.",
+    "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or uptake model.",
+    "No temperature or pH response law is bound; values apply at their stated condition only."
+   ],
+   "validity_notes": [
+    "Values come from user dataset reaction_618_reentry (sha256 7b21a8202ada81fab24116c68aa222a43334d4418477cd71016f2b71500655e4); FungMod did not check them against an external source.",
+    "Product formation uses the user-stated yield of 2 mol/mol."
+   ]
+  },
+  "entities": {
+   "substrates": [
+    {
+     "id": "cellobiose",
+     "loader": "generic_dissolved",
+     "data": {
+      "kind": "substrate",
+      "name": "Cellobiose",
+      "substrate_type": "generic_dissolved",
+      "chemical_class": "cellobiose",
+      "physical_state": "dissolved",
+      "bond_types": [
+       "beta_1_4_glycosidic"
+      ],
+      "accessible_bonds": [
+       "beta_1_4_glycosidic"
+      ],
+      "required_enzyme_classes": [
+       "reaction_618_reentry__beta_glucosidase"
+      ],
+      "degradation_products": [
+       {
+        "name": "beta_D_glucose",
+        "source": "Re-entry of the selected SABIO-RK Reaction 618 kinetic law (EntryID 35622; Seshadri et al. 2009, Plant Physiology, PubMed 19587102) as user-supplied literature values, with a stated assay design for the initial substrate and enzyme concentrations.",
+        "notes": "Product declared by the selected registry substrate and case-template product-map contract."
+       }
+      ],
+      "completeness": "partial",
+      "default_degradation_model": "homogeneous_dissolved",
+      "water_activity_dependence": "unknown",
+      "provenance": {
+       "source": "Re-entry of the selected SABIO-RK Reaction 618 kinetic law (EntryID 35622; Seshadri et al. 2009, Plant Physiology, PubMed 19587102) as user-supplied literature values, with a stated assay design for the initial substrate and enzyme concentrations.",
+       "confidence_level": "user_supplied",
+       "notes": "Soluble disaccharide substrate for first SABIO-RK kinetic pilot.",
+       "validity_range": "Values come from user dataset reaction_618_reentry (sha256 7b21a8202ada81fab24116c68aa222a43334d4418477cd71016f2b71500655e4); FungMod did not check them against an external source.; Product formation uses the user-stated yield of 2 mol/mol."
+      },
+      "parameters": []
+     }
+    }
+   ],
+   "enzymes": [
+    {
+     "id": "reaction_618_reentry__beta_glucosidase",
+     "data": {
+      "kind": "enzyme",
+      "name": "beta-glucosidase (reaction_618_reentry user dataset)",
+      "enzyme_class": "reaction_618_reentry__beta_glucosidase",
+      "target_bond_types": [
+       "beta_1_4_glycosidic"
+      ],
+      "target_substrate_classes": [
+       "cellobiose"
+      ],
+      "target_substrate_names": [
+       "Cellobiose"
+      ],
+      "validity_labels": [
+       "user_supplied_metadata",
+       "homogeneous_enzyme_kinetics"
+      ],
+      "provenance": {
+       "source": "Re-entry of the selected SABIO-RK Reaction 618 kinetic law (EntryID 35622; Seshadri et al. 2009, Plant Physiology, PubMed 19587102) as user-supplied literature values, with a stated assay design for the initial substrate and enzyme concentrations.",
+       "measurement_method": "registry-backed case-template assembly",
+       "confidence_level": "user_supplied",
+       "notes": "Namespaced copy of registry enzyme class beta_glucosidase for user dataset reaction_618_reentry; bond and substrate-class compatibility come from the registry record, the strain assignment from the user's enzymes.csv. Restricted to homogeneous Michaelis-Menten kinetics.",
+       "validity_range": "Values come from user dataset reaction_618_reentry (sha256 7b21a8202ada81fab24116c68aa222a43334d4418477cd71016f2b71500655e4); FungMod did not check them against an external source.; Product formation uses the user-stated yield of 2 mol/mol.",
+       "units": "not_applicable"
+      },
+      "catalytic_parameters": [],
+      "adsorption_parameters": [],
+      "parameters": []
+     }
+    }
+   ],
+   "product_maps": [
+    {
+     "id": "reaction_618_reentry__beta_glucosidase__cellobiose__product_map",
+     "loader": "stoichiometric",
+     "data": {
+      "kind": "product_map",
+      "name": "Cellobiose to beta_D_glucose product map (reaction_618_reentry)",
+      "product_map_type": "stoichiometric",
+      "maturity": "user_supplied_metadata",
+      "provenance": {
+       "source": "Re-entry of the selected SABIO-RK Reaction 618 kinetic law (EntryID 35622; Seshadri et al. 2009, Plant Physiology, PubMed 19587102) as user-supplied literature values, with a stated assay design for the initial substrate and enzyme concentrations.",
+       "confidence_level": "user_supplied",
+       "notes": "User-stated yield 2 mol beta_D_glucose per mol cellobiose (substrates.csv row 2)."
+      },
+      "notes": "User-stated yield 2 mol beta_D_glucose per mol cellobiose (substrates.csv row 2).",
+      "reactants": {
+       "cellobiose_concentration": 1.0
+      },
+      "products": {
+       "beta_D_glucose_concentration": 2.0
+      }
+     }
+    }
+   ]
+  },
+  "parameters": [
+   {
+    "id": "reaction_618_reentry__beta_glucosidase__cellobiose__parameters",
+    "parameters": [
+     {
+      "name": "km for beta-glucosidase from Os3BGlu6 beta-glucosidase source (SABIO-RK EntryID 35622) on Cellobiose at c30_ph5 (reaction_618_reentry)",
+      "symbol": "reaction_618_reentry__km__beta_glucosidase__cellobiose",
+      "value": 15.3,
+      "units": "mM",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 selected kinetic law, EntryID 35622 (Seshadri et al. 2009, Plant Physiol, PubMed 19587102)",
+      "confidence_level": "user_reported_literature",
+      "notes": "User-supplied km from dataset reaction_618_reentry (kinetics.csv row 2); evidence type literature. Registry case role: km.",
+      "measurement_method": "Michaelis-Menten parameter reported in SABIO-RK EntryID 35622 (Os3BGlu6 on cellobiose, 100 mM sodium acetate)",
+      "validity_range": "Condition c30_ph5: 30 degC, pH 5.0; no temperature or pH response law is attached."
+     },
+     {
+      "name": "kcat for beta-glucosidase from Os3BGlu6 beta-glucosidase source (SABIO-RK EntryID 35622) on Cellobiose at c30_ph5 (reaction_618_reentry)",
+      "symbol": "reaction_618_reentry__kcat__beta_glucosidase__cellobiose",
+      "value": 0.13,
+      "units": "s^(-1)",
+      "uncertainty": 0.0,
+      "source": "SABIO-RK Reaction 618 selected kinetic law, EntryID 35622 (Seshadri et al. 2009, Plant Physiol, PubMed 19587102)",
+      "confidence_level": "user_reported_literature",
+      "notes": "User-supplied kcat from dataset reaction_618_reentry (kinetics.csv row 3); evidence type literature. Registry case role: kcat.",
+      "measurement_method": "Michaelis-Menten parameter reported in SABIO-RK EntryID 35622 (Os3BGlu6 on cellobiose, 100 mM sodium acetate)",
+      "validity_range": "Condition c30_ph5: 30 degC, pH 5.0; no temperature or pH response law is attached."
+     },
+     {
+      "name": "initial substrate concentration for beta-glucosidase from Os3BGlu6 beta-glucosidase source (SABIO-RK EntryID 35622) on Cellobiose at c30_ph5 (reaction_618_reentry)",
+      "symbol": "reaction_618_reentry__substrate_initial_concentration__beta_glucosidase__cellobiose",
+      "value": 10.0,
+      "units": "mM",
+      "uncertainty": 0.0,
+      "source": "Virtual assay design for this re-entry; not reported by SABIO-RK",
+      "confidence_level": "user_design_value",
+      "notes": "User-supplied substrate_initial_concentration from dataset reaction_618_reentry (kinetics.csv row 4); evidence type design. Registry case role: substrate_initial_concentration.",
+      "measurement_method": "experimental design",
+      "validity_range": "Condition c30_ph5: 30 degC, pH 5.0; no temperature or pH response law is attached."
+     },
+     {
+      "name": "enzyme concentration for beta-glucosidase from Os3BGlu6 beta-glucosidase source (SABIO-RK EntryID 35622) on Cellobiose at c30_ph5 (reaction_618_reentry)",
+      "symbol": "reaction_618_reentry__enzyme_concentration__beta_glucosidase__cellobiose",
+      "value": 0.001,
+      "units": "mM",
+      "uncertainty": 0.0,
+      "source": "Virtual assay design for this re-entry; not reported by SABIO-RK",
+      "confidence_level": "user_design_value",
+      "notes": "User-supplied enzyme_concentration from dataset reaction_618_reentry (kinetics.csv row 5); evidence type design. Registry case role: enzyme_initial_concentration.",
+      "measurement_method": "experimental design",
+      "validity_range": "Condition c30_ph5: 30 degC, pH 5.0; no temperature or pH response law is attached."
+     }
+    ]
+   }
+  ],
+  "processes": [
+   {
+    "id": "reaction_618_reentry__beta_glucosidase__cellobiose__homogeneous_mm",
+    "process_type": "homogeneous_michaelis_menten",
+    "states": {
+     "substrate": "cellobiose_concentration",
+     "product": "beta_D_glucose_concentration",
+     "enzyme": "beta_glucosidase_concentration"
+    },
+    "product_map": "reaction_618_reentry__beta_glucosidase__cellobiose__product_map",
+    "parameters": {
+     "km": "reaction_618_reentry__km__beta_glucosidase__cellobiose",
+     "kcat": "reaction_618_reentry__kcat__beta_glucosidase__cellobiose",
+     "rate_units": "mM / second"
+    },
+    "modifiers": [],
+    "output_state_roles": {
+     "substrate": "cellobiose_concentration",
+     "product": "beta_D_glucose_concentration",
+     "enzyme": "beta_glucosidase_concentration"
+    },
+    "assumptions": [
+     "Dissolved homogeneous Michaelis-Menten kinetics from user dataset reaction_618_reentry.",
+     "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or uptake model.",
+     "No temperature or pH response law is bound; values apply at their stated condition only."
+    ]
+   }
+  ],
+  "initial_state": {
+   "states": {
+    "cellobiose_concentration": {
+     "value": 10.0,
+     "units": "mM"
+    },
+    "beta_D_glucose_concentration": {
+     "value": 0.0,
+     "units": "mM"
+    },
+    "beta_glucosidase_concentration": {
+     "value": 0.001,
+     "units": "mM"
+    }
+   }
+  },
+  "time": {
+   "start": {
+    "value": 0.0,
+    "units": "hour"
+   },
+   "stop": {
+    "value": 10.0,
+    "units": "hour"
+   },
+   "points": 61
+  },
+  "validators": [
+   {
+    "id": "non_negative_concentrations",
+    "validator_type": "non_negative",
+    "species": [
+     "cellobiose_concentration",
+     "beta_D_glucose_concentration",
+     "beta_glucosidase_concentration"
+    ]
+   },
+   {
+    "id": "substrate_product_balance",
+    "validator_type": "mass_balance",
+    "conserved_weights": {
+     "cellobiose_concentration": 1.0,
+     "beta_D_glucose_concentration": 0.5
+    }
+   }
+  ],
+  "outputs": {
+   "directory": "<OUTPUT_ROOT>",
+   "save": [
+    "record",
+    "validation_report"
+   ],
+   "plots": [
+    "state_trajectories"
+   ]
+  }
+ },
+ "user_data_records_sha256_esterase_case": "4f92a532f98356be6ac680b4652ac411a975e3c772dd2f0348c590a207ef3464",
+ "user_data_records_sha256_literature_reentry": "37baa76aaefcbe1d27746720218eafd7712a47ca8c0927245eea597895fce6e1"
+}

@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c50_ph5,50,degC,5.0,Illustrative assay condition at the stated optima for the import fixture

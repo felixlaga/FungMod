@@ -1,0 +1,15 @@
+dataset_id: oxidase_demo
+contributor: FungMod maintainers
+date: 2026-10-06
+source: FungMod user-data import fixture; illustrative values, not measurements
+notes: >-
+  Non-specific import case for the Vmax route and response laws of the
+  user-data route: a laccase-like oxidase class acting on the phenolic OH bond
+  of a dissolved user substrate. Vmax is derived from a specific activity and
+  an enzyme loading; cardinal temperature and pH laws are bound from
+  responses.csv. Every value is an estimate (exploratory prior); nothing here
+  is a measurement.
+simulation:
+  duration: 60
+  units: minute
+  points: 61
