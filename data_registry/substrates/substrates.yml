@@ -131,3 +131,119 @@ records:
       source; the registry therefore declares no product pool for this substrate
       and the organism case tracks consumed cellulose that is not retained as
       biomass through an explicit closure ledger rather than a product species.
+
+  - record_id: xylan
+    name: Generic insoluble xylan
+    display_name: xylan
+    aliases:
+      - generic xylan
+    maturity: exploratory_metadata
+    provenance:
+      source: >-
+        Generic polysaccharide definition: a (1->4)-beta-D-xylan backbone, the linkage
+        named in the IUBMB Enzyme Nomenclature reaction of EC 3.2.1.8 (endohydrolysis
+        of (1->4)-beta-D-xylosidic linkages in xylans). Not a characterized
+        preparation.
+      confidence_level: generic_class_definition
+      notes: >-
+        Composition varies by source: natural xylans carry arabinosyl,
+        (4-O-methyl-)glucuronosyl and acetyl substituents in proportions that differ
+        between plants and preparations, and the insoluble fraction depends on the
+        extraction. None of this is represented; the record names the backbone bond
+        class only.
+    substrate_class: xylan
+    physical_state: solid_polymer
+    bond_classes:
+      - beta_1_4_xylosidic
+    products:
+      - D_xylose_equivalent
+    properties: {}
+    notes: >-
+      One suspended solid polymer on a dry-mass basis, for the apparent
+      Michaelis-Menten route of user data. The product D_xylose_equivalent is the mass
+      of D-xylose that the solubilized backbone gives on complete hydrolysis (for
+      example measured by HPLC after acid post-hydrolysis); it is not free xylose
+      (an endo-xylanase releases mainly xylo-oligosaccharides) and not a
+      reducing-sugar (DNS) equivalent, which counts chain ends rather than mass. The
+      complete-hydrolysis mass yield of an unsubstituted backbone is the registry
+      product map xylan_to_d_xylose_equivalent_mass_yield; a user dataset states its
+      own yield. No surface area, crystallinity, particle size or substitution
+      pattern is recorded.
+
+  - record_id: starch
+    name: Generic solid starch
+    display_name: starch
+    aliases:
+      - generic starch
+    maturity: exploratory_metadata
+    provenance:
+      source: >-
+        Generic polysaccharide definition: a mixture of amylose, a linear
+        (1->4)-alpha-D-glucan, and amylopectin, a (1->4)-alpha-D-glucan with
+        (1->6)-alpha-D-glucosidic branch points; the (1->4) linkage and the (1->6)
+        branch points are those named in the IUBMB Enzyme Nomenclature entry of EC
+        3.2.1.3. Not a characterized preparation.
+      confidence_level: generic_class_definition
+      notes: >-
+        Composition varies by source: the amylose/amylopectin ratio, branch density,
+        granule size and crystallinity, gelatinization state and the lipid and protein
+        content differ between botanical sources and preparations. None of this is
+        represented; the record names the bond classes only.
+    substrate_class: starch
+    physical_state: solid_polymer
+    bond_classes:
+      - alpha_1_4_glycosidic
+      - alpha_1_6_glycosidic
+    products:
+      - beta_D_glucose
+    properties: {}
+    notes: >-
+      One suspended solid polymer (for example raw granules) on a dry-mass basis, for
+      the apparent Michaelis-Menten route of user data; amylose and amylopectin are
+      both alpha-D-glucans and are not separated. The bond classes are categorical:
+      the share of (1->6) branch points is not recorded and no rate depends on it.
+      The declared product is beta-D-glucose, the product of glucoamylase (EC
+      3.2.1.3), the only registry class acting on starch; other amylolytic
+      activities, such as alpha-amylase, release malto-oligosaccharides, which this
+      record does not declare. The complete-hydrolysis mass yield is the registry
+      product map starch_to_beta_d_glucose_mass_yield; a user dataset states its own
+      yield. No surface area, granule size, crystallinity or gelatinization model is
+      recorded.
+
+  - record_id: chitin
+    name: Generic insoluble chitin
+    display_name: chitin
+    aliases:
+      - generic chitin
+    maturity: exploratory_metadata
+    provenance:
+      source: >-
+        Generic polysaccharide definition: a (1->4)-beta-linked polymer of
+        N-acetyl-D-glucosamine, the linkage named in the IUBMB Enzyme Nomenclature
+        reaction of EC 3.2.1.14 (random endo-hydrolysis of N-acetyl-beta-D-glucosaminide
+        (1->4)-beta-linkages in chitin and chitodextrins). Not a characterized
+        preparation.
+      confidence_level: generic_class_definition
+      notes: >-
+        Composition varies by source: the degree of acetylation (partly deacetylated
+        glucosamine units), the polymorph (alpha or beta chitin), crystallinity and the
+        residual protein and mineral of the preparation differ between sources. None
+        of this is represented; the record names the bond class only.
+    substrate_class: chitin
+    physical_state: solid_polymer
+    bond_classes:
+      - beta_1_4_n_acetylglucosaminidic
+    products:
+      - N_acetyl_D_glucosamine_equivalent
+    properties: {}
+    notes: >-
+      One suspended solid polymer on a dry-mass basis, for the apparent
+      Michaelis-Menten route of user data. The product
+      N_acetyl_D_glucosamine_equivalent is the mass of N-acetyl-D-glucosamine that the
+      solubilized polymer gives on complete hydrolysis; chitinase releases mainly
+      chitobiose and chito-oligosaccharides, so the product is not free
+      N-acetyl-D-glucosamine. The complete-hydrolysis mass yield of a fully
+      acetylated polymer is the registry product map
+      chitin_to_n_acetyl_d_glucosamine_equivalent_mass_yield; a user dataset states
+      its own yield. No surface area, crystallinity, polymorph or degree of
+      acetylation is recorded.

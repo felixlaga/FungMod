@@ -374,17 +374,21 @@ Assembled draft: g1_draft
   condition c30_ph5: 30 degC, pH 5 (conditions.csv)
   condition c40_ph5: 40 degC, pH 5 (conditions.csv)
 
-Enzyme classes of the fungus: 3
+Enzyme classes of the fungus: 5
   class              declared in  evidence
   beta_glucosidase   genomes.csv  genome annotation (dbCAN, 3 genes, families GH1, GH3; family_polyspecific)
   cellobiohydrolase  genomes.csv  genome annotation (dbCAN, 1 gene, families GH7; family_diagnostic)
   cellulase_generic  genomes.csv  genome annotation (dbCAN, 1 gene, families GH5; family_polyspecific)
+  endo_xylanase      genomes.csv  genome annotation (dbCAN, 1 gene, families GH10; family_diagnostic)
+  glucoamylase       genomes.csv  genome annotation (dbCAN, 1 gene, families GH15; family_diagnostic)
 Annotated classes without a registry record (no case is assembled for them):
-  - endo_xylanase (families GH10): no enzyme-class record in the registry; ...
+  - laccase (families AA1): no enzyme-class record in the registry; ...
   ...
 On Cellobiose (cellobiose): acting classes beta_glucosidase
   not acting: cellobiohydrolase: substrate class 'cellobiose' is not among the class's substrate classes ['cellulose_particulate', 'cellulose_film_generic']
   not acting: cellulase_generic: substrate class 'cellobiose' is not among the class's substrate classes ['cellulose_film_generic']
+  not acting: endo_xylanase: substrate class 'cellobiose' is not among the class's substrate classes ['xylan']
+  not acting: glucoamylase: substrate class 'cellobiose' is not among the class's substrate classes ['starch']
 
 Cases: 2 (enzyme class x substrate x condition)
   #  fungus                      class             substrate   condition  kinetics status       route           source ids
@@ -488,7 +492,7 @@ Genome and proteome annotations (genomes.csv): 1
   strain                      file                                tool                                                          source
   genome_annotated_strain_g1  annotations/strain_g1_overview.txt  dbCAN 3 overview format (hand-written fixture; no dbCAN run)  ...
   note: Enzyme classes inferred from a genome annotation state what the strain can encode, not what it expresses, secretes or how fast; ...
-Enzyme classes resolved from them: 3
+Enzyme classes resolved from them: 5
 ...
 ```
 

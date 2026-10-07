@@ -15,6 +15,7 @@ import json
 import os
 import shutil
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -33,10 +34,9 @@ from fungal_model.capability import (
 )
 from fungal_model.provenance import USER_DATASET_PROVENANCE_KEY
 from fungal_model.registry import FungModRegistry, load_registry
-from fungal_model.registry.loaders import load_parameter_record_mapping, load_registry_record_mapping
+from fungal_model.registry.loaders import load_parameter_record_mapping
 from fungal_model.registry.records import (
     PARAMETER_ALLOWED_USE_GAP_ANALYSIS_ONLY,
-    EnzymeClassRecord,
     ParameterRecord,
     parameter_record_mode_eligibility_blocker,
 )
@@ -55,6 +55,9 @@ BGL = "genome_demo__beta_glucosidase"
 # USERDATA-008: the registry has a cellobiohydrolase record, so the GH7 gene now gives a modellable class.
 CBH = "genome_demo__cellobiohydrolase"
 CELLULASE = "genome_demo__cellulase_generic"
+# REGISTRY-002: the registry has endo_xylanase and glucoamylase records, so the GH10 and GH15 genes now give
+# modellable classes (acting on the solid xylan and starch classes, which this fixture has no substrate of).
+XYLANASE = "genome_demo__endo_xylanase"
 GLUCOAMYLASE = "genome_demo__glucoamylase"
 BGL_PREFIX = "genome_demo__strain_g1__beta_glucosidase__cellobiose__c30_ph5__"
 SOURCE = "FungMod genome-route format fixture; synthetic gene identifiers, not a real genome"
@@ -81,38 +84,36 @@ def genome(base_registry: FungModRegistry) -> UserDataset:
 
 @pytest.fixture(scope="module")
 def extended_registry(base_registry: FungModRegistry) -> FungModRegistry:
-    """The shipped registry plus one test-only enzyme-class record (not shipped, no kinetics).
+    """The shipped registry with its glucoamylase record widened in memory to the fixture's maltose class.
 
-    It makes the family map's glucoamylase class (GH15) modellable, so the
-    route can be exercised on a resolved class acting on a non-cellulose
-    substrate; the shipped registry has no such record.
+    REGISTRY-002 ships ``glucoamylase`` (EC 3.2.1.3, GH15) as categorical
+    metadata acting on the solid starch class only. This test-only copy also
+    lists the user-defined dissolved ``maltose`` class (not shipped, no
+    kinetics), so the route can be exercised on a resolved class acting on a
+    dissolved non-cellulose substrate; with the shipped record the class acts
+    on no substrate of the fixture.
     """
 
-    record = load_registry_record_mapping(
-        "enzyme_classes",
-        {
-            "record_id": "glucoamylase",
-            "name": "glucoamylase",
-            "ec_number": "3.2.1.3",
-            "maturity": "exploratory_metadata",
-            "provenance": {
-                "source": "In-memory registry extension of tests/test_user_data_genome.py; not a shipped record",
-                "confidence_level": "exploratory_assumption",
-            },
-            "target_bond_classes": ["alpha_1_4_glycosidic"],
-            "compatible_substrate_classes": ["maltose"],
-            "compatible_processes": ["homogeneous_michaelis_menten"],
-            "notes": "Exists only in this test module to show that modellability follows the base registry.",
+    shipped = base_registry.enzyme_classes["glucoamylase"]
+    widened = replace(
+        shipped,
+        maturity="exploratory_metadata",
+        compatible_substrate_classes=(*shipped.compatible_substrate_classes, "maltose"),
+        provenance={
+            **shipped.provenance,
+            "test_only_change": "maltose added in memory by tests/test_user_data_genome.py; not a shipped record",
         },
     )
-    assert isinstance(record, EnzymeClassRecord)
     return FungModRegistry.build(
         registry_id=base_registry.registry_id,
         version=base_registry.version,
         maturity=base_registry.maturity,
         provenance=base_registry.provenance,
         fungi=base_registry.fungi.values(),
-        enzyme_classes=(*base_registry.enzyme_classes.values(), record),
+        enzyme_classes=(
+            *(record for record in base_registry.enzyme_classes.values() if record.record_id != "glucoamylase"),
+            widened,
+        ),
         substrates=base_registry.substrates.values(),
         environments=base_registry.environments.values(),
         process_compatibility=base_registry.process_compatibility.values(),
@@ -128,7 +129,7 @@ def extended_registry(base_registry: FungModRegistry) -> FungModRegistry:
 
 def test_resolved_registry_classes_join_the_strain_with_genome_evidence(genome: UserDataset) -> None:
     fungus = _records(genome, "fungi")[FUNGUS]
-    assert fungus["enzyme_classes"] == [BGL, CBH, CELLULASE]
+    assert fungus["enzyme_classes"] == [BGL, CBH, CELLULASE, XYLANASE, GLUCOAMYLASE]
     assert "genomes.csv row 2" in fungus["notes"]
 
     evidence = fungus["provenance"]["enzyme_class_evidence"][BGL]
@@ -148,14 +149,21 @@ def test_resolved_registry_classes_join_the_strain_with_genome_evidence(genome: 
     assert fungus["provenance"]["enzyme_class_evidence"][CBH]["evidence"] == (
         "genome annotation (dbCAN, 1 gene, families GH7)"
     )
+    assert fungus["provenance"]["enzyme_class_evidence"][XYLANASE]["evidence"] == (
+        "genome annotation (dbCAN, 1 gene, families GH10)"
+    )
+    assert fungus["provenance"]["enzyme_class_evidence"][GLUCOAMYLASE]["evidence"] == (
+        "genome annotation (dbCAN, 1 gene, families GH15)"
+    )
 
     enzyme_class = _records(genome, "enzyme_classes")[BGL]
     assert enzyme_class["provenance"]["registry_parent_enzyme_class"] == "beta_glucosidase"
     assert enzyme_class["compatible_processes"] == ["homogeneous_michaelis_menten"]
     assert _records(genome, "enzyme_classes")[CBH]["provenance"]["registry_parent_enzyme_class"] == "cellobiohydrolase"
+    assert _records(genome, "enzyme_classes")[XYLANASE]["provenance"]["registry_parent_enzyme_class"] == "endo_xylanase"
 
     resolved = {item["enzyme_class"]: item for item in genome.genome_resolved_classes}
-    assert set(resolved) == {"beta_glucosidase", "cellobiohydrolase", "cellulase_generic"}
+    assert set(resolved) == {"beta_glucosidase", "cellobiohydrolase", "cellulase_generic", "endo_xylanase", "glucoamylase"}
     assert resolved["beta_glucosidase"]["families"] == ["GH1", "GH3"]
     assert resolved["beta_glucosidase"]["gene_count"] == 3
     assert resolved["beta_glucosidase"]["record_id"] == BGL
@@ -181,7 +189,7 @@ def test_explicit_enzymes_row_wins_and_both_pieces_of_evidence_are_recorded(tmp_
     dataset = _load(tmp_path, {"enzymes.csv": enzymes})
 
     fungus = _records(dataset, "fungi")[FUNGUS]
-    assert fungus["enzyme_classes"] == [BGL, CBH, CELLULASE]
+    assert fungus["enzyme_classes"] == [BGL, CBH, CELLULASE, XYLANASE, GLUCOAMYLASE]
     evidence = fungus["provenance"]["enzyme_class_evidence"][BGL]
     assert (evidence["evidence"], evidence["source"]) == ("activity assay on cellobiose", "LN-9 p. 2")
     assert (evidence["file"], evidence["row"], evidence["declared_by"]) == ("enzymes.csv", 2, "enzymes.csv")
@@ -205,12 +213,12 @@ def test_resolved_classes_without_a_registry_record_are_listed_not_fabricated(
     base_registry: FungModRegistry,
 ) -> None:
     unmodellable = {item["enzyme_class"]: item for item in genome.unmodellable_enzyme_classes}
-    # USERDATA-008: cellobiohydrolase has a registry record now and is no longer listed here.
-    assert set(unmodellable) == {"endo_xylanase", "glucoamylase", "laccase"}
-    assert unmodellable["endo_xylanase"]["families"] == ["GH10"]
-    assert unmodellable["endo_xylanase"]["gene_count"] == 1
-    assert unmodellable["endo_xylanase"]["specificity"] == DIAGNOSTIC
+    # USERDATA-008 (cellobiohydrolase) and REGISTRY-002 (endo_xylanase, glucoamylase): these classes have
+    # registry records now and are no longer listed here; laccase (AA1) still has none.
+    assert set(unmodellable) == {"laccase"}
     assert unmodellable["laccase"]["families"] == ["AA1"]
+    assert unmodellable["laccase"]["gene_count"] == 1
+    assert unmodellable["laccase"]["specificity"] == POLYSPECIFIC
     assert all("no enzyme-class record" in item["reason"] for item in unmodellable.values())
 
     generated = json.dumps(genome.to_dict()["records"])
@@ -221,7 +229,7 @@ def test_resolved_classes_without_a_registry_record_are_listed_not_fabricated(
         assert not any(record_id.endswith(enzyme_class) for record_id in overlaid.enzyme_classes)
     summary = genome.summary()
     assert summary["unmodellable_enzyme_classes"] == [dict(item) for item in genome.unmodellable_enzyme_classes]
-    assert summary["record_counts"]["enzyme_classes"] == 3
+    assert summary["record_counts"]["enzyme_classes"] == 5
 
 
 def test_unmapped_families_are_listed(genome: UserDataset) -> None:
@@ -284,11 +292,7 @@ def test_preflight_is_underparameterized_with_the_requests_as_suggested_experime
     assert all(text in preflight_csv for text in requests)
     resolution = json.loads(Path(written.paths["user_dataset_genome_resolution"]).read_text(encoding="utf-8"))
     assert resolution["user_dataset_digest"] == genome.digest
-    assert {item["enzyme_class"] for item in resolution["unmodellable_enzyme_classes"]} == {
-        "endo_xylanase",
-        "glucoamylase",
-        "laccase",
-    }
+    assert {item["enzyme_class"] for item in resolution["unmodellable_enzyme_classes"]} == {"laccase"}
     assert {item["family"] for item in resolution["unmapped_families"]} == {"CBM1", "GT2"}
     assert resolution["genome_annotations"][0]["annotation_file"] == ANNOTATION
 
@@ -298,8 +302,10 @@ def test_preflight_is_underparameterized_with_the_requests_as_suggested_experime
         "beta_glucosidase",
         "cellobiohydrolase",
         "cellulase_generic",
+        "endo_xylanase",
+        "glucoamylase",
     ]
-    assert len(experiment["unmodellable_enzyme_classes"]) == 3
+    assert len(experiment["unmodellable_enzyme_classes"]) == 1
     assert len(experiment["unmapped_families"]) == 2
 
 
@@ -322,17 +328,23 @@ def test_scientific_mode_never_runs_on_a_genome_only_class(genome: UserDataset, 
 
 
 def test_a_resolved_class_on_a_non_cellulose_substrate_follows_the_base_registry(
+    genome: UserDataset,
     extended_registry: FungModRegistry,
 ) -> None:
+    gap_id = "genome_demo__strain_g1__glucoamylase__maltose__c30_ph5__km__gap"
+    # With the shipped record (solid starch only) the class joins the strain but acts on no fixture substrate.
+    assert _records(genome, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CBH, CELLULASE, XYLANASE, GLUCOAMYLASE]
+    assert gap_id not in _records(genome, "parameter_records")
+
     dataset = load_user_dataset(GENOME, registry=extended_registry)
 
-    assert _records(dataset, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CBH, CELLULASE, GLUCOAMYLASE]
+    assert _records(dataset, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CBH, CELLULASE, XYLANASE, GLUCOAMYLASE]
     assert "glucoamylase" in {item["enzyme_class"] for item in dataset.genome_resolved_classes}
     assert "glucoamylase" not in {item["enzyme_class"] for item in dataset.unmodellable_enzyme_classes}
-    gap = _parameter(dataset, "genome_demo__strain_g1__glucoamylase__maltose__c30_ph5__km__gap")
+    gap = _parameter(dataset, gap_id)
     assert gap.substrate_id == "genome_demo__maltose"
     assert gap.provenance["measurement_request"] == (
-        f"Measure km of glucoamylase from {STRAIN_NAME} on maltose at 30 degC, pH 5.0 "
+        f"Measure km of Glucoamylase from {STRAIN_NAME} on maltose at 30 degC, pH 5.0 "
         f"(concentration units){GLUCOAMYLASE_NOTE}"
     )
     assert gap.provenance[USER_DATASET_PROVENANCE_KEY]["genome_annotation"]["specificity"] == DIAGNOSTIC
@@ -384,6 +396,7 @@ def test_genome_plus_user_kinetics_runs_one_class_while_the_other_stays_a_gap(
         "beta_glucosidase",
         "cellobiohydrolase",
         "cellulase_generic",
+        "endo_xylanase",
         "glucoamylase",
     }
     assert {item["family"] for item in summary["experiment"]["unmapped_families"]} == {"CBM1", "GT2"}
@@ -409,10 +422,12 @@ def test_min_tools_agreeing_applies_the_users_threshold(tmp_path: Path) -> None:
     two = _load(tmp_path / "two", {GENOME_TABLE: _genomes_row(min_tools="2")})
     resolved = {item["enzyme_class"]: item for item in two.genome_resolved_classes}
     # synthetic_g003 (GH3 by DIAMOND only) and synthetic_g007 (GH5 by HMMER only) drop out;
-    # synthetic_g004 (GH7 by three tools) gives the cellobiohydrolase record (USERDATA-008).
-    assert set(resolved) == {"beta_glucosidase", "cellobiohydrolase"}
+    # synthetic_g004 (GH7 by three tools) gives the cellobiohydrolase record (USERDATA-008), and
+    # synthetic_g005 (GH10) and synthetic_g009 (GH15), each by three tools, the endo_xylanase and
+    # glucoamylase records (REGISTRY-002).
+    assert set(resolved) == {"beta_glucosidase", "cellobiohydrolase", "endo_xylanase", "glucoamylase"}
     assert resolved["beta_glucosidase"]["gene_count"] == 2
-    assert _records(two, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CBH]
+    assert _records(two, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CBH, XYLANASE, GLUCOAMYLASE]
     (read,) = two.genome_annotations
     assert read["min_tools_agreeing"] == 2
     assert "at least 2 of the tool columns present (HMMER, dbCAN_sub, DIAMOND)" in read["consensus_rule"]
@@ -421,7 +436,7 @@ def test_min_tools_agreeing_applies_the_users_threshold(tmp_path: Path) -> None:
 
     three = _load(tmp_path / "three", {GENOME_TABLE: _genomes_row(min_tools="3")})
     by_class = {item["enzyme_class"]: item for item in three.genome_resolved_classes}
-    assert set(by_class) == {"beta_glucosidase", "cellobiohydrolase"}
+    assert set(by_class) == {"beta_glucosidase", "cellobiohydrolase", "endo_xylanase", "glucoamylase"}
     bgl = by_class["beta_glucosidase"]
     assert (bgl["families"], bgl["gene_count"]) == (["GH3"], 1)
     assert (by_class["cellobiohydrolase"]["families"], by_class["cellobiohydrolase"]["gene_count"]) == (["GH7"], 1)
@@ -530,13 +545,14 @@ def test_annotation_reached_through_a_symbolic_link_outside_the_directory_is_ref
 
 
 def test_strain_whose_annotation_resolves_no_registry_class_is_refused(tmp_path: Path) -> None:
-    # USERDATA-008: GH7 resolves to the cellobiohydrolase record now, so the annotation keeps GH10 only.
-    overview = "".join(line for line in _overview_lines() if line.startswith("Gene ID") or "GH10" in line)
+    # USERDATA-008 and REGISTRY-002: GH7, GH10 and GH15 resolve to registry records now, so the annotation keeps
+    # the AA1 gene only, whose laccase class has no registry record.
+    overview = "".join(line for line in _overview_lines() if line.startswith("Gene ID") or "AA1" in line)
     issues = _issues(tmp_path, {ANNOTATION: overview})
 
     assert _has_issue(issues, "strains.csv", 2, "strain_id", "resolved no enzyme class with a registry record"), issues
     message = next(issue["message"] for issue in issues if issue["file"] == "strains.csv")
-    assert "endo_xylanase" in message
+    assert "laccase" in message
     assert "FungMod does not create enzyme classes from a genome annotation" in message
 
 
