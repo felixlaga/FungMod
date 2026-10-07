@@ -113,7 +113,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
-| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) on dissolved substrates, or kcat or Vmax as an apparent Michaelis-Menten law on one suspended solid polymer in dry mass per volume (the enzyme as protein mass, assay activity or a dose per gram of substrate, with an optional conversion-dependent reactivity exponent), plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
 | Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts ([command line](docs/cli.md)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
@@ -1084,7 +1084,17 @@ directly: `kcat_limiting`, `km_limiting`, the four pK values and the fitted
 the rate follows the condition or grid pH, each condition's pH must lie inside
 the fitted range, and the SABIO-RK drafting below emits this form for entries
 of SABIO-RK's "Michaelis-Menten (pH-dependent)" law
-([three rate forms](docs/user-data.md#three-rate-forms)). See
+([three rate forms](docs/user-data.md#three-rate-forms)). A substrate can
+instead be one suspended solid polymer stated on a dry-mass basis
+(`physical_state` `solid_polymer`, `amount_basis` `dry_mass`, a g/g yield):
+the same law then runs as an apparent bulk law in g/L, with the enzyme as a
+protein mass or an assay activity (such as FPU) per volume or as an
+`enzyme_dose` per gram of substrate (one derived record), `kcat` checked per
+case with pint, and an optional `reactivity_exponent` that binds the existing
+conversion-dependent factor `(S/S0)^n`; activity routes to Vmax, the
+pH-ionization form, composite substrates and adsorption or surface-area inputs
+are refused, and no adsorption, synergy, product inhibition or LPMO kinetics
+are represented ([solid substrates](docs/user-data.md#solid-substrates)). See
 `docs/user-data.md` for the table formats and limitations. An optional `genomes.csv` takes a strain's enzyme classes from
 its dbCAN genome annotation: classes with a registry record join the
 strain, classes without one and unmapped families are reported, and every

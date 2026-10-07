@@ -23,6 +23,14 @@ assumptions and the case runs in exploratory mode only; it is an
 enzyme-kinetics case, not a whole-fungus model, and temperature stays
 metadata for it.
 
+The enzyme class `cellobiohydrolase` (EC 3.2.1.91, with the reducing-end EC
+3.2.1.176 as an alias; CAZy GH6 and GH7) is categorical metadata only: it
+lists the insoluble cellulose substrate classes and the homogeneous
+Michaelis-Menten law that user data runs as an apparent law on a solid
+substrate, and no parameter record or compatibility record carries kinetics
+for it. Classes resolved to it from a genome or proteome become explicit gaps
+on a solid cellulose substrate of a user dataset.
+
 The registry layer is intended to support future modelability assessment and
 plug-and-play screening. It separates categorical facts, such as enzyme class
 and substrate class compatibility, from numeric value specifications.

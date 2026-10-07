@@ -37,7 +37,7 @@ A loaded `UserDataset` can be passed as `user_data=` as well; it carries the
 `dataset_id`, a SHA-256 `digest` over the manifest and table bytes, the
 generated registry mappings (`records`) and `to_dict()`.
 
-Five complete examples live in the test fixtures:
+Seven complete examples live in the test fixtures:
 `tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on a
 user-defined aryl ester, `kcat` form, estimates only),
 `tests/fixtures/user_data/literature_reentry/` (the published SABIO-RK Reaction
@@ -55,7 +55,11 @@ classes come only from a hand-written dbCAN overview in `genomes.csv`; a format
 fixture with synthetic gene identifiers, not a real genome, and no kinetic
 values, so every resolved class is a gap). `tests/fixtures/user_data/uniprot_case/`
 does the same from a hand-written UniProtKB TSV export (a format fixture with
-synthetic accessions, not a real proteome).
+synthetic accessions, not a real proteome). `tests/fixtures/user_data/solid_case/`
+is a [solid substrate](#solid-substrates): the registry's apparent hydrolysis
+constants for a filter-paper activity pool re-entered as estimates on a
+user-defined particulate substrate in g/L, with enzyme doses in FPU per gram
+and a reactivity exponent.
 
 To start from public kinetics instead of typing them in, draft the tables from
 SABIO-RK entries and review them; see
@@ -102,9 +106,10 @@ for case in draft.assembly["cases"]:
 
 With the hand-written annotation of the `genome_case` fixture and the frozen
 Reaction 618 snapshot (`tests/test_user_data_assembly.py`), the strain has
-`beta_glucosidase` (GH1, GH3) and `cellulase_generic` (GH5) from its
-annotation; `cellulase_generic` does not act on cellobiose and is reported as
-such, and the four annotated classes without a registry record are listed. At
+`beta_glucosidase` (GH1, GH3), `cellobiohydrolase` (GH7) and
+`cellulase_generic` (GH5) from its annotation; `cellobiohydrolase` and
+`cellulase_generic` do not act on cellobiose and are reported as such, and
+the three annotated classes without a registry record are listed. At
 30 degC, pH 5 the beta-glucosidase kinetics are `transferred_estimate` from
 EntryID 35622, a rice enzyme. At 40 degC, pH 5 the case is a `gap`: the only
 kinetics were stated at 30 degC, and once loaded, its measurement requests
@@ -225,8 +230,10 @@ cases of a registry fungus.
 - No rate, concentration, expression or secretion is taken from a genome.
 - The stored registry cases of a registry fungus are listed, not copied: they
   run without the draft.
-- Everything else is as for any user dataset (below): dissolved substrates and
-  homogeneous Michaelis-Menten kinetics only.
+- Dissolved substrates only: a requested substrate of `user_data` that is a
+  [solid substrate](#solid-substrates) is refused (the drafted tables carry no
+  `amount_basis`); load such a dataset with `load_user_dataset` directly.
+  Everything else is as for any user dataset (below).
 - There is no command-line subcommand yet.
 
 ## Directory layout
@@ -321,8 +328,8 @@ snake_case.
 ### `substrates.csv`
 
 Columns: `substrate_id`\*, `registry_substrate`, `name`, `substrate_class`,
-`physical_state`, `bond_classes`, `product`\*, `product_yield`\*,
-`yield_basis`\*, `source`\*.
+`physical_state`, `bond_classes`, `amount_basis`, `product`\*,
+`product_yield`\*, `yield_basis`\*, `source`\*.
 
 ```text
 substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
@@ -331,13 +338,19 @@ cellobiose,cellobiose,,,,,beta_D_glucose,2,mol/mol,Reaction equation of the sour
 ```
 
 - With `registry_substrate`, the registry record is referenced, not copied: the
-  row supplies only the product, yield and source, and the other descriptive
-  columns must stay blank. The registry substrate must be dissolved and must
-  already list the product.
-- Without it, every column is required and `physical_state` must be
-  `dissolved`.
-- The product yield is always explicit (`yield_basis` must be `mol/mol`); it is
-  never inferred.
+  row supplies only the product, yield, bases and source, and the other
+  descriptive columns must stay blank. The registry substrate must be
+  `dissolved` or `solid_polymer` and must already list the product.
+- Without it, `name`, `substrate_class`, `physical_state` and `bond_classes`
+  are required, and `physical_state` must be `dissolved` or `solid_polymer`.
+- A `dissolved` substrate is stated in amounts per volume: leave
+  `amount_basis` blank, and `yield_basis` must be `mol/mol`.
+- A `solid_polymer` substrate is one suspended polymer stated on a dry-mass
+  basis: `amount_basis` must be `dry_mass` and `yield_basis` must be `g/g`
+  (grams of product per gram of dry substrate consumed). See
+  [solid substrates](#solid-substrates).
+- The product yield is always explicit; it is never inferred, and no basis is
+  converted to another.
 
 ### `conditions.csv`
 
@@ -383,6 +396,8 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,enzyme_concentration
 | `pk_free_lower`, `pk_free_upper` | `dimensionless` | Lower and upper pK of the free enzyme (`pKe1`, `pKe2`). |
 | `pk_complex_lower`, `pk_complex_upper` | `dimensionless` | Lower and upper pK of the enzyme-substrate complex (`pKes1`, `pKes2`). |
 | `ph_min`, `ph_max` | `dimensionless` | The pH range the pH-ionization law was fitted over; exact values between 0 and 14. |
+| `enzyme_dose` | enzyme per dry substrate mass, e.g. mg/g or FPU/g | Enzyme per substrate mass; times `substrate_initial_concentration` it gives the enzyme concentration. [Solid substrates](#solid-substrates) only. |
+| `reactivity_exponent` | `dimensionless`, zero or positive | Exponent `n` of the conversion-dependent factor `(S / S0)^n`. [Solid substrates](#solid-substrates) only. |
 
 `U` is the enzyme unit of the unit registry, one micromole per minute.
 `enzyme_activity` is refused as ambiguous: say `specific_activity` or
@@ -390,11 +405,12 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,enzyme_concentration
 
 - Give either `value` (exact) or `lower` and `upper` (a range, sampled
   uniformly in exploratory runs).
-- The concentration rows of one case must all be amount per volume: a mass
-  concentration next to a molar one would need a molar mass, and the mol/mol
-  yield cannot be applied to mass concentrations either, so both are refused.
-  For the same reason `vmax` and `assay_activity` must be amounts, not masses,
-  per volume per time.
+- On a dissolved substrate the concentration rows of one case must all be
+  amount per volume: a mass concentration next to a molar one would need a
+  molar mass, and the mol/mol yield cannot be applied to mass concentrations
+  either, so both are refused. For the same reason `vmax` and
+  `assay_activity` must be amounts, not masses, per volume per time. A
+  [solid substrate](#solid-substrates) has the opposite rule: dry masses only.
 - `method` is required for `measured`, `literature` and `design` rows, and for
   every `vmax` row whatever its evidence type: it must say how the maximum rate
   of the simulated system was obtained.
@@ -502,7 +518,8 @@ instead.
 #### Three routes to Vmax
 
 Vmax for a case comes from exactly one route; rows of two routes in one case
-are refused.
+are refused. On a [solid substrate](#solid-substrates) only the first route,
+an explicit `vmax` row, is accepted.
 
 1. **An explicit `vmax` row**, a rate for the simulated system itself, with a
    `method` saying how it was obtained. Refused without a method or in mass
@@ -701,10 +718,22 @@ Limits of the genome route:
   and nothing is downloaded at run time.
 - Family-level mapping: the curated map covers 18 CAZy families, a
   polyspecific family gives only a candidate class, and the `EC#` column is not
-  used. With the shipped registry only `beta_glucosidase` and
-  `cellulase_generic` among the mapped classes have a record, so most resolved
-  classes are reported as unmodellable; the resolver's `require_diagnostic`
-  filter is not exposed.
+  used. With the shipped registry only `beta_glucosidase`,
+  `cellobiohydrolase` and `cellulase_generic` among the mapped classes have a
+  record, so most resolved classes are reported as unmodellable; the
+  resolver's `require_diagnostic` filter is not exposed.
+- `cellobiohydrolase` (GH6, GH7) is a categorical record without kinetics
+  (EC 3.2.1.91, with the reducing-end EC 3.2.1.176 as an alias) whose
+  substrate classes are the registry's insoluble cellulose classes
+  (`cellulose_particulate`, `cellulose_film_generic`). It joins the strain, and
+  on a [solid substrate](#solid-substrates) of such a class its roles are gaps
+  whose requests ask for dry-mass units, for example "Measure km of
+  Cellobiohydrolase from Genome-annotated strain G1 on Particulate cellulose
+  lot G at 30 degC, pH 5.0 (dry mass per volume, for example g/L); the class
+  was inferred from the dbCAN annotation (families GH7)." It acts on no
+  dissolved substrate. Endoglucanase and LPMO have no record: GH5, GH12 and
+  GH45 still map to `cellulase_generic`, and AA9 to an LPMO class without a
+  record (no oxidative rate law exists).
 - Gene counts are annotated genes, not active enzymes, copy numbers or
   expression.
 - The test fixture is a format fixture written by hand; no real genome
@@ -770,8 +799,8 @@ entry has an EC number or a CAZy family.
 protein go through the same `CapabilityResolver` and curated family map as a
 dbCAN annotation; each complete EC number goes through the registry's enzyme
 class lookup (`RegistryResolver.resolve_enzyme_class`, which matches the
-`ec_number` of a registry record), so an EC number resolves only to a class
-with a registry record. An EC number no record carries is listed under
+`ec_number` or an alias of a registry record), so an EC number resolves only
+to a class with a registry record. An EC number no record carries is listed under
 `unresolved_ec_numbers`; one that two records carry is listed there as
 ambiguous, and FungMod picks neither.
 
@@ -785,9 +814,10 @@ it is listed under `ec_cazy_disagreements` with both sides (families and the
 classes they name, EC numbers and the classes they resolve to, and the
 contested classes), and FungMod does not choose between them. With the
 shipped registry, a GH7 protein annotated EC 3.2.1.21 (GH7 names
-cellobiohydrolase, the EC number beta-glucosidase) and a GH3 protein annotated
-EC 3.2.1.37 only (GH3 names beta-glucosidase, whose record carries EC
-3.2.1.21) both disagree. A protein whose EC numbers resolve to nothing and
+cellobiohydrolase, the EC number beta-glucosidase; both classes are contested)
+and a GH3 protein annotated EC 3.2.1.37 only (GH3 names beta-glucosidase,
+whose record carries EC 3.2.1.21) both disagree, while a GH7 protein annotated
+EC 3.2.1.91 agrees on `cellobiohydrolase`. A protein whose EC numbers resolve to nothing and
 whose family classes carry no registry EC number cannot be compared: its
 family classes count, and its EC numbers are listed as unresolved. Every
 other protein supports the classes its families or EC numbers name, and each
@@ -868,11 +898,200 @@ Limits of the UniProt route:
 - CAZy cross-references cover only part of a proteome; a protein without one
   can still be a CAZyme. An export without CAZy cross-references resolves
   through EC numbers alone.
-- EC numbers resolve only to registry classes that carry an EC number (with
-  the shipped registry, only `beta_glucosidase`), so most EC numbers are
+- EC numbers resolve only to registry classes that carry an EC number or list
+  it as an alias (with the shipped registry, `beta_glucosidase`, EC 3.2.1.21,
+  and `cellobiohydrolase`, EC 3.2.1.91 and 3.2.1.176), so most EC numbers are
   listed as unresolved, and an EC number can contradict a family only through
-  such a class.
+  such a class. A GH7 protein annotated EC 3.2.1.4 (an endoglucanase I)
+  therefore disagrees with the GH7 family call.
 - One organism per export; no merging of proteomes or strains.
+
+## Solid substrates
+
+A substrate can be one suspended solid polymer, for example a particulate
+polysaccharide, stated on a dry-mass basis. The homogeneous Michaelis-Menten
+process law then runs as an **apparent** bulk saturation law on the dry mass
+per volume:
+
+```text
+kcat form:  rate = kcat · E · S / (Km + S)
+Vmax form:  rate = Vmax · S / (Km + S)
+optional:   rate × (S / S0)^n          (reactivity_exponent n, S0 the case's initial substrate)
+```
+
+`S` is the dry mass of the solid per volume, `E` the enzyme as a protein mass
+or an assay activity per volume, `Km` an apparent half-saturation constant in
+dry mass per volume. This is the law of the registry's culture-physiology case
+(cellulose consumption `k_h F S / (K_h + S)` with filter-paper activity `F`),
+now reachable from your own tables. It is an effective law: `Km` is not a
+binding constant, and `kcat`, `Vmax` and `Km` hold for the substrate
+preparation and the enzyme and solids loadings at which they were measured.
+
+### Declaring a solid substrate
+
+In `substrates.csv`, a solid substrate has `physical_state` `solid_polymer`,
+`amount_basis` `dry_mass` and `yield_basis` `g/g`; the yield is grams of
+product per gram of dry substrate consumed, stated by you. A registry
+substrate whose record is `solid_polymer` is referenced the same way (the row
+gives `amount_basis`, the product, the yield and the source).
+
+### Units
+
+| `quantity` | On a solid substrate | Example |
+| --- | --- | --- |
+| `km`, `substrate_initial_concentration` | dry mass per volume | `g/L` |
+| `enzyme_concentration` | protein mass per volume, or an activity per volume in one of the registry's assay units (`filter_paper_unit`, `FPU`; `beta_glucosidase_assay_unit`, `BGU`) | `mg/L`, `FPU/L` |
+| `kcat` | substrate mass per time per enzyme amount | `g/(mg*h)` (which is 1/time), `g/FPU/h` |
+| `vmax` | dry mass per volume per time | `g/L/h` |
+| `enzyme_dose` | enzyme per dry substrate mass | `mg/g`, `FPU/g` |
+| `reactivity_exponent` | `dimensionless`, zero or positive | `1` |
+
+The units of `kcat` are checked per case with pint against the case's own
+enzyme and substrate rows: `kcat × E` must be the substrate's mass per volume
+per time. `kcat` in `g/(mg*h)` with an enzyme in `FPU/L`, or in `g/FPU/h`
+with an enzyme in `mg/L`, is refused on the `kcat` row. An assay unit is never
+converted to protein mass or molarity, and no molar mass, hydration factor or
+monomer equivalent is applied anywhere.
+
+### Worked example
+
+`tests/fixtures/user_data/solid_case/` re-enters the registry's apparent
+hydrolysis constants (`gelain_hydrolysis_k_h_calibrated` and
+`gelain_hydrolysis_Kh_calibrated`, a FungMod retrospective fit for
+*T. harzianum* P49P11 on Celufloc 200) as estimates on a user-defined
+particulate substrate, at two enzyme doses with the same temperature and pH:
+
+```text
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+particulate_lot_p1,,Particulate cellulose lot P1,cellulose_particulate,solid_polymer,beta_1_4_glycosidic,dry_mass,solubilized_substrate_mass,1,g/g,<source>
+```
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,sd,replicates
+strain_p1,cellulase_total_filter_paper_activity,particulate_lot_p1,dose_5,km,16.726013979440346,,,g/L,estimate,re-entered registry value (retrospective fit),<source>,,
+strain_p1,cellulase_total_filter_paper_activity,particulate_lot_p1,dose_5,kcat,0.018378579847405995,,,g/FPU/h,estimate,re-entered registry value (retrospective fit),<source>,,
+strain_p1,cellulase_total_filter_paper_activity,particulate_lot_p1,dose_5,substrate_initial_concentration,20,,,g/L,design,experimental design,<source>,,
+strain_p1,cellulase_total_filter_paper_activity,particulate_lot_p1,dose_5,enzyme_dose,5,,,FPU/g,design,experimental design,<source>,,
+strain_p1,cellulase_total_filter_paper_activity,particulate_lot_p1,dose_5,reactivity_exponent,1,,,dimensionless,estimate,assumed linear substrate reactivity factor (Kadam et al. 2004); not measured for this lot,<source>,,
+```
+
+(and the same rows at `dose_1_25` with an enzyme dose of 1.25 FPU/g).
+
+```python
+import fungmod as fm
+
+dataset = fm.load_user_dataset("tests/fixtures/user_data/solid_case")
+study = fm.virtual_experiment(
+    fungi="strain_p1",
+    substrates="particulate_lot_p1",
+    environments=["dose_5", "dose_1_25"],
+    user_data=dataset,
+)
+result = study.simulate(mode="exploratory", n_samples=1)
+```
+
+The doses give enzyme concentrations of 100 and 25 FPU/L, each one derived
+record. The case runs in exploratory mode only, because the constants are a
+fit typed in as estimates (scientific mode refuses it). Without the
+reactivity rows, the trajectory at 100 FPU/L equals the registry
+culture-physiology case's cellulose trajectory with the same constants when its
+enzyme synthesis and loss are switched off (`value_overrides`) and its
+filter-paper activity is set to 100 FPU/L, and both equal the integrated law
+`Km ln(S0/S) + (S0 - S) = kcat E t`, solved with the Lambert W function. With
+`n = 1` the time to reach `S` is `(S0 / (kcat E)) (Km (1/S - 1/S0) + ln(S0/S))`
+(`tests/test_user_data_solid_substrates.py`).
+
+### The enzyme-dose route
+
+Laboratories usually report an enzyme loading per gram of substrate.
+`enzyme_dose` (enzyme per dry substrate mass, for example `mg/g` or `FPU/g`)
+times the case's `substrate_initial_concentration` gives the enzyme
+concentration, multiplied with pint. Like the specific-activity route to Vmax,
+it is **one derived record** for the enzyme-concentration role: its provenance
+lists both rows (value or range, units, evidence type, source, method), the
+formula and the unit conversion, and its maturity is the weaker of the two
+inputs. The dose row produces no record of its own; the initial-substrate row
+keeps its own record. A dose range times the exact initial substrate is again
+a uniform range. Refused: a dose next to an `enzyme_concentration` in the same
+case (both set the enzyme), a dose with a ranged initial substrate (the
+derived enzyme would be sampled independently of the substrate it is derived
+from), and a dose on a dissolved substrate. A dose without an initial
+substrate leaves the enzyme concentration a gap whose request asks for the
+initial substrate.
+
+### Conversion-dependent reactivity
+
+An optional `reactivity_exponent` row binds the existing
+`substrate_reactivity` modifier: the rate is multiplied by `(S / S0)^n`, with
+`S0` the case's **own** initial-substrate record (the same record that sets the
+initial state; no separate constant) and `n` zero or positive. `n = 1` is the
+linear substrate reactivity factor of Kadam, Rydholm and McMillan (2004,
+doi:10.1021/bp034316x), the provenance the modifier carries; `n = 0` removes
+it. The factor is phenomenological: it resolves no surface, crystallinity or
+particle structure, and nothing else of the Kadam model (adsorption, product
+inhibition) is implemented. When one case of a class and substrate gives the
+exponent, the pair binds the factor and every other strain and condition of
+the pair gets a gap for it. Without it, the template states that no
+conversion-dependent slowdown is represented. The exponent is refused on a
+dissolved substrate.
+
+### Refused on a solid substrate
+
+Each refusal names its file, row and column:
+
+- `specific_activity`, `enzyme_loading` and `assay_activity`, the activity
+  routes to Vmax: an activity in amount per time would need a molar mass of a
+  repeat unit, one in substrate mass per enzyme mass per time is the `kcat`
+  of the kcat form, and a saturating activity is not defined for an
+  interfacial substrate. Give `kcat` with an enzyme concentration or dose, or
+  `vmax`.
+- The pH-ionization form: its Km(pH) describes the ionization of a dissolved
+  enzyme-substrate complex, while the Km of the apparent law is not a binding
+  constant. An enzyme class in the pH-ionization form cannot act on a solid
+  substrate of the dataset either. Use a cardinal pH law in `responses.csv`.
+- Molar units on any substrate-side row, on `vmax` and on the enzyme.
+- `physical_state` `mixed_solid` or `solid_biomass` (composite substrates,
+  which would need a composition model) and `unknown`; a `yield_basis` other
+  than `g/g`; an `amount_basis` other than `dry_mass`.
+- Adsorption, binding-capacity and surface inputs: the `kinetics.csv`
+  quantities `adsorption_constant`, `adsorption_dissociation_constant`,
+  `binding_capacity`, `accessible_surface_area`, `specific_surface_area` and
+  `surface_rate_constant`, and the `substrates.csv` columns
+  `specific_surface_area`, `accessible_surface_area`, `surface_area`,
+  `binding_capacity`, `adsorption_capacity`, `crystallinity_index`,
+  `particle_size` and `accessible_fraction`. No law of this route reads them,
+  and FungMod does not store a value no law uses.
+- `timecourse.csv` rows on a solid substrate (comparison and fitting read
+  amounts per volume with a mol/mol yield).
+
+### Scientific mode
+
+Unchanged: a solid case reaches scientific mode only when every bound role,
+the reactivity exponent and the dose's inputs included, is an exact
+`measured`, `literature` or `design` value; an estimate anywhere keeps it
+exploratory. Scientific still means exact inputs and an implemented law, not
+validation.
+
+### Limits of the solid route
+
+- One polymer per substrate, as a bulk dry mass per volume; no composite
+  substrates (glucan, xylan and lignin fractions), no particle size,
+  crystallinity, porosity or accessible-area model.
+- No enzyme adsorption or partitioning between free and bound enzyme, and no
+  Langmuir surface law; the surface law is a later increment.
+- No synergy between enzyme classes acting on one solid, no product
+  inhibition, no oxidative (LPMO) kinetics; one enzyme class and one process
+  per case.
+- The constants are apparent and preparation- and loading-specific; FungMod
+  does not extrapolate them to other loadings and does not warn when you do.
+- No conversion between dry mass, monomer equivalents and moles; the product
+  is a pool in grams with your stated g/g yield.
+- No time courses, comparison or fitting on solid substrates; the assembly
+  and SABIO-RK drafting routes draft dissolved substrates only.
+- The assembled substrate entity carries the substrate's own physical state
+  (`solid_polymer`, loaded with the generic solid loader) and an `unknown`
+  default degradation model: the apparent law establishes no degradation
+  regime of the material.
 
 ## Evidence types, maturity and modes
 
@@ -925,7 +1144,8 @@ out of data you intend to simulate.
 | --- | --- |
 | Fungus per strain, listing its namespaced classes (from `enzymes.csv` and `genomes.csv`) | `<dataset_id>__<strain_id>` |
 | Enzyme class per declared class, limited to the process law of its rate form (`homogeneous_michaelis_menten`, or `ph_ionization_michaelis_menten` for the pH-ionization form) | `<dataset_id>__<class>` |
-| Substrate per user-defined substrate (registry substrates are referenced) | `<dataset_id>__<substrate_id>` |
+| Substrate per user-defined substrate, with its physical state (registry substrates are referenced) | `<dataset_id>__<substrate_id>` |
+| Enzyme concentration derived from an `enzyme_dose` ([solid substrates](#solid-substrates)) | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__enzyme_concentration` |
 | Environment per condition | `<dataset_id>__<condition_id>` |
 | Compatibility and case template per class and compatible substrate | `<dataset_id>__<class>__<substrate_id>__homogeneous_mm[_template]`, or `__ph_ionization_mm[_template]` in the pH-ionization form |
 | Parameter record per kinetics row of a role | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__<quantity>` |
@@ -936,15 +1156,20 @@ out of data you intend to simulate.
 The compatibility record binds the roles of the pair's rate form (`km`,
 `kcat`, `substrate_initial_concentration`, `enzyme_initial_concentration`;
 `km`, `vmax`, `substrate_initial_concentration`; or the ten roles of the
-pH-ionization form in the table [above](#three-rate-forms)) followed by the
-parameters of any bound law; the template of a Vmax-form pair has no enzyme
-state, and a pair with laws lists them under
-`process_state_metadata.process_modifiers`. The template of a pH-ionization
+pH-ionization form in the table [above](#three-rate-forms)), then
+`reactivity_exponent` when a solid pair binds the reactivity factor, followed
+by the parameters of any bound law; the template of a Vmax-form pair has no
+enzyme state, and a pair with laws or the reactivity factor lists them under
+`process_state_metadata.process_modifiers` (the reactivity factor as
+`substrate_reactivity` with `reference_concentration_role`
+`substrate_initial_concentration`). The template of a pH-ionization
 pair has the process type `ph_ionization_michaelis_menten`, so its assembled
 model reads the pH of the environment and reports
 `environment_effect_status = active_response_model` for pH.
 `specific_activity`, `enzyme_loading` and `assay_activity` rows produce no
-records of their own; they appear in the provenance of the Vmax record.
+records of their own; they appear in the provenance of the Vmax record, as an
+`enzyme_dose` row appears in the provenance of the derived enzyme
+concentration.
 
 A class and substrate are compatible when the substrate class is among the
 class's compatible substrate classes and they share a bond class. A
@@ -968,8 +1193,10 @@ role of the pair's rate form without a kinetics row becomes an explicit unknown
 parameter record with maturity `user_dataset_gap` and the allowed use
 `preflight_and_gap_analysis_only_requires_measurement_or_curation`. Its units
 come only from the user's own rows of the same case (a missing `km` takes the
-case's concentration units); otherwise the units stay empty and the notes
-state the dimension needed. Its provenance holds a measurement request such
+case's concentration units; on a [solid substrate](#solid-substrates) only the
+dry-mass rows `km` and `substrate_initial_concentration` lend their units);
+otherwise the units stay empty and the notes state the dimension needed, in
+dry-mass terms on a solid substrate. Its provenance holds a measurement request such
 as:
 
 > Measure kcat of carboxylesterase from Esterase source strain E1 on
@@ -1078,7 +1305,8 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,s200,product,10,minute,8.7,µM
 - `units` must be a concentration in amount per volume, the kind of the case's
   states (the product yield is mol/mol), for example µM or mM. Other
   dimensions, and mass concentrations such as g/L, are refused with the case's
-  own units in the message.
+  own units in the message. Time courses of a
+  [solid substrate](#solid-substrates) are refused in this version.
 - `sd` is a positive standard deviation in `units` when given, and
   `replicates` a positive integer; report replicates as their mean with `sd`.
 - One series (strain, class, substrate, condition and observable) uses one
@@ -1414,7 +1642,8 @@ Limits of the SABIO-RK route:
 - Michaelis-Menten kinetics only, in the kcat form, the Vmax form or the
   diprotic pH-ionization form, one form per enzyme class and substrate, and
   the pH-ionization form on all substrates of an enzyme class or on none;
-  dissolved substrates only.
+  dissolved substrates, or one suspended solid polymer on a dry-mass basis
+  under the apparent law (see the [limits of the solid route](#limits-of-the-solid-route)).
 - The pH-ionization form reads the pH once from the environment: no pH
   dynamics, buffer identity, ionic strength or pH-dependent enzyme stability.
   Its constants are not rescaled with temperature except through a bound
@@ -1423,9 +1652,11 @@ Limits of the SABIO-RK route:
   itself check that the environment pH is exact; a pH range cannot come from
   `conditions.csv` or an `EnvironmentGrid`, and should one reach a case through
   another environment, assembly refuses it.
-- No unit conversion between molar and mass concentrations or rates, and the
-  product yield must be mol/mol. An assay activity is accepted only on the case
-  substrate at saturation; activities are never converted between substrates.
+- No unit conversion between molar and mass concentrations or rates; the
+  product yield must be mol/mol on a dissolved substrate and g/g on a solid
+  one. An assay activity is accepted only on the case substrate at saturation
+  (and never on a solid substrate); activities are never converted between
+  substrates.
 - Response laws are limited to the cardinal temperature, cardinal pH and
   Arrhenius laws, one per condition, and scale the rate only: `Km` and the
   concentrations are not rescaled, and no thermal inactivation is represented.
