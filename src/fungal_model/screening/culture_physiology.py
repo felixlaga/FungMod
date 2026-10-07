@@ -9,7 +9,15 @@ registry parameter records; nothing is inferred from the organism's name.
 
 The assembler is organism-, substrate- and enzyme-agnostic. Organism identity
 lives in the registry records bound through the process-compatibility record;
-the template only names roles.
+the template only names roles. The number of enzyme pools, their names and
+their units are whatever the template declares: a process template may state
+its ``rate_units`` as a fixed parameter or derive them from a state role
+(``rate_units_from_state_role``: the units of that state's initial record per
+unit of the template's time grid), so that one template serves cases whose
+records state their pools in different units. ``geometry`` is required and is
+either a well-mixed geometry mapping or an explicit ``null`` for a
+concentration-only model that claims no vessel (as the enzyme-kinetics
+assemblers do).
 """
 
 from __future__ import annotations
@@ -67,6 +75,7 @@ _PROCESS_TEMPLATE_FIELDS = frozenset(
         "product_map",
         "modifiers",
         "assumptions",
+        "rate_units_from_state_role",
     }
 )
 
@@ -133,6 +142,7 @@ def build_culture_physiology_config_data(
             parameter_records=parameter_records,
             registry=registry,
             environment_id=environment_id,
+            state_units=state_units,
         )
         for spec in process_specs
     ]
@@ -395,6 +405,19 @@ def _process_template_specs(
         parameter_roles = raw.get("parameter_roles")
         if not isinstance(parameter_roles, Mapping):
             raise RegistryCaseBuildError(f"Process template {process_id!r} requires a parameter_roles mapping.")
+        units_role = raw.get("rate_units_from_state_role")
+        if units_role is not None:
+            if str(units_role) not in template.state_roles:
+                raise RegistryCaseBuildError(
+                    f"Process template {process_id!r} rate_units_from_state_role references undeclared state role "
+                    f"{units_role!r}."
+                )
+            fixed = raw.get("fixed_parameters") or {}
+            if isinstance(fixed, Mapping) and "rate_units" in fixed:
+                raise RegistryCaseBuildError(
+                    f"Process template {process_id!r} declares both fixed rate_units and rate_units_from_state_role; "
+                    "give one."
+                )
         product_map = raw.get("product_map")
         if product_map is not None and str(product_map) not in product_map_ids:
             raise RegistryCaseBuildError(
@@ -558,6 +581,7 @@ def _process_config(
     parameter_records: Mapping[str, ParameterRecord],
     registry: FungModRegistry,
     environment_id: str,
+    state_units: Mapping[str, str],
 ) -> dict[str, Any]:
     process_id = str(spec["id"])
     states: dict[str, Any] = {
@@ -576,6 +600,11 @@ def _process_config(
     if not isinstance(fixed_parameters, Mapping):
         raise RegistryCaseBuildError(f"Process template {process_id!r} fixed_parameters must be a mapping.")
     parameters.update({str(key): value for key, value in fixed_parameters.items()})
+    units_role = spec.get("rate_units_from_state_role")
+    if units_role is not None:
+        # The rate is in the units of the state it changes, per unit of the case's time grid.
+        state_name = _template_state(case_template, str(units_role))
+        parameters["rate_units"] = f"({state_units[state_name]}) / {case_template.time_grid['units']}"
     config: dict[str, Any] = {
         "id": process_id,
         "process_type": str(spec["process_type"]),
@@ -657,8 +686,13 @@ def _entities(
     environment_id: str,
 ) -> dict[str, Any]:
     metadata = template.process_state_metadata
-    geometry = metadata.get("geometry")
-    if not isinstance(geometry, Mapping) or not geometry:
+    if "geometry" not in metadata:
+        raise RegistryCaseBuildError(
+            f"Case template {template.case_template_id!r} requires explicit geometry metadata."
+        )
+    # An explicit null is a concentration-only model that claims no vessel; anything else must be a geometry.
+    geometry = metadata["geometry"]
+    if geometry is not None and (not isinstance(geometry, Mapping) or not geometry):
         raise RegistryCaseBuildError(
             f"Case template {template.case_template_id!r} requires explicit geometry metadata."
         )
@@ -673,8 +707,10 @@ def _entities(
         raise RegistryCaseBuildError(
             f"Case template {template.case_template_id!r} must declare at least one substrate entity."
         )
-    entities: dict[str, Any] = {
-        "geometry": {"id": "geometry", "loader": "well_mixed", "data": deepcopy(dict(geometry))},
+    entities: dict[str, Any] = {}
+    if geometry is not None:
+        entities["geometry"] = {"id": "geometry", "loader": "well_mixed", "data": deepcopy(dict(geometry))}
+    entities |= {
         "substrates": substrates,
         "enzymes": enzymes,
         "product_maps": [

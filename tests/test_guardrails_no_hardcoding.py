@@ -118,6 +118,14 @@ USER_DATA_FORBIDDEN_TOKENS = (
     # USERDATA-008 solid-substrate tests: the classes, substrates and re-entered constants come from the tables.
     "xylan",
     "celufloc",
+    # USERDATA-009 culture fixtures: strains, substrates, conditions and pools come from culture.csv and its tables.
+    "strain_h1",
+    "lot_h1",
+    "strain_x1",
+    "lot_x1",
+    "culture_reentry",
+    "culture_estimates",
+    "load_10",
     # REGISTRY-002: the polysaccharide substrates, classes and products are registry records, never code.
     "starch",
     "chitin",
@@ -153,6 +161,14 @@ def test_user_data_import_has_no_organism_substrate_or_enzyme_specific_tokens(mo
 
     for forbidden in ORGANISM_SUBSTRATE_ENZYME_TOKENS:
         assert forbidden not in user_data, forbidden
+
+
+def test_culture_assembler_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
+    """The culture_physiology assembler that user cultures reuse names roles only (USERDATA-009)."""
+
+    module = (ROOT / "src" / "fungal_model" / "screening" / "culture_physiology.py").read_text(encoding="utf-8").lower()
+    for forbidden in (*USER_DATA_FORBIDDEN_TOKENS, "gelain", "filter_paper", "fpu", "beta_glucosidase_assay"):
+        assert forbidden not in module, forbidden
 
 
 def test_command_line_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:

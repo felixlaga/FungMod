@@ -26,7 +26,12 @@ laws into one well-mixed culture. It names *roles*, never organisms:
 | `process_templates` | Ordered generic processes (`homogeneous_michaelis_menten`, `first_order`, `proportional_synthesis`, ...) with their state-role and parameter-role bindings and explicit assumptions. |
 | `conservation` | The weighted closure ledger enforced by the `mass_balance` validator; every product map must balance under those weights at build time. |
 | `state_species` | The registry identity behind every state (`organism`, `substrate`, `enzyme`, `ledger`). |
-| `entities`, `geometry` | Inline substrate, enzyme and reactor metadata with provenance. |
+| `entities`, `geometry` | Inline substrate, enzyme and reactor metadata with provenance; `geometry` may be an explicit `null` for a concentration-only model that claims no vessel. |
+
+A process template states its `rate_units` as a fixed parameter, or derives
+them with `rate_units_from_state_role` from the units of one state's initial
+record per unit of the time grid (never both), so one template can serve cases
+whose records use different units.
 
 The assembler fails closed: a parameter role that no process, product map or
 initial state uses is rejected, as is a referenced role without a resolved
@@ -141,6 +146,18 @@ sit slightly below zero near depletion, so the compiled core evaluates rates at
 (`negative_state_policy`). The integrated trajectory is never clipped; the
 `non_negative` validator reports any accepted state below its tolerance. See
 [Compiled model core](compiled-core.md).
+
+## Your own strain on this model
+
+`culture.csv` in a user dataset binds this same composition to your own
+strain, solid substrate and constants (USERDATA-009): consumption by one
+enzyme pool, the biomass yield and its closure ledger, first-order biomass
+loss, and induced synthesis and loss of every pool you name, each pool in its
+own protein-mass or assay units. The generated template uses
+`rate_units_from_state_role` and a `null` geometry; the shipped
+*T. harzianum* case assembles byte-identically, and re-entering its records in
+`culture.csv` reproduces its trajectories. See
+[fungal culture](user-data.md#fungal-culture-growth-and-secretion).
 
 ## Next organism records
 

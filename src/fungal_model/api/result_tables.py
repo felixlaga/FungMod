@@ -25,6 +25,7 @@ from fungal_model.api.output_schema import (
     table_fieldnames,
 )
 from fungal_model.api.user_data import USER_DATASET_MATURITY_FITTED, USER_DATASET_PARAMETER_MATURITIES
+from fungal_model.core.units import ASSAY_BASE_UNITS, units_are_compatible
 from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
@@ -1018,7 +1019,15 @@ def _process_mechanism_descriptor(
         "state_variables": ";".join(_mechanism_state_variables(process_type)),
         "parameters": ";".join(_mechanism_parameters(report, role_records)),
         "assumptions": "; ".join(report.assumptions),
-        "limitations": "; ".join(_mechanism_limitations(process_type)),
+        "limitations": "; ".join(
+            _mechanism_limitations(
+                process_type,
+                role_records,
+                pool_units=_culture_pool_units(registry, compatibility, role_records)
+                if process_type == "culture_physiology"
+                else (),
+            )
+        ),
         "provenance": json.dumps(
             {
                 "process_type": process_type,
@@ -1106,7 +1115,47 @@ def _mechanism_maturity(process_type: str, role_records: Mapping[str, ParameterR
     return "software_tested_mixed_parameter_maturity"
 
 
-def _mechanism_limitations(process_type: str) -> tuple[str, ...]:
+def _has_calibrated_record(role_records: Mapping[str, ParameterRecord]) -> bool:
+    """Whether a case binds a retrospectively calibrated registry record, whose limits its outputs must state."""
+
+    return any(record.maturity == "calibrated" for record in role_records.values())
+
+
+def _culture_pool_units(
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord | None,
+    role_records: Mapping[str, ParameterRecord],
+) -> tuple[str, ...]:
+    """Units of the initial records of a culture template's enzyme-pool states (``state_species`` type enzyme)."""
+
+    template_id = getattr(compatibility, "case_template_id", "")
+    if not template_id or template_id not in registry.case_templates:
+        return ()
+    template = registry.case_templates[template_id]
+    species = template.process_state_metadata.get("state_species", {})
+    units: list[str] = []
+    if not isinstance(species, Mapping):
+        return ()
+    for role, binding in species.items():
+        if not isinstance(binding, Mapping) or binding.get("entity_type") != "enzyme":
+            continue
+        spec = template.initial_state_mapping.get(str(role), {})
+        record = role_records.get(str(spec.get("parameter_role", ""))) if isinstance(spec, Mapping) else None
+        if record is not None and record.value.units:
+            units.append(record.value.units)
+    return tuple(units)
+
+
+def _assay_activity_units(units: str) -> bool:
+    return any(units_are_compatible(units, f"{assay} / liter") for assay in ASSAY_BASE_UNITS)
+
+
+def _mechanism_limitations(
+    process_type: str,
+    role_records: Mapping[str, ParameterRecord] | None = None,
+    *,
+    pool_units: Sequence[str] = (),
+) -> tuple[str, ...]:
     if process_type == "homogeneous_michaelis_menten":
         return (
             "Well-mixed homogeneous process only.",
@@ -1134,11 +1183,22 @@ def _mechanism_limitations(process_type: str) -> tuple[str, ...]:
             "No empirical validation claim is implied by simulation output.",
         )
     if process_type == "culture_physiology":
+        # The pool and calibration sentences follow the case's own records, never the organism.
+        pools = (
+            "Enzyme pools are assay activities and are not converted to protein mass or molarity."
+            if pool_units and all(_assay_activity_units(units) for units in pool_units)
+            else "Enzyme pools keep the units of their parameter records (a protein mass or an assay activity per "
+            "volume) and are not converted between protein mass, assay units and molarity."
+        )
         return (
             "Exactly the template-declared process laws are represented; nutrient, oxygen, maintenance, "
             "morphology, and pH dynamics are absent unless a template declares them.",
-            "Enzyme pools are assay activities and are not converted to protein mass or molarity.",
-            "Calibrated parameters are retrospective fits to published means; they are not validated predictions.",
+            pools,
+            *(
+                ("Calibrated parameters are retrospective fits to published means; they are not validated predictions.",)
+                if _has_calibrated_record(role_records or {})
+                else ()
+            ),
             "No empirical validation claim is implied by simulation output.",
         )
     return ("No empirical validation claim is implied by simulation output.",)
@@ -2509,15 +2569,16 @@ def _limitation_rows(
                 case.process_type,
             )
         )
-        rows.append(
-            _limitation_row(
-                context,
-                "retrospective_calibration",
-                "important",
-                "Calibrated parameter records are retrospective fits to published duplicate means without measured uncertainty; the trajectories are not validated predictions and must not be cited as independent evidence.",
-                case.process_type,
+        if _has_calibrated_record(role_records):
+            rows.append(
+                _limitation_row(
+                    context,
+                    "retrospective_calibration",
+                    "important",
+                    "Calibrated parameter records are retrospective fits to published duplicate means without measured uncertainty; the trajectories are not validated predictions and must not be cited as independent evidence.",
+                    case.process_type,
+                )
             )
-        )
     if case.process_type == "surface_catalysis":
         rows.append(
             _limitation_row(

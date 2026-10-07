@@ -143,7 +143,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
-| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) on dissolved substrates, or kcat or Vmax as an apparent Michaelis-Menten law on one suspended solid polymer in dry mass per volume (the enzyme as protein mass, assay activity or a dose per gram of substrate, with an optional conversion-dependent reactivity exponent), plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) on dissolved substrates, or kcat or Vmax as an apparent Michaelis-Menten law on one suspended solid polymer in dry mass per volume (the enzyme as protein mass, assay activity or a dose per gram of substrate, with an optional conversion-dependent reactivity exponent), plus optional temperature and pH response laws, or a fungal culture in `culture.csv` (your strain growing on a solid substrate and secreting its enzyme pools, through the registry's existing culture model: consumption by one pool, an explicit biomass yield, induced synthesis and loss of each pool), overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
 | Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts (`--runnable-only`: the runnable cases of a request with gaps, exit code 4); the user-data workflow `assemble` (fungus X on substrate Y at conditions Z from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's status and the `REVIEW:` fields), `draft-kinetics`, `check-data`, `run --compare-timecourses` and `fit`, with nothing fetched ([command line](docs/cli.md)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
@@ -1131,7 +1131,17 @@ referenced as such substrates; the registry classes `endo_xylanase`
 (GH10/GH11, EC 3.2.1.8), `glucoamylase` (GH15, EC 3.2.1.3) and `chitinase`
 (GH18, EC 3.2.1.14) act on them as categorical records without kinetics, and
 product maps give the complete-hydrolysis mass yields for reference
-([registry polymers](docs/user-data.md#registry-polymers)). See
+([registry polymers](docs/user-data.md#registry-polymers)). An
+optional `culture.csv` simulates a strain growing on such a solid and secreting
+its enzymes: it binds the registry's existing `culture_physiology` model (the
+*T. harzianum* P49P11 case's composition: consumption by one enzyme pool,
+biomass with an explicit yield and a closure ledger, first-order biomass loss,
+substrate-induced synthesis and first-order loss of every pool) to your own
+constants, one row per role, with pools in protein mass or assay units (never
+converted), units checked with pint, every missing role a gap with a
+plain-words measurement request, and no new numerics; re-entering the registry
+case's records reproduces its trajectories
+([fungal culture](docs/user-data.md#fungal-culture-growth-and-secretion)). See
 `docs/user-data.md` for the table formats and limitations. An optional `genomes.csv` takes a strain's enzyme classes from
 its dbCAN genome annotation: classes with a registry record join the
 strain, classes without one and unmapped families are reported, and every

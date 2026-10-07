@@ -1,0 +1,2 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+particulate_lot_h1,,Particulate cellulose lot H1 (registry culture substrate re-entered),cellulose_particulate,solid_polymer,beta_1_4_glycosidic,dry_mass,solubilized_substrate_mass,1,g/g,"Gelain 2020 Methods 2.2 (doi:10.1016/j.cesx.2020.100085), Celufloc 200; the product row is required by substrates.csv and is not used by the culture form (no product identity is claimed)"

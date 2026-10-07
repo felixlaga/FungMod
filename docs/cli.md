@@ -17,7 +17,7 @@ fungmod run --help
 | --- | --- |
 | `fungmod run` | Preflight, then simulate and write tables, manifest and report; `--runnable-only` simulates the runnable cases when others are blocked (exit code 4); `--compare-timecourses` also compares the simulation with your time courses. |
 | `fungmod preflight` | Preflight only; optionally write the preflight tables. |
-| `fungmod check-data DIR` | Validate a [user dataset](user-data.md) and list its gaps, genome or proteome resolution, time courses, fitted values, or every unfilled `REVIEW:` field. |
+| `fungmod check-data DIR` | Validate a [user dataset](user-data.md) and list its gaps, genome or proteome resolution, [cultures](user-data.md#fungal-culture-growth-and-secretion), time courses, fitted values, or every unfilled `REVIEW:` field. |
 | `fungmod list` | List the fungi, substrates and environments that can be named. |
 | `fungmod assemble` | Draft one reviewable user dataset for a fungus on substrates at conditions from its annotation, the classes you assert, a user dataset and kinetics sources (`assemble_user_tables`). |
 | `fungmod draft-kinetics SOURCE` | Draft user tables from a SABIO-RK export or frozen snapshot (`user_tables_from_sabiork`). |
@@ -496,9 +496,13 @@ Enzyme classes resolved from them: 5
 ...
 ```
 
-`check-data` also prints a dataset's time courses (one row per series, with
-its points, time range, units and how many observations carry an `sd`) and,
-for a fitted dataset, the fitted values with their identifiability verdicts.
+`check-data` also prints a dataset's cultures (one row per strain and
+culture substrate, with the consuming pool, every enzyme pool and the
+`culture.csv` rows; see
+[fungal culture](user-data.md#fungal-culture-growth-and-secretion)), its time
+courses (one row per series, with its points, time range, units and how many
+observations carry an `sd`) and, for a fitted dataset, the fitted values with
+their identifiability verdicts.
 
 **Run it.** The printed command asks for both conditions and carries
 `--runnable-only`, because the 40 degC case is a gap that the preflight

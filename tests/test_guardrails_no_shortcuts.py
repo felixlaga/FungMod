@@ -12,6 +12,7 @@ HIGH_RISK_PATHS = (
     "src/fungal_model/io",
     "src/fungal_model/solvers",
     "src/fungal_model/api/user_data.py",
+    "src/fungal_model/screening/culture_physiology.py",
     "src/fungal_model/capability/uniprot.py",
     "src/fungal_model/sources/uniprot.py",
     "src/fungal_model/api/user_data_sources.py",

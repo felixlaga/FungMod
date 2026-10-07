@@ -1,0 +1,16 @@
+dataset_id: culture_reentry
+contributor: FungMod maintainers
+date: 2026-10-07
+source: >-
+  Re-entry of FungMod's registry culture case for T. harzianum P49P11 on Celufloc 200
+  (records gelain_hydrolysis_*_calibrated and gelain_2020_cellulose_initial_*), not new data
+notes: >-
+  Culture case of the user-data route (USERDATA-009). The nine constants are FungMod's
+  retrospective all-condition fit of the Gelain 2020 hydrolysis candidate (registry maturity
+  calibrated), typed in as estimates; the initial biomass, the initial activities and the three
+  cellulose loadings are the deposited workbook values (registry maturity literature_processed),
+  typed in as literature. The case therefore runs in exploratory mode only.
+simulation:
+  duration: 96
+  units: hour
+  points: 97

@@ -26,6 +26,251 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## USERDATA-009 Fungal Culture In User Data: Growth And Secretion
+
+Status: `complete` for the stated scope (2026-10-07); the ninth increment of
+the user-supplied-data route. For the owner's goal ("fungus X on substrate Y in
+conditions Z; FungMod assembles the enzymes and kinetics and simulates"), the
+user-data route simulated only an enzyme at a concentration the user states
+(an enzyme assay). The whole-culture model (the fungus growing on the
+substrate and secreting its enzymes) existed only as the registry's
+`culture_physiology` template for *T. harzianum* P49P11 (Gelain 2020). It is
+now reachable from user tables for the user's own strain, solid substrate and
+constants, with no new numerics. (The Langmuir surface law, named USERDATA-009
+in the USERDATA-008 entry, is renumbered USERDATA-010.)
+
+Representation: a new optional table `culture.csv` (columns `strain_id`,
+`substrate_id`, `condition_id`, `quantity`, `units`, `evidence_type`, `source`
+required; `enzyme_class`, `value`/`lower`/`upper`, `method`, `sd`,
+`replicates`), not new `kinetics.csv` quantities. `kinetics.csv` rows are keyed
+by an enzyme class and drive the rate-form machinery (form detection per case
+and pair, molar/mass checks, fits); five of the culture's roles belong to the
+culture as a whole, where an enzyme class would be meaningless, and the
+culture/assay boundary (the mixing refusal) is then a table boundary. The
+culture vocabulary (`CULTURE_QUANTITIES`) stays separate from
+`KINETIC_QUANTITIES`, and `fit_user_dataset` never touches it.
+
+Roles (template role; units checked with pint; examples):
+
+| `culture.csv` quantity | `enzyme_class` | Template role | Dimension |
+| --- | --- | --- | --- |
+| `substrate_initial_concentration` | blank | `initial_substrate` | dry mass / volume (`g/L`) |
+| `initial_biomass` | blank | `initial_biomass` | dry mass / volume, same units text as the substrate |
+| `biomass_yield` | blank | `biomass_yield` | dimensionless, in (0, 1] (`g/g`) |
+| `biomass_loss_rate` | blank | `biomass_loss_rate` | 1/time |
+| `induction_half_saturation` | blank | `induction_half_saturation` | dry mass / volume, > 0 |
+| `hydrolysis_capacity` | consuming pool | `hydrolysis_capacity` | substrate mass / time / pool amount (`g/FPU/h`, `g/mg/h`) |
+| `hydrolysis_half_saturation` | consuming pool | `hydrolysis_half_saturation` | dry mass / volume, > 0 |
+| `initial_enzyme_concentration` | each pool | `initial_enzyme_concentration__<class>` | protein mass or assay activity / volume |
+| `specific_production_rate` | each pool | `specific_production_rate__<class>` | pool amount / biomass mass / time |
+| `enzyme_loss_rate` | each pool | `enzyme_loss_rate__<class>` | 1/time |
+
+Changed:
+
+- `api/user_data.py`: parses and validates `culture.csv` (`_parse_culture`,
+  `_culture_units_error`, `_culture_value_bounds`) and cross-validates it
+  (`_validate_cultures`, `_validate_culture_case_units`) before the rate forms.
+  A culture is the rows of one strain on one substrate; its pools are the
+  classes the rows name; exactly one acts on the substrate (the consuming pool,
+  found by the categorical `enzyme_class_acts_on` rule, never by name), the
+  others are produced and lost only. One culture model per consuming class and
+  substrate (`_CulturePair`) serves every strain that declares the class; a
+  solid substrate the class acts on without rows becomes a culture of gaps with
+  the consuming pool only. Per-case units: `initial_biomass` and
+  `substrate_initial_concentration` in identical units (the closure ledger adds
+  them with weight one; the assembler compares unit strings), `k_h x E` a
+  substrate dry mass per volume per time with the case's consuming pool, and
+  `q x X` an amount of the pool per volume per time; pools are never converted
+  between protein mass, assay units and molarity. Generation
+  (`_generate_culture_records`): one parameter record per strain, role and
+  condition (maturity from the evidence type; estimates stay exploratory, the
+  template is scientific only when every bound record is exact and
+  scientific-eligible), or an explicit gap whose measurement request names the
+  role in plain words (strain, substrate, condition, units; the measured
+  conditions when the case has none; the genome evidence of a genome-only
+  class; the pool's own units for a missing rate); a `culture_physiology`
+  compatibility `<dataset>__<class>__<substrate>__culture_physiology` and
+  template `..._culture_template` with the registry template's structure
+  (state roles `substrate`, `biomass`, `enzyme`, `enzyme_<class>`, two ledgers;
+  product map with `parameter_role` / `complement_of_parameter_role`
+  `biomass_yield`; processes consumption (`homogeneous_michaelis_menten`),
+  `biomass_loss` (`first_order`), and per pool `proportional_synthesis` and
+  `first_order` loss; dry-mass closure conservation), `geometry: null` and
+  `rate_units_from_state_role`. The consuming class's generated copy lists
+  `culture_physiology`; a strain with a culture says so in its notes (others
+  keep the earlier notes). `UserDataset.cultures` (also in `to_dict()` and
+  `summary()`). Refused, each with file, row and column: a culture on a
+  dissolved substrate (no dry-mass basis) and a dissolved substrate a culture
+  class acts on; `kinetics.csv` rows of a strain and substrate with a culture
+  (the mixing refusal), of the culture's class and substrate by another strain,
+  and of a culture class on any substrate; a strain declaring the consuming
+  class with another class acting on the substrate, or without every pool; no
+  or two consuming pools; consumption quantities on a non-consuming pool;
+  `responses.csv` rows of a culture; `timecourse.csv` rows of a culture case;
+  wrong dimensions, unparseable units, `fitted` and unknown evidence, a missing
+  method, `enzyme_class` given on a culture-level or missing on a pool
+  quantity, an undeclared class, a yield above one or at zero, a zero
+  half-saturation constant, `kinetics.csv` quantities and unknown quantities,
+  duplicate rows.
+- Mixing decision: refused rather than supported. FungMod selects one process
+  compatibility per case by enzyme class and substrate class, and the preflight
+  picks among candidates by status; a case with both a culture and an assay
+  model would have its model chosen by the preflight, not by the user, and an
+  enzyme class that lists two process laws makes preflight report the missing
+  one as incompatible (the same reason the pH-ionization form is per class).
+  Time-course decision: refused, because the comparison and the fit read the
+  `substrate` and `product` roles of an enzyme-assay case and fit only `km`,
+  `kcat` and `vmax`; biomass, pools and ledgers are not observables of the
+  comparison.
+- `screening/culture_physiology.py` (generic, no organism, substrate or enzyme
+  branch): a process template may give `rate_units_from_state_role` (the rate
+  in the units of that state's initial record per unit of the template time
+  grid; refused with a fixed `rate_units` or an undeclared state role), so one
+  per-pair template serves cases whose pools or substrate use different units;
+  `geometry` may be an explicit `null` (no geometry entity, as in the
+  enzyme-kinetics assemblers; a missing or empty geometry is still refused).
+  The assembler otherwise already assumed no fixed number of pools and no
+  organism names.
+- `api/result_tables.py`: the culture limitation "Calibrated parameter records
+  are retrospective fits ..." (row `retrospective_calibration` and the
+  mechanism sentence) is written only when the case binds a `calibrated`
+  record, and "Enzyme pools are assay activities" only when every pool's
+  initial record (found through the template's `state_species` of type enzyme)
+  is in an assay unit; otherwise a generic pool sentence. Both are true of the
+  registry case and were false of user cultures.
+- `api/user_data_assembly.py`: the solid-substrate refusal names a culture of
+  the `user_data` dataset on that substrate (drafts carry no `culture.csv`).
+- `cli.py`: `fungmod check-data` prints a "Cultures" table (strain, substrate,
+  consuming pool, pools, rows); `run` needs no change.
+- Fixtures: `tests/fixtures/user_data/culture_reentry/` (the registry case
+  re-entered: the nine calibrated constants as `estimate`, because they are
+  FungMod's retrospective fit, neither literature values nor measurements nor a
+  fit of this dataset; the four deposited initial conditions as `literature`,
+  matching their `literature_processed` maturity; three loadings; README with
+  the record-by-record table) and `tests/fixtures/user_data/culture_estimates/`
+  (a user-defined strain and endo-xylanase-like class on a user-defined
+  xylan-like solid, one protein-mass pool, every value an illustrative
+  estimate).
+- Docs: `docs/user-data.md` section "Fungal culture: growth and secretion"
+  (model equations, `culture.csv` columns, role table with units, worked
+  example with real `check-data` and `run` output, what is generated, gaps with
+  real requests, refusals, what is and is not modelled) and updates to the
+  fixture list, directory layout, assembly limits, time-course units and the
+  limitations; `docs/organism-physiology.md` (the two assembler additions and
+  "your own strain on this model"); `docs/cli.md`; `docs/capabilities.md`;
+  `README.md` (capability row and user-data paragraph); `CHANGELOG.md` (Added,
+  Changed); the USERDATA-008 entry's next task renumbered to USERDATA-010.
+
+Byte-identity of the shipped case: `yaml.safe_dump(config.to_dict(),
+sort_keys=False)` of the *T. harzianum* case in scientific mode at 10, 20 and
+30 g/L hashes to the values computed from an export of base commit `be50dd1`
+(pinned in `test_shipped_case_assembles_byte_identically`), and canonical JSON
+of the assembled config and of the raw builder output are identical before and
+after. A seeded scientific and exploratory (two samples) virtual experiment of
+the shipped case at the three loadings, before and after, normalised for the
+output directory name, differ only in the nine `run_environment.json`
+timestamps: tables, trajectories, limitations, mechanism rows, manifests and
+reports are byte-identical. The generated records of the seven earlier
+fixtures hash to their base-commit values.
+
+Tests: new `tests/test_user_data_culture.py` (26 test functions, 62 cases):
+records and roles of the re-entry (39 records, 13 roles, template structure,
+class processes, `cultures`); maturity per evidence type; parity: the
+re-entry's substrate, biomass, both pools and both ledgers equal the registry
+case's at 10, 20 and 30 g/L (`rtol` 1e-9; observed equal to the last digit)
+with the dry-mass closure `S + X + ledgers = S0 + X0`; the assembled user
+config has the registry config's process types, state roles, parameter values
+(converted to base units), product-map coefficients and closure weights, no
+geometry and per-state rate units; shipped config digests; record digests of
+the seven earlier fixtures; the two assembler additions and their refusals;
+the non-specific case (protein-mass pool in `milligram / liter`, closure,
+exploratory run, scientific refusal, mechanism maturity and pool sentence, no
+calibration row); a measured variant runs in scientific mode
+(`scientific_exact_unvalidated`) and one estimate makes it exploratory; ranges
+are sampled; gaps with exact plain-words requests (incl. the pool's own units),
+gap units of the initial biomass, preflight suggested experiments; a condition
+and a strain without rows; a partial run (`blocked="report"`) of a culture
+beside a gap case; 12 wrong-dimension and 4 per-case unit refusals; 13
+malformed-row refusals; dissolved substrate; mixing (same strain; other strain
+on the pair); a culture class on a second solid (gap culture), with assay rows
+and on a dissolved substrate; time course and response-law refusals; pool
+rules (none, two, a second declared acting class, a strain missing a pool, an
+undeclared pool, a duplicate role); a request for every role; the assembly
+refusal; `fungmod check-data` (table and a refusal as `file:row:column`) and
+`fungmod run` (exploratory exit 0, scientific exit 3). Guardrails: culture
+fixture tokens added to the user-data token list; the culture assembler gets
+its own no-organism-token test and joins the no-shortcut paths; the culture
+names are exported and not placeholders.
+
+Commands and results (worktree on `claude/user-data-culture`, based on `main`
+at `be50dd1`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`: all
+  checks passed.
+- `pyright --pythonpath <venv python>` on `api/user_data.py`,
+  `api/result_tables.py`, `api/user_data_assembly.py`, `cli.py` and
+  `screening/culture_physiology.py`: 0 errors (without `--pythonpath` pyright
+  cannot resolve numpy in this environment).
+- `mkdocs build --strict`: built, no warnings (`site/` removed).
+- Targeted run (`tests/test_user_data_*.py`, organism case, culture processes,
+  registry case builder, case-class selection, config-driven assembly, CLI and
+  CLI workflow, guardrails, partial runs, docs sync, hygiene, instruction
+  hierarchy, modelability, capability resolution, case templates, Gelain
+  culture benchmark): 721 passed; after the guardrail and docs edits, the
+  culture, solid, import, organism, guardrail, docs-sync, hygiene, roadmap,
+  colony-plan, CLI, partial-run, case-template, culture-process and
+  proportional-synthesis tests: 299 passed.
+- Full suite (`pytest`, nohup): 2539 passed in 51 min.
+- Byte-identity scripts against an export of `be50dd1`: shipped configs
+  (canonical JSON, YAML in insertion order, raw builder output) identical; 422
+  output files of the shipped virtual experiment identical except 9
+  `run_environment.json` timestamps; earlier fixtures' record digests
+  identical.
+
+Not changed: no process law, factory, modifier, solver, registry record, case
+template file, kinetics.csv rule, rate form, fit, comparison or preflight
+status; datasets without `culture.csv` generate byte-identical records; the
+shipped culture case assembles and simulates byte-identically.
+
+Scientific impact: a user's own culture data (growth yield, loss, induction,
+production and loss of each enzyme pool, initial biomass and pools) reach a
+simulation of the fungus growing and secreting over time through the culture
+model FungMod already implements for *T. harzianum*, with every value's units,
+evidence and maturity explicit, assay pools kept as assay pools, and every
+missing role a named measurement. Nothing is new about the biology: the laws,
+their assumptions and their limits are the registry template's, now stated in
+every generated template.
+
+Compatibility: additive (an optional table, new exported names, a new
+`UserDataset.cultures` field and `to_dict()`/`summary()` keys); a strain with a
+culture gets culture notes. Result-table text changes only for culture cases
+without calibrated or with non-assay records (none existed before).
+
+Limitations: one fungus per case; the growth and induction laws are the
+existing ones (growth driven by consumed substrate through one consuming pool,
+one induction constant shared by all pools, no maintenance, nutrient or oxygen
+limitation, no costed secretion); no spatial mycelium, morphology or vessel
+volume; no oxygen or pH dynamics and no response laws (condition temperature
+and pH are metadata); no soluble products (the `substrates.csv` product row is
+still required and unused by a culture); non-consuming pools act on nothing; a
+strain with a culture cannot carry another class acting on that substrate in
+the same dataset (a genome-derived one included); no time courses, comparison,
+fitting or assembly drafting of cultures.
+
+Ambiguities: whether the induction constant should be per pool (the registry
+template shares one; kept); whether a pool rate gap should take the pool's
+units (it names them in the request but leaves the record's units unknown);
+`Kinetic values` in `check-data` also counts culture values.
+
+Risk: medium-low. The new route is additive and refuses what it cannot run;
+the two assembler additions are opt-in fields that the shipped template does
+not use, checked byte for byte; the result-table change is conditional on
+record maturity and pool units and leaves the shipped case unchanged.
+
+Recommended next task: USERDATA-010, the Langmuir surface law for user data
+(as described in the USERDATA-008 entry); then culture observables (biomass
+and pool time courses) in the comparison, so a user culture can be compared
+with its own measurements.
+
 ## REGISTRY-002 Xylan, Starch And Chitin And Their Hydrolase Classes
 
 Status: `complete` for the stated scope (2026-10-07). A fungal genome or
@@ -896,7 +1141,7 @@ Risk: medium-low. Most changes are additive and refused on malformed input;
 the record changes genome and UniProt outputs for GH6/GH7, which the updated
 tests pin.
 
-Recommended next task: USERDATA-009, the Langmuir surface law for user data:
+Recommended next task: USERDATA-010 (numbered USERDATA-009 when this entry was written; that number went to the culture route), the Langmuir surface law for user data:
 refactor `_surface_catalysis_config_data` to the template-driven pattern (no
 BIO-001 or toy branch, no geometry fallback, scientific mode) and accept
 adsorption constant, surface rate constant and accessible area on a solid
