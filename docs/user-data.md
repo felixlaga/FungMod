@@ -69,10 +69,11 @@ SABIO-RK entries and review them; see
 | `responses.csv` | no | Temperature and pH response laws bound to a strain, enzyme class and substrate. |
 | `genomes.csv` | no | A dbCAN genome annotation per strain, from which enzyme classes are resolved. |
 | annotation files | with `genomes.csv` | The dbCAN `overview.txt` files that `genomes.csv` names, anywhere inside the directory. |
+| `timecourse.csv` | no | Measured substrate remaining and product formed over time (see [time courses](#time-courses-comparison-and-fitting)). |
+| `fit_report.json` | in a fitted dataset | The report of the fit that produced the dataset's `fitted` rows, named by the manifest `fit` block. |
 
-Any other CSV file in the directory (for example a time-course table) is
-refused as unsupported in this version rather than ignored. Columns not listed
-below are refused too. Required columns are marked with an asterisk. Lists inside a cell
+Any other CSV file in the directory is refused as unsupported in this version
+rather than ignored. Columns not listed below are refused too. Required columns are marked with an asterisk. Lists inside a cell
 are separated by semicolons. Rows are reported by their spreadsheet line
 number (the header is line 1).
 
@@ -95,8 +96,9 @@ simulation:                          # required; there is no default time grid
   points: 61
 ```
 
-`notes` is also accepted. Every generated identifier is prefixed with
-`<dataset_id>__`.
+`notes` is also accepted, and `fit` in a dataset written by `fit_user_dataset`
+(see [below](#fitting-kinetic-constants-to-time-courses)). Every generated
+identifier is prefixed with `<dataset_id>__`.
 
 ### `strains.csv`
 
@@ -452,6 +454,12 @@ Limits of the genome route:
 | `literature` | `user_reported_literature` | scientific and exploratory | exploratory screening only |
 | `design` | `user_design_value` | scientific and exploratory | exploratory screening only |
 | `estimate` | `exploratory_prior` (provenance `exploratory_prior: true`) | exploratory only | exploratory only |
+| `fitted` | `user_fitted` | exploratory screening only | (not written) |
+
+`fitted` rows are written only by `fit_user_dataset` and are accepted only
+with the manifest `fit` block that describes them (see
+[fitting](#fitting-kinetic-constants-to-time-courses)); a hand-typed `fitted`
+row is refused. They never reach scientific mode.
 
 The maturities are ordered from weakest to strongest as
 `exploratory_prior` < `user_design_value` < `user_reported_literature` <
@@ -574,8 +582,196 @@ read when the dataset has a `genomes.csv`. In the standard tables,
 `user_reported_literature_range`, `user_design_value_exact_value` and so on,
 estimates read `user_supplied_exploratory_prior`, and the mechanism maturity
 of an all-user, non-estimate case is
-`software_tested_user_supplied_parameterized`. The output schema version is
-unchanged.
+`software_tested_user_supplied_parameterized`; a case with a `fitted` value
+reads `user_fitted_exact_value` and
+`software_tested_user_fitted_in_sample_unvalidated`. Output schema `2.1.0`
+adds the `timecourse_comparison` table, written only on request (see
+[comparing](#comparing-a-virtual-experiment-with-the-time-courses)); the other
+tables are unchanged.
+
+## Time courses, comparison and fitting
+
+> **Honesty note.** Comparing a simulation with your own time courses, and
+> fitting constants to them, measures **in-sample** agreement with your own
+> data. It is not validation. A value fitted to a time course reproduces that
+> time course by construction, so the agreement is not independent evidence
+> that the model or the value is right; only a prediction checked against data
+> that played no part in choosing the values can say that (see
+> [independent validation](independent-validation.md)). FungMod labels every
+> fitted value `fitted` (maturity `user_fitted`), limits it to exploratory
+> screening, refuses it in scientific mode, and marks comparison rows whose
+> observations were used in the fit.
+
+### `timecourse.csv` (optional)
+
+Columns: `strain_id`\*, `enzyme_class`\*, `substrate_id`\*, `condition_id`\*,
+`observable`\*, `time`\*, `time_units`\*, `value`\*, `units`\*, `sd`,
+`replicates`, `source`\*, `method`\*.
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,observable,time,time_units,value,units,sd,replicates,source,method
+strain_e1,carboxylesterase,p_nitrophenyl_butyrate,s200,substrate,0,minute,200.4,µM,2.0,3,LN-42 p. 20,HPLC
+strain_e1,carboxylesterase,p_nitrophenyl_butyrate,s200,substrate,10,minute,191.2,µM,2.0,3,LN-42 p. 20,HPLC
+strain_e1,carboxylesterase,p_nitrophenyl_butyrate,s200,product,10,minute,8.7,µM,0.4,3,LN-42 p. 20,absorbance at 405 nm
+```
+
+- `observable` is `substrate` (substrate remaining) or `product` (product
+  formed since time zero).
+- The strain, enzyme class (declared for the strain), substrate (one the class
+  can act on) and condition must be declared in the other tables.
+- `time` is a finite number, zero or positive, in `time_units` (a time unit);
+  `value` is a finite number. Values are not clipped: a slightly negative
+  product after background subtraction is kept as measured.
+- `units` must be a concentration in amount per volume, the kind of the case's
+  states (the product yield is mol/mol), for example µM or mM. Other
+  dimensions, and mass concentrations such as g/L, are refused with the case's
+  own units in the message.
+- `sd` is a positive standard deviation in `units` when given, and
+  `replicates` a positive integer; report replicates as their mean with `sd`.
+- One series (strain, class, substrate, condition and observable) uses one
+  time unit and one value unit and lists each time once; a repeated time is
+  refused.
+
+The time courses are kept on `UserDataset.timecourses`, keyed by the generated
+case id `<dataset_id>__<strain>__<class>__<substrate>__<condition>`, one
+`UserTimecourse` per observable with its rows, sources and methods, and appear
+in `to_dict()` (`timecourses`) and `summary()` (`timecourse_case_ids`). They
+are observations, not registry records: no record is generated from them. The
+file's bytes enter the dataset digest.
+
+### Comparing a virtual experiment with the time courses
+
+```python
+dataset = fm.load_user_dataset("path/to/esterase_case")
+study = fm.virtual_experiment(
+    fungi="Esterase source strain E1",
+    substrates="p-nitrophenyl butyrate",
+    environments=["s50", "s200", "s800"],
+    user_data=dataset,
+)
+result = study.simulate(mode="exploratory", n_samples=32)
+comparison = result.compare_with_timecourses()   # or fm.compare_with_timecourses(result, dataset)
+for series in comparison.series:
+    print(series["series_id"], series["rmse"], series["units"], series["fraction_inside_band"])
+```
+
+For each simulated case with time courses, the median (`p50`) and the 5-95 %
+band (`p05`, `p95`) of `trajectory_quantiles.csv` are brought to each observed
+time by **linear interpolation on the simulated output grid** and converted to
+the observation's units: the substrate state for `substrate`, and
+`product_formed` for `product`. An observation outside the simulated time
+range refuses the comparison with its row; nothing is extrapolated (extend
+`simulation.duration` instead). The comparison is refused for a result built
+from another dataset or without time courses.
+
+`timecourse_comparison.csv` is written into the output directory (and joins
+`output_manifest.json`): one row per observation with the observed value and
+`sd`, the interpolated `simulated_p05`, `simulated_p50` and `simulated_p95`,
+the residual (simulated median minus observed), the standardized residual when
+`sd` is given, `inside_band`, and per series the RMSE and mean residual in the
+observable's units, the fraction inside the band, the number of observations
+and the number with `sd`. Every row carries the interpolation method,
+`used_in_fit`, `allowed_use = in_sample_agreement_with_user_timecourses_not_validation`
+and the in-sample note. In exploratory mode the band spans the sampled input
+ranges; with exact inputs every sample is identical and the band has zero
+width, so the fraction inside it says little.
+
+### Fitting kinetic constants to time courses
+
+```python
+fit = fm.fit_user_dataset(
+    dataset,
+    parameters=[
+        ("strain_e1", "carboxylesterase", "p_nitrophenyl_butyrate", "km"),
+        ("strain_e1", "carboxylesterase", "p_nitrophenyl_butyrate", "kcat"),
+    ],
+    bounds={"km": (10, 5000, "µM"), "kcat": (1, 300, "1/min")},   # required
+    initial={"km": 1000, "kcat": 5},
+)
+for item in fit.quantities:
+    print(item.quantity, item.value, item.units, item.identifiability, item.interval)
+fitted = fit.write("path/to/esterase_case_fitted")   # a new user dataset
+```
+
+What the fit does:
+
+- **One case, shared constants.** `parameters` names `(strain_id,
+  enzyme_class, substrate_id, quantity)` tuples of one case with quantities
+  among `km`, `kcat` (kcat form) and `vmax` (Vmax form). The time courses of
+  that case at `conditions` (default: every condition with time courses) are
+  fitted together, so each fitted constant is shared by those conditions; they
+  must have the same known temperature and pH (for example several initial
+  substrate concentrations of one assay), otherwise the fit is refused. Every
+  role the fit does not vary must be an exact value.
+- **The existing machinery.** The predictions come from the same assembled
+  model a virtual experiment runs (the case's registry records rebuilt by the
+  registry assembler for each candidate), integrated on the compiled core
+  (`ConfiguredConditionPredictor`), and the optimizer is
+  `fungal_model.calibration.fit_least_squares` (bounded trust-region least
+  squares) on the natural logarithm of each value. The finite-difference step
+  is `1e-3` in log space, above the ODE solver's step noise; it is recorded.
+- **Bounds are required** as `(lower, upper, units)` with `0 < lower < upper`;
+  there are no default bounds. The fitted value is reported in those units.
+  `initial` gives starting values in the same units; without it, the
+  dataset's exact value at every fitted condition is the start, and the fit is
+  refused when there is none.
+- **Error model.** By default each residual is divided by its observation's
+  `sd` (independent Gaussian errors with the reported standard deviations).
+  When any fitted observation lacks `sd`, the fit is refused unless you pass
+  `error_model="unweighted"`, which fits raw residuals (one value unit across
+  the series) and is recorded in the dataset and the report.
+- **Identifiability.** With `sd` weighting each quantity is profiled
+  (`fungal_model.calibration.profile_likelihood`): it is fixed on a log grid
+  across its bounds (`profile_points`, default 21, plus the optimum) while the
+  other fitted quantities are refitted, and each crossing of the threshold
+  (the chi-square quantile of one degree of freedom at `confidence_level`,
+  3.84 at 0.95) is bisected with ten further profile evaluations. A quantity
+  is `identified` when the profile crosses the threshold on both sides within
+  its bounds, `bounded_above_only` or `bounded_below_only` when on one side
+  only, and `not_identified_within_bounds` otherwise; the interval is where the
+  profile stays under the threshold. With `unweighted`, the local information
+  matrix of the residuals (`local_information_analysis`) must have full rank,
+  and a linearized interval (residual variance estimated from the residuals)
+  must lie inside both bounds. Verdicts are conditional on the bounds of the
+  other fitted quantities and on the error model; a finite grid with local
+  refits is not a global identifiability proof.
+- **Refusals.** A quantity that is not identified refuses the fit with
+  `UserDataFitError` (whose `report` holds the profiles) unless
+  `allow_unidentified=True`; then its rows are written and labelled "NOT
+  IDENTIFIED". A fit that does not converge is always refused, and so are a
+  fit with no more observations than quantities, a `kcat` fit in a Vmax-form
+  case (or the reverse), and a dataset that is itself the result of a fit.
+
+What `fit.write(path)` writes (a new or empty directory; nothing is
+overwritten):
+
+- a copy of every input file, byte for byte, except `kinetics.csv` and
+  `user_dataset.yml`;
+- `kinetics.csv` with each fitted quantity at each fitted condition replaced
+  by a row of `evidence_type = fitted`, the fitted value in the bound units, a
+  `method` naming the fit and the time-course rows and a `source` naming the
+  input dataset and its digest (a fitted `vmax` replaces the case's whole Vmax
+  route at that condition);
+- `user_dataset.yml` with a new `dataset_id` (default `<input id>_fitted`)
+  and a `fit` block: method, objective, error model, input dataset id and
+  digest, the fit report file and its SHA-256, the case, conditions and
+  `timecourse.csv` rows used, and per quantity the value, units, bounds,
+  starting value, identifiability verdict, method and interval;
+- `fit_report.json`: the full report (convergence, residuals per observation,
+  observations against parameters, profiles, local information, settings,
+  warnings and the claim boundary).
+
+On loading, a `fitted` row is accepted only when the `fit` block lists its
+case, condition, quantity, value and units and the report file matches its
+recorded digest; a value edited by hand, a changed report or a hand-typed
+`fitted` row is refused. The fitted record has maturity `user_fitted`, allowed
+use `exploratory_screening_only_not_calibrated_uncertainty_not_environment_response`,
+and carries the fit description (method, objective, data rows, bounds,
+identifiability and the scientific-mode boundary) under
+`provenance.fungmod_user_dataset.fit`. Preflight in exploratory mode treats it
+like any exact value; **scientific mode refuses it**, and no relabelling
+route is provided: an in-sample fit is not independent evidence, and the same
+time courses cannot both choose a value and vouch for it.
 
 ## Starting from SABIO-RK
 
@@ -741,8 +937,17 @@ Limits of the SABIO-RK route:
   are rescaled by the law. When the dataset has several conditions for a case
   (gap records included) no condition-specific record is copied and the grid
   case reports the roles as missing.
-- No enzyme cocktails or multi-step chains, no time-course responses or
-  fitting, no growth, secretion or uptake.
+- No enzyme cocktails or multi-step chains, no growth, secretion or uptake.
+- Time courses measure the substrate state or the product formed of a
+  simulated case; other observables (intermediates, biomass, rates) are not
+  read. Comparison interpolates linearly on the simulated output grid and
+  never extrapolates.
+- A fit covers one case and shares its constants across conditions of one
+  temperature and pH; it fits `km`, `kcat` and `vmax` only (not
+  concentrations or response-law parameters), from one starting point (no
+  multi-start), assumes independent Gaussian errors with the reported `sd`
+  (or equal variances when unweighted) and never chains fits. Fitted values
+  stay exploratory; scientific mode refuses them.
 - A genome annotation adds enzyme classes, never rates; only dbCAN
   `overview.txt` files are read, and only classes with a registry record are
   added (see the limits of the genome route above).

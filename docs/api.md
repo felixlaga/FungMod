@@ -28,8 +28,19 @@ The `fungmod` console script (also `python -m fungal_model`); see
       members:
         - load_user_dataset
         - UserDataset
+        - UserTimecourse
+        - TimecoursePoint
         - UserDataError
 
+::: fungal_model.api.user_data_fit
+    options:
+      members:
+        - compare_with_timecourses
+        - TimecourseComparison
+        - fit_user_dataset
+        - UserDatasetFit
+        - FittedQuantity
+        - UserDataFitError
 ::: fungal_model.api.user_data_sources
     options:
       members:

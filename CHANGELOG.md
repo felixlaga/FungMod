@@ -6,6 +6,34 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Time courses in user data, comparison and fitting (USERDATA-004): an
+  optional `timecourse.csv` (`strain_id`, `enzyme_class`, `substrate_id`,
+  `condition_id`, `observable` = `substrate` or `product`, `time`,
+  `time_units`, `value`, `units`, optional `sd` and `replicates`, `source`,
+  `method`) is validated (declared references, amount-per-volume units of the
+  case's kind, finite values, nonnegative times, one unit and one row per time
+  in a series) and kept on `UserDataset.timecourses` by generated case id,
+  never as registry records. `compare_with_timecourses` (also
+  `DegradationScreenResult.compare_with_timecourses()`) interpolates the
+  simulated median and 5-95 % band linearly to the observed times, refuses
+  observations outside the simulated range, and writes
+  `timecourse_comparison.csv` with residuals, RMSE, the fraction inside the
+  band, observations with sd and an in-sample, not-validation note; output
+  schema `2.1.0` adds the table. `fit_user_dataset` fits `km` with `kcat` or
+  `vmax` of one case across conditions of one temperature and pH with
+  `fit_least_squares` on the assembled model (compiled core), with required
+  bounds, sd-weighted residuals (or an explicit, recorded
+  `error_model="unweighted"`), a profile-likelihood identifiability verdict
+  with bisected interval limits (local information for the unweighted
+  objective), refusal of unidentified quantities unless
+  `allow_unidentified=True`, and returns a new dataset (`UserDatasetFit.write`)
+  whose fitted values are `kinetics.csv` rows of the new evidence type
+  `fitted` (maturity `user_fitted`, exploratory screening only, refused by
+  scientific mode), described by a manifest `fit` block and `fit_report.json`
+  and checked on load. `profile_likelihood` gains an optional `diff_step`
+  passed to its nuisance refits; `fungal_model.screening` gains
+  `resolve_screen_role_records` (`docs/user-data.md`).
+
 - Colony comparison stage 0 recorded (COLONY-002) under the plan's third
   dated amendment, before any fit: the radial domain ends at a 9 cm dish wall
   (a declared assumption), the 40 mm scan window is declared separately, and

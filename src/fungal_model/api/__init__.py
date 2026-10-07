@@ -63,6 +63,13 @@ from fungal_model.api.source_provider import (
     source_proposal,
 )
 from fungal_model.api.user_data import UserDataError, UserDataset, load_user_dataset
+from fungal_model.api.user_data_fit import (
+    TimecourseComparison,
+    UserDataFitError,
+    UserDatasetFit,
+    compare_with_timecourses,
+    fit_user_dataset,
+)
 from fungal_model.api.user_data_sources import (
     UserTablesDraft,
     UserTablesSourceError,
@@ -131,6 +138,11 @@ __all__ = [
     "UserDataError",
     "UserDataset",
     "load_user_dataset",
+    "TimecourseComparison",
+    "UserDataFitError",
+    "UserDatasetFit",
+    "compare_with_timecourses",
+    "fit_user_dataset",
     "UserTablesDraft",
     "UserTablesSourceError",
     "user_tables_from_sabiork",

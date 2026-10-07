@@ -25,6 +25,7 @@ should be recoverable from an exported artifact.
 | `conservation_diagnostics.csv` | Copied configured conservation diagnostics, when present. |
 | `thermodynamic_diagnostics.csv` | Copied configured thermodynamic diagnostics, when present. |
 | `solver_diagnostics.csv` | Solver metadata without invented quality thresholds. |
+| `timecourse_comparison.csv` | Written on request by `result.compare_with_timecourses()`: simulated median and 5-95 % band at the user's observed times, residuals and RMSE; in-sample agreement, not validation (schema `2.1.0`). |
 
 Header-only diagnostic tables mean that the corresponding configured evidence
 was unavailable. Missing diagnostics are not converted to zeros.

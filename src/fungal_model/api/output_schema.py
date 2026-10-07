@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "2.0.0"
+OUTPUT_SCHEMA_VERSION = "2.1.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -503,6 +503,60 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             ),
         ),
         primary_key=("case_id", "time_index", "state", "state_role", "source", "units"),
+    ),
+    # Written on request by DegradationScreenResult.compare_with_timecourses (schema 2.1.0), not by every run.
+    "timecourse_comparison": _table(
+        "Simulated median and 5-95 percent band interpolated to the user's own time-course observations, "
+        "with residuals; in-sample agreement with the user's data, not validation.",
+        (
+            *COMMON_CASE_COLUMNS,
+            _column(
+                "timecourse_case_id",
+                "Generated user case id (dataset, strain, enzyme class, substrate, condition).",
+                semantic_type="identifier",
+            ),
+            _column("observable", "Observed quantity.", allowed_values="substrate; product"),
+            _column("simulated_state", "Simulated trajectory compared: the substrate state, or product_formed."),
+            _column("timecourse_row", "Spreadsheet line of the observation in timecourse.csv.", semantic_type="integer"),
+            _column("time", "Observation time.", units_policy="time_units", semantic_type="number"),
+            _column("time_units", "Units for the time column, as given in timecourse.csv."),
+            _column("observed", "Observed value.", units_policy="units", semantic_type="number"),
+            _column("sd", "Reported standard deviation of the observation.", required=False, units_policy="units"),
+            _column("replicates", "Reported number of replicates.", required=False, semantic_type="integer"),
+            _column("units", "Units of observed, sd, the simulated values, residual and series_rmse."),
+            _column("simulated_p05", "Simulated 5th percentile interpolated to the time.", semantic_type="number"),
+            _column("simulated_p50", "Simulated median interpolated to the time.", semantic_type="number"),
+            _column("simulated_p95", "Simulated 95th percentile interpolated to the time.", semantic_type="number"),
+            _column("sample_count", "Simulated samples behind the band.", semantic_type="integer"),
+            _column("residual", "simulated_p50 minus observed.", units_policy="units", semantic_type="number"),
+            _column(
+                "standardized_residual",
+                "residual divided by sd; blank without sd.",
+                required=False,
+                semantic_type="number",
+            ),
+            _column("inside_band", "Whether simulated_p05 <= observed <= simulated_p95.", semantic_type="boolean"),
+            _column("series_n_observations", "Observations in this case and observable.", semantic_type="integer"),
+            _column("series_n_with_sd", "Observations of the series that report sd.", semantic_type="integer"),
+            _column("series_rmse", "Root-mean-square residual of the series.", units_policy="units", semantic_type="number"),
+            _column("series_mean_residual", "Mean residual of the series.", units_policy="units", semantic_type="number"),
+            _column(
+                "series_fraction_inside_band",
+                "Fraction of the series' observations inside the simulated 5-95 percent band.",
+                semantic_type="number",
+            ),
+            _column("interpolation", "How simulated values were brought to the observed times."),
+            _column(
+                "used_in_fit",
+                "Whether fit_user_dataset used this observation to fit a value of the simulated dataset.",
+                semantic_type="boolean",
+            ),
+            _column("allowed_use", "Machine-readable allowed-use policy for the comparison."),
+            _column(
+                "interpretation_guardrail", "Human-readable guardrail preventing validation/calibration overclaims."
+            ),
+        ),
+        primary_key=("case_id", "observable", "timecourse_row"),
     ),
     "conservation_diagnostics": _table(
         "Configured-output conservation diagnostics copied from existing per-sample conservation_diagnostics artifacts.",
