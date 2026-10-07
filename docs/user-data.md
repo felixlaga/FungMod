@@ -135,10 +135,11 @@ measurement requests (exit code 4, a
 
 With the hand-written annotation of the `genome_case` fixture and the frozen
 Reaction 618 snapshot (`tests/test_user_data_assembly.py`), the strain has
-`beta_glucosidase` (GH1, GH3), `cellobiohydrolase` (GH7) and
-`cellulase_generic` (GH5) from its annotation; `cellobiohydrolase` and
-`cellulase_generic` do not act on cellobiose and are reported as such, and
-the three annotated classes without a registry record are listed. At
+`beta_glucosidase` (GH1, GH3), `cellobiohydrolase` (GH7),
+`cellulase_generic` (GH5), `endo_xylanase` (GH10) and `glucoamylase` (GH15)
+from its annotation; all but `beta_glucosidase` do not act on cellobiose and
+are reported as such, and the one annotated class without a registry record
+(`laccase`, AA1) is listed. At
 30 degC, pH 5 the beta-glucosidase kinetics are `transferred_estimate` from
 EntryID 35622, a rice enzyme. At 40 degC, pH 5 the case is a `gap`: the only
 kinetics were stated at 30 degC, and once loaded, its measurement requests
@@ -381,7 +382,9 @@ cellobiose,cellobiose,,,,,beta_D_glucose,2,mol/mol,Reaction equation of the sour
 - With `registry_substrate`, the registry record is referenced, not copied: the
   row supplies only the product, yield, bases and source, and the other
   descriptive columns must stay blank. The registry substrate must be
-  `dissolved` or `solid_polymer` and must already list the product.
+  `dissolved` or `solid_polymer` and must already list the product (the
+  registry's solid polymers and their products are listed under
+  [registry polymers](#registry-polymers)).
 - Without it, `name`, `substrate_class`, `physical_state` and `bond_classes`
   are required, and `physical_state` must be `dissolved` or `solid_polymer`.
 - A `dissolved` substrate is stated in amounts per volume: leave
@@ -759,9 +762,11 @@ Limits of the genome route:
   and nothing is downloaded at run time.
 - Family-level mapping: the curated map covers 18 CAZy families, a
   polyspecific family gives only a candidate class, and the `EC#` column is not
-  used. With the shipped registry only `beta_glucosidase`,
-  `cellobiohydrolase` and `cellulase_generic` among the mapped classes have a
-  record, so most resolved classes are reported as unmodellable; the
+  used. With the shipped registry, six of the thirteen mapped classes have a
+  record (`beta_glucosidase`, `cellobiohydrolase`, `cellulase_generic`,
+  `endo_xylanase`, `glucoamylase` and `chitinase`); LPMO, cellobiose
+  dehydrogenase, acetyl xylan esterase, laccase, class II peroxidase,
+  alpha-amylase and pectate lyase are reported as unmodellable. The
   resolver's `require_diagnostic` filter is not exposed.
 - `cellobiohydrolase` (GH6, GH7) is a categorical record without kinetics
   (EC 3.2.1.91, with the reducing-end EC 3.2.1.176 as an alias) whose
@@ -775,6 +780,12 @@ Limits of the genome route:
   dissolved substrate. Endoglucanase and LPMO have no record: GH5, GH12 and
   GH45 still map to `cellulase_generic`, and AA9 to an LPMO class without a
   record (no oxidative rate law exists).
+- `endo_xylanase` (GH10, GH11; EC 3.2.1.8), `glucoamylase` (GH15; EC 3.2.1.3)
+  and `chitinase` (GH18; EC 3.2.1.14) are categorical records without kinetics
+  (REGISTRY-002) acting on the registry polymers `xylan`, `starch` and
+  `chitin` ([registry polymers](#registry-polymers)). They join the strain,
+  and on a dataset substrate that references such a polymer their roles are
+  gaps with dry-mass requests. They act on no dissolved substrate.
 - Gene counts are annotated genes, not active enzymes, copy numbers or
   expression.
 - The test fixture is a format fixture written by hand; no real genome
@@ -858,8 +869,9 @@ shipped registry, a GH7 protein annotated EC 3.2.1.21 (GH7 names
 cellobiohydrolase, the EC number beta-glucosidase; both classes are contested)
 and a GH3 protein annotated EC 3.2.1.37 only (GH3 names beta-glucosidase,
 whose record carries EC 3.2.1.21) both disagree, while a GH7 protein annotated
-EC 3.2.1.91 agrees on `cellobiohydrolase`. A protein whose EC numbers resolve to nothing and
-whose family classes carry no registry EC number cannot be compared: its
+EC 3.2.1.91 agrees on `cellobiohydrolase` and a GH11 protein annotated
+EC 3.2.1.8 on `endo_xylanase`. A protein whose EC numbers resolve to nothing
+and whose family classes carry no registry EC number cannot be compared: its
 family classes count, and its EC numbers are listed as unresolved. Every
 other protein supports the classes its families or EC numbers name, and each
 class records which accessions support it through both annotations
@@ -940,11 +952,13 @@ Limits of the UniProt route:
   can still be a CAZyme. An export without CAZy cross-references resolves
   through EC numbers alone.
 - EC numbers resolve only to registry classes that carry an EC number or list
-  it as an alias (with the shipped registry, `beta_glucosidase`, EC 3.2.1.21,
-  and `cellobiohydrolase`, EC 3.2.1.91 and 3.2.1.176), so most EC numbers are
-  listed as unresolved, and an EC number can contradict a family only through
-  such a class. A GH7 protein annotated EC 3.2.1.4 (an endoglucanase I)
-  therefore disagrees with the GH7 family call.
+  it as an alias (with the shipped registry, `beta_glucosidase`, EC 3.2.1.21;
+  `cellobiohydrolase`, EC 3.2.1.91 and 3.2.1.176; `endo_xylanase`, EC 3.2.1.8;
+  `glucoamylase`, EC 3.2.1.3; and `chitinase`, EC 3.2.1.14; no EC number is
+  carried by two classes), so most EC numbers are listed as unresolved, and an
+  EC number can contradict a family only through such a class. A GH7 protein
+  annotated EC 3.2.1.4 (an endoglucanase I) therefore disagrees with the GH7
+  family call.
 - One organism per export; no merging of proteomes or strains.
 
 ## Solid substrates
@@ -974,7 +988,8 @@ In `substrates.csv`, a solid substrate has `physical_state` `solid_polymer`,
 `amount_basis` `dry_mass` and `yield_basis` `g/g`; the yield is grams of
 product per gram of dry substrate consumed, stated by you. A registry
 substrate whose record is `solid_polymer` is referenced the same way (the row
-gives `amount_basis`, the product, the yield and the source).
+gives `amount_basis`, the product, the yield and the source); see
+[registry polymers](#registry-polymers).
 
 ### Units
 
@@ -1041,6 +1056,83 @@ filter-paper activity is set to 100 FPU/L, and both equal the integrated law
 `Km ln(S0/S) + (S0 - S) = kcat E t`, solved with the Lambert W function. With
 `n = 1` the time to reach `S` is `(S0 / (kcat E)) (Km (1/S - 1/S0) + ln(S0/S))`
 (`tests/test_user_data_solid_substrates.py`).
+
+### Registry polymers
+
+Instead of describing a solid yourself, you can reference a registry substrate
+whose record is `solid_polymer`. Since REGISTRY-002 the registry holds three
+generic polysaccharides, each with one registry enzyme class acting on it
+(categorical metadata from the IUBMB nomenclature and the CAZy families; no
+kinetic value):
+
+| Registry substrate | Bond classes | Declared product | Complete-hydrolysis yield (product map) | Registry class acting on it |
+| --- | --- | --- | --- | --- |
+| `xylan` | `beta_1_4_xylosidic` | `D_xylose_equivalent` | 1.136358 g/g (`xylan_to_d_xylose_equivalent_mass_yield`) | `endo_xylanase` (EC 3.2.1.8; GH10, GH11) |
+| `starch` | `alpha_1_4_glycosidic`, `alpha_1_6_glycosidic` | `beta_D_glucose` | 1.111107 g/g (`starch_to_beta_d_glucose_mass_yield`) | `glucoamylase` (EC 3.2.1.3; GH15) |
+| `chitin` | `beta_1_4_n_acetylglucosaminidic` | `N_acetyl_D_glucosamine_equivalent` | 1.088659 g/g (`chitin_to_n_acetyl_d_glucosamine_equivalent_mass_yield`) | `chitinase` (EC 3.2.1.14; GH18) |
+
+The insoluble cellulose `cellulose_film_generic` can be referenced the same
+way (product `soluble_cellulose_hydrolysis_product`); `cellulose_celufloc_200`
+declares no product, so a row cannot reference it. The names, aliases and EC
+numbers of the classes resolve in `enzymes.csv` and `kinetics.csv` (for
+example `xylanase`, `EC 3.2.1.8`, `amyloglucosidase`, `endochitinase`).
+
+What the records say, and what they do not:
+
+- **Products.** An endo-xylanase releases mainly xylo-oligosaccharides and a
+  chitinase mainly chitobiose and chito-oligosaccharides, so `xylan` and
+  `chitin` declare **monomer equivalents**: the mass of D-xylose or
+  N-acetyl-D-glucosamine that the solubilized polymer gives on complete
+  hydrolysis (for example measured by HPLC after acid post-hydrolysis), not
+  free monomer and not a reducing-sugar (DNS) equivalent. Glucoamylase
+  releases beta-D-glucose from the non-reducing chain ends, so `starch`
+  declares `beta_D_glucose`. A row naming another product (`D_xylose`, say) is
+  refused with the declared one.
+- **Yields.** Each product map is the theoretical mass yield of the idealized
+  homopolymer, `M(monomer) / M(monomer - H2O)` from the conventional atomic
+  weights (C 12.011, H 1.008, N 14.007, O 15.999), in the limit of a high
+  degree of polymerization; the formula is in its provenance. The yield in
+  `substrates.csv` is still yours: FungMod neither fills it from the map nor
+  checks it against it. Side chains of a real xylan, the lipid and protein of
+  a starch and the deacetylated units of a chitin change the true yield.
+- **Composition.** The substrate records are generic definitions
+  (`exploratory_metadata`): composition varies by source (xylan
+  substitution, the amylose/amylopectin ratio and gelatinization of starch,
+  the acetylation and polymorph of chitin) and none of it is recorded. The
+  starch bond classes are categorical: a case neither weights the (1->4) and
+  (1->6) bonds nor resolves branch points, and starch is one bulk dry mass.
+- **Classes.** A chitinase found in a fungal genome may serve cell-wall
+  remodelling rather than nutrition; it is a candidate capability on an
+  external chitin. The classes list only the solid polymer, not dissolved
+  oligosaccharides.
+
+A dataset written by `tests/test_registry_polysaccharide_classes.py` (strain,
+condition and illustrative estimates, not measurements) references `xylan`:
+
+```text
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+xylan,xylan,,,,,dry_mass,D_xylose_equivalent,1.136358,g/g,Complete-hydrolysis mass yield of registry product map xylan_to_d_xylose_equivalent_mass_yield
+```
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,sd,replicates
+strain_p2,endo_xylanase,xylan,c40_ph5,km,8.0,,,g/L,estimate,,LN-21 p. 2 (illustrative),,
+strain_p2,endo_xylanase,xylan,c40_ph5,kcat,0.6,,,g/(mg*h),estimate,,LN-21 p. 2 (illustrative),,
+strain_p2,endo_xylanase,xylan,c40_ph5,substrate_initial_concentration,10.0,,,g/L,design,experimental design,LN-21 p. 3,,
+strain_p2,endo_xylanase,xylan,c40_ph5,enzyme_concentration,0.5,,,mg/L,design,experimental design,LN-21 p. 3,,
+```
+
+with `enzymes.csv` declaring the class as `EC 3.2.1.8`. The case runs in
+exploratory mode only (the constants are estimates), the xylan trajectory
+equals the integrated law with `Vmax = kcat E` = 0.3 g/L/h, and the product is
+`1.136358 (S0 - S)` g/L at every time point. The same test runs starch with
+glucoamylase and chitin with chitinase. From a genome or proteome, GH10, GH11,
+GH15 and GH18 (or EC 3.2.1.8, 3.2.1.3 and 3.2.1.14) give these classes, and on
+a dataset that references the polymer their roles are gaps with dry-mass
+requests, for example "Measure km of Endo-1,4-beta-xylanase from
+Genome-annotated strain G1 on Generic insoluble xylan at 30 degC, pH 5.0 (dry
+mass per volume, for example g/L); the class was inferred from the dbCAN
+annotation (families GH10)."
 
 ### The enzyme-dose route
 

@@ -91,14 +91,16 @@ SHIPPED_CONFIG_DIGESTS = {
 }
 # SHA-256 of the generated records (json.dumps(dataset.to_dict()["records"], sort_keys=True)) of the earlier
 # fixtures at the same base commit: the culture route must leave every dataset without culture.csv unchanged.
+# genome_case and uniprot_case were recomputed on REGISTRY-002 (7d09e65) alone, whose new endo_xylanase,
+# glucoamylase and chitinase records resolve in those two fixtures; the culture route leaves them unchanged too.
 EARLIER_RECORD_DIGESTS = {
     "esterase_case": "4f92a532f98356be6ac680b4652ac411a975e3c772dd2f0348c590a207ef3464",
     "literature_reentry": "37baa76aaefcbe1d27746720218eafd7712a47ca8c0927245eea597895fce6e1",
     "oxidase_case": "eb82f225a0cd09115afb44b67e0bb2496e7bf11ee7f0960624759b1970f7e322",
     "bgl1a_ph_ionization": "5a5c837fde83d33c1b01fdfd88499eddd4112fbc8a4c3097e6efcaa246af60f1",
     "solid_case": "9b1eecb8cd6820ec7c1c27f17bff9d4820e5679c0350a77c3caba1ced2215e83",
-    "genome_case": "096351de5bb46385f2de83f88b919996033472fa40816a7cfe7b85dd073cd658",
-    "uniprot_case": "6bde5a32287164f8916f5e9b79dafadc16af14b1a2a6ec1287bec8c727bd4e81",
+    "genome_case": "f13786fee336d8c58e9dc5d052e1b138158ade98d268cd6b0788ed6b5a8b118e",
+    "uniprot_case": "8ec0dfbf50881d866a00b0392149a1dd60cd8260ac3acdd771e5b7d71a5b6532",
 }
 
 CULTURE_HEADER = (

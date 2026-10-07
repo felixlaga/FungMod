@@ -271,6 +271,210 @@ Recommended next task: USERDATA-010, the Langmuir surface law for user data
 and pool time courses) in the comparison, so a user culture can be compared
 with its own measurements.
 
+## REGISTRY-002 Xylan, Starch And Chitin And Their Hydrolase Classes
+
+Status: `complete` for the stated scope (2026-10-07). A fungal genome or
+proteome usually yields xylanases, glucoamylases and chitinases. The CAZy
+family map already assigned GH10/GH11, GH15 and GH18 to the class ids
+`endo_xylanase`, `glucoamylase` and `chitinase`, but no registry record
+existed, so the genome and UniProt routes reported them as unmodellable, and
+a user could not name xylan, starch or chitin as a registry substrate. This
+adds categorical registry metadata only, following the `cellobiohydrolase`
+precedent of USERDATA-008; no code changed.
+
+Changed (data):
+
+- `data_registry/enzymes/enzyme_classes.yml`: `endo_xylanase` (EC 3.2.1.8;
+  aliases `endo-xylanase`, `endoxylanase`, `xylanase`, `EC 3.2.1.8`; bond
+  class `beta_1_4_xylosidic`; substrate class `xylan`), `glucoamylase`
+  (EC 3.2.1.3; `glucan 1,4-alpha-glucosidase`, `amyloglucosidase`,
+  `EC 3.2.1.3`; `alpha_1_4_glycosidic` and `alpha_1_6_glycosidic`; `starch`)
+  and `chitinase` (EC 3.2.1.14; `endochitinase`, `EC 3.2.1.14`;
+  `beta_1_4_n_acetylglucosaminidic`; `chitin`). Each lists only
+  `homogeneous_michaelis_menten` (the apparent law on a solid of USERDATA-008),
+  maturity `literature_metadata`, provenance the IUBMB ExplorEnz entry
+  (accepted name and reaction) and the CAZy families (Drula et al. 2022,
+  doi:10.1093/nar/gkab1045), notes on what is not represented (substitution,
+  GH10/GH11 differences, branch-point rates, endo/exo GH18 members, binding
+  modules, synergy), and why the products are monomer equivalents. No EC
+  alias collides with another class's (checked by a test).
+- `data_registry/substrates/substrates.yml`: `xylan`, `starch` and `chitin`,
+  `physical_state` `solid_polymer`, `properties` empty, maturity
+  `exploratory_metadata`, provenance "Generic polysaccharide definition ...
+  Not a characterized preparation" with the linkage as named in the IUBMB
+  reaction, `confidence_level` `generic_class_definition`, and "Composition
+  varies by source" notes (xylan side chains; amylose/amylopectin ratio,
+  granules and gelatinization; acetylation and polymorph of chitin). Products:
+  `D_xylose_equivalent`, `beta_D_glucose`,
+  `N_acetyl_D_glucosamine_equivalent`. An endo-xylanase releases mainly
+  xylo-oligosaccharides and a chitinase mainly chitobiose and oligomers, so
+  xylan and chitin declare the monomer-equivalent mass on complete hydrolysis
+  rather than free monomer; glucoamylase releases beta-D-glucose itself
+  (IUBMB reaction of EC 3.2.1.3), so starch declares it directly. Starch lists
+  both alpha bond classes categorically: the schema records which bond types
+  exist, no rate depends on them, and the notes say that branch points are
+  not resolved and starch is one bulk dry mass.
+- `data_registry/product_maps/product_maps.yml` (until now empty): three
+  `stoichiometric` maps, `xylan_to_d_xylose_equivalent_mass_yield` 1.136358,
+  `starch_to_beta_d_glucose_mass_yield` 1.111107 and
+  `chitin_to_n_acetyl_d_glucosamine_equivalent_mass_yield` 1.088659 g/g, each
+  `M(monomer) / M(monomer - H2O)` from the conventional atomic weights
+  (C 12.011, H 1.008, N 14.007, O 15.999) with the formula and `yield_basis`
+  in the provenance, maturity `exploratory_metadata`. The notes state the
+  high-polymer limit, the mass (not molar) basis, the water not being a state,
+  and that no route reads the maps: a user dataset states its own yield, and
+  FungMod neither fills nor checks it from them.
+- No compatibility record, case template or parameter record: user data
+  generates its own compatibility and template for a referenced registry
+  solid, as for `cellulose_film_generic` in USERDATA-008. No family-map change;
+  no LPMO, endoglucanase or other record.
+- `tests/fixtures/user_data/uniprot_case/annotations/strain_u1_uniprot.tsv`
+  gains `X0TEST13` (AA1, EC 1.10.3.2, unreviewed): with `X0TEST09` (GH15,
+  EC 3.2.1.3) now resolving, the fixture had no class without a record left,
+  and the coexistence and refusal tests need one. Fixture READMEs updated.
+
+Tests: new `tests/test_registry_polysaccharide_classes.py` (41 cases): the
+records load and validate, carry the stated EC numbers, aliases, bond and
+substrate classes, process, provenance and maturity, and no parameter,
+compatibility or template names them; the family map resolves GH10, GH11,
+GH15 and GH18 to them as diagnostic; each class acts on its own polymer only
+(`enzyme_class_acts_on` over the whole registry); no LPMO, endoglucanase,
+laccase or alpha-amylase record; no EC number is carried by two classes;
+13 enzyme-class and 7 substrate names, aliases and EC numbers resolve through
+`RegistryResolver` and `resolve_any`; each product-map coefficient equals the
+yield recomputed from atomic weights (abs 5e-7) and its formula string; dbCAN
+GH10, GH15 and an added GH18 gene become four gaps each with dry-mass requests
+on the referenced registry polymers and the preflight lists them; a UniProt
+GH11/EC 3.2.1.8 row (and GH10/EC 3.2.1.8, GH15/EC 3.2.1.3, GH18/EC 3.2.1.14)
+agrees, GH11 with EC 3.2.1.3 is a disagreement on both classes, and in a
+dataset the request names the accession; user estimates (km, kcat in
+g/(mg*h)) with design loadings on registry `xylan` (endo-xylanase named as
+`EC 3.2.1.8`), `starch` (glucoamylase named `amyloglucosidase`) and `chitin`
+run in exploratory mode only (scientific refused), the substrate equals the
+Lambert W solution with `Vmax = kcat E` (rtol 1e-6) and the product equals
+`Y (S0 - S)` at every point with `Y` the product-map yield; a stated yield of
+0.9 is used as written; a row naming `D_xylose` on registry xylan is refused
+with the declared product. `tests/test_guardrails_no_hardcoding.py`: the
+user-data and UniProt token lists gain `starch`, `chitin`, `xylose`,
+`glucosamine`, `amylase`, `chitinase`, `3.2.1.8` and `3.2.1.14`, and a new
+test keeps the polysaccharide names out of every generic path, `api`,
+`capability`, `registry` and `screening`.
+
+Changed expectations (each because the new records exist):
+- `tests/test_registry_loading.py::test_load_toy_registry_index`: the registry's
+  product maps are the three new ids instead of empty.
+- `tests/test_capability_resolution.py`: the "nothing is modellable"
+  annotation uses CE1 (acetyl xylan esterase, no record) instead of GH10; the
+  white-rot resolution also asserts `endo_xylanase` and `chitinase` modellable.
+- `tests/test_user_data_genome.py`: the strain's classes gain `endo_xylanase`
+  and `glucoamylase` (after `cellulase_generic`), with their GH10 and GH15
+  evidence; `unmodellable_enzyme_classes` is `laccase` only (its family,
+  gene count and polyspecific label are asserted instead of endo-xylanase's);
+  generated enzyme classes 3 -> 5; the preflight resolution lists `laccase`
+  only and five resolved classes; with `min_tools_agreeing` 2 and 3 the GH10
+  and GH15 genes (three tools each) keep their classes; the "no registry
+  class" refusal uses an AA1-only annotation and names laccase.
+- `tests/test_user_data_uniprot.py`: the strain gains `glucoamylase`, which
+  `X0TEST09` supports through agreeing CAZy and EC; with `X0TEST13` the
+  export has 13 rows (11 unreviewed), `protein_counts` `cazy_and_ec` 3 and
+  `cazy` 3, `ec_comparable_classes` adds `chitinase`, `endo_xylanase` and
+  `glucoamylase`, and the unresolved EC numbers are 1.10.3.2, 3.1.1.73,
+  3.2.1.37 and 3.2.1.4; `unmodellable_enzyme_classes` is `laccase`
+  (`X0TEST13`, polyspecific) instead of `glucoamylase`; generated enzyme
+  classes 3 -> 4; the refusal export keeps `X0TEST13` instead of `X0TEST09`;
+  the fetched snapshot resolves `glucoamylase` too and its metadata counts 13
+  rows.
+- `tests/test_user_data_assembly.py`: the G1 repertoire gains `endo_xylanase`
+  and `glucoamylase`, both reported as not acting on cellobiose; `laccase` is
+  the only class without a record.
+- `tests/test_cli_user_data_workflow.py`: the G1 draft resolves 5 classes.
+- The in-memory test-only `glucoamylase` record of the genome, UniProt and
+  assembly tests would now duplicate the shipped id (the registry refuses
+  duplicates). Those tests exercise a resolved class acting on the fixtures'
+  dissolved `maltose`, which the shipped record (solid starch only) does not
+  list, and the assembly drafts dissolved substrates only; they now widen the
+  shipped record in memory to the `maltose` class (test-only provenance note,
+  maturity `exploratory_metadata`), and the genome and UniProt tests first
+  assert that with the shipped record no maltose case exists. The requests
+  name the shipped record's name, `Glucoamylase`.
+
+Docs: `docs/user-data.md` (new "Registry polymers" subsection of "Solid
+substrates": the registry polymers, bond classes, products, yields and
+acting classes, what the records do and do not say, the worked xylan example
+and the genome request; updates to the substrates table, the assembly
+example, the genome and UniProt limits and the CAZy/EC paragraph),
+`docs/capabilities.md` (genome row; five of ten white-rot classes have a
+record), `docs/cli.md` (the `assemble` and `check-data` example output),
+`data_registry/README.md`, `README.md` (user-data subsection),
+`CHANGELOG.md`.
+
+Commands and results (worktree on `claude/registry-polysaccharide-classes`,
+based on `main` be50dd1, Python 3.11 venv):
+- `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`: all
+  checks passed.
+- `pyright` (no source file changed) on the new and the eight changed test
+  files: 0 errors, 0 warnings.
+- `mkdocs build --strict`: built without warnings; `site/` removed; the new
+  anchor `#registry-polymers` and its links checked in the built HTML.
+- Targeted: `pytest` on `tests/test_registry_*.py`,
+  `tests/test_capability_resolution.py`, `tests/test_user_data_*.py`,
+  `tests/test_guardrails_*.py`, `tests/test_phase1_documentation_sync.py`,
+  `tests/test_repository_hygiene.py`, `tests/test_active_instruction_hierarchy.py`,
+  `tests/test_roadmap_orchestration_status.py`, `tests/test_preflight_fixes_docs001.py`,
+  `tests/test_cli.py`, `tests/test_cli_user_data_workflow.py`,
+  `tests/test_virtual_experiment_name_resolution.py` and
+  `tests/test_modelability_report.py`: 785 passed.
+- Full suite (`pytest`, run with nohup): 2517 passed in 48 min.
+- The records of the four dissolved user-data fixtures still hash to the
+  USERDATA-008 digests (`test_dissolved_datasets_generate_byte_identical_records`).
+
+Not changed: no source file, process law, solver, loader, schema, family
+mapping or output table; user-data rules are unchanged (a referenced registry
+solid already worked since USERDATA-008); no kinetic value anywhere; the
+legacy Stage 9 `StarchSubstrate` and `ChitinSubstrate` metadata modules are
+untouched and unrelated to the registry records.
+
+Scientific impact: GH10/GH11, GH15 and GH18 enzymes from a genome or
+proteome become explicit measurement requests on a named solid polymer
+instead of "unmodellable", and user kinetics on xylan, starch or chitin run
+through the existing apparent law with an explicit, sourced product identity.
+No rate is shipped or inferred; the yields are idealized stoichiometry for
+reference.
+
+Compatibility: additive for datasets. Genome and UniProt outputs change
+wherever GH10, GH11, GH15, GH18 or EC 3.2.1.8, 3.2.1.3 and 3.2.1.14 occur
+(listed above): those classes join a strain and appear in
+`genome_resolved_classes` rather than `unmodellable_enzyme_classes`, and a
+protein with one of these EC numbers can now agree or disagree with its CAZy
+family. A user `enzyme_classes.csv` row whose `class_id` or `name` equals one
+of the new names or aliases (for example `xylanase`) is now refused as a
+collision, and a user substrate named `xylan`, `starch` or `chitin` collides
+with the registry record.
+
+Limitations: generic polymers without composition, accessible area,
+crystallinity or particle size; the product maps hold for idealized
+homopolymers and are not applied or checked; no debranching, beta-xylosidase,
+beta-N-acetylhexosaminidase or alpha-amylase class, so complete hydrolysis to
+monomers is not itself modelled; GH18 endo- and exo-chitinases are one class;
+the classes act on the solid polymers only, not on dissolved oligosaccharides;
+the IUBMB and CAZy texts are cited from the curated sources without an online
+check in this session (no network).
+
+Ambiguities: whether `glucoamylase` should also list dissolved maltose and
+malto-oligosaccharides (IUBMB covers enzymes acting on polysaccharides more
+rapidly than on oligosaccharides); not added, to keep this record to the
+solid route, and the tests widen it in memory instead. Product names use
+"equivalent" for xylan and chitin rather than the literal "xylose" and
+"GlcNAc", because the endo-acting classes do not release free monomer.
+
+Risk: low. Data and test changes only; the user-data and genome behaviour
+changes are the documented consequences of new records.
+
+Recommended next task: USERDATA-009, the Langmuir surface law for user data
+(unchanged from USERDATA-008), or a follow-up that warns when a stated g/g
+yield on a registry polymer exceeds its product map's complete-hydrolysis
+yield.
+
 ## RUN-001 Run The Runnable Cases Of A Request
 
 Status: `complete` for the stated scope (2026-10-07). For the owner's goal

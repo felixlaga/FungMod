@@ -126,6 +126,12 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "culture_reentry",
     "culture_estimates",
     "load_10",
+    # REGISTRY-002: the polysaccharide substrates, classes and products are registry records, never code.
+    "starch",
+    "chitin",
+    "xylose",
+    "glucosamine",
+    "amylase",
 )
 
 
@@ -186,16 +192,51 @@ def test_uniprot_route_modules_have_no_organism_substrate_or_enzyme_specific_tok
             "glucoamylase",
             "maltose",
             "xylanase",
+            "chitinase",
             "laccase",
             "esterase",
             "trichoderma",
             "aspergillus",
             "3.2.1.21",
             "3.2.1.3",
+            "3.2.1.8",
+            "3.2.1.14",
             "x0test",
             "up000000000",
         ):
             assert forbidden not in module, (relative, forbidden)
+
+
+POLYSACCHARIDE_CLASS_TOKENS = (
+    "xylan",
+    "xylose",
+    "starch",
+    "amylase",
+    "chitin",
+    "glucosamine",
+)
+POLYSACCHARIDE_GENERIC_PATHS = (
+    *GENERIC_SOURCE_PATHS,
+    "src/fungal_model/api",
+    "src/fungal_model/capability",
+    "src/fungal_model/registry",
+    "src/fungal_model/screening",
+)
+
+
+def test_registry_polysaccharide_classes_stay_out_of_generic_code() -> None:
+    """REGISTRY-002: xylan, starch and chitin and their classes and products live in data_registry only.
+
+    The legacy metadata modules under src/fungal_model/substrates are not generic paths and are not scanned.
+    """
+
+    violations = [
+        f"{path.relative_to(ROOT).as_posix()}: {token}"
+        for path in _python_files(POLYSACCHARIDE_GENERIC_PATHS)
+        for token in POLYSACCHARIDE_CLASS_TOKENS
+        if token in path.read_text(encoding="utf-8").lower()
+    ]
+    assert not violations, violations
 
 
 def _python_files(paths: tuple[str, ...]) -> tuple[Path, ...]:

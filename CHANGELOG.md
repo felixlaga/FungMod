@@ -41,6 +41,38 @@ All notable public releases of FungMod are documented here.
   assembles byte-identically
   ([fungal culture](docs/user-data.md#fungal-culture-growth-and-secretion)).
 
+- Registry records for xylan, starch and chitin and their hydrolase classes
+  (REGISTRY-002), categorical metadata without kinetic values. Enzyme classes
+  `endo_xylanase` (EC 3.2.1.8; aliases `endo-xylanase`, `endoxylanase`,
+  `xylanase`), `glucoamylase` (EC 3.2.1.3; `glucan 1,4-alpha-glucosidase`,
+  `amyloglucosidase`) and `chitinase` (EC 3.2.1.14; `endochitinase`), the ids
+  the CAZy family map already assigns to GH10/GH11, GH15 and GH18; provenance
+  IUBMB (ExplorEnz) and CAZy (Drula et al. 2022), maturity
+  `literature_metadata`, process `homogeneous_michaelis_menten` only. Solid
+  substrates `xylan` (`beta_1_4_xylosidic`), `starch` (`alpha_1_4_glycosidic`,
+  `alpha_1_6_glycosidic`, categorical; no branch-point model) and `chitin`
+  (`beta_1_4_n_acetylglucosaminidic`), `physical_state` `solid_polymer`,
+  generic polysaccharide definitions (`exploratory_metadata`; composition
+  varies by source and is not recorded), declaring the products
+  `D_xylose_equivalent`, `beta_D_glucose` and
+  `N_acetyl_D_glucosamine_equivalent` (monomer equivalents where the enzyme
+  releases oligosaccharides). The first records of
+  `data_registry/product_maps/product_maps.yml`: the complete-hydrolysis mass
+  yields 1.136358, 1.111107 and 1.088659 g/g of the idealized homopolymers,
+  with the formula from conventional atomic weights in their provenance;
+  reference stoichiometry that no route fills or checks a user's yield from.
+  A user dataset can reference the three polymers as registry substrates and
+  run user kinetics on them through the apparent Michaelis-Menten route of
+  USERDATA-008 ([registry polymers](docs/user-data.md#registry-polymers)).
+  GH10, GH11, GH15 and GH18 genes of a dbCAN annotation and EC 3.2.1.8,
+  3.2.1.3 and 3.2.1.14 proteins of a UniProt export now resolve to modellable
+  classes instead of `unmodellable_enzyme_classes`; on a dataset substrate that
+  references the polymer their roles are gaps with dry-mass measurement
+  requests. No compatibility record, case template, parameter record or
+  family-map change; no LPMO or endoglucanase record. The UniProt format
+  fixture gains `X0TEST13` (AA1, EC 1.10.3.2), so a class without a record
+  stays covered.
+
 - Partial runs: simulate the runnable cases of a request and report the
   blocked ones (RUN-001). `VirtualExperiment.simulate(..., blocked="report")`
   simulates exactly the cases whose preflight allows simulation in the

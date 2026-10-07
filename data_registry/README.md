@@ -31,6 +31,30 @@ substrate, and no parameter record or compatibility record carries kinetics
 for it. Classes resolved to it from a genome or proteome become explicit gaps
 on a solid cellulose substrate of a user dataset.
 
+The enzyme classes `endo_xylanase` (EC 3.2.1.8; CAZy GH10 and GH11),
+`glucoamylase` (EC 3.2.1.3; GH15) and `chitinase` (EC 3.2.1.14; GH18) are
+categorical metadata of the same kind (IUBMB ExplorEnz entries and CAZy family
+descriptions, Drula et al. 2022; `literature_metadata`; no kinetics). Each acts
+on one generic solid polymer: `xylan` (bond class `beta_1_4_xylosidic`),
+`starch` (`alpha_1_4_glycosidic` and `alpha_1_6_glycosidic`, listed
+categorically; no branch-point model) and `chitin`
+(`beta_1_4_n_acetylglucosaminidic`). These substrate records are generic
+polysaccharide definitions (`exploratory_metadata`): composition varies by
+source (xylan side chains, the amylose/amylopectin ratio of starch, the
+acetylation of chitin) and none of it is recorded. Endo-xylanases and
+chitinases release oligosaccharides, so xylan and chitin declare monomer
+equivalents (`D_xylose_equivalent`, `N_acetyl_D_glucosamine_equivalent`, the
+mass on complete hydrolysis); glucoamylase releases `beta_D_glucose` itself.
+The three product maps in `product_maps/product_maps.yml` record the
+complete-hydrolysis mass yields of the idealized homopolymers, computed from
+conventional atomic weights with the formula in their provenance (1.136358,
+1.111107 and 1.088659 g/g). They are reference stoichiometry: a user dataset
+states its own yield, and no route fills or checks it from these maps. No
+compatibility record, case template or parameter record exists for these
+classes. The family map's other classes (LPMO, cellobiose dehydrogenase,
+acetyl xylan esterase, laccase, class II peroxidase, alpha-amylase and pectate
+lyase) and endoglucanase have no record.
+
 The registry layer is intended to support future modelability assessment and
 plug-and-play screening. It separates categorical facts, such as enzyme class
 and substrate class compatibility, from numeric value specifications.
