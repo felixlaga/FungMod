@@ -369,6 +369,218 @@ Recommended next task: user time-course tables (`timecourse.csv`) compared
 against the simulated trajectories with the existing comparison metrics, then
 fitting of user kinetic constants to them.
 
+## FIX-RATES-001 Degradation And Product-Release Rates From State Rates
+
+Status: `complete` for the stated scope (2026-10-06).
+
+Defect: `result_tables._time_series_rows` built `degradation_rate` and
+`product_release_rate` from `_rate_by_index`, which kept whichever process
+rate was listed last at each time index, and gave both rows that value and
+unit; `_maximum_process_rate` took the largest value of any process for both
+`maximum_product_release_rate` and `maximum_substrate_depletion_rate`. In
+multi-process cases the rates belonged to an arbitrary process with arbitrary
+units (the *T. harzianum* P49P11 culture case on Celufloc 200 reported a
+maximum substrate depletion rate of 45.07
+`beta_glucosidase_assay_unit / hour / liter` for cellulose in g/L); in
+single-process cases with a product yield other than one the product release
+rate was the process rate (SABIO-RK Reaction 618: half of d[glucose]/dt).
+
+Changed:
+
+- `ProcessODESolver.run` records `SimulationResult.state_rates`: at every
+  returned time point, `CompiledModel.rhs` (the right-hand side the solver
+  integrated, rates at `max(state, 0)`) gives the net rate of every state in
+  state units per time unit. No finite differences. The field defaults to
+  empty, so other producers (legacy engine results, the mycelium model) are
+  unaffected; `save()` always writes `state_rates.csv` (`kind=state_rate`,
+  header-only when empty) and `to_dict()` includes `state_rates`.
+- Result tables: `degradation_rate` = -d[substrate]/dt and
+  `product_release_rate` = +d[product]/dt from `state_rates.csv` for the
+  case's substrate and product state roles, each with its own units, source
+  `simulation_state_rate`; `maximum_substrate_depletion_rate` and
+  `maximum_product_release_rate` are their maxima over the returned time
+  points, with a note naming the state. Without a mapped role or without
+  `state_rates.csv` the rows are `not_applicable` (empty value, `units` and
+  `source` `not_applicable`, reason in a new optional `notes` column of
+  `time_series_long.csv`) and the metrics are `not_applicable` with the
+  reason; there is no process-rate fallback. `_rate_by_index` and
+  `_maximum_process_rate` are removed. `process_rate.<id>` rows are unchanged.
+- The report's degradation-rate section and the `degradation_rate_vs_time.png`
+  quicklook select `simulation_state_rate` rows.
+- Output schema `2.0.0` (was `1.8.0`): the rows keep their names but change
+  meaning, values, units and source; `time_series_long` gains the optional
+  `notes` column and documents its `source` values.
+- Docs: `docs/concepts/outputs.md` rate section, README output-schema and
+  `AssembledModel.run()` paragraphs, CHANGELOG (Unreleased, Fixed).
+
+Tests: `tests/test_state_rate_metrics.py` (new): Reaction 618 product release
+equals the template yield (2) times the degradation rate at every time point
+and the degradation rate equals the single process rate, in concentration per
+time; the *T. harzianum* culture case reports the maximum depletion rate in
+cellulose mass concentration per time, agreeing with an independent
+second-order finite-difference estimate on a 20-fold refined grid within
+1e-4 of the peak rate, and reports `product_release_rate` as not applicable
+(the template maps no product); a two-process mass-action/decay model with
+mixed time units has `state_rates` equal to S·r computed by hand, in
+`record.json` and `state_rates.csv`; a bundle without `state_rates.csv`
+reports the rows and metrics as not applicable with the reason. Updated:
+bundle file lists in `test_results.py`, `test_configured_model_workflow.py`,
+`test_full_integration_workflow.py` and
+`test_configured_output_bundle_reproducibility.py` include `state_rates.csv`;
+`test_results.py` checks the header-only table for a producer without state
+rates; `test_virtual_experiment_api.py` pins schema `2.0.0`;
+`test_bio002_generic_chain_assembly.py` checks that the chain's rate rows are
+state rates. No assertion pinned the old wrong values.
+
+Not changed: no process law, rate kernel, integration, tolerance, trajectory,
+process-rate value, registry record or template. Trajectories and
+`process_rates.csv` are bit-identical.
+
+Scientific impact: degradation and product-release rates and their maxima are
+now the simulated net change of the mapped substrate and product. Earlier
+reported maximum rates and product-release rates from multi-process cases or
+yields other than one were wrong. No committed data, benchmark or paper
+artifact contains these rows or metrics.
+
+Backward compatibility: consumers selecting these rows by
+`source == simulation_process_rate` must use `simulation_state_rate`;
+`1.8.0` and `2.0.0` bundles must not be pooled. Bundles without
+`state_rates.csv` give `not_applicable` rate rows when re-tabulated.
+
+Limitations: maxima are over the returned time points, not the continuous
+maximum between them; well-mixed `ProcessODESolver` runs only.
+
+## CLI-001 Command-Line Virtual Experiments
+
+Status: `complete` for the stated scope (2026-10-06); the command-line form of
+the product goal ("fungus X on substrate Y in conditions Z, and the software
+calculates") over the existing virtual-experiment API.
+
+Changed:
+
+- `fungal_model.cli` (`main(argv=None) -> int`, `build_parser()`), registered
+  as the console script `fungmod = "fungal_model.cli:main"` in
+  `[project.scripts]` (setup.py keeps only the resource-staging build step and
+  declares no entry points), and `fungal_model/__main__.py` for
+  `python -m fungal_model`. argparse, four subcommands:
+  - `run`: `--fungus`, `--substrate` (repeatable names, aliases or ids);
+    conditions as `--environment`/`--condition` (registry environments or a
+    user-data `condition_id`) or a `--temperature-c`/`--ph`/`--oxygen` grid
+    (`environment_grid`); `--user-data DIR`, `--registry PATH` (default: the
+    packaged registry, printed); `--mode` required; `--samples` and `--seed`
+    required in exploratory mode and refused in scientific mode;
+    `--output DIR` required, new or empty; `--report` adds the HTML report and
+    `index.html`; `--no-plots`. It prints the resolved names, the preflight
+    table with missing items and their suggested experiments, simulates
+    through `VirtualExperiment.simulate`, always writes the Markdown report,
+    and prints per case the environment effect and guardrail, the final
+    metrics and threshold times (median and 5th to 95th percentile from
+    `summary_metrics.csv`, statuses from `final_metrics.csv` and
+    `threshold_times.csv`), then the output directory, manifest, report,
+    limitations count by severity and the provenance and limitations paths.
+  - `preflight`: the same selection, no simulation, optional `--output` for
+    the preflight tables (`write_preflight_report`).
+  - `check-data DIR`: dataset id, digest, directory, time grid, generated
+    record counts, kinetic values and gaps with each measurement request.
+  - `list`: registry fungi, substrates and environments with id, name and
+    maturity, `--aliases`, `--user-data` overlay.
+  - Exit codes: 0 success; 1 the simulation failed after a passing preflight;
+    2 usage or input errors (argparse errors, unknown or ambiguous names, an
+    invalid registry, a non-empty output directory, `UserDataError` with every
+    issue as `file:row:column: message`); 3 the preflight blocks a requested
+    case in the requested mode (nothing is simulated or written; the blocked
+    cases, the API's scientific-mode wording and the measurement requests are
+    printed).
+- API, no behaviour change: `DegradationScreenResult.case_summary()` and
+  `summary_metrics()` read the existing tables; `preflight_policy(report)` in
+  `fungal_model.api.result_tables` (previously `_preflight_policy`) is public
+  so that the command line uses the same per-mode simulation rule as
+  `modelability_preflight.csv`.
+- CI: the installed-wheel smoke also runs `fungmod --version` and
+  `fungmod list`.
+- Docs: `docs/cli.md` (in the nav after the quickstart; every subcommand, the
+  "fungus X on substrate Y at 30 °C and pH 5" example with its real output,
+  modes, user data, exit codes), README "Command line" subsection and
+  capability row, API reference section, install, quickstart and home links,
+  changelog.
+
+Tests: `tests/test_cli.py` (30 tests): Reaction 618 exploratory run with the
+default packaged registry (manifest, report files, figures, printed metrics
+matching `summary_metrics.csv`, limitations count and table paths); the
+T. harzianum culture case in scientific mode (run label, printed threshold
+time matching `threshold_times.csv`); a temperature/pH grid in exploratory
+mode and the same grid blocked in scientific mode with the registry
+suggestions; the esterase fixture in exploratory mode (dataset id and digest
+in output and manifest) and blocked in scientific mode; the literature
+re-entry in scientific mode; a kcat gap exiting 3 from `preflight` and `run`
+with the measurement request printed and in the preflight tables;
+`check-data` success, gaps, and bad units (both issues as
+`kinetics.csv:row:units:`, exit 2); `list` with and without user data and
+aliases; nine `run` usage errors and seven selection input errors (exit 2,
+nothing written); a non-empty output directory; help texts with the API's
+scientific-mode wording; `--version`; the pyproject console script; and
+`python -m fungal_model --version` in a subprocess. Guardrails now cover
+`cli.py` and `__main__.py` (no-hardcoding paths and an organism/substrate/
+enzyme token test, no-shortcut patterns, no low-level solver construction,
+complete public entry point using the public API); the release-configuration
+test pins `[project.scripts]` and the wheel smoke; the API test covers the
+two accessors and `preflight_policy`.
+
+Not changed: no process law, solver, registry record, output table or schema
+(still `1.8.0`), preflight status, simulation rule or numerical result. The
+command line adds no default for any scientific value.
+
+Scientific impact: none on results; the same simulations become reachable
+from a shell, with the mode, sample count and seed always stated by the user
+and the environment-effect guardrail, limitations and provenance printed with
+the numbers.
+
+Limitations: one invocation simulates only when every requested case passes
+the preflight (the API rule), so a mixed request must be split; the printed
+numbers are four significant figures of the tables, which hold full
+precision; no JSON output mode; `python -m fungmod` is not provided (the
+`fungmod` namespace has no real submodules).
+
+Recommended next task: a machine-readable `--json` summary for `run` and
+`preflight`, then per-case selection so that runnable cases of a mixed
+request can be simulated while the blocked ones are reported.
+
+## FIX-DOCS001 Two Defects Found By The Documentation Audit
+
+Date: 2026-10-06
+
+Status: complete. The README and docs audit (DOCS-001) ran every documented
+example and found two code defects; both are fixed with regression tests.
+
+- SABIO-RK proposals: `_proposed_parameter_symbol` mapped every parameter of a
+  type it does not special-case to the bare type token, so the four `pKa`
+  parameters of the pH-dependent entries (38522 and seven others in Reaction
+  618) all became `pka` and `review_source_proposal` refused the whole
+  reaction with a duplicate record ID. The parameter's SABIO-RK name now
+  completes the symbol when it differs from the type (`pka_pke1`, `pka_pke2`,
+  `pka_pkes1`, `pka_pkes2`); `Km_<species>`, `kcat_<substrate>`, the
+  concentration symbols and types whose name adds nothing (`ph`) are unchanged.
+- Preflight: `assess_modelability` now checks the environment conditions the
+  selected process law reads at run time, declared by the law modules
+  (`PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS = ("ph",)`,
+  `THERMAL_INACTIVATION_ENVIRONMENT_CONDITIONS = ("temperature",)`, collected
+  in `PROCESS_ENVIRONMENT_CONDITIONS`). A missing or unknown value is a
+  missing item; a range or distribution is incompatible ("the law needs one
+  value per run; use an environment with an exact pH, or an EnvironmentGrid
+  point"). The *P. chrysosporium* K-3 case in `toy_lab_environment` (pH range)
+  is therefore no longer modelable; in the Tsukada assay environments and
+  EnvironmentGrid points it is unchanged.
+
+Tests: `tests/test_preflight_fixes_docs001.py` (distinct symbols in every
+Reaction 618 entry, the whole proposal reviewable, ranged pH blocking in both
+modes, exact pH unchanged, the declared conditions, processes without
+environment reads unaffected).
+
+Not changed: any rate law, parameter record or registry record; the
+homogeneous Michaelis-Menten and culture cases. Scientific impact: a case that
+could only fail at run time is now refused at preflight.
+
+
 ## DOCS-001 README And Docs Accuracy Audit
 
 Status: `complete` for the stated scope (2026-10-06). Documentation only: no

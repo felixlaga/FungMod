@@ -29,6 +29,39 @@ should be recoverable from an exported artifact.
 Header-only diagnostic tables mean that the corresponding configured evidence
 was unavailable. Missing diagnostics are not converted to zeros.
 
+## Degradation and product-release rates
+
+The tables follow output schema `2.0.0`.
+
+| Row or metric | Table | Definition |
+| --- | --- | --- |
+| `degradation_rate` | `time_series_long.csv` | -d[substrate]/dt of the case's mapped substrate state |
+| `product_release_rate` | `time_series_long.csv` | +d[product]/dt of the case's mapped product state |
+| `maximum_substrate_depletion_rate` | `final_metrics.csv` | maximum of `degradation_rate` over the returned time points |
+| `maximum_product_release_rate` | `final_metrics.csv` | maximum of `product_release_rate` over the returned time points |
+| `process_rate.<process_id>` | `time_series_long.csv` | rate of one configured process, in its own rate units |
+
+Each rate is in its state's units per time unit, and the rate rows carry the
+source `simulation_state_rate`. The values come from the sample bundle's
+`state_rates.csv`: at every returned time point the well-mixed solver evaluates
+the same compiled right-hand side it integrated, with rates evaluated at
+`max(state, 0)` as during integration. They are not finite differences of the
+trajectory and not a process rate, so a product yield other than one and models
+with several processes report the change of the mapped state itself.
+
+If a case maps no substrate or no product state, or a sample bundle has no
+`state_rates.csv` (bundles written before schema `2.0.0`, or producers that
+record none), the rows have an empty `value`, `units` and `source` set to
+`not_applicable`, and the reason in `notes`; the final metrics have status
+`not_applicable` with the reason. Process rates are never used in their place.
+
+Bundles written under schema `1.8.0` report `degradation_rate` and
+`product_release_rate` as whichever process rate was listed last at each time
+point, and both maximum-rate metrics as the largest rate of any process, in
+that process's units. Those values are wrong for models with more than one
+process and for product yields other than one; do not compare them with schema
+`2.0.0` values.
+
 ## Configured-model artifacts
 
 Configured runs also write:
@@ -37,7 +70,9 @@ Configured runs also write:
 - merged parameters;
 - entity snapshots;
 - process build decisions;
-- state and process-rate trajectories;
+- state, process-rate and net state-rate trajectories (`state_trajectories.csv`,
+  `process_rates.csv`, `state_rates.csv`; the last is header-only when the
+  producer records no state rates);
 - validation and solver reports;
 - conservation and thermodynamic summaries when configured;
 - entropy-production-rate trajectories when every required conversion and

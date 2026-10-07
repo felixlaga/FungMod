@@ -10,6 +10,17 @@
         - VirtualExperimentError
         - virtual_experiment
 
+## Command line
+
+The `fungmod` console script (also `python -m fungal_model`); see
+[command line](cli.md) for the subcommands and exit codes.
+
+::: fungal_model.cli
+    options:
+      members:
+        - main
+        - build_parser
+
 ## User-supplied data
 
 ::: fungal_model.api.user_data

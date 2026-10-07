@@ -15,6 +15,8 @@ GENERIC_SOURCE_PATHS = (
     "src/fungal_model/io",
     "src/fungal_model/workflows",
     "src/fungal_model/api/user_data.py",
+    "src/fungal_model/cli.py",
+    "src/fungal_model/__main__.py",
 )
 
 ALLOWED_DOMAIN_SPECIFIC_PATHS = (
@@ -110,6 +112,10 @@ USER_DATA_FORBIDDEN_TOKENS = (
 )
 
 
+# user_data.py and the command line name no source database either.
+ORGANISM_SUBSTRATE_ENZYME_TOKENS = (*USER_DATA_FORBIDDEN_TOKENS, "sabio")
+
+
 def test_user_data_sources_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
     """The SABIO-RK drafting module names its source, never an organism, substrate or enzyme."""
 
@@ -121,8 +127,15 @@ def test_user_data_sources_has_no_organism_substrate_or_enzyme_specific_tokens()
 def test_user_data_import_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
     user_data = (ROOT / "src" / "fungal_model" / "api" / "user_data.py").read_text(encoding="utf-8").lower()
 
-    for forbidden in (*USER_DATA_FORBIDDEN_TOKENS, "sabio"):
+    for forbidden in ORGANISM_SUBSTRATE_ENZYME_TOKENS:
         assert forbidden not in user_data, forbidden
+
+
+def test_command_line_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
+    for relative in ("src/fungal_model/cli.py", "src/fungal_model/__main__.py"):
+        source = (ROOT / relative).read_text(encoding="utf-8").lower()
+        for forbidden in ORGANISM_SUBSTRATE_ENZYME_TOKENS:
+            assert forbidden not in source, f"{relative}: {forbidden}"
 
 
 def _python_files(paths: tuple[str, ...]) -> tuple[Path, ...]:

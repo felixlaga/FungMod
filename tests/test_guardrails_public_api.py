@@ -145,6 +145,24 @@ def test_pet_plugin_helpers_are_available_only_from_pet_plugin() -> None:
         assert name in pet_plugin.__all__
 
 
+def test_command_line_entry_point_is_complete_and_uses_the_public_api() -> None:
+    import fungal_model.__main__ as module_entry
+    import fungal_model.cli as cli
+
+    assert callable(cli.main)
+    for source in (inspect.getsource(cli), inspect.getsource(module_entry)):
+        lowered = source.lower()
+        assert "notimplementederror" not in lowered
+        assert "placeholder" not in lowered
+        assert "todo" not in lowered
+    source = inspect.getsource(cli)
+    assert "virtual_experiment(" in source
+    assert ".simulate(" in source
+    assert ".preflight(" in source
+    for low_level in ("simulate_screen", "assess_modelability", "run_configured_model", "ProcessODESolver"):
+        assert low_level not in source
+
+
 def test_public_api_names_are_not_unfinished_placeholders() -> None:
     candidates = (
         *FOUNDATION_PUBLIC_API.values(),

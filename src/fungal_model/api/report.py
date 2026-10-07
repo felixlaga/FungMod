@@ -384,7 +384,7 @@ def _degradation_rate_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
         row
         for row in rows
         if _value(row, "state") == "degradation_rate"
-        and _value(row, "source") == "simulation_process_rate"
+        and _value(row, "source") == "simulation_state_rate"
         and _optional_float(_value(row, "value")) is not None
     ]
     if not rate_rows:
@@ -393,7 +393,8 @@ def _degradation_rate_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
     lines = [
         "These rows are an inspection summary over existing `time_series_long.csv` "
         "`degradation_rate` rows only. They are not validation, calibration, empirical comparison, "
-        "or a new rate law."
+        "or a new rate law. Each row is -d[substrate]/dt of the case's substrate state, taken from "
+        "the state-rate trajectory recorded by the simulation."
     ]
     grouped: dict[tuple[str, str, str, str], list[tuple[float, float]]] = {}
     for row in rate_rows:
