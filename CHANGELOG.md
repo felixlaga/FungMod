@@ -44,6 +44,46 @@ All notable public releases of FungMod are documented here.
   classes in parallel, kcat and Vmax forms, one competitively inhibited);
   illustrative estimates only. Datasets without `enzyme_network` generate
   byte-identical records.
+
+- A fungus's enzyme repertoire from its name (FETCH-001): `fungmod assemble
+  --fetch-proteome` searches UniProt's reference proteomes for the name of
+  `--scientific-name` (or, without it, of `--fungus`) and takes a proteome
+  only when exactly one candidate's organism name equals it
+  (case-insensitive) or the search has a single candidate; no candidate,
+  several without one exact match, or a truncated search is refused (exit 2)
+  with every candidate listed (identifier, organism, taxonomy id, type,
+  protein count), and `--proteome UP...` chooses one (among the candidates
+  when `--fetch-proteome` is kept; any proteome without it). The chosen
+  proteome's UniProtKB export is copied into the draft and written as its
+  `genomes.csv` row (`UniProt release <X-UniProt-Release>`, or the retrieval
+  date recorded as such when the header is absent; the source names the
+  organism, taxonomy id, query, SHA-256 and URL), and the classes come from
+  the existing UniProt route; no kinetic value comes from a proteome.
+  `--fetch` is the command line's only network opt-in: without it the frozen
+  snapshots under `--snapshot-dir` (default `data/source_snapshots/uniprot`)
+  are read and verified, the same command reruns offline byte for byte, and a
+  missing snapshot is refused with the command that fetches it; a changed
+  snapshot, or a new response that differs from a stored one, is refused.
+  `--annotation` and the proteome options are refused together.
+  `fungal_model.sources.uniprot` adds `search_proteomes_by_name` (the search
+  response frozen with URL, query, retrieval time, HTTP status, release and
+  result-count headers and SHA-256), `choose_proteome`,
+  `resolve_proteome_name`, `fetch_proteome_by_name` (which also checks the
+  export's taxonomy id against the chosen candidate's),
+  `parse_proteome_search_tsv` and the error types `ProteomeChoiceError`,
+  `MissingSnapshotError` and `SnapshotConflictError` (both subclasses of
+  `UniprotFetchError`, raised where it was raised before).
+  `assemble_user_tables` takes `proteome` (a frozen proteome snapshot) and
+  `proteome_selection` (how it was chosen, recorded in `user_dataset.yml`,
+  `review.md` and the assembly report), and reads `annotation` as a UniProtKB
+  TSV export when `annotation_tool` names UniProt. The proteomes search
+  endpoint, the query fields `organism_name` and `proteome_type` and the
+  columns `upid`, `organism`, `organism_id` and `protein_count` are used as
+  UniProt documents them; they were not verified against a live response,
+  because the development environment could not reach rest.uniprot.org, and
+  the tests use synthetic responses
+  ([from a fungus name](docs/user-data.md#from-a-fungus-name)).
+
 - Fungal cultures in user data (USERDATA-009): "fungus X on substrate Y in
   conditions Z" now also simulates the fungus growing on the substrate and
   secreting its enzymes, not only an enzyme at a stated concentration. An
@@ -714,6 +754,18 @@ All notable public releases of FungMod are documented here.
   remain explicit; no validated organism model or registry promotion is claimed.
 
 ### Changed
+
+- Text only (FETCH-001): `UniprotSnapshot.genomes_row` (and so
+  `write_snapshot_to_user_dataset`) prefixes its `source` with the export's
+  organism and taxonomy id; an assembled draft's manifest `source` and
+  `review.md` call a UniProt export "UniProt proteome export" instead of
+  "dbCAN annotation" (also for a UniProt row reused from `user_data`), list
+  its unresolved EC numbers and EC/CAZy disagreements, and count proteins
+  rather than genes for its classes (which previously raised a `KeyError` in
+  `review.md` for an unmodellable class of a reused UniProt row); the draft's
+  limitations name UniProt exports among the offline sources. The command
+  line's no-fetch sentence (`NO_FETCH_HELP`) now names `assemble --fetch` as
+  its one network opt-in. No numerical behaviour changes.
 
 - The `culture_physiology` assembler accepts `rate_units_from_state_role` on a
   process template (the rate in the units of that state's initial record per

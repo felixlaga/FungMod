@@ -131,6 +131,9 @@ From a shell, `fungmod assemble --fungus ... --substrate ... --temperature-c
 --kinetics-source ... --entry-id 35622 --dataset-id ... --output ...` writes the
 same draft and prints the per-case report, the `REVIEW:` fields and the next
 commands ([command line](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
+With `--fetch-proteome --fetch` in place of the annotation, the repertoire
+comes from the UniProt reference proteome found under the fungus's name
+([from a fungus name](#from-a-fungus-name)).
 When a case of the draft is a `gap` or a `conflict`, the printed `fungmod
 run` command carries `--runnable-only` and a line says why: once loaded, that
 case's kinetic constants are explicit gaps, so the preflight blocks it, and
@@ -178,8 +181,11 @@ mode both cases are refused, because the transferred values are estimates.
   `temperature_units` (`degC` or `kelvin`), `ph` and optionally
   `condition_id` and `notes`. Nothing is invented.
 - Sources of the enzyme repertoire: `annotation` with `annotation_tool` and
-  `annotation_source` (checked like a `genomes.csv` row, copied into
-  `annotations/` and listed in `genomes.csv`), `enzyme_classes` you assert
+  `annotation_source` (a dbCAN `overview.txt`, or a UniProtKB TSV export when
+  the tool names UniProt; checked like a `genomes.csv` row, copied into
+  `annotations/` and listed in `genomes.csv`), or instead `proteome`, a
+  frozen UniProt proteome snapshot, with `proteome_selection` saying how it
+  was chosen ([from a fungus name](#from-a-fungus-name)), `enzyme_classes` you assert
   (a class name, alias, EC number or ID, or a mapping with `enzyme_class`,
   `evidence` and `source`; missing evidence or source is a `REVIEW:` field),
   the registry record of a registry fungus, and the strain's rows in
@@ -223,8 +229,11 @@ cases of a registry fungus.
 ### Rules
 
 - **The repertoire is evidence, never a name.** A class belongs to the fungus
-  only through its genome annotation, a class you assert, its own rows in your
-  dataset or its registry record. A SABIO-RK entry or a name never adds one.
+  only through its genome annotation or proteome export, a class you assert,
+  its own rows in your dataset or its registry record. A SABIO-RK entry or a
+  name never adds one; a name can at most select a UniProt reference proteome
+  ([from a fungus name](#from-a-fungus-name)), whose entries are then the
+  evidence.
 - **Which classes act on a substrate** is the registry's categorical rule (the
   substrate class is one of the class's substrate classes and they share a
   bond class; `enzyme_class_acts_on`). Classes of the fungus that do not act on
@@ -262,9 +271,11 @@ cases of a registry fungus.
 ### Limits
 
 - One fungus per call.
-- Offline sources only: a dbCAN `overview.txt` file, a user dataset and
-  SABIO-RK entries from a proposal, a frozen snapshot or an export; no other
-  kinetics database.
+- Offline sources only: a dbCAN `overview.txt` file or a UniProtKB export (a
+  file or a frozen UniProt proteome snapshot), a user dataset and SABIO-RK
+  entries from a proposal, a frozen snapshot or an export; no other kinetics
+  database. The proteome snapshot is fetched beforehand, only on request
+  (`fungmod assemble --fetch`, or `refresh=True` in Python).
 - Transferred kinetics are estimates; scientific mode needs your own, or
   same-species literature, values.
 - No rate, concentration, expression or secretion is taken from a genome.
@@ -945,12 +956,13 @@ The response is parsed before it is stored; it is frozen under
 or changed snapshot is refused. A new response whose digest differs from the
 stored one is refused unless you pass `overwrite=True`. A taxonomy id query
 (`organism_id:<id>`) returns every UniProtKB entry of that organism, which may
-be more than its reference proteome. There is no lookup from a free-text
-organism name to a proteome: choosing the proteome is left to you (possible
-future work, which would show candidates rather than guess). The URL and the
-return-field names follow UniProt's REST documentation as known when the
-client was written; they were not checked against a live response in the
-environment it was written in, which could not reach rest.uniprot.org.
+be more than its reference proteome. To go from an organism name to its
+reference proteome, see [from a fungus name](#from-a-fungus-name): the
+candidates are shown, and only an exact name or a sole candidate is taken.
+The URL and the return-field names follow UniProt's REST documentation as
+known when the client was written; they were not checked against a live
+response in the environment it was written in, which could not reach
+rest.uniprot.org.
 
 Limits of the UniProt route:
 
@@ -971,6 +983,126 @@ Limits of the UniProt route:
   annotated EC 3.2.1.4 (an endoglucanase I) therefore disagrees with the GH7
   family call.
 - One organism per export; no merging of proteomes or strains.
+
+### From a fungus name
+
+`fungmod assemble --fetch-proteome` goes from the name of the fungus to the
+UniProtKB export of its UniProt reference proteome, so that you do not have to
+look up the `UP...` identifier and download the export yourself. The draft is
+the same as with an [export you downloaded](#from-a-uniprot-proteome): the
+classes come from the proteome's EC numbers and CAZy cross-references, and no
+kinetic value comes from it.
+
+```bash
+fungmod assemble --fungus "My strain" --scientific-name "Genus species" \
+  --fetch-proteome --fetch \
+  --substrate cellobiose --temperature-c 30 --ph 5 \
+  --dataset-id my_strain --output my_strain
+```
+
+1. **Search.** The name of `--scientific-name` (or, without it, of
+   `--fungus`) is searched among UniProt's reference proteomes:
+   `https://rest.uniprot.org/proteomes/search?query=organism_name:"<name>" AND proteome_type:1&fields=upid,organism,organism_id,protein_count&format=tsv&size=500`.
+   The phrase matches organism names that contain it, in any letter case, so a
+   species name also finds its strains.
+2. **Choice.** A proteome is taken only when exactly one candidate's organism
+   name equals the name (case-insensitive, spaces normalised), or when the
+   search has exactly one candidate (its organism name, for example with a
+   strain added, is printed and recorded). Refused, with every candidate
+   printed (proteome identifier, organism, taxonomy id, type, protein count):
+   no candidate; several candidates without exactly one exact match; and a
+   search with more results than one response holds (500; UniProt's
+   `X-Total-Results` header or a next-page link says so). FungMod never takes
+   the first, the largest or the best-annotated candidate. Choose one by
+   running the same command with `--proteome UP...`: with `--fetch-proteome`
+   kept, the identifier must be one of the candidates. A proteome that is not
+   a reference proteome, or that UniProt lists under another name, is used
+   only when you name it with `--proteome` alone.
+3. **Export.** The chosen proteome's UniProtKB entries are fetched as
+   [above](#from-a-uniprot-proteome) (`(proteome:UP...)`); the export's
+   `Organism (ID)` must equal the chosen candidate's taxonomy id.
+4. **Draft.** The export is copied to `annotations/proteome_UP....tsv` and is
+   the draft's `genomes.csv` row: `annotation_tool` is
+   `UniProt release <release>` from the `X-UniProt-Release` header, or
+   `UniProt downloaded <date> (no release header in the response)` when
+   UniProt sends none; `source` names the organism, its taxonomy id, the
+   query, the retrieval time, the release, the SHA-256 and the URL. Every
+   class without kinetics is a gap with measurement requests that name the
+   proteome and its accessions. How the proteome was chosen (one sentence
+   with the name, the rule, the number of candidates and the search
+   snapshot's digest) is recorded in the `source` of `user_dataset.yml`, in
+   `review.md` and in `draft.assembly["annotation"]["selection"]`.
+
+**Network and snapshots.** The command line reaches the network only with
+`--fetch`. Each response is parsed before it is stored and is frozen under
+`--snapshot-dir` (default `data/source_snapshots/uniprot`, relative to the
+current directory): the search as `organism_name_<name>_<digest>/proteomes.tsv`
+with `snapshot.json` (name, query, URL, retrieval time, HTTP status, the
+`X-UniProt-Release`, `X-UniProt-Release-Date` and `X-Total-Results` headers
+when sent, SHA-256, candidate count), the export as
+`proteome_UP.../uniprotkb.tsv` with its own `snapshot.json`. A search is
+stored whatever it finds, so that a refusal is reproducible as well. Without
+`--fetch` only these snapshots are read and their digests verified: the same
+command gives the same draft, byte for byte, without network. A missing
+snapshot is refused with the command that fetches it; a changed snapshot is
+refused; a new response whose bytes differ from a stored one is refused and
+the stored one kept (remove that snapshot directory, or choose another
+`--snapshot-dir`, to store the new one). An HTTP error or an unreadable
+response stores nothing. `--proteome UP...` without `--fetch-proteome` skips
+the search; `--annotation` and the proteome options are refused together,
+because `genomes.csv` holds one annotation per strain.
+
+In Python the same steps are `fungal_model.sources.uniprot`
+`fetch_proteome_by_name` (or `resolve_proteome_name`, made of
+`search_proteomes_by_name` and `choose_proteome`, then
+`fetch_proteome_snapshot`), and `assemble_user_tables(proteome=...)`, which
+takes the `UniprotSnapshot` or its directory instead of `annotation`:
+
+```python
+import fungmod as fm
+from fungal_model.sources.uniprot import fetch_proteome_by_name
+
+# refresh=True is the network opt-in; ProteomeChoiceError lists the candidates when none is taken
+resolution, snapshot = fetch_proteome_by_name("Genus species", refresh=True)
+draft = fm.assemble_user_tables(
+    dataset_id="my_strain",
+    fungus="My strain",
+    substrates=["cellobiose"],
+    conditions=[{"temperature": 30, "temperature_units": "degC", "ph": 5}],
+    proteome=snapshot,
+    proteome_selection=resolution.statement,
+)
+```
+
+An export you downloaded yourself also goes through `annotation`: with an
+`annotation_tool` naming UniProt and its release or download date (`--annotation
+export.tsv --annotation-tool "UniProt 2026_03"`), the file is read and checked
+like a `genomes.csv` UniProt row.
+
+**Not verified live.** The search URL, the query fields `organism_name` and
+`proteome_type` (`proteome_type:1` for reference proteomes), the return fields
+`upid`, `organism`, `organism_id` and `protein_count` with their TSV headers
+`Proteome Id`, `Organism`, `Organism Id` and `Protein count` (compared
+case-insensitively), the `X-Total-Results` header and the empty body for no
+match are as UniProt's REST documentation describes them, as known when the
+client was written. They were not checked against a live response, because
+the environment the client was written in could not reach rest.uniprot.org;
+the tests serve synthetic responses in that format
+(`tests/fixtures/uniprot_proteome_search/`). A response without these
+columns is refused and nothing is stored, so a change on UniProt's side stops
+the route rather than misleading it.
+
+Limits of the name route:
+
+- The name is matched as a phrase in UniProt's organism names. Synonyms,
+  misspellings and common names are UniProt's search to resolve; FungMod takes
+  only an exact name or a sole candidate.
+- Reference proteomes only, unless you name another proteome with
+  `--proteome`.
+- A reference proteome stands for its species, usually one strain; it is not
+  your strain's genome. The draft says which proteome was used; whether your
+  strain carries the same enzymes is for you to judge.
+- The limits of the UniProt route listed above apply unchanged.
 
 ## Solid substrates
 

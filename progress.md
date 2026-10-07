@@ -194,6 +194,213 @@ an explicit molar-mass conversion need a dimensional product coefficient in
 the core (new numerics); competing substrates of one enzyme need a
 multi-substrate denominator (a new law).
 
+## FETCH-001 A Fungus's Enzyme Repertoire From Its Name
+
+Status: `complete` for the stated scope (2026-10-07), with the live UniProt
+endpoint unverified (below). For the owner's goal ("fungus X on substrate Y in
+conditions Z, and then it automatically fetches the different enzymes in the
+fungus"), a user had to find the UniProt proteome identifier by hand, download
+a TSV and pass it. `fungmod assemble --fetch-proteome --fetch` now goes from
+the fungus's name to its UniProt reference proteome, freezes both responses,
+and drafts the dataset whose `genomes.csv` row is that proteome's export; the
+classes come from the existing UniProt route (USERDATA-007). Stacked on
+REGISTRY-002 and USERDATA-009 (branch `claude/fetch-by-name`).
+
+Decisions:
+
+- **Choice rule (no guess).** A proteome is taken only when exactly one
+  candidate's organism name equals the searched name (case-insensitive,
+  whitespace-normalized; `MATCH_EXACT_NAME`) or the search has exactly one
+  candidate (`MATCH_UNIQUE_CANDIDATE`; its organism name, for example with a
+  strain added, is printed and recorded). Refused with every candidate listed
+  (`ProteomeChoiceError`: identifier, organism, taxonomy id, type, protein
+  count): no candidate; several without one exact match; several exact
+  matches; a truncated search (`X-Total-Results` above the rows read, or a
+  next-page `Link`; page size 500). Never the first or the largest; a test
+  serves the rows in both orders.
+- **Which name.** `--scientific-name` when given, otherwise the `--fungus`
+  text as typed (printed as "from --scientific-name" or "from --fungus").
+- **Composition with `--proteome`.** `--proteome UP...` alone takes that
+  proteome without a search; with `--fetch-proteome` it chooses among the
+  name's candidates (`MATCH_PROTEOME_ID`) and is refused when it is not one,
+  so an ambiguous refusal is resolved by re-running the printed command with
+  `--proteome PROTEOME_ID`. `--annotation`, `--annotation-tool` or
+  `--annotation-source` with a proteome option is refused (one `genomes.csv`
+  row per strain); `--fetch` or `--snapshot-dir` without a proteome option is
+  refused.
+- **Network.** `assemble --fetch` is the command line's only network opt-in
+  (it maps to `refresh=True` of the sources module; `cli.py` itself imports no
+  `urllib` or `socket`). Without it only frozen snapshots under
+  `--snapshot-dir` (default the API's `data/source_snapshots/uniprot`, a new
+  option; `--cache-dir` stays the kinetics snapshots) are read and verified; a
+  missing one is refused with the exact command plus `--fetch`, quoted with
+  `shell_quote`. A search is stored whatever it finds, so that a refusal is
+  reproducible offline. A changed snapshot, or a new response that differs
+  from a stored one, is refused and the stored one kept (the CLI says which
+  directory to remove); an HTTP error or unreadable response stores nothing.
+- **Endpoint.** `GET https://rest.uniprot.org/proteomes/search?query=organism_name:"<name>" AND proteome_type:1&fields=upid,organism,organism_id,protein_count&format=tsv&size=500`,
+  TSV headers `Proteome Id`, `Organism`, `Organism Id`, `Protein count`
+  compared case-insensitively, an empty body read as no candidate. The type
+  printed for every candidate is "reference proteome (proteome_type:1)", taken
+  from the query filter because no return field for the type was relied on.
+  As documented by UniProt to the best of the author's knowledge; **not
+  verified live**: this container cannot reach rest.uniprot.org (the egress
+  proxy refuses the connection, `CONNECT tunnel failed, response 403`, and
+  fetching UniProt's REST documentation pages was blocked the same way). A
+  response without these columns is refused, nothing stored.
+- **Consistency check.** `fetch_proteome_by_name` refuses an export whose
+  `Organism (ID)` differs from the chosen candidate's taxonomy id.
+
+Changed:
+
+- `sources/uniprot.py`: `normalize_organism_name`, `proteome_name_query`,
+  `build_proteome_search_url`, `search_key` (case-folded slug plus a 12-hex
+  digest, so a case-insensitive file system cannot mix two names),
+  `ProteomeCandidate`, `parse_proteome_search_tsv`, `ProteomeSearchSnapshot`,
+  `load_proteome_search_snapshot`, `search_proteomes_by_name` (snapshot
+  `proteomes.tsv` + `snapshot.json`: kind, name and name key, query, URL,
+  fields, page size, retrieval time, HTTP status, release, release date, total
+  results, next page, truncated, SHA-256, size, candidate rows, field-names
+  note), `ProteomeNameResolution` (`statement`, `match_rule`, `to_dict`),
+  `choose_proteome`, `resolve_proteome_name`, `fetch_proteome_by_name`;
+  errors `ProteomeChoiceError`, `MissingSnapshotError`,
+  `SnapshotConflictError` (the latter two subclass `UniprotFetchError` and are
+  now raised by `fetch_proteome_snapshot` with unchanged messages);
+  `UniprotSnapshot.genomes_row` prefixes `source` with the organism and
+  taxonomy id. Module docstring: the "no organism-name lookup (future work)"
+  paragraph is replaced by the rule above.
+- `api/user_data_assembly.py`: `assemble_user_tables(proteome=...,
+  proteome_selection=...)`. A `UniprotSnapshot` (or its directory) is
+  re-verified, copied to `annotations/<query key>.tsv`, and its
+  `genomes_row` is the draft's row; `annotation` is read as a UniProtKB TSV
+  export when `annotation_tool` names UniProt (the `genomes.csv` dispatch rule;
+  before, such a call failed in the dbCAN reader). Both go through
+  `_proteome_classes`: `_genome_tool`, the one-proteome-identifier rule of the
+  loader, `parse_uniprot_tsv` and `resolve_uniprot_proteome` with the family
+  map and the base registry; evidence text identical to the loader's;
+  unmodellable classes, unmapped families, unresolved EC numbers and EC/CAZy
+  disagreements reported. The annotation report gains `source_type`,
+  `proteome_id`, organism, counts, the unresolved and disagreeing entries,
+  `snapshot` and `selection`; the manifest source and `review.md` name a
+  UniProt export as such (also a UniProt row reused from `user_data`, where
+  `review.md` previously raised `KeyError: 'gene_count'` for an unmodellable
+  class; reproduced on an export of `67c8a74`) and record the selection; two
+  limitation sentences name proteome exports.
+- `cli.py`: `--proteome`, `--fetch-proteome`, `--fetch`, `--snapshot-dir` in
+  the repertoire group; the proteome block printed before the assembly report
+  (network used or not, name and its option, query, candidate table with the
+  chosen row, rule, export and both snapshot digests, release or its absence);
+  unresolved EC numbers and disagreements printed with the classes;
+  `NO_FETCH_HELP` now says nothing is fetched unless `assemble --fetch`;
+  `FETCH_HELP`; assemble epilog and top epilog examples; module docstring.
+  `main` keeps the argument list (`args.command_line`) for printed commands.
+- `.gitattributes`: `tests/fixtures/uniprot_proteome_search/** -text`.
+- Fixtures `tests/fixtures/uniprot_proteome_search/` with README: four
+  synthetic proteome-search responses (exact match among two, sole candidate
+  with a strain name, two candidates without an exact match, header only) and
+  a five-entry synthetic UniProtKB export of a second organism (EC-only
+  beta-glucosidase, GH11/3.2.1.8, GH18/3.2.1.14 with CBM18, AA9 without a
+  record, an unresolved EC number). All labelled as hand-written synthetic
+  test responses, not UniProt data; placeholder identifiers `UP99999000x`,
+  taxonomy ids `900000000x`, accessions `X9B2P00x`.
+- Docs: `docs/user-data.md` "From a fungus name" (steps, network and
+  snapshots, Python, not verified live, limits) and updates to "From a UniProt
+  proteome", the assembly paragraph, inputs, rules and limits; `docs/cli.md`
+  section "From a fungus name: its UniProt reference proteome" with output
+  produced from the synthetic responses (labelled), the command table,
+  options table, the network paragraph, arguments and exit code 2;
+  `README.md` (command-line capability row, assemble paragraph, UniProt
+  paragraph); `docs/capabilities.md`; `CHANGELOG.md` (Added; Changed: text
+  only).
+
+Tests: new `tests/test_fetch_by_name.py` (30 test functions, 49 cases), every
+test with `urllib.request.urlopen` and `socket.socket.connect` patched to fail
+and a test asserting it; responses served by URL through `_FakeUniprot`:
+query, URL and key; parser (documented columns, case-insensitive headers,
+empty body, ten refusals); exact match stored with full metadata and reused
+offline with an identical digest and decision, in any letter case; sole
+candidate (second organism, no release header); ambiguous refused with every
+candidate, reproducible offline, resolved by `proteome_id`, refused for a
+non-candidate; no candidate (empty body, header only); two exact matches;
+truncated search (total-results header, next-page link); HTTP 503, unreachable,
+HTTP 204 and HTML store nothing; missing snapshot refused without fetching;
+tampered, foreign-name and wrong-kind snapshots refused; a different response
+kept unless `overwrite`; taxonomy mismatch refused; neither first nor largest
+taken (both row orders); assembly from a snapshot (row, file, classes,
+evidence, unmodellable, disagreements, statement in manifest and `review.md`,
+no kinetics row, same draft from the directory); proteome refusals (with
+`annotation`, selection without proteome, blank selection, missing and
+tampered snapshot); `annotation` with a UniProt tool (second organism; no
+version, two identifiers, a non-export file refused); reused UniProt row from
+`user_data` (the `KeyError` regression); CLI end to end (`--fetch-proteome
+--fetch`, exact requests, printed block, `genomes.csv` row, offline rerun
+byte-identical, `_fill`, `load_user_dataset`, `check-data`, preflight
+`underparameterized` with requests naming the proteome and accessions); CLI by
+`--scientific-name` for the second organism (date version); offline without a
+snapshot prints the command with `--fetch` and writes nothing; ambiguous lists
+candidates and is resolved by `--proteome`; no candidate; `--proteome` alone
+skips the search; newer response and tampered export refused; HTTP 500 stores
+nothing; six option refusals; help text. Modified:
+`tests/test_user_data_uniprot.py` (the "no organism lookup" contract test
+now pins the candidate-based lookup), `tests/test_guardrails_public_api.py`
+(ten new names exported, not placeholders), `tests/test_guardrails_no_hardcoding.py`
+(fixture tokens added to the user-data tokens and to the UniProt-module scan),
+`tests/test_cli_user_data_workflow.py` (the CLI opens no connection itself and
+passes `refresh` only from `--fetch`).
+
+Commands and results (worktree on `claude/fetch-by-name`, based on `67c8a74`,
+Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on `sources/uniprot.py`, `cli.py` and
+  `api/user_data_assembly.py`: 0 errors.
+- `mkdocs build --strict`: built, no warnings; both new anchors present.
+- `tests/test_fetch_by_name.py`: 49 passed.
+- Targeted run (new tests, UniProt, assembly, genome, sources, import, CLI,
+  CLI workflow, guardrails, documentation sync, hygiene, instruction
+  hierarchy, roadmap, shared progress, release configuration, capability
+  resolution, source providers, partial runs, git data integrity, packaged
+  distribution): 436 passed in 5 min 33 s.
+- Full suite (`pytest`, background, final code): 2630 passed in 42 min.
+- Not run: a live request to rest.uniprot.org (no network route from this
+  container); the CI matrix (macOS, Windows, Python 3.12 and 3.13).
+
+Not changed: no process law, rate form, registry record, family map, kinetics
+rule, preflight status or simulation; no output-table or manifest schema of a
+run; `load_user_dataset` and the `genomes.csv` UniProt route are unchanged;
+dbCAN drafts are unchanged except two limitation sentences in their report and
+`review.md`; `fetch_proteome_snapshot` raises the same messages.
+
+Scientific impact: none on numbers. The enzyme repertoire of a named fungus
+can now come from its UniProt reference proteome without manual lookup, with
+the choice explicit and auditable; classes stay presence-only evidence
+(UniProtKB annotation is mostly automatic), every class without kinetics is a
+gap with measurement requests, and nothing about rates comes from a
+proteome.
+
+Compatibility: additive (new options, functions, error subclasses and
+`assemble_user_tables` parameters). Text changes: `genomes_row` source
+prefix, `NO_FETCH_HELP`, the assembly limitations, UniProt labels in drafts.
+
+Risks and limitations: the live endpoint, `proteome_type:1` as the
+reference-proteome filter, the TSV headers, the empty body for no match and
+the `X-Total-Results` header are unverified (a mismatch is refused, not
+misread, except `proteome_type:1` meaning other than reference proteomes, which
+would mislabel the printed type); a reference proteome stands for its species,
+not the user's strain; names are matched as UniProt's phrase search does, so
+synonyms and common names depend on UniProt; reference proteomes only unless
+named by identifier; a snapshot can only be replaced by removing its
+directory (no CLI overwrite flag, deliberately).
+
+Ambiguities: whether a unique non-exact candidate should need confirmation
+(kept as the owner's rule, printed and recorded); whether to fall back to
+non-reference proteomes when none is found (not done; refused with guidance).
+
+Next task: verify the endpoint against a live UniProt response from a machine
+with network access (one `fungmod assemble --fetch-proteome --fetch` for a
+well-known fungus, compare the stored `proteomes.tsv` headers and
+`X-Total-Results`, then pin a recorded real response as a labelled fixture);
+then USERDATA-010 (the Langmuir surface law).
+
 ## USERDATA-009 Fungal Culture In User Data: Growth And Secretion
 
 Status: `complete` for the stated scope (2026-10-07); the ninth increment of

@@ -131,6 +131,12 @@ fungmod run --user-data my_strain --fungus "My strain" --substrate cellobiose \
 
 `assemble` prints the `run` command with `--runnable-only` when the draft has
 gaps, so that the cases with kinetics run while the gaps are reported.
+Without an annotation file, `--fetch-proteome --fetch` in place of
+`--annotation` takes the enzyme repertoire from the UniProt reference proteome
+found under the fungus's name (`--scientific-name`, else `--fungus`); `--fetch`
+is the command line's only network access, and the responses are frozen so
+that the same command reruns offline
+([from a fungus name](docs/user-data.md#from-a-fungus-name)).
 
 `fungmod draft-kinetics SOURCE --provider sabiork` drafts tables from
 SABIO-RK entries alone ([user-data workflow](docs/cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
@@ -149,7 +155,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
 | Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) on dissolved substrates, or kcat or Vmax as an apparent Michaelis-Menten law on one suspended solid polymer in dry mass per volume (the enzyme as protein mass, assay activity or a dose per gram of substrate, with an optional conversion-dependent reactivity exponent), plus optional temperature and pH response laws, or a fungal culture in `culture.csv` (your strain growing on a solid substrate and secreting its enzyme pools, through the registry's existing culture model: consumption by one pool, an explicit biomass yield, induced synthesis and loss of each pool), or, with `enzyme_network` in the manifest, all of a strain's classes acting together (independent Michaelis-Menten processes whose rates add on shared pools, a pool released by one class degraded by the next where a substrate's stated product is another substrate of the dataset, optional competitive product inhibition through a `ki` row; no synergy or competition for sites), overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
-| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts (`--runnable-only`: the runnable cases of a request with gaps, exit code 4); the user-data workflow `assemble` (fungus X on substrate Y at conditions Z from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's status and the `REVIEW:` fields), `draft-kinetics`, `check-data`, `run --compare-timecourses` and `fit`, with nothing fetched ([command line](docs/cli.md)) |
+| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts (`--runnable-only`: the runnable cases of a request with gaps, exit code 4); the user-data workflow `assemble` (fungus X on substrate Y at conditions Z from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's status and the `REVIEW:` fields), `draft-kinetics`, `check-data`, `run --compare-timecourses` and `fit`, with nothing fetched unless you opt in: `assemble --fetch-proteome --fetch` finds the fungus's UniProt reference proteome by name (an exact name or a sole candidate is taken, anything else is refused with the candidates listed), freezes the responses as digest-checked snapshots and takes its enzyme classes, never a rate, through UniProt REST endpoints used as documented but not verified live ([command line](docs/cli.md#from-a-fungus-name-its-uniprot-reference-proteome)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
@@ -1172,7 +1178,12 @@ proteome: its CAZy cross-references resolve through the same family map, its
 EC numbers through the registry, a protein whose two annotations disagree
 supports neither, and the requests name the proteome and accessions.
 `fungal_model.sources.uniprot` fetches such an export only on explicit
-`refresh=True`, into a digest-checked snapshot.
+`refresh=True`, into a digest-checked snapshot, and `fetch_proteome_by_name`
+reaches it from an organism name through UniProt's reference-proteome search:
+only an exact organism name or a sole candidate is taken, anything else is
+refused with every candidate, and the search is frozen too (endpoint and
+column names as UniProt documents them, not verified against a live
+response).
 `assemble_user_tables` drafts one such dataset for a request "fungus X on
 substrate(s) Y at condition(s) Z": the repertoire comes only from the fungus's
 annotation, asserted classes, dataset rows or registry record; classes that act

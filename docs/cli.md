@@ -19,7 +19,7 @@ fungmod run --help
 | `fungmod preflight` | Preflight only; optionally write the preflight tables. |
 | `fungmod check-data DIR` | Validate a [user dataset](user-data.md) and list its gaps, genome or proteome resolution, [cultures](user-data.md#fungal-culture-growth-and-secretion), [enzyme networks](user-data.md#several-enzymes-acting-together), time courses, fitted values, or every unfilled `REVIEW:` field. |
 | `fungmod list` | List the fungi, substrates and environments that can be named. |
-| `fungmod assemble` | Draft one reviewable user dataset for a fungus on substrates at conditions from its annotation, the classes you assert, a user dataset and kinetics sources (`assemble_user_tables`). |
+| `fungmod assemble` | Draft one reviewable user dataset for a fungus on substrates at conditions from its annotation (or its UniProt proteome, by identifier or [found under its name](#from-a-fungus-name-its-uniprot-reference-proteome)), the classes you assert, a user dataset and kinetics sources (`assemble_user_tables`). |
 | `fungmod draft-kinetics SOURCE` | Draft user tables from a SABIO-RK export or frozen snapshot (`user_tables_from_sabiork`). |
 | `fungmod fit DIR` | Fit Km with kcat or Vmax of one case to the dataset's time courses and write the fitted dataset (`fit_user_dataset`). |
 
@@ -28,13 +28,19 @@ Name resolution, the preflight, the simulation rule of each mode, sampling,
 the tables and the report are the ones described in
 [virtual experiments](concepts/virtual-experiments.md) and
 [outputs](concepts/outputs.md); assembling, drafting, comparing and fitting
-are the ones described in [user-supplied data](user-data.md). No subcommand
-fetches anything from the network: every source is a local file, a user
-dataset or a frozen snapshot already on disk.
+are the ones described in [user-supplied data](user-data.md). Nothing is
+fetched from the network unless you pass `fungmod assemble --fetch`, the one
+network opt-in of the command line (it queries UniProt for the proteome of
+`--proteome` or `--fetch-proteome` and freezes the responses as snapshots);
+otherwise every source is a local file, a user dataset or a frozen snapshot
+already on disk.
 
 The whole workflow for "fungus X on substrate Y in conditions Z" from a
 shell is: [`assemble`](#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)
-the sources you have into a draft, fill its `REVIEW:` fields,
+the sources you have into a draft (the enzyme repertoire can come from the
+UniProt reference proteome
+[found under the fungus's name](#from-a-fungus-name-its-uniprot-reference-proteome)),
+fill its `REVIEW:` fields,
 `check-data`, `run` (with [`--runnable-only`](#run-the-runnable-cases-of-a-request)
 while the draft still has gaps), [compare](#compare-with-your-time-courses)
 with your time courses and [fit](#fit-kinetic-constants-to-your-time-courses)
@@ -439,7 +445,8 @@ The options map one to one onto the arguments of `assemble_user_tables`:
 | `--substrate NAME` (repeatable) | `substrates` (names; a new substrate's categories become `REVIEW:` fields) |
 | `--temperature-c T --ph PH` (repeatable) | `conditions`: every T x pH pair, in degC, as for the `run` grid |
 | `--scientific-name NAME` | `scientific_name` |
-| `--annotation FILE`, `--annotation-tool TOOL`, `--annotation-source TEXT` | `annotation`, `annotation_tool`, `annotation_source` |
+| `--annotation FILE`, `--annotation-tool TOOL`, `--annotation-source TEXT` | `annotation`, `annotation_tool`, `annotation_source` (a dbCAN `overview.txt`, or a UniProtKB TSV export when the tool names UniProt) |
+| `--proteome PROTEOME_ID`, `--fetch-proteome`, `--fetch`, `--snapshot-dir DIR` | `proteome` (the frozen snapshot from `fetch_proteome_snapshot` or `fetch_proteome_by_name`), `proteome_selection` (`ProteomeNameResolution.statement`); see [from a fungus name](#from-a-fungus-name-its-uniprot-reference-proteome) |
 | `--enzyme-class CLASS`, `--enzyme-class-evidence CLASS EVIDENCE SOURCE` (repeatable) | `enzyme_classes` (a name, or a mapping with evidence and source) |
 | `--kinetics-source SOURCE` (repeatable) | `kinetics_sources`: a SABIO-RK export JSON, or a reaction id read from the frozen snapshots |
 | `--entry-id ID`, `--same-species ORGANISM` (repeatable) | `entry_ids`, `same_species` |
@@ -561,6 +568,122 @@ A condition that a temperature or pH law reaches from the measured one (see
 [assembling](user-data.md#assembling-fungus-substrate-and-conditions)) is
 not a `conditions.csv` row; `assemble` then prints a second `fungmod run`
 command with `--temperature-c` and `--ph` for that grid condition.
+
+## From a fungus name: its UniProt reference proteome
+
+Instead of an annotation file, `assemble` can take the fungus's enzyme
+repertoire from the UniProt reference proteome found under its name:
+`--fetch-proteome` searches UniProt's reference proteomes for the name of
+`--scientific-name` (or, without it, of `--fungus`), and the chosen
+proteome's UniProtKB export becomes the draft's `genomes.csv` row. Its EC
+numbers and CAZy cross-references give the classes, exactly as for a
+[UniProt export](user-data.md#from-a-uniprot-proteome); no kinetic value
+comes from a proteome. `--fetch` is the network opt-in; without it only the
+frozen snapshots under `--snapshot-dir` (default
+`data/source_snapshots/uniprot`) are read.
+
+```bash
+fungmod assemble --fungus "My strain" --scientific-name "Genus species" \
+  --fetch-proteome --fetch \
+  --substrate cellobiose --temperature-c 30 --ph 5 \
+  --dataset-id my_strain --output my_strain
+```
+
+A proteome is taken only when exactly one candidate's organism name equals
+the name (case-insensitive) or when the search has exactly one candidate.
+No candidate, several candidates without one exact match, or a search with
+more results than one response holds is refused (exit code 2) with every
+candidate listed; FungMod never takes the first or the largest. Run the same
+command with `--proteome UP...` to choose one (with `--fetch-proteome` kept
+it must be a candidate); `--proteome UP...` alone takes any proteome by its
+identifier, without a search. `--annotation` and the proteome options are
+refused together: `genomes.csv` holds one annotation per strain.
+
+The output below was produced by `tests/test_fetch_by_name.py`, which serves
+**synthetic test responses written by hand** in UniProt's documented format
+(`tests/fixtures/uniprot_proteome_search/`, not UniProt data) through a
+patched `urllib.request.urlopen`; the environment the client was written in
+could not reach rest.uniprot.org, so the live endpoint and its column names
+were not verified (see
+[from a fungus name](user-data.md#from-a-fungus-name)).
+
+```text
+Proteome of the fungus (UniProt):
+  network: --fetch given; UniProt was queried and the responses are frozen under snapshots
+  name searched: 'Synthetic format-fixture organism' (from --fungus)
+  search: organism_name:"Synthetic format-fixture organism" AND proteome_type:1 -> 2 candidate(s); snapshot snapshots/organism_name_synthetic_format_fixture_organism_9be2b1295814 (SHA-256 53dcc99a...; retrieved ...; UniProt release fixture_release)
+    #  proteome     organism                                           taxonomy    type                                  proteins
+    1  UP000000000  Synthetic format-fixture organism                  0           reference proteome (proteome_type:1)  13        chosen
+    2  UP999990001  Synthetic format-fixture organism (strain FIX-1B)  9000000001  reference proteome (proteome_type:1)  4211
+  chosen: UP000000000 (Synthetic format-fixture organism) because its organism name equals the name searched (case-insensitive)
+  export: (proteome:UP000000000), 13 UniProtKB entries of Synthetic format-fixture organism; snapshot snapshots/proteome_UP000000000 (SHA-256 3385df61...; retrieved ...; UniProt release fixture_release)
+
+Assembled draft: u1_draft
+  fungus 'Synthetic format-fixture organism' -> Synthetic format-fixture organism (strain synthetic_format_fixture_organism, new_strain)
+  substrate 'cellobiose' -> Cellobiose (cellobiose, registry)
+  condition c30_ph5: 30 degC, pH 5 (conditions.csv)
+
+Enzyme classes of the fungus: 4
+  class              declared in  evidence
+  beta_glucosidase   genomes.csv  UniProt proteome UP000000000 (3 proteins, CAZy families GH1, GH3, EC 3.2.1.21)
+  cellobiohydrolase  genomes.csv  UniProt proteome UP000000000 (1 protein, CAZy families GH7, EC 3.2.1.91)
+  cellulase_generic  genomes.csv  UniProt proteome UP000000000 (1 protein, CAZy families GH5)
+  glucoamylase       genomes.csv  UniProt proteome UP000000000 (1 protein, CAZy families GH15, EC 3.2.1.3)
+Annotated classes without a registry record (no case is assembled for them):
+  - laccase (families AA1): no enzyme-class record in the registry; FungMod does not create one from a proteome export, so no case is assembled for it
+...
+EC numbers of the proteome without a registry class (listed, not resolved):
+  - 1.10.3.2 (1 protein(s)): no registry enzyme class carries this EC number
+  ...
+Proteins whose CAZy and EC annotations name different classes (they support no class):
+  - X0TEST04: CAZy CBM1, GH7 -> cellobiohydrolase; EC 3.2.1.21 -> beta_glucosidase
+  - X0TEST10: CAZy GH3 -> beta_glucosidase; EC 3.2.1.37 -> no class
+On Cellobiose (cellobiose): acting classes beta_glucosidase
+  ...
+
+Cases: 1 (enzyme class x substrate x condition)
+  #  fungus                             class             substrate   condition  kinetics status  route  source ids
+  1  Synthetic format-fixture organism  beta_glucosidase  cellobiose  c30_ph5    gap              none   -
+  case 1: no source gives kinetics for beta-glucosidase on Cellobiose at 30 degC, pH 5
+...
+```
+
+The draft's `genomes.csv` row names the proteome, the organism and the
+snapshot:
+
+```text
+strain_id,annotation_file,annotation_tool,source,min_tools_agreeing
+synthetic_format_fixture_organism,annotations/proteome_UP000000000.tsv,UniProt release fixture_release,"Synthetic format-fixture organism, taxonomy 0: UniProtKB REST stream query (proteome:UP000000000) retrieved ..., UniProt release fixture_release; SHA-256 3385df61...; https://rest.uniprot.org/uniprotkb/stream?query=(proteome:UP000000000)&fields=...&format=tsv",
+```
+
+Without a release header the tool reads `UniProt downloaded <date> (no release
+header in the response)`. Run without `--fetch`, the same command reads the
+two frozen snapshots (`network: not used`) and writes the same draft, byte for
+byte. Without a snapshot it is refused with the command that fetches it:
+
+```text
+fungmod assemble: error: no frozen snapshot of the UniProt proteome search for 'Genus species' in data/source_snapshots/uniprot/organism_name_genus_species_cf9a2b77f492; the command line reaches UniProt only with --fetch.
+  To query UniProt and freeze the response(s) under data/source_snapshots/uniprot, run the same command with --fetch:
+    fungmod assemble --fungus 'Strain Y' --scientific-name 'Genus species' --fetch-proteome --substrate cellobiose --temperature-c 30 --ph 5 --dataset-id y_draft --output y_draft --fetch
+```
+
+An ambiguous name is refused with its candidates:
+
+```text
+fungmod assemble: error: The UniProt proteome search for 'Synthetic fixture mould' found 2 reference proteomes and none is named exactly that; FungMod does not choose between them.
+  name searched: 'Synthetic fixture mould' (from --fungus); search snapshot snapshots/organism_name_synthetic_fixture_mould_94e03650b2e2 (...)
+  candidates (2):
+    #  proteome     organism                                   taxonomy    type                                  proteins
+    1  UP999990002  Synthetic fixture mould B2 (strain FIX-2)  9000000002  reference proteome (proteome_type:1)  5
+    2  UP999990003  Synthetic fixture mould B3 (strain FIX-3)  9000000003  reference proteome (proteome_type:1)  3870
+  Choose one and run the same command with --proteome PROTEOME_ID; with --fetch-proteome kept, it must be one of these candidates:
+    fungmod assemble --fungus 'Synthetic fixture mould' --fetch-proteome --fetch --substrate cellobiose --temperature-c 30 --ph 5 --snapshot-dir snapshots --dataset-id m_draft --output m_draft --proteome PROTEOME_ID
+```
+
+A new response whose bytes differ from a frozen snapshot is refused and the
+snapshot kept; remove that snapshot directory (or choose another
+`--snapshot-dir`) and run with `--fetch` again to store the new one. An HTTP
+error stores nothing.
 
 ## Draft tables from SABIO-RK
 
@@ -767,6 +890,10 @@ with `--aliases`, the aliases that `--fungus`, `--substrate` and
 - An option of `assemble`, `draft-kinetics` or `fit` that you do not give is
   not passed to the API: the decision stays a `REVIEW:` field of the draft, or
   the API's own documented default applies (stated in `--help`).
+- `assemble --fetch` is the only option that reaches the network, and only
+  for `--proteome` or `--fetch-proteome`; `--fetch` or `--snapshot-dir`
+  without them is refused. `--snapshot-dir` defaults to the API's
+  `data/source_snapshots/uniprot`, relative to the current directory.
   `draft-kinetics --provider` and every `fit --fit` bound are required.
 
 ## Exit codes
@@ -775,6 +902,6 @@ with `--aliases`, the aliases that `--fungus`, `--substrate` and
 | --- | --- |
 | 0 | Success (`preflight`: every case is runnable). |
 | 1 | The simulation failed after a passing preflight. |
-| 2 | Usage or input error: missing or invalid arguments, unknown or ambiguous names, an invalid registry or user dataset (including unfilled `REVIEW:` fields), a draft the API refuses (`UserTablesSourceError`, `UserTablesAssemblyError`), a refused fit (`UserDataFitError`: not identified, not converged, invalid bounds), a refused time-course comparison (printed after the complete simulation bundle), a non-empty output directory. Issues that carry a file, row and column are printed as `file:row:column: message`. |
+| 2 | Usage or input error: missing or invalid arguments, unknown or ambiguous names, an invalid registry or user dataset (including unfilled `REVIEW:` fields), a draft the API refuses (`UserTablesSourceError`, `UserTablesAssemblyError`), a refused fit (`UserDataFitError`: not identified, not converged, invalid bounds), a refused UniProt proteome (no candidate or several for a name, a missing, changed or superseded snapshot, an HTTP error), a refused time-course comparison (printed after the complete simulation bundle), a non-empty output directory. Issues that carry a file, row and column are printed as `file:row:column: message`. |
 | 3 | The preflight blocks at least one requested case in the requested mode; nothing is simulated (with `--runnable-only`: no requested case is runnable). |
 | 4 | Partial run (`run --runnable-only`): the runnable cases were simulated and the bundle written; the blocked cases are listed with their measurement requests and marked `not_simulated` in the tables. |

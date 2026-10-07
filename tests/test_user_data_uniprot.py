@@ -955,14 +955,22 @@ def test_a_fetched_snapshot_written_into_a_dataset_loads_with_the_suggested_row(
             write_snapshot_to_user_dataset(snapshot, dataset_dir, strain_id="strain_u1", annotation_file=bad)
 
 
-def test_the_fetch_client_is_complete_and_names_no_organism_lookup() -> None:
+def test_the_fetch_client_is_complete_and_reaches_a_proteome_from_a_name_only_through_candidates() -> None:
+    """FETCH-001 replaced "no organism-name lookup" by a lookup that chooses only an exact name or a sole candidate.
+
+    The behaviour (exact match, unique candidate, refusals with every candidate) is pinned in
+    ``tests/test_fetch_by_name.py``; here the module stays complete and keeps no free-form name query.
+    """
+
     for name in uniprot_source.__all__:
         candidate = getattr(uniprot_source, name)
         if callable(candidate) and not isinstance(candidate, type):
             source = inspect.getsource(candidate).lower()
             assert "notimplementederror" not in source and "todo" not in source, name
-    assert "future work" in (uniprot_source.__doc__ or "")
+    assert "future work" not in (uniprot_source.__doc__ or "")
+    assert "resolve_proteome_name" in (uniprot_source.__doc__ or "")
     assert not hasattr(uniprot_source, "organism_name_query")
+    assert uniprot_source.proteome_name_query("Genus species").endswith(uniprot_source.REFERENCE_PROTEOME_CLAUSE)
 
 
 # ---------------------------------------------------------------------------
