@@ -39,10 +39,11 @@ maturity of each input, the assumptions made, the inputs that are still
 unknown and the measurements that would supply them. The model is assembled
 from records (organisms, enzyme classes, substrates, environments and
 parameters) rather than from code written for one organism, so the same
-workflow runs on the shipped records, on a user's own records, and on records
-built from the user's data or from public kinetic databases. The assembled
-models can be calibrated to measured time courses and exported to the
-community standards SBML, SED-ML, COMBINE and PEtab.
+workflow runs on the shipped records and on a laboratory's own tables, whose
+enzyme repertoire can come from a genome annotation or a proteome and whose
+kinetics can come from the laboratory's measurements or from a public kinetic
+database. The assembled models can be calibrated to measured time courses and
+exported to the community standards SBML, SED-ML, COMBINE and PEtab.
 
 # Statement of need
 
@@ -122,13 +123,29 @@ affine-invariant ensemble sampler [@goodman2010] classify which constants a
 dataset identifies. Studies run under plans frozen by SHA-256 digest before
 any fit, and every recorded result cites the digest of its plan.
 
-**Data intake.** A SABIO-RK client fetches kinetic-law entries on request,
-stores them as digested snapshots and turns them into proposals that must be
-reviewed and signed before they become registry records; fetched values never
-flow into a simulation directly. A genome route maps dbCAN CAZyme
-annotations to enzyme classes through a curated CAZy family map; it reports
-which classes are present but never assigns a rate, and it is not yet
-connected to virtual experiments.
+**User data.** A dataset schema lets a laboratory run its own strains,
+enzymes, substrates, conditions and kinetics without editing the registry:
+kcat with an enzyme concentration, Vmax (stated, or derived from a specific
+activity and an enzyme loading, or from a saturating assay activity), or a
+diprotic pH-ionisation law, with optional temperature and pH response laws.
+The loader checks every row, reports each problem by file, row and column,
+and turns each missing value into an explicit unknown with a measurement
+request. Measured time courses can be compared with a simulation, and Km with
+kcat or Vmax can be fitted to them; fitted values carry their fit report and
+stay exploratory.
+
+**From a name to a draft.** A strain's enzyme classes can come from a dbCAN
+annotation of its genome or from a UniProt proteome export, resolved through
+a curated CAZy family map and the registry's EC numbers; neither ever
+supplies a rate. SABIO-RK kinetic-law entries, fetched only on request into
+digested snapshots, are converted into user tables whose open decisions are
+marked for review. One call assembles a reviewable dataset for a fungus, its
+substrates and its conditions from these sources and reports, per case,
+whether the kinetics are the laboratory's, published for the same species,
+transferred from another organism (and then only an estimate), conflicting or
+missing; kinetics are never reused at another condition without a stated
+response law. A command-line interface runs, checks and lists virtual
+experiments.
 
 **Spatial mycelium.** An exploratory module simulates hyphal and tip
 densities with tip extension, branching, anastomosis, uptake and
@@ -141,7 +158,7 @@ and is not yet connected to the registry.
 # Research impact statement
 
 FungMod 0.1.1 is released on PyPI under the MIT licence, with documentation
-at https://fungmod.readthedocs.io/. About 2,000 automated tests run on Linux,
+at https://fungmod.readthedocs.io/. More than 2,000 automated tests run on Linux,
 macOS and Windows for Python 3.11 to 3.13. The repository includes four
 reproducible case studies on the published *Trichoderma harzianum* P49P11
 cellulose cultures [@gelain2020] (holdout benchmarks, posterior sampling,
