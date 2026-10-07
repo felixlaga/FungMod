@@ -26,6 +26,61 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## COLONY-002 Stage 0 Of The Colony Comparison Recorded Under Amendments 2 And 3
+
+Date: 2026-10-06
+
+Status: complete for stage 0 (software checks, no fit). Stage A not run.
+
+Stage 0 was recorded three times, each under the plan as it then stood, and
+failed twice; each failure was traced, the plan was amended before any fit,
+and the superseded record is kept as the amendment's evidence.
+
+- Under amendment 1 (`results/stage_0_superseded_ea6e2e72/`): grid 0.574 /
+  0.102 and symmetry 0.760 / 0.192 failed, solver passed. Cause: the active
+  translocation term aggregates tips like Keller-Segel chemotaxis (the spike
+  grows without bound with refinement). Amendment 2 removed the term, added a
+  well-posedness guard and decision rule R0.
+- Under amendment 2 (`results/stage_0_superseded_ca0e016c/`): grid (5.3e-5,
+  0.0056) and solver (1.1e-7) passed, symmetry (0.382, 0.059) failed. Cause:
+  the radial wall at the window's half-diagonal (28.3 mm) and the cartesian
+  walls on the window differ, and neither is physical; the radial tip front
+  also leads the detected hull by about 4.7 mm. Amendment 3 moved the radial
+  wall to a 9 cm dish (declared assumption), declared the window separately,
+  and set the symmetry comparison to the leading hours with at most 0.1
+  percent of radial tips beyond the window half side, with a 0.25 mm cartesian
+  reference; that window rule was recorded before any finer cartesian result.
+- Under amendment 3 (`results/stage_0/`, plan `2ce70b6b...`): grid 4.0e-5
+  (tips) and 0.0054 (area) against 0.02; solver 1.7e-8 and 0 against 0.005;
+  symmetry over hours 1 to 12, 0.026 and 0.016 against 0.03. All passed. The
+  radial model runs 62 h in 0.8 s; the cartesian reference took 4.1 hours.
+  An independent probe confirmed the numbers and showed that the tip
+  difference at 12 to 14 h does not change between 0.5 and 0.25 mm cells
+  (wall reflection, not discretisation).
+
+Changed: `data/benchmarks/de_ligne_2019_colony/plan.json` (amendments 2 and
+3); `results/stage_0/` and the two superseded records with READMEs;
+`research/colony_comparison.py` (no active term, the grid guard, the window
+and dish domain from the plan, `tip_fraction_beyond_radius`, the
+plan-declared cartesian grid and comparison window); `mycelium/hyphae.py`
+(the aggregation failure mode declared on active translocation);
+`scripts/run_de_ligne_2019_colony_comparison.py` (the plan's cartesian grid by
+default); `docs/colony-comparison.md` (amendments 2 and 3, the stage 0
+record), `docs/spatial-mycelium.md`, `docs/capabilities.md`,
+`docs/paper-readiness.md`, `README.md`, `CHANGELOG.md`, the state document.
+
+Tests: the plan test pins the amendment chain and digest, the amendment
+contents and the superseded records' verdicts; the stage 0 test records a
+run on small grids with the comparison window and the minimum-hours rule;
+`tip_fraction_beyond_radius` is tested on the radial reference and refused on
+a cartesian grid.
+
+Not changed: any data, observation operator, hold-out, bound or decision
+rule. Scientific impact: none on biology; stage 0 shows the radial model is
+grid- and solver-converged and agrees with the two-dimensional model while
+the colony is inside the window, at artificial check values.
+
+
 ## USERDATA-005 Public Kinetics Into User Tables
 
 Status: `complete` for the stated scope (2026-10-06). Kinetics fetched from a
@@ -971,10 +1026,10 @@ assumption, not a measurement.
 
 ## COLONY-001 Frozen Plan For The De Ligne 2019 Colony Comparison
 
-Status: `partial` (plan frozen 2026-10-06 and amended once the same day, before any check was recorded, to make the area operator's detection density a grid-independent constant; stage 0 core pieces built under SPATIAL-002, the runner and the recorded checks not; no fit run).
+Status: `partial` (plan frozen 2026-10-06 and amended three times the same day before any fit: amendment 1 made the area operator's detection density a grid-independent constant, amendment 2 removed the ill-posed active translocation term and added a grid guard, amendment 3 moved the radial wall to the dish and set the symmetry check's comparison window by the tips; stage 0 software built under SPATIAL-002; stage 0 recorded under amendments 1 and 2, both superseded, and re-recorded under amendment 3 (COLONY-002); no fit run).
 
 `data/benchmarks/de_ligne_2019_colony/plan.json` (SHA-256
-`ea6e2e7270b809fee092655f7e6882cf266e16d86d955c276ba5e2edc5ad959e`, pinned by
+`2ce70b6b21b2d254f4d01d3fb5ec1523442299f2ed6ce2853c270fab712acd9d`, pinned by
 `tests/test_colony_comparison_plan.py`) declares the within-study transfer test
 of the continuum mycelium (SPATIAL-001) against DATA-003 before anything is
 run: an axisymmetric geometry on the scan window with the inoculum disc, the

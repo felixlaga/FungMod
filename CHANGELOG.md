@@ -6,6 +6,16 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Colony comparison stage 0 recorded (COLONY-002) under the plan's third
+  dated amendment, before any fit: the radial domain ends at a 9 cm dish wall
+  (a declared assumption), the 40 mm scan window is declared separately, and
+  the symmetry check compares the radial model with a 0.25 mm cartesian
+  reference over the hours before the radial tips reach the window walls.
+  Grid (4.0e-5, 0.0054), solver (1.7e-8) and symmetry (0.026, 0.016 against
+  0.03) checks passed; the two superseded stage 0 records are kept as the
+  evidence for amendments 2 and 3. `tip_fraction_beyond_radius` and the
+  plan-declared window and symmetry window in the study module. No fit.
+
 - Public kinetics into user tables (USERDATA-005): `user_tables_from_sabiork`
   drafts the user-dataset tables (strains, enzymes, optional enzyme classes,
   substrates, conditions, kinetics) and a `user_dataset.yml` from SABIO-RK

@@ -1603,8 +1603,9 @@ Current capability labels mean:
   no individual hyphae, moving colony boundary or morphology, no organism
   parameters, and is not reachable from the registry, the configured workflow
   or `VirtualExperiment`. The colony comparison against De Ligne 2019 has a
-  frozen plan and stage 0 software (`docs/colony-comparison.md`); no fit to
-  colony data has been run.
+  frozen plan whose stage 0 software checks (grid, solver, symmetry) are
+  recorded and passed (`docs/colony-comparison.md`); no fit to colony data has
+  been run.
 - PET is marked `partial`. Cellulose has narrow registry-backed exploratory
   BIO-001/BIO-002 surface and enzyme-chain paths, but the generic
   `CelluloseSubstrate` class remains Stage 9 placeholder metadata and is not a
