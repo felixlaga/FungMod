@@ -36,6 +36,72 @@ All notable public releases of FungMod are documented here.
   field names were not verified against a live response
   (`docs/user-data.md#from-a-uniprot-proteome`).
 
+- Time courses in user data, comparison and fitting (USERDATA-004): an
+  optional `timecourse.csv` (`strain_id`, `enzyme_class`, `substrate_id`,
+  `condition_id`, `observable` = `substrate` or `product`, `time`,
+  `time_units`, `value`, `units`, optional `sd` and `replicates`, `source`,
+  `method`) is validated (declared references, amount-per-volume units of the
+  case's kind, finite values, nonnegative times, one unit and one row per time
+  in a series) and kept on `UserDataset.timecourses` by generated case id,
+  never as registry records. `compare_with_timecourses` (also
+  `DegradationScreenResult.compare_with_timecourses()`) interpolates the
+  simulated median and 5-95 % band linearly to the observed times, refuses
+  observations outside the simulated range, and writes
+  `timecourse_comparison.csv` with residuals, RMSE, the fraction inside the
+  band, observations with sd and an in-sample, not-validation note; output
+  schema `2.1.0` adds the table. `fit_user_dataset` fits `km` with `kcat` or
+  `vmax` of one case across conditions of one temperature and pH with
+  `fit_least_squares` on the assembled model (compiled core), with required
+  bounds, sd-weighted residuals (or an explicit, recorded
+  `error_model="unweighted"`), a profile-likelihood identifiability verdict
+  with bisected interval limits (local information for the unweighted
+  objective), refusal of unidentified quantities unless
+  `allow_unidentified=True`, and returns a new dataset (`UserDatasetFit.write`)
+  whose fitted values are `kinetics.csv` rows of the new evidence type
+  `fitted` (maturity `user_fitted`, exploratory screening only, refused by
+  scientific mode), described by a manifest `fit` block and `fit_report.json`
+  and checked on load. `profile_likelihood` gains an optional `diff_step`
+  passed to its nuisance refits; `fungal_model.screening` gains
+  `resolve_screen_role_records` (`docs/user-data.md`).
+
+- Colony comparison stage 0 recorded (COLONY-002) under the plan's third
+  dated amendment, before any fit: the radial domain ends at a 9 cm dish wall
+  (a declared assumption), the 40 mm scan window is declared separately, and
+  the symmetry check compares the radial model with a 0.25 mm cartesian
+  reference over the hours before the radial tips reach the window walls.
+  Grid (4.0e-5, 0.0054), solver (1.7e-8) and symmetry (0.026, 0.016 against
+  0.03) checks passed; the two superseded stage 0 records are kept as the
+  evidence for amendments 2 and 3. `tip_fraction_beyond_radius` and the
+  plan-declared window and symmetry window in the study module. No fit.
+
+- Public kinetics into user tables (USERDATA-005): `user_tables_from_sabiork`
+  drafts the user-dataset tables (strains, enzymes, optional enzyme classes,
+  substrates, conditions, kinetics) and a `user_dataset.yml` from SABIO-RK
+  kinetic-law entries given as a `RegistryProposal` from `source_proposal`, a
+  downloaded export JSON or a reaction ID read from the local snapshots;
+  nothing is fetched while drafting. `UserTablesDraft.write` adds a
+  `review.md` listing every mapping decision and every entry or parameter not
+  converted, with the reason, and writes byte-identical files for the same
+  input. One strain per organism and expression host (or
+  `strain_id_for_organism`); EC numbers resolved against the registry (an
+  unresolved one is listed, and an `enzyme_classes.csv` row with `REVIEW:`
+  bond and substrate classes is drafted only with
+  `propose_enzyme_classes=True`); substrates resolved by name or alias, product
+  and mol/mol yield from the reaction stoichiometry; one condition per
+  temperature and pH with the buffer in notes; Km, kcat, Vmax (as `vmax` or
+  `specific_activity` by dimension) and the assay concentrations copied as
+  `literature` values with `sd`, source (EntryID, first author, year, PubMed
+  ID) and method (kinetic law), units kept when the unit registry parses them
+  or mapped through the explicit `SABIORK_UNIT_SPELLINGS` table, otherwise
+  listed. Mutant enzymes, isoenzyme conflicts on one case, kcat/Km, pKa and
+  other parameters are listed, not converted; laws with pKa parameters are
+  listed as pH-ionization laws and only their Km and kcat are converted. The
+  `design` argument states the virtual assay's substrate and enzyme
+  concentrations and enzyme loading. `load_user_dataset` now refuses any table
+  cell or manifest value beginning with `REVIEW:`, naming each such field,
+  before interpreting the tables; the simulation time grid of a draft is such
+  a field (`docs/user-data.md#starting-from-sabio-rk`).
+
 - Enzyme repertoire from a genome annotation in user data (USERDATA-003): an
   optional `genomes.csv` (`strain_id`, `annotation_file`, `annotation_tool`,
   `source`, optional `min_tools_agreeing`) points a strain to a dbCAN
@@ -442,6 +508,26 @@ All notable public releases of FungMod are documented here.
   reuses compiled kernels for unconstrained processes.
 
 ### Fixed
+
+- A case could be preflighted on one enzyme class and built from another
+  (FIX-SELECT-001). When a fungus listed several enzyme classes acting on one
+  substrate (common once genome annotations or proteomes add classes to a user
+  strain), `assess_modelability` evaluated every compatible process record and
+  selected one, but kept only its process type; `select_registry_case_compatibility`
+  then took the first compatible record in the fungus's listing order. A case
+  reported modelable on the complete parameters of class B was assembled from
+  class A, listed first: an assembly error after a passing preflight, or a
+  simulation of an enzyme the preflight did not assess. `ModelabilityReport`
+  now records `selected_compatibility_id` and `selected_enzyme_class` (also in
+  `to_dict()`, so in `virtual_experiment_summary.json` and
+  `screen_summary.json`); config assembly, the exploratory and scientific
+  screens and the result tables build the case from exactly that record,
+  checked against the case, and the tables resolve it once per case and refuse
+  a preflight report that selected a different record. A report built without
+  the new fields is resolved only when the case has one candidate record, and
+  refused with the candidates named otherwise. Every shipped case has one
+  candidate: selection, assembled configs and the standard CSV tables are
+  unchanged, and the output schema stays `2.0.0`.
 
 - Degradation and product-release rates in the virtual-experiment tables were
   wrong (FIX-RATES-001). `time_series_long.csv` built `degradation_rate` and

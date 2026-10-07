@@ -106,7 +106,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
-| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests ([user-supplied data](docs/user-data.md)) |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values ([user-supplied data](docs/user-data.md)) |
 | Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts ([command line](docs/cli.md)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
@@ -863,7 +863,8 @@ configured conservation diagnostics copied from existing per-sample
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
-In output schema `2.0.0`, `time_series_long.csv` reports `degradation_rate`
+In output schema `2.0.0` (current: `2.1.0`, which adds the on-request
+`timecourse_comparison.csv`), `time_series_long.csv` reports `degradation_rate`
 as -d[substrate]/dt and `product_release_rate` as +d[product]/dt of the case's
 mapped substrate and product states (source `simulation_state_rate`), each in
 that state's units per time unit. They are read from the per-sample
@@ -1075,7 +1076,22 @@ limitations. An optional `genomes.csv` takes a strain's enzyme classes from
 its dbCAN genome annotation: classes with a registry record join the
 strain, classes without one and unmapped families are reported, and every
 resolved class that can act on a dataset substrate but has no kinetics becomes
-a named measurement request, since no rate is ever taken from a genome. A
+a named measurement request, since no rate is ever taken from a genome. Public
+kinetics reach these tables with the user in the loop: `user_tables_from_sabiork`
+drafts them from SABIO-RK kinetic-law entries (a `source_proposal`, a frozen
+snapshot or an export you downloaded) with a `review.md` of every mapping
+decision and everything not converted, and `load_user_dataset` refuses the
+draft until every `REVIEW:` field is filled
+([starting from SABIO-RK](docs/user-data.md#starting-from-sabio-rk)).
+An optional `timecourse.csv` of measured substrate remaining and product
+formed over time can be compared with a simulation
+(`result.compare_with_timecourses()` writes `timecourse_comparison.csv` with
+the median and 5-95 % band at the observed times, residuals and RMSE), and
+`fit_user_dataset` fits `km` with `kcat` or `vmax` to it with the existing
+least-squares calibration, required bounds, sd-weighted residuals and a
+profile-likelihood identifiability verdict, returning a new dataset whose
+values are labelled `fitted`: in-sample estimates that stay exploratory and
+are refused by scientific mode, never validated values.
 `genomes.csv` row can instead point to a UniProtKB TSV export of the strain's
 proteome: its CAZy cross-references resolve through the same family map, its
 EC numbers through the registry, a protein whose two annotations disagree
@@ -1108,6 +1124,14 @@ assembly, execution, and result inspection:
 - `load_user_dataset`
 - `UserDataset`
 - `UserDataError`
+- `compare_with_timecourses`
+- `TimecourseComparison`
+- `fit_user_dataset`
+- `UserDatasetFit`
+- `UserDataFitError`
+- `user_tables_from_sabiork`
+- `UserTablesDraft`
+- `UserTablesSourceError`
 - `review_source_proposal`
 - `CurationDecision`
 - `CurationResult`
@@ -1600,8 +1624,9 @@ Current capability labels mean:
   no individual hyphae, moving colony boundary or morphology, no organism
   parameters, and is not reachable from the registry, the configured workflow
   or `VirtualExperiment`. The colony comparison against De Ligne 2019 has a
-  frozen plan and stage 0 software (`docs/colony-comparison.md`); no fit to
-  colony data has been run.
+  frozen plan whose stage 0 software checks (grid, solver, symmetry) are
+  recorded and passed (`docs/colony-comparison.md`); no fit to colony data has
+  been run.
 - PET is marked `partial`. Cellulose has narrow registry-backed exploratory
   BIO-001/BIO-002 surface and enzyme-chain paths, but the generic
   `CelluloseSubstrate` class remains Stage 9 placeholder metadata and is not a

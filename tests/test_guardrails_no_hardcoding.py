@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,6 +17,7 @@ GENERIC_SOURCE_PATHS = (
     "src/fungal_model/io",
     "src/fungal_model/workflows",
     "src/fungal_model/api/user_data.py",
+    "src/fungal_model/api/user_data_fit.py",
     "src/fungal_model/cli.py",
     "src/fungal_model/__main__.py",
 )
@@ -83,10 +86,9 @@ def test_registry_case_builder_has_no_reaction_specific_onboarding_tokens() -> N
         assert forbidden not in case_builder
 
 
-ORGANISM_SUBSTRATE_ENZYME_TOKENS = (
+USER_DATA_FORBIDDEN_TOKENS = (
     "reaction_618",
     "reaction 618",
-    "sabio",
     "glucosidase",
     "cellobiose",
     "glucose",
@@ -108,11 +110,29 @@ ORGANISM_SUBSTRATE_ENZYME_TOKENS = (
     # USERDATA-007 UniProt-route fixture: accessions and the proteome id come from the export and genomes.csv.
     "x0test",
     "up000000000",
+    # USERDATA-005: organisms and hosts of the Reaction 618 snapshot come from the source entries.
+    "phanerochaete",
+    "hordeum",
+    "escherichia",
+    "bacteroides",
 )
 
 
-def test_user_data_import_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
-    user_data = (ROOT / "src" / "fungal_model" / "api" / "user_data.py").read_text(encoding="utf-8").lower()
+# user_data.py and the command line name no source database either.
+ORGANISM_SUBSTRATE_ENZYME_TOKENS = (*USER_DATA_FORBIDDEN_TOKENS, "sabio")
+
+
+def test_user_data_sources_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
+    """The SABIO-RK drafting module names its source, never an organism, substrate or enzyme."""
+
+    module = (ROOT / "src" / "fungal_model" / "api" / "user_data_sources.py").read_text(encoding="utf-8").lower()
+    for forbidden in USER_DATA_FORBIDDEN_TOKENS:
+        assert forbidden not in module, forbidden
+
+
+@pytest.mark.parametrize("module", ("user_data.py", "user_data_fit.py"))
+def test_user_data_import_has_no_organism_substrate_or_enzyme_specific_tokens(module: str) -> None:
+    user_data = (ROOT / "src" / "fungal_model" / "api" / module).read_text(encoding="utf-8").lower()
 
     for forbidden in ORGANISM_SUBSTRATE_ENZYME_TOKENS:
         assert forbidden not in user_data, forbidden

@@ -30,6 +30,7 @@ from fungal_model.screening.ensemble import (
     RegistryScreenResult,
     RegistryScreenSimulationError,
     ScreenSimulationMode,
+    resolve_screen_role_records,
     simulate_screen,
 )
 from fungal_model.screening.modelability import (
@@ -66,6 +67,7 @@ __all__ = [
     "build_resolved_case_config",
     "registry_case_config_factory",
     "resolve_registry_case",
+    "resolve_screen_role_records",
     "run_extracellular_enzyme_chain_demo",
     "select_registry_case_template",
     "simulate_screen",
