@@ -80,12 +80,12 @@ def test_plan_model_builds_on_both_geometries_with_the_inoculum_only(plan: dict)
     with pytest.raises(study.ColonyComparisonError, match="outside the plan's bounds"):
         study.check_within_bounds(plan, {**values, "v": 100.0})
     with pytest.raises(study.ColonyComparisonError, match="missing"):
-        study.check_within_bounds(plan, {symbol: value for symbol, value in values.items() if symbol != "Da"})
+        study.check_within_bounds(plan, {symbol: value for symbol, value in values.items() if symbol != "Di"})
     scaled = study.scaled_values(values, 0.5)
     assert scaled["v"] == values["v"] * 0.5 and scaled["b"] == values["b"] * 0.5 and scaled["Kv"] == values["Kv"]
     with pytest.raises(study.ColonyComparisonError, match="phi"):
         study.scaled_values(values, 1.5)
-    for geometry, cells in (("axisymmetric", 50), ("cartesian", 40)):
+    for geometry, cells in (("axisymmetric", 225), ("cartesian", 40)):
         model = study.colony_model(plan, values, geometry=geometry, cells=cells)
         compiled = model.compile()
         assert {process.name for process in model.processes} == {
@@ -123,7 +123,7 @@ def test_observables_start_at_the_disc_and_the_plan_solver_is_declared(plan: dic
 def test_stage_0_records_checks_that_cite_the_plan(tmp_path: Path, plan: dict) -> None:
     messages: list[str] = []
     summary = study.run_stage_0(
-        ROOT, tmp_path, hours=[1, 2], radial_cells=40, cartesian_cells=16, log=messages.append
+        ROOT, tmp_path, hours=list(range(1, 9)), radial_cells=40, cartesian_cells=16, log=messages.append
     )
     output = tmp_path / "stage_0"
     inputs = json.loads((output / "inputs.json").read_text(encoding="utf-8"))
@@ -133,6 +133,10 @@ def test_stage_0_records_checks_that_cite_the_plan(tmp_path: Path, plan: dict) -
     assert checks["plan_sha256"] == plan["_sha256"]
     assert set(checks["grid"]["relative_differences"]) == {"tip_count", "mycelial_area_cm2"}
     assert checks["symmetry"]["status"] == "run" and checks["symmetry"]["cartesian_cells"] == 16
+    assert checks["symmetry"]["compared_hours"] == list(range(1, 9))
+    assert len(checks["symmetry"]["tip_fraction_beyond_window"]) == 9
+    short = study.run_stage_0(ROOT, tmp_path / "short", hours=[1, 2], radial_cells=40, cartesian_cells=16)
+    assert short["checks"]["symmetry"]["status"] == "not run" and "plan needs 8" in short["checks"]["symmetry"]["reason"]
     assert isinstance(checks["grid"]["passed"], bool) and isinstance(checks["solver"]["passed"], bool)
     errors = json.loads((output / "error_models.json").read_text(encoding="utf-8"))
     assert set(errors["series"]) == set(plan["data"]["species_order"])
@@ -142,3 +146,44 @@ def test_stage_0_records_checks_that_cite_the_plan(tmp_path: Path, plan: dict) -
     skipped = study.run_stage_0(ROOT, tmp_path / "skip", hours=[1], radial_cells=40, cartesian_cells=None)
     assert skipped["checks"]["symmetry"]["status"] == "not run"
     assert Q_(1.0, "centimeter ** 2").to("millimeter ** 2").magnitude == 100.0
+
+
+def test_the_plan_model_has_no_active_translocation_and_the_guard_compares_two_grids(plan: dict) -> None:
+    model = study.colony_model(plan, dict(study.STAGE_0_CHECK_VALUES), cells=40)
+    translocation = next(process for process in model.processes if process.name == "translocation")
+    assert getattr(translocation, "active_diffusivity_symbol") is None
+    assert all("aggregation" not in mode for mode in translocation.failure_modes)
+    assert "Da" not in study.STAGE_0_CHECK_VALUES and "Da" not in study.SHARED_SYMBOLS
+    guard = study.grid_convergence(plan, dict(study.STAGE_0_CHECK_VALUES), 1.0, hours=[1, 2], cells=40)
+    assert guard["cells"] == [40, 80] and guard["threshold"] == study.grid_threshold(plan) == 0.02
+    assert set(guard["relative_differences"]) == set(study.OBSERVABLE_NAMES)
+    assert guard["passed"] == (max(guard["relative_differences"].values()) <= guard["threshold"])
+    assert guard["coarse"]["time_h"].tolist() == guard["fine"]["time_h"].tolist() == [0.0, 1.0, 2.0]
+
+
+def test_active_translocation_declares_its_aggregation_failure_mode() -> None:
+    from fungal_model.mycelium import Translocation
+    from fungal_model.mycelium.benchmarks import SUBSTRATE_UNITS, TIP_UNITS
+    from fungal_model.mycelium.hyphae import ACTIVE_TRANSLOCATION_AGGREGATION
+
+    active = Translocation(
+        name="t", internal_field="s", internal_units=SUBSTRATE_UNITS, diffusivity_symbol="Di",
+        tip_field="n", tip_units=TIP_UNITS, active_diffusivity_symbol="Da",
+    )
+    passive = Translocation(name="t", internal_field="s", internal_units=SUBSTRATE_UNITS, diffusivity_symbol="Di")
+    assert ACTIVE_TRANSLOCATION_AGGREGATION in active.failure_modes
+    assert "Keller-Segel" in ACTIVE_TRANSLOCATION_AGGREGATION
+    assert ACTIVE_TRANSLOCATION_AGGREGATION not in passive.failure_modes
+
+
+def test_tip_fraction_beyond_a_radius_is_read_on_the_radial_reference(plan: dict) -> None:
+    values = dict(study.STAGE_0_CHECK_VALUES)
+    result = study.simulate_condition(plan, values, 1.0, hours=[1, 2, 3], cells=90)
+    fractions = study.tip_fraction_beyond_radius(result, radius=Q_(study.window_half_side_mm(plan), "millimeter"))
+    assert fractions.shape == (4,) and np.all((fractions >= 0.0) & (fractions <= 1.0))
+    assert fractions[0] == 0.0 and fractions[-1] < 1e-6
+    inside = study.tip_fraction_beyond_radius(result, radius=Q_(0.0, "millimeter"))
+    assert inside[-1] == pytest.approx(1.0)
+    planar = study.simulate_condition(plan, values, 1.0, hours=[1], geometry="cartesian", cells=8, solver=study.plan_solver(plan, "check"))
+    with pytest.raises(study.ColonyComparisonError, match="axisymmetric"):
+        study.tip_fraction_beyond_radius(planar, radius=Q_(1.0, "millimeter"))

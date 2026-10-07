@@ -529,10 +529,10 @@ VALIDATION_CASES: dict[str, tuple[dict[str, str | None], tuple[str, int | None, 
         },
         ("kinetics.csv", 3, "quantity", "needs kcat and an enzyme concentration"),
     ),
-    # USERDATA-002 imports responses.csv; other tables are still refused.
+    # USERDATA-002 imports responses.csv and USERDATA-004 timecourse.csv; other tables are still refused.
     "unsupported_extra_csv": (
-        {"timecourse.csv": "time,value\n0,1\n"},
-        ("timecourse.csv", None, None, "Unsupported table 'timecourse.csv'"),
+        {"growth_curve.csv": "time,value\n0,1\n"},
+        ("growth_curve.csv", None, None, "Unsupported table 'growth_curve.csv'"),
     ),
     "missing_time_grid": (
         {
@@ -586,7 +586,7 @@ def test_every_issue_is_collected_before_raising(tmp_path: Path) -> None:
         edits={
             "kinetics.csv": kinetics,
             "conditions.csv": "condition_id,temperature,temperature_units,ph,notes\nc37_ph7_5,37,degC,15,\n",
-            "timecourse.csv": "time,value\n0,1\n",
+            "growth_curve.csv": "time,value\n0,1\n",
         },
     )
 
@@ -600,7 +600,7 @@ def test_every_issue_is_collected_before_raising(tmp_path: Path) -> None:
         ("kinetics.csv", 3, "method"),
         ("kinetics.csv", 5, "strain_id"),
         ("conditions.csv", 2, "ph"),
-        ("timecourse.csv", None, None),
+        ("growth_curve.csv", None, None),
     } <= located
     assert "kinetics.csv row 2 column units" in str(excinfo.value)
 

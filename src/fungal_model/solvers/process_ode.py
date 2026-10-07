@@ -108,6 +108,7 @@ class ProcessODESolver:
             constraints_by_process=constraints_by_process,
             compiled=compiled,
         )
+        state_rates = _record_state_rates(compiled, solution.t, solution.y)
         thermodynamic_metadata = _thermodynamic_metadata(
             self.model.thermodynamic_constraints,
             thermodynamic_evaluations,
@@ -147,6 +148,7 @@ class ProcessODESolver:
                 "success": bool(solution.success),
                 "message": str(solution.message),
             },
+            state_rates=state_rates,
         )
         validators = tuple(self.model.validators) + tuple(request.validators)
         if validators:
@@ -285,6 +287,31 @@ def _record_process_rates(
             rate_values[0].units,
         )
     return rates, evaluations
+
+
+def _record_state_rates(
+    compiled: CompiledModel,
+    times: np.ndarray,
+    states: np.ndarray,
+) -> dict[str, Quantity]:
+    """Net rate of change of every state at the returned time points.
+
+    Each column is ``compiled.rhs`` at the accepted state, i.e. the same
+    stoichiometric right-hand side the solver integrated, under the same
+    negative-state policy (rates evaluated at ``max(state, 0)``). Values are in
+    state units per integration time unit. No finite differences of the
+    trajectory are used.
+    """
+
+    time_values = np.asarray(times, dtype=float)
+    state_matrix = np.asarray(states, dtype=float).reshape(len(compiled.state_names), time_values.size)
+    derivatives = np.empty((len(compiled.state_names), time_values.size), dtype=float)
+    for index, time_value in enumerate(time_values):
+        derivatives[:, index] = compiled.rhs(float(time_value), state_matrix[:, index])
+    return {
+        name: Q_(derivatives[row], f"{units} / {compiled.time_units}")
+        for row, (name, units) in enumerate(zip(compiled.state_names, compiled.state_units, strict=True))
+    }
 
 
 def _constraints_by_process(

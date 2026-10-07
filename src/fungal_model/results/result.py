@@ -68,6 +68,10 @@ class SimulationResult:
     name: str = "simulation"
     label: str = "toy"
     source_result_summary: dict[str, Any] | None = None
+    # Net rate of change of every state at every returned time point, in state
+    # units per time unit, evaluated by the producer from the same right-hand
+    # side it integrated. Empty when the producer does not record it.
+    state_rates: dict[str, Quantity] = field(default_factory=dict)
 
     @classmethod
     def from_ode_result(
@@ -184,6 +188,10 @@ class SimulationResult:
                 name: _quantity_to_dict(quantity)
                 for name, quantity in self.process_rates.items()
             },
+            "state_rates": {
+                name: _quantity_to_dict(quantity)
+                for name, quantity in self.state_rates.items()
+            },
             "derived_quantities": {
                 name: _quantity_to_dict(quantity)
                 for name, quantity in self.derived_quantities.items()
@@ -299,6 +307,7 @@ class SimulationResult:
         _write_parameter_table(path / "parameters.csv", self.parameters)
         _write_quantity_table(path / "state_trajectories.csv", self.time, self.states, kind="state")
         _write_quantity_table(path / "process_rates.csv", self.time, self.process_rates, kind="rate")
+        _write_quantity_table(path / "state_rates.csv", self.time, self.state_rates, kind="state_rate")
         _write_quantity_table(path / "derived_quantities.csv", self.time, self.derived_quantities, kind="derived")
         self.plot_states(figures / "state_trajectories.png")
         self.plot_rates(figures / "process_rates.png")

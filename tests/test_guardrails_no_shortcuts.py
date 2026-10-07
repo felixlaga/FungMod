@@ -12,8 +12,12 @@ HIGH_RISK_PATHS = (
     "src/fungal_model/io",
     "src/fungal_model/solvers",
     "src/fungal_model/api/user_data.py",
+    "src/fungal_model/capability/uniprot.py",
+    "src/fungal_model/sources/uniprot.py",
     "src/fungal_model/api/user_data_sources.py",
     "src/fungal_model/api/user_data_assembly.py",
+    "src/fungal_model/cli.py",
+    "src/fungal_model/__main__.py",
 )
 
 SUSPICIOUS_PATTERNS = {

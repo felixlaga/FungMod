@@ -37,19 +37,25 @@ A loaded `UserDataset` can be passed as `user_data=` as well; it carries the
 `dataset_id`, a SHA-256 `digest` over the manifest and table bytes, the
 generated registry mappings (`records`) and `to_dict()`.
 
-Four complete examples live in the test fixtures:
+Five complete examples live in the test fixtures:
 `tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on a
 user-defined aryl ester, `kcat` form, estimates only),
 `tests/fixtures/user_data/literature_reentry/` (the published SABIO-RK Reaction
 618 selected entry typed in as literature values against the registry's
 `cellobiose` and `beta_glucosidase`),
+`tests/fixtures/user_data/bgl1a_ph_ionization/` (the published pH-dependent
+law of SABIO-RK entry 38522, BGL1A from Tsukada et al. 2008, typed in as
+literature values in the [pH-ionization form](#three-rate-forms), with design
+loadings),
 `tests/fixtures/user_data/oxidase_case/` (a user-defined laccase-like oxidase on
 a dissolved phenolic substrate, Vmax from a specific activity and an enzyme
 loading, with cardinal temperature and pH laws in `responses.csv`; estimates
 only) and `tests/fixtures/user_data/genome_case/` (a strain whose enzyme
 classes come only from a hand-written dbCAN overview in `genomes.csv`; a format
 fixture with synthetic gene identifiers, not a real genome, and no kinetic
-values, so every resolved class is a gap).
+values, so every resolved class is a gap). `tests/fixtures/user_data/uniprot_case/`
+does the same from a hand-written UniProtKB TSV export (a format fixture with
+synthetic accessions, not a real proteome).
 
 To start from public kinetics instead of typing them in, draft the tables from
 SABIO-RK entries and review them; see
@@ -235,12 +241,13 @@ cases of a registry fungus.
 | `conditions.csv` | yes | Assay conditions (temperature and pH). |
 | `kinetics.csv` | yes | Kinetic values, one row per quantity and case. |
 | `responses.csv` | no | Temperature and pH response laws bound to a strain, enzyme class and substrate. |
-| `genomes.csv` | no | A dbCAN genome annotation per strain, from which enzyme classes are resolved. |
-| annotation files | with `genomes.csv` | The dbCAN `overview.txt` files that `genomes.csv` names, anywhere inside the directory. |
+| `genomes.csv` | no | A dbCAN genome annotation or a UniProt proteome export per strain, from which enzyme classes are resolved. |
+| annotation files | with `genomes.csv` | The dbCAN `overview.txt` files and UniProt TSV exports that `genomes.csv` names, anywhere inside the directory. |
+| `timecourse.csv` | no | Measured substrate remaining and product formed over time (see [time courses](#time-courses-comparison-and-fitting)). |
+| `fit_report.json` | in a fitted dataset | The report of the fit that produced the dataset's `fitted` rows, named by the manifest `fit` block. |
 
-Any other CSV file in the directory (for example a time-course table) is
-refused as unsupported in this version rather than ignored. Columns not listed
-below are refused too. Required columns are marked with an asterisk. Lists inside a cell
+Any other CSV file in the directory is refused as unsupported in this version
+rather than ignored. Columns not listed below are refused too. Required columns are marked with an asterisk. Lists inside a cell
 are separated by semicolons. Rows are reported by their spreadsheet line
 number (the header is line 1).
 
@@ -263,8 +270,9 @@ simulation:                          # required; there is no default time grid
   points: 61
 ```
 
-`notes` is also accepted. Every generated identifier is prefixed with
-`<dataset_id>__`.
+`notes` is also accepted, and `fit` in a dataset written by `fit_user_dataset`
+(see [below](#fitting-kinetic-constants-to-time-courses)). Every generated
+identifier is prefixed with `<dataset_id>__`.
 
 ### `strains.csv`
 
@@ -370,6 +378,11 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,enzyme_concentration
 | `specific_activity` | amount per time per enzyme mass, e.g. µmol/min/mg or U/mg | Activity per mass of enzyme preparation. |
 | `enzyme_loading` | enzyme mass per volume, e.g. mg/L | Enzyme preparation per volume of the simulated system. |
 | `assay_activity` | amount per time per volume, e.g. U/mL | Volumetric activity in the simulated system. |
+| `kcat_limiting` | 1/time | Limiting turnover of the pH-ionization form (`k0`). |
+| `km_limiting` | concentration, amount per volume | Limiting Michaelis constant of the pH-ionization form (`Km0`, positive). |
+| `pk_free_lower`, `pk_free_upper` | `dimensionless` | Lower and upper pK of the free enzyme (`pKe1`, `pKe2`). |
+| `pk_complex_lower`, `pk_complex_upper` | `dimensionless` | Lower and upper pK of the enzyme-substrate complex (`pKes1`, `pKes2`). |
+| `ph_min`, `ph_max` | `dimensionless` | The pH range the pH-ionization law was fitted over; exact values between 0 and 14. |
 
 `U` is the enzyme unit of the unit registry, one micromole per minute.
 `enzyme_activity` is refused as ambiguous: say `specific_activity` or
@@ -390,10 +403,10 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,enzyme_concentration
 - `activity_substrate` and `activity_saturating` belong to `assay_activity`
   rows only and are refused on any other row.
 
-#### Two rate forms
+#### Three rate forms
 
-A case (one strain, enzyme class, substrate and condition) uses one of two
-forms of homogeneous Michaelis-Menten kinetics:
+A case (one strain, enzyme class, substrate and condition) uses one of three
+forms of Michaelis-Menten kinetics:
 
 - **kcat form**, `rate = kcat · E · S / (Km + S)`: `km`, `kcat`,
   `substrate_initial_concentration` and `enzyme_concentration`. The enzyme is a
@@ -401,13 +414,90 @@ forms of homogeneous Michaelis-Menten kinetics:
 - **Vmax form**, `rate = Vmax · S / (Km + S)`: `km`, Vmax and
   `substrate_initial_concentration`. There is no enzyme state, so enzyme loss
   or dilution cannot be simulated.
+- **pH-ionization form**, the diprotic law FungMod implements as the process
+  law `ph_ionization_michaelis_menten` (the law of the registry's BGL1A case,
+  see [environment response laws](environment-response.md)):
+  `kcat_limiting`, `km_limiting`, `pk_free_lower`, `pk_free_upper`,
+  `pk_complex_lower`, `pk_complex_upper`, `ph_min`, `ph_max`,
+  `substrate_initial_concentration` and `enzyme_concentration`. The enzyme is a
+  model state and the rate follows the pH of the environment:
+
+  ```text
+  f_e(pH)  = (10^(pk_free_lower - pH) + 1) (10^(pH - pk_free_upper) + 1)
+  f_es(pH) = (10^(pk_complex_lower - pH) + 1) (10^(pH - pk_complex_upper) + 1)
+  kcat(pH) = kcat_limiting / f_es(pH)
+  Km(pH)   = km_limiting · f_e(pH) / f_es(pH)
+  rate     = kcat(pH) · E · S / (Km(pH) + S)
+  ```
+
+  "Limiting" means the plateau constant of the fit: `kcat_limiting` is the
+  turnover of the enzyme-substrate complex in its active protonation state,
+  so the turnover at any pH is at most `kcat_limiting`, and `km_limiting` is
+  the matching plateau Michaelis constant. Neither is the kcat or Km measured
+  at one pH, so do not enter single-pH constants here (they belong to the kcat
+  form), and do not enter these constants as `kcat` and `km`. The quantities
+  map to the assembler's roles exactly as the registry's BGL1A records do:
+
+  | `quantity` | Role | SABIO-RK name |
+  | --- | --- | --- |
+  | `kcat_limiting` | `turnover` | `k0` |
+  | `km_limiting` | `michaelis_constant` | `Km0` |
+  | `pk_free_lower` / `pk_free_upper` | `free_enzyme_lower_pk` / `free_enzyme_upper_pk` | `pKe1` / `pKe2` |
+  | `pk_complex_lower` / `pk_complex_upper` | `complex_lower_pk` / `complex_upper_pk` | `pKes1` / `pKes2` |
+  | `ph_min` / `ph_max` | `minimum_ph` / `maximum_ph` | start and end of the law's pH variable |
+  | `substrate_initial_concentration` | `substrate_initial_concentration` | |
+  | `enzyme_concentration` | `enzyme_initial_concentration` | |
+
+  The re-entry of SABIO-RK entry 38522 in
+  `tests/fixtures/user_data/bgl1a_ph_ionization/` reads:
+
+  ```text
+  strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,sd,replicates
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,kcat_limiting,1.81,,,1/s,literature,<law constant of entry 38522>,<source>,0.05,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,km_limiting,6.8,,,mM,literature,<law constant of entry 38522>,<source>,0.29,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,pk_free_lower,4.4,,,dimensionless,literature,<law constant of entry 38522>,<source>,0.2,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,pk_free_upper,7.7,,,dimensionless,literature,<law constant of entry 38522>,<source>,0.2,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,pk_complex_lower,4.1,,,dimensionless,literature,<law constant of entry 38522>,<source>,0.1,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,pk_complex_upper,7.6,,,dimensionless,literature,<law constant of entry 38522>,<source>,0.1,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,ph_min,4,,,dimensionless,literature,<lower end of the pH series>,<source>,,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,ph_max,8,,,dimensionless,literature,<upper end of the pH series>,<source>,,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,substrate_initial_concentration,5,,,mM,design,experimental design,<design note>,,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,enzyme_concentration,0.001,,,mM,design,experimental design,<design note>,,
+  ```
+
+  With the registry case's loadings it gives the same substrate trajectory as
+  the registry BGL1A case in the Tsukada pH 5 assay, and an `EnvironmentGrid`
+  over pH 4 to 8 gives initial rates in the ratios of the law's factors
+  (`tests/test_user_data_ph_ionization.py`). The condition's temperature is the
+  temperature the law was fitted at; its pH is the pH the case runs at.
+
+  Checks: the pK values are finite numbers in `dimensionless`; each lower pK
+  lies below its upper pK (for ranges, the whole lower range below the whole
+  upper range, so that every sampled pair is ordered); `ph_min` and `ph_max`
+  are exact, between 0 and 14, with `ph_min < ph_max`; and every condition with
+  pH-ionization rows has one exact pH inside `[ph_min, ph_max]`. An `unknown`
+  pH or a pH outside the fitted range is refused on its `conditions.csv` row
+  with the reason, and a pH range is never a condition (`ph` takes one number
+  or `unknown`). In an `EnvironmentGrid` a grid pH outside the range is not
+  refused: the law runs with an `EnvironmentalValidityWarning`, as the
+  registry case does. `kcat_limiting` and `km_limiting` may be ranges for
+  exploratory sampling.
 
 A case that gives `kcat` or `enzyme_concentration` together with any Vmax row
-is refused; FungMod never derives one form from the other. All strains and
-conditions of one enzyme class and substrate share one generated process, so
-they must use the same form; a dataset where one strain uses `kcat` and another
-`vmax` on the same pair is refused. A pair without any rate row is generated in
-the kcat form, and its gap requests name both forms (see below).
+is refused; FungMod never derives one form from the other. A case that gives
+any pH-ionization quantity together with `kcat` or a Vmax row is refused too
+(its `enzyme_concentration` belongs to whichever of the kcat and pH-ionization
+forms the case uses). All strains and conditions of one enzyme class and
+substrate share one generated process, so they must use the same form; a
+dataset where one strain uses `kcat` and another `vmax`, or the pH-ionization
+form, on the same pair is refused. A generated enzyme class lists the process
+law it runs and preflight looks for that law on every substrate of the class,
+so a class uses the pH-ionization form on all of its substrates or on none: a
+class with the pH-ionization form on one substrate and the kcat or Vmax form on
+another is refused. A pair without any rate row is generated in the kcat form,
+and its gap requests name both forms (see below); when its class uses the
+pH-ionization form on its other substrates, it is generated in that form
+instead.
 
 #### Three routes to Vmax
 
@@ -471,7 +561,9 @@ The laws are the implemented modifiers described in
 [environment response laws](environment-response.md); a law name FungMod does
 not implement is refused, and so are implemented laws this importer does not
 bind yet (Gaussian pH, oxygen, water activity) and the optional validity bounds
-of the Arrhenius law. Validation:
+of the Arrhenius law. On a pair in the pH-ionization form a pH law is refused
+as double-counting, because the ionization law already makes the rate depend on
+pH; a temperature law binds as usual. Validation:
 
 - Every parameter the law needs is present exactly once, with the right
   dimension (temperatures in `degC` or `kelvin`, pH as `dimensionless`
@@ -496,8 +588,8 @@ The law multiplies the configured rate by an activity that is one at its
 reference parameter: the optimum of a cardinal law, the reference temperature
 of the Arrhenius law. The law therefore rescales the reference value, and the
 kinetic constants of that strain, enzyme class and substrate (`km`, `kcat`,
-`vmax`, `specific_activity`, `assay_activity`) must be stated at the reference
-condition. For every condition at which such rows exist, the condition's
+`vmax`, `specific_activity`, `assay_activity`, `kcat_limiting`, `km_limiting`)
+must be stated at the reference condition. For every condition at which such rows exist, the condition's
 temperature or pH must equal the reference parameter exactly, or lie within
 the `reference_tolerance` stated on the reference parameter's row (a
 nonnegative number in that row's units; FungMod has no tolerance of its own).
@@ -507,7 +599,8 @@ the optimum); the declaration is recorded in provenance and not checked. A
 condition with an unknown temperature or pH cannot carry kinetic constants for
 a law on that condition. Otherwise the dataset is refused with a message
 naming the condition, the reference value and the difference. Concentrations
-and `enzyme_loading` are amounts, not rates, and are not checked or rescaled.
+and `enzyme_loading` are amounts, not rates, and are not checked or rescaled;
+nor are the pK values and the fitted pH range of the pH-ionization form.
 
 ### `genomes.csv` (optional): enzyme classes from a genome annotation
 
@@ -518,6 +611,10 @@ Columns: `strain_id`\*, `annotation_file`\*, `annotation_tool`\*, `source`\*,
 strain_id,annotation_file,annotation_tool,source
 strain_g1,annotations/strain_g1_overview.txt,dbCAN 4.1.4,"run_dbcan on the predicted proteome of assembly <accession>, 2026-09-30"
 ```
+
+A row may instead point to a UniProtKB TSV export of the strain's proteome;
+see [From a UniProt proteome](#from-a-uniprot-proteome). The rest of this
+section describes dbCAN rows.
 
 Instead of (or besides) listing a strain's enzyme classes by hand, point it to
 the dbCAN annotation of its genome or proteome. FungMod resolves the
@@ -599,8 +696,9 @@ sources), `genome_resolved_classes`, `unmodellable_enzyme_classes` and
 
 Limits of the genome route:
 
-- dbCAN `overview.txt` only, read from the dataset directory; no other
-  annotation format and no download at run time.
+- A dbCAN row reads a dbCAN `overview.txt` from the dataset directory; the
+  only other format is a UniProtKB TSV export ([below](#from-a-uniprot-proteome)),
+  and nothing is downloaded at run time.
 - Family-level mapping: the curated map covers 18 CAZy families, a
   polyspecific family gives only a candidate class, and the `EC#` column is not
   used. With the shipped registry only `beta_glucosidase` and
@@ -612,6 +710,170 @@ Limits of the genome route:
 - The test fixture is a format fixture written by hand; no real genome
   annotation is bundled.
 
+### From a UniProt proteome
+
+Most fungi with a sequenced genome have a UniProt proteome whose entries carry
+EC numbers and CAZy cross-references. A `genomes.csv` row can point to a
+UniProtKB TSV export of that proteome instead of a dbCAN overview, so no
+annotation tool has to be run:
+
+```text
+strain_id,annotation_file,annotation_tool,source
+strain_u1,annotations/strain_u1_uniprot.tsv,UniProt 2026_03,"UniProt proteome UP000xxxxxx, all UniProtKB entries, downloaded 2026-10-01"
+```
+
+**Downloading the export.** On uniprot.org, find the organism's proteome
+(Proteomes, search the organism, open the reference proteome and note its
+`UP...` identifier), then list its UniProtKB entries (the query
+`proteome:UP000xxxxxx`). Choose *Download*, format *TSV*, *Compressed: No*,
+and customise the columns so that the export holds at least `Entry` and one of
+`EC number` and `CAZy`; FungMod also reads `Entry Name`, `Protein names`,
+`Gene Names`, `Organism`, `Organism (ID)` and `Reviewed`, and these are
+worth selecting. The column names are UniProt's own; where each sits in the
+website's column picker may change (the CAZy column is among the
+cross-references to protein family databases). Any other column is allowed and
+ignored; its name is listed under `ignored_columns`. Save the file inside the
+dataset directory.
+
+**The row.**
+
+- `annotation_tool` is `UniProt` (or `UniProtKB`) followed by the UniProt
+  release (for example `2026_03`, shown on the website and in the
+  `X-UniProt-Release` header) or the download date, recorded as written. The
+  export does not record either, so a row without one is refused.
+- `annotation_file` follows the path rules of a dbCAN row: relative to the
+  dataset directory, `/`-separated, no absolute path, no `..`, no symbolic link
+  out of the directory. The file's bytes enter the dataset `digest` and
+  `file_digests`, so changing any byte (even in an ignored column) changes the
+  digest.
+- `source` says which proteome was exported. When it names one UniProt
+  proteome identifier (`UP` followed by digits) that identifier is recorded as
+  `proteome_id` and named in the measurement requests; a `source` naming
+  several identifiers is refused. Without one, requests name the export file.
+- `min_tools_agreeing` counts agreeing dbCAN tool columns; a UniProt export has
+  none, so a value on a UniProt row is refused.
+
+**Reading the export.** `Entry` is required and must be unique; the format of
+an accession is not checked. `EC number` cells hold EC numbers separated by
+`"; "`; a partial number such as `3.2.1.-` is kept as partial and never
+completed or resolved. `CAZy` cells hold family identifiers separated by `;`,
+usually with a trailing `;`; a subfamily suffix is dropped as in the dbCAN
+route (`GH5_5` counts as `GH5`). An export must describe one organism: more
+than one `Organism (ID)` (or, without that column, more than one `Organism`)
+is refused, because mixed sets are not supported. Also refused: a header
+without `Entry` or without both `EC number` and `CAZy`, a repeated header
+column, a malformed EC number or CAZy identifier, a `Reviewed` cell other than
+`reviewed` or `unreviewed`, a gzip-compressed file and an export in which no
+entry has an EC number or a CAZy family.
+
+**Resolution.** Nothing new decides a class. The CAZy families of each
+protein go through the same `CapabilityResolver` and curated family map as a
+dbCAN annotation; each complete EC number goes through the registry's enzyme
+class lookup (`RegistryResolver.resolve_enzyme_class`, which matches the
+`ec_number` of a registry record), so an EC number resolves only to a class
+with a registry record. An EC number no record carries is listed under
+`unresolved_ec_numbers`; one that two records carry is listed there as
+ambiguous, and FungMod picks neither.
+
+**When CAZy and EC disagree.** For a protein that has a mapped CAZy family
+and a complete EC number, FungMod compares the classes its families name with
+the classes its EC numbers resolve to, on every class the EC side can speak
+about: the classes its EC numbers resolve to and every registry class whose
+record carries an EC number. The two disagree when such a class is named by
+one side and not by the other. A disagreeing protein supports **no** class:
+it is listed under `ec_cazy_disagreements` with both sides (families and the
+classes they name, EC numbers and the classes they resolve to, and the
+contested classes), and FungMod does not choose between them. With the
+shipped registry, a GH7 protein annotated EC 3.2.1.21 (GH7 names
+cellobiohydrolase, the EC number beta-glucosidase) and a GH3 protein annotated
+EC 3.2.1.37 only (GH3 names beta-glucosidase, whose record carries EC
+3.2.1.21) both disagree. A protein whose EC numbers resolve to nothing and
+whose family classes carry no registry EC number cannot be compared: its
+family classes count, and its EC numbers are listed as unresolved. Every
+other protein supports the classes its families or EC numbers name, and each
+class records which accessions support it through both annotations
+(`cazy_and_ec`), the families only (`cazy`) or the EC numbers only (`ec`).
+
+**Outcomes.** As for a dbCAN row: a class with a registry record joins the
+strain (an explicit `enzymes.csv` row wins and keeps the proteome evidence
+beside it), a class without one is listed in `unmodellable_enzyme_classes`
+and generates nothing, and a family without a class is listed in
+`unmapped_families`. A class that only EC numbers support has no family
+specificity (`specificity` is `null`). No rate, kinetic constant, enzyme
+concentration or expression level is taken from the proteome: every resolved
+class that can act on a dataset substrate but has no kinetics becomes
+`user_dataset_gap` unknowns whose requests name the evidence:
+
+> Measure km of beta-glucosidase from Proteome-annotated strain U1 on
+> Cellobiose at 30 degC, pH 5.0 (concentration units); the class was inferred
+> from UniProt proteome UP000000000 (accessions X0TEST01, X0TEST02, X0TEST03;
+> CAZy families GH1, GH3; EC 3.2.1.21; 1 of 3 reviewed in Swiss-Prot; family
+> membership is polyspecific, so the activity itself needs confirming).
+
+A request quotes at most ten accessions and says how many more there are; the
+provenance lists all. Preflight is `underparameterized` and scientific and
+exploratory simulation are refused for such a class until kinetics are
+supplied, exactly as for a dbCAN class.
+
+**Outputs.** Every entry a UniProt row adds to `genome_annotations`,
+`genome_resolved_classes`, `unmodellable_enzyme_classes` and
+`unmapped_families` (and so to `virtual_experiment_summary.json` and
+`user_dataset_genome_resolution.json`) carries `source_type`
+`uniprot_proteome` and the accessions behind it (`accessions`,
+`accession_count`; classes also `accessions_by_basis`, `reviewed_accessions`
+and `ec_numbers`). Its `genome_annotations` entry adds the `proteome_id`,
+organism and taxonomy id, the columns read and ignored, `review_counts`,
+`protein_counts` (agreeing, CAZy only, EC only, disagreement, no class),
+`unresolved_ec_numbers`, `partial_ec_numbers`, `ec_cazy_disagreements`,
+`ec_comparable_classes` and the comparison rule. Entries of a dbCAN row keep
+exactly their earlier keys (no `source_type`); a dataset may mix both kinds of
+rows, one per strain.
+
+**Fetching an export on request.** `fungal_model.sources.uniprot` builds the
+UniProt REST stream URL for a proteome identifier or an NCBI taxonomy id and
+fetches it only when you pass `refresh=True`:
+
+```python
+from fungal_model.sources.uniprot import fetch_proteome_snapshot, write_snapshot_to_user_dataset
+
+snapshot = fetch_proteome_snapshot(proteome_id="UP000xxxxxx", refresh=True)
+# https://rest.uniprot.org/uniprotkb/stream?query=(proteome:UP000xxxxxx)
+#   &fields=accession,id,protein_name,gene_names,organism_name,organism_id,ec,xref_cazy,reviewed&format=tsv
+row = write_snapshot_to_user_dataset(snapshot, "path/to/my_dataset", strain_id="strain_u1")
+# row: a genomes.csv row to review and add yourself (genomes.csv is not written)
+```
+
+The response is parsed before it is stored; it is frozen under
+`data/source_snapshots/uniprot/<query>/` (by default) as `uniprotkb.tsv` with
+`snapshot.json` (SHA-256, URL, query, retrieval time, HTTP status and the
+`X-UniProt-Release` and `X-UniProt-Release-Date` headers when sent). Without
+`refresh=True` only that snapshot is read and its digest verified; a missing
+or changed snapshot is refused. A new response whose digest differs from the
+stored one is refused unless you pass `overwrite=True`. A taxonomy id query
+(`organism_id:<id>`) returns every UniProtKB entry of that organism, which may
+be more than its reference proteome. There is no lookup from a free-text
+organism name to a proteome: choosing the proteome is left to you (possible
+future work, which would show candidates rather than guess). The URL and the
+return-field names follow UniProt's REST documentation as known when the
+client was written; they were not checked against a live response in the
+environment it was written in, which could not reach rest.uniprot.org.
+
+Limits of the UniProt route:
+
+- UniProtKB annotation is mostly automatic: unreviewed (TrEMBL) entries carry
+  EC numbers and names assigned by prediction rules. `Reviewed` is reported
+  per class and in each request, never used to filter.
+- A protein in the proteome is not an expressed or secreted enzyme, and the
+  number of accessions is not a copy number or an activity.
+- CAZy cross-references cover only part of a proteome; a protein without one
+  can still be a CAZyme. An export without CAZy cross-references resolves
+  through EC numbers alone.
+- EC numbers resolve only to registry classes that carry an EC number (with
+  the shipped registry, only `beta_glucosidase`), so most EC numbers are
+  listed as unresolved, and an EC number can contradict a family only through
+  such a class.
+- One organism per export; no merging of proteomes or strains.
+
 ## Evidence types, maturity and modes
 
 | `evidence_type` | Record maturity | Exact value | Range |
@@ -620,6 +882,12 @@ Limits of the genome route:
 | `literature` | `user_reported_literature` | scientific and exploratory | exploratory screening only |
 | `design` | `user_design_value` | scientific and exploratory | exploratory screening only |
 | `estimate` | `exploratory_prior` (provenance `exploratory_prior: true`) | exploratory only | exploratory only |
+| `fitted` | `user_fitted` | exploratory screening only | (not written) |
+
+`fitted` rows are written only by `fit_user_dataset` and are accepted only
+with the manifest `fit` block that describes them (see
+[fitting](#fitting-kinetic-constants-to-time-courses)); a hand-typed `fitted`
+row is refused. They never reach scientific mode.
 
 The maturities are ordered from weakest to strongest as
 `exploratory_prior` < `user_design_value` < `user_reported_literature` <
@@ -656,20 +924,25 @@ out of data you intend to simulate.
 | Record | Identifier |
 | --- | --- |
 | Fungus per strain, listing its namespaced classes (from `enzymes.csv` and `genomes.csv`) | `<dataset_id>__<strain_id>` |
-| Enzyme class per declared class, limited to homogeneous Michaelis-Menten | `<dataset_id>__<class>` |
+| Enzyme class per declared class, limited to the process law of its rate form (`homogeneous_michaelis_menten`, or `ph_ionization_michaelis_menten` for the pH-ionization form) | `<dataset_id>__<class>` |
 | Substrate per user-defined substrate (registry substrates are referenced) | `<dataset_id>__<substrate_id>` |
 | Environment per condition | `<dataset_id>__<condition_id>` |
-| Compatibility and case template per class and compatible substrate | `<dataset_id>__<class>__<substrate_id>__homogeneous_mm[_template]` |
+| Compatibility and case template per class and compatible substrate | `<dataset_id>__<class>__<substrate_id>__homogeneous_mm[_template]`, or `__ph_ionization_mm[_template]` in the pH-ionization form |
 | Parameter record per kinetics row of a role | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__<quantity>` |
 | Vmax record (explicit row, derived, or from an assay activity) | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__vmax` |
 | Response-law parameter record per `responses.csv` row | `<dataset_id>__<strain>__<class>__<substrate>__<law>__<parameter>` |
 | Explicit unknown per missing role or law parameter | the same identifier with `__gap` |
 
 The compatibility record binds the roles of the pair's rate form (`km`,
-`kcat`, `substrate_initial_concentration`, `enzyme_initial_concentration`, or
-`km`, `vmax`, `substrate_initial_concentration`) followed by the parameters of
-any bound law; the template of a Vmax-form pair has no enzyme state, and a
-pair with laws lists them under `process_state_metadata.process_modifiers`.
+`kcat`, `substrate_initial_concentration`, `enzyme_initial_concentration`;
+`km`, `vmax`, `substrate_initial_concentration`; or the ten roles of the
+pH-ionization form in the table [above](#three-rate-forms)) followed by the
+parameters of any bound law; the template of a Vmax-form pair has no enzyme
+state, and a pair with laws lists them under
+`process_state_metadata.process_modifiers`. The template of a pH-ionization
+pair has the process type `ph_ionization_michaelis_menten`, so its assembled
+model reads the pH of the environment and reports
+`environment_effect_status = active_response_model` for pH.
 `specific_activity`, `enzyme_loading` and `assay_activity` rows produce no
 records of their own; they appear in the provenance of the Vmax record.
 
@@ -712,7 +985,16 @@ request that names both forms:
 
 A started Vmax route with one of its two rows missing asks for that row (for
 example the enzyme loading needed to derive Vmax from the specific activity in
-a stated row). When a law is bound to an enzyme class and substrate for one
+a stated row). A missing constant of the pH-ionization form asks for a fit of
+the law over a pH series at the condition's temperature, for example:
+
+> Measure the lower pK of the free enzyme (pk_free_lower) of acid
+> phosphatase-like enzyme from Phosphatase source strain P1 on model alkyl
+> phosphate monoester (dimensionless) by fitting the diprotic pH-ionization law
+> to initial rates over a pH series at the temperature of condition c37_ph5
+> (37 degC).
+
+and a missing `ph_min` or `ph_max` asks for the end of the fitted pH series. When a law is bound to an enzyme class and substrate for one
 strain, every other strain of that pair gets a gap per law parameter (with
 no condition), asking for that parameter of that law.
 
@@ -744,7 +1026,8 @@ both appear in `virtual_experiment_summary.json` (under `experiment`) and in
 `output_manifest.json` (`null` without user data). Beside them,
 `virtual_experiment_summary.json` lists `genome_resolved_classes`,
 `unmodellable_enzyme_classes` and `unmapped_families` (empty lists for a
-dataset without `genomes.csv`, `null` without user data), and
+dataset without `genomes.csv`, `null` without user data; entries from a
+UniProt export carry `source_type` and accessions), and
 `VirtualExperiment.write_preflight_report` writes
 `user_dataset_genome_resolution.json` with these lists and the annotations
 read when the dataset has a `genomes.csv`. In the standard tables,
@@ -752,8 +1035,196 @@ read when the dataset has a `genomes.csv`. In the standard tables,
 `user_reported_literature_range`, `user_design_value_exact_value` and so on,
 estimates read `user_supplied_exploratory_prior`, and the mechanism maturity
 of an all-user, non-estimate case is
-`software_tested_user_supplied_parameterized`. The output schema version is
-unchanged.
+`software_tested_user_supplied_parameterized`; a case with a `fitted` value
+reads `user_fitted_exact_value` and
+`software_tested_user_fitted_in_sample_unvalidated`. Output schema `2.1.0`
+adds the `timecourse_comparison` table, written only on request (see
+[comparing](#comparing-a-virtual-experiment-with-the-time-courses)); the other
+tables are unchanged.
+
+## Time courses, comparison and fitting
+
+> **Honesty note.** Comparing a simulation with your own time courses, and
+> fitting constants to them, measures **in-sample** agreement with your own
+> data. It is not validation. A value fitted to a time course reproduces that
+> time course by construction, so the agreement is not independent evidence
+> that the model or the value is right; only a prediction checked against data
+> that played no part in choosing the values can say that (see
+> [independent validation](independent-validation.md)). FungMod labels every
+> fitted value `fitted` (maturity `user_fitted`), limits it to exploratory
+> screening, refuses it in scientific mode, and marks comparison rows whose
+> observations were used in the fit.
+
+### `timecourse.csv` (optional)
+
+Columns: `strain_id`\*, `enzyme_class`\*, `substrate_id`\*, `condition_id`\*,
+`observable`\*, `time`\*, `time_units`\*, `value`\*, `units`\*, `sd`,
+`replicates`, `source`\*, `method`\*.
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,observable,time,time_units,value,units,sd,replicates,source,method
+strain_e1,carboxylesterase,p_nitrophenyl_butyrate,s200,substrate,0,minute,200.4,µM,2.0,3,LN-42 p. 20,HPLC
+strain_e1,carboxylesterase,p_nitrophenyl_butyrate,s200,substrate,10,minute,191.2,µM,2.0,3,LN-42 p. 20,HPLC
+strain_e1,carboxylesterase,p_nitrophenyl_butyrate,s200,product,10,minute,8.7,µM,0.4,3,LN-42 p. 20,absorbance at 405 nm
+```
+
+- `observable` is `substrate` (substrate remaining) or `product` (product
+  formed since time zero).
+- The strain, enzyme class (declared for the strain), substrate (one the class
+  can act on) and condition must be declared in the other tables.
+- `time` is a finite number, zero or positive, in `time_units` (a time unit);
+  `value` is a finite number. Values are not clipped: a slightly negative
+  product after background subtraction is kept as measured.
+- `units` must be a concentration in amount per volume, the kind of the case's
+  states (the product yield is mol/mol), for example µM or mM. Other
+  dimensions, and mass concentrations such as g/L, are refused with the case's
+  own units in the message.
+- `sd` is a positive standard deviation in `units` when given, and
+  `replicates` a positive integer; report replicates as their mean with `sd`.
+- One series (strain, class, substrate, condition and observable) uses one
+  time unit and one value unit and lists each time once; a repeated time is
+  refused.
+
+The time courses are kept on `UserDataset.timecourses`, keyed by the generated
+case id `<dataset_id>__<strain>__<class>__<substrate>__<condition>`, one
+`UserTimecourse` per observable with its rows, sources and methods, and appear
+in `to_dict()` (`timecourses`) and `summary()` (`timecourse_case_ids`). They
+are observations, not registry records: no record is generated from them. The
+file's bytes enter the dataset digest.
+
+### Comparing a virtual experiment with the time courses
+
+```python
+dataset = fm.load_user_dataset("path/to/esterase_case")
+study = fm.virtual_experiment(
+    fungi="Esterase source strain E1",
+    substrates="p-nitrophenyl butyrate",
+    environments=["s50", "s200", "s800"],
+    user_data=dataset,
+)
+result = study.simulate(mode="exploratory", n_samples=32)
+comparison = result.compare_with_timecourses()   # or fm.compare_with_timecourses(result, dataset)
+for series in comparison.series:
+    print(series["series_id"], series["rmse"], series["units"], series["fraction_inside_band"])
+```
+
+For each simulated case with time courses, the median (`p50`) and the 5-95 %
+band (`p05`, `p95`) of `trajectory_quantiles.csv` are brought to each observed
+time by **linear interpolation on the simulated output grid** and converted to
+the observation's units: the substrate state for `substrate`, and
+`product_formed` for `product`. An observation outside the simulated time
+range refuses the comparison with its row; nothing is extrapolated (extend
+`simulation.duration` instead). The comparison is refused for a result built
+from another dataset or without time courses.
+
+`timecourse_comparison.csv` is written into the output directory (and joins
+`output_manifest.json`): one row per observation with the observed value and
+`sd`, the interpolated `simulated_p05`, `simulated_p50` and `simulated_p95`,
+the residual (simulated median minus observed), the standardized residual when
+`sd` is given, `inside_band`, and per series the RMSE and mean residual in the
+observable's units, the fraction inside the band, the number of observations
+and the number with `sd`. Every row carries the interpolation method,
+`used_in_fit`, `allowed_use = in_sample_agreement_with_user_timecourses_not_validation`
+and the in-sample note. In exploratory mode the band spans the sampled input
+ranges; with exact inputs every sample is identical and the band has zero
+width, so the fraction inside it says little.
+
+### Fitting kinetic constants to time courses
+
+```python
+fit = fm.fit_user_dataset(
+    dataset,
+    parameters=[
+        ("strain_e1", "carboxylesterase", "p_nitrophenyl_butyrate", "km"),
+        ("strain_e1", "carboxylesterase", "p_nitrophenyl_butyrate", "kcat"),
+    ],
+    bounds={"km": (10, 5000, "µM"), "kcat": (1, 300, "1/min")},   # required
+    initial={"km": 1000, "kcat": 5},
+)
+for item in fit.quantities:
+    print(item.quantity, item.value, item.units, item.identifiability, item.interval)
+fitted = fit.write("path/to/esterase_case_fitted")   # a new user dataset
+```
+
+What the fit does:
+
+- **One case, shared constants.** `parameters` names `(strain_id,
+  enzyme_class, substrate_id, quantity)` tuples of one case with quantities
+  among `km`, `kcat` (kcat form) and `vmax` (Vmax form). The time courses of
+  that case at `conditions` (default: every condition with time courses) are
+  fitted together, so each fitted constant is shared by those conditions; they
+  must have the same known temperature and pH (for example several initial
+  substrate concentrations of one assay), otherwise the fit is refused. Every
+  role the fit does not vary must be an exact value.
+- **The existing machinery.** The predictions come from the same assembled
+  model a virtual experiment runs (the case's registry records rebuilt by the
+  registry assembler for each candidate), integrated on the compiled core
+  (`ConfiguredConditionPredictor`), and the optimizer is
+  `fungal_model.calibration.fit_least_squares` (bounded trust-region least
+  squares) on the natural logarithm of each value. The finite-difference step
+  is `1e-3` in log space, above the ODE solver's step noise; it is recorded.
+- **Bounds are required** as `(lower, upper, units)` with `0 < lower < upper`;
+  there are no default bounds. The fitted value is reported in those units.
+  `initial` gives starting values in the same units; without it, the
+  dataset's exact value at every fitted condition is the start, and the fit is
+  refused when there is none.
+- **Error model.** By default each residual is divided by its observation's
+  `sd` (independent Gaussian errors with the reported standard deviations).
+  When any fitted observation lacks `sd`, the fit is refused unless you pass
+  `error_model="unweighted"`, which fits raw residuals (one value unit across
+  the series) and is recorded in the dataset and the report.
+- **Identifiability.** With `sd` weighting each quantity is profiled
+  (`fungal_model.calibration.profile_likelihood`): it is fixed on a log grid
+  across its bounds (`profile_points`, default 21, plus the optimum) while the
+  other fitted quantities are refitted, and each crossing of the threshold
+  (the chi-square quantile of one degree of freedom at `confidence_level`,
+  3.84 at 0.95) is bisected with ten further profile evaluations. A quantity
+  is `identified` when the profile crosses the threshold on both sides within
+  its bounds, `bounded_above_only` or `bounded_below_only` when on one side
+  only, and `not_identified_within_bounds` otherwise; the interval is where the
+  profile stays under the threshold. With `unweighted`, the local information
+  matrix of the residuals (`local_information_analysis`) must have full rank,
+  and a linearized interval (residual variance estimated from the residuals)
+  must lie inside both bounds. Verdicts are conditional on the bounds of the
+  other fitted quantities and on the error model; a finite grid with local
+  refits is not a global identifiability proof.
+- **Refusals.** A quantity that is not identified refuses the fit with
+  `UserDataFitError` (whose `report` holds the profiles) unless
+  `allow_unidentified=True`; then its rows are written and labelled "NOT
+  IDENTIFIED". A fit that does not converge is always refused, and so are a
+  fit with no more observations than quantities, a `kcat` fit in a Vmax-form
+  case (or the reverse), and a dataset that is itself the result of a fit.
+
+What `fit.write(path)` writes (a new or empty directory; nothing is
+overwritten):
+
+- a copy of every input file, byte for byte, except `kinetics.csv` and
+  `user_dataset.yml`;
+- `kinetics.csv` with each fitted quantity at each fitted condition replaced
+  by a row of `evidence_type = fitted`, the fitted value in the bound units, a
+  `method` naming the fit and the time-course rows and a `source` naming the
+  input dataset and its digest (a fitted `vmax` replaces the case's whole Vmax
+  route at that condition);
+- `user_dataset.yml` with a new `dataset_id` (default `<input id>_fitted`)
+  and a `fit` block: method, objective, error model, input dataset id and
+  digest, the fit report file and its SHA-256, the case, conditions and
+  `timecourse.csv` rows used, and per quantity the value, units, bounds,
+  starting value, identifiability verdict, method and interval;
+- `fit_report.json`: the full report (convergence, residuals per observation,
+  observations against parameters, profiles, local information, settings,
+  warnings and the claim boundary).
+
+On loading, a `fitted` row is accepted only when the `fit` block lists its
+case, condition, quantity, value and units and the report file matches its
+recorded digest; a value edited by hand, a changed report or a hand-typed
+`fitted` row is refused. The fitted record has maturity `user_fitted`, allowed
+use `exploratory_screening_only_not_calibrated_uncertainty_not_environment_response`,
+and carries the fit description (method, objective, data rows, bounds,
+identifiability and the scientific-mode boundary) under
+`provenance.fungmod_user_dataset.fit`. Preflight in exploratory mode treats it
+like any exact value; **scientific mode refuses it**, and no relabelling
+route is provided: an in-sample fit is not independent evidence, and the same
+time courses cannot both choose a value and vouch for it.
 
 ## Starting from SABIO-RK
 
@@ -795,7 +1266,8 @@ with `REVIEW:`: always the manifest's `contributor` and the simulation time grid
 temperature or pH that SABIO-RK gives only as a range, the product or yield of
 a reaction that does not name one product, the categorical fields of a
 substrate the registry does not know, the bond and substrate classes of a
-proposed enzyme class, and the enzyme loading a specific activity needs.
+proposed enzyme class, the enzyme loading a specific activity needs, and the
+`ph_min` and `ph_max` of a pH-ionization law whose entry states no pH range.
 `draft.review_fields` and the "Fields to fill" table of `review.md` list them
 with file, row and column, and `load_user_dataset` refuses the directory until
 each is filled:
@@ -841,7 +1313,8 @@ Every application of these rules is recorded in `review.md`.
 | kcat | `kcat` | |
 | Vmax | `vmax` or `specific_activity` | `vmax` when the units are an amount per volume per time; `specific_activity` when they are an amount per time per enzyme mass, with an `enzyme_loading` row taken from `design` or left as `REVIEW:`. A mass rate is listed. |
 | Concentration of the substrate or the enzyme | `substrate_initial_concentration`, `enzyme_concentration` | The assay's values, usually the tested range; a `design` value replaces them (the replaced value is listed). |
-| kcat/Km, pKa, pH, Ki and other types | | Listed, not converted. |
+| `k0`, `Km0`, `pKe1`, `pKe2`, `pKes1`, `pKes2` and the pH variable of the diprotic "Michaelis-Menten (pH-dependent)" law | `kcat_limiting`, `km_limiting`, `pk_free_lower`, `pk_free_upper`, `pk_complex_lower`, `pk_complex_upper`, `ph_min`, `ph_max` | The [pH-ionization form](#three-rate-forms); see below. |
+| kcat/Km, pKa of any other law, Ki and other types | | Listed, not converted. |
 
 Values are copied, never converted: start and end values give `value` or
 `lower` and `upper`, the standard deviation becomes `sd`, and the evidence type
@@ -868,16 +1341,47 @@ a conflict and none is converted; choose one with `entry_ids`. All cases of an
 enzyme class and substrate share one rate form, so when some entries give kcat
 and others Vmax the kcat form is kept and the Vmax values are listed.
 
-**pH-dependent laws.** A kinetic law with pKa parameters (SABIO-RK's
-"Michaelis-Menten (pH-dependent)") is not turned into a cardinal pH law. FungMod
-implements that law for registry cases (`ph_ionization_michaelis_menten`, see
-[environment response laws](environment-response.md)), but `responses.csv`
-cannot bind it yet, so the entry is listed under "pH-ionization laws" as
-"pH-ionization law not importable as user data yet"; only its Km and kcat are
-converted, at the entry's pH. SABIO-RK
-gives the pH of such an entry as the range of the pH profile, so that pH is a
-`REVIEW:` field, and the converted constants belong to a law that also contains
-pH terms: they need not equal the Km and kcat observed at any single pH.
+**pH-dependent laws.** An entry whose kinetic law carries the four pKa
+parameters with the limiting kcat and Km of SABIO-RK's diprotic
+"Michaelis-Menten (pH-dependent)" law (kinetic-law type 24, as in entries
+38522 to 38534 of Reaction 618) is drafted in the
+[pH-ionization form](#three-rate-forms). The converter recognises the law by
+its formula, compared with whitespace removed to
+`E*((k0)/((10^(pKes1-pH)+1)*(10^(pH-pKes2)+1)))*S/(((k0)/((10^(pKes1-pH)+1)*(10^(pH-pKes2)+1)))/(((k0)/(Km0))/((10^(pKe1-pH)+1)*(10^(pH-pKe2)+1)))+S)`,
+and by the parameter names in it: `k0` becomes `kcat_limiting`, `Km0`
+`km_limiting`, `pKe1` and `pKe2` `pk_free_lower` and `pk_free_upper`, `pKes1`
+and `pKes2` `pk_complex_lower` and `pk_complex_upper`, all as `literature`
+values with their standard deviations (SABIO-RK's `-` unit of a pKa is written
+`dimensionless`). `k0` and `Km0` are never written as `kcat` and `km`: they are
+the law's limiting constants, not the constants at the entry's pH. `ph_min`
+and `ph_max` are the pH range the entry states, the start and end of the law's
+pH variable or else of the assay pH (entry 38522 gives 4 to 8); when it states
+none, or two different ones, they are `REVIEW:` fields. The condition pH is the
+pH the case runs at: SABIO-RK gives the assay pH of such an entry as the range
+of the pH profile, so it stays a `REVIEW:` field, to be filled with one pH
+inside `ph_min` to `ph_max` (`unknown` is refused for this form). A law with
+pKa parameters whose formula or parameter names differ is listed, not
+converted, and none of its constants is written. Because one enzyme class uses
+one process law, pH-ionization entries are listed, not converted, when the
+selected entries give the same enzyme class in the kcat or Vmax form; select
+them alone with `entry_ids`. `review.md` lists every pH-dependent law under
+"pH-ionization laws" with its pKa values and whether it was converted.
+
+```python
+draft = fm.user_tables_from_sabiork(
+    "618",
+    dataset_id="bgl1a_sabiork",
+    entry_ids=["38522"],
+    design={
+        "substrate_initial_concentration": {"value": 5, "units": "mM"},
+        "enzyme_concentration": {"value": 0.001, "units": "mM"},
+    },
+)
+draft.write("bgl1a_sabiork")  # fill contributor, the time grid and the condition pH (one value from 4 to 8)
+```
+
+Once reviewed (pH 5, 14400 s, 145 points), the drafted entry 38522 simulates
+the same trajectory as the hand-written `bgl1a_ph_ionization` fixture.
 
 **What Reaction 618 gives.** Of the 29 entries of the frozen Reaction 618
 snapshot, five are converted (38521, 39245, 44879, 44888, 60725). Listed with a
@@ -886,13 +1390,15 @@ two studies expressed in the same host and measured at 30 degC and pH 5; 38522
 with 38534, the pH-dependent laws of BGL1A and BGL1B), four entries whose EC
 numbers the registry does not resolve (3.2.1.74, 3.2.1.25, 3.2.1.58) and one
 entry without a Km, kcat or Vmax value.
-`entry_ids=["35622"]` converts the selected entry of the registry case.
+`entry_ids=["35622"]` converts the selected entry of the registry case, and
+`entry_ids=["38522"]` the pH-dependent law of the registry's BGL1A case.
 
 Limits of the SABIO-RK route:
 
 - SABIO-RK only, and only what an export contains; no other kinetics database.
-- Homogeneous Michaelis-Menten constants only; inhibition, cooperativity,
-  pH-ionization and multi-substrate laws are listed, not imported.
+- Homogeneous Michaelis-Menten constants and the diprotic pH-dependent law
+  only; inhibition, cooperativity, other pH laws and multi-substrate laws are
+  listed, not imported.
 - No value is converted between units, and SABIO-RK's normalised values are not
   used.
 - A SABIO-RK concentration range is the range tested in the assay; it is
@@ -905,8 +1411,18 @@ Limits of the SABIO-RK route:
 
 ## Limitations of this increment
 
-- Homogeneous Michaelis-Menten kinetics only, in the kcat form or the Vmax
-  form, one form per enzyme class and substrate; dissolved substrates only.
+- Michaelis-Menten kinetics only, in the kcat form, the Vmax form or the
+  diprotic pH-ionization form, one form per enzyme class and substrate, and
+  the pH-ionization form on all substrates of an enzyme class or on none;
+  dissolved substrates only.
+- The pH-ionization form reads the pH once from the environment: no pH
+  dynamics, buffer identity, ionic strength or pH-dependent enzyme stability.
+  Its constants are not rescaled with temperature except through a bound
+  temperature law, which rescales the rate only. A grid pH outside `ph_min` to
+  `ph_max` warns rather than being refused. On this branch preflight does not
+  itself check that the environment pH is exact; a pH range cannot come from
+  `conditions.csv` or an `EnvironmentGrid`, and should one reach a case through
+  another environment, assembly refuses it.
 - No unit conversion between molar and mass concentrations or rates, and the
   product yield must be mol/mol. An assay activity is accepted only on the case
   substrate at saturation; activities are never converted between substrates.
@@ -919,11 +1435,21 @@ Limits of the SABIO-RK route:
   are rescaled by the law. When the dataset has several conditions for a case
   (gap records included) no condition-specific record is copied and the grid
   case reports the roles as missing.
-- No enzyme cocktails or multi-step chains, no time-course responses or
-  fitting, no growth, secretion or uptake.
+- No enzyme cocktails or multi-step chains, no growth, secretion or uptake.
+- Time courses measure the substrate state or the product formed of a
+  simulated case; other observables (intermediates, biomass, rates) are not
+  read. Comparison interpolates linearly on the simulated output grid and
+  never extrapolates.
+- A fit covers one case and shares its constants across conditions of one
+  temperature and pH; it fits `km`, `kcat` and `vmax` only (not
+  concentrations or response-law parameters), from one starting point (no
+  multi-start), assumes independent Gaussian errors with the reported `sd`
+  (or equal variances when unweighted) and never chains fits. Fitted values
+  stay exploratory; scientific mode refuses them.
 - A genome annotation adds enzyme classes, never rates; only dbCAN
-  `overview.txt` files are read, and only classes with a registry record are
-  added (see the limits of the genome route above).
+  `overview.txt` files and UniProtKB TSV exports are read, and only classes
+  with a registry record are added (see the limits of the genome and UniProt
+  routes above).
 - One substrate per substrate class for each enzyme class, because FungMod
   selects a process by enzyme class and substrate class.
 - A namespaced copy of a registry class keeps the parent's EC number, so
