@@ -1364,6 +1364,7 @@ def _expected_configured_output_files() -> tuple[str, ...]:
         "solver_report.json",
         "state_trajectories.csv",
         "process_rates.csv",
+        "state_rates.csv",
         "derived_quantities.csv",
         "figures/state_trajectories.png",
         "figures/process_rates.png",

@@ -52,7 +52,9 @@ def write_quicklook_plots(
             _plot_rows(
                 rows,
                 output_path=figure_root / "degradation_rate_vs_time.png",
-                include=lambda row: row.get("state") == "degradation_rate",
+                include=lambda row: (
+                    row.get("state") == "degradation_rate" and row.get("source") == "simulation_state_rate"
+                ),
                 ylabel="degradation rate",
             )
         )

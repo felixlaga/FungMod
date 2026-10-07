@@ -20,9 +20,13 @@ def test_public_distribution_metadata_and_install_contract() -> None:
     assert project["license"] == "MIT"
     assert project["urls"]["Documentation"] == "https://fungmod.readthedocs.io/"
     assert pyproject["tool"]["setuptools"]["include-package-data"] is False
+    # The console script is declared in pyproject only; setup.py adds the
+    # resource-staging build step and must not declare entry points of its own.
+    assert project["scripts"] == {"fungmod": "fungal_model.cli:main"}
     setup_py = (ROOT / "setup.py").read_text(encoding="utf-8")
     manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     assert "stage_packaged_resources" in setup_py
+    assert "entry_points" not in setup_py
     assert "graft data" in manifest
     assert "graft data_registry" in manifest
     assert not any(
@@ -109,3 +113,5 @@ def test_ci_builds_docs_notebooks_and_distribution() -> None:
     assert "scripts/check_built_distribution_resources.py dist/fungmod-*.whl" in commands
     assert "python -m twine check dist/*" in commands
     assert "fungmod-wheel-smoke" in commands
+    assert "/tmp/fungmod-wheel-smoke/bin/fungmod --version" in commands
+    assert "/tmp/fungmod-wheel-smoke/bin/fungmod list" in commands
