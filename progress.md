@@ -81,6 +81,87 @@ grid- and solver-converged and agrees with the two-dimensional model while
 the colony is inside the window, at artificial check values.
 
 
+## FIX-RATES-001 Degradation And Product-Release Rates From State Rates
+
+Status: `complete` for the stated scope (2026-10-06).
+
+Defect: `result_tables._time_series_rows` built `degradation_rate` and
+`product_release_rate` from `_rate_by_index`, which kept whichever process
+rate was listed last at each time index, and gave both rows that value and
+unit; `_maximum_process_rate` took the largest value of any process for both
+`maximum_product_release_rate` and `maximum_substrate_depletion_rate`. In
+multi-process cases the rates belonged to an arbitrary process with arbitrary
+units (the *T. harzianum* P49P11 culture case on Celufloc 200 reported a
+maximum substrate depletion rate of 45.07
+`beta_glucosidase_assay_unit / hour / liter` for cellulose in g/L); in
+single-process cases with a product yield other than one the product release
+rate was the process rate (SABIO-RK Reaction 618: half of d[glucose]/dt).
+
+Changed:
+
+- `ProcessODESolver.run` records `SimulationResult.state_rates`: at every
+  returned time point, `CompiledModel.rhs` (the right-hand side the solver
+  integrated, rates at `max(state, 0)`) gives the net rate of every state in
+  state units per time unit. No finite differences. The field defaults to
+  empty, so other producers (legacy engine results, the mycelium model) are
+  unaffected; `save()` always writes `state_rates.csv` (`kind=state_rate`,
+  header-only when empty) and `to_dict()` includes `state_rates`.
+- Result tables: `degradation_rate` = -d[substrate]/dt and
+  `product_release_rate` = +d[product]/dt from `state_rates.csv` for the
+  case's substrate and product state roles, each with its own units, source
+  `simulation_state_rate`; `maximum_substrate_depletion_rate` and
+  `maximum_product_release_rate` are their maxima over the returned time
+  points, with a note naming the state. Without a mapped role or without
+  `state_rates.csv` the rows are `not_applicable` (empty value, `units` and
+  `source` `not_applicable`, reason in a new optional `notes` column of
+  `time_series_long.csv`) and the metrics are `not_applicable` with the
+  reason; there is no process-rate fallback. `_rate_by_index` and
+  `_maximum_process_rate` are removed. `process_rate.<id>` rows are unchanged.
+- The report's degradation-rate section and the `degradation_rate_vs_time.png`
+  quicklook select `simulation_state_rate` rows.
+- Output schema `2.0.0` (was `1.8.0`): the rows keep their names but change
+  meaning, values, units and source; `time_series_long` gains the optional
+  `notes` column and documents its `source` values.
+- Docs: `docs/concepts/outputs.md` rate section, README output-schema and
+  `AssembledModel.run()` paragraphs, CHANGELOG (Unreleased, Fixed).
+
+Tests: `tests/test_state_rate_metrics.py` (new): Reaction 618 product release
+equals the template yield (2) times the degradation rate at every time point
+and the degradation rate equals the single process rate, in concentration per
+time; the *T. harzianum* culture case reports the maximum depletion rate in
+cellulose mass concentration per time, agreeing with an independent
+second-order finite-difference estimate on a 20-fold refined grid within
+1e-4 of the peak rate, and reports `product_release_rate` as not applicable
+(the template maps no product); a two-process mass-action/decay model with
+mixed time units has `state_rates` equal to S·r computed by hand, in
+`record.json` and `state_rates.csv`; a bundle without `state_rates.csv`
+reports the rows and metrics as not applicable with the reason. Updated:
+bundle file lists in `test_results.py`, `test_configured_model_workflow.py`,
+`test_full_integration_workflow.py` and
+`test_configured_output_bundle_reproducibility.py` include `state_rates.csv`;
+`test_results.py` checks the header-only table for a producer without state
+rates; `test_virtual_experiment_api.py` pins schema `2.0.0`;
+`test_bio002_generic_chain_assembly.py` checks that the chain's rate rows are
+state rates. No assertion pinned the old wrong values.
+
+Not changed: no process law, rate kernel, integration, tolerance, trajectory,
+process-rate value, registry record or template. Trajectories and
+`process_rates.csv` are bit-identical.
+
+Scientific impact: degradation and product-release rates and their maxima are
+now the simulated net change of the mapped substrate and product. Earlier
+reported maximum rates and product-release rates from multi-process cases or
+yields other than one were wrong. No committed data, benchmark or paper
+artifact contains these rows or metrics.
+
+Backward compatibility: consumers selecting these rows by
+`source == simulation_process_rate` must use `simulation_state_rate`;
+`1.8.0` and `2.0.0` bundles must not be pooled. Bundles without
+`state_rates.csv` give `not_applicable` rate rows when re-tabulated.
+
+Limitations: maxima are over the returned time points, not the continuous
+maximum between them; well-mixed `ProcessODESolver` runs only.
+
 ## CLI-001 Command-Line Virtual Experiments
 
 Status: `complete` for the stated scope (2026-10-06); the command-line form of
