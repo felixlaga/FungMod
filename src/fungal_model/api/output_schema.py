@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "1.9.0"
+OUTPUT_SCHEMA_VERSION = "2.1.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -158,7 +158,8 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("time_units", "Units for the time column."),
             _column(
                 "state",
-                "State or derived observable name; process rates use process_rate.<id> and persisted derived quantities use derived_quantity.<name>.",
+                "State or derived observable name; process rates use process_rate.<id> and persisted derived quantities use derived_quantity.<name>. "
+                "degradation_rate is -d[substrate]/dt and product_release_rate is +d[product]/dt of the mapped substrate and product states.",
             ),
             _column(
                 "state_role",
@@ -168,7 +169,17 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("units", "Units for value."),
             _column(
                 "source",
-                "Whether the row is a simulated state, explicit process rate, persisted simulation-derived quantity, or presentation-derived observable.",
+                "Whether the row is a simulated state, explicit process rate, recorded net state rate, persisted simulation-derived quantity, presentation-derived observable, or not applicable.",
+                allowed_values=(
+                    "simulation_state; derived_from_states; derived_from_solid_substrate_state; "
+                    "derived_proxy_from_solid_substrate_state; simulation_state_rate; simulation_process_rate; "
+                    "simulation_derived_quantity; not_applicable"
+                ),
+            ),
+            _column(
+                "notes",
+                "Why a derived rate row is not applicable; blank otherwise.",
+                required=False,
             ),
         ),
         primary_key=("case_id", "sample_id", "time_index", "state"),
@@ -493,7 +504,7 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         ),
         primary_key=("case_id", "time_index", "state", "state_role", "source", "units"),
     ),
-    # Written on request by DegradationScreenResult.compare_with_timecourses (schema 1.9.0), not by every run.
+    # Written on request by DegradationScreenResult.compare_with_timecourses (schema 2.1.0), not by every run.
     "timecourse_comparison": _table(
         "Simulated median and 5-95 percent band interpolated to the user's own time-course observations, "
         "with residuals; in-sample agreement with the user's data, not validation.",

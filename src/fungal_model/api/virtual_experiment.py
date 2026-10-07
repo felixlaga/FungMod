@@ -309,6 +309,11 @@ class DegradationScreenResult:
         )
         return self.tables
 
+    def case_summary(self) -> list[dict[str, str]]:
+        """Load the one-row-per-case summary table without rerunning simulation."""
+
+        return self._table_rows("case_summary", "case_summary.csv")
+
     def time_series(self) -> list[dict[str, str]]:
         """Load the standard long-form time-series table without rerunning simulation."""
 
@@ -323,6 +328,11 @@ class DegradationScreenResult:
         """Load the standard threshold-times table without rerunning simulation."""
 
         return self._table_rows("threshold_times", "threshold_times.csv")
+
+    def summary_metrics(self) -> list[dict[str, str]]:
+        """Load the per-case ensemble summary of computed metrics and threshold times."""
+
+        return self._table_rows("summary_metrics", "summary_metrics.csv")
 
     def sampled_parameters(self) -> list[dict[str, str]]:
         """Load the standard sampled-parameters table without rerunning simulation."""

@@ -574,7 +574,7 @@ estimates read `user_supplied_exploratory_prior`, and the mechanism maturity
 of an all-user, non-estimate case is
 `software_tested_user_supplied_parameterized`; a case with a `fitted` value
 reads `user_fitted_exact_value` and
-`software_tested_user_fitted_in_sample_unvalidated`. Output schema `1.9.0`
+`software_tested_user_fitted_in_sample_unvalidated`. Output schema `2.1.0`
 adds the `timecourse_comparison` table, written only on request (see
 [comparing](#comparing-a-virtual-experiment-with-the-time-courses)); the other
 tables are unchanged.

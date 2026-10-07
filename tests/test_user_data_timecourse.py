@@ -205,7 +205,7 @@ def test_comparison_with_the_integrated_solution_has_near_zero_rmse(
     assert list(rows[0])[: len(OUTPUT_TABLE_SCHEMAS["timecourse_comparison"]["columns"])] == [
         column["name"] for column in OUTPUT_TABLE_SCHEMAS["timecourse_comparison"]["columns"]
     ]
-    assert {row["output_schema_version"] for row in rows} == {OUTPUT_SCHEMA_VERSION} == {"1.9.0"}
+    assert {row["output_schema_version"] for row in rows} == {OUTPUT_SCHEMA_VERSION} == {"2.1.0"}
     assert {row["allowed_use"] for row in rows} == {"in_sample_agreement_with_user_timecourses_not_validation"}
     assert {row["interpretation_guardrail"] for row in rows} == {TIMECOURSE_COMPARISON_NOTE}
     assert "not validation" in TIMECOURSE_COMPARISON_NOTE

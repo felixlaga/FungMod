@@ -42,6 +42,9 @@ dependencies = [
     "cryptography>=42.0",
 ]
 
+[project.scripts]
+fungmod = "fungal_model.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "build>=1.5",
