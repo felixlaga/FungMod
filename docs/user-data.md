@@ -46,7 +46,7 @@ proteome resolution, cultures, time courses and fitted values, or every issue as
 `assemble_user_tables`, `user_tables_from_sabiork`, `compare_with_timecourses`
 and `fit_user_dataset` (see [the user-data workflow from a shell](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
 
-Nine complete examples live in the test fixtures:
+Eleven complete examples live in the test fixtures:
 `tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on a
 user-defined aryl ester, `kcat` form, estimates only),
 `tests/fixtures/user_data/literature_reentry/` (the published SABIO-RK Reaction
@@ -75,6 +75,13 @@ and a reactivity exponent. `tests/fixtures/user_data/culture_reentry/` and
 retrospective fit as estimates, the deposited initial conditions as
 literature), and a user-defined strain growing on a user-defined xylan-like
 solid with one protein-mass enzyme pool (estimates only).
+`tests/fixtures/user_data/network_chain/` and
+`tests/fixtures/user_data/network_parallel/` are
+[enzyme networks](#several-enzymes-acting-together): two user-defined classes
+degrading a soluble polymer-like substrate through an oligomer-like pool to a
+monomer-like product, and two user-defined classes in parallel on one ester-like
+substrate (kcat and Vmax forms) with competitive product inhibition of one of
+them (estimates only).
 
 To start from public kinetics instead of typing them in, draft the tables from
 SABIO-RK entries and review them; see
@@ -320,8 +327,11 @@ simulation:                          # required; there is no default time grid
 ```
 
 `notes` is also accepted, and `fit` in a dataset written by `fit_user_dataset`
-(see [below](#fitting-kinetic-constants-to-time-courses)). Every generated
-identifier is prefixed with `<dataset_id>__`.
+(see [below](#fitting-kinetic-constants-to-time-courses)). An optional
+`enzyme_network` block with `entry_substrates` makes every case of the dataset
+an enzyme network of all the strain's classes acting together (see
+[several enzymes acting together](#several-enzymes-acting-together)). Every
+generated identifier is prefixed with `<dataset_id>__`.
 
 ### `strains.csv`
 
@@ -415,7 +425,7 @@ notes; pH must lie between 0 and 14.
 Columns: `strain_id`\*, `enzyme_class`\*, `substrate_id`\*, `condition_id`\*,
 `quantity`\*, `value`, `lower`, `upper`, `units`\*, `evidence_type`\*,
 `method`, `source`\*, `sd`, `replicates`, `activity_substrate`,
-`activity_saturating`.
+`activity_saturating`, `inhibitor`.
 
 ```text
 strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,sd,replicates
@@ -442,6 +452,7 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,enzyme_concentration
 | `ph_min`, `ph_max` | `dimensionless` | The pH range the pH-ionization law was fitted over; exact values between 0 and 14. |
 | `enzyme_dose` | enzyme per dry substrate mass, e.g. mg/g or FPU/g | Enzyme per substrate mass; times `substrate_initial_concentration` it gives the enzyme concentration. [Solid substrates](#solid-substrates) only. |
 | `reactivity_exponent` | `dimensionless`, zero or positive | Exponent `n` of the conversion-dependent factor `(S / S0)^n`. [Solid substrates](#solid-substrates) only. |
+| `ki` | concentration, amount per volume | Competitive inhibition constant of the row's process by the pool named in `inhibitor` (positive). [Enzyme networks](#competitive-product-inhibition-ki) on dissolved substrates only. |
 
 `U` is the enzyme unit of the unit registry, one micromole per minute.
 `enzyme_activity` is refused as ambiguous: say `specific_activity` or
@@ -1214,7 +1225,9 @@ validation.
   Langmuir surface law; the surface law is a later increment.
 - No synergy between enzyme classes acting on one solid, no product
   inhibition, no oxidative (LPMO) kinetics; one enzyme class and one process
-  per case.
+  per case, except in an [enzyme network](#several-enzymes-acting-together),
+  where several classes on one solid act additively and independently (still
+  without synergy, adsorption competition or product inhibition).
 - The constants are apparent and preparation- and loading-specific; FungMod
   does not extrapolate them to other loadings and does not warn when you do.
 - No conversion between dry mass, monomer equivalents and moles; the product
@@ -1472,6 +1485,256 @@ Not modelled, and the template and outputs say so:
   conditions at which they were obtained; nothing extrapolates them.
 - No time courses, comparison or fitting of cultures; no assembly route.
 
+## Several enzymes acting together
+
+The rate forms above run **one** enzyme class of a strain on one substrate: the
+class the preflight selects. A fungus secretes several enzymes at once, and an
+optional `enzyme_network` block in `user_dataset.yml` makes every case of the
+dataset an enzyme network instead: every declared class of the strain that acts
+on a pool of the network runs its own Michaelis-Menten process, classes on one
+pool act in parallel, and a pool released by one class is the substrate of the
+next. The process law, the modifiers and the solver are the existing ones;
+FungMod adds no numerics. The compiled core sums the stoichiometric columns of
+every process, so processes on one pool add their rates:
+
+```text
+pool i:  dS_i/dt = - sum over classes j acting on i of  r_ij  +  y_(i-1) x sum over classes k acting on pool i-1 of  r_(i-1)k
+each r:  Vmax S / (Km + S)  or  kcat E S / (Km + S)          (the pair's own rate form and rows)
+with ki: r x (Km + S) / (Km (1 + I / Ki) + S)                 (competitive inhibition by a downstream pool I)
+```
+
+```yaml
+enzyme_network:
+  entry_substrates: [polymer_p1]   # the substrates each network starts from
+```
+
+Without the block nothing changes: the records of every dataset without it are
+byte-identical to those of the previous version.
+
+### Pools and links
+
+- A network starts from an **entry substrate** listed in `entry_substrates`.
+- The pool a substrate releases is its `substrates.csv` `product`, with its
+  stated `product_yield`. A **link** to another pool is made only when that
+  product equals another row's `substrate_id`; names, aliases and registry ids
+  are never matched. The chain of links ends at the first product that is no
+  substrate of the dataset, the network's **final product**. Each substrate has
+  one product, so the pools of a network form a chain (for example
+  polymer -> oligomer -> monomer) and any number of classes may act in parallel
+  on each pool.
+- The entry starts at its `substrate_initial_concentration`; every
+  intermediate pool and the final product start at zero. Every pool is reported
+  in the units of the entry's initial concentration, and pint converts each Km,
+  Vmax and Ki.
+- The members of a network are the declared classes (from `enzymes.csv` or a
+  genome annotation) that act on one of its pools by the categorical rule.
+  Each runs one process on its pool in its pair's rate form: the kcat form
+  (with its own enzyme state) or the Vmax form, with every route to Vmax and
+  to the enzyme concentration described above.
+- An intermediate pool may also be an entry; it then starts a network of its
+  own, from its own initial concentration.
+
+### Competitive product inhibition: `ki`
+
+A `kinetics.csv` row with quantity `ki` and the new column `inhibitor` binds the
+existing provenance-bound `competitive_inhibition` modifier to the process of
+its class and pool:
+
+```text
+rate = Vmax S / (Km (1 + I / Ki) + S)
+```
+
+`Km` is the process's own Michaelis constant, `I` the state of the pool named in
+`inhibitor`, and `Ki` the row's value. The inhibitor is a pool the network
+releases **downstream** of the row's substrate: an intermediate's
+`substrate_id`, or the final product as written in `substrates.csv`. `Ki` is an
+amount per volume (for example mM or uM), the unit basis of the product pool,
+checked with pint, and positive. The law's provenance is the primary source
+FungMod records for this modifier
+(BIO-003, <https://pubmed.ncbi.nlm.nih.gov/7985803/>, maturity
+`literature_backed_software_tested`); it supports the equation, not your Ki,
+which keeps its own row's source and evidence type. When one strain or
+condition gives `ki` for a process, every other strain and condition of that
+process gets a Ki gap with a measurement request. A process without a `ki` row
+has **no** inhibition term, and its template says so in its limitations; no
+inhibition constant is assumed.
+
+### Worked example: a chain and a parallel pair
+
+`tests/fixtures/user_data/network_chain/` is a user-defined strain with two
+user-defined classes: one cuts a soluble polymer-like substrate into four
+oligomer-like units, the other cuts each oligomer-like unit into two
+monomer-like units (every value an illustrative estimate):
+
+```text
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
+polymer_p1,,Soluble polymer-like substrate P1,soluble_polymer_like,dissolved,inner_glycosidic_like,oligomer_o1,4,mol/mol,<source>
+oligomer_o1,,Oligomer-like pool O1,oligomer_like,dissolved,inner_glycosidic_like,monomer_m1,2,mol/mol,<source>
+```
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,km,2,,,mM,estimate,illustrative estimate,<source>
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,kcat,30,,,1/min,estimate,illustrative estimate,<source>
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,substrate_initial_concentration,5,,,mM,estimate,illustrative estimate,<source>
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,enzyme_concentration,0.002,,,mM,estimate,illustrative estimate,<source>
+strain_n1,oligomer_hydrolase_like,oligomer_o1,c30_ph5,km,1,,,mM,estimate,illustrative estimate,<source>
+strain_n1,oligomer_hydrolase_like,oligomer_o1,c30_ph5,kcat,60,,,1/min,estimate,illustrative estimate,<source>
+strain_n1,oligomer_hydrolase_like,oligomer_o1,c30_ph5,enzyme_concentration,0.001,,,mM,estimate,illustrative estimate,<source>
+```
+
+```text
+$ fungmod check-data tests/fixtures/user_data/network_chain
+...
+Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, enzyme_network): 1
+  from polymer_p1: polymer_p1 -> oligomer_o1 (4 mol/mol), oligomer_o1 -> monomer_m1 (2 mol/mol); strains strain_n1
+  enzyme class             pool         rate form  competitive inhibitor
+  depolymerase_like        polymer_p1   kcat       none
+  oligomer_hydrolase_like  oligomer_o1  kcat       none
+
+$ fungmod run --user-data tests/fixtures/user_data/network_chain --fungus strain_n1 \
+    --substrate polymer_p1 --environment c30_ph5 --mode exploratory --samples 8 --seed 1 --output network_run
+...
+    final_substrate_remaining          3.395e-05 [3.395e-05, 3.395e-05] millimolar (n=8)
+    final_product_formed               39.98 [39.98, 39.98] millimolar (n=8)
+    maximum_product_release_rate       0.1095 [0.1095, 0.1095] millimolar / minute (n=8)
+    maximum_substrate_depletion_rate   0.04286 [0.04286, 0.04286] millimolar / minute (n=8)
+  Threshold times (median [5th, 95th percentile] over samples):
+    time_to_10_percent_substrate_degradation  11.85 [11.85, 11.85] minute (n=8)
+    time_to_50_percent_substrate_degradation  64.77 [64.77, 64.77] minute (n=8)
+    time_to_90_percent_substrate_degradation  151.8 [151.8, 151.8] minute (n=8)
+```
+
+The threshold times and the substrate depletion rate refer to the entry pool,
+`product_formed` and the product release rate to the final product. The time
+series hold every pool and enzyme (`state_role` `substrate`, `intermediate_1`,
+`product`, `enzyme_<class>`) and one `process_rate.<dataset>__<class>__<pool>__homogeneous_mm`
+per process, and `mechanism_summary.csv` has the network row followed by one
+process-law row per process naming its class (`configured_by`). Here the
+oligomer-like pool accumulates while the first class outpaces the second
+(10.45 mM at 145 minutes) and is then cleared; the closure `8 P + 2 O + M`
+stays at 40 mM in every run (`conservation_diagnostics.csv`, weights from the
+yields). In Python:
+
+```python
+dataset = fm.load_user_dataset("tests/fixtures/user_data/network_chain")
+print(dataset.enzyme_networks[0]["pools"], dataset.enzyme_networks[0]["product"])
+study = fm.virtual_experiment(
+    fungi="strain_n1", substrates="polymer_p1", environments="c30_ph5", user_data=dataset
+)
+result = study.simulate(mode="exploratory", n_samples=8, seed=1)
+```
+
+`tests/fixtures/user_data/network_parallel/` is the materially different case:
+two classes in parallel on one dissolved ester-like substrate, one in the kcat
+form and one in the Vmax form, and a `ki` of the first class for the released
+acid-like product:
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,inhibitor
+strain_q2,cleaver_a_like,ester_s2,c25_ph7,ki,200,,,µM,estimate,illustrative estimate,<source>,acid_a2
+```
+
+Its tests check that the depletion rate is the sum of the two process rates at
+every output time, that the first class's rate equals
+`Vmax S / (Km (1 + P / Ki) + S)` on the simulated states, that a smaller Ki
+leaves more substrate, and that with an initial substrate far below both Km
+the substrate decays as `S0 exp(-(Vmax_A / Km_A + Vmax_B / Km_B) t)`
+(`tests/test_user_data_network.py`). A network of one class equals the
+single-class case of the same rows.
+
+### What a network generates
+
+| Record | Identifier |
+| --- | --- |
+| Case template per entry (`process_type` `enzyme_network`) | `<dataset_id>__<entry>__enzyme_network_template` |
+| Compatibility per class acting on the entry, all pointing to that template | `<dataset_id>__<class>__<entry>__enzyme_network` |
+| Parameter record per strain, condition and role | `<dataset_id>__network__<entry>__<strain>__<condition>__<role>` (`__gap` for a gap) |
+| Parameter symbol per role | `<dataset_id>__network__<entry>__<role>` |
+
+The roles are `substrate_initial_concentration` (the entry's), and per process
+`km__<class>__<pool>`, `kcat__<class>__<pool>` with
+`enzyme_initial_concentration__<class>` or `vmax__<class>__<pool>`, plus
+`ki__<class>__<pool>` and `reactivity_exponent__<class>__<pool>` when bound.
+Each record keeps the value, evidence, maturity and provenance of its row (or
+derivation, or gap) and adds the network, role, class and pool under
+`fungmod_user_dataset.enzyme_network`; its enzyme-class selector is empty
+because one network serves the compatibility of every class acting on its
+entry. The generated classes list `enzyme_network` as their only process, so a
+network dataset has no single-class cases: the preflight never chooses between
+a network and one of its classes. `UserDataset.enzyme_networks` (also in
+`to_dict()` and `summary()`) lists each network's pools, links and yields,
+processes (class, pool, rate form, process id, inhibitor), classes, strains and
+generated ids. The template is scientific only when every record bound to it is
+exact and scientific-eligible, as for every user template.
+
+### Gaps of a network
+
+Every role of every process at every condition for every strain of the network
+is a record or an explicit gap with the single-class route's measurement
+request, naming the class and the pool it acts on, for example "Measure kcat
+and the enzyme concentration of Oligomer hydrolase-like class N1 from
+Illustrative network strain N1 on Oligomer-like pool O1 at 30 degC, pH 5.0, or
+Vmax (or a specific activity and enzyme loading)." A network with a gap is
+underparameterized and not simulated: a class the strain has is never silently
+left out. With `--runnable-only` (`blocked="report"`) the complete cases run
+and the others are listed with their requests.
+
+### Refused in a network
+
+Each refusal names its file, row and column:
+
+- A product that equals the `registry_substrate` of a row with another
+  `substrate_id` (ambiguous: write the `substrate_id` to link, or another name
+  to end the network), and a cycle of products.
+- A link between pools on different bases, dissolved (amount per volume,
+  `mol/mol`) and solid (dry mass per volume, `g/g`): the Michaelis-Menten law
+  writes its product in the units of its substrate, and a conversion would need
+  a molar mass as a dimensional yield, which FungMod does not apply.
+- A class that acts on two pools of one network: one enzyme on two substrates
+  competes for its active site, which independent processes do not represent.
+- Strains of one dataset that declare different classes of a network (one
+  network serves every strain; put other enzyme sets in separate datasets).
+- On an intermediate pool: an initial concentration (unless the pool is an
+  entry), an `enzyme_dose` and a `reactivity_exponent`. Different initial
+  concentrations of one entry on the rows of its classes (they are one pool).
+- The pH-ionization form in a network; `culture.csv`, `timecourse.csv` and
+  `responses.csv` in a network dataset.
+- `ki` outside a network dataset (a network of one class is the single-class
+  case with inhibition), on a solid substrate (the apparent Km is not a binding
+  constant), naming a pool that is not downstream (the substrate itself or an
+  upstream pool), in mass units, two inhibitors of one process, and the
+  `inhibitor` column on any other row.
+- Unknown or repeated entries, an entry no declared class acts on, and a
+  substrate that is part of no network.
+- `assemble_user_tables` (and `fungmod assemble`) with a network dataset as
+  `user_data`: drafts are single-class tables and would drop the network.
+
+### What a network does and does not model
+
+Modelled: several enzyme classes of one strain acting on a chain of
+well-mixed pools, each by its own Michaelis-Menten law at its stated
+concentration, classes on one pool in parallel with additive rates, each pool
+released into the next with the stated yield, and optional competitive
+inhibition of a process by one downstream pool.
+
+Not modelled, and the template and outputs say so:
+
+- **Additive, independent action.** Classes on one pool do not compete for
+  substrate binding or adsorption sites, do not cooperate (no endo/exo
+  synergy) and do not interact; their rates simply add. Measured mixtures that
+  degrade faster or slower than the sum of their parts are outside this model.
+- One competitive inhibitor per process, and only competitive: no
+  non-competitive, uncompetitive or mixed inhibition, no inhibition by several
+  products of one process, no substrate inhibition, no competing substrates of
+  one enzyme, no transglycosylation.
+- Chains only (each substrate has one product), on one amount basis; no
+  branching products, no dry-mass-to-molar conversion.
+- No response laws, time courses, comparison, fitting, cultures or assembly
+  drafting of networks yet; the values hold at the condition of their rows.
+- An enzyme-kinetics model at stated enzyme concentrations, not a fungus
+  growing and secreting; the strain's class list decides which classes act.
+
 ## Evidence types, maturity and modes
 
 | `evidence_type` | Record maturity | Exact value | Range |
@@ -1532,6 +1795,7 @@ out of data you intend to simulate.
 | Response-law parameter record per `responses.csv` row | `<dataset_id>__<strain>__<class>__<substrate>__<law>__<parameter>` |
 | Explicit unknown per missing role or law parameter | the same identifier with `__gap` |
 | Culture compatibility and case template per consuming class and culture substrate ([fungal culture](#fungal-culture-growth-and-secretion)) | `<dataset_id>__<class>__<substrate_id>__culture_physiology`, `<dataset_id>__<class>__<substrate_id>__culture_template` |
+| Enzyme-network template per entry substrate, compatibility per class acting on it, and records per strain, condition and role ([several enzymes acting together](#what-a-network-generates)) | `<dataset_id>__<entry>__enzyme_network_template`, `<dataset_id>__<class>__<entry>__enzyme_network`, `<dataset_id>__network__<entry>__<strain>__<condition>__<role>` |
 | Culture parameter record per strain, condition and role (`<pool>` for a pool quantity only) | `<dataset_id>__<strain>__<substrate>__<condition>__culture__<quantity>[__<pool>]`, symbol `<dataset_id>__culture__<quantity>[__<pool>]__<class>__<substrate_id>` |
 
 The compatibility record binds the roles of the pair's rate form (`km`,
@@ -2067,7 +2331,13 @@ Limits of the SABIO-RK route:
   are rescaled by the law. When the dataset has several conditions for a case
   (gap records included) no condition-specific record is copied and the grid
   case reports the roles as missing.
-- No enzyme cocktails or multi-step chains. Growth and secretion only through
+- Several enzyme classes act together only in an enzyme network
+  ([several enzymes acting together](#several-enzymes-acting-together)):
+  independent Michaelis-Menten processes whose rates add on shared pools, a
+  chain of pools linked by explicit products on one amount basis, and
+  optionally one competitive inhibitor per process; no synergy, competition for
+  sites, competing substrates of one enzyme, other inhibition forms, response
+  laws, time courses or cultures in a network. Growth and secretion only through
   `culture.csv`, which binds the registry's culture model (one consuming pool,
   an explicit yield, induced synthesis; see
   [what is and is not modelled](#what-is-and-is-not-modelled)); no uptake of

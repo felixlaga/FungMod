@@ -1,0 +1,2 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
+ester_s2,,Ester-like substrate S2,ester_like_substrate,dissolved,ester_like_bond,acid_a2,1,mol/mol,Illustrative test note NW-2 p. 2 (one acid-like product per ester-like molecule; an assumed stoichiometry)

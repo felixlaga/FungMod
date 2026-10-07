@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c30_ph5,30,degC,5.0,Illustrative assay condition for the enzyme-network fixture

@@ -2020,6 +2020,33 @@ def _culture_physiology_config_data(
     )
 
 
+def _enzyme_network_config_data(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    case_template: CaseTemplateRecord,
+    substrate: SubstrateRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    parameter_records: Mapping[str, ParameterRecord],
+    output_directory: str | None,
+) -> dict[str, Any]:
+    from fungal_model.screening.enzyme_network import build_enzyme_network_config_data
+
+    return build_enzyme_network_config_data(
+        registry=registry,
+        compatibility=compatibility,
+        case_template=case_template,
+        substrate=substrate,
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        environment_id=environment_id,
+        parameter_records=parameter_records,
+        output_directory=output_directory,
+    )
+
+
 def _homogeneous_mm_provenance(
     *,
     registry: FungModRegistry,
@@ -2264,6 +2291,26 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
             "exploratory screens sample the same template through the ensemble path."
         ),
         config_data_builder=_culture_physiology_config_data,
+    ),
+    "enzyme_network": RegistryProcessAssembler(
+        process_type="enzyme_network",
+        process_label="Enzyme network",
+        required_parameter_roles=(),
+        required_state_roles=("substrate", "product"),
+        deterministic_mode="scientific",
+        additional_supported_modes=("toy",),
+        required_process_state_metadata=(
+            "config_name",
+            "config_mode",
+            "config_maturity",
+            "parameter_set_id",
+        ),
+        enforce_template_mode_match=True,
+        unsupported_mode_message=(
+            "Enzyme-network registry assembly supports mode='scientific' or mode='toy'; "
+            "exploratory screens sample the same template through the ensemble path."
+        ),
+        config_data_builder=_enzyme_network_config_data,
     ),
     "extracellular_enzyme_chain": RegistryProcessAssembler(
         process_type="extracellular_enzyme_chain",

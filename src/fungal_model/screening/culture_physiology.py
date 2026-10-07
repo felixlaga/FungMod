@@ -18,6 +18,19 @@ records state their pools in different units. ``geometry`` is required and is
 either a well-mixed geometry mapping or an explicit ``null`` for a
 concentration-only model that claims no vessel (as the enzyme-kinetics
 assemblers do).
+
+The composition itself (``build_composed_process_config_data``) is shared with
+other template-declared compositions of generic process laws, such as the
+``enzyme_network`` of several enzyme classes acting together
+(``fungal_model.screening.enzyme_network``): the outer process type, its
+non-negativity validator id and the fallback config name are its only
+parameters. A process template may bind the existing ``product_inhibition``,
+``competitive_inhibition`` and ``substrate_reactivity`` modifiers and the
+environment-response modifiers; state roles of a modifier are named by keys
+ending in ``_state_role`` and parameter roles by other keys ending in ``_role``.
+A process template may name the ``enzyme_class`` it stands for; that name is
+output metadata only (``process_enzyme_classes`` of the assembled case-template
+config, written only when a template names one) and no process law reads it.
 """
 
 from __future__ import annotations
@@ -27,6 +40,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from typing import Any
 
+from fungal_model.modifiers.reactivity import SUBSTRATE_REACTIVITY_MODIFIER_TYPE
 from fungal_model.processes import ProcessLibrary
 from fungal_model.registry.records import (
     CaseTemplateRecord,
@@ -55,6 +69,8 @@ from fungal_model.screening.template_environment_modifiers import (
 )
 
 CULTURE_PHYSIOLOGY_PROCESS_TYPE = "culture_physiology"
+# The modifier type of the existing provenance-bound competitive-inhibition law (``modifiers.enzyme_inhibition``).
+COMPETITIVE_INHIBITION_MODIFIER_TYPE = "competitive_inhibition"
 CULTURE_PHYSIOLOGY_REQUIRED_STATE_ROLES = ("substrate", "biomass")
 CULTURE_PHYSIOLOGY_REQUIRED_PROCESS_STATE_METADATA = (
     "config_name",
@@ -62,7 +78,7 @@ CULTURE_PHYSIOLOGY_REQUIRED_PROCESS_STATE_METADATA = (
     "config_maturity",
     "parameter_set_id",
 )
-_STATE_SPECIES_ENTITY_TYPES = frozenset({"organism", "substrate", "enzyme", "ledger"})
+_STATE_SPECIES_ENTITY_TYPES = frozenset({"organism", "substrate", "product", "enzyme", "ledger"})
 _COEFFICIENT_REFERENCE_FIELDS = frozenset({"parameter_role", "complement_of_parameter_role"})
 _PROCESS_TEMPLATE_FIELDS = frozenset(
     {
@@ -76,6 +92,7 @@ _PROCESS_TEMPLATE_FIELDS = frozenset(
         "modifiers",
         "assumptions",
         "rate_units_from_state_role",
+        "enzyme_class",
     }
 )
 
@@ -94,12 +111,52 @@ def build_culture_physiology_config_data(
 ) -> dict[str, Any]:
     """Build raw model-config data for one culture-physiology registry case."""
 
+    return build_composed_process_config_data(
+        process_type=CULTURE_PHYSIOLOGY_PROCESS_TYPE,
+        non_negative_validator_id="non_negative_culture_states",
+        fallback_label="culture physiology case",
+        registry=registry,
+        compatibility=compatibility,
+        case_template=case_template,
+        substrate=substrate,
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        environment_id=environment_id,
+        parameter_records=parameter_records,
+        output_directory=output_directory,
+    )
+
+
+def build_composed_process_config_data(
+    *,
+    process_type: str,
+    non_negative_validator_id: str,
+    fallback_label: str,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    case_template: CaseTemplateRecord,
+    substrate: SubstrateRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    parameter_records: Mapping[str, ParameterRecord],
+    output_directory: str | None,
+) -> dict[str, Any]:
+    """Build raw model-config data for a template-declared composition of generic process laws.
+
+    ``process_type`` is the outer process type the template must declare (for
+    example ``culture_physiology``); every inner process, product map, state
+    species, closure weight and modifier comes from the template and its
+    resolved parameter records. ``non_negative_validator_id`` names the
+    non-negativity validator of every template state, and ``fallback_label``
+    starts the config name when the template gives none.
+    """
+
+    del substrate  # The template's own entities describe every substrate the composition uses.
     metadata = case_template.process_state_metadata
     template_id = case_template.case_template_id
-    if case_template.process_type != CULTURE_PHYSIOLOGY_PROCESS_TYPE:
-        raise RegistryCaseBuildError(
-            f"Case template {template_id!r} must use process_type={CULTURE_PHYSIOLOGY_PROCESS_TYPE!r}."
-        )
+    if case_template.process_type != process_type:
+        raise RegistryCaseBuildError(f"Case template {template_id!r} must use process_type={process_type!r}.")
     mode = str(metadata.get("config_mode", ""))
     if mode not in {"toy", "exploratory", "scientific"}:
         raise RegistryCaseBuildError(
@@ -166,13 +223,19 @@ def build_culture_physiology_config_data(
             "process_ids": [process["id"] for process in processes],
         }
     )
+    enzyme_classes = {
+        str(spec["id"]): str(spec["enzyme_class"]) for spec in process_specs if spec.get("enzyme_class") is not None
+    }
+    if enzyme_classes:
+        # Output metadata only: which enzyme class each process stands for (the process laws never read it).
+        case_template_config["process_enzyme_classes"] = enzyme_classes
     return {
         "kind": "model_config",
         "name": _template_config_name(
             case_template=case_template,
             fungus_id=fungus_id,
             substrate_id=substrate_id,
-            fallback=f"culture physiology case {fungus_id} on {substrate_id}",
+            fallback=f"{fallback_label} {fungus_id} on {substrate_id}",
         ),
         "mode": mode,
         "maturity": str(metadata["config_maturity"]),
@@ -196,7 +259,7 @@ def build_culture_physiology_config_data(
         "time": _template_time_config(case_template),
         "validators": [
             {
-                "id": "non_negative_culture_states",
+                "id": non_negative_validator_id,
                 "validator_type": "non_negative",
                 "species": list(dict.fromkeys(state_roles.values())),
             },
@@ -383,6 +446,10 @@ def _process_template_specs(
                 f"{', '.join(unknown)}."
             )
         process_id = _required_text(raw, "id", label=f"Case template {template.case_template_id!r} process template")
+        if "enzyme_class" in raw and not _canonical_template_text(raw["enzyme_class"]):
+            raise RegistryCaseBuildError(
+                f"Process template {process_id!r} enzyme_class must be canonical nonblank text when given."
+            )
         if process_id in seen:
             raise RegistryCaseBuildError(
                 f"Case template {template.case_template_id!r} repeats process template id {process_id!r}."
@@ -525,10 +592,18 @@ def _require_every_role_used(
 
 
 def _modifier_roles(value: Any) -> set[str]:
+    """Parameter roles a modifier names: values of keys ending in ``_role``, except state roles (``_state_role``)."""
+
     roles: set[str] = set()
     if isinstance(value, Mapping):
         for key, nested in value.items():
-            if isinstance(key, str) and key.endswith("_role") and isinstance(nested, str) and nested:
+            if (
+                isinstance(key, str)
+                and key.endswith("_role")
+                and not key.endswith("_state_role")
+                and isinstance(nested, str)
+                and nested
+            ):
                 roles.add(nested)
             roles.update(_modifier_roles(nested))
     elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
@@ -673,8 +748,84 @@ def _process_modifiers(
                 }
             )
             continue
+        if modifier_type == COMPETITIVE_INHIBITION_MODIFIER_TYPE:
+            modifiers.append(
+                _competitive_inhibition_modifier(
+                    modifier, case_template=case_template, parameter_records=parameter_records, label=label
+                )
+            )
+            continue
+        if modifier_type == SUBSTRATE_REACTIVITY_MODIFIER_TYPE:
+            fields = _modifier_fields(
+                modifier,
+                ("substrate_state_role", "reference_concentration_role", "exponent_role"),
+                label=label,
+            )
+            modifiers.append(
+                {
+                    "type": SUBSTRATE_REACTIVITY_MODIFIER_TYPE,
+                    "substrate_state": _template_state(case_template, fields["substrate_state_role"]),
+                    "reference_concentration": _template_parameter_record(
+                        parameter_records, fields["reference_concentration_role"]
+                    ).parameter_symbol,
+                    "exponent": _template_parameter_record(parameter_records, fields["exponent_role"]).parameter_symbol,
+                }
+            )
+            continue
         raise RegistryCaseBuildError(f"{label} declares unsupported modifier type {modifier_type!r}.")
     return modifiers
+
+
+def _competitive_inhibition_modifier(
+    modifier: Mapping[str, Any],
+    *,
+    case_template: CaseTemplateRecord,
+    parameter_records: Mapping[str, ParameterRecord],
+    label: str,
+) -> dict[str, Any]:
+    """Bind the existing provenance-bound competitive-inhibition modifier from template roles.
+
+    The template names the substrate and inhibitor state roles, the roles of the
+    process's own Michaelis constant and of the inhibition constant, and the
+    law's primary source and maturity; the modifier itself checks that the
+    substrate and Michaelis constant are those of its base process.
+    """
+
+    fields = _modifier_fields(
+        modifier,
+        (
+            "substrate_state_role",
+            "inhibitor_state_role",
+            "michaelis_constant_role",
+            "inhibition_constant_role",
+            "primary_source",
+            "maturity",
+        ),
+        label=label,
+    )
+    return {
+        "type": COMPETITIVE_INHIBITION_MODIFIER_TYPE,
+        "substrate_state": _template_state(case_template, fields["substrate_state_role"]),
+        "inhibitor_state": _template_state(case_template, fields["inhibitor_state_role"]),
+        "michaelis_constant": _template_parameter_record(
+            parameter_records, fields["michaelis_constant_role"]
+        ).parameter_symbol,
+        "inhibition_constant": _template_parameter_record(
+            parameter_records, fields["inhibition_constant_role"]
+        ).parameter_symbol,
+        "primary_source": fields["primary_source"],
+        "maturity": fields["maturity"],
+    }
+
+
+def _modifier_fields(modifier: Mapping[str, Any], names: Sequence[str], *, label: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for name in names:
+        value = modifier.get(name)
+        if not _canonical_template_text(value):
+            raise RegistryCaseBuildError(f"{label} requires canonical nonblank {name!r} text.")
+        fields[name] = str(value)
+    return fields
 
 
 def _entities(
@@ -824,8 +975,10 @@ def _required_text(value: Mapping[str, Any], key: str, *, label: str) -> str:
 
 
 __all__ = [
+    "COMPETITIVE_INHIBITION_MODIFIER_TYPE",
     "CULTURE_PHYSIOLOGY_PROCESS_TYPE",
     "CULTURE_PHYSIOLOGY_REQUIRED_PROCESS_STATE_METADATA",
     "CULTURE_PHYSIOLOGY_REQUIRED_STATE_ROLES",
+    "build_composed_process_config_data",
     "build_culture_physiology_config_data",
 ]

@@ -46,6 +46,7 @@ from fungal_model.screening.case_builder import (
     get_registry_process_assembler,
     select_registry_case_compatibility,
 )
+from fungal_model.screening.enzyme_network import ENZYME_NETWORK_PROCESS_TYPE
 from fungal_model.screening.modelability import missing_item_suggestion
 from fungal_model.screening.parameter_resolution import (
     ExactTemplateParameterError,
@@ -918,7 +919,91 @@ def _mechanism_summary_rows(
         compatibility=compatibility,
     )
     rows = [{**_case_columns(context), "mechanism_index": 0, **mechanism}]
+    if case.process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        rows.extend(
+            _network_process_mechanism_rows(
+                context=context, case=case, start_index=len(rows), maturity=str(mechanism["maturity"])
+            )
+        )
     rows.extend(_rate_modifier_mechanism_rows(context=context, case=case, start_index=len(rows)))
+    return rows
+
+
+def _sample_config_data(case: RegistryCaseEnsemble) -> Mapping[str, Any] | None:
+    """The assembled config of the case's first sample, or None when it is unavailable."""
+
+    if not case.samples:
+        return None
+    config_path = Path(case.samples[0].config_path)
+    if not config_path.exists():
+        return None
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    return data if isinstance(data, Mapping) else None
+
+
+def _network_process_mechanism_rows(
+    *,
+    context: Mapping[str, Any],
+    case: RegistryCaseEnsemble,
+    start_index: int,
+    maturity: str,
+) -> list[dict[str, Any]]:
+    """One row per process of an enzyme network: its enzyme class, pool, released pools, law and parameters."""
+
+    data = _sample_config_data(case)
+    if data is None:
+        return []
+    template = data.get("case_template", {})
+    enzyme_classes = template.get("process_enzyme_classes", {}) if isinstance(template, Mapping) else {}
+    process_configs = data.get("processes", [])
+    if not isinstance(process_configs, list) or not isinstance(enzyme_classes, Mapping):
+        return []
+    rows: list[dict[str, Any]] = []
+    for process in process_configs:
+        if not isinstance(process, Mapping):
+            continue
+        process_id = str(process.get("id", ""))
+        states = process.get("states", {})
+        parameters = process.get("parameters", {})
+        if not isinstance(states, Mapping) or not isinstance(parameters, Mapping):
+            continue
+        enzyme_class = str(enzyme_classes.get(process_id, ""))
+        state_text = ";".join(f"{field}:{state}" for field, state in states.items())
+        parameter_text = ";".join(
+            f"{field}:{symbol}" for field, symbol in parameters.items() if field != "rate_units"
+        )
+        assumptions = process.get("assumptions", [])
+        rows.append(
+            {
+                **_case_columns(context),
+                "mechanism_index": start_index + len(rows),
+                # Each process of a network is a process law of the case (output schema 2.2.0 mechanism kinds).
+                "mechanism_kind": "process_law",
+                "mechanism_id": process_id,
+                "mechanism_family": _mechanism_family(str(process.get("process_type", ""))),
+                "active": True,
+                "maturity": maturity,
+                "configured_by": enzyme_class,
+                "equation_or_law": _mechanism_law(str(process.get("process_type", ""))),
+                "state_variables": state_text,
+                "parameters": parameter_text,
+                "assumptions": "; ".join(str(item) for item in assumptions) if isinstance(assumptions, list) else "",
+                "limitations": (
+                    "Acts on its pool independently of the other processes of the network; their rates add on a "
+                    "shared pool. No competition for substrate or adsorption sites and no synergy."
+                ),
+                "provenance": json.dumps(
+                    {
+                        "process_id": process_id,
+                        "process_type": str(process.get("process_type", "")),
+                        "enzyme_class": enzyme_class,
+                        "product_map": str(process.get("product_map", "")),
+                        "source": "assembled_model_config",
+                    },
+                    sort_keys=True,
+                ),
+            }
+        )
     return rows
 
 
@@ -951,6 +1036,16 @@ def _rate_modifier_mechanism_rows(
             if not isinstance(modifier, Mapping):
                 continue
             modifier_type = str(modifier.get("type") or modifier.get("modifier_type") or "")
+            if modifier_type == "competitive_inhibition":
+                rows.append(
+                    _competitive_inhibition_mechanism_row(
+                        context=context,
+                        modifier=modifier,
+                        process_id=process_id,
+                        index=start_index + len(rows),
+                    )
+                )
+                continue
             if modifier_type != "product_inhibition":
                 continue
             product_state = str(modifier.get("product_state", ""))
@@ -991,6 +1086,62 @@ def _rate_modifier_mechanism_rows(
                 }
             )
     return rows
+
+
+def _competitive_inhibition_mechanism_row(
+    *,
+    context: Mapping[str, Any],
+    modifier: Mapping[str, Any],
+    process_id: str,
+    index: int,
+) -> dict[str, Any]:
+    """The mechanism row of a configured provenance-bound competitive-inhibition modifier."""
+
+    fields = {
+        name: str(modifier.get(name, ""))
+        for name in (
+            "substrate_state",
+            "inhibitor_state",
+            "michaelis_constant",
+            "inhibition_constant",
+            "primary_source",
+            "maturity",
+        )
+    }
+    return {
+        **_case_columns(context),
+        "mechanism_index": index,
+        "mechanism_kind": "rate_modifier",
+        "mechanism_id": "competitive_inhibition",
+        "mechanism_family": "provenance-bound competitive Michaelis-Menten inhibition modifier",
+        "active": True,
+        "maturity": fields["maturity"],
+        "configured_by": process_id,
+        "equation_or_law": "rate_multiplier = (K_m + S) / (K_m * (1 + I / K_i) + S)",
+        "state_variables": f"substrate:{fields['substrate_state']};competitive_inhibitor:{fields['inhibitor_state']}",
+        "parameters": (
+            f"michaelis_constant:{fields['michaelis_constant']};inhibition_constant:{fields['inhibition_constant']}"
+        ),
+        "assumptions": (
+            "One inhibitor competes with the substrate of its homogeneous Michaelis-Menten base process; K_m is the "
+            "base process's own Michaelis constant."
+        ),
+        "limitations": (
+            "One competitive inhibitor per process; no non-competitive, uncompetitive, mixed, irreversible, "
+            "allosteric or multi-inhibitor law. The primary source supports the equation, not the configured K_i."
+        ),
+        "provenance": json.dumps(
+            {
+                "process_id": process_id,
+                "modifier_type": "competitive_inhibition",
+                "inhibitor_state": fields["inhibitor_state"],
+                "inhibition_constant": fields["inhibition_constant"],
+                "primary_source": fields["primary_source"],
+                "source": "assembled_model_config",
+            },
+            sort_keys=True,
+        ),
+    }
 
 
 def _process_mechanism_descriptor(
@@ -1050,6 +1201,8 @@ def _mechanism_family(process_type: str) -> str:
         return "generic two-step extracellular enzyme chain"
     if process_type == "culture_physiology":
         return "generic well-mixed culture physiology composed from registry process templates"
+    if process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        return "generic enzyme network: template-declared homogeneous Michaelis-Menten processes on shared pools"
     return "generic configured process law"
 
 
@@ -1070,6 +1223,11 @@ def _mechanism_law(process_type: str) -> str:
             "template-declared composition of generic process laws (substrate conversion with explicit yield, "
             "first-order loss, producer-proportional synthesis) sharing one explicit closure ledger"
         )
+    if process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        return (
+            "dS_i/dt = -sum_j r_ij + sum_k y_k r_k over the processes on and into pool i, each r = Vmax * S / (Km + S) "
+            "or its explicit-enzyme form, optionally scaled by its configured modifiers"
+        )
     return "configured process law"
 
 
@@ -1084,6 +1242,8 @@ def _mechanism_state_variables(process_type: str) -> tuple[str, ...]:
         return ("substrate", "intermediate", "product", "surface_catalyst", "homogeneous_catalyst")
     if process_type == "culture_physiology":
         return ("substrate", "biomass", "enzyme_pools", "ledger_pools")
+    if process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        return ("substrate", "intermediate_pools", "product", "enzymes_of_kcat_form_processes")
     return ()
 
 
@@ -1199,6 +1359,13 @@ def _mechanism_limitations(
                 if _has_calibrated_record(role_records or {})
                 else ()
             ),
+            "No empirical validation claim is implied by simulation output.",
+        )
+    if process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        return (
+            "Exactly the template-declared processes are represented; parallel processes on one pool act "
+            "additively and independently, without competition for substrate or adsorption sites or synergy.",
+            "Not a whole-fungus physiology, secretion, uptake, or biomass model.",
             "No empirical validation claim is implied by simulation output.",
         )
     return ("No empirical validation claim is implied by simulation output.",)
@@ -2579,6 +2746,19 @@ def _limitation_rows(
                     case.process_type,
                 )
             )
+    if case.process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        rows.append(
+            _limitation_row(
+                context,
+                "not_modelled",
+                "important",
+                "This is an enzyme network of well-mixed Michaelis-Menten processes on shared pools: parallel "
+                "processes on one pool act additively and independently (no competition for substrate or adsorption "
+                "sites, no synergy), and it is not a whole-fungus growth, secretion, uptake, biomass, or respiration "
+                "model.",
+                case.process_type,
+            )
+        )
     if case.process_type == "surface_catalysis":
         rows.append(
             _limitation_row(

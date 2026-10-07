@@ -6,6 +6,44 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Several enzyme classes acting together in user data (USERDATA-010): an
+  optional `enzyme_network` block in `user_dataset.yml` (`entry_substrates`)
+  makes every case of the dataset an enzyme network instead of the one class
+  the preflight selects. Every declared class of the strain that acts on a
+  pool of the network runs its own homogeneous Michaelis-Menten process (kcat
+  or Vmax form, every existing route to Vmax and to the enzyme concentration);
+  processes on one pool add their rates, and a pool released by one class is
+  the next class's substrate only where a substrate's `substrates.csv`
+  product equals another `substrate_id`, with the stated yield. Intermediates
+  and the final product start at zero; every pool is reported in the entry's
+  units; closure weights come from the yields. A new `kinetics.csv` quantity
+  `ki` with a new column `inhibitor` (a downstream pool) binds the existing
+  provenance-bound `competitive_inhibition` modifier,
+  `Vmax S / (Km (1 + I / Ki) + S)` with the process's own Km; a process
+  without `ki` has no inhibition term and says so in its template. No new
+  numerics: a new `enzyme_network` template type is assembled by the
+  `culture_physiology` composition builder, generalised to
+  `build_composed_process_config_data` (which now also binds the existing
+  `competitive_inhibition` and `substrate_reactivity` modifiers and records
+  each process's enzyme class as output metadata); the shipped culture case
+  assembles byte-identically. Records are selected per case (strain, entry,
+  condition); every missing role is a gap with the single-class measurement
+  request, and a network with a gap is not simulated. Refused with file, row
+  and column: cycles, ambiguous products, links between dissolved and
+  dry-mass pools, a class on two pools of one network, strains with different
+  member classes, inputs of intermediate pools, disagreeing entry loadings,
+  the pH-ionization form, `culture.csv`, `timecourse.csv` and `responses.csv`
+  in a network dataset, `ki` outside a network, on a solid, in mass units, on
+  a non-downstream pool or with two inhibitors per process, and a network
+  dataset as `user_data` of `assemble_user_tables`. `UserDataset.enzyme_networks`
+  (and `to_dict()`/`summary()`) lists each network; `fungmod check-data` prints
+  them; `mechanism_summary.csv` gains one process-law row per network process
+  (naming its class) and a row per competitive-inhibition modifier (output
+  schema unchanged, 2.2.0). Fixtures `network_chain` (polymer-like ->
+  oligomer-like -> monomer-like, two classes) and `network_parallel` (two
+  classes in parallel, kcat and Vmax forms, one competitively inhibited);
+  illustrative estimates only. Datasets without `enzyme_network` generate
+  byte-identical records.
 - Fungal cultures in user data (USERDATA-009): "fungus X on substrate Y in
   conditions Z" now also simulates the fungus growing on the substrate and
   secreting its enzymes, not only an enzyme at a stated concentration. An

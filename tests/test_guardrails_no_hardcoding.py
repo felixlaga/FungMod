@@ -132,6 +132,22 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "xylose",
     "glucosamine",
     "amylase",
+    # USERDATA-010 enzyme-network fixtures: strains, classes, pools and products come from the tables.
+    "network_chain",
+    "network_parallel",
+    "strain_n1",
+    "strain_q2",
+    "polymer_p1",
+    "oligomer_o1",
+    "monomer_m1",
+    "ester_s2",
+    "acid_a2",
+    "depolymerase",
+    "oligomer_hydrolase",
+    "cleaver_a",
+    "cleaver_b",
+    "c30_ph5",
+    "c25_ph7",
 )
 
 
@@ -167,6 +183,14 @@ def test_culture_assembler_has_no_organism_substrate_or_enzyme_specific_tokens()
     """The culture_physiology assembler that user cultures reuse names roles only (USERDATA-009)."""
 
     module = (ROOT / "src" / "fungal_model" / "screening" / "culture_physiology.py").read_text(encoding="utf-8").lower()
+    for forbidden in (*USER_DATA_FORBIDDEN_TOKENS, "gelain", "filter_paper", "fpu", "beta_glucosidase_assay"):
+        assert forbidden not in module, forbidden
+
+
+def test_enzyme_network_assembler_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
+    """The enzyme_network assembler that user networks run names roles only (USERDATA-010)."""
+
+    module = (ROOT / "src" / "fungal_model" / "screening" / "enzyme_network.py").read_text(encoding="utf-8").lower()
     for forbidden in (*USER_DATA_FORBIDDEN_TOKENS, "gelain", "filter_paper", "fpu", "beta_glucosidase_assay"):
         assert forbidden not in module, forbidden
 

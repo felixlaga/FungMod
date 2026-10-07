@@ -14,6 +14,10 @@ from fungal_model.screening.culture_physiology import (
     CULTURE_PHYSIOLOGY_PROCESS_TYPE,
     build_culture_physiology_config_data,
 )
+from fungal_model.screening.enzyme_network import (
+    ENZYME_NETWORK_PROCESS_TYPE,
+    build_enzyme_network_config_data,
+)
 from fungal_model.screening.enzyme_chain import (
     BIO002_ENZYME_CHAIN_TEMPLATE_ID,
     EXTRACELLULAR_ENZYME_CHAIN_PROCESS_TYPE,
@@ -46,6 +50,7 @@ __all__ = [
     "RegistryCaseConfigMode",
     "BIO002_ENZYME_CHAIN_TEMPLATE_ID",
     "CULTURE_PHYSIOLOGY_PROCESS_TYPE",
+    "ENZYME_NETWORK_PROCESS_TYPE",
     "EnsembleSample",
     "EnsembleSampleFailure",
     "EXTRACELLULAR_ENZYME_CHAIN_PROCESS_TYPE",
@@ -62,6 +67,7 @@ __all__ = [
     "ScreenSimulationMode",
     "assess_modelability",
     "build_culture_physiology_config_data",
+    "build_enzyme_network_config_data",
     "build_extracellular_enzyme_chain_config",
     "build_model_config_from_registry_case",
     "build_resolved_case_config",
