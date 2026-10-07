@@ -16,6 +16,8 @@ from fungal_model import (
     SourceProviderError,
     UserDataError,
     UserDataset,
+    UserTablesDraft,
+    UserTablesSourceError,
     VirtualExperiment,
     VirtualExperimentError,
     environment_grid,
@@ -27,6 +29,7 @@ from fungal_model import (
     load_user_dataset,
     run_configured_model,
     source_proposal,
+    user_tables_from_sabiork,
     virtual_experiment,
 )
 from fungal_model.plugins import pet as pet_plugin
@@ -74,6 +77,9 @@ RESEARCHER_PUBLIC_API = {
     "load_user_dataset": load_user_dataset,
     "UserDataset": UserDataset,
     "UserDataError": UserDataError,
+    "user_tables_from_sabiork": user_tables_from_sabiork,
+    "UserTablesDraft": UserTablesDraft,
+    "UserTablesSourceError": UserTablesSourceError,
 }
 
 PET_PLUGIN_ONLY_NAMES = (
@@ -115,6 +121,8 @@ def test_current_researcher_public_api_is_exported() -> None:
         "SourceProviderError",
         "UserDataset",
         "UserDataError",
+        "UserTablesDraft",
+        "UserTablesSourceError",
     }
     for name, expected in RESEARCHER_PUBLIC_API.items():
         assert name in fungal_model.__all__

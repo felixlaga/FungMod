@@ -26,6 +26,133 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## USERDATA-005 Public Kinetics Into User Tables
+
+Status: `complete` for the stated scope (2026-10-06). Kinetics fetched from a
+public source now reach a simulation through the user-data route with a person
+in the loop: SABIO-RK kinetic-law entries are drafted into user-dataset
+tables, the user reviews and edits them, and `load_user_dataset` checks them
+like any other dataset. Nothing is fetched while drafting; the live SABIO-RK
+query stays behind `source_proposal(provider="sabiork", refresh=True)`.
+
+Changed:
+
+- New `api/user_data_sources.py`: `user_tables_from_sabiork(source, *,
+  dataset_id, strain_id_for_organism=None, entry_ids=None, design=None,
+  propose_enzyme_classes=False, registry=None, cache_dir=...)` returning a
+  `UserTablesDraft` (rows of `strains.csv`, `enzymes.csv`, optional
+  `enzyme_classes.csv`, `substrates.csv`, `conditions.csv`, `kinetics.csv`,
+  the manifest, `review.md`, `review_fields`, `not_converted`,
+  `not_converted_parameters`, `decisions`; `write()` refuses existing files
+  without `overwrite=True` and paths inside `data_registry/`, and writes
+  byte-identical files for the same input). `source` is a `RegistryProposal`,
+  an export JSON path or a reaction ID string read through the existing
+  adapter; the raw entries are re-read from the snapshot for the expression
+  host, condition ranges and parameter comments, which the adapter's records
+  do not carry.
+- Mapping (all recorded in `review.md`): one strain per organism and
+  `expressed_in` host (or `strain_id_for_organism`); wildtype in vitro entries
+  only (mutants listed); EC number resolved with `RegistryResolver` (an
+  unresolved one listed; with `propose_enzyme_classes=True` an
+  `enzyme_classes.csv` row whose bond and substrate classes are `REVIEW:`);
+  the substrate named by the Km and concentration parameters resolved by name
+  or alias (else a row with `REVIEW:` categorical fields); product and mol/mol
+  yield from the stoichiometry when one product is named; registry class and
+  substrate compatibility checked before converting; one condition per
+  temperature and pH (`°C` to `degC`, `K` to `kelvin`), buffer in notes,
+  missing values `unknown`, ranges `REVIEW:`; Km, kcat, Vmax (`vmax` or
+  `specific_activity` by dimension, with an `enzyme_loading` from `design` or a
+  `REVIEW:` row) and the assay's substrate and enzyme concentrations as
+  `literature` rows with `sd`, source `SABIO-RK EntryID <id> (<first author>
+  et al. <year>, PMID <id>)` and method `SABIO-RK kinetic law <id>, <law>`
+  plus the parameter name and SABIO-RK comment. Units are kept when the unit
+  registry parses them, else mapped through `SABIORK_UNIT_SPELLINGS`
+  (same unit, ASCII spelling), else listed; the dimension is then checked per
+  quantity. kcat/Km, pKa, pH and other types are listed. Laws with pKa
+  parameters are listed as "pH-ionization law not importable as user data
+  yet"; only their Km and kcat are converted, with the entry's pH (a range for
+  Reaction 618, so a `REVIEW:` field). Entries mapping to one case are all
+  listed as conflicts; mixed kcat and Vmax forms on one class and substrate
+  keep the kcat form and list the Vmax values. `design` supplies only
+  `substrate_initial_concentration`, `enzyme_concentration` and
+  `enzyme_loading` and replaces the assay values (listed).
+- `api/user_data.py`: `REVIEW_MARKER = "REVIEW:"`. A table cell or manifest
+  value (at any depth) beginning with it is refused with one issue per field
+  ("Unfilled review field <column>: ..."), before the tables are interpreted;
+  a reviewed manifest field is not reported a second time by its type check.
+  Datasets without the marker load exactly as before.
+- Exports: `user_tables_from_sabiork`, `UserTablesDraft`,
+  `UserTablesSourceError` from `fungal_model.api`, `fungal_model` and
+  `fungmod`.
+- Docs: `docs/user-data.md` "Starting from SABIO-RK" (inputs, worked example
+  from `source_proposal` to `virtual_experiment`, review fields, mapping
+  table, units, conflicts, pH-dependent laws, what Reaction 618 gives, limits)
+  and the `REVIEW:` rule; `docs/api.md`; README sentence and Public API list;
+  changelog.
+
+Tests: `tests/test_user_data_sources.py` (20 tests, network blocked through
+`urllib.request.urlopen` and the fetch module's `urlopen`). On the real frozen
+Reaction 618 snapshot: EntryID 35622 with the fixture's design values loads
+once the manifest's review fields are filled and gives the same Km, kcat,
+units, `sd`, maturity and design values as `literature_reentry`, with the
+product `beta_D_glucose` and yield 2 taken from the equation; both datasets
+simulate in scientific mode to identical substrate and product trajectories.
+All 29 entries: five converted (38521, 39245, 44879, 44888, 60725), 24 listed
+with reasons (15 mutants, conflicts 35622/39780 and 38522/38534, four
+unresolved EC numbers, one without values), the eight pH-dependent entries
+listed in the pH-ionization section, every parameter of a converted entry
+either written or listed, every written unit parseable, and the draft loads
+once reviewed. A pH range, a free-text cell and a scalar `simulation` holding
+`REVIEW:` are refused by name; EntryID 38522 converts only Km0 and k0 and lists
+its pKa parameters; EC 3.2.1.74 is listed, and proposed only on opt-in with
+`REVIEW:` bond classes that the loader refuses. The proposal, export-file and
+reaction-ID routes give identical tables; output is byte-identical across
+runs; `strain_id_for_organism`, argument errors and the overwrite guard are
+checked. Format tests on a derived copy of EntryID 35622 (labelled as such)
+route a Vmax in `µmol*min^(-1)*mg^(-1)` to `specific_activity` (with a
+`REVIEW:` loading, or a design loading that the loader turns into 0.6 µM/min),
+a Vmax in `µM*min^(-1)` to `vmax`, list a mass rate and an unparseable unit,
+keep kcat over a Vmax in one entry, and exercise the unit table with a unit
+registry that rejects `^(-1)`. Guardrails: the new module is in the
+no-shortcut scan and must not name organisms, substrates or enzymes (the
+organism and host words of the snapshot were added to the shared forbidden
+list); the public-API guardrail covers the three new names.
+
+Gates: `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`
+clean; `pyright` on the changed source and test files 0 errors; `mkdocs build
+--strict` clean; the user-data, SABIO-RK, source-provider, curation,
+guardrail, documentation-sync and hygiene tests 299 passed; the full suite
+2130 passed (run before the last change, which only stops a generated strain
+ID from taking an ID mapped to another organism and adds its test; the
+targeted set above was re-run after it).
+
+Not changed: no process law, solver, registry record, snapshot, curated
+record, output schema or fixture; `source_proposal` and the adapter are
+unchanged; the live fetch is not called.
+
+Scientific impact: values reach a simulation only as reviewed user data with
+their SABIO-RK EntryID, publication, law and comments in provenance; nothing
+is converted between units, no bond class or product is invented, mutants and
+pH-ionization laws are not passed off as organism kinetics or cardinal laws.
+
+Non-specific coverage: the converter has no organism, substrate or enzyme
+branch; the derived-entry format tests exercise Vmax, specific-activity and
+unit paths that Reaction 618 does not contain. Only SABIO-RK Reaction 618 is
+available offline, so no second real reaction is tested.
+
+Limitations: SABIO-RK only; Michaelis-Menten constants only; strains keyed by
+organism and host spelling; isoenzymes on one case must be chosen with
+`entry_ids`; SABIO-RK concentration ranges are assay ranges and stay
+exploratory unless a design value replaces them; the unit table is a fallback
+that the current unit registry does not need for the spellings in the
+snapshot.
+
+Recommended next task: let user data bind the existing
+`ph_ionization_michaelis_menten` process law (k0, Km0 and the four pKa values),
+so that the listed pH-dependent SABIO-RK laws can be imported as laws rather
+than as constants at one pH; then a second frozen SABIO-RK snapshot with Vmax and
+specific-activity entries to test those routes on real data.
+
 ## FIX-SELECT-001 One Compatibility Record Per Case, From Preflight To Tables
 
 Status: `complete` for the stated scope (2026-10-07).
