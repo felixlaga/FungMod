@@ -36,7 +36,9 @@ import argparse
 import csv
 import json
 import math
+import os
 import shlex
+import subprocess
 import sys
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -181,6 +183,20 @@ class _UsageError(Exception):
     def __init__(self, message: str, details: Sequence[str] = ()) -> None:
         super().__init__(message)
         self.details = tuple(details)
+
+
+
+def shell_quote(argument: str) -> str:
+    """Quote one argument of a printed next-step command for the shell of the platform.
+
+    POSIX shells get ``shlex.quote``; on Windows, where single quotes do not quote and
+    backslashes are path separators, the argument is quoted the way ``cmd`` and
+    PowerShell read it (``subprocess.list2cmdline``).
+    """
+
+    if os.name == "nt":
+        return subprocess.list2cmdline([argument])
+    return shlex.quote(argument)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1634,23 +1650,23 @@ def _print_review_fields(fields: Sequence[Mapping[str, Any]]) -> None:
 
 def _print_assembly_next_steps(draft: AssembledTablesDraft, output: Path) -> None:
     report = draft.assembly
-    directory = shlex.quote(str(output))
+    directory = shell_quote(str(output))
     selection = [
         "--user-data",
         directory,
         "--fungus",
-        shlex.quote(report["fungus"]["name"]),
+        shell_quote(report["fungus"]["name"]),
         *(
             part
             for item in report["substrates"]
-            for part in ("--substrate", shlex.quote(item["registry_substrate"] or item["name"]))
+            for part in ("--substrate", shell_quote(item["registry_substrate"] or item["name"]))
         ),
     ]
     listed = [item for item in report["requested_conditions"] if item["in_conditions_csv"]]
     grid = [item for item in report["requested_conditions"] if not item["in_conditions_csv"]]
     commands = []
     if listed:
-        conditions = [part for item in listed for part in ("--condition", shlex.quote(item["condition_id"]))]
+        conditions = [part for item in listed for part in ("--condition", shell_quote(item["condition_id"]))]
         commands.append(" ".join(("fungmod run", *selection, *conditions)))
     for item in grid:
         values = item["environment_grid"]
@@ -1663,13 +1679,13 @@ def _print_assembly_next_steps(draft: AssembledTablesDraft, output: Path) -> Non
 
 
 def _print_draft_next_steps(draft: UserTablesDraft, output: Path) -> None:
-    directory = shlex.quote(str(output))
+    directory = shell_quote(str(output))
     command = f"fungmod run --user-data {directory} --fungus STRAIN --substrate SUBSTRATE --condition CONDITION_ID"
     _print_next_steps(draft, output, [command])
 
 
 def _print_next_steps(draft: UserTablesDraft, output: Path, commands: Sequence[str]) -> None:
-    directory = shlex.quote(str(output))
+    directory = shell_quote(str(output))
     step = 1
     print()
     print("Next:")
@@ -1735,8 +1751,8 @@ def _print_fit_quantities(report: Mapping[str, Any]) -> None:
 
 def _print_fitted_dataset(fitted: UserDataset, fit: UserDatasetFit, output: Path) -> None:
     case = fit.report["case"]
-    directory = shlex.quote(str(output))
-    conditions = " ".join(f"--condition {shlex.quote(condition)}" for condition in fit.report["conditions"])
+    directory = shell_quote(str(output))
+    conditions = " ".join(f"--condition {shell_quote(condition)}" for condition in fit.report["conditions"])
     print()
     print(f"Fitted dataset: {fitted.dataset_id} (digest {fitted.digest})")
     print(f"Directory: {fitted.source_directory}")
@@ -1745,8 +1761,8 @@ def _print_fitted_dataset(fitted: UserDataset, fit: UserDatasetFit, output: Path
     print("Next (fitted values run in exploratory mode only; scientific mode refuses them):")
     print(f"  fungmod check-data {directory}")
     print(
-        f"  fungmod run --user-data {directory} --fungus {shlex.quote(case['strain_id'])} "
-        f"--substrate {shlex.quote(case['substrate_id'])} {conditions} \\"
+        f"  fungmod run --user-data {directory} --fungus {shell_quote(case['strain_id'])} "
+        f"--substrate {shell_quote(case['substrate_id'])} {conditions} \\"
     )
     print("    --mode exploratory --samples N --seed S --output RUN_DIR --compare-timecourses")
 

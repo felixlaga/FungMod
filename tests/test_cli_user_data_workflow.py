@@ -17,6 +17,7 @@ import contextlib
 import csv
 import io
 import json
+import os
 import shlex
 import shutil
 import socket
@@ -44,6 +45,7 @@ from fungal_model.cli import (
     IN_SAMPLE_HELP,
     NO_FETCH_HELP,
     main,
+    shell_quote,
 )
 from fungal_model.registry import load_registry
 from fungal_model.sources.sabiork import fetch as sabiork_fetch
@@ -176,6 +178,14 @@ def _review_line(field: dict[str, object]) -> str:
     return f"{field['file']}:{row}:{field['column'] or '-'}: {field['note']}"
 
 
+def _split_printed_command(text: str) -> list[str]:
+    """Split a printed command the way the platform's shell would (see ``fungal_model.cli.shell_quote``)."""
+
+    if os.name == "nt":
+        return [part[1:-1] if len(part) > 1 and part[0] == part[-1] == '"' else part for part in shlex.split(text, posix=False)]
+    return shlex.split(text)
+
+
 def _printed_run_commands(stdout: str) -> list[list[str]]:
     """The `fungmod run` commands a draft prints as its next step, without the placeholder mode line."""
 
@@ -183,7 +193,7 @@ def _printed_run_commands(stdout: str) -> list[list[str]]:
     for line in stdout.splitlines():
         text = line.strip()
         if text.startswith("fungmod run "):
-            commands.append(shlex.split(text.removesuffix("\\").strip())[1:])
+            commands.append(_split_printed_command(text.removesuffix("\\").strip())[1:])
     return commands
 
 
@@ -228,7 +238,7 @@ def test_assemble_fill_check_data_and_run_end_to_end(tmp_path: Path) -> None:
     assert len(draft.review_fields) == 8
     for field in draft.review_fields:
         assert _review_line(dict(field)) in out
-    assert f"fungmod check-data {draft_dir}" in out
+    assert f"fungmod check-data {shell_quote(str(draft_dir))}" in out
 
     # The draft does not load until every REVIEW field is filled.
     code, out_check, err_check = _cli("check-data", draft_dir)
@@ -477,7 +487,7 @@ def test_draft_kinetics_lists_entries_as_the_api_reports_them(tmp_path: Path) ->
         assert _review_line(dict(field)) in out
     for row in draft.strains:
         assert row["strain_id"] in out
-    assert f"fungmod check-data {output}" in out
+    assert f"fungmod check-data {shell_quote(str(output))}" in out
 
     # One selected entry, with the design, a strain id and the reaction-id form read from the frozen snapshots.
     selected = tmp_path / "os3bglu6"
@@ -946,3 +956,18 @@ def test_the_command_line_names_no_source_database_and_opens_no_connection() -> 
     for forbidden in ("urllib", "urlopen", "socket", "refresh=True", "http://", "https://"):
         assert forbidden not in source, forbidden
 
+
+
+def test_printed_commands_quote_arguments_for_the_platform_shell(monkeypatch: pytest.MonkeyPatch) -> None:
+    """POSIX shells get shlex quoting; Windows gets the double quotes cmd and PowerShell read, never single quotes."""
+
+    import fungal_model.cli as cli
+
+    windows_path = r"C:\Users\runner\AppData\Local\Temp\pytest-0\g1 draft"
+    monkeypatch.setattr(cli.os, "name", "nt")
+    assert cli.shell_quote(windows_path) == f'"{windows_path}"'
+    assert cli.shell_quote(r"C:\Temp\g1_draft") == r"C:\Temp\g1_draft"
+    assert cli.shell_quote("Genome-annotated strain G1") == '"Genome-annotated strain G1"'
+    monkeypatch.setattr(cli.os, "name", "posix")
+    assert cli.shell_quote("/tmp/g1 draft") == "'/tmp/g1 draft'"
+    assert cli.shell_quote("/tmp/g1_draft") == "/tmp/g1_draft"

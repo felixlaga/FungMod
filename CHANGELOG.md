@@ -33,7 +33,9 @@ All notable public releases of FungMod are documented here.
   subcommand fetches. `USER_TABLE_PROVIDERS` in
   `fungal_model.api.user_data_sources` maps the provider name `sabiork` to
   `user_tables_from_sabiork`, so that the command line names no source
-  database (`docs/cli.md`).
+  database (`docs/cli.md`). The printed next-step commands quote their
+  arguments for the platform's shell (POSIX quoting, or the double quotes
+  `cmd` and PowerShell read on Windows).
 
 - One reviewable dataset for "fungus X on substrate(s) Y at condition(s) Z"
   (ASSEMBLE-001): `assemble_user_tables` drafts the user-dataset tables for
