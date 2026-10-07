@@ -60,6 +60,11 @@ conditions, and refuses to run otherwise. Nothing is inferred from the
 organism's name: if the roles are absent, the case is reported as missing
 those parameters.
 
+User datasets bind `temperature_cardinal_rosso`, `ph_cardinal_rosso` and
+`temperature_arrhenius_reference` through the same mechanism from an optional
+`responses.csv`, with the kinetic constants required at the law's reference
+condition; see [user-supplied data](user-data.md).
+
 ## What the output tables say
 
 Every assembled config records `provenance.environment_response`: which

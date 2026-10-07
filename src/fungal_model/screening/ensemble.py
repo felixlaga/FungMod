@@ -242,7 +242,7 @@ def _simulate_case_ensemble(
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
-        required_roles=assembler.required_parameter_roles,
+        required_roles=assembler.parameter_roles_for(compatibility),
         process_label=assembler.process_label,
     )
     if mode == "scientific":
