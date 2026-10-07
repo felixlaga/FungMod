@@ -56,6 +56,7 @@ from types import MappingProxyType
 from typing import Any
 
 from fungal_model.api.user_data import (
+    CULTURE_TABLE,
     GENOME_TABLE,
     RESPONSE_LAWS,
     REVIEW_MARKER,
@@ -1044,11 +1045,20 @@ class _Assembler:
         state = record.physical_state if record is not None else row.get("physical_state", "")
         if state != "dissolved":
             # A solid substrate of a user dataset is stated on a dry-mass basis (amount_basis, a g/g yield);
-            # drafted tables carry dissolved substrates only, so the row would lose its basis here.
+            # drafted tables carry dissolved substrates only, so the row would lose its basis here. Drafts carry
+            # no culture.csv either: a culture of the dataset on this substrate would be lost.
+            assert self.user is not None
+            cultured = [item for item in self.user.dataset.cultures if item["substrate_id"] == row["substrate_id"]]
+            culture_text = (
+                f", and the dataset's {CULTURE_TABLE} has a culture on it (strain "
+                f"{', '.join(repr(item['strain_id']) for item in cultured)}), which drafts do not carry"
+                if cultured
+                else ""
+            )
             raise UserTablesAssemblyError(
                 f"substrates[{index}] ({text!r}) is substrate {row['substrate_id']!r} of the user dataset with "
-                f"physical state {state!r}; assembled drafts cover dissolved substrates only. Load that dataset "
-                "with load_user_dataset directly."
+                f"physical state {state!r}; assembled drafts cover dissolved substrates only{culture_text}. Load "
+                "that dataset with load_user_dataset directly."
             )
         if record is not None:
             return _Target(

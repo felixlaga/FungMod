@@ -183,6 +183,39 @@ def test_uniprot_route_api_is_exported_and_not_a_placeholder() -> None:
             assert "todo" not in source, name
 
 
+def test_culture_route_names_are_exported_and_not_placeholders() -> None:
+    """USERDATA-009: culture.csv is read by load_user_dataset; its vocabulary is exported from the user-data module."""
+
+    import fungal_model.api.user_data as user_data
+
+    for name in (
+        "CULTURE_TABLE",
+        "CULTURE_QUANTITIES",
+        "CULTURE_LEVEL_QUANTITIES",
+        "CULTURE_CONSUMPTION_QUANTITIES",
+        "CULTURE_POOL_QUANTITIES",
+        "CULTURE_EVIDENCE_TYPES",
+        "USER_DATASET_CULTURE_PROCESS_TYPE",
+    ):
+        assert name in user_data.__all__, name
+    assert user_data.CULTURE_TABLE == "culture.csv"
+    assert set(user_data.CULTURE_QUANTITIES) == {
+        *user_data.CULTURE_LEVEL_QUANTITIES,
+        *user_data.CULTURE_CONSUMPTION_QUANTITIES,
+        *user_data.CULTURE_POOL_QUANTITIES,
+    }
+    for function in (
+        user_data.load_user_dataset,
+        user_data._parse_culture,
+        user_data._validate_cultures,
+        user_data._generate_culture_records,
+    ):
+        source = inspect.getsource(function).lower()
+        assert "notimplementederror" not in source
+        assert "placeholder" not in source
+        assert "todo" not in source
+
+
 def test_command_line_entry_point_is_complete_and_uses_the_public_api() -> None:
     import fungal_model.__main__ as module_entry
     import fungal_model.cli as cli

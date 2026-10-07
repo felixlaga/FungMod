@@ -1,0 +1,2 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+endo_xylanase_like,Endo-xylanase-like pool X1,3.2.1.8,beta_1_4_xylosidic,xylan_like_solid,Illustrative user-defined class for the culture test (IUBMB EC 3.2.1.8 names the activity; no record of this pool exists)

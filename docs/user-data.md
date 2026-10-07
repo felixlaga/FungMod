@@ -39,14 +39,14 @@ generated registry mappings (`records`) and `to_dict()`.
 
 Every step on this page also runs from a shell ([command line](cli.md)):
 `fungmod check-data DIR` loads a directory and prints its gaps, genome or
-proteome resolution, time courses and fitted values, or every issue as
+proteome resolution, cultures, time courses and fitted values, or every issue as
 `file:row:column: message`; `fungmod run --user-data DIR` simulates it;
 `fungmod assemble`, `fungmod draft-kinetics`, `fungmod run
 --compare-timecourses` and `fungmod fit` are the command-line forms of
 `assemble_user_tables`, `user_tables_from_sabiork`, `compare_with_timecourses`
 and `fit_user_dataset` (see [the user-data workflow from a shell](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
 
-Seven complete examples live in the test fixtures:
+Nine complete examples live in the test fixtures:
 `tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on a
 user-defined aryl ester, `kcat` form, estimates only),
 `tests/fixtures/user_data/literature_reentry/` (the published SABIO-RK Reaction
@@ -68,7 +68,13 @@ synthetic accessions, not a real proteome). `tests/fixtures/user_data/solid_case
 is a [solid substrate](#solid-substrates): the registry's apparent hydrolysis
 constants for a filter-paper activity pool re-entered as estimates on a
 user-defined particulate substrate in g/L, with enzyme doses in FPU per gram
-and a reactivity exponent.
+and a reactivity exponent. `tests/fixtures/user_data/culture_reentry/` and
+`tests/fixtures/user_data/culture_estimates/` are
+[fungal cultures](#fungal-culture-growth-and-secretion): the registry's
+*T. harzianum* culture case re-entered in `culture.csv` (FungMod's
+retrospective fit as estimates, the deposited initial conditions as
+literature), and a user-defined strain growing on a user-defined xylan-like
+solid with one protein-mass enzyme pool (estimates only).
 
 To start from public kinetics instead of typing them in, draft the tables from
 SABIO-RK entries and review them; see
@@ -258,7 +264,10 @@ cases of a registry fungus.
   run without the draft.
 - Dissolved substrates only: a requested substrate of `user_data` that is a
   [solid substrate](#solid-substrates) is refused (the drafted tables carry no
-  `amount_basis`); load such a dataset with `load_user_dataset` directly.
+  `amount_basis`, and no `culture.csv`: the message names a culture on that
+  substrate); load such a dataset with `load_user_dataset` directly. Cultures
+  of a `user_data` dataset on other substrates are not carried, like any
+  substrate that was not requested.
   Everything else is as for any user dataset (below).
 - From a shell, `fungmod assemble` takes the request as a grid of
   `--temperature-c` and `--ph` values in degC, substrates by name and asserted
@@ -282,6 +291,7 @@ cases of a registry fungus.
 | `genomes.csv` | no | A dbCAN genome annotation or a UniProt proteome export per strain, from which enzyme classes are resolved. |
 | annotation files | with `genomes.csv` | The dbCAN `overview.txt` files and UniProt TSV exports that `genomes.csv` names, anywhere inside the directory. |
 | `timecourse.csv` | no | Measured substrate remaining and product formed over time (see [time courses](#time-courses-comparison-and-fitting)). |
+| `culture.csv` | no | A strain growing on a solid substrate and secreting its enzyme pools: the roles of the registry's culture model (see [fungal culture](#fungal-culture-growth-and-secretion)). |
 | `fit_report.json` | in a fitted dataset | The report of the fit that produced the dataset's `fitted` rows, named by the manifest `fit` block. |
 
 Any other CSV file in the directory is refused as unsupported in this version
@@ -1124,6 +1134,252 @@ validation.
   default degradation model: the apparent law establishes no degradation
   regime of the material.
 
+## Fungal culture: growth and secretion
+
+The rate forms above simulate an enzyme at a concentration you state: an
+enzyme assay. An optional `culture.csv` instead simulates **the fungus growing
+on the substrate and secreting its enzymes over time**. It binds the same
+culture model as the registry's *T. harzianum* P49P11 case (the
+`culture_physiology` template of Gelain 2020; see
+[organism physiology](organism-physiology.md)) to your own strain, solid
+substrate and constants. The process laws and the assembler are the existing
+ones; FungMod adds no numerics for user cultures.
+
+```text
+consumption:   dS/dt = - k_h · E · S / (K_h + S)            (one consuming enzyme pool E)
+growth:        dX/dt = + Y · k_h · E · S / (K_h + S) - k_d · X
+ledgers:       (1 - Y) of the consumed substrate -> consumed substrate not retained as biomass
+               k_d · X                            -> biomass dry mass lost
+each pool P:   dP/dt = + q_P · X · S / (K_ind + S) - k_P · P
+```
+
+`S` is the substrate's dry mass per volume, `X` the biomass dry mass per volume
+(in the same unit as `S`), and each pool `P` an enzyme amount per volume in its
+own unit: a protein mass (for example `mg/L`) or an activity in one of the
+registry's assay units (`FPU/L`, `BGU/L`). Exactly one pool, the one whose
+class acts on the substrate, consumes it; every other pool is produced and lost
+only. All pools share one induction constant `K_ind`, as in the registry case.
+`S + X` and both ledgers form one closed dry-mass balance, which every run
+checks.
+
+### `culture.csv` (optional)
+
+| Column | Required | Meaning |
+| --- | --- | --- |
+| `strain_id`* | yes | A strain of `strains.csv`. |
+| `substrate_id`* | yes | A substrate of `substrates.csv`: a `solid_polymer` with `amount_basis` `dry_mass`. |
+| `condition_id`* | yes | A condition of `conditions.csv`: the culture's temperature and pH (metadata, as for every case without a response law). |
+| `quantity`* | yes | One role of the culture model (table below). |
+| `enzyme_class` | for pool quantities | The pool's enzyme class, which the strain declares in `enzymes.csv` or `genomes.csv`; blank for a quantity of the culture as a whole. |
+| `value` / `lower`, `upper` | yes | An exact value, or a range sampled in exploratory mode. |
+| `units`* | yes | Checked with pint against the role's dimension. |
+| `evidence_type`* | yes | `measured`, `literature`, `design` or `estimate` (`fitted` is refused: no culture constant is fitted). |
+| `method` | for `measured`, `literature`, `design` | How the value was obtained. |
+| `source`* | yes | Where the value comes from. |
+| `sd`, `replicates` | no | Kept as provenance, not sampled. |
+
+### Roles and units
+
+| `quantity` | `enzyme_class` | Template role | Units (dimension) | Example |
+| --- | --- | --- | --- | --- |
+| `substrate_initial_concentration` | blank | `initial_substrate` | dry mass per volume | `g/L` |
+| `initial_biomass` | blank | `initial_biomass` | biomass dry mass per volume, written exactly like the initial substrate's units | `g/L` |
+| `biomass_yield` | blank | `biomass_yield` | dimensionless, above 0 and at most 1 | `g/g` |
+| `biomass_loss_rate` | blank | `biomass_loss_rate` | 1/time | `1/h` |
+| `induction_half_saturation` | blank | `induction_half_saturation` | dry mass per volume, above 0 | `g/L` |
+| `hydrolysis_capacity` | the consuming pool | `hydrolysis_capacity` | substrate dry mass per time per pool amount | `g/FPU/h`, `g/mg/h` |
+| `hydrolysis_half_saturation` | the consuming pool | `hydrolysis_half_saturation` | dry mass per volume, above 0 | `g/L` |
+| `initial_enzyme_concentration` | each pool | `initial_enzyme_concentration__<class>` | protein mass or assay activity per volume | `FPU/L`, `mg/L` |
+| `specific_production_rate` | each pool | `specific_production_rate__<class>` | pool amount per biomass dry mass per time | `FPU/g/h`, `mg/g/h` |
+| `enzyme_loss_rate` | each pool | `enzyme_loss_rate__<class>` | 1/time | `1/h` |
+
+The units of a case are also checked together: `hydrolysis_capacity × E` must be
+the substrate's dry mass per volume per time with the consuming pool's own
+units, and `specific_production_rate × X` an amount of the pool per volume per
+time, so a pool in `FPU/L` with a rate per protein mass (or the reverse) is
+refused on the rate's row. A molar amount is refused on every substrate-side,
+biomass and pool row, and no pool is ever converted between protein mass,
+assay units and molarity.
+
+### Worked example
+
+`tests/fixtures/user_data/culture_estimates/` is a user-defined strain with
+one user-defined class (an endo-xylanase-like pool stated as a protein mass)
+on a user-defined xylan-like solid; every value is an illustrative estimate:
+
+```text
+strain_id,substrate_id,condition_id,quantity,enzyme_class,value,lower,upper,units,evidence_type,method,source
+strain_x1,xylan_lot_x1,c25,substrate_initial_concentration,,15,,,g/L,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,initial_biomass,,0.2,,,g/L,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,biomass_yield,,0.35,,,g/g,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,biomass_loss_rate,,0.01,,,1/h,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,induction_half_saturation,,0.5,,,g/L,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,hydrolysis_capacity,endo_xylanase_like,0.005,,,g/mg/h,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,hydrolysis_half_saturation,endo_xylanase_like,5,,,g/L,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,initial_enzyme_concentration,endo_xylanase_like,1,,,mg/L,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,specific_production_rate,endo_xylanase_like,5,,,mg/g/h,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,enzyme_loss_rate,endo_xylanase_like,0.02,,,1/h,estimate,illustrative estimate,<source>
+```
+
+`kinetics.csv` holds only its header. `fungmod check-data` lists the culture:
+
+```text
+$ fungmod check-data tests/fixtures/user_data/culture_estimates
+...
+Kinetic values: 10; gaps: 0
+Cultures (culture.csv; the strain grows on the substrate and secretes its enzyme pools, culture_physiology): 1
+  strain     substrate     consuming pool      enzyme pools        culture.csv rows
+  strain_x1  xylan_lot_x1  endo_xylanase_like  endo_xylanase_like  2-11
+```
+
+and `fungmod run` (or `virtual_experiment(..., user_data=...)`) simulates it:
+
+```text
+$ fungmod run --user-data tests/fixtures/user_data/culture_estimates --fungus strain_x1 \
+    --substrate xylan_lot_x1 --environment c25 --mode exploratory --samples 8 --seed 1 --output culture_run
+...
+  1  culture_estimates__strain_x1  culture_estimates__xylan_lot_x1  culture_estimates__c25  modelable  yes
+...
+    final_substrate_remaining          4.105e-06 [4.105e-06, 4.105e-06] gram / liter (n=8)
+    maximum_substrate_depletion_rate   0.4913 [0.4913, 0.4913] gram / hour / liter (n=8)
+  Threshold times (median [5th, 95th percentile] over samples):
+    time_to_10_percent_substrate_degradation  26.47 [26.47, 26.47] hour (n=8)
+    time_to_50_percent_substrate_degradation  49.02 [49.02, 49.02] hour (n=8)
+    time_to_90_percent_substrate_degradation  62.3 [62.3, 62.3] hour (n=8)
+```
+
+The time series hold the substrate, the biomass, every pool (in its own units;
+here `milligram / liter`) and both ledgers. Every value is exact, so the eight
+samples coincide; a range in `culture.csv` would be sampled. Because every row
+is an estimate, scientific mode refuses the case; with `measured`,
+`literature` or `design` rows throughout, the generated template is scientific
+and the run is labelled `scientific_exact_unvalidated` (exact inputs and
+implemented laws, not validation).
+
+`tests/fixtures/user_data/culture_reentry/` re-enters the registry's own
+*T. harzianum* culture case: the nine constants of FungMod's retrospective fit
+as `estimate` (they are a fit, neither a literature value nor a measurement of
+the strain) and the deposited initial biomass, initial activities and 10, 20
+and 30 g/L loadings as `literature`, with a filter-paper (`FPU`) pool that
+consumes the cellulose and a beta-glucosidase (`BGU`) pool that is produced and
+lost only. Its biomass, cellulose, both activity and both ledger trajectories
+equal the registry case's at every loading (`tests/test_user_data_culture.py`).
+
+### What is generated
+
+One culture model per consuming enzyme class and substrate, shared by every
+strain that declares the class (the strain's records are selected by its
+fungus id, as for the rate forms): a `culture_physiology` process compatibility
+(`<dataset>__<class>__<substrate>__culture_physiology`) and case template
+(`..._culture_template`) that composes the existing process laws (homogeneous
+Michaelis-Menten consumption with a stoichiometric biomass yield and closure
+ledger, first-order biomass loss, proportional induced synthesis and
+first-order loss of each pool), and for every such strain, role and condition
+one parameter record, or an explicit gap. The template declares no vessel
+geometry (the model is concentration-only), and each synthesis and consumption
+rate is in the units of the state it changes per unit of the dataset's time
+grid, so one template serves cases whose rows use different units. The
+template is scientific only when every bound record is exact and
+scientific-eligible; one estimate keeps it exploratory (the weakest input
+wins). The generated enzyme class of the consuming pool lists
+`culture_physiology` as its process; the other pools keep their own.
+`UserDataset.cultures` lists each strain's culture (consuming pool, pools,
+template and compatibility ids, rows).
+
+### Gaps
+
+A role without a row is an explicit unknown with a measurement request that
+names it in plain words, for example:
+
+```text
+culture_estimates__strain_x1__xylan_lot_x1__c25__culture__biomass_yield__gap
+  Measure the biomass yield of Illustrative culture strain X1 on Xylan-like solid lot X1 at condition c25
+  (25 degC, pH 6.0): grams of biomass dry mass formed per gram of dry Xylan-like solid lot X1 consumed
+  (g/g, dimensionless).
+culture_estimates__strain_x1__xylan_lot_x1__c25__culture__specific_production_rate__endo_xylanase_like__gap
+  Measure the specific production rate of Endo-xylanase-like pool X1 by Illustrative culture strain X1
+  growing on Xylan-like solid lot X1 at condition c25 (25 degC, pH 6.0): enzyme produced per biomass dry
+  mass per time at inducing substrate levels (amount of the pool per biomass dry mass per time; the pool is
+  stated in mg/L, culture.csv row 8).
+```
+
+Nothing is defaulted. A condition with no rows makes every role a gap whose
+request says at which conditions the culture has values; a strain that declares
+the consuming class without rows has a culture of gaps; a solid substrate the
+consuming class acts on without rows is a culture of gaps with the consuming
+pool only. With `--runnable-only` (`blocked="report"`) a culture case runs
+beside its gap cases ([partial runs](cli.md)).
+
+### Refused
+
+Each refusal names its file, row and column:
+
+- A culture on a substrate without the required basis: a dissolved substrate
+  (the culture closes a dry-mass balance and the yield is g/g), and a dissolved
+  substrate that a culture's consuming class acts on (a class runs one process
+  law on all of its substrates).
+- Mixing the culture with the enzyme-assay forms: a `kinetics.csv` row of a
+  strain and substrate that have a culture; a `kinetics.csv` row of another
+  strain on the culture's class and substrate (all strains of one class and
+  substrate share one generated process); a `kinetics.csv` row of a culture's
+  consuming class on any substrate. FungMod builds one model per strain,
+  substrate and condition and does not choose between a culture and an assay;
+  keep assay kinetics in a separate dataset.
+- A strain that declares the consuming class and another class acting on the
+  culture substrate (a class from a genome annotation included: run the
+  culture in a dataset without `genomes.csv`), and a strain that declares the
+  consuming class but not every pool of the culture.
+- A culture whose pools include no class acting on the substrate, or more
+  than one (synergy between pools is not modelled); `hydrolysis_capacity` or
+  `hydrolysis_half_saturation` on a pool that does not consume the substrate.
+- Units of the wrong dimension, units of one case that do not fit together
+  (above), an initial biomass in other units than the initial substrate, a
+  yield above 1 g/g or at zero, a zero half-saturation constant, an
+  `enzyme_class` on a culture-level quantity or a missing one on a pool
+  quantity, a class the strain does not declare, `fitted` evidence, a
+  `kinetics.csv` quantity such as `km`, and duplicate rows.
+- `responses.csv` rows of a culture: the culture model applies no temperature
+  or pH law, so its constants hold at the condition of their rows.
+- `timecourse.csv` rows of a culture case: the comparison and the fit read the
+  substrate and the product of an enzyme-assay case; a culture's biomass, pools
+  and ledgers are not observables of the comparison, and no culture constant is
+  fitted.
+- `assemble_user_tables` and `fungmod assemble` do not draft or carry
+  `culture.csv`: a culture's substrate is a solid, which assembled drafts
+  refuse with a message naming the culture; cultures on other substrates of a
+  `user_data` dataset are not carried, like any substrate that was not
+  requested. Load a culture dataset with `load_user_dataset` directly.
+
+### What is and is not modelled
+
+Modelled: one strain growing in a well-mixed batch on one suspended solid
+substrate (dry-mass basis); substrate consumption by one secreted enzyme pool
+with an apparent saturation law; biomass formation with an explicit yield and a
+closure ledger for the consumed substrate not retained as biomass; first-order
+biomass loss into a ledger; substrate-induced, biomass-proportional synthesis
+and first-order loss of every enzyme pool, each in its own units.
+
+Not modelled, and the template and outputs say so:
+
+- One fungus per case: no co-cultures, competition or cross-feeding.
+- The growth and induction laws are the existing ones: growth is driven only by
+  the consumed substrate (no Monod uptake of a soluble sugar, no maintenance,
+  no nutrient or oxygen limitation), induction saturates in the solid substrate
+  with one constant shared by all pools, and synthesis has no material cost,
+  repression or lag.
+- No spatial mycelium (the spatial colony models are separate and are not
+  bound by user data), no pellet or morphology, no vessel volume.
+- No oxygen or pH dynamics: the template declares none, and no response law is
+  bound; the temperature and pH of a condition are metadata.
+- No soluble products: the product named in `substrates.csv` is not released
+  by the culture (the row is still required by `substrates.csv`); consumed
+  substrate is biomass or ledger.
+- Pools other than the consuming one act on nothing; no synergy, product
+  inhibition, adsorption or surface law.
+- Constants are apparent and specific to the strain, substrate preparation and
+  conditions at which they were obtained; nothing extrapolates them.
+- No time courses, comparison or fitting of cultures; no assembly route.
+
 ## Evidence types, maturity and modes
 
 | `evidence_type` | Record maturity | Exact value | Range |
@@ -1174,7 +1430,7 @@ out of data you intend to simulate.
 | Record | Identifier |
 | --- | --- |
 | Fungus per strain, listing its namespaced classes (from `enzymes.csv` and `genomes.csv`) | `<dataset_id>__<strain_id>` |
-| Enzyme class per declared class, limited to the process law of its rate form (`homogeneous_michaelis_menten`, or `ph_ionization_michaelis_menten` for the pH-ionization form) | `<dataset_id>__<class>` |
+| Enzyme class per declared class, limited to the process law of its rate form (`homogeneous_michaelis_menten`, or `ph_ionization_michaelis_menten` for the pH-ionization form, or `culture_physiology` for a culture's consuming class) | `<dataset_id>__<class>` |
 | Substrate per user-defined substrate, with its physical state (registry substrates are referenced) | `<dataset_id>__<substrate_id>` |
 | Enzyme concentration derived from an `enzyme_dose` ([solid substrates](#solid-substrates)) | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__enzyme_concentration` |
 | Environment per condition | `<dataset_id>__<condition_id>` |
@@ -1183,6 +1439,8 @@ out of data you intend to simulate.
 | Vmax record (explicit row, derived, or from an assay activity) | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__vmax` |
 | Response-law parameter record per `responses.csv` row | `<dataset_id>__<strain>__<class>__<substrate>__<law>__<parameter>` |
 | Explicit unknown per missing role or law parameter | the same identifier with `__gap` |
+| Culture compatibility and case template per consuming class and culture substrate ([fungal culture](#fungal-culture-growth-and-secretion)) | `<dataset_id>__<class>__<substrate_id>__culture_physiology`, `<dataset_id>__<class>__<substrate_id>__culture_template` |
+| Culture parameter record per strain, condition and role (`<pool>` for a pool quantity only) | `<dataset_id>__<strain>__<substrate>__<condition>__culture__<quantity>[__<pool>]`, symbol `<dataset_id>__culture__<quantity>[__<pool>]__<class>__<substrate_id>` |
 
 The compatibility record binds the roles of the pair's rate form (`km`,
 `kcat`, `substrate_initial_concentration`, `enzyme_initial_concentration`;
@@ -1337,7 +1595,9 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,s200,product,10,minute,8.7,µM
   states (the product yield is mol/mol), for example µM or mM. Other
   dimensions, and mass concentrations such as g/L, are refused with the case's
   own units in the message. Time courses of a
-  [solid substrate](#solid-substrates) are refused in this version.
+  [solid substrate](#solid-substrates), and of a
+  [culture](#fungal-culture-growth-and-secretion) case, are refused in this
+  version.
 - `sd` is a positive standard deviation in `units` when given, and
   `replicates` a positive integer; report replicates as their mean with `sd`.
 - One series (strain, class, substrate, condition and observable) uses one
@@ -1715,7 +1975,11 @@ Limits of the SABIO-RK route:
   are rescaled by the law. When the dataset has several conditions for a case
   (gap records included) no condition-specific record is copied and the grid
   case reports the roles as missing.
-- No enzyme cocktails or multi-step chains, no growth, secretion or uptake.
+- No enzyme cocktails or multi-step chains. Growth and secretion only through
+  `culture.csv`, which binds the registry's culture model (one consuming pool,
+  an explicit yield, induced synthesis; see
+  [what is and is not modelled](#what-is-and-is-not-modelled)); no uptake of
+  soluble products.
 - Time courses measure the substrate state or the product formed of a
   simulated case; other observables (intermediates, biomass, rates) are not
   read. Comparison interpolates linearly on the simulated output grid and

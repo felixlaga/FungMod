@@ -896,6 +896,7 @@ def _check_data(args: argparse.Namespace) -> int:
             print(f"  - {gap['record_id']}")
             print(f"    measurement request: {gap['provenance']['measurement_request']}")
     _print_genome_resolution(dataset)
+    _print_cultures(dataset)
     _print_timecourses(dataset)
     _print_fit_block(dataset)
     return EXIT_OK
@@ -1904,6 +1905,28 @@ def _print_genome_resolution(dataset: UserDataset) -> None:
         print(f"Families without an enzyme class: {len(dataset.unmapped_families)}")
         for item in dataset.unmapped_families:
             print(f"  - {item['strain_id']} {item['family']}: {item['reason']}")
+
+
+def _print_cultures(dataset: UserDataset) -> None:
+    if not dataset.cultures:
+        return
+    print(
+        f"Cultures (culture.csv; the strain grows on the substrate and secretes its enzyme pools, "
+        f"culture_physiology): {len(dataset.cultures)}"
+    )
+    rows = [
+        (
+            str(item["strain_id"]),
+            str(item["substrate_id"]),
+            str(item["enzyme_class"]),
+            ", ".join(str(pool) for pool in item["enzyme_pools"]),
+            _rows_text(item["rows"]) if item["rows"] else "none (every role a gap)",
+        )
+        for item in dataset.cultures
+    ]
+    headers = ("strain", "substrate", "consuming pool", "enzyme pools", "culture.csv rows")
+    for line in _table(headers, rows):
+        print(f"  {line}")
 
 
 def _print_timecourses(dataset: UserDataset) -> None:

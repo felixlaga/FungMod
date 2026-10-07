@@ -1,0 +1,11 @@
+strain_id,substrate_id,condition_id,quantity,enzyme_class,value,lower,upper,units,evidence_type,method,source
+strain_x1,xylan_lot_x1,c25,substrate_initial_concentration,,15,,,g/L,estimate,illustrative estimate,Illustrative test note IT-9 p. 2
+strain_x1,xylan_lot_x1,c25,initial_biomass,,0.2,,,g/L,estimate,illustrative estimate,Illustrative test note IT-9 p. 2
+strain_x1,xylan_lot_x1,c25,biomass_yield,,0.35,,,g/g,estimate,illustrative estimate,Illustrative test note IT-9 p. 2
+strain_x1,xylan_lot_x1,c25,biomass_loss_rate,,0.01,,,1/h,estimate,illustrative estimate,Illustrative test note IT-9 p. 2
+strain_x1,xylan_lot_x1,c25,induction_half_saturation,,0.5,,,g/L,estimate,illustrative estimate,Illustrative test note IT-9 p. 2
+strain_x1,xylan_lot_x1,c25,hydrolysis_capacity,endo_xylanase_like,0.005,,,g/mg/h,estimate,illustrative estimate,Illustrative test note IT-9 p. 3
+strain_x1,xylan_lot_x1,c25,hydrolysis_half_saturation,endo_xylanase_like,5,,,g/L,estimate,illustrative estimate,Illustrative test note IT-9 p. 3
+strain_x1,xylan_lot_x1,c25,initial_enzyme_concentration,endo_xylanase_like,1,,,mg/L,estimate,illustrative estimate,Illustrative test note IT-9 p. 3
+strain_x1,xylan_lot_x1,c25,specific_production_rate,endo_xylanase_like,5,,,mg/g/h,estimate,illustrative estimate,Illustrative test note IT-9 p. 3
+strain_x1,xylan_lot_x1,c25,enzyme_loss_rate,endo_xylanase_like,0.02,,,1/h,estimate,illustrative estimate,Illustrative test note IT-9 p. 3

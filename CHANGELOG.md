@@ -6,6 +6,41 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Fungal cultures in user data (USERDATA-009): "fungus X on substrate Y in
+  conditions Z" now also simulates the fungus growing on the substrate and
+  secreting its enzymes, not only an enzyme at a stated concentration. An
+  optional `culture.csv` binds the registry's existing `culture_physiology`
+  composition (the *T. harzianum* P49P11 case's model: substrate consumption
+  `k_h E S / (K_h + S)` by one enzyme pool, biomass with an explicit yield
+  and a closure ledger, first-order biomass loss, and biomass-proportional,
+  substrate-induced synthesis and first-order loss of every enzyme pool) to a
+  user's strain and solid substrate, one row per role and condition:
+  `substrate_initial_concentration`, `initial_biomass`, `biomass_yield`,
+  `biomass_loss_rate`, `induction_half_saturation` (culture level),
+  `hydrolysis_capacity`, `hydrolysis_half_saturation` (the consuming pool)
+  and `initial_enzyme_concentration`, `specific_production_rate`,
+  `enzyme_loss_rate` (each pool). Units are checked with pint per role and per
+  case (`k_h x E` and `q x X` against the case's own pool and biomass units;
+  substrate and biomass in one unit); pools stay a protein mass or an assay
+  activity and are never converted; maturity follows the evidence type (the
+  weakest input wins); every missing role is a gap whose measurement request
+  names it in plain words; nothing is defaulted. One culture model per
+  consuming class and solid substrate is generated (template, compatibility,
+  records for every strain declaring the class); `UserDataset.cultures`, its
+  `summary()` and `to_dict()` list them, and `fungmod check-data` prints them.
+  Refused with file, row and column: a culture on a dissolved substrate,
+  culture rows mixed with enzyme-assay rows for the same strain and substrate
+  (or for the culture's class and substrate, or for the culture's class
+  anywhere), a strain with a second class acting on the culture substrate or
+  missing a pool, no or two consuming pools, response laws and time courses
+  of culture cases, units of the wrong dimension and `fitted` evidence.
+  `assemble_user_tables` and `fungmod assemble` do not draft cultures: the
+  solid-substrate refusal names the culture. No new numerics: re-entering the
+  registry case's records (`tests/fixtures/user_data/culture_reentry`)
+  reproduces its trajectories at every loading, and the shipped case
+  assembles byte-identically
+  ([fungal culture](docs/user-data.md#fungal-culture-growth-and-secretion)).
+
 - Partial runs: simulate the runnable cases of a request and report the
   blocked ones (RUN-001). `VirtualExperiment.simulate(..., blocked="report")`
   simulates exactly the cases whose preflight allows simulation in the
@@ -609,6 +644,17 @@ All notable public releases of FungMod are documented here.
   remain explicit; no validated organism model or registry promotion is claimed.
 
 ### Changed
+
+- The `culture_physiology` assembler accepts `rate_units_from_state_role` on a
+  process template (the rate in the units of that state's initial record per
+  unit of the time grid; refused together with a fixed `rate_units` or with an
+  undeclared state role) and an explicit `geometry: null` (a concentration-only
+  model without a geometry entity; a missing or empty geometry is still
+  refused) (USERDATA-009). The output tables state the retrospective-calibration
+  limitation of a culture case only when it binds a `calibrated` record, and
+  "Enzyme pools are assay activities" only when every pool record is in assay
+  units; the shipped *T. harzianum* case's configs and output tables are
+  byte-identical.
 
 - User-dataset gap requests name the measured condition (ASSEMBLE-001): when
   a strain, enzyme class and substrate have kinetic constants at other

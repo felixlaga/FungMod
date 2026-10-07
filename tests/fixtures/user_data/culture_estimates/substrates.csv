@@ -1,0 +1,2 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+xylan_lot_x1,,Xylan-like solid lot X1,xylan_like_solid,solid_polymer,beta_1_4_xylosidic,dry_mass,solubilized_substrate_mass,1,g/g,"Illustrative test note IT-9 p. 1; the product row is required by substrates.csv and is not used by the culture form (no product identity is claimed)"
