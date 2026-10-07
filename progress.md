@@ -81,6 +81,106 @@ grid- and solver-converged and agrees with the two-dimensional model while
 the colony is inside the window, at artificial check values.
 
 
+## USERDATA-002 Vmax, Activity And Environment Responses In User Data
+
+Status: `complete` for the stated scope (2026-10-06); the second increment of
+the user-supplied-data route. It removes the two largest practical barriers of
+USERDATA-001: most laboratories report a maximum rate, a specific activity or
+an assay activity rather than `kcat`, and kinetics depend on temperature and
+pH.
+
+Changed:
+
+- Generic (`screening/case_builder.py`): `RegistryRoleSet` and
+  `RegistryProcessAssembler.alternative_role_sets`, `role_set_for` and
+  `parameter_roles_for`. The homogeneous Michaelis-Menten assembler accepts
+  either `{km, kcat, substrate_initial_concentration,
+  enzyme_initial_concentration}` (primary, unchanged) or `{km, vmax,
+  substrate_initial_concentration}` with template state roles `substrate` and
+  `product` only; the compatibility record's `parameter_roles` select the set,
+  and binding two complete sets is refused. `_enzyme_kinetics_config_data`
+  takes the selected state roles (the process `vmax` form of
+  `HomogeneousMichaelisMentenFactory` already existed). `screening/ensemble.py`
+  and `api/result_tables.py` ask the assembler for the role set instead of the
+  primary roles. `modelability.py` needed no change (it reads the
+  compatibility's `required_parameters`).
+- `api/user_data.py`: `kinetics.csv` quantities `vmax` (method required),
+  `specific_activity`, `enzyme_loading`, `assay_activity` and columns
+  `activity_substrate`, `activity_saturating`; per case one rate form (kcat
+  with an enzyme concentration, or Vmax) and one Vmax route (explicit row;
+  `specific_activity` x `enzyme_loading` as a derived record computed with
+  pint, listing both rows, the formula and the conversion, maturity the weaker
+  input's under `USER_DATASET_MATURITY_ORDER`, one range input scaled, two
+  ranges refused; or an assay activity accepted only on the case substrate at
+  saturation); one form per enzyme class and substrate. Optional
+  `responses.csv` (`RESPONSE_LAWS`: `temperature_cardinal_rosso`,
+  `ph_cardinal_rosso`, `temperature_arrhenius_reference`, all existing
+  template modifiers): parameters complete and unique, dimensions checked, the
+  law's own domain checked by evaluating the implemented law, one law per
+  condition and pair, `design` evidence refused, and the reference-condition
+  rule (kinetic constants at the law's optimum or reference temperature,
+  exactly, within the row's own `reference_tolerance`, or declared with
+  `kinetics_at_reference = yes`). Laws are bound as
+  `process_state_metadata.process_modifiers` of the generated template with
+  condition-independent parameter records (temperatures in kelvin), the whole
+  law at its weakest row's maturity; other strains of the pair get law gaps.
+  Gap requests follow the started rate form, or name both forms ("Measure kcat
+  and the enzyme concentration ..., or Vmax (or a specific activity and enzyme
+  loading)."). Datasets without the new quantities or `responses.csv` generate
+  byte-identical records.
+- Docs: `docs/user-data.md` (quantities, rate forms, the three Vmax routes and
+  their refusals, `responses.csv`, reference-condition rule, maturity
+  ordering, gaps, limitations), a cross-reference in
+  `docs/environment-response.md`, README subsection and capability row,
+  changelog.
+
+Tests: `tests/test_user_data_v2.py` (51 tests) with the fixture
+`tests/fixtures/user_data/oxidase_case/` (a laccase-like oxidase class on the
+`phenolic_oh` bond of a dissolved user substrate, specific activity in
+umol/min/mg and loading in mg/L, cardinal temperature 10/50/70 degC and pH
+3/5/8 laws, estimates only): the derived Vmax equals 12 umol/min/mg x 0.05
+mg/L = 0.6 uM/min and lists both rows; weaker-maturity cases; exploratory
+simulation runs; an `EnvironmentGrid` over 20, 50 and 65 degC is fastest at
+50 degC and its initial rates match the CTMI factors computed in the test
+(0.15625, 0.47265625) to 1e-9, with `active_response_model`; a pH grid matches
+the CPM; an Arrhenius binding matches exp(-Ea/R (1/T - 1/T_ref)); scientific
+mode refused for estimates and reached with measured kinetics and laws; the
+Vmax form reproduces the kcat form on the Reaction 618 re-entry when Vmax =
+kcat x E (largest difference 5e-14 mM against a solver bound of 2e-7 mM); 25
+refusal cases; gap requests; law gaps for a second strain; a pair mixing rate
+forms refused; laws checked against the existing modifier roles; and a
+snapshot test that the shipped Reaction 618 and BGL1A configs, the
+USERDATA-001 scientific config and the USERDATA-001 generated records are
+byte-identical to the code before this change
+(`tests/fixtures/user_data/assembled_config_snapshots.json`, taken from the
+base commit). In `tests/test_user_data_import.py` three expectations that
+asserted the lifted v1 refusals now assert the replacements (a `vmax` row next
+to an enzyme concentration, an unsupported `timecourse.csv`, a `vmax` row
+without its method); the guardrail forbids the new fixture's enzyme and
+substrate words in `api/user_data.py`.
+
+Not changed: no process law, modifier, solver, registry file, shipped record,
+output table schema or shipped preflight text; shipped cases assemble
+byte-identically; user data never reaches `data_registry`.
+
+Scientific impact: user data can now state the rate a laboratory measured and
+how it depends on temperature and pH, through laws FungMod already implements,
+with derived values traceable to their rows and the weakest evidence carried
+through. Nothing is converted between substrates, from sub-saturating assays,
+or between molar and mass units.
+
+Limitations: one rate form per enzyme class and substrate; the Vmax form has
+no enzyme state (no enzyme loss or dilution); assay activities are read per
+volume of the simulated system; laws scale the rate only (Km and
+concentrations are not rescaled), one per condition, no Gaussian pH, oxygen,
+water-activity or thermal-inactivation laws from user tables, and no Arrhenius
+validity bounds; laws are bound per enzyme class and substrate, so other
+strains of the pair need the law's parameters.
+
+Recommended next task: user time-course tables (`timecourse.csv`) compared
+against the simulated trajectories with the existing comparison metrics, then
+fitting of user kinetic constants to them.
+
 ## FIX-RATES-001 Degradation And Product-Release Rates From State Rates
 
 Status: `complete` for the stated scope (2026-10-06).

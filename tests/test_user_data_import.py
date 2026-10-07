@@ -520,13 +520,19 @@ VALIDATION_CASES: dict[str, tuple[dict[str, str | None], tuple[str, int | None, 
         {"kinetics.csv": _kinetics_text().replace("strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,km", "strain_x,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,km")},
         ("kinetics.csv", 2, "strain_id", "not declared in strains.csv"),
     ),
-    "vmax_row": (
-        {"kinetics.csv": _kinetics_text().replace(",kcat,30,,,1/min,", ",vmax,30,,,µM/min,")},
+    # USERDATA-002 accepts vmax rows; a vmax row next to an enzyme concentration mixes the two rate forms.
+    "vmax_row_with_enzyme_concentration": (
+        {
+            "kinetics.csv": _kinetics_text().replace(
+                ",kcat,30,,,1/min,estimate,,", ",vmax,30,,,µM/min,estimate,initial-rate fit,"
+            )
+        },
         ("kinetics.csv", 3, "quantity", "needs kcat and an enzyme concentration"),
     ),
+    # USERDATA-002 imports responses.csv; other tables are still refused.
     "unsupported_extra_csv": (
-        {"responses.csv": "time,value\n0,1\n"},
-        ("responses.csv", None, None, "Unsupported table 'responses.csv'"),
+        {"timecourse.csv": "time,value\n0,1\n"},
+        ("timecourse.csv", None, None, "Unsupported table 'timecourse.csv'"),
     ),
     "missing_time_grid": (
         {
@@ -580,7 +586,7 @@ def test_every_issue_is_collected_before_raising(tmp_path: Path) -> None:
         edits={
             "kinetics.csv": kinetics,
             "conditions.csv": "condition_id,temperature,temperature_units,ph,notes\nc37_ph7_5,37,degC,15,\n",
-            "responses.csv": "time,value\n0,1\n",
+            "timecourse.csv": "time,value\n0,1\n",
         },
     )
 
@@ -588,12 +594,13 @@ def test_every_issue_is_collected_before_raising(tmp_path: Path) -> None:
         load_user_dataset(dataset_dir, registry=REGISTRY_INDEX)
 
     located = {(issue["file"], issue["row"], issue["column"]) for issue in excinfo.value.issues}
+    # USERDATA-002: a vmax row is accepted but must state its method.
     assert {
         ("kinetics.csv", 2, "units"),
-        ("kinetics.csv", 3, "quantity"),
+        ("kinetics.csv", 3, "method"),
         ("kinetics.csv", 5, "strain_id"),
         ("conditions.csv", 2, "ph"),
-        ("responses.csv", None, None),
+        ("timecourse.csv", None, None),
     } <= located
     assert "kinetics.csv row 2 column units" in str(excinfo.value)
 

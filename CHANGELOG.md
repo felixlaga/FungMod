@@ -16,6 +16,30 @@ All notable public releases of FungMod are documented here.
   evidence for amendments 2 and 3. `tip_fraction_beyond_radius` and the
   plan-declared window and symmetry window in the study module. No fit.
 
+- Vmax, activity and environment responses in user data (USERDATA-002):
+  `kinetics.csv` accepts `vmax` (with a required `method`),
+  `specific_activity`, `enzyme_loading` and `assay_activity` with the new
+  columns `activity_substrate` and `activity_saturating`. Vmax comes from
+  exactly one route per case: an explicit row, `specific_activity` x
+  `enzyme_loading` (a derived record, computed with pint, listing both rows and
+  the formula, with the weaker input's maturity in the order
+  `exploratory_prior` < `user_design_value` < `user_reported_literature` <
+  `user_measured`), or an assay activity on the case substrate at saturation;
+  other substrates, sub-saturating activities, mixed routes and kcat with Vmax
+  are refused. The homogeneous Michaelis-Menten assembler gains a generic
+  alternative role set `{km, vmax, substrate_initial_concentration}` without an
+  enzyme state (`RegistryRoleSet`, `RegistryProcessAssembler.role_set_for`);
+  shipped cases assemble byte-identically. An optional `responses.csv` binds
+  `temperature_cardinal_rosso`, `ph_cardinal_rosso` or
+  `temperature_arrhenius_reference` to a strain, enzyme class and substrate
+  through the case-template process modifiers, after checking the parameters,
+  their dimensions, the law's own domain and that the kinetic constants are
+  stated at the law's reference condition (exactly, within a stated
+  `reference_tolerance`, or declared with `kinetics_at_reference`). Estimated
+  law parameters make the whole law an exploratory prior. Gap requests name
+  the rate form the user started, or both forms when none was
+  (`docs/user-data.md`).
+
 - Command-line virtual experiments (CLI-001): the `fungmod` console script
   (`fungal_model.cli:main`, also `python -m fungal_model`) with `run`,
   `preflight`, `check-data` and `list`. `fungmod run --fungus NAME
