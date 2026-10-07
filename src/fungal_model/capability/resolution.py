@@ -44,6 +44,12 @@ class CapabilityResolutionError(ValueError):
     """Raised when capability cannot be resolved honestly from the inputs."""
 
 
+def default_family_map_path() -> Path:
+    """Return the curated CAZy family map shipped with the registry."""
+
+    return default_registry_path().parent / "cazyme_families" / "cazyme_family_map.yml"
+
+
 @dataclass(frozen=True)
 class FamilyMapping:
     """One curated CAZy family to enzyme-class assignment."""
@@ -74,11 +80,7 @@ class CazymeFamilyMap:
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> "CazymeFamilyMap":
-        resolved = (
-            Path(path)
-            if path is not None
-            else default_registry_path().parent / "cazyme_families" / "cazyme_family_map.yml"
-        )
+        resolved = Path(path) if path is not None else default_family_map_path()
         data = yaml.safe_load(Path(resolved).read_text(encoding="utf-8"))
         if not isinstance(data, Mapping) or data.get("record_type") != "cazyme_family_map":
             raise CapabilityResolutionError(f"{resolved} is not a cazyme_family_map record file.")
@@ -296,6 +298,7 @@ class CapabilityResolver:
 
 __all__ = [
     "DIAGNOSTIC",
+    "default_family_map_path",
     "POLYSPECIFIC",
     "SPECIFICITY_LEVELS",
     "CapabilityResolution",

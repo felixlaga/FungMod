@@ -16,6 +16,30 @@ All notable public releases of FungMod are documented here.
   evidence for amendments 2 and 3. `tip_fraction_beyond_radius` and the
   plan-declared window and symmetry window in the study module. No fit.
 
+- Enzyme repertoire from a genome annotation in user data (USERDATA-003): an
+  optional `genomes.csv` (`strain_id`, `annotation_file`, `annotation_tool`,
+  `source`, optional `min_tools_agreeing`) points a strain to a dbCAN
+  `overview.txt` inside the dataset directory (absolute and escaping paths,
+  missing files, other tools, a tool without its version and malformed headers
+  are refused; the file's bytes enter the dataset digest). The annotation is
+  resolved with the existing `CapabilityResolver` and CAZy family map against
+  the base registry: classes with a registry record join the strain's declared
+  classes with the evidence "genome annotation (dbCAN, N genes, families ...)"
+  (an explicit `enzymes.csv` row wins and keeps both pieces of evidence),
+  classes without a record are listed in `unmodellable_enzyme_classes` and
+  families without a class in `unmapped_families`, never turned into records.
+  No rate is taken from the genome: every resolved class that can act on a
+  dataset substrate but has no kinetics becomes `user_dataset_gap` unknowns
+  whose measurement requests name the families the class was inferred from. The default consensus rule is the
+  existing one of `families_from_overview` (a family called by any tool
+  column); `min_tools_agreeing` requires that many tool columns per gene. The
+  lists appear in `UserDataset.to_dict()`, the new `UserDataset.summary()`,
+  `virtual_experiment_summary.json` and a `user_dataset_genome_resolution.json`
+  written beside the preflight report. `fungal_model.capability` gains
+  `parse_overview` (per-gene calls) and `default_family_map_path`; the family
+  map's two citations containing a colon are now quoted so they load as text
+  (`docs/user-data.md`).
+
 - Vmax, activity and environment responses in user data (USERDATA-002):
   `kinetics.csv` accepts `vmax` (with a required `method`),
   `specific_activity`, `enzyme_loading` and `assay_activity` with the new

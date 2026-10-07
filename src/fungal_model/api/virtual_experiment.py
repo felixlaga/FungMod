@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import csv
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import product
 from pathlib import Path
@@ -29,6 +29,10 @@ from fungal_model.screening import (
 
 VirtualExperimentMode = Literal["exploratory", "scientific"]
 DEFAULT_REGISTRY_REFERENCE = "data_registry/registry_index.yml"
+USER_DATASET_GENOME_RESOLUTION_FILE = "user_dataset_genome_resolution.json"
+# Genome-resolution lists of a user dataset that ``VirtualExperiment.to_dict`` carries beside
+# ``user_dataset_id``; the preflight genome-resolution file adds the annotations read.
+_GENOME_EXPERIMENT_KEYS = ("genome_resolved_classes", "unmodellable_enzyme_classes", "unmapped_families")
 
 
 class VirtualExperimentError(ValueError):
@@ -48,6 +52,7 @@ class VirtualExperiment:
     resolved_records: tuple[ResolvedRecord, ...] = ()
     user_dataset_id: str | None = None
     user_dataset_digest: str | None = None
+    user_dataset_summary: Mapping[str, Any] | None = None
 
     @classmethod
     def from_registry(
@@ -116,6 +121,7 @@ class VirtualExperiment:
             resolved_records=resolved_records,
             user_dataset_id=None if user_dataset is None else user_dataset.dataset_id,
             user_dataset_digest=None if user_dataset is None else user_dataset.digest,
+            user_dataset_summary=None if user_dataset is None else user_dataset.summary(),
         )
 
     @classmethod
@@ -164,14 +170,32 @@ class VirtualExperiment:
         mode: ModelabilityMode = "exploratory",
         output_dir: str | Path = "outputs/virtual_experiment_preflight",
     ) -> WrittenTables:
-        """Write preflight-only diagnostic tables without assembling or running a model."""
+        """Write preflight-only diagnostic tables without assembling or running a model.
+
+        When the experiment's user dataset has a ``genomes.csv``, the report
+        also writes ``user_dataset_genome_resolution.json``: the annotations
+        read, the enzyme classes they resolved, the resolved classes without a
+        registry record, and the unmapped CAZy families.
+        """
 
         reports = self.preflight(mode=mode)
-        return write_preflight_tables(
+        tables = write_preflight_tables(
             registry=self.registry,
             preflight_reports=reports,
             output_dir=output_dir,
         )
+        summary = self.user_dataset_summary
+        if summary is None or not summary.get("genome_annotations"):
+            return tables
+        path = Path(output_dir) / USER_DATASET_GENOME_RESOLUTION_FILE
+        document = {
+            "kind": "fungmod_user_dataset_genome_resolution",
+            "user_dataset_id": self.user_dataset_id,
+            "user_dataset_digest": self.user_dataset_digest,
+            **{key: summary.get(key, []) for key in ("genome_annotations", *_GENOME_EXPERIMENT_KEYS)},
+        }
+        path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return WrittenTables(paths={**tables.paths, "user_dataset_genome_resolution": str(path)})
 
     def simulate(
         self,
@@ -240,6 +264,10 @@ class VirtualExperiment:
             "resolved_records": [record.to_dict() for record in self.resolved_records],
             "user_dataset_id": self.user_dataset_id,
             "user_dataset_digest": self.user_dataset_digest,
+            **{
+                key: None if self.user_dataset_summary is None else list(self.user_dataset_summary.get(key, []))
+                for key in _GENOME_EXPERIMENT_KEYS
+            },
         }
 
     @property
