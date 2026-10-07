@@ -1,0 +1,13 @@
+dataset_id: genome_demo
+contributor: FungMod maintainers
+date: 2026-10-06
+source: FungMod genome-route format fixture; synthetic gene identifiers, not a real genome
+notes: >-
+  Genome-route case of the user-data route (USERDATA-003). The strain's enzyme
+  classes come only from a hand-written dbCAN overview in the documented
+  format; enzymes.csv holds its header only and kinetics.csv holds no values,
+  so every resolved class becomes explicit gaps with measurement requests.
+simulation:
+  duration: 60
+  units: minute
+  points: 61

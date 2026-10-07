@@ -1,0 +1,2 @@
+strain_id,annotation_file,annotation_tool,source
+strain_g1,annotations/strain_g1_overview.txt,dbCAN 3 overview format (hand-written fixture; no dbCAN run),"FungMod genome-route format fixture; synthetic gene identifiers, not a real genome"

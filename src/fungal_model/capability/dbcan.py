@@ -15,13 +15,17 @@ from __future__ import annotations
 
 import csv
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from fungal_model.capability.resolution import CazymeAnnotation, CapabilityResolutionError
 
 #: Tool columns that may carry family calls, in dbCAN3 overview.txt.
 TOOL_COLUMNS = ("HMMER", "dbCAN_sub", "DIAMOND", "eCAMI", "Hotpep")
+
+#: The gene identifier column of dbCAN overview.txt.
+GENE_ID_COLUMN = "Gene ID"
 
 #: A CAZy family prefix: letters then digits, e.g. GH5, AA9, CE1, PL1, GT2, CBM1.
 _FAMILY = re.compile(r"^(GH|GT|PL|CE|AA|CBM)(\d+)")
@@ -68,6 +72,119 @@ def families_from_overview(path: str | Path, *, tool_columns: Iterable[str] = TO
     return tuple(sorted(families))
 
 
+@dataclass(frozen=True)
+class OverviewGene:
+    """The family calls of one gene in a dbCAN overview, per tool column."""
+
+    gene_id: str
+    calls: Mapping[str, tuple[str, ...]]
+
+    def tools_calling(self, family: str) -> int:
+        """Return how many tool columns call ``family`` for this gene."""
+
+        return sum(1 for families in self.calls.values() if family in families)
+
+
+@dataclass(frozen=True)
+class DbcanOverview:
+    """A dbCAN overview parsed per gene, so that families can be counted in genes.
+
+    ``tool_columns`` are the tool columns present in the file, in
+    ``TOOL_COLUMNS`` order. ``genes`` hold every gene row with its per-tool
+    family calls (genes without any call included).
+    """
+
+    tool_columns: tuple[str, ...]
+    genes: tuple[OverviewGene, ...]
+
+    def family_genes(self, *, min_tools_agreeing: int | None = None) -> dict[str, tuple[str, ...]]:
+        """Return each called family with the genes that support it, families sorted.
+
+        Without ``min_tools_agreeing`` a family counts for a gene when any tool
+        column calls it, which is the rule of ``families_from_overview``: the
+        set of families returned is the same. With ``min_tools_agreeing = m``
+        a family counts for a gene only when at least ``m`` of the tool columns
+        present call it for that gene; ``m`` must lie between one and the
+        number of tool columns present.
+        """
+
+        required = 1 if min_tools_agreeing is None else min_tools_agreeing
+        if isinstance(required, bool) or not isinstance(required, int) or required < 1:
+            raise CapabilityResolutionError(
+                f"min_tools_agreeing must be a positive integer; got {min_tools_agreeing!r}."
+            )
+        if required > len(self.tool_columns):
+            raise CapabilityResolutionError(
+                f"min_tools_agreeing {required} exceeds the {len(self.tool_columns)} tool column(s) present "
+                f"({', '.join(self.tool_columns)}); no family could be called."
+            )
+        supported: dict[str, list[str]] = {}
+        for gene in self.genes:
+            called = sorted({family for families in gene.calls.values() for family in families})
+            for family in called:
+                if gene.tools_calling(family) >= required:
+                    supported.setdefault(family, []).append(gene.gene_id)
+        return {family: tuple(supported[family]) for family in sorted(supported)}
+
+
+def parse_overview(
+    text: str,
+    *,
+    source: str,
+    tool_columns: Iterable[str] = TOOL_COLUMNS,
+) -> DbcanOverview:
+    """Parse the text of a dbCAN ``overview.txt`` per gene.
+
+    The header must hold ``Gene ID`` and at least one tool column. Gene
+    identifiers must be nonblank and unique, a row may not have more cells than
+    the header, and at least one family must be called. ``source`` names the
+    file in error messages. Cells are read with the same family rule as
+    ``families_from_overview`` (subfamily suffixes and residue ranges dropped).
+    """
+
+    reader = csv.reader(text.splitlines(), delimiter="\t")
+    header = next(reader, None)
+    if header is None or not any(cell.strip() for cell in header):
+        raise CapabilityResolutionError(f"{source} has no header row.")
+    names = [cell.strip() for cell in header]
+    expected = tuple(tool_columns)
+    present = tuple(column for column in expected if column in names)
+    if GENE_ID_COLUMN not in names or not present:
+        raise CapabilityResolutionError(
+            f"{source} does not have a dbCAN overview header: it needs the column {GENE_ID_COLUMN!r} and at least "
+            f"one of the tool columns {expected} separated by tabs; found {tuple(names)}."
+        )
+    duplicates = sorted({name for name in names if name and names.count(name) > 1})
+    if duplicates:
+        raise CapabilityResolutionError(f"{source} repeats the header column(s) {duplicates}.")
+    gene_index = names.index(GENE_ID_COLUMN)
+    tool_indices = {column: names.index(column) for column in present}
+    genes: list[OverviewGene] = []
+    seen: dict[str, int] = {}
+    for line, cells in enumerate(reader, start=2):
+        if not any(cell.strip() for cell in cells):
+            continue
+        if len(cells) > len(names):
+            raise CapabilityResolutionError(f"{source} line {line} has more cells than the header.")
+        gene_id = cells[gene_index].strip() if gene_index < len(cells) else ""
+        if not gene_id:
+            raise CapabilityResolutionError(f"{source} line {line} has no gene identifier in {GENE_ID_COLUMN!r}.")
+        if gene_id in seen:
+            raise CapabilityResolutionError(
+                f"{source} line {line} repeats gene {gene_id!r} from line {seen[gene_id]}; an overview has one "
+                "row per gene."
+            )
+        seen[gene_id] = line
+        calls = {
+            column: tuple(sorted(_families_in_cell(cells[index] if index < len(cells) else "")))
+            for column, index in tool_indices.items()
+        }
+        genes.append(OverviewGene(gene_id=gene_id, calls=calls))
+    if not any(families for gene in genes for families in gene.calls.values()):
+        raise CapabilityResolutionError(f"{source} yielded no CAZy family calls.")
+    return DbcanOverview(tool_columns=present, genes=tuple(genes))
+
+
 def annotation_from_overview(
     path: str | Path,
     *,
@@ -92,4 +209,12 @@ def annotation_from_overview(
     )
 
 
-__all__ = ["TOOL_COLUMNS", "annotation_from_overview", "families_from_overview"]
+__all__ = [
+    "GENE_ID_COLUMN",
+    "TOOL_COLUMNS",
+    "DbcanOverview",
+    "OverviewGene",
+    "annotation_from_overview",
+    "families_from_overview",
+    "parse_overview",
+]
