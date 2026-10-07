@@ -6,6 +6,32 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- One reviewable dataset for "fungus X on substrate(s) Y at condition(s) Z"
+  (ASSEMBLE-001): `assemble_user_tables` drafts the user-dataset tables for
+  exactly that request from the sources at hand (a dbCAN annotation copied into
+  the draft and listed in `genomes.csv`, enzyme classes the user asserts, the
+  registry record of a registry fungus, an existing user dataset, SABIO-RK
+  entries as `user_tables_from_sabiork` accepts them) and returns an
+  `AssembledTablesDraft` (a `UserTablesDraft` with `responses.csv`,
+  `genomes.csv`, the annotation file and an `assembly` report). Per enzyme
+  class, substrate and condition the report and `review.md` give the class
+  evidence, the kinetics status (`user_data`, `literature_same_organism`,
+  `transferred_estimate`, `conflict`, `gap`), how the condition is reached,
+  the source IDs and the reason. The repertoire comes only from the
+  annotation, asserted classes, the fungus's dataset rows or its registry
+  record; classes acting on a substrate without evidence are reported and not
+  added; SABIO-RK entries of the fungus's species are converted by
+  `user_tables_from_sabiork` (literature), entries of another organism by the
+  same conversion and then written as `estimate` rows whose method begins
+  "transferred from <organism> enzyme, SABIO-RK entry <id>"; several
+  candidates for one case are listed until `entry_ids` chooses; kinetics are
+  never reused at another condition, except through a temperature or pH law
+  at an `EnvironmentGrid` condition, which the report names. The reviewer,
+  time grid, kcat-form enzyme concentration, unsettled yields, new substrate
+  categories and the annotation source are `REVIEW:` fields unless given.
+  Nothing is fetched, and the output is byte-identical for the same input
+  (`docs/user-data.md#assembling-fungus-substrate-and-conditions`).
+
 - pH-ionization kinetics in user data (USERDATA-006): a third rate form for a
   (class, substrate) pair in `kinetics.csv`, with the quantities
   `kcat_limiting` (1/time), `km_limiting` (concentration), `pk_free_lower`,
@@ -480,6 +506,15 @@ All notable public releases of FungMod are documented here.
   remain explicit; no validated organism model or registry promotion is claimed.
 
 ### Changed
+
+- User-dataset gap requests name the measured condition (ASSEMBLE-001): when
+  a strain, enzyme class and substrate have kinetic constants at other
+  conditions of `conditions.csv` but none at this one, each gap's measurement
+  request adds "kinetics.csv states kinetic constants of this strain, enzyme
+  class and substrate only at <condition> (<temperature>, <pH>), and FungMod
+  does not reuse kinetics measured at another condition". Values, records and
+  gaps are unchanged. The loader's categorical compatibility rule is exposed as
+  `fungal_model.api.user_data.enzyme_class_acts_on` and used by the assembly.
 
 - README and documentation accuracy audit (DOCS-001): the README's current
   limitations now describe the implemented temperature and pH laws, thermal

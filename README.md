@@ -70,6 +70,13 @@ With your own measurements, put them in a folder of small CSV tables
 `user_data="that/folder"`; FungMod checks every table, keeps each value's
 source and units, and turns anything missing into a named measurement request
 ([user-supplied data](docs/user-data.md)).
+To start from a request instead, `assemble_user_tables(fungus=..., substrates=...,
+conditions=...)` gathers what your sources say about that fungus (its dbCAN
+annotation, the enzyme classes you assert, a user dataset, SABIO-RK entries)
+into one draft of those tables with a per-case report: your own values,
+same-species literature, kinetics transferred from another organism (kept as
+estimates), conflicts and gaps; you review it and load it
+([assembling fungus, substrate and conditions](docs/user-data.md#assembling-fungus-substrate-and-conditions)).
 
 ### Command line
 
@@ -106,7 +113,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
-| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values ([user-supplied data](docs/user-data.md)) |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
 | Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts ([command line](docs/cli.md)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
@@ -1104,6 +1111,16 @@ EC numbers through the registry, a protein whose two annotations disagree
 supports neither, and the requests name the proteome and accessions.
 `fungal_model.sources.uniprot` fetches such an export only on explicit
 `refresh=True`, into a digest-checked snapshot.
+`assemble_user_tables` drafts one such dataset for a request "fungus X on
+substrate(s) Y at condition(s) Z": the repertoire comes only from the fungus's
+annotation, asserted classes, dataset rows or registry record; classes that act
+on a substrate without evidence in the fungus are reported, not added;
+kinetics of another organism's enzyme are written as estimates whose method
+names the transfer; several candidates for one case are listed, not chosen;
+and kinetics are never reused at another condition except through a response
+law at an `EnvironmentGrid` condition. One fungus per call, offline sources
+only, no rate from a genome
+([assembling fungus, substrate and conditions](docs/user-data.md#assembling-fungus-substrate-and-conditions)).
 
 ## Public API
 
@@ -1138,6 +1155,9 @@ assembly, execution, and result inspection:
 - `user_tables_from_sabiork`
 - `UserTablesDraft`
 - `UserTablesSourceError`
+- `assemble_user_tables`
+- `AssembledTablesDraft`
+- `UserTablesAssemblyError`
 - `review_source_proposal`
 - `CurationDecision`
 - `CurationResult`

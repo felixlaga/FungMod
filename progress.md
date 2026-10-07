@@ -26,6 +26,179 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## ASSEMBLE-001 One Dataset For Fungus, Substrate And Conditions
+
+Status: `complete` for the stated scope (2026-10-06). The step the owner's goal
+was missing now exists: "fungus X on substrate(s) Y at condition(s) Z", plus
+whatever sources the user has, is assembled into ONE reviewable user-dataset
+draft for exactly that request, with a report stating per enzyme class,
+substrate and condition what is known, from where and what is missing. The
+draft is reviewed, its `REVIEW:` fields filled, and loaded with
+`load_user_dataset` like any other dataset.
+
+Changed:
+
+- New `api/user_data_assembly.py`: `assemble_user_tables(*, dataset_id,
+  fungus, substrates, conditions, scientific_name=None, same_species=(),
+  annotation=None, annotation_tool=None, annotation_source=None,
+  enzyme_classes=None, kinetics_sources=(), user_data=None, responses=None,
+  design=None, time_grid=None, entry_ids=None, registry=None, cache_dir=...)`
+  returning an `AssembledTablesDraft`, a frozen subclass of `UserTablesDraft`
+  (composition over the existing route: `user_data_sources.py` is unchanged)
+  that adds `responses.csv` and `genomes.csv` rows, the annotation file
+  (written under `annotations/`) and the `assembly` report; `write()` keeps
+  the overwrite and `data_registry/` guards. Signature additions beyond the
+  suggested one, and why: `scientific_name` and `same_species` (a SABIO-RK
+  entry is the fungus's own only by an explicit species, never by parsing the
+  fungus name), `annotation_source` (genomes.csv requires a source; a
+  `REVIEW:` field when omitted) and `responses` (so a law can be supplied for
+  SABIO-RK-derived cases, not only through a dataset's `responses.csv`).
+- Repertoire: only from the annotation (validated with the genome route's own
+  tool and overview checks, resolved with `CapabilityResolver` and the curated
+  family map; classes without a registry record and unmapped families are
+  reported), asserted classes (`REVIEW:` evidence and source when not given),
+  the fungus's `user_data` rows (kept unchanged, including its genome
+  resolution) or the registry record of a registry fungus. A registry fungus
+  becomes a strain of its own (`<record>_assembled`), and its stored registry
+  cases (compatibility, template, parameter records) are listed, not copied.
+- Compatibility per substrate with the loader's rule, now exposed as
+  `user_data.enzyme_class_acts_on` (the loader's `_shared_bonds` delegates to
+  it): classes of X that do not act on Y are reported with the reason; classes
+  that act on Y without evidence in X are reported as "no annotated gene and no
+  user assertion for class C", with the SABIO-RK entries not used because of
+  it, and are not added.
+- Kinetics per case, precedence user dataset > same species > transfer:
+  `user_data` rows kept unchanged; each SABIO-RK entry converted on its own by
+  `user_tables_from_sabiork(entry_ids=[id])` (so mutants, unresolved EC
+  numbers, units and pH-ionization laws are handled exactly as USERDATA-005
+  handles them); an entry of another organism is then written with evidence
+  `estimate` (design rows stay `design`) and a method beginning "transferred
+  from <organism> enzyme, SABIO-RK entry <id>"; several candidates of the same
+  standing are a `conflict`, none converted until `entry_ids` chooses; a case
+  without kinetics gets no kinetic row, so the loader records its gaps. One
+  rate form per class and substrate (the best-evidence source sets it; other
+  forms are listed). The kcat form's enzyme concentration is a `REVIEW:` row
+  unless `design` states it (the assay's value is listed as replaced).
+- Conditions: requested conditions are matched to measured ones by equal
+  temperature (kelvin) and pH. Kinetics are never reused at another
+  condition. From the loader and `VirtualExperiment` code: kinetics bind to
+  one `conditions.csv` condition, gaps are generated at every row without
+  kinetics, a `responses.csv` law is applied only at `EnvironmentGrid`
+  conditions, and the grid overlay copies a value only when it is stated at
+  exactly one condition. So a requested condition is either a row whose gaps
+  name the measured condition, or, when a temperature or pH law covers every
+  difference and the pair's only rows are its measured condition, an
+  `EnvironmentGrid` condition (not a row; the report gives the grid);
+  otherwise the law-carried case is downgraded to a gap with the reason
+  (iterated until stable). Gap cases receive the stated design substrate
+  concentration (and the enzyme concentration when the pair already uses the
+  kcat form), so their gaps are only the kinetic constants.
+- Report (`draft.assembly`, also in `to_dict()`): fungus and how it resolved,
+  substrates, requested and measured conditions, classes with every piece of
+  evidence, unmodellable classes and unmapped families, per-substrate
+  compatibility, and per case: fungus, strain, enzyme class, substrate,
+  condition, class evidence, `kinetics_status` (`user_data`,
+  `literature_same_organism`, `transferred_estimate`, `conflict`, `gap`),
+  `condition_route`, measured condition, source IDs, design rows and reason;
+  every SABIO-RK entry with its use and reason; stored registry cases; sources;
+  limitations. `review.md` shows the same as tables plus the transfers (with
+  "only by editing kinetics.csv yourself"), gaps and what to measure, grid
+  conditions, entries, decisions and limitations.
+- `api/user_data.py` (additive): a gap's measurement request names the
+  conditions at which the same strain, class and substrate have kinetic
+  constants when this case has none ("...; kinetics.csv states kinetic
+  constants of this strain, enzyme class and substrate only at c30_ph5 (30
+  degC, pH 5), and FungMod does not reuse kinetics measured at another
+  condition"); `_CaseContext.measured_elsewhere`; `enzyme_class_acts_on`.
+- Exports: `assemble_user_tables`, `AssembledTablesDraft`,
+  `UserTablesAssemblyError` (a `UserTablesSourceError`) from
+  `fungal_model.api`, `fungal_model` and `fungmod`.
+- Docs: `docs/user-data.md` "Assembling fungus, substrate and conditions"
+  (worked example, inputs, status table, rules, limits) and the gap-request
+  clause; `docs/api.md`; `docs/capabilities.md`; README quick start,
+  capability row, user-data paragraph and Public API list; changelog (Added
+  and Changed).
+
+Tests: `tests/test_user_data_assembly.py` (24 test functions, 39 cases with
+the parametrized argument errors; network blocked through
+`urllib.request.urlopen` and the SABIO-RK fetch module). On the real frozen
+Reaction 618 export with the `genome_case` annotation: a strain of unstated
+species gets EntryID 35622 as `transferred_estimate` (estimate rows, transfer
+method, `REVIEW:` enzyme concentration), the other genome classes are reported
+as the genome route reports them, the reviewed draft loads, runs in
+exploratory mode and is refused in scientific mode with the standard reason;
+the registry fungus *Phanerochaete chrysosporium* gets EntryID 38521 as
+`literature_same_organism`, its stored pH-ionization case is listed, and with
+design values the reviewed draft is `modelable` and simulates in scientific
+mode; `same_species` maps a species explicitly; without it the same entry is a
+transfer. A requested 40 degC condition without a law is a gap whose loaded
+measurement requests name c30_ph5 and which preflight reports as
+underparameterized. On the illustrative `oxidase_case` (a non-cellulose
+oxidase class on a phenolic substrate, user data kept unchanged) its
+temperature law carries 50 degC kinetics to 40 degC as an `EnvironmentGrid`
+condition, and both grid conditions run with `active_response_model` and the
+CTMI ratio; the same law given through `responses` behaves identically;
+without it 40 degC is a gap naming c50_ph5; with only a temperature law and a
+pH-6 request, the extra row makes the law case a gap with the reason. A class
+acting on cellobiose without evidence is reported, not added, and the loaded
+fungus has only the asserted class; the repertoire is never taken from a name;
+the `literature_reentry` dataset wins over the rice entries at its condition
+and its rows are byte-for-byte the fixture's; three rice entries at one
+condition are a conflict until `entry_ids` chooses, and entries only at other
+conditions make a gap; a test-only in-memory glucoamylase record and the
+fixture's maltose row exercise a user-described substrate (and an
+undescribed one leaves compatibility undetermined with `REVIEW:` categories).
+Byte-identical output, the three SABIO-RK source routes, a loaded
+`UserDataset` as input, explicit condition IDs, report fields, 16 argument
+errors, the `data_registry/` guard and the exports are checked; a direct loader
+test pins the new gap-request clause on a copy of the esterase fixture with a
+second condition, and that the fixture itself is unchanged. Guardrails: the new module is in the no-shortcut scan,
+must not name organisms, substrates or enzymes, and the public-API guardrail
+and README list cover the three new names.
+
+Gates: `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`
+clean; `pyright` on the changed source and test files 0 errors; `mkdocs build
+--strict` clean; the user-data (including the new file), guardrail,
+documentation-sync, hygiene and virtual-experiment tests 215 passed; the full
+suite 2170 passed (25 min) on the committed tree.
+
+Not changed: no process law, solver, registry record, snapshot, fixture,
+output schema or `user_data_sources.py`; the loader's values, records, gaps
+and validation are unchanged apart from the added request clause; nothing is
+fetched.
+
+Scientific impact: none on any simulated value. The assembly only arranges
+existing sources into reviewable tables; it never upgrades evidence (a
+cross-organism value is an estimate), never invents a class, condition,
+product yield, enzyme concentration or time grid, and never reuses kinetics at
+another condition without an explicit response law.
+
+Compatibility: additive. Existing datasets load to the same records; the only
+visible change is the extra clause on gap requests of a strain, class and
+substrate that has kinetic constants at some conditions and none at others.
+
+Non-specific coverage: the assembly has no organism, substrate or enzyme
+branch; it is exercised on beta-glucosidase/cellobiose (SABIO-RK, genome), a
+laccase-like oxidase on a phenolic substrate (user data with laws), a
+carboxylesterase on an aryl ester (user data) and a test-only glucoamylase on
+a user-described maltose.
+
+Remaining ambiguities: same-species matching is by exact organism name (no
+taxonomy service offline); strain-level differences within a species are
+reported but not distinguished. A law route requires the pair's kinetics at
+one condition and no other `conditions.csv` row, which the loader and grid
+design impose. Review text for gaps summarises what to measure; the exact
+measurement-request sentences are the loader's, produced once the draft
+loads.
+
+Risk: low to moderate. New code path, additive; the loader change alters only
+text of some gap requests.
+
+Recommended next task: a `fungmod assemble` command-line subcommand on the CLI
+branch that calls `assemble_user_tables` and writes the draft; then let user
+data bind `ph_ionization_michaelis_menten` so pH-dependent SABIO-RK laws can be
+assembled as laws.
+
 ## USERDATA-006 pH-Ionization Kinetics In User Data
 
 Status: `complete` for the stated scope (2026-10-06). The shipped registry

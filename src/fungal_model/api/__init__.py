@@ -75,6 +75,11 @@ from fungal_model.api.user_data_sources import (
     UserTablesSourceError,
     user_tables_from_sabiork,
 )
+from fungal_model.api.user_data_assembly import (
+    AssembledTablesDraft,
+    UserTablesAssemblyError,
+    assemble_user_tables,
+)
 from fungal_model.api.virtual_experiment import (
     DegradationScreenResult,
     VirtualExperiment,
@@ -146,6 +151,9 @@ __all__ = [
     "UserTablesDraft",
     "UserTablesSourceError",
     "user_tables_from_sabiork",
+    "AssembledTablesDraft",
+    "UserTablesAssemblyError",
+    "assemble_user_tables",
     "VirtualExperiment",
     "VirtualExperimentError",
     "VirtualExperimentMode",

@@ -59,7 +59,175 @@ synthetic accessions, not a real proteome).
 
 To start from public kinetics instead of typing them in, draft the tables from
 SABIO-RK entries and review them; see
-[starting from SABIO-RK](#starting-from-sabio-rk).
+[starting from SABIO-RK](#starting-from-sabio-rk). To ask for one fungus on
+some substrates at some conditions and have FungMod gather everything it can
+from your sources into one draft, see
+[assembling fungus, substrate and conditions](#assembling-fungus-substrate-and-conditions).
+
+## Assembling fungus, substrate and conditions
+
+`assemble_user_tables` takes the request "fungus X on substrate(s) Y at
+condition(s) Z" together with the sources you have, and drafts one set of the
+tables described below for exactly that request. Its `review.md` and its
+`assembly` report say, for every enzyme class, substrate and condition, what is
+known, where it comes from and what is missing. Like the SABIO-RK route, the
+result is a draft: you review it, fill its `REVIEW:` fields and load it.
+
+```python
+import fungmod as fm
+
+draft = fm.assemble_user_tables(
+    dataset_id="strain_g1_on_cellobiose",
+    fungus="Genome-annotated strain G1",          # a new strain, a registry fungus, or a strain of user_data
+    substrates=["cellobiose"],                    # registry substrates, user_data substrates, or ones you describe
+    conditions=[
+        {"temperature": 30, "temperature_units": "degC", "ph": 5},
+        {"temperature": 40, "temperature_units": "degC", "ph": 5},
+    ],
+    annotation="path/to/overview.txt",            # the fungus's dbCAN annotation, copied into the draft
+    annotation_tool="dbCAN 4.1.4",
+    annotation_source="run_dbcan on the predicted proteome of assembly <accession>",
+    kinetics_sources=["618"],                     # SABIO-RK sources, as user_tables_from_sabiork takes them
+    entry_ids=["35622"],
+    design={                                      # the virtual assay's own amounts, optional
+        "substrate_initial_concentration": {"value": 10, "units": "mM"},
+        "enzyme_concentration": {"value": 1e-3, "units": "mM"},
+    },
+    time_grid={"duration": 10, "units": "hour", "points": 61},
+)
+draft.write("strain_g1_on_cellobiose")  # tables, annotations/, user_dataset.yml and review.md
+for case in draft.assembly["cases"]:
+    print(case["enzyme_class"], case["condition"], case["kinetics_status"], case["reason"])
+```
+
+With the hand-written annotation of the `genome_case` fixture and the frozen
+Reaction 618 snapshot (`tests/test_user_data_assembly.py`), the strain has
+`beta_glucosidase` (GH1, GH3) and `cellulase_generic` (GH5) from its
+annotation; `cellulase_generic` does not act on cellobiose and is reported as
+such, and the four annotated classes without a registry record are listed. At
+30 degC, pH 5 the beta-glucosidase kinetics are `transferred_estimate` from
+EntryID 35622, a rice enzyme. At 40 degC, pH 5 the case is a `gap`: the only
+kinetics were stated at 30 degC, and once loaded, its measurement requests
+read "Measure km of beta-glucosidase from Genome-annotated strain G1 on
+Cellobiose at 40 degC, pH 5 (mM); kinetics.csv states kinetic constants of this
+strain, enzyme class and substrate only at c30_ph5 (30 degC, pH 5), and FungMod
+does not reuse kinetics measured at another condition; ...". The draft loads
+once its contributor is filled in, runs in exploratory mode, and is refused in
+scientific mode because the transferred values are estimates.
+
+### Inputs
+
+- `fungus`: with `user_data`, the strain of that dataset (ID, name or alias)
+  whose rows are used; otherwise a registry fungus (name, alias or ID), which
+  becomes a strain of its own (registry names may not be reused) whose
+  record's enzyme classes count as evidence; otherwise a free-text name for a
+  new strain. `scientific_name` states the species of a new strain.
+- `substrates`: names, aliases or IDs of registry substrates (dissolved ones
+  only), substrates of `user_data` (their rows are kept), or new substrates,
+  given as a name or as a mapping with `substrate` and optionally
+  `substrate_id`, `substrate_class`, `physical_state`, `bond_classes`,
+  `product`, `product_yield` and `source`; what you leave out is a `REVIEW:`
+  field. A mapping for a registry substrate may add `product`,
+  `product_yield` and `source` only.
+- `conditions`: one mapping per condition with `temperature`,
+  `temperature_units` (`degC` or `kelvin`), `ph` and optionally
+  `condition_id` and `notes`. Nothing is invented.
+- Sources of the enzyme repertoire: `annotation` with `annotation_tool` and
+  `annotation_source` (checked like a `genomes.csv` row, copied into
+  `annotations/` and listed in `genomes.csv`), `enzyme_classes` you assert
+  (a class name, alias, EC number or ID, or a mapping with `enzyme_class`,
+  `evidence` and `source`; missing evidence or source is a `REVIEW:` field),
+  the registry record of a registry fungus, and the strain's rows in
+  `user_data`.
+- Sources of kinetics: `user_data` (a dataset directory or a loaded
+  `UserDataset`; it is loaded and checked first) and `kinetics_sources`
+  (SABIO-RK, as `user_tables_from_sabiork` accepts them); `entry_ids` selects
+  entries across them, and `same_species` lists SABIO-RK organism names you
+  declare to be the fungus's own species.
+- `responses`: response-law rows for the fungus, with the columns of
+  `responses.csv` and `substrate` in place of `strain_id` and `substrate_id`.
+- `design` and `time_grid`: the virtual assay's amounts
+  (`substrate_initial_concentration`, `enzyme_concentration`,
+  `enzyme_loading`) and the simulation time grid. Without them these are
+  `REVIEW:` fields; the time grid of `user_data` is used when you give one.
+
+### Kinetics status of a case
+
+A case is one enzyme class of the fungus that acts on a requested substrate,
+at one requested condition.
+
+| `kinetics_status` | Source | What the draft holds |
+| --- | --- | --- |
+| `user_data` | Your dataset's rows for this strain, class, substrate and condition. | The rows, unchanged, with your evidence types. |
+| `literature_same_organism` | One SABIO-RK entry whose organism is the fungus's species. | The entry converted exactly as `user_tables_from_sabiork` converts it (`literature`). |
+| `transferred_estimate` | One SABIO-RK entry of another organism. | The same conversion, then every row that is not a design row has evidence type `estimate` and a method beginning "transferred from <organism> enzyme, SABIO-RK entry <id>". Exploratory mode only. |
+| `conflict` | Several candidates of the same standing. | Nothing; all are listed. Choose one with `entry_ids`. |
+| `gap` | No candidate at this condition. | No kinetic constant; `load_user_dataset` records the gaps and their measurement requests. |
+
+Your own data takes precedence over entries of the fungus's species, which
+take precedence over transfers; weaker candidates at the same condition are
+listed as not used. `condition_route` says how the condition is reached:
+`same_condition` (kinetics stated at it), `response_law` (carried from the
+measured condition by a law, see below) or `none`. Each case in
+`draft.assembly["cases"]` also gives the fungus, the class and its evidence,
+the substrate, the condition, the measured condition, the source IDs and the
+reason; `review.md` shows the same as tables, followed by the transfers, the
+gaps, the SABIO-RK entries and what became of each, and the stored registry
+cases of a registry fungus.
+
+### Rules
+
+- **The repertoire is evidence, never a name.** A class belongs to the fungus
+  only through its genome annotation, a class you assert, its own rows in your
+  dataset or its registry record. A SABIO-RK entry or a name never adds one.
+- **Which classes act on a substrate** is the registry's categorical rule (the
+  substrate class is one of the class's substrate classes and they share a
+  bond class; `enzyme_class_acts_on`). Classes of the fungus that do not act on
+  a substrate are reported with the reason. Classes that act on it without
+  evidence in the fungus are reported as "no annotated gene and no user
+  assertion for class C", with the SABIO-RK entries that are therefore not
+  used, and they are not added.
+- **A transfer stays an estimate.** Kinetics measured on another organism's
+  enzyme are never labelled literature or measured for the fungus. Only you can
+  change that, by editing `kinetics.csv` yourself with the evidence that
+  justifies it.
+- **One value per case.** Several candidates are listed and none is converted
+  until `entry_ids` chooses, the rule of the SABIO-RK route.
+- **No reuse across conditions.** Kinetics are never copied from the condition
+  at which they were stated to another. A requested condition that differs
+  from the measured one is either a `conditions.csv` row whose gaps name the
+  measured condition, or, when a temperature or pH law of `responses.csv` (or
+  `responses`) covers every difference, a condition you run through an
+  `EnvironmentGrid`: the loader applies a law only at grid conditions, and a
+  grid condition reuses a value only when the dataset states it at exactly one
+  condition. A law-carried condition is therefore not a `conditions.csv` row,
+  and it stays law-carried only while the draft's only rows for that class and
+  substrate are its measured condition; otherwise it becomes a gap with the
+  reason. The report gives the grid to run, for example
+  `environment_grid(temperature_C=[40.0], ph=[5.0])`.
+- **Your decisions stay yours.** The reviewer, the time grid, the enzyme
+  concentration of the kcat form, an enzyme loading, a product yield that no
+  source settles, a new substrate's categories and the source of an annotation
+  are `REVIEW:` fields unless you give them. A case without kinetics receives
+  your design substrate concentration (and your enzyme concentration when its
+  pair already uses the kcat form), so its gaps are only the kinetic constants.
+- **Offline and deterministic.** Nothing is fetched while assembling, and the
+  same inputs give byte-identical files.
+
+### Limits
+
+- One fungus per call.
+- Offline sources only: a dbCAN `overview.txt` file, a user dataset and
+  SABIO-RK entries from a proposal, a frozen snapshot or an export; no other
+  kinetics database.
+- Transferred kinetics are estimates; scientific mode needs your own, or
+  same-species literature, values.
+- No rate, concentration, expression or secretion is taken from a genome.
+- The stored registry cases of a registry fungus are listed, not copied: they
+  run without the draft.
+- Everything else is as for any user dataset (below): dissolved substrates and
+  homogeneous Michaelis-Menten kinetics only.
+- There is no command-line subcommand yet.
 
 ## Directory layout
 
@@ -830,6 +998,16 @@ and a missing `ph_min` or `ph_max` asks for the end of the fitted pH series. Whe
 strain, every other strain of that pair gets a gap per law parameter (with
 no condition), asking for that parameter of that law.
 
+When the strain, class and substrate have kinetic constants at other
+conditions but none at this one, the request names them, since kinetics are
+never reused at another condition:
+
+> Measure km of carboxylesterase from Esterase source strain E1 on
+> p-nitrophenyl butyrate at 45 degC, pH 7.5 (concentration units); kinetics.csv
+> states kinetic constants of this strain, enzyme class and substrate only at
+> c37_ph7_5 (37 degC, pH 7.5), and FungMod does not reuse kinetics measured at
+> another condition.
+
 When the class of the case comes only from the strain's genome annotation,
 every request ends with the families it was inferred from (see
 [`genomes.csv`](#genomescsv-optional-enzyme-classes-from-a-genome-annotation)),
@@ -1282,3 +1460,8 @@ Limits of the SABIO-RK route:
 - Tables drafted from SABIO-RK are drafts: nothing is imported without a
   person filling the `REVIEW:` fields, and only the conversions listed in
   [starting from SABIO-RK](#starting-from-sabio-rk) are made.
+- An assembled draft covers one fungus per call, reads offline sources only,
+  writes kinetics of another organism's enzyme as estimates, and reaches a
+  condition other than the measured one only through a response law at an
+  `EnvironmentGrid` condition (see
+  [assembling fungus, substrate and conditions](#assembling-fungus-substrate-and-conditions)).

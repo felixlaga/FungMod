@@ -8,6 +8,7 @@ import pytest
 import fungal_model
 import fungal_model.workflows as workflows
 from fungal_model import (
+    AssembledTablesDraft,
     DegradationScreenResult,
     EnvironmentCase,
     EnvironmentGrid,
@@ -16,10 +17,12 @@ from fungal_model import (
     SourceProviderError,
     UserDataError,
     UserDataset,
+    UserTablesAssemblyError,
     UserTablesDraft,
     UserTablesSourceError,
     VirtualExperiment,
     VirtualExperimentError,
+    assemble_user_tables,
     environment_grid,
     load_geometry,
     load_model_config,
@@ -80,6 +83,9 @@ RESEARCHER_PUBLIC_API = {
     "user_tables_from_sabiork": user_tables_from_sabiork,
     "UserTablesDraft": UserTablesDraft,
     "UserTablesSourceError": UserTablesSourceError,
+    "assemble_user_tables": assemble_user_tables,
+    "AssembledTablesDraft": AssembledTablesDraft,
+    "UserTablesAssemblyError": UserTablesAssemblyError,
 }
 
 PET_PLUGIN_ONLY_NAMES = (
@@ -123,6 +129,8 @@ def test_current_researcher_public_api_is_exported() -> None:
         "UserDataError",
         "UserTablesDraft",
         "UserTablesSourceError",
+        "AssembledTablesDraft",
+        "UserTablesAssemblyError",
     }
     for name, expected in RESEARCHER_PUBLIC_API.items():
         assert name in fungal_model.__all__

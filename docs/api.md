@@ -31,6 +31,7 @@ The `fungmod` console script (also `python -m fungal_model`); see
         - UserTimecourse
         - TimecoursePoint
         - UserDataError
+        - enzyme_class_acts_on
 
 ## Enzyme repertoire from a UniProt proteome
 
@@ -74,6 +75,14 @@ The `fungmod` console script (also `python -m fungal_model`); see
         - UserTablesDraft
         - UserTablesSourceError
         - SABIORK_UNIT_SPELLINGS
+
+::: fungal_model.api.user_data_assembly
+    options:
+      members:
+        - assemble_user_tables
+        - AssembledTablesDraft
+        - UserTablesAssemblyError
+        - ASSEMBLY_STATUSES
 
 ## Environment grids
 
