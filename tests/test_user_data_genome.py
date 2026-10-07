@@ -52,6 +52,8 @@ FUNGUS = "genome_demo__strain_g1"
 STRAIN_NAME = "Genome-annotated strain G1"
 ENVIRONMENT = "genome_demo__c30_ph5"
 BGL = "genome_demo__beta_glucosidase"
+# USERDATA-008: the registry has a cellobiohydrolase record, so the GH7 gene now gives a modellable class.
+CBH = "genome_demo__cellobiohydrolase"
 CELLULASE = "genome_demo__cellulase_generic"
 GLUCOAMYLASE = "genome_demo__glucoamylase"
 BGL_PREFIX = "genome_demo__strain_g1__beta_glucosidase__cellobiose__c30_ph5__"
@@ -126,7 +128,7 @@ def extended_registry(base_registry: FungModRegistry) -> FungModRegistry:
 
 def test_resolved_registry_classes_join_the_strain_with_genome_evidence(genome: UserDataset) -> None:
     fungus = _records(genome, "fungi")[FUNGUS]
-    assert fungus["enzyme_classes"] == [BGL, CELLULASE]
+    assert fungus["enzyme_classes"] == [BGL, CBH, CELLULASE]
     assert "genomes.csv row 2" in fungus["notes"]
 
     evidence = fungus["provenance"]["enzyme_class_evidence"][BGL]
@@ -143,13 +145,17 @@ def test_resolved_registry_classes_join_the_strain_with_genome_evidence(genome: 
     assert fungus["provenance"]["enzyme_class_evidence"][CELLULASE]["evidence"] == (
         "genome annotation (dbCAN, 1 gene, families GH5)"
     )
+    assert fungus["provenance"]["enzyme_class_evidence"][CBH]["evidence"] == (
+        "genome annotation (dbCAN, 1 gene, families GH7)"
+    )
 
     enzyme_class = _records(genome, "enzyme_classes")[BGL]
     assert enzyme_class["provenance"]["registry_parent_enzyme_class"] == "beta_glucosidase"
     assert enzyme_class["compatible_processes"] == ["homogeneous_michaelis_menten"]
+    assert _records(genome, "enzyme_classes")[CBH]["provenance"]["registry_parent_enzyme_class"] == "cellobiohydrolase"
 
     resolved = {item["enzyme_class"]: item for item in genome.genome_resolved_classes}
-    assert set(resolved) == {"beta_glucosidase", "cellulase_generic"}
+    assert set(resolved) == {"beta_glucosidase", "cellobiohydrolase", "cellulase_generic"}
     assert resolved["beta_glucosidase"]["families"] == ["GH1", "GH3"]
     assert resolved["beta_glucosidase"]["gene_count"] == 3
     assert resolved["beta_glucosidase"]["record_id"] == BGL
@@ -175,7 +181,7 @@ def test_explicit_enzymes_row_wins_and_both_pieces_of_evidence_are_recorded(tmp_
     dataset = _load(tmp_path, {"enzymes.csv": enzymes})
 
     fungus = _records(dataset, "fungi")[FUNGUS]
-    assert fungus["enzyme_classes"] == [BGL, CELLULASE]
+    assert fungus["enzyme_classes"] == [BGL, CBH, CELLULASE]
     evidence = fungus["provenance"]["enzyme_class_evidence"][BGL]
     assert (evidence["evidence"], evidence["source"]) == ("activity assay on cellobiose", "LN-9 p. 2")
     assert (evidence["file"], evidence["row"], evidence["declared_by"]) == ("enzymes.csv", 2, "enzymes.csv")
@@ -199,10 +205,11 @@ def test_resolved_classes_without_a_registry_record_are_listed_not_fabricated(
     base_registry: FungModRegistry,
 ) -> None:
     unmodellable = {item["enzyme_class"]: item for item in genome.unmodellable_enzyme_classes}
-    assert set(unmodellable) == {"cellobiohydrolase", "endo_xylanase", "glucoamylase", "laccase"}
-    assert unmodellable["cellobiohydrolase"]["families"] == ["GH7"]
-    assert unmodellable["cellobiohydrolase"]["gene_count"] == 1
-    assert unmodellable["cellobiohydrolase"]["specificity"] == DIAGNOSTIC
+    # USERDATA-008: cellobiohydrolase has a registry record now and is no longer listed here.
+    assert set(unmodellable) == {"endo_xylanase", "glucoamylase", "laccase"}
+    assert unmodellable["endo_xylanase"]["families"] == ["GH10"]
+    assert unmodellable["endo_xylanase"]["gene_count"] == 1
+    assert unmodellable["endo_xylanase"]["specificity"] == DIAGNOSTIC
     assert unmodellable["laccase"]["families"] == ["AA1"]
     assert all("no enzyme-class record" in item["reason"] for item in unmodellable.values())
 
@@ -214,7 +221,7 @@ def test_resolved_classes_without_a_registry_record_are_listed_not_fabricated(
         assert not any(record_id.endswith(enzyme_class) for record_id in overlaid.enzyme_classes)
     summary = genome.summary()
     assert summary["unmodellable_enzyme_classes"] == [dict(item) for item in genome.unmodellable_enzyme_classes]
-    assert summary["record_counts"]["enzyme_classes"] == 2
+    assert summary["record_counts"]["enzyme_classes"] == 3
 
 
 def test_unmapped_families_are_listed(genome: UserDataset) -> None:
@@ -278,7 +285,6 @@ def test_preflight_is_underparameterized_with_the_requests_as_suggested_experime
     resolution = json.loads(Path(written.paths["user_dataset_genome_resolution"]).read_text(encoding="utf-8"))
     assert resolution["user_dataset_digest"] == genome.digest
     assert {item["enzyme_class"] for item in resolution["unmodellable_enzyme_classes"]} == {
-        "cellobiohydrolase",
         "endo_xylanase",
         "glucoamylase",
         "laccase",
@@ -290,9 +296,10 @@ def test_preflight_is_underparameterized_with_the_requests_as_suggested_experime
     assert experiment["user_dataset_id"] == DATASET_ID
     assert [item["enzyme_class"] for item in experiment["genome_resolved_classes"]] == [
         "beta_glucosidase",
+        "cellobiohydrolase",
         "cellulase_generic",
     ]
-    assert len(experiment["unmodellable_enzyme_classes"]) == 4
+    assert len(experiment["unmodellable_enzyme_classes"]) == 3
     assert len(experiment["unmapped_families"]) == 2
 
 
@@ -319,7 +326,7 @@ def test_a_resolved_class_on_a_non_cellulose_substrate_follows_the_base_registry
 ) -> None:
     dataset = load_user_dataset(GENOME, registry=extended_registry)
 
-    assert _records(dataset, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CELLULASE, GLUCOAMYLASE]
+    assert _records(dataset, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CBH, CELLULASE, GLUCOAMYLASE]
     assert "glucoamylase" in {item["enzyme_class"] for item in dataset.genome_resolved_classes}
     assert "glucoamylase" not in {item["enzyme_class"] for item in dataset.unmodellable_enzyme_classes}
     gap = _parameter(dataset, "genome_demo__strain_g1__glucoamylase__maltose__c30_ph5__km__gap")
@@ -375,6 +382,7 @@ def test_genome_plus_user_kinetics_runs_one_class_while_the_other_stays_a_gap(
     assert summary["experiment"]["user_dataset_digest"] == dataset.digest
     assert {item["enzyme_class"] for item in summary["experiment"]["genome_resolved_classes"]} == {
         "beta_glucosidase",
+        "cellobiohydrolase",
         "cellulase_generic",
         "glucoamylase",
     }
@@ -400,10 +408,11 @@ def test_genome_plus_user_kinetics_runs_one_class_while_the_other_stays_a_gap(
 def test_min_tools_agreeing_applies_the_users_threshold(tmp_path: Path) -> None:
     two = _load(tmp_path / "two", {GENOME_TABLE: _genomes_row(min_tools="2")})
     resolved = {item["enzyme_class"]: item for item in two.genome_resolved_classes}
-    # synthetic_g003 (GH3 by DIAMOND only) and synthetic_g007 (GH5 by HMMER only) drop out.
-    assert set(resolved) == {"beta_glucosidase"}
+    # synthetic_g003 (GH3 by DIAMOND only) and synthetic_g007 (GH5 by HMMER only) drop out;
+    # synthetic_g004 (GH7 by three tools) gives the cellobiohydrolase record (USERDATA-008).
+    assert set(resolved) == {"beta_glucosidase", "cellobiohydrolase"}
     assert resolved["beta_glucosidase"]["gene_count"] == 2
-    assert _records(two, "fungi")[FUNGUS]["enzyme_classes"] == [BGL]
+    assert _records(two, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CBH]
     (read,) = two.genome_annotations
     assert read["min_tools_agreeing"] == 2
     assert "at least 2 of the tool columns present (HMMER, dbCAN_sub, DIAMOND)" in read["consensus_rule"]
@@ -411,8 +420,11 @@ def test_min_tools_agreeing_applies_the_users_threshold(tmp_path: Path) -> None:
     assert {item["family"] for item in two.unmapped_families} == {"CBM1", "GT2"}
 
     three = _load(tmp_path / "three", {GENOME_TABLE: _genomes_row(min_tools="3")})
-    (bgl,) = three.genome_resolved_classes
+    by_class = {item["enzyme_class"]: item for item in three.genome_resolved_classes}
+    assert set(by_class) == {"beta_glucosidase", "cellobiohydrolase"}
+    bgl = by_class["beta_glucosidase"]
     assert (bgl["families"], bgl["gene_count"]) == (["GH3"], 1)
+    assert (by_class["cellobiohydrolase"]["families"], by_class["cellobiohydrolase"]["gene_count"]) == (["GH7"], 1)
     assert three.unmapped_families == ()
 
 
@@ -518,12 +530,13 @@ def test_annotation_reached_through_a_symbolic_link_outside_the_directory_is_ref
 
 
 def test_strain_whose_annotation_resolves_no_registry_class_is_refused(tmp_path: Path) -> None:
-    overview = "".join(line for line in _overview_lines() if line.startswith("Gene ID") or "GH7" in line)
+    # USERDATA-008: GH7 resolves to the cellobiohydrolase record now, so the annotation keeps GH10 only.
+    overview = "".join(line for line in _overview_lines() if line.startswith("Gene ID") or "GH10" in line)
     issues = _issues(tmp_path, {ANNOTATION: overview})
 
     assert _has_issue(issues, "strains.csv", 2, "strain_id", "resolved no enzyme class with a registry record"), issues
     message = next(issue["message"] for issue in issues if issue["file"] == "strains.csv")
-    assert "cellobiohydrolase" in message
+    assert "endo_xylanase" in message
     assert "FungMod does not create enzyme classes from a genome annotation" in message
 
 

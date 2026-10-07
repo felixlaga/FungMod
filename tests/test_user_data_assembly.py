@@ -190,14 +190,14 @@ def test_kinetics_of_another_organism_are_transferred_estimates(tmp_path: Path) 
 def test_other_genome_classes_are_reported_as_the_genome_route_reports_them() -> None:
     draft = _g1()
     classes = {item["enzyme_class"]: item for item in draft.assembly["enzyme_classes"]}
-    assert set(classes) == {"beta_glucosidase", "cellulase_generic"}
+    # USERDATA-008: GH7 resolves to the registry's cellobiohydrolase record, which does not act on cellobiose.
+    assert set(classes) == {"beta_glucosidase", "cellobiohydrolase", "cellulase_generic"}
     assert classes["beta_glucosidase"]["declared_in"] == "genomes.csv"
     (evidence,) = classes["beta_glucosidase"]["evidence"]
     assert evidence["kind"] == "genome_annotation"
     assert evidence["families"] == ["GH1", "GH3"]
     assert evidence["gene_ids"] == ["synthetic_g001", "synthetic_g002", "synthetic_g003"]
     assert {item["enzyme_class"] for item in draft.assembly["unmodellable_enzyme_classes"]} == {
-        "cellobiohydrolase",
         "endo_xylanase",
         "glucoamylase",
         "laccase",
@@ -205,9 +205,9 @@ def test_other_genome_classes_are_reported_as_the_genome_route_reports_them() ->
     assert {item["family"] for item in draft.assembly["unmapped_families"]} == {"CBM1", "GT2"}
     (compatibility,) = draft.assembly["substrate_compatibility"]
     assert [item["enzyme_class"] for item in compatibility["acting"]] == ["beta_glucosidase"]
-    (not_acting,) = compatibility["not_acting"]
-    assert not_acting["enzyme_class"] == "cellulase_generic"
-    assert "substrate class 'cellobiose'" in not_acting["reason"]
+    not_acting = {item["enzyme_class"]: item for item in compatibility["not_acting"]}
+    assert set(not_acting) == {"cellobiohydrolase", "cellulase_generic"}
+    assert all("substrate class 'cellobiose'" in item["reason"] for item in not_acting.values())
     # The annotation is copied and listed in genomes.csv, so the loader resolves the same classes.
     assert draft.annotation_files == {"annotations/strain_g1_overview.txt": ANNOTATION.read_bytes()}
     (genome_row,) = draft.genomes
@@ -217,6 +217,7 @@ def test_other_genome_classes_are_reported_as_the_genome_route_reports_them() ->
     )
     assert draft.enzymes == ()  # every class comes from the annotation alone
     assert "Does not act on it: cellulase_generic" in draft.review
+    assert "Does not act on it: cellobiohydrolase" in draft.review
 
 
 # ---------------------------------------------------------------------------

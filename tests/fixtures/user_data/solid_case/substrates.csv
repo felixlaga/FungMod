@@ -1,0 +1,2 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+particulate_lot_p1,,Particulate cellulose lot P1,cellulose_particulate,solid_polymer,beta_1_4_glycosidic,dry_mass,solubilized_substrate_mass,1,g/g,"Mass-equivalent pool of solubilized substrate (1 g per g dry substrate consumed); no product identity is claimed"

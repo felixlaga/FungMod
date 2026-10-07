@@ -115,6 +115,9 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "hordeum",
     "escherichia",
     "bacteroides",
+    # USERDATA-008 solid-substrate tests: the classes, substrates and re-entered constants come from the tables.
+    "xylan",
+    "celufloc",
 )
 
 

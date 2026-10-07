@@ -1,0 +1,16 @@
+dataset_id: solid_reentry
+contributor: FungMod maintainers
+date: 2026-10-07
+source: >-
+  Re-entry of the registry's apparent hydrolysis constants (gelain_hydrolysis_k_h_calibrated,
+  gelain_hydrolysis_Kh_calibrated) on a user-defined particulate substrate, with design loadings
+notes: >-
+  Solid-substrate case of the user-data route (USERDATA-008). The two kinetic
+  constants are FungMod's retrospective fit for T. harzianum P49P11 on Celufloc 200,
+  typed in as estimates (they are a fit, not a measurement of this strain or lot);
+  the initial substrate, the enzyme doses and the reactivity exponent are stated
+  design values and an assumption, not measurements.
+simulation:
+  duration: 96
+  units: hour
+  points: 97

@@ -37,6 +37,47 @@ All notable public releases of FungMod are documented here.
   arguments for the platform's shell (POSIX quoting, or the double quotes
   `cmd` and PowerShell read on Windows).
 
+- Solid substrates in user data (USERDATA-008): a `substrates.csv` row may
+  declare one suspended solid polymer, `physical_state` `solid_polymer` with
+  the new column `amount_basis` `dry_mass` and `yield_basis` `g/g`; a registry
+  substrate whose record is `solid_polymer` may be referenced the same way. The
+  existing homogeneous Michaelis-Menten law then runs as an apparent bulk law
+  on the dry mass per volume (kcat or Vmax form; the law of the registry's
+  culture-physiology hydrolysis process), with the enzyme as a protein mass or
+  an activity in one of the registry's assay units per volume and `kcat`
+  checked per case with pint so that `kcat x E` is the substrate's mass per
+  volume per time. New `kinetics.csv` quantities: `enzyme_dose` (enzyme per
+  dry substrate mass; times the case's exact `substrate_initial_concentration`
+  it is one derived enzyme-concentration record listing both rows, the formula
+  and the pint factor, at the weaker input's maturity; mixing it with an
+  explicit `enzyme_concentration` or a ranged initial substrate is refused) and
+  `reactivity_exponent` (binds the existing `substrate_reactivity` modifier,
+  `(S/S0)^n` with `S0` the case's own initial-substrate record, citing the
+  modifier's Kadam et al. 2004 provenance; refused on dissolved substrates).
+  Refused on solids, each with file, row and column: the specific-activity,
+  enzyme-loading and assay-activity routes to Vmax, the pH-ionization form
+  (also an ionization class acting on a solid), molar units, composite
+  (`mixed_solid`, `solid_biomass`) and `unknown` states, adsorption,
+  binding-capacity and surface-area quantities and columns, and time courses.
+  Generated templates state the apparent-law limitations (no adsorption or
+  partitioning, surface law, synergy, product inhibition or LPMO kinetics).
+  Scientific mode follows the unchanged rule. The assembly route refuses a
+  requested solid substrate of a user dataset. New fixture
+  `tests/fixtures/user_data/solid_case/` (`docs/user-data.md#solid-substrates`).
+
+- Registry enzyme class `cellobiohydrolase` (USERDATA-008): EC 3.2.1.91 with
+  the reducing-end EC 3.2.1.176 as an alias, target bond class
+  `beta_1_4_glycosidic`, substrate classes `cellulose_particulate` and
+  `cellulose_film_generic`, compatible process `homogeneous_michaelis_menten`;
+  provenance IUBMB (ExplorEnz) and CAZy GH6/GH7 (Drula et al. 2022), maturity
+  `literature_metadata`, no kinetic values. GH6/GH7 genes of a dbCAN
+  annotation and GH7 or EC 3.2.1.91/3.2.1.176 proteins of a UniProt export now
+  resolve to a modellable class instead of `unmodellable_enzyme_classes`; on a
+  solid cellulose substrate its roles are gaps with measurement requests, and a
+  GH7 protein annotated with another class's EC number is a disagreement on
+  both classes. The CAZy family map is unchanged; endoglucanase and LPMO have
+  no record.
+
 - One reviewable dataset for "fungus X on substrate(s) Y at condition(s) Z"
   (ASSEMBLE-001): `assemble_user_tables` drafts the user-dataset tables for
   exactly that request from the sources at hand (a dbCAN annotation copied into
@@ -601,6 +642,17 @@ All notable public releases of FungMod are documented here.
   reuses compiled kernels for unconstrained processes.
 
 ### Fixed
+
+- The homogeneous and pH-ionization Michaelis-Menten assembler labelled every
+  substrate entity dissolved (`generic_dissolved` loader, `physical_state`
+  `dissolved`, `homogeneous_dissolved` degradation model) whatever the
+  registry substrate declared (USERDATA-008). It now reads the substrate
+  record's physical state: a dissolved substrate keeps exactly those labels (the
+  shipped and user dissolved configs are byte-identical), any other substrate
+  gets the generic solid loader, its own physical state and an `unknown`
+  default degradation model. The case-template modifier binding also accepts
+  the existing `substrate_reactivity` modifier (substrate state role,
+  reference-concentration role and exponent role, none defaulted).
 
 - A case could be preflighted on one enzyme class and built from another
   (FIX-SELECT-001). When a fungus listed several enzyme classes acting on one
