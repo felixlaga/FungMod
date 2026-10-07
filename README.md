@@ -1092,7 +1092,7 @@ least-squares calibration, required bounds, sd-weighted residuals and a
 profile-likelihood identifiability verdict, returning a new dataset whose
 values are labelled `fitted`: in-sample estimates that stay exploratory and
 are refused by scientific mode, never validated values.
-`genomes.csv` row can instead point to a UniProtKB TSV export of the strain's
+A `genomes.csv` row can instead point to a UniProtKB TSV export of the strain's
 proteome: its CAZy cross-references resolve through the same family map, its
 EC numbers through the registry, a protein whose two annotations disagree
 supports neither, and the requests name the proteome and accessions.
