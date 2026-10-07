@@ -376,8 +376,10 @@ with both panel readings and every limitation flagged
 comparison is declared in a frozen plan (COLONY-001,
 `docs/colony-comparison.md`): observation operators, error model, four
 held-out conditions, stages and decision rules, pinned by digest before any
-software or fit. Open: stage 0 of that plan (axisymmetric grid, operators,
-the cardinal water-activity law, the runner), then the fits; organism
+software or fit. Stage 0 is recorded (2026-10-06, under the plan's third
+amendment, which moved the radial wall to the dish and limited the symmetry
+comparison to the hours before tips reach the window walls): grid, solver
+and symmetry checks passed. Open: the fits (stage A); organism
 parameters from the literature (Boswell et al. 2003, *Rhizoctonia
 solani*); a sparse compiled Jacobian for calibration speed; lifting
 well-mixed process kernels per cell; registry and configured-workflow

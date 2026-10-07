@@ -1,0 +1,5 @@
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,sd,replicates
+strain_l1,laccase_like_oxidase,syringaldazine_like,c50_ph5,km,20,,,µM,estimate,,"FungMod user-data import fixture; illustrative values, not measurements",,
+strain_l1,laccase_like_oxidase,syringaldazine_like,c50_ph5,substrate_initial_concentration,50,,,µM,estimate,,"FungMod user-data import fixture; illustrative values, not measurements",,
+strain_l1,laccase_like_oxidase,syringaldazine_like,c50_ph5,specific_activity,12,,,µmol/min/mg,estimate,,"FungMod user-data import fixture; illustrative values, not measurements",,
+strain_l1,laccase_like_oxidase,syringaldazine_like,c50_ph5,enzyme_loading,0.05,,,mg/L,estimate,,"FungMod user-data import fixture; illustrative values, not measurements",,

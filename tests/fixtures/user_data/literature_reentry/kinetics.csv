@@ -1,0 +1,5 @@
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,sd,replicates
+os3bglu6_source,beta_glucosidase,cellobiose,c30_ph5,km,15.3,,,mM,literature,"Michaelis-Menten parameter reported in SABIO-RK EntryID 35622 (Os3BGlu6 on cellobiose, 100 mM sodium acetate)","SABIO-RK Reaction 618 selected kinetic law, EntryID 35622 (Seshadri et al. 2009, Plant Physiol, PubMed 19587102)",1.2,
+os3bglu6_source,beta_glucosidase,cellobiose,c30_ph5,kcat,0.13,,,s^(-1),literature,"Michaelis-Menten parameter reported in SABIO-RK EntryID 35622 (Os3BGlu6 on cellobiose, 100 mM sodium acetate)","SABIO-RK Reaction 618 selected kinetic law, EntryID 35622 (Seshadri et al. 2009, Plant Physiol, PubMed 19587102)",0.001,
+os3bglu6_source,beta_glucosidase,cellobiose,c30_ph5,substrate_initial_concentration,10,,,mM,design,experimental design,Virtual assay design for this re-entry; not reported by SABIO-RK,,
+os3bglu6_source,beta_glucosidase,cellobiose,c30_ph5,enzyme_concentration,1e-3,,,mM,design,experimental design,Virtual assay design for this re-entry; not reported by SABIO-RK,,

@@ -1,0 +1,11 @@
+dataset_id: esterase_demo
+contributor: FungMod maintainers
+date: 2026-10-06
+source: FungMod user-data import fixture; illustrative values, not measurements
+notes: >-
+  Non-specific import case for the user-data route. Every kinetic value is an
+  estimate (exploratory prior); nothing here is a measurement.
+simulation:
+  duration: 60
+  units: minute
+  points: 61

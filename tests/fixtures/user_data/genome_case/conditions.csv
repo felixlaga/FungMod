@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c30_ph5,30,degC,5.0,Assay condition of the genome-route fixture

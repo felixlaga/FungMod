@@ -1,0 +1,2 @@
+strain_id,enzyme_class,evidence,source
+bgl1a_source,beta_glucosidase,"purified recombinant enzyme kinetics (BGL1A wild type expressed in Escherichia coli Rosetta DE3)","SABIO-RK Reaction 618 kinetic-law entry 38522 (Tsukada et al. 2008, PMID 18023045)"

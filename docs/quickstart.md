@@ -25,9 +25,11 @@ for report in study.preflight(mode="exploratory"):
     print(report.summary())
 ```
 
-Preflight classifies cases as modelable, exploratory, underparameterized,
-unsupported, or incompatible. It is a guardrail—not the final scientific
-output.
+Preflight classifies each case as `modelable`, `exploratory`,
+`underparameterized` or `unsupported`, and lists its known, uncertain, missing
+and incompatible inputs. A case without a compatible process is `unsupported`;
+otherwise any missing or incompatible input makes it `underparameterized`. It
+is a guardrail—not the final scientific output.
 
 ## 3. Simulate
 
@@ -91,6 +93,10 @@ all files in the bundle.
 
 ## Next
 
+- Run the same study from a shell with the [command line](cli.md)
+  (`fungmod run`, `fungmod preflight`, `fungmod list`).
+- Run the same workflow on your own measurements with
+  [user-supplied data](user-data.md).
 - Run the [zero-to-report notebook](notebooks.md#zero-to-a-complete-report).
 - Learn how [virtual-experiment modes](concepts/virtual-experiments.md) differ.
 - Use the [output reference](concepts/outputs.md) for downstream analysis.

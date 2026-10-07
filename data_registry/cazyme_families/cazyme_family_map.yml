@@ -13,8 +13,8 @@ description: >
 
 provenance:
   sources:
-    - Drula E, Garron ML, Dogan S, Lombard V, Henrissat B, Terrapon N. The carbohydrate-active enzyme database: functions and literature. Nucleic Acids Res. 2022;50(D1):D571-D577. doi:10.1093/nar/gkab1045
-    - Zheng J, Ge Q, Yan Y, Zhang X, Huang L, Yin Y. dbCAN3: automated carbohydrate-active enzyme and substrate annotation. Nucleic Acids Res. 2023;51(W1):W115-W121. doi:10.1093/nar/gkad328
+    - "Drula E, Garron ML, Dogan S, Lombard V, Henrissat B, Terrapon N. The carbohydrate-active enzyme database: functions and literature. Nucleic Acids Res. 2022;50(D1):D571-D577. doi:10.1093/nar/gkab1045"
+    - "Zheng J, Ge Q, Yan Y, Zhang X, Huang L, Yin Y. dbCAN3: automated carbohydrate-active enzyme and substrate annotation. Nucleic Acids Res. 2023;51(W1):W115-W121. doi:10.1093/nar/gkad328"
     - Levasseur A, Drula E, Lombard V, Coutinho PM, Henrissat B. Expansion of the enzymatic repertoire of the CAZy database to integrate auxiliary redox enzymes. Biotechnol Biofuels. 2013;6:41. doi:10.1186/1754-6834-6-41
   curated_by: Claude (Anthropic) for FungMod
   curation_date: 2026-08-18

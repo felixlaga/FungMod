@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "data/benchmarks/de_ligne_2019_colony/plan.json"
 DATASET_DIR = ROOT / "data/experiments/literature/de_ligne_2019_colony_growth"
 PANEL_TABLE = ROOT / "data/experiments/source_intake/de_ligne_2019/digitized_panels.csv"
-FROZEN_SHA256 = "ea6e2e7270b809fee092655f7e6882cf266e16d86d955c276ba5e2edc5ad959e"
-SHARED = {"Kv", "c_ext", "Dn", "a", "dn", "cu", "Di", "Da", "R0", "n0", "rho0"}
+FROZEN_SHA256 = "2ce70b6b21b2d254f4d01d3fb5ec1523442299f2ed6ce2853c270fab712acd9d"
+SHARED = {"Kv", "c_ext", "Dn", "a", "dn", "cu", "Di", "R0", "n0", "rho0"}
 
 
 @pytest.fixture(scope="module")
@@ -31,8 +31,14 @@ def test_plan_digest_is_the_frozen_one() -> None:
 
 def test_plan_is_frozen_before_any_fit(plan) -> None:
     assert plan["status"].startswith("plan frozen 2026-10-06")
-    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [("2026-10-06", "e7a8706e")]
+    assert [(entry["date"], entry["previous_sha256"][:8]) for entry in plan["amendments"]] == [
+        ("2026-10-06", "e7a8706e"),
+        ("2026-10-06", "ea6e2e72"),
+        ("2026-10-06", "ca0e016c"),
+    ]
     assert "detection density" in plan["amendments"][0]["reason"]
+    assert "active translocation" in plan["amendments"][1]["reason"]
+    assert "dish" in plan["amendments"][2]["reason"]
     assert plan["observation_operators"]["detection_density"] == {
         "value": 1.0,
         "units": "1 / millimeter",
@@ -41,8 +47,13 @@ def test_plan_is_frozen_before_any_fit(plan) -> None:
     assert "before the affected stage is run" in plan["amendment_rule"]
     results = PLAN_PATH.parent / "results"
     if results.exists():
-        # Only stage 0 (software checks, no fit) may be recorded under this plan so far.
-        assert sorted(path.name for path in results.iterdir()) == ["stage_0"]
+        # Only stage 0 (software checks, no fit) may be recorded under this plan so far,
+        # with the records that amendments 2 and 3 superseded kept as their evidence.
+        assert sorted(path.name for path in results.iterdir()) == [
+            "stage_0",
+            "stage_0_superseded_ca0e016c",
+            "stage_0_superseded_ea6e2e72",
+        ]
         chain = {FROZEN_SHA256, *(entry["previous_sha256"] for entry in plan["amendments"])}
         for inputs_path in sorted(results.rglob("inputs.json")):
             inputs = json.loads(inputs_path.read_text(encoding="utf-8"))
@@ -93,3 +104,43 @@ def test_documentation_cites_the_frozen_digest() -> None:
     assert "no fit has been run" in page
     ledger = (ROOT / "progress.md").read_text(encoding="utf-8")
     assert FROZEN_SHA256 in ledger
+
+
+def test_amendment_2_removes_the_active_term_and_guards_grid_convergence(plan) -> None:
+    symbols = {item["symbol"] for item in plan["model"]["parameters"]}
+    assert "Da" not in symbols
+    translocation = next(process for process in plan["model"]["processes"] if process["name"] == "translocation")
+    assert "no active term" in translocation["law"]
+    guard = plan["geometry"]["well_posedness_guard"]
+    assert guard["max_relative_difference"] == 0.02
+    assert any("stage A optimum" in item for item in guard["applies_to"])
+    assert any("stage C prediction" in item for item in guard["applies_to"])
+    assert plan["geometry"]["symmetry_check"]["max_relative_difference"] == 0.03
+    assert "not grid converged" in plan["decision_rules"]["R0_grid_converged"]
+    superseded = PLAN_PATH.parent / "results" / "stage_0_superseded_ea6e2e72"
+    if superseded.exists():
+        checks = json.loads((superseded / "checks.json").read_text(encoding="utf-8"))
+        assert checks["grid"]["passed"] is False and checks["symmetry"]["passed"] is False
+        assert checks["solver"]["passed"] is True
+        assert checks["plan_sha256"].startswith("ea6e2e72")
+
+
+def test_amendment_3_puts_the_wall_at_the_dish_and_reads_the_window_apart(plan) -> None:
+    geometry = plan["geometry"]
+    assert geometry["domain"]["radius_mm"] == 45.0 and geometry["domain"]["cells"] == 450
+    assert geometry["domain"]["cell_mm"] == 0.1 and "declared assumption" in geometry["domain"]["reason"]
+    assert geometry["window"]["side_mm"] == 40.0
+    check = geometry["symmetry_check"]
+    assert check["cartesian_cells"] * check["cartesian_cell_mm"] == geometry["window"]["side_mm"]
+    assert check["max_tip_fraction_beyond_window"] == 0.001 and check["minimum_hours"] == 8
+    assert "symmetry_threshold" not in geometry
+    assert "900 cells" in geometry["well_posedness_guard"]["definition"]
+    reason = plan["amendments"][2]["reason"]
+    assert "recorded before any cartesian result at a finer cell" in reason
+    assert "No model term, parameter, bound, operator, hold-out, stage or decision rule changed." in reason
+    superseded = PLAN_PATH.parent / "results" / "stage_0_superseded_ca0e016c"
+    if superseded.exists():
+        checks = json.loads((superseded / "checks.json").read_text(encoding="utf-8"))
+        assert checks["grid"]["passed"] is True and checks["solver"]["passed"] is True
+        assert checks["symmetry"]["passed"] is False
+        assert checks["plan_sha256"].startswith("ca0e016c")

@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c30_ph5,30,degC,5.0,"One pH of the SABIO-RK entry 38522 pH series (50 mM sodium acetate), as the registry environment tsukada_2008_bgl1a_assay_30c_ph5"

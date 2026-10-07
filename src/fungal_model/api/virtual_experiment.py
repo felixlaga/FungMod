@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import json
 import csv
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import product
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid
 from fungal_model.api.output_schema import OUTPUT_SCHEMA_VERSION
 from fungal_model.api.quicklook import write_quicklook_plots as write_quicklook_plot_files
 from fungal_model.api.report import write_virtual_experiment_report
 from fungal_model.api.result_tables import WrittenTables, write_preflight_tables, write_standard_tables
+from fungal_model.api.user_data import UserDataset, load_user_dataset
 from fungal_model.resources import default_registry_path
 from fungal_model.registry.records import ParameterRecord
 from fungal_model.registry import FungModRegistry, RegistryResolver, ResolvedRecord, load_registry
@@ -26,8 +27,15 @@ from fungal_model.screening import (
     simulate_screen,
 )
 
+if TYPE_CHECKING:
+    from fungal_model.api.user_data_fit import TimecourseComparison
+
 VirtualExperimentMode = Literal["exploratory", "scientific"]
 DEFAULT_REGISTRY_REFERENCE = "data_registry/registry_index.yml"
+USER_DATASET_GENOME_RESOLUTION_FILE = "user_dataset_genome_resolution.json"
+# Genome-resolution lists of a user dataset that ``VirtualExperiment.to_dict`` carries beside
+# ``user_dataset_id``; the preflight genome-resolution file adds the annotations read.
+_GENOME_EXPERIMENT_KEYS = ("genome_resolved_classes", "unmodellable_enzyme_classes", "unmapped_families")
 
 
 class VirtualExperimentError(ValueError):
@@ -45,6 +53,11 @@ class VirtualExperiment:
     registry_source: str = ""
     environment_cases: tuple[EnvironmentCase, ...] = ()
     resolved_records: tuple[ResolvedRecord, ...] = ()
+    user_dataset_id: str | None = None
+    user_dataset_digest: str | None = None
+    user_dataset_summary: Mapping[str, Any] | None = None
+    # The overlaid user dataset itself, kept for comparisons with its time courses.
+    user_dataset: UserDataset | None = field(default=None, repr=False, compare=False)
 
     @classmethod
     def from_registry(
@@ -55,10 +68,25 @@ class VirtualExperiment:
         environments: Sequence[str] | str | EnvironmentGrid,
         registry: str | Path | FungModRegistry = DEFAULT_REGISTRY_REFERENCE,
         resolve_names: bool = False,
+        user_data: str | Path | UserDataset | None = None,
     ) -> "VirtualExperiment":
-        """Create a virtual experiment from curated registry IDs or opted-in aliases."""
+        """Create a virtual experiment from curated registry IDs or opted-in aliases.
+
+        ``user_data`` is a user dataset directory (see ``load_user_dataset``) or
+        an already loaded ``UserDataset``. Its records are overlaid in memory
+        on the loaded registry before names are resolved and before any
+        ``EnvironmentGrid`` overlay; nothing is written to the registry.
+        """
 
         loaded_registry, registry_source = _load_registry_source(registry)
+        user_dataset: UserDataset | None = None
+        if user_data is not None:
+            user_dataset = (
+                user_data
+                if isinstance(user_data, UserDataset)
+                else load_user_dataset(user_data, registry=loaded_registry)
+            )
+            loaded_registry = user_dataset.overlay(loaded_registry)
         fungus_inputs = _string_tuple(fungi, field_name="fungi")
         substrate_inputs = _string_tuple(substrates, field_name="substrates")
         environment_ids, environment_cases = _environment_inputs(environments)
@@ -96,6 +124,10 @@ class VirtualExperiment:
             registry_source=registry_source,
             environment_cases=environment_cases,
             resolved_records=resolved_records,
+            user_dataset_id=None if user_dataset is None else user_dataset.dataset_id,
+            user_dataset_digest=None if user_dataset is None else user_dataset.digest,
+            user_dataset_summary=None if user_dataset is None else user_dataset.summary(),
+            user_dataset=user_dataset,
         )
 
     @classmethod
@@ -106,6 +138,7 @@ class VirtualExperiment:
         substrates: Sequence[str] | str,
         environments: Sequence[str] | str | EnvironmentGrid,
         registry: str | Path | FungModRegistry = DEFAULT_REGISTRY_REFERENCE,
+        user_data: str | Path | UserDataset | None = None,
     ) -> "VirtualExperiment":
         """Create a virtual experiment by resolving researcher-facing names and aliases."""
 
@@ -115,6 +148,7 @@ class VirtualExperiment:
             environments=environments,
             registry=registry,
             resolve_names=True,
+            user_data=user_data,
         )
 
     def preflight(self, *, mode: ModelabilityMode = "exploratory") -> tuple[ModelabilityReport, ...]:
@@ -142,14 +176,32 @@ class VirtualExperiment:
         mode: ModelabilityMode = "exploratory",
         output_dir: str | Path = "outputs/virtual_experiment_preflight",
     ) -> WrittenTables:
-        """Write preflight-only diagnostic tables without assembling or running a model."""
+        """Write preflight-only diagnostic tables without assembling or running a model.
+
+        When the experiment's user dataset has a ``genomes.csv``, the report
+        also writes ``user_dataset_genome_resolution.json``: the annotations
+        read, the enzyme classes they resolved, the resolved classes without a
+        registry record, and the unmapped CAZy families.
+        """
 
         reports = self.preflight(mode=mode)
-        return write_preflight_tables(
+        tables = write_preflight_tables(
             registry=self.registry,
             preflight_reports=reports,
             output_dir=output_dir,
         )
+        summary = self.user_dataset_summary
+        if summary is None or not summary.get("genome_annotations"):
+            return tables
+        path = Path(output_dir) / USER_DATASET_GENOME_RESOLUTION_FILE
+        document = {
+            "kind": "fungmod_user_dataset_genome_resolution",
+            "user_dataset_id": self.user_dataset_id,
+            "user_dataset_digest": self.user_dataset_digest,
+            **{key: summary.get(key, []) for key in ("genome_annotations", *_GENOME_EXPERIMENT_KEYS)},
+        }
+        path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return WrittenTables(paths={**tables.paths, "user_dataset_genome_resolution": str(path)})
 
     def simulate(
         self,
@@ -216,6 +268,12 @@ class VirtualExperiment:
             "registry_id": self.registry.registry_id,
             "registry_source": self.registry_source,
             "resolved_records": [record.to_dict() for record in self.resolved_records],
+            "user_dataset_id": self.user_dataset_id,
+            "user_dataset_digest": self.user_dataset_digest,
+            **{
+                key: None if self.user_dataset_summary is None else list(self.user_dataset_summary.get(key, []))
+                for key in _GENOME_EXPERIMENT_KEYS
+            },
         }
 
     @property
@@ -251,6 +309,11 @@ class DegradationScreenResult:
         )
         return self.tables
 
+    def case_summary(self) -> list[dict[str, str]]:
+        """Load the one-row-per-case summary table without rerunning simulation."""
+
+        return self._table_rows("case_summary", "case_summary.csv")
+
     def time_series(self) -> list[dict[str, str]]:
         """Load the standard long-form time-series table without rerunning simulation."""
 
@@ -265,6 +328,11 @@ class DegradationScreenResult:
         """Load the standard threshold-times table without rerunning simulation."""
 
         return self._table_rows("threshold_times", "threshold_times.csv")
+
+    def summary_metrics(self) -> list[dict[str, str]]:
+        """Load the per-case ensemble summary of computed metrics and threshold times."""
+
+        return self._table_rows("summary_metrics", "summary_metrics.csv")
 
     def sampled_parameters(self) -> list[dict[str, str]]:
         """Load the standard sampled-parameters table without rerunning simulation."""
@@ -300,6 +368,34 @@ class DegradationScreenResult:
         """Load trajectory quantile bands without rerunning simulation."""
 
         return self._table_rows("trajectory_quantiles", "trajectory_quantiles.csv")
+
+    def compare_with_timecourses(self, output_dir: str | Path | None = None) -> "TimecourseComparison":
+        """Compare the simulated trajectories with the time courses of the experiment's user dataset.
+
+        Writes ``timecourse_comparison.csv`` (by default into the output
+        directory, where it joins the tables and the manifest) and returns the
+        ``TimecourseComparison``; see ``compare_with_timecourses`` in
+        ``fungal_model.api.user_data_fit``. The agreement is in-sample, not
+        validation.
+        """
+
+        from fungal_model.api.user_data_fit import compare_with_timecourses
+
+        dataset = self.experiment.user_dataset
+        if dataset is None:
+            raise VirtualExperimentError(
+                "This virtual experiment was built without user_data, so it has no time courses to compare with."
+            )
+        if not dataset.timecourses:
+            raise VirtualExperimentError(
+                f"User dataset {dataset.dataset_id!r} has no timecourse.csv, so there are no time courses to compare with."
+            )
+        return compare_with_timecourses(self, dataset, output_dir=output_dir)
+
+    def timecourse_comparison(self) -> list[dict[str, str]]:
+        """Load ``timecourse_comparison.csv`` written by ``compare_with_timecourses``."""
+
+        return self._table_rows("timecourse_comparison", "timecourse_comparison.csv")
 
     def conservation_diagnostics(self) -> list[dict[str, str]]:
         """Load configured conservation diagnostics copied from existing sample artifacts."""
@@ -406,6 +502,8 @@ class DegradationScreenResult:
             if self.mode == "scientific"
             else "",
             "output_directory": str(root),
+            "user_dataset_id": self.experiment.user_dataset_id,
+            "user_dataset_digest": self.experiment.user_dataset_digest,
             "tables": None if self.tables is None else self.tables.to_dict(),
             "quicklook_paths": list(self.quicklook_paths),
             "files": [*files, destination.name],
@@ -446,14 +544,21 @@ def virtual_experiment(
     substrates: Sequence[str] | str,
     environments: Sequence[str] | str | EnvironmentGrid,
     registry: str | Path | FungModRegistry = DEFAULT_REGISTRY_REFERENCE,
+    user_data: str | Path | UserDataset | None = None,
 ) -> VirtualExperiment:
-    """Create a researcher-facing virtual experiment from registry IDs, names, or aliases."""
+    """Create a researcher-facing virtual experiment from registry IDs, names, or aliases.
+
+    ``user_data`` optionally names a user dataset directory, or passes a
+    loaded ``UserDataset``, whose strains, conditions and kinetics are
+    overlaid in memory on the registry before names are resolved.
+    """
 
     return VirtualExperiment.from_names(
         fungi=fungi,
         substrates=substrates,
         environments=environments,
         registry=registry,
+        user_data=user_data,
     )
 
 

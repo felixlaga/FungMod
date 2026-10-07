@@ -159,6 +159,15 @@ two- and three-dimensional grids.
 
 ## What it is not
 
+- The active translocation term (`Translocation` with a tip field) is not
+  well posed in general: carrying substrate up the tip-density gradient
+  while a branching process makes tips where the substrate is forms a
+  chemotaxis-like positive feedback that can concentrate tips into a spike
+  whose height grows without bound under grid refinement (COLONY-001 stage
+  0: the 24 hour tip count doubled with each halving of the cell at
+  `D_a = 1`). The process declares this failure mode; any result that uses
+  the term needs a grid-convergence check, and the colony comparison plan
+  dropped the term.
 - No individual hyphae, orientation, septa or diameter: densities only.
 - No colony boundary as a moving interface; the "extent" is the measure of
   cells above a threshold the caller declares.
@@ -176,10 +185,12 @@ two- and three-dimensional grids.
   *Coniophora puteana* under sixteen temperature-humidity conditions from
   De Ligne et al. 2019 (IMA Fungus 10:7, CC BY 4.0), digitized from the
   supplementary figures with every reading limitation flagged
-  (`scripts/digitize_de_ligne_2019_figures.py`). Before any comparison is a
-  result, an observation operator from the model's hyphal length and tip
-  density fields to the scanned mycelial area and graph-derived tip count
-  must be declared, and a frozen plan must name the conditions used for
-  calibration and those held out.
+  (`scripts/digitize_de_ligne_2019_figures.py`). The observation operators
+  from the model's hyphal length and tip density fields to the scanned
+  mycelial area and graph-derived tip count are declared (above), and a frozen
+  plan names the conditions used for calibration and those held out
+  ([colony comparison plan](colony-comparison.md)); its stage 0 checks
+  (grid, solver, symmetry) are recorded and passed under amendment 3, and no
+  fit has been run.
 - The existing 1D and N-D reaction-diffusion engines are unchanged; they
   remain the `Reaction`-based path recorded under `FD-009`.

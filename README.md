@@ -51,6 +51,55 @@ import fungal_model
 print(fungmod.__version__)
 ```
 
+Name a fungus or enzyme source, a substrate and the conditions, and FungMod
+assembles the model from its records and simulates degradation over time:
+
+```python
+import fungmod as fm
+
+study = fm.virtual_experiment(
+    fungi="beta-glucosidase source",
+    substrates="cellobiose",
+    environments="SABIO-RK Reaction 618 selected assay conditions",
+)
+result = study.simulate(mode="exploratory", n_samples=32, seed=618)
+```
+
+With your own measurements, put them in a folder of small CSV tables
+(strains, their enzymes, substrates, conditions and kinetics) and pass
+`user_data="that/folder"`; FungMod checks every table, keeps each value's
+source and units, and turns anything missing into a named measurement request
+([user-supplied data](docs/user-data.md)).
+To start from a request instead, `assemble_user_tables(fungus=..., substrates=...,
+conditions=...)` gathers what your sources say about that fungus (its dbCAN
+annotation, the enzyme classes you assert, a user dataset, SABIO-RK entries)
+into one draft of those tables with a per-case report: your own values,
+same-species literature, kinetics transferred from another organism (kept as
+estimates), conflicts and gaps; you review it and load it
+([assembling fungus, substrate and conditions](docs/user-data.md#assembling-fungus-substrate-and-conditions)).
+
+### Command line
+
+The package also installs a `fungmod` command (or `python -m fungal_model`)
+for the same virtual experiments without writing Python: name the fungus,
+the substrate and the conditions, choose a mode, and FungMod preflights,
+simulates and writes the tables, manifest and report:
+
+```bash
+fungmod run --fungus "P. chrysosporium" --substrate cellobiose \
+  --temperature-c 30 --ph 5 \
+  --mode exploratory --samples 32 --seed 1 --output runs/first --report
+```
+
+It prints the preflight table, the final metrics and threshold times of each
+case, the limitations count and where the provenance and limitations tables
+are. `--mode`, and in exploratory mode `--samples` and `--seed`, are
+required, because there is no hidden default; scientific mode means exact
+inputs and implemented mechanisms, not experimental validation. A case the
+preflight blocks exits with code 3 and its measurement requests.
+`fungmod preflight`, `fungmod check-data DIR` and `fungmod list` cover the
+other steps ([command line](docs/cli.md)).
+
 Start with the [installation guide](https://fungmod.readthedocs.io/en/latest/install/),
 run a complete workflow in
 [`20_zero_to_complete_virtual_experiment.ipynb`](notebooks/examples/20_zero_to_complete_virtual_experiment.ipynb),
@@ -64,7 +113,9 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
-| Uncertainty | Monte Carlo propagation, local sensitivity, and variance-based global sensitivity |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
+| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts ([command line](docs/cli.md)) |
+| Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
 
@@ -181,7 +232,8 @@ each implementation:
   assembly,
 - environment-driven temperature, pH, water-activity, oxygen, and product
   inhibition modifiers, including the Rosso cardinal temperature (CTMI) and
-  cardinal pH (CPM) growth-response laws,
+  cardinal pH (CPM) growth-response laws and the Rosso and Robinson cardinal
+  water-activity law,
 - a pH-ionization Michaelis-Menten process law (diprotic ionization of `kcat`
   and `Km`, the SABIO-RK pH-dependent law form) and a first-order Arrhenius
   thermal-inactivation process law, both compiled to numeric kernels,
@@ -353,11 +405,13 @@ validated biology is forbidden.
 
 ## Development
 
-Before changing the codebase, read the active source-of-truth chain:
+Before changing the codebase, read the active source-of-truth chain; the full
+order, including `progress.md` and `ARCHITECTURE_DEBT.md`, is in `AGENTS.md`:
 
 1. [`AGENTS.md`](AGENTS.md)
 2. [`foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md`](foundation_progress/FUNGMOD_CENTRAL_GOAL_VIRTUAL_EXPERIMENTS.md)
 3. [`foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md`](foundation_progress/FUNGMOD_NEXT_PHASES_ROADMAP.md)
+4. [`foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`](foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md)
 
 Historical foundation-first plans under `old_progress/` are non-binding. The
 active goal is degradation dynamics over time without hiding assumptions,
@@ -370,6 +424,9 @@ dependencies:
 python3 -m pip install -e ".[dev,docs,notebooks]"
 ```
 
+Add the `standards` and `copasi` extras, as CI does, to run the SBML, SED-ML,
+PEtab and COPASI tests; without them those tests are skipped.
+
 ## Test
 
 ```bash
@@ -378,8 +435,10 @@ pytest
 
 ## Quality Gates
 
-CI is required before merging. The CI workflow installs `.[dev]` and runs the
-package-quality gates below:
+CI is required before merging. The lint, type and test jobs install
+`.[dev,standards,copasi]`, the documentation job installs `.[docs]`, and the
+workflow runs the package-quality gates below (plus release-notebook execution
+and an offline installed-wheel smoke test):
 
 ```bash
 python -m ruff check src tests scripts/run_*.py
@@ -406,16 +465,22 @@ up-to-date branches, no force pushes, and no unaudited direct bypass.
 <details>
 <summary><strong>Open the advanced SABIO-RK curation and registry-promotion workflow</strong></summary>
 
-Researchers can create a review-only SABIO-RK registry proposal with one
-scientific identifier. SABIO-RK does not require an API key, so no credential
+Researchers can create a review-only SABIO-RK registry proposal from
+scientific identifiers. SABIO-RK does not require an API key, so no credential
 is supplied or read from an environment variable:
 
 ```python
 from fungal_model import source_proposal
 
-proposal = source_proposal(provider="sabiork", reaction_id="618")
+proposal = source_proposal(provider="sabiork", reaction_id="618", entry_id="35622")
 proposal.write("data/proposed_records/sabiork/reaction_618")
 ```
+
+The example selects kinetic-law entry 35622, the entry the review below
+decides on. A proposal for all of Reaction 618 can be created and written, but
+`review_source_proposal(...)` currently rejects it with a duplicate record ID:
+the frozen snapshot's pH-dependent entries (for example 38522) carry four
+`pKa` parameters each, and their proposed parameter IDs collide.
 
 `source_proposal(...)` also accepts friendly `ec_number`, `enzyme`, `substrate`,
 `organism`/`source`, and `entry_id` selectors. It does not expose raw Solr syntax.
@@ -805,9 +870,20 @@ configured conservation diagnostics copied from existing per-sample
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
-In output schema `1.8.0`, `time_series_long.csv` retains legacy
-`degradation_rate`/`product_release_rate` presentation aliases and also writes
-authoritative `process_rate.<process_id>` rows for every configured process.
+In output schema `2.0.0` (current: `2.1.0`, which adds the on-request
+`timecourse_comparison.csv`), `time_series_long.csv` reports `degradation_rate`
+as -d[substrate]/dt and `product_release_rate` as +d[product]/dt of the case's
+mapped substrate and product states (source `simulation_state_rate`), each in
+that state's units per time unit. They are read from the per-sample
+`state_rates.csv` net state-rate trajectory, which the well-mixed solver
+records by evaluating the same compiled right-hand side it integrated at every
+returned time point. `final_metrics.csv` reports `maximum_substrate_depletion_rate`
+and `maximum_product_release_rate` as the maxima of those two series over the
+returned time points. When a case maps no substrate or product state, or a
+sample bundle has no `state_rates.csv`, the rows and metrics are
+`not_applicable` with the reason in `notes`; process rates are never used in
+their place. `process_rate.<process_id>` rows are still written for every
+configured process.
 Persisted `derived_quantities.csv` values are copied under the collision-safe
 `derived_quantity.<name>` namespace with explicit thermodynamic or general
 derived roles; the standard writer does not recompute them.
@@ -968,6 +1044,84 @@ artifact inspection, report/index links, and the header-only/no-metadata
 guardrail, see
 `notebooks/examples/19_solver_diagnostics_example.ipynb`.
 
+### Simulate From Your Own Tables
+
+A directory with a `user_dataset.yml` manifest and CSV tables of strains,
+their enzyme classes, substrates, conditions and kinetics reaches a virtual
+experiment without editing the registry:
+
+```python
+import fungmod as fm
+
+dataset = fm.load_user_dataset("path/to/my_dataset")  # raises fm.UserDataError listing every issue
+study = fm.virtual_experiment(
+    fungi="my strain name",
+    substrates="my substrate",
+    environments="my_condition_id",
+    user_data=dataset,
+)
+result = study.simulate(mode="exploratory", n_samples=32)
+```
+
+`load_user_dataset` returns a `UserDataset` whose records are namespaced by
+the dataset id and overlaid on the registry in memory; every parameter record
+keeps its source, units, condition, file and row and the dataset digest.
+`measured`, `literature` and `design` values reach scientific mode when they
+are exact; `estimate` values stay exploratory; a missing kinetic role becomes
+an explicit unknown carrying a measurement request that preflight quotes as
+the suggested experiment. Kinetics are homogeneous Michaelis-Menten on
+dissolved substrates, either `kcat` with an enzyme concentration or a Vmax
+taken from exactly one route: a `vmax` row with its method, a
+`specific_activity` times an `enzyme_loading` (a derived record whose maturity
+is the weaker input's), or an `assay_activity` measured on the case substrate
+at saturation. An optional `responses.csv` binds the cardinal temperature,
+cardinal pH or Arrhenius law to a strain, enzyme and substrate through the
+template modifiers, so an `EnvironmentGrid` over temperature or pH changes the
+rate through the law; the kinetic constants must then be stated at the law's
+reference condition. A third rate form takes a published pH-dependent law
+directly: `kcat_limiting`, `km_limiting`, the four pK values and the fitted
+`ph_min`/`ph_max` bind the diprotic `ph_ionization_michaelis_menten` law, so
+the rate follows the condition or grid pH, each condition's pH must lie inside
+the fitted range, and the SABIO-RK drafting below emits this form for entries
+of SABIO-RK's "Michaelis-Menten (pH-dependent)" law
+([three rate forms](docs/user-data.md#three-rate-forms)). See
+`docs/user-data.md` for the table formats and limitations. An optional `genomes.csv` takes a strain's enzyme classes from
+its dbCAN genome annotation: classes with a registry record join the
+strain, classes without one and unmapped families are reported, and every
+resolved class that can act on a dataset substrate but has no kinetics becomes
+a named measurement request, since no rate is ever taken from a genome. Public
+kinetics reach these tables with the user in the loop: `user_tables_from_sabiork`
+drafts them from SABIO-RK kinetic-law entries (a `source_proposal`, a frozen
+snapshot or an export you downloaded) with a `review.md` of every mapping
+decision and everything not converted, and `load_user_dataset` refuses the
+draft until every `REVIEW:` field is filled
+([starting from SABIO-RK](docs/user-data.md#starting-from-sabio-rk)).
+An optional `timecourse.csv` of measured substrate remaining and product
+formed over time can be compared with a simulation
+(`result.compare_with_timecourses()` writes `timecourse_comparison.csv` with
+the median and 5-95 % band at the observed times, residuals and RMSE), and
+`fit_user_dataset` fits `km` with `kcat` or `vmax` to it with the existing
+least-squares calibration, required bounds, sd-weighted residuals and a
+profile-likelihood identifiability verdict, returning a new dataset whose
+values are labelled `fitted`: in-sample estimates that stay exploratory and
+are refused by scientific mode, never validated values.
+A `genomes.csv` row can instead point to a UniProtKB TSV export of the strain's
+proteome: its CAZy cross-references resolve through the same family map, its
+EC numbers through the registry, a protein whose two annotations disagree
+supports neither, and the requests name the proteome and accessions.
+`fungal_model.sources.uniprot` fetches such an export only on explicit
+`refresh=True`, into a digest-checked snapshot.
+`assemble_user_tables` drafts one such dataset for a request "fungus X on
+substrate(s) Y at condition(s) Z": the repertoire comes only from the fungus's
+annotation, asserted classes, dataset rows or registry record; classes that act
+on a substrate without evidence in the fungus are reported, not added;
+kinetics of another organism's enzyme are written as estimates whose method
+names the transfer; several candidates for one case are listed, not chosen;
+and kinetics are never reused at another condition except through a response
+law at an `EnvironmentGrid` condition. One fungus per call, offline sources
+only, no rate from a genome
+([assembling fungus, substrate and conditions](docs/user-data.md#assembling-fungus-substrate-and-conditions)).
+
 ## Public API
 
 `fungmod` is the canonical import namespace:
@@ -990,6 +1144,20 @@ assembly, execution, and result inspection:
 - `VirtualExperimentError`
 - `source_proposal`
 - `SourceProviderError`
+- `load_user_dataset`
+- `UserDataset`
+- `UserDataError`
+- `compare_with_timecourses`
+- `TimecourseComparison`
+- `fit_user_dataset`
+- `UserDatasetFit`
+- `UserDataFitError`
+- `user_tables_from_sabiork`
+- `UserTablesDraft`
+- `UserTablesSourceError`
+- `assemble_user_tables`
+- `AssembledTablesDraft`
+- `UserTablesAssemblyError`
 - `review_source_proposal`
 - `CurationDecision`
 - `CurationResult`
@@ -1057,8 +1225,10 @@ independent validation. The source does not state the commercial formulation's
 organism, its parameter uncertainties are unavailable, and the stored 0.6 mM
 uncertainty is digitization resolution rather than experimental variability.
 
-The literature collection now contains seven series from three papers. The
-additional Alvarez-Gonzalez conditions support within-source comparisons;
+The enzyme-hydrolysis part of the literature collection contains seven series
+from three papers; the collection also holds the Gelain 2020 whole-culture and
+De Ligne 2019 colony-growth sources (`data/experiments/literature/README.md`).
+The additional Alvarez-Gonzalez conditions support within-source comparisons;
 Ariaeenejad and Cao supply different enzyme preparations and are fitted
 separately. `scripts/run_alvarez_gonzalez_2022_stage2_calibration.py` estimates
 parameters from the reference series and predicts the other conditions.
@@ -1075,6 +1245,27 @@ partially missing or invalid uncertainty is rejected rather than averaged or
 filled in. Digitization resolution remains distinct from experimental noise.
 See [calibration evidence](docs/calibration-evidence.md) for the interpretation
 and remaining evidence requirements.
+
+### Cross-solver reproduction and research export
+
+Cross-solver reproduction (recorded 2026-10-05, second run): the Gelain 2020
+registry case is exported as a multi-condition PEtab problem and reproduced in
+COPASI under a frozen plan (`docs/gelain-cross-solver.md`). The recorded
+outcome is `reproduced`: at FungMod's least-squares optimum the worst
+|COPASI − FungMod| difference is 1.6e-8 of sigma and the objectives agree to
+2e-8, and COPASI's best fit lies 2.5e-8 (relative) below FungMod's objective,
+inside the 0.1 percent gate. A first run against the earlier stage A fit found
+an objective 1.3 percent lower; that was traced to the default finite-difference
+step of FungMod's optimiser, and stage A was re-run with a declared step. This
+is agreement between two solvers on one retrospective fit, not biological
+validation or evidence that the optimum is unique.
+
+Research export and calibration hardening (2026-09-28): mixed-unit SBML exports
+preserve native trajectories; PEtab keeps validation/holdout rows outside fitting
+and rejects missing noise scales. Configured calibration offers optional
+profile-likelihood grids. An explicit frozen-prediction/raw-replicate evaluation
+workflow is documented in `docs/independent-validation.md`; independent biological
+validation still requires external data.
 
 ## Notebooks
 
@@ -1273,16 +1464,19 @@ boundaries. CURATION-001 is complete for that defined curation workflow, not
 for scientific validation or automatic simulation authorization.
 
 Foundation process configs can be built through `ProcessLibrary.default_foundation()`.
-The current library provides factories for first-order, mass-action,
-homogeneous Michaelis-Menten, and generic surface-catalysis benchmark
-processes. These are framework mechanisms, not organism- or substrate-specific
-biology.
+The current library provides factories for thirteen generic process types:
+first-order, mass-action, homogeneous and pH-ionization Michaelis-Menten,
+proportional synthesis, substrate transglycosylation, surface catalysis,
+thermal inactivation, resource-limited growth and maintenance, costed
+secretion, dilution exchange and gas transfer. These are framework mechanisms,
+not organism- or substrate-specific biology.
 
 Assembled process models now support native well-mixed execution through
 `AssembledModel.run()`. The method delegates to `ProcessODESolver`, returns a
-standard `SimulationResult`, records process-rate trajectories, runs supplied
-validators, and rejects unsupported geometry instead of silently switching
-execution paths.
+standard `SimulationResult`, records process-rate trajectories and net
+state-rate trajectories (`SimulationResult.state_rates`, written as
+`state_rates.csv`), runs supplied validators, and rejects unsupported geometry
+instead of silently switching execution paths.
 
 Substrate, geometry, product-map, and validator loading now goes through
 registries. The default substrate registry is generic-first and supports
@@ -1390,20 +1584,6 @@ machine-readable citation is in [`CITATION.cff`](CITATION.cff); GitHub renders a
 [citing guide](https://fungmod.readthedocs.io/citing/) for BibTeX export and DOI
 details.
 
-Cross-solver reproduction (2026-10-05): the Gelain 2020 registry case is
-exported as a multi-condition PEtab problem and reproduced in COPASI under a
-frozen plan (`docs/gelain-cross-solver.md`). The two simulators agree to 1.7e-8
-of sigma at FungMod's optimum; COPASI then finds an objective 1.3 percent
-lower, which FungMod evaluates to the same value, so FungMod's recorded
-least-squares optimum is an optimiser stopping point and is reported as such.
-
-Research export and calibration hardening (2026-09-28): mixed-unit SBML exports
-preserve native trajectories; PEtab keeps validation/holdout rows outside fitting
-and rejects missing noise scales. Configured calibration offers optional
-profile-likelihood grids. An explicit frozen-prediction/raw-replicate evaluation
-workflow is documented in `docs/independent-validation.md`; independent biological
-validation still requires external data.
-
 ## Current Limitations
 
 Current capability labels mean:
@@ -1424,8 +1604,20 @@ Current capability labels mean:
 - Michaelis-Menten kinetics currently means homogeneous dissolved-substrate kinetics only.
 - PET surface hydrolysis currently uses a minimal equilibrium Langmuir coverage model with constant accessible surface area.
 - PET product release is represented as a lumped mass-equivalent hydrolysate in the Stage 4 example, not resolved MHET/BHET/TPA/EG chemistry.
-- Temperature scaling currently uses Arrhenius acceleration only; enzyme thermal deactivation is recorded as a limitation and is not implemented.
-- pH activity currently uses an empirical Gaussian profile; mechanistic ionization chemistry is not implemented.
+- Temperature and pH act on rates only through explicit laws, read once from a
+  static environment; there are no temperature or pH dynamics
+  (`docs/environment-response.md`). Temperature: the Arrhenius reference and
+  Rosso cardinal (CTMI) modifiers and a first-order Arrhenius
+  `thermal_inactivation` process law (irreversible single-exponential loss; no
+  reversible unfolding, proteolysis or stabilizer protection). pH: the
+  empirical Gaussian and Rosso cardinal (CPM) modifiers and the
+  diprotic-ionization Michaelis-Menten process law (SABIO-RK law type 24), an
+  empirical fit of a measured profile that does not represent buffer identity,
+  ionic strength or pH-dependent stability. Only the ionization law is bound to
+  a shipped registry case (*P. chrysosporium* BGL1A on cellobiose, pH 4 to 8,
+  exploratory mode only); the other laws act only where a config or template
+  binds them explicitly, and the repository holds no sourced cardinal values or
+  inactivation energies.
 - `FungalCouplingModel` can compose explicit capability-matched extracellular
   degradation, secretion, enzyme decay, secretion cost, assimilable-product
   uptake, biomass yield, and maintenance in one well-mixed ODE system. It is an
@@ -1453,6 +1645,14 @@ Current capability labels mean:
   implement irregular/curvilinear meshes, advection, porous-medium closures,
   adaptive mesh refinement, moving colony boundaries, morphology, or true
   surface/volume coupling.
+- `fungal_model.mycelium` is an exploratory continuum (density) mycelium on
+  uniform Cartesian or axisymmetric grids (`docs/spatial-mycelium.md`). It has
+  no individual hyphae, moving colony boundary or morphology, no organism
+  parameters, and is not reachable from the registry, the configured workflow
+  or `VirtualExperiment`. The colony comparison against De Ligne 2019 has a
+  frozen plan whose stage 0 software checks (grid, solver, symmetry) are
+  recorded and passed (`docs/colony-comparison.md`); no fit to colony data has
+  been run.
 - PET is marked `partial`. Cellulose has narrow registry-backed exploratory
   BIO-001/BIO-002 surface and enzyme-chain paths, but the generic
   `CelluloseSubstrate` class remains Stage 9 placeholder metadata and is not a
@@ -1460,8 +1660,10 @@ Current capability labels mean:
   remain Stage 9 placeholder metadata classes with unknown physical parameters
   and no default degradation model.
 - Universal substrate modules record bond classes, required enzyme classes, and product classes, but they do not implement substrate-specific kinetics, accessibility models, thermodynamic constraints, or assimilation evidence.
-- Calibration utilities are generic least-squares tools; no parameters are
-  calibrated by default. `audit_calibration_evidence(...)` checks a completed
+- Calibration utilities are generic least-squares and posterior-sampling tools;
+  nothing is fitted during a virtual-experiment run. The only registry
+  parameters labelled `calibrated` are the nine *T. harzianum* constants, a
+  frozen retrospective fit. `audit_calibration_evidence(...)` checks a completed
   fit against caller-supplied provenance-bearing criteria and external-evidence
   metadata, but `publication_claim_authorized` is always false. The bundled
   same-source literature comparison is not a calibration or independent
@@ -1472,24 +1674,40 @@ Current capability labels mean:
   designs, reports Saltelli first-order and Jansen total-order estimates, can
   bootstrap intervals, records exact evaluation counts and seeds, fails on any
   model-evaluation error, and does not clip finite-sample indices. Independent
-  inputs are required; correlated-input sensitivity and full Bayesian
-  calibration are not implemented.
+  inputs are required; correlated-input sensitivity is not implemented.
+- Posterior sampling (`fungal_model.calibration.bayesian`,
+  `docs/bayesian-calibration.md`) is limited to bounded uniform or log-uniform
+  priors, explicit Gaussian observation-error models and a gradient-free
+  affine-invariant ensemble sampler. Its identifiability verdicts are
+  conditional on the declared prior box, the error model and a finite chain;
+  the one recorded study (*T. harzianum*) assumes its error model because no
+  replicate-level data exist, and no verdict is validation.
 - `AssembledModel.run()` currently supports well-mixed process ODE execution;
   unsupported geometry fails before simulation. The run compiles the model to a
   numeric stoichiometric right-hand side with units resolved at build time and
   records every process's kernel kind in `solver_metadata["kernel"]`
   (`docs/compiled-core.md`). Rates are evaluated at `max(state, 0)` so pools
   can deplete without clipping the trajectory; the `non_negative` validator
-  reports accepted states below tolerance. The legacy `SimulationEngine`, the
-  spatial engines and the Pirt/Monod culture closures are not on the compiled
-  core yet.
+  reports accepted states below tolerance. The legacy
+  `Reaction`/`SimulationEngine` path and the 1D and N-D reaction-diffusion
+  engines still integrate their own right-hand sides (`FD-009` in
+  `ARCHITECTURE_DEBT.md`). The Pirt/Monod culture closures are compiled
+  processes: `ResourceLimitedCulture`, `DegradingCulture` and
+  `FungalCouplingModel` run on the compiled core through `simulate_compiled`,
+  while `ResourceLimitedCulture.simulate`, `DegradingCulture.simulate` and
+  `FungalCouplingModel.build_engine()` keep their native right-hand sides. The
+  spatial mycelium compiles its own field kernels.
 - The registry's one whole-organism case (*T. harzianum* P49P11 on Celufloc
   200 cellulose, `docs/organism-physiology.md`) composes generic process laws
   through a `culture_physiology` template. Its nine constants are a frozen
   retrospective fit to published duplicate means; three sit at fitting bounds.
   It runs in `scientific` mode because it is exact and implemented, not because
   it is validated. Nutrient, oxygen, maintenance, soluble-intermediate, pH and
-  morphology physiology are absent, and no other organism record is runnable.
+  morphology physiology are absent. No other organism record reaches organism
+  physiology: the other named-organism record, *P. chrysosporium* K-3, reaches
+  only the recombinant BGL1A enzyme-kinetics case on cellobiose (exploratory
+  mode), and strains from user-supplied tables (`docs/user-data.md`) reach only
+  homogeneous Michaelis-Menten enzyme cases.
 - The generic configured workflow currently supports foundation process
   factories and well-mixed execution; unsupported process types and geometry
   fail before simulation.

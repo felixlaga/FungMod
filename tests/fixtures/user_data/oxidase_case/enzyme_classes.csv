@@ -1,0 +1,2 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+laccase_like_oxidase,laccase-like oxidase,1.10.3.2,phenolic_oh,phenolic_azine,"FungMod user-data import fixture; illustrative values, not measurements"

@@ -43,6 +43,11 @@ HOMOGENEOUS_MM_PARAMETER_ROLES = (
     "substrate_initial_concentration",
     "enzyme_initial_concentration",
 )
+HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES = (
+    "km",
+    "vmax",
+    "substrate_initial_concentration",
+)
 PH_IONIZATION_MM_PROCESS_TYPE = "ph_ionization_michaelis_menten"
 PH_IONIZATION_MM_PARAMETER_ROLES = (
     "turnover",
@@ -57,6 +62,7 @@ PH_IONIZATION_MM_PARAMETER_ROLES = (
     "enzyme_initial_concentration",
 )
 _HOMOGENEOUS_MM_PROCESS_PARAMETER_ROLES = {"km": "km", "kcat": "kcat"}
+_HOMOGENEOUS_MM_VMAX_PROCESS_PARAMETER_ROLES = {"km": "km", "vmax": "vmax"}
 _PH_IONIZATION_MM_PROCESS_PARAMETER_ROLES = {
     "turnover": "turnover",
     "michaelis_constant": "michaelis_constant",
@@ -81,6 +87,24 @@ class RegistryCaseBuildError(ValueError):
     """Raised when a registry case cannot be converted into a model config."""
 
 
+PRIMARY_ROLE_SET_NAME = "primary"
+
+
+@dataclass(frozen=True)
+class RegistryRoleSet:
+    """One complete set of parameter and state roles an assembler can build from.
+
+    A process law may accept more than one parameterization (for example a
+    maximum rate, or a turnover number with an explicit catalyst state). Each
+    alternative names every parameter role and template state role it needs;
+    the compatibility record's ``parameter_roles`` select the set.
+    """
+
+    name: str
+    parameter_roles: tuple[str, ...]
+    state_roles: tuple[str, ...]
+
+
 @dataclass(frozen=True)
 class RegistryProcessAssembler:
     """Config assembly metadata for one registry process type."""
@@ -95,12 +119,54 @@ class RegistryProcessAssembler:
     enforce_template_mode_match: bool
     unsupported_mode_message: str
     config_data_builder: Callable[..., dict[str, Any]]
+    alternative_role_sets: tuple[RegistryRoleSet, ...] = ()
 
     @property
     def supported_request_modes(self) -> tuple[RegistryCaseConfigMode, ...]:
         """Return the backward-compatible primary mode plus explicit additions."""
 
         return (self.deterministic_mode, *self.additional_supported_modes)
+
+    @property
+    def primary_role_set(self) -> RegistryRoleSet:
+        """The role set given by ``required_parameter_roles`` and ``required_state_roles``."""
+
+        return RegistryRoleSet(
+            name=PRIMARY_ROLE_SET_NAME,
+            parameter_roles=self.required_parameter_roles,
+            state_roles=self.required_state_roles,
+        )
+
+    def role_set_for(self, compatibility: ProcessCompatibilityRecord) -> RegistryRoleSet:
+        """Return the role set a compatibility record binds.
+
+        The primary set is returned when the record binds every primary
+        parameter role, or when it binds no alternative completely (so that
+        missing-role errors keep naming the primary roles). An alternative is
+        returned when the record binds all of its parameter roles and not all
+        primary roles. Binding the primary set and an alternative, or two
+        alternatives, completely is ambiguous and refused.
+        """
+
+        bound = set(compatibility.parameter_roles)
+        complete = [
+            role_set
+            for role_set in (self.primary_role_set, *self.alternative_role_sets)
+            if set(role_set.parameter_roles) <= bound
+        ]
+        if len(complete) > 1:
+            raise RegistryCaseBuildError(
+                f"Process compatibility record {compatibility.record_id!r} binds more than one complete "
+                f"{self.process_label} role set ({', '.join(item.name for item in complete)}); bind exactly one."
+            )
+        if complete:
+            return complete[0]
+        return self.primary_role_set
+
+    def parameter_roles_for(self, compatibility: ProcessCompatibilityRecord) -> tuple[str, ...]:
+        """Return the parameter roles required for the role set a compatibility record binds."""
+
+        return self.role_set_for(compatibility).parameter_roles
 
 
 def build_model_config_from_registry_case(
@@ -208,7 +274,7 @@ def resolve_registry_case(
         fungus_id=fungus_id,
         substrate_id=substrate_id,
         environment_id=environment_id,
-        required_roles=assembler.required_parameter_roles,
+        required_roles=assembler.parameter_roles_for(compatibility),
         process_label=assembler.process_label,
         mode=mode,
     )
@@ -420,7 +486,7 @@ def _validate_case_template_for_assembler(
         )
     missing_roles = tuple(
         role
-        for role in assembler.required_state_roles
+        for role in assembler.role_set_for(compatibility).state_roles
         if role not in template.state_roles
     )
     if missing_roles:
@@ -453,27 +519,135 @@ def select_registry_case_compatibility(
     substrate_id: str,
     report: ModelabilityReport,
 ) -> ProcessCompatibilityRecord:
+    """Return the process compatibility record the modelability report selected.
+
+    ``assess_modelability`` evaluates every compatible record of a case and
+    records the one it selected in ``report.selected_compatibility_id``. Config
+    assembly, the exploratory and scientific screens and the result tables all
+    resolve the case through this function, so a case is built from exactly the
+    record, and therefore the enzyme class, that the preflight assessed. The
+    record is looked up by its identifier and checked against the case; it is
+    never re-derived.
+
+    A report without a selected record (built by hand, or by an older caller)
+    is resolved only when the case has exactly one candidate record; with
+    several candidates it is refused with the candidates named, because any
+    choice could differ from the one the preflight assessed.
+    """
+
+    if report.fungus_id != fungus_id or report.substrate_id != substrate_id:
+        raise RegistryCaseBuildError(
+            f"Modelability report for {report.fungus_id!r} + {report.substrate_id!r} cannot select the "
+            f"process compatibility record of case {fungus_id!r} + {substrate_id!r}."
+        )
+    if report.selected_compatibility_id is not None:
+        return _reported_compatibility(
+            registry=registry,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            report=report,
+            compatibility_id=report.selected_compatibility_id,
+        )
+    candidates = _compatibility_candidates(
+        registry=registry,
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        process_types=report.required_processes,
+    )
+    if len(candidates) == 1:
+        return candidates[0]
+    if not candidates:
+        raise RegistryCaseBuildError(
+            "Modelability report selects no process compatibility record, and no compatible process "
+            f"record of case {fungus_id!r} + {substrate_id!r} could be selected for config assembly."
+        )
+    listed = "; ".join(
+        f"{record.record_id} (enzyme class {record.enzyme_class}, process type {record.process_type})"
+        for record in candidates
+    )
+    raise RegistryCaseBuildError(
+        "Modelability report does not name its selected process compatibility record, and case "
+        f"{fungus_id!r} + {substrate_id!r} has {len(candidates)} candidate records: {listed}. "
+        "Assess the case with assess_modelability, which records the selected record, instead of "
+        "choosing one here."
+    )
+
+
+def _reported_compatibility(
+    *,
+    registry: FungModRegistry,
+    fungus_id: str,
+    substrate_id: str,
+    report: ModelabilityReport,
+    compatibility_id: str,
+) -> ProcessCompatibilityRecord:
+    compatibility = registry.process_compatibility.get(compatibility_id)
+    if compatibility is None:
+        raise RegistryCaseBuildError(
+            f"Modelability report selected process compatibility record {compatibility_id!r}, "
+            "which this registry does not hold; assess the case against the registry used for assembly."
+        )
+    problems: list[str] = []
+    if report.selected_enzyme_class not in (None, compatibility.enzyme_class):
+        problems.append(
+            f"the report names enzyme class {report.selected_enzyme_class!r}, the record "
+            f"{compatibility.enzyme_class!r}"
+        )
+    if compatibility.process_type not in report.required_processes:
+        problems.append(
+            f"the record's process type {compatibility.process_type!r} is not among the report's "
+            f"required processes {list(report.required_processes)!r}"
+        )
+    candidate_ids = {
+        record.record_id
+        for record in _compatibility_candidates(
+            registry=registry,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            process_types=(compatibility.process_type,),
+        )
+    }
+    if compatibility.record_id not in candidate_ids:
+        problems.append(
+            "the record is not a standalone compatibility record of the fungus's enzyme classes for the "
+            "substrate's class and bond classes"
+        )
+    if problems:
+        raise RegistryCaseBuildError(
+            f"Modelability report selected process compatibility record {compatibility_id!r}, which does "
+            f"not fit case {fungus_id!r} + {substrate_id!r}: {'; '.join(problems)}."
+        )
+    return compatibility
+
+
+def _compatibility_candidates(
+    *,
+    registry: FungModRegistry,
+    fungus_id: str,
+    substrate_id: str,
+    process_types: tuple[str, ...],
+) -> tuple[ProcessCompatibilityRecord, ...]:
+    """Every standalone compatibility record of the case for the given process types."""
+
     fungus = registry.get_fungus(fungus_id)
     substrate = registry.get_substrate(substrate_id)
+    candidates: dict[str, ProcessCompatibilityRecord] = {}
     for enzyme_class_id in fungus.enzyme_classes:
-        for process_type in report.required_processes:
+        for process_type in process_types:
             try:
-                candidates = registry.get_process_compatibility(
+                records = registry.get_process_compatibility(
                     enzyme_class=enzyme_class_id,
                     substrate_class=substrate.substrate_class,
                     process_type=process_type,
                 )
             except RegistryLookupError:
                 # An organism may carry enzyme classes that do not act on this
-                # substrate; only classes with a compatibility record can select.
+                # substrate; only classes with a compatibility record are candidates.
                 continue
-            for compatibility in candidates:
+            for compatibility in records:
                 if set(compatibility.required_bond_classes).issubset(substrate.bond_classes):
-                    return compatibility
-    raise RegistryCaseBuildError(
-        "Modelability reported a modelable case, but no compatible process "
-        "record could be selected for config assembly."
-    )
+                    candidates.setdefault(compatibility.record_id, compatibility)
+    return tuple(candidates.values())
 
 
 def _exact_role_parameters(
@@ -1260,9 +1434,16 @@ def _bio001_geometry_data() -> dict[str, Any]:
 
 
 def _homogeneous_mm_config_data(**kwargs: Any) -> dict[str, Any]:
+    role_set = _REGISTRY_PROCESS_ASSEMBLERS["homogeneous_michaelis_menten"].role_set_for(kwargs["compatibility"])
+    process_parameter_roles = (
+        _HOMOGENEOUS_MM_PROCESS_PARAMETER_ROLES
+        if role_set.name == PRIMARY_ROLE_SET_NAME
+        else _HOMOGENEOUS_MM_VMAX_PROCESS_PARAMETER_ROLES
+    )
     return _enzyme_kinetics_config_data(
         process_type="homogeneous_michaelis_menten",
-        process_parameter_roles=_HOMOGENEOUS_MM_PROCESS_PARAMETER_ROLES,
+        process_parameter_roles=process_parameter_roles,
+        state_roles=role_set.state_roles,
         **kwargs,
     )
 
@@ -1271,6 +1452,7 @@ def _ph_ionization_mm_config_data(**kwargs: Any) -> dict[str, Any]:
     return _enzyme_kinetics_config_data(
         process_type=PH_IONIZATION_MM_PROCESS_TYPE,
         process_parameter_roles=_PH_IONIZATION_MM_PROCESS_PARAMETER_ROLES,
+        state_roles=_REGISTRY_PROCESS_ASSEMBLERS[PH_IONIZATION_MM_PROCESS_TYPE].required_state_roles,
         **kwargs,
     )
 
@@ -1279,6 +1461,7 @@ def _enzyme_kinetics_config_data(
     *,
     process_type: str,
     process_parameter_roles: Mapping[str, str],
+    state_roles: tuple[str, ...],
     registry: FungModRegistry,
     compatibility: ProcessCompatibilityRecord,
     case_template: CaseTemplateRecord,
@@ -1289,11 +1472,16 @@ def _enzyme_kinetics_config_data(
     parameter_records: Mapping[str, ParameterRecord],
     output_directory: str | None,
 ) -> dict[str, Any]:
-    """Assemble one dissolved enzyme-kinetics process (plain or pH-dependent Michaelis-Menten)."""
+    """Assemble one dissolved enzyme-kinetics process (plain or pH-dependent Michaelis-Menten).
 
-    substrate_state = _template_state(case_template, "substrate")
-    product_state = _template_state(case_template, "product")
-    enzyme_state = _template_state(case_template, "enzyme")
+    ``state_roles`` are the template state roles of the selected role set, in
+    the order they appear in the process states and validators: substrate,
+    product and, for enzyme-explicit role sets, enzyme.
+    """
+
+    states = {role: _template_state(case_template, role) for role in state_roles}
+    substrate_state = states["substrate"]
+    product_state = states["product"]
     process_id = str(case_template.process_state_metadata["process_id"])
     parameter_set_id = str(
         case_template.process_state_metadata["parameter_set_id"]
@@ -1386,11 +1574,7 @@ def _enzyme_kinetics_config_data(
             {
                 "id": process_id,
                 "process_type": process_type,
-                "states": {
-                    "substrate": substrate_state,
-                    "product": product_state,
-                    "enzyme": enzyme_state,
-                },
+                "states": dict(states),
                 "product_map": _product_map_id(case_template),
                 "parameters": {
                     **{
@@ -1416,7 +1600,7 @@ def _enzyme_kinetics_config_data(
             {
                 "id": "non_negative_concentrations",
                 "validator_type": "non_negative",
-                "species": [substrate_state, product_state, enzyme_state],
+                "species": list(states.values()),
             },
             {
                 "id": "substrate_product_balance",
@@ -1957,6 +2141,13 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
             "or mode='scientific'."
         ),
         config_data_builder=_homogeneous_mm_config_data,
+        alternative_role_sets=(
+            RegistryRoleSet(
+                name="vmax",
+                parameter_roles=HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES,
+                state_roles=("substrate", "product"),
+            ),
+        ),
     ),
     PH_IONIZATION_MM_PROCESS_TYPE: RegistryProcessAssembler(
         process_type=PH_IONIZATION_MM_PROCESS_TYPE,
@@ -2019,9 +2210,13 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
 
 
 __all__ = [
+    "HOMOGENEOUS_MM_PARAMETER_ROLES",
+    "HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES",
+    "PRIMARY_ROLE_SET_NAME",
     "RegistryCaseBuildError",
     "RegistryCaseConfigMode",
     "RegistryProcessAssembler",
+    "RegistryRoleSet",
     "build_registry_process_config_data",
     "build_model_config_from_registry_case",
     "get_registry_process_assembler",

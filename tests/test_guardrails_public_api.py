@@ -8,22 +8,31 @@ import pytest
 import fungal_model
 import fungal_model.workflows as workflows
 from fungal_model import (
+    AssembledTablesDraft,
     DegradationScreenResult,
     EnvironmentCase,
     EnvironmentGrid,
     Parameter,
     ParameterSet,
     SourceProviderError,
+    UserDataError,
+    UserDataset,
+    UserTablesAssemblyError,
+    UserTablesDraft,
+    UserTablesSourceError,
     VirtualExperiment,
     VirtualExperimentError,
+    assemble_user_tables,
     environment_grid,
     load_geometry,
     load_model_config,
     load_parameter_set,
     load_product_map,
     load_substrate,
+    load_user_dataset,
     run_configured_model,
     source_proposal,
+    user_tables_from_sabiork,
     virtual_experiment,
 )
 from fungal_model.plugins import pet as pet_plugin
@@ -68,6 +77,15 @@ RESEARCHER_PUBLIC_API = {
     "VirtualExperimentError": VirtualExperimentError,
     "source_proposal": source_proposal,
     "SourceProviderError": SourceProviderError,
+    "load_user_dataset": load_user_dataset,
+    "UserDataset": UserDataset,
+    "UserDataError": UserDataError,
+    "user_tables_from_sabiork": user_tables_from_sabiork,
+    "UserTablesDraft": UserTablesDraft,
+    "UserTablesSourceError": UserTablesSourceError,
+    "assemble_user_tables": assemble_user_tables,
+    "AssembledTablesDraft": AssembledTablesDraft,
+    "UserTablesAssemblyError": UserTablesAssemblyError,
 }
 
 PET_PLUGIN_ONLY_NAMES = (
@@ -107,6 +125,12 @@ def test_current_researcher_public_api_is_exported() -> None:
         "DegradationScreenResult",
         "VirtualExperimentError",
         "SourceProviderError",
+        "UserDataset",
+        "UserDataError",
+        "UserTablesDraft",
+        "UserTablesSourceError",
+        "AssembledTablesDraft",
+        "UserTablesAssemblyError",
     }
     for name, expected in RESEARCHER_PUBLIC_API.items():
         assert name in fungal_model.__all__
@@ -127,6 +151,54 @@ def test_pet_plugin_helpers_are_available_only_from_pet_plugin() -> None:
     for name in PET_PLUGIN_ONLY_NAMES:
         assert hasattr(pet_plugin, name)
         assert name in pet_plugin.__all__
+
+
+def test_uniprot_route_api_is_exported_and_not_a_placeholder() -> None:
+    """USERDATA-007: the UniProt parser and resolver from ``fungal_model.capability``, the fetch client from
+    ``fungal_model.sources.uniprot``; complete functions, not top-level names."""
+
+    import fungal_model.capability as capability
+    import fungal_model.sources.uniprot as uniprot_source
+
+    for module, names in (
+        (capability, ("decode_uniprot_tsv", "parse_uniprot_tsv", "resolve_uniprot_proteome")),
+        (
+            uniprot_source,
+            (
+                "build_stream_url",
+                "fetch_proteome_snapshot",
+                "load_proteome_snapshot",
+                "organism_query",
+                "proteome_query",
+                "write_snapshot_to_user_dataset",
+            ),
+        ),
+    ):
+        for name in names:
+            assert name in module.__all__, name
+            assert not hasattr(fungal_model, name), name
+            source = inspect.getsource(getattr(module, name)).lower()
+            assert "notimplementederror" not in source, name
+            assert "placeholder" not in source, name
+            assert "todo" not in source, name
+
+
+def test_command_line_entry_point_is_complete_and_uses_the_public_api() -> None:
+    import fungal_model.__main__ as module_entry
+    import fungal_model.cli as cli
+
+    assert callable(cli.main)
+    for source in (inspect.getsource(cli), inspect.getsource(module_entry)):
+        lowered = source.lower()
+        assert "notimplementederror" not in lowered
+        assert "placeholder" not in lowered
+        assert "todo" not in lowered
+    source = inspect.getsource(cli)
+    assert "virtual_experiment(" in source
+    assert ".simulate(" in source
+    assert ".preflight(" in source
+    for low_level in ("simulate_screen", "assess_modelability", "run_configured_model", "ProcessODESolver"):
+        assert low_level not in source
 
 
 def test_public_api_names_are_not_unfinished_placeholders() -> None:

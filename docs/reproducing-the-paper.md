@@ -57,8 +57,9 @@ includes and references every figure.
 
 `paper/paper.tex` is the manuscript; `paper/paper.bib` its references.
 `make paper-pdf` runs `latexmk -pdf` in `paper/` and writes
-`paper/paper.pdf`, which is not committed (the build products are ignored by
-git). It needs a TeX distribution with `latexmk`, `natbib`, `booktabs`,
+`paper/paper.pdf`. `.gitignore` lists the build products, but a built
+`paper.pdf` and its LaTeX auxiliary files were committed on 2026-10-06 and are
+tracked, so a local build shows them as modified. It needs a TeX distribution with `latexmk`, `natbib`, `booktabs`,
 `tabularx`, `geometry`, `graphicx`, `url` and `hyperref`; `lmodern`,
 `caption` and `microtype` are used when present. A full TeX Live has all of
 them; on a minimal installation such as TinyTeX run

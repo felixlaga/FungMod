@@ -5,6 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
+from fungal_model.processes.inactivation import (
+    THERMAL_INACTIVATION_ENVIRONMENT_CONDITIONS,
+    THERMAL_INACTIVATION_PROCESS_TYPE,
+)
+from fungal_model.processes.ionization import (
+    PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS,
+    PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE,
+)
 from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
@@ -47,7 +55,16 @@ class ReportItem:
 
 @dataclass(frozen=True)
 class ModelabilityReport:
-    """Structured report for whether a registry case can be modelled."""
+    """Structured report for whether a registry case can be modelled.
+
+    ``selected_compatibility_id`` is the ``record_id`` of the process
+    compatibility record the assessment selected among every compatible record
+    of the case, and ``selected_enzyme_class`` is that record's enzyme class.
+    Config assembly, the exploratory and scientific screens and the result
+    tables build the case from exactly this record. Both are ``None`` when no
+    compatible record exists; a report built by hand without them is resolved
+    only when the case has a single candidate record.
+    """
 
     fungus_id: str
     substrate_id: str
@@ -63,6 +80,8 @@ class ModelabilityReport:
     required_parameters: tuple[str, ...]
     suggested_experiments: tuple[str, ...]
     assumptions: tuple[str, ...]
+    selected_compatibility_id: str | None = None
+    selected_enzyme_class: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -80,6 +99,8 @@ class ModelabilityReport:
             "required_parameters": list(self.required_parameters),
             "suggested_experiments": list(self.suggested_experiments),
             "assumptions": list(self.assumptions),
+            "selected_compatibility_id": self.selected_compatibility_id,
+            "selected_enzyme_class": self.selected_enzyme_class,
         }
 
     def summary(self) -> str:
@@ -249,6 +270,7 @@ def assess_modelability(
 
     selected_required_parameters: tuple[str, ...] = ()
     selected_processes: tuple[str, ...] = tuple(record.process_type for record in compatibility_records)
+    selected_compatibility: ProcessCompatibilityRecord | None = None
     if compatibility_records:
         selected = max(
             (
@@ -269,7 +291,15 @@ def assess_modelability(
         missing.extend(selected["missing"])
         incompatible.extend(selected["incompatible"])
         selected_required_parameters = tuple(selected["required_parameters"])
-        selected_processes = (selected["compatibility"].process_type,)
+        chosen: ProcessCompatibilityRecord = selected["compatibility"]
+        selected_compatibility = chosen
+        selected_processes = (chosen.process_type,)
+        condition_missing, condition_incompatible = _environment_condition_items(
+            process_type=chosen.process_type,
+            environment=environment,
+        )
+        missing.extend(condition_missing)
+        incompatible.extend(condition_incompatible)
 
     status = _status(
         compatibility_records=tuple(compatibility_records),
@@ -296,6 +326,8 @@ def assess_modelability(
             "Registry records may be toy, exploratory, or curated scientific records; mode-specific maturity rules decide how they are used.",
             f"Mode-specific classification used mode={mode!r}.",
         ),
+        selected_compatibility_id=None if selected_compatibility is None else selected_compatibility.record_id,
+        selected_enzyme_class=None if selected_compatibility is None else selected_compatibility.enzyme_class,
     )
 
 
@@ -439,12 +471,16 @@ def _classify_parameter(
         )
         return
     if record.value.is_unknown:
+        details: dict[str, Any] = {"record_id": record.record_id, "value": record.value.to_dict()}
+        request = record.provenance.get("measurement_request")
+        if isinstance(request, str) and request.strip():
+            details["measurement_request"] = request.strip()
         missing.append(
             _item(
                 "parameter",
                 record.parameter_symbol,
                 "Required parameter is explicitly unknown.",
-                {"record_id": record.record_id, "value": record.value.to_dict()},
+                details,
             )
         )
         return
@@ -540,6 +576,45 @@ def _matches(record_value: str | None, requested: str) -> bool:
     return record_value is None or record_value == requested
 
 
+#: Environment conditions each process law reads at run time, as the law
+#: modules declare them. The law needs one value per run, so a range, a
+#: distribution or an unknown here would fail every simulation sample.
+PROCESS_ENVIRONMENT_CONDITIONS: Mapping[str, tuple[str, ...]] = {
+    PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE: PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS,
+    THERMAL_INACTIVATION_PROCESS_TYPE: THERMAL_INACTIVATION_ENVIRONMENT_CONDITIONS,
+}
+
+
+def _environment_condition_items(*, process_type: str, environment: Any) -> tuple[list[ReportItem], list[ReportItem]]:
+    missing: list[ReportItem] = []
+    incompatible: list[ReportItem] = []
+    for condition in PROCESS_ENVIRONMENT_CONDITIONS.get(process_type, ()):
+        value = environment.conditions.get(condition)
+        item_id = f"{environment.record_id}:{condition}"
+        if value is None or value.is_unknown:
+            missing.append(
+                _item(
+                    "environment_condition",
+                    item_id,
+                    f"Process law {process_type!r} reads the environment condition {condition!r}, "
+                    "which this environment does not give.",
+                    {"process_type": process_type, "condition": condition},
+                )
+            )
+        elif value.kind != "exact":
+            incompatible.append(
+                _item(
+                    "environment_condition",
+                    item_id,
+                    f"Process law {process_type!r} reads the environment condition {condition!r}, which is a "
+                    f"{value.kind} in this environment; the law needs one value per run. Use an environment "
+                    f"with an exact {condition}, or an EnvironmentGrid point.",
+                    {"process_type": process_type, "condition": condition, "value": value.to_dict()},
+                )
+            )
+    return missing, incompatible
+
+
 def _status(
     *,
     compatibility_records: tuple[ProcessCompatibilityRecord, ...],
@@ -562,8 +637,22 @@ def _suggested_experiments(missing: list[ReportItem]) -> tuple[str, ...]:
     suggestions: list[str] = []
     for item in missing:
         if item.item_type == "parameter":
-            suggestions.append(f"Measure or curate {item.item_id} for the selected registry case.")
+            suggestions.append(missing_item_suggestion(item))
     return tuple(dict.fromkeys(suggestions))
+
+
+def missing_item_suggestion(item: ReportItem) -> str:
+    """Return the suggested experiment for one missing parameter item.
+
+    A parameter record that states its own ``measurement_request`` (carried in
+    the item details) is quoted verbatim; otherwise the generic sentence names
+    the parameter symbol.
+    """
+
+    request = item.details.get("measurement_request")
+    if isinstance(request, str) and request.strip():
+        return request.strip()
+    return f"Measure or curate {item.item_id} for the selected registry case."
 
 
 def _validate_mode(mode: str) -> None:
@@ -586,4 +675,5 @@ __all__ = [
     "ModelabilityStatus",
     "ReportItem",
     "assess_modelability",
+    "missing_item_suggestion",
 ]

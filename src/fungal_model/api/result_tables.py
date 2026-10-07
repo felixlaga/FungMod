@@ -24,8 +24,10 @@ from fungal_model.api.output_schema import (
     output_schema_document,
     table_fieldnames,
 )
+from fungal_model.api.user_data import USER_DATASET_MATURITY_FITTED, USER_DATASET_PARAMETER_MATURITIES
 from fungal_model.registry.records import (
     ParameterRecord,
+    ProcessCompatibilityRecord,
     RegistryRecord,
     parameter_record_is_exploratory,
     parameter_record_is_mode_eligible,
@@ -43,6 +45,7 @@ from fungal_model.screening.case_builder import (
     get_registry_process_assembler,
     select_registry_case_compatibility,
 )
+from fungal_model.screening.modelability import missing_item_suggestion
 from fungal_model.screening.parameter_resolution import (
     ExactTemplateParameterError,
     resolve_exact_template_parameter_records,
@@ -188,7 +191,10 @@ def _build_table_rows(
             (case.fungus_id, case.substrate_id, case.environment_id),
             case.modelability_report,
         )
-        role_records = _role_parameter_records(registry=registry, case=case, mode=screen_result.mode)
+        compatibility = _case_compatibility(registry=registry, case=case, report=report)
+        role_records = _role_parameter_records(
+            registry=registry, case=case, compatibility=compatibility, mode=screen_result.mode
+        )
         context = _case_context(
             registry=registry,
             case=case,
@@ -199,23 +205,33 @@ def _build_table_rows(
         rows["modelability_preflight"].append(_preflight_row(context, report))
         rows["modelability_items"].extend(_modelability_item_rows(context, report))
         rows["case_summary"].append(_case_summary_row(context, case, report))
-        rows["provenance_table"].extend(_provenance_rows(context, registry, case, report, role_records))
-        rows["limitations_table"].extend(_limitation_rows(context, registry, case, report, role_records))
+        rows["provenance_table"].extend(
+            _provenance_rows(context, registry, case, report, role_records, compatibility)
+        )
+        rows["limitations_table"].extend(
+            _limitation_rows(context, registry, case, report, role_records, compatibility)
+        )
         rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
-        rows["suggested_experiments"].extend(_suggested_experiment_rows(context, registry, case, report))
+        rows["suggested_experiments"].extend(
+            _suggested_experiment_rows(context, registry, case, report, compatibility)
+        )
         rows["assumption_summary"].extend(_assumption_summary_rows(context, report))
-        rows["mechanism_summary"].extend(_mechanism_summary_rows(context, registry, case, report, role_records))
+        rows["mechanism_summary"].extend(
+            _mechanism_summary_rows(context, registry, case, report, role_records, compatibility)
+        )
         for sample in case.samples:
             sample_context = _sample_context(context, sample)
             state_roles = _state_roles(sample)
             trajectory_rows = _read_trajectory(sample)
             rate_rows = _read_process_rates(sample)
+            state_rate_rows = _read_state_rates(sample)
             derived_rows = _read_derived_quantities(sample)
             rows["time_series_long"].extend(
                 _time_series_rows(
                     sample_context=sample_context,
                     trajectory_rows=trajectory_rows,
                     rate_rows=rate_rows,
+                    state_rate_rows=state_rate_rows,
                     derived_rows=derived_rows,
                     state_roles=state_roles,
                 )
@@ -225,7 +241,7 @@ def _build_table_rows(
                 _final_metric_rows(
                     sample_context=sample_context,
                     trajectory_rows=trajectory_rows,
-                    rate_rows=rate_rows,
+                    state_rate_rows=state_rate_rows,
                     state_roles=state_roles,
                 )
             )
@@ -546,7 +562,7 @@ def _sample_context(context: Mapping[str, Any], sample: EnsembleSample) -> dict[
 
 
 def _preflight_row(context: Mapping[str, Any], report: ModelabilityReport) -> dict[str, Any]:
-    policy = _preflight_policy(report)
+    policy = preflight_policy(report)
     return {
         **_case_columns(context),
         "assessment_mode": report.mode,
@@ -563,7 +579,16 @@ def _preflight_row(context: Mapping[str, Any], report: ModelabilityReport) -> di
     }
 
 
-def _preflight_policy(report: ModelabilityReport) -> dict[str, Any]:
+def preflight_policy(report: ModelabilityReport) -> dict[str, Any]:
+    """Return whether a preflight report allows simulation in its mode, and why not.
+
+    The mapping holds ``simulation_allowed_for_mode`` (scientific mode
+    simulates only ``modelable`` cases; exploratory mode also simulates
+    ``exploratory`` cases; toy mode never simulates), ``blocking_reason`` and
+    ``recommended_next_action``, the same values as the columns of
+    ``modelability_preflight.csv``.
+    """
+
     if report.mode == "scientific":
         if report.status == "modelable":
             return {
@@ -741,6 +766,7 @@ def _mechanism_summary_rows(
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     role_records: Mapping[str, ParameterRecord],
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
     mechanism = _process_mechanism_descriptor(
         context=context,
@@ -748,6 +774,7 @@ def _mechanism_summary_rows(
         case=case,
         report=report,
         role_records=role_records,
+        compatibility=compatibility,
     )
     rows = [{**_case_columns(context), "mechanism_index": 0, **mechanism}]
     rows.extend(_rate_modifier_mechanism_rows(context=context, case=case, start_index=len(rows)))
@@ -832,17 +859,9 @@ def _process_mechanism_descriptor(
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     role_records: Mapping[str, ParameterRecord],
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> dict[str, Any]:
     process_type = str(context.get("process_type", case.process_type))
-    try:
-        compatibility = select_registry_case_compatibility(
-            registry=registry,
-            fungus_id=case.fungus_id,
-            substrate_id=case.substrate_id,
-            report=report,
-        )
-    except RegistryCaseBuildError:
-        compatibility = None
     configured_by = (
         getattr(compatibility, "case_template_id", "") or getattr(compatibility, "record_id", "")
         if compatibility is not None
@@ -937,6 +956,11 @@ def _mechanism_maturity(process_type: str, role_records: Mapping[str, ParameterR
         return "software_tested_literature_parameterized"
     if "exploratory_prior" in maturities:
         return "software_tested_exploratory_parameterized"
+    if USER_DATASET_MATURITY_FITTED in maturities:
+        # A value fitted to the user's own time courses: in-sample, not independent evidence.
+        return "software_tested_user_fitted_in_sample_unvalidated"
+    if maturities <= USER_DATASET_PARAMETER_MATURITIES:
+        return "software_tested_user_supplied_parameterized"
     if maturities <= {"literature_processed", "calibrated"} and "calibrated" in maturities:
         return "software_tested_retrospectively_calibrated_unvalidated"
     return "software_tested_mixed_parameter_maturity"
@@ -1068,6 +1092,15 @@ def _read_process_rates(sample: EnsembleSample) -> list[dict[str, str]]:
     return _read_csv(path)
 
 
+def _read_state_rates(sample: EnsembleSample) -> list[dict[str, str]] | None:
+    """Rows of the sample's ``state_rates.csv``, or ``None`` when the bundle has none."""
+
+    path = Path(sample.output_directory) / "state_rates.csv"
+    if not path.exists():
+        return None
+    return _read_csv(path)
+
+
 def _read_derived_quantities(sample: EnsembleSample) -> list[dict[str, str]]:
     path = Path(sample.output_directory) / "derived_quantities.csv"
     if not path.exists():
@@ -1080,6 +1113,7 @@ def _time_series_rows(
     sample_context: Mapping[str, Any],
     trajectory_rows: Sequence[Mapping[str, str]],
     rate_rows: Sequence[Mapping[str, str]],
+    state_rate_rows: Sequence[Mapping[str, str]] | None,
     derived_rows: Sequence[Mapping[str, str]],
     state_roles: Mapping[str, str],
 ) -> list[dict[str, Any]]:
@@ -1091,7 +1125,7 @@ def _time_series_rows(
     product_state = state_roles.get("product")
     initial_substrate = _initial_state_value(trajectory_rows, substrate_state)
     initial_product = _initial_state_value(trajectory_rows, product_state)
-    rate_by_index = _rate_by_index(rate_rows)
+    role_rates = _role_rate_observables(state_rate_rows, state_roles)
     rate_rows_by_index = _quantity_rows_by_index(rate_rows)
     derived_rows_by_index = _quantity_rows_by_index(derived_rows)
     for index, row in enumerate(trajectory_rows):
@@ -1160,19 +1194,8 @@ def _time_series_rows(
                         "source": "derived_from_states",
                     }
                 )
-        if index in rate_by_index:
-            rate = rate_by_index[index]
-            for state_name in ("degradation_rate", "product_release_rate"):
-                output.append(
-                    {
-                        **base,
-                        "state": state_name,
-                        "state_role": "derived_rate",
-                        "value": rate["value"],
-                        "units": rate["units"],
-                        "source": "simulation_process_rate",
-                    }
-                )
+        for observable_name, role_rate in role_rates.items():
+            output.append(_role_rate_time_series_row(base, observable_name, role_rate, index))
         for rate in rate_rows_by_index.get(index, ()):
             output.append(
                 {
@@ -1202,7 +1225,7 @@ def _final_metric_rows(
     *,
     sample_context: Mapping[str, Any],
     trajectory_rows: Sequence[Mapping[str, str]],
-    rate_rows: Sequence[Mapping[str, str]],
+    state_rate_rows: Sequence[Mapping[str, str]] | None,
     state_roles: Mapping[str, str],
 ) -> list[dict[str, Any]]:
     base = _base_sample_columns(sample_context)
@@ -1219,7 +1242,7 @@ def _final_metric_rows(
     final_substrate = _optional_float(final_row.get(substrate_state or ""))
     initial_product = _initial_state_value(trajectory_rows, product_state)
     final_product = _optional_float(final_row.get(product_state or ""))
-    max_rate = _maximum_process_rate(rate_rows)
+    role_rates = _role_rate_observables(state_rate_rows, state_roles)
     rows: list[dict[str, Any]] = []
     if substrate_state is None or final_substrate is None:
         rows.append(
@@ -1373,20 +1396,23 @@ def _final_metric_rows(
                         "",
                     )
                 )
-    for metric_name in ("maximum_product_release_rate", "maximum_substrate_depletion_rate"):
-        if max_rate is None:
+    for metric_name, observable_name in _MAXIMUM_RATE_METRICS:
+        role_rate = role_rates[observable_name]
+        if role_rate.reason:
+            rows.append(
+                _metric_row(base, metric_name, "", "not_applicable", "not_applicable", role_rate.reason)
+            )
+        else:
             rows.append(
                 _metric_row(
                     base,
                     metric_name,
-                    "",
-                    "not_applicable",
-                    "not_applicable",
-                    "No process-rate trajectory was available.",
+                    max(role_rate.values.values()),
+                    role_rate.units,
+                    "computed",
+                    role_rate.metric_note,
                 )
             )
-        else:
-            rows.append(_metric_row(base, metric_name, max_rate["value"], max_rate["units"], "computed", ""))
     return rows
 
 
@@ -2153,6 +2179,7 @@ def _provenance_rows(
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     role_records: Mapping[str, ParameterRecord],
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for record_type, record in (
@@ -2161,15 +2188,6 @@ def _provenance_rows(
         ("environment", registry.get_environment(case.environment_id)),
     ):
         rows.append(_record_provenance_row(context, record_type, record, role="", symbol="", value_kind=""))
-    try:
-        compatibility = select_registry_case_compatibility(
-            registry=registry,
-            fungus_id=case.fungus_id,
-            substrate_id=case.substrate_id,
-            report=report,
-        )
-    except RegistryCaseBuildError:
-        compatibility = None
     if compatibility is not None:
         rows.append(
             _record_provenance_row(context, "process_compatibility", compatibility, role="", symbol="", value_kind="")
@@ -2249,6 +2267,7 @@ def _limitation_rows(
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     role_records: Mapping[str, ParameterRecord],
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     if context.get("environment_effect_status") == "metadata_only":
@@ -2300,7 +2319,7 @@ def _limitation_rows(
         rows.append(_limitation_row(context, "missing_input", "blocking", item.message, item.item_id))
     for item in report.incompatible:
         rows.append(_limitation_row(context, "incompatible_input", "blocking", item.message, item.item_id))
-    rows.extend(_case_template_limitation_rows(context, registry=registry, case=case, report=report))
+    rows.extend(_case_template_limitation_rows(context, registry=registry, compatibility=compatibility))
     if any(_is_exploratory_record(record) for record in role_records.values()):
         rows.append(
             _limitation_row(
@@ -2385,18 +2404,13 @@ def _case_template_limitation_rows(
     context: Mapping[str, Any],
     *,
     registry: FungModRegistry,
-    case: RegistryCaseEnsemble,
-    report: ModelabilityReport,
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
+    if compatibility is None:
+        return []
     try:
-        compatibility = select_registry_case_compatibility(
-            registry=registry,
-            fungus_id=case.fungus_id,
-            substrate_id=case.substrate_id,
-            report=report,
-        )
         template = registry.get_case_template(compatibility.case_template_id)
-    except (RegistryLookupError, RegistryCaseBuildError):
+    except RegistryLookupError:
         return []
     rows: list[dict[str, Any]] = []
     for limitation in template.limitations:
@@ -2468,6 +2482,7 @@ def _suggested_experiment_rows(
     registry: FungModRegistry,
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     suggestions = tuple(report.suggested_experiments)
@@ -2490,7 +2505,7 @@ def _suggested_experiment_rows(
                 "allowed_use_after_resolution": "scientific_or_exploratory_when_recorded_with_provenance_and_units",
             }
         )
-    rows.extend(_case_template_suggested_experiment_rows(context, registry=registry, case=case, report=report))
+    rows.extend(_case_template_suggested_experiment_rows(context, registry=registry, compatibility=compatibility))
     return rows
 
 
@@ -2498,18 +2513,13 @@ def _case_template_suggested_experiment_rows(
     context: Mapping[str, Any],
     *,
     registry: FungModRegistry,
-    case: RegistryCaseEnsemble,
-    report: ModelabilityReport,
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
+    if compatibility is None:
+        return []
     try:
-        compatibility = select_registry_case_compatibility(
-            registry=registry,
-            fungus_id=case.fungus_id,
-            substrate_id=case.substrate_id,
-            report=report,
-        )
         template = registry.get_case_template(compatibility.case_template_id)
-    except (RegistryLookupError, RegistryCaseBuildError):
+    except RegistryLookupError:
         return []
     suggestions = template.process_state_metadata.get("suggested_experiments", ())
     if not isinstance(suggestions, Sequence) or isinstance(suggestions, str):
@@ -2537,39 +2547,75 @@ def _case_template_suggested_experiment_rows(
 
 def _suggestion_for_missing_item(item: Any) -> str:
     if getattr(item, "item_type", "") == "parameter":
-        return f"Measure or curate {item.item_id} for the selected registry case."
+        return missing_item_suggestion(item)
     return f"Resolve missing or incompatible {item.item_type}: {item.item_id}."
 
 
 def _parameter_symbol_for_suggestion(suggestion: str, report: ModelabilityReport) -> str:
     for item in tuple(report.missing) + tuple(report.incompatible):
-        if item.item_type == "parameter" and item.item_id in suggestion:
+        if item.item_type != "parameter":
+            continue
+        if item.item_id in suggestion or item.details.get("measurement_request") == suggestion:
             return item.item_id
     return ""
+
+
+def _case_compatibility(
+    *,
+    registry: FungModRegistry,
+    case: RegistryCaseEnsemble,
+    report: ModelabilityReport,
+) -> ProcessCompatibilityRecord | None:
+    """Return the compatibility record the screen built this case from, once for every table.
+
+    The record is the one the case's own modelability report selected (the
+    report the screen assembled the case from). A preflight report that names a
+    different selected record is refused, because the tables would then mix two
+    enzyme classes or compatibility records. ``None`` means the case report has
+    no compatible record at all; the table rows that need one are then omitted.
+    Any other selection failure is raised, not hidden.
+    """
+
+    simulated = case.modelability_report
+    if simulated.selected_compatibility_id is None and not simulated.required_processes:
+        compatibility = None
+    else:
+        compatibility = select_registry_case_compatibility(
+            registry=registry,
+            fungus_id=case.fungus_id,
+            substrate_id=case.substrate_id,
+            report=simulated,
+        )
+    simulated_id = None if compatibility is None else compatibility.record_id
+    if report.selected_compatibility_id is not None and report.selected_compatibility_id != simulated_id:
+        raise RegistryCaseBuildError(
+            f"Preflight report for {case.fungus_id} + {case.substrate_id} + {case.environment_id} selected "
+            f"process compatibility record {report.selected_compatibility_id!r}, but the screen built the case "
+            f"from {simulated_id!r}. Write the tables with the preflight reports of the same registry and mode."
+        )
+    return compatibility
 
 
 def _role_parameter_records(
     *,
     registry: FungModRegistry,
     case: RegistryCaseEnsemble,
+    compatibility: ProcessCompatibilityRecord | None,
     mode: str,
 ) -> dict[str, ParameterRecord]:
-    try:
-        compatibility = select_registry_case_compatibility(
-            registry=registry,
-            fungus_id=case.fungus_id,
-            substrate_id=case.substrate_id,
-            report=case.modelability_report,
-        )
-    except RegistryCaseBuildError:
+    if compatibility is None:
         return {}
     assembler = get_registry_process_assembler(compatibility.process_type)
     if assembler is None:
         return {}
+    try:
+        required_roles = assembler.parameter_roles_for(compatibility)
+    except RegistryCaseBuildError:
+        return {}
     explicit_records = _exact_template_role_records(
         registry=registry,
         compatibility=compatibility,
-        required_roles=assembler.required_parameter_roles,
+        required_roles=required_roles,
         fungus_id=case.fungus_id,
         substrate_id=case.substrate_id,
         environment_id=case.environment_id,
@@ -2578,7 +2624,7 @@ def _role_parameter_records(
     if explicit_records is not None:
         return dict(explicit_records)
     records: dict[str, ParameterRecord] = {}
-    roles = tuple(dict.fromkeys((*assembler.required_parameter_roles, *compatibility.parameter_roles.keys())))
+    roles = tuple(dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys())))
     for role in roles:
         symbol = compatibility.parameter_roles.get(role)
         if symbol is None:
@@ -2715,9 +2761,63 @@ def _initial_state_value(
     return _optional_float(trajectory_rows[0].get(state_name))
 
 
-def _rate_by_index(rate_rows: Sequence[Mapping[str, str]]) -> dict[int, dict[str, Any]]:
-    output: dict[int, dict[str, Any]] = {}
-    for row in rate_rows:
+STATE_RATE_SOURCE = "simulation_state_rate"
+NO_STATE_RATE_TRAJECTORY_REASON = "No state-rate trajectory was recorded for this sample."
+# Each observable is the recorded net rate of one mapped state times a sign:
+# (observable name, state role, sign, symbolic definition).
+_ROLE_RATE_OBSERVABLES = (
+    ("degradation_rate", "substrate", -1.0, "-d[substrate]/dt"),
+    ("product_release_rate", "product", 1.0, "+d[product]/dt"),
+)
+_MAXIMUM_RATE_METRICS = (
+    ("maximum_product_release_rate", "product_release_rate"),
+    ("maximum_substrate_depletion_rate", "degradation_rate"),
+)
+
+
+@dataclass(frozen=True)
+class _RoleRate:
+    """Signed net rate of one mapped state per time index, or why it is unavailable."""
+
+    values: Mapping[int, float]
+    units: str
+    metric_note: str
+    reason: str
+
+
+def _role_rate_observables(
+    state_rate_rows: Sequence[Mapping[str, str]] | None,
+    state_roles: Mapping[str, str],
+) -> dict[str, _RoleRate]:
+    return {
+        observable_name: _role_rate(
+            state_rate_rows,
+            role=role,
+            state_name=state_roles.get(role),
+            sign=sign,
+            description=description,
+        )
+        for observable_name, role, sign, description in _ROLE_RATE_OBSERVABLES
+    }
+
+
+def _role_rate(
+    state_rate_rows: Sequence[Mapping[str, str]] | None,
+    *,
+    role: str,
+    state_name: str | None,
+    sign: float,
+    description: str,
+) -> _RoleRate:
+    if not state_rate_rows:
+        return _RoleRate({}, "", "", NO_STATE_RATE_TRAJECTORY_REASON)
+    if state_name is None:
+        return _RoleRate({}, "", "", f"No {role} state mapping was available.")
+    values: dict[int, float] = {}
+    units: set[str] = set()
+    for row in state_rate_rows:
+        if row.get("name") != state_name:
+            continue
         try:
             index = int(str(row.get("index", "")))
         except ValueError:
@@ -2725,12 +2825,50 @@ def _rate_by_index(rate_rows: Sequence[Mapping[str, str]]) -> dict[int, dict[str
         value = _optional_float(row.get("value"))
         if value is None:
             continue
-        output[index] = {
-            "name": row.get("name", ""),
-            "value": value,
-            "units": row.get("units", ""),
+        # Adding 0.0 turns a negated zero into +0.0.
+        values[index] = sign * value + 0.0
+        units.add(str(row.get("units", "")))
+    if not values:
+        return _RoleRate({}, "", "", f"No state-rate trajectory was recorded for {role} state {state_name!r}.")
+    if len(units) != 1:
+        return _RoleRate(
+            {}, "", "", f"State-rate rows for {role} state {state_name!r} carry inconsistent units {sorted(units)}."
+        )
+    return _RoleRate(
+        values,
+        units.pop(),
+        f"Maximum over the returned time points of {description} for state {state_name}, "
+        "from the recorded state-rate trajectory.",
+        "",
+    )
+
+
+def _role_rate_time_series_row(
+    base: Mapping[str, Any],
+    observable_name: str,
+    role_rate: _RoleRate,
+    index: int,
+) -> dict[str, Any]:
+    if not role_rate.reason and index in role_rate.values:
+        return {
+            **base,
+            "state": observable_name,
+            "state_role": "derived_rate",
+            "value": role_rate.values[index],
+            "units": role_rate.units,
+            "source": STATE_RATE_SOURCE,
+            "notes": "",
         }
-    return output
+    reason = role_rate.reason or "No state-rate value was recorded at this time index."
+    return {
+        **base,
+        "state": observable_name,
+        "state_role": "derived_rate",
+        "value": "",
+        "units": "not_applicable",
+        "source": "not_applicable",
+        "notes": reason,
+    }
 
 
 def _quantity_rows_by_index(
@@ -2768,18 +2906,6 @@ def _derived_quantity_role(name: str) -> str:
     return "simulation_derived_quantity"
 
 
-def _maximum_process_rate(rate_rows: Sequence[Mapping[str, str]]) -> dict[str, Any] | None:
-    values: list[tuple[float, str]] = []
-    for row in rate_rows:
-        value = _optional_float(row.get("value"))
-        if value is not None:
-            values.append((value, row.get("units", "")))
-    if not values:
-        return None
-    value, units = max(values, key=lambda item: item[0])
-    return {"value": value, "units": units}
-
-
 def _value_source(record: ParameterRecord) -> str:
     return record.value.source or _provenance_source(record.provenance)
 
@@ -2808,6 +2934,8 @@ def _parameter_source_class(record: ParameterRecord | None) -> str:
         return "unknown"
     if _is_exploratory_record(record):
         return "user_supplied_exploratory_prior"
+    if record.maturity in USER_DATASET_PARAMETER_MATURITIES:
+        return f"{record.maturity}_{'exact_value' if record.value.kind == 'exact' else 'range'}"
     if record.maturity == "literature_range" or record.value.kind == "range":
         return "literature_range"
     if record.maturity == "literature_processed" and record.value.kind == "exact":
@@ -2883,4 +3011,4 @@ def _float_or_blank(value: Any) -> Any:
     return "" if number is None else number
 
 
-__all__ = ["WrittenTables", "write_standard_tables"]
+__all__ = ["WrittenTables", "preflight_policy", "write_standard_tables"]
