@@ -27,6 +27,7 @@ from fungal_model.api.output_schema import (
 from fungal_model.api.user_data import USER_DATASET_MATURITY_FITTED, USER_DATASET_PARAMETER_MATURITIES
 from fungal_model.registry.records import (
     ParameterRecord,
+    ProcessCompatibilityRecord,
     RegistryRecord,
     parameter_record_is_exploratory,
     parameter_record_is_mode_eligible,
@@ -190,7 +191,10 @@ def _build_table_rows(
             (case.fungus_id, case.substrate_id, case.environment_id),
             case.modelability_report,
         )
-        role_records = _role_parameter_records(registry=registry, case=case, mode=screen_result.mode)
+        compatibility = _case_compatibility(registry=registry, case=case, report=report)
+        role_records = _role_parameter_records(
+            registry=registry, case=case, compatibility=compatibility, mode=screen_result.mode
+        )
         context = _case_context(
             registry=registry,
             case=case,
@@ -201,12 +205,20 @@ def _build_table_rows(
         rows["modelability_preflight"].append(_preflight_row(context, report))
         rows["modelability_items"].extend(_modelability_item_rows(context, report))
         rows["case_summary"].append(_case_summary_row(context, case, report))
-        rows["provenance_table"].extend(_provenance_rows(context, registry, case, report, role_records))
-        rows["limitations_table"].extend(_limitation_rows(context, registry, case, report, role_records))
+        rows["provenance_table"].extend(
+            _provenance_rows(context, registry, case, report, role_records, compatibility)
+        )
+        rows["limitations_table"].extend(
+            _limitation_rows(context, registry, case, report, role_records, compatibility)
+        )
         rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
-        rows["suggested_experiments"].extend(_suggested_experiment_rows(context, registry, case, report))
+        rows["suggested_experiments"].extend(
+            _suggested_experiment_rows(context, registry, case, report, compatibility)
+        )
         rows["assumption_summary"].extend(_assumption_summary_rows(context, report))
-        rows["mechanism_summary"].extend(_mechanism_summary_rows(context, registry, case, report, role_records))
+        rows["mechanism_summary"].extend(
+            _mechanism_summary_rows(context, registry, case, report, role_records, compatibility)
+        )
         for sample in case.samples:
             sample_context = _sample_context(context, sample)
             state_roles = _state_roles(sample)
@@ -754,6 +766,7 @@ def _mechanism_summary_rows(
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     role_records: Mapping[str, ParameterRecord],
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
     mechanism = _process_mechanism_descriptor(
         context=context,
@@ -761,6 +774,7 @@ def _mechanism_summary_rows(
         case=case,
         report=report,
         role_records=role_records,
+        compatibility=compatibility,
     )
     rows = [{**_case_columns(context), "mechanism_index": 0, **mechanism}]
     rows.extend(_rate_modifier_mechanism_rows(context=context, case=case, start_index=len(rows)))
@@ -845,17 +859,9 @@ def _process_mechanism_descriptor(
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     role_records: Mapping[str, ParameterRecord],
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> dict[str, Any]:
     process_type = str(context.get("process_type", case.process_type))
-    try:
-        compatibility = select_registry_case_compatibility(
-            registry=registry,
-            fungus_id=case.fungus_id,
-            substrate_id=case.substrate_id,
-            report=report,
-        )
-    except RegistryCaseBuildError:
-        compatibility = None
     configured_by = (
         getattr(compatibility, "case_template_id", "") or getattr(compatibility, "record_id", "")
         if compatibility is not None
@@ -2173,6 +2179,7 @@ def _provenance_rows(
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     role_records: Mapping[str, ParameterRecord],
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for record_type, record in (
@@ -2181,15 +2188,6 @@ def _provenance_rows(
         ("environment", registry.get_environment(case.environment_id)),
     ):
         rows.append(_record_provenance_row(context, record_type, record, role="", symbol="", value_kind=""))
-    try:
-        compatibility = select_registry_case_compatibility(
-            registry=registry,
-            fungus_id=case.fungus_id,
-            substrate_id=case.substrate_id,
-            report=report,
-        )
-    except RegistryCaseBuildError:
-        compatibility = None
     if compatibility is not None:
         rows.append(
             _record_provenance_row(context, "process_compatibility", compatibility, role="", symbol="", value_kind="")
@@ -2269,6 +2267,7 @@ def _limitation_rows(
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     role_records: Mapping[str, ParameterRecord],
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     if context.get("environment_effect_status") == "metadata_only":
@@ -2320,7 +2319,7 @@ def _limitation_rows(
         rows.append(_limitation_row(context, "missing_input", "blocking", item.message, item.item_id))
     for item in report.incompatible:
         rows.append(_limitation_row(context, "incompatible_input", "blocking", item.message, item.item_id))
-    rows.extend(_case_template_limitation_rows(context, registry=registry, case=case, report=report))
+    rows.extend(_case_template_limitation_rows(context, registry=registry, compatibility=compatibility))
     if any(_is_exploratory_record(record) for record in role_records.values()):
         rows.append(
             _limitation_row(
@@ -2405,18 +2404,13 @@ def _case_template_limitation_rows(
     context: Mapping[str, Any],
     *,
     registry: FungModRegistry,
-    case: RegistryCaseEnsemble,
-    report: ModelabilityReport,
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
+    if compatibility is None:
+        return []
     try:
-        compatibility = select_registry_case_compatibility(
-            registry=registry,
-            fungus_id=case.fungus_id,
-            substrate_id=case.substrate_id,
-            report=report,
-        )
         template = registry.get_case_template(compatibility.case_template_id)
-    except (RegistryLookupError, RegistryCaseBuildError):
+    except RegistryLookupError:
         return []
     rows: list[dict[str, Any]] = []
     for limitation in template.limitations:
@@ -2488,6 +2482,7 @@ def _suggested_experiment_rows(
     registry: FungModRegistry,
     case: RegistryCaseEnsemble,
     report: ModelabilityReport,
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     suggestions = tuple(report.suggested_experiments)
@@ -2510,7 +2505,7 @@ def _suggested_experiment_rows(
                 "allowed_use_after_resolution": "scientific_or_exploratory_when_recorded_with_provenance_and_units",
             }
         )
-    rows.extend(_case_template_suggested_experiment_rows(context, registry=registry, case=case, report=report))
+    rows.extend(_case_template_suggested_experiment_rows(context, registry=registry, compatibility=compatibility))
     return rows
 
 
@@ -2518,18 +2513,13 @@ def _case_template_suggested_experiment_rows(
     context: Mapping[str, Any],
     *,
     registry: FungModRegistry,
-    case: RegistryCaseEnsemble,
-    report: ModelabilityReport,
+    compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
+    if compatibility is None:
+        return []
     try:
-        compatibility = select_registry_case_compatibility(
-            registry=registry,
-            fungus_id=case.fungus_id,
-            substrate_id=case.substrate_id,
-            report=report,
-        )
         template = registry.get_case_template(compatibility.case_template_id)
-    except (RegistryLookupError, RegistryCaseBuildError):
+    except RegistryLookupError:
         return []
     suggestions = template.process_state_metadata.get("suggested_experiments", ())
     if not isinstance(suggestions, Sequence) or isinstance(suggestions, str):
@@ -2570,20 +2560,50 @@ def _parameter_symbol_for_suggestion(suggestion: str, report: ModelabilityReport
     return ""
 
 
-def _role_parameter_records(
+def _case_compatibility(
     *,
     registry: FungModRegistry,
     case: RegistryCaseEnsemble,
-    mode: str,
-) -> dict[str, ParameterRecord]:
-    try:
+    report: ModelabilityReport,
+) -> ProcessCompatibilityRecord | None:
+    """Return the compatibility record the screen built this case from, once for every table.
+
+    The record is the one the case's own modelability report selected (the
+    report the screen assembled the case from). A preflight report that names a
+    different selected record is refused, because the tables would then mix two
+    enzyme classes or compatibility records. ``None`` means the case report has
+    no compatible record at all; the table rows that need one are then omitted.
+    Any other selection failure is raised, not hidden.
+    """
+
+    simulated = case.modelability_report
+    if simulated.selected_compatibility_id is None and not simulated.required_processes:
+        compatibility = None
+    else:
         compatibility = select_registry_case_compatibility(
             registry=registry,
             fungus_id=case.fungus_id,
             substrate_id=case.substrate_id,
-            report=case.modelability_report,
+            report=simulated,
         )
-    except RegistryCaseBuildError:
+    simulated_id = None if compatibility is None else compatibility.record_id
+    if report.selected_compatibility_id is not None and report.selected_compatibility_id != simulated_id:
+        raise RegistryCaseBuildError(
+            f"Preflight report for {case.fungus_id} + {case.substrate_id} + {case.environment_id} selected "
+            f"process compatibility record {report.selected_compatibility_id!r}, but the screen built the case "
+            f"from {simulated_id!r}. Write the tables with the preflight reports of the same registry and mode."
+        )
+    return compatibility
+
+
+def _role_parameter_records(
+    *,
+    registry: FungModRegistry,
+    case: RegistryCaseEnsemble,
+    compatibility: ProcessCompatibilityRecord | None,
+    mode: str,
+) -> dict[str, ParameterRecord]:
+    if compatibility is None:
         return {}
     assembler = get_registry_process_assembler(compatibility.process_type)
     if assembler is None:

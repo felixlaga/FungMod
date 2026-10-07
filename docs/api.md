@@ -41,6 +41,13 @@ The `fungmod` console script (also `python -m fungal_model`); see
         - UserDatasetFit
         - FittedQuantity
         - UserDataFitError
+::: fungal_model.api.user_data_sources
+    options:
+      members:
+        - user_tables_from_sabiork
+        - UserTablesDraft
+        - UserTablesSourceError
+        - SABIORK_UNIT_SPELLINGS
 
 ## Environment grids
 

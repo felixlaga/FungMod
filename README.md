@@ -1076,7 +1076,13 @@ limitations. An optional `genomes.csv` takes a strain's enzyme classes from
 its dbCAN genome annotation: classes with a registry record join the
 strain, classes without one and unmapped families are reported, and every
 resolved class that can act on a dataset substrate but has no kinetics becomes
-a named measurement request, since no rate is ever taken from a genome.
+a named measurement request, since no rate is ever taken from a genome. Public
+kinetics reach these tables with the user in the loop: `user_tables_from_sabiork`
+drafts them from SABIO-RK kinetic-law entries (a `source_proposal`, a frozen
+snapshot or an export you downloaded) with a `review.md` of every mapping
+decision and everything not converted, and `load_user_dataset` refuses the
+draft until every `REVIEW:` field is filled
+([starting from SABIO-RK](docs/user-data.md#starting-from-sabio-rk)).
 An optional `timecourse.csv` of measured substrate remaining and product
 formed over time can be compared with a simulation
 (`result.compare_with_timecourses()` writes `timecourse_comparison.csv` with
@@ -1117,6 +1123,9 @@ assembly, execution, and result inspection:
 - `fit_user_dataset`
 - `UserDatasetFit`
 - `UserDataFitError`
+- `user_tables_from_sabiork`
+- `UserTablesDraft`
+- `UserTablesSourceError`
 - `review_source_proposal`
 - `CurationDecision`
 - `CurationResult`
@@ -1609,8 +1618,9 @@ Current capability labels mean:
   no individual hyphae, moving colony boundary or morphology, no organism
   parameters, and is not reachable from the registry, the configured workflow
   or `VirtualExperiment`. The colony comparison against De Ligne 2019 has a
-  frozen plan and stage 0 software (`docs/colony-comparison.md`); no fit to
-  colony data has been run.
+  frozen plan whose stage 0 software checks (grid, solver, symmetry) are
+  recorded and passed (`docs/colony-comparison.md`); no fit to colony data has
+  been run.
 - PET is marked `partial`. Cellulose has narrow registry-backed exploratory
   BIO-001/BIO-002 surface and enzyme-chain paths, but the generic
   `CelluloseSubstrate` class remains Stage 9 placeholder metadata and is not a

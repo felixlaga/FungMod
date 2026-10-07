@@ -70,6 +70,11 @@ from fungal_model.api.user_data_fit import (
     compare_with_timecourses,
     fit_user_dataset,
 )
+from fungal_model.api.user_data_sources import (
+    UserTablesDraft,
+    UserTablesSourceError,
+    user_tables_from_sabiork,
+)
 from fungal_model.api.virtual_experiment import (
     DegradationScreenResult,
     VirtualExperiment,
@@ -138,6 +143,9 @@ __all__ = [
     "UserDatasetFit",
     "compare_with_timecourses",
     "fit_user_dataset",
+    "UserTablesDraft",
+    "UserTablesSourceError",
+    "user_tables_from_sabiork",
     "VirtualExperiment",
     "VirtualExperimentError",
     "VirtualExperimentMode",

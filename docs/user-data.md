@@ -51,6 +51,10 @@ classes come only from a hand-written dbCAN overview in `genomes.csv`; a format
 fixture with synthetic gene identifiers, not a real genome, and no kinetic
 values, so every resolved class is a gap).
 
+To start from public kinetics instead of typing them in, draft the tables from
+SABIO-RK entries and review them; see
+[starting from SABIO-RK](#starting-from-sabio-rk).
+
 ## Directory layout
 
 | File | Required | Content |
@@ -72,6 +76,12 @@ Any other CSV file in the directory is refused as unsupported in this version
 rather than ignored. Columns not listed below are refused too. Required columns are marked with an asterisk. Lists inside a cell
 are separated by semicolons. Rows are reported by their spreadsheet line
 number (the header is line 1).
+
+A cell or manifest value that begins with `REVIEW:` is a field a drafted
+dataset left for you to decide (see
+[starting from SABIO-RK](#starting-from-sabio-rk)). Such a directory is refused
+before anything else is checked, with one issue per review field naming its
+file, row and column, so do not start your own text with `REVIEW:`.
 
 ### `user_dataset.yml`
 
@@ -763,6 +773,154 @@ like any exact value; **scientific mode refuses it**, and no relabelling
 route is provided: an in-sample fit is not independent evidence, and the same
 time courses cannot both choose a value and vouch for it.
 
+## Starting from SABIO-RK
+
+Public kinetics reach a simulation by the same route as your own tables, with
+you in the loop. `user_tables_from_sabiork` drafts the tables above from
+SABIO-RK kinetic-law entries; you review and edit them; `load_user_dataset`
+then checks them like any other dataset. The entries can come from:
+
+- a `RegistryProposal` from `source_proposal(provider="sabiork", ...)`, which
+  reads a frozen snapshot, or queries SABIO-RK live only when you pass
+  `refresh=True` and your network allows it;
+- the path of a kinetic-law export JSON you downloaded from SABIO-RK yourself
+  (the `{"meta": ..., "data": [...]}` document of
+  `https://sabio.h-its.org/export-api/sabio/kinlaw-entry/json?q=...`);
+- a reaction ID string such as `"618"`, read from the local snapshot folders
+  through the same adapter.
+
+Drafting never fetches anything.
+
+```python
+import fungmod as fm
+
+proposal = fm.source_proposal(provider="sabiork", reaction_id="618", entry_id="35622")
+draft = fm.user_tables_from_sabiork(
+    proposal,                      # or "path/to/export.json", or "618"
+    dataset_id="os3bglu6_sabiork",
+    design={                       # the virtual assay's own amounts, optional
+        "substrate_initial_concentration": {"value": 10, "units": "mM"},
+        "enzyme_concentration": {"value": 1e-3, "units": "mM"},
+    },
+)
+draft.write("os3bglu6_sabiork")  # the tables, user_dataset.yml and review.md
+print(draft.review)                # every decision, and everything not converted
+```
+
+The draft does not load yet. Every field that needs a person's decision begins
+with `REVIEW:`: always the manifest's `contributor` and the simulation time grid
+(FungMod has no default grid), and also, when the source leaves them open, a
+temperature or pH that SABIO-RK gives only as a range, the product or yield of
+a reaction that does not name one product, the categorical fields of a
+substrate the registry does not know, the bond and substrate classes of a
+proposed enzyme class, and the enzyme loading a specific activity needs.
+`draft.review_fields` and the "Fields to fill" table of `review.md` list them
+with file, row and column, and `load_user_dataset` refuses the directory until
+each is filled:
+
+```text
+UserDataError: User dataset 'os3bglu6_sabiork' still has unfilled review fields (cells or manifest
+values beginning with 'REVIEW:'). 4 issue(s):
+- user_dataset.yml column contributor: Unfilled review field contributor: 'REVIEW: name of the person
+  who reviewed these tables'. Replace it with a reviewed value before loading.
+- user_dataset.yml column simulation.duration: Unfilled review field simulation.duration: ...
+```
+
+After editing `user_dataset.yml` (for example `duration: 10`, `units: hour`,
+`points: 61`) and reviewing the tables:
+
+```python
+dataset = fm.load_user_dataset("os3bglu6_sabiork")
+study = fm.virtual_experiment(
+    fungi="oryza_sativa_in_escherichia_coli_origami_de3",
+    substrates="cellobiose",
+    environments="c30_ph5",
+    user_data=dataset,
+)
+study.preflight(mode="scientific")
+result = study.simulate(mode="scientific")
+```
+
+With this design, the drafted EntryID 35622 gives the same Km, kcat, standard
+deviations, design values and trajectory as the hand-written
+`literature_reentry` fixture (`tests/test_user_data_sources.py`).
+
+### Mapping rules
+
+Every application of these rules is recorded in `review.md`.
+
+| SABIO-RK | User tables | Rule |
+| --- | --- | --- |
+| Organism and expression host (`expressed_in`) | `strains.csv` | One strain per organism and host, ID `<organism>_in_<host>` (or the ID given in `strain_id_for_organism`), name `SABIO-RK enzyme source: <organism>, expressed in <host>`. Mutant enzymes are listed, not converted: an engineered variant is not an enzyme of the organism. |
+| EC number | `enzymes.csv` | Resolved against the registry's enzyme classes, where EC numbers are aliases. An unresolved EC number is listed and the entry not converted; with `propose_enzyme_classes=True` an `enzyme_classes.csv` row is drafted whose bond and substrate classes are `REVIEW:` fields, never inferred. |
+| Substrate named by the Km and concentration parameters (or the reaction's only substrate) | `substrates.csv` | Resolved against the registry by name or alias and referenced; otherwise a row with `REVIEW:` substrate class, physical state and bond classes. The product and its mol/mol yield (product coefficient divided by substrate coefficient) come from the reaction when it names one product; otherwise `REVIEW:`. |
+| Temperature, pH, buffer | `conditions.csv` | One condition per distinct temperature and pH (IDs such as `c30_ph5`), the buffer in `notes`. A missing value is `unknown`; a range is a `REVIEW:` field. `°C` becomes `degC` and `K` `kelvin`. |
+| Km | `km` | |
+| kcat | `kcat` | |
+| Vmax | `vmax` or `specific_activity` | `vmax` when the units are an amount per volume per time; `specific_activity` when they are an amount per time per enzyme mass, with an `enzyme_loading` row taken from `design` or left as `REVIEW:`. A mass rate is listed. |
+| Concentration of the substrate or the enzyme | `substrate_initial_concentration`, `enzyme_concentration` | The assay's values, usually the tested range; a `design` value replaces them (the replaced value is listed). |
+| kcat/Km, pKa, pH, Ki and other types | | Listed, not converted. |
+
+Values are copied, never converted: start and end values give `value` or
+`lower` and `upper`, the standard deviation becomes `sd`, and the evidence type
+is `literature`. The source reads `SABIO-RK EntryID 35622 (Seshadri S et al.
+2009, PMID 19587102)` and the method `SABIO-RK kinetic law 35622,
+Michaelis-Menten`, followed by the SABIO-RK parameter name when it differs
+from its type (`Km0`, `k0`) and SABIO-RK's comment (`apparent`, `estimated from
+plot`). `design` takes only `substrate_initial_concentration`,
+`enzyme_concentration` and `enzyme_loading`; kinetic constants come from the
+source.
+
+**Units.** A unit string the unit registry parses is kept as written
+(`mM`, `s^(-1)` and `µmol*min^(-1)*mg^(-1)` all parse). Otherwise the explicit
+table `SABIORK_UNIT_SPELLINGS` maps a known SABIO-RK spelling to the same unit
+in ASCII (`s^(-1)` to `1/s`, `µmol*min^(-1)*mg^(-1)` to `umol/min/mg`), and the
+mapping is recorded; any other unit is listed and its value not converted.
+The dimension is then checked for the quantity, so a spelling the registry
+misreads (`units/mg` parses as a luminosity) is listed too.
+
+**Conflicts and rate forms.** FungMod holds one value per quantity and case.
+Entries that map to the same strain, enzyme class, substrate and condition
+(isoenzymes of one organism measured at the same condition) are all listed as
+a conflict and none is converted; choose one with `entry_ids`. All cases of an
+enzyme class and substrate share one rate form, so when some entries give kcat
+and others Vmax the kcat form is kept and the Vmax values are listed.
+
+**pH-dependent laws.** A kinetic law with pKa parameters (SABIO-RK's
+"Michaelis-Menten (pH-dependent)") is not turned into a cardinal pH law. FungMod
+implements that law for registry cases (`ph_ionization_michaelis_menten`, see
+[environment response laws](environment-response.md)), but `responses.csv`
+cannot bind it yet, so the entry is listed under "pH-ionization laws" as
+"pH-ionization law not importable as user data yet"; only its Km and kcat are
+converted, at the entry's pH. SABIO-RK
+gives the pH of such an entry as the range of the pH profile, so that pH is a
+`REVIEW:` field, and the converted constants belong to a law that also contains
+pH terms: they need not equal the Km and kcat observed at any single pH.
+
+**What Reaction 618 gives.** Of the 29 entries of the frozen Reaction 618
+snapshot, five are converted (38521, 39245, 44879, 44888, 60725). Listed with a
+reason: 15 mutants, two conflicts (35622 with 39780, wild-type rice enzymes from
+two studies expressed in the same host and measured at 30 degC and pH 5; 38522
+with 38534, the pH-dependent laws of BGL1A and BGL1B), four entries whose EC
+numbers the registry does not resolve (3.2.1.74, 3.2.1.25, 3.2.1.58) and one
+entry without a Km, kcat or Vmax value.
+`entry_ids=["35622"]` converts the selected entry of the registry case.
+
+Limits of the SABIO-RK route:
+
+- SABIO-RK only, and only what an export contains; no other kinetics database.
+- Homogeneous Michaelis-Menten constants only; inhibition, cooperativity,
+  pH-ionization and multi-substrate laws are listed, not imported.
+- No value is converted between units, and SABIO-RK's normalised values are not
+  used.
+- A SABIO-RK concentration range is the range tested in the assay; it is
+  written as a range, which exploratory runs sample uniformly and scientific
+  mode refuses, unless a `design` value replaces it.
+- Strains are keyed by organism and host as SABIO-RK spells them, so
+  `Escherichia coli Origami (DE3)` and `Escherichia coli Origami(DE3) cell` are
+  different hosts; merge them by editing the tables.
+- Mutant enzymes are not converted.
+
 ## Limitations of this increment
 
 - Homogeneous Michaelis-Menten kinetics only, in the kcat form or the Vmax
@@ -800,3 +958,6 @@ time courses cannot both choose a value and vouch for it.
   ambiguous; strains, substrates and conditions are unaffected.
 - The overlay lives in memory for one experiment. There is no promotion of
   user records into the shared registry.
+- Tables drafted from SABIO-RK are drafts: nothing is imported without a
+  person filling the `REVIEW:` fields, and only the conversions listed in
+  [starting from SABIO-RK](#starting-from-sabio-rk) are made.
