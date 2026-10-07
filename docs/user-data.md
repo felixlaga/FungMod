@@ -43,6 +43,10 @@ user-defined aryl ester, `kcat` form, estimates only),
 `tests/fixtures/user_data/literature_reentry/` (the published SABIO-RK Reaction
 618 selected entry typed in as literature values against the registry's
 `cellobiose` and `beta_glucosidase`),
+`tests/fixtures/user_data/bgl1a_ph_ionization/` (the published pH-dependent
+law of SABIO-RK entry 38522, BGL1A from Tsukada et al. 2008, typed in as
+literature values in the [pH-ionization form](#three-rate-forms), with design
+loadings),
 `tests/fixtures/user_data/oxidase_case/` (a user-defined laccase-like oxidase on
 a dissolved phenolic substrate, Vmax from a specific activity and an enzyme
 loading, with cardinal temperature and pH laws in `responses.csv`; estimates
@@ -206,6 +210,11 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,enzyme_concentration
 | `specific_activity` | amount per time per enzyme mass, e.g. µmol/min/mg or U/mg | Activity per mass of enzyme preparation. |
 | `enzyme_loading` | enzyme mass per volume, e.g. mg/L | Enzyme preparation per volume of the simulated system. |
 | `assay_activity` | amount per time per volume, e.g. U/mL | Volumetric activity in the simulated system. |
+| `kcat_limiting` | 1/time | Limiting turnover of the pH-ionization form (`k0`). |
+| `km_limiting` | concentration, amount per volume | Limiting Michaelis constant of the pH-ionization form (`Km0`, positive). |
+| `pk_free_lower`, `pk_free_upper` | `dimensionless` | Lower and upper pK of the free enzyme (`pKe1`, `pKe2`). |
+| `pk_complex_lower`, `pk_complex_upper` | `dimensionless` | Lower and upper pK of the enzyme-substrate complex (`pKes1`, `pKes2`). |
+| `ph_min`, `ph_max` | `dimensionless` | The pH range the pH-ionization law was fitted over; exact values between 0 and 14. |
 
 `U` is the enzyme unit of the unit registry, one micromole per minute.
 `enzyme_activity` is refused as ambiguous: say `specific_activity` or
@@ -226,10 +235,10 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,enzyme_concentration
 - `activity_substrate` and `activity_saturating` belong to `assay_activity`
   rows only and are refused on any other row.
 
-#### Two rate forms
+#### Three rate forms
 
-A case (one strain, enzyme class, substrate and condition) uses one of two
-forms of homogeneous Michaelis-Menten kinetics:
+A case (one strain, enzyme class, substrate and condition) uses one of three
+forms of Michaelis-Menten kinetics:
 
 - **kcat form**, `rate = kcat · E · S / (Km + S)`: `km`, `kcat`,
   `substrate_initial_concentration` and `enzyme_concentration`. The enzyme is a
@@ -237,13 +246,90 @@ forms of homogeneous Michaelis-Menten kinetics:
 - **Vmax form**, `rate = Vmax · S / (Km + S)`: `km`, Vmax and
   `substrate_initial_concentration`. There is no enzyme state, so enzyme loss
   or dilution cannot be simulated.
+- **pH-ionization form**, the diprotic law FungMod implements as the process
+  law `ph_ionization_michaelis_menten` (the law of the registry's BGL1A case,
+  see [environment response laws](environment-response.md)):
+  `kcat_limiting`, `km_limiting`, `pk_free_lower`, `pk_free_upper`,
+  `pk_complex_lower`, `pk_complex_upper`, `ph_min`, `ph_max`,
+  `substrate_initial_concentration` and `enzyme_concentration`. The enzyme is a
+  model state and the rate follows the pH of the environment:
+
+  ```text
+  f_e(pH)  = (10^(pk_free_lower - pH) + 1) (10^(pH - pk_free_upper) + 1)
+  f_es(pH) = (10^(pk_complex_lower - pH) + 1) (10^(pH - pk_complex_upper) + 1)
+  kcat(pH) = kcat_limiting / f_es(pH)
+  Km(pH)   = km_limiting · f_e(pH) / f_es(pH)
+  rate     = kcat(pH) · E · S / (Km(pH) + S)
+  ```
+
+  "Limiting" means the plateau constant of the fit: `kcat_limiting` is the
+  turnover of the enzyme-substrate complex in its active protonation state,
+  so the turnover at any pH is at most `kcat_limiting`, and `km_limiting` is
+  the matching plateau Michaelis constant. Neither is the kcat or Km measured
+  at one pH, so do not enter single-pH constants here (they belong to the kcat
+  form), and do not enter these constants as `kcat` and `km`. The quantities
+  map to the assembler's roles exactly as the registry's BGL1A records do:
+
+  | `quantity` | Role | SABIO-RK name |
+  | --- | --- | --- |
+  | `kcat_limiting` | `turnover` | `k0` |
+  | `km_limiting` | `michaelis_constant` | `Km0` |
+  | `pk_free_lower` / `pk_free_upper` | `free_enzyme_lower_pk` / `free_enzyme_upper_pk` | `pKe1` / `pKe2` |
+  | `pk_complex_lower` / `pk_complex_upper` | `complex_lower_pk` / `complex_upper_pk` | `pKes1` / `pKes2` |
+  | `ph_min` / `ph_max` | `minimum_ph` / `maximum_ph` | start and end of the law's pH variable |
+  | `substrate_initial_concentration` | `substrate_initial_concentration` | |
+  | `enzyme_concentration` | `enzyme_initial_concentration` | |
+
+  The re-entry of SABIO-RK entry 38522 in
+  `tests/fixtures/user_data/bgl1a_ph_ionization/` reads:
+
+  ```text
+  strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,sd,replicates
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,kcat_limiting,1.81,,,1/s,literature,<law constant of entry 38522>,<source>,0.05,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,km_limiting,6.8,,,mM,literature,<law constant of entry 38522>,<source>,0.29,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,pk_free_lower,4.4,,,dimensionless,literature,<law constant of entry 38522>,<source>,0.2,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,pk_free_upper,7.7,,,dimensionless,literature,<law constant of entry 38522>,<source>,0.2,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,pk_complex_lower,4.1,,,dimensionless,literature,<law constant of entry 38522>,<source>,0.1,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,pk_complex_upper,7.6,,,dimensionless,literature,<law constant of entry 38522>,<source>,0.1,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,ph_min,4,,,dimensionless,literature,<lower end of the pH series>,<source>,,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,ph_max,8,,,dimensionless,literature,<upper end of the pH series>,<source>,,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,substrate_initial_concentration,5,,,mM,design,experimental design,<design note>,,
+  bgl1a_source,beta_glucosidase,cellobiose,c30_ph5,enzyme_concentration,0.001,,,mM,design,experimental design,<design note>,,
+  ```
+
+  With the registry case's loadings it gives the same substrate trajectory as
+  the registry BGL1A case in the Tsukada pH 5 assay, and an `EnvironmentGrid`
+  over pH 4 to 8 gives initial rates in the ratios of the law's factors
+  (`tests/test_user_data_ph_ionization.py`). The condition's temperature is the
+  temperature the law was fitted at; its pH is the pH the case runs at.
+
+  Checks: the pK values are finite numbers in `dimensionless`; each lower pK
+  lies below its upper pK (for ranges, the whole lower range below the whole
+  upper range, so that every sampled pair is ordered); `ph_min` and `ph_max`
+  are exact, between 0 and 14, with `ph_min < ph_max`; and every condition with
+  pH-ionization rows has one exact pH inside `[ph_min, ph_max]`. An `unknown`
+  pH or a pH outside the fitted range is refused on its `conditions.csv` row
+  with the reason, and a pH range is never a condition (`ph` takes one number
+  or `unknown`). In an `EnvironmentGrid` a grid pH outside the range is not
+  refused: the law runs with an `EnvironmentalValidityWarning`, as the
+  registry case does. `kcat_limiting` and `km_limiting` may be ranges for
+  exploratory sampling.
 
 A case that gives `kcat` or `enzyme_concentration` together with any Vmax row
-is refused; FungMod never derives one form from the other. All strains and
-conditions of one enzyme class and substrate share one generated process, so
-they must use the same form; a dataset where one strain uses `kcat` and another
-`vmax` on the same pair is refused. A pair without any rate row is generated in
-the kcat form, and its gap requests name both forms (see below).
+is refused; FungMod never derives one form from the other. A case that gives
+any pH-ionization quantity together with `kcat` or a Vmax row is refused too
+(its `enzyme_concentration` belongs to whichever of the kcat and pH-ionization
+forms the case uses). All strains and conditions of one enzyme class and
+substrate share one generated process, so they must use the same form; a
+dataset where one strain uses `kcat` and another `vmax`, or the pH-ionization
+form, on the same pair is refused. A generated enzyme class lists the process
+law it runs and preflight looks for that law on every substrate of the class,
+so a class uses the pH-ionization form on all of its substrates or on none: a
+class with the pH-ionization form on one substrate and the kcat or Vmax form on
+another is refused. A pair without any rate row is generated in the kcat form,
+and its gap requests name both forms (see below); when its class uses the
+pH-ionization form on its other substrates, it is generated in that form
+instead.
 
 #### Three routes to Vmax
 
@@ -307,7 +393,9 @@ The laws are the implemented modifiers described in
 [environment response laws](environment-response.md); a law name FungMod does
 not implement is refused, and so are implemented laws this importer does not
 bind yet (Gaussian pH, oxygen, water activity) and the optional validity bounds
-of the Arrhenius law. Validation:
+of the Arrhenius law. On a pair in the pH-ionization form a pH law is refused
+as double-counting, because the ionization law already makes the rate depend on
+pH; a temperature law binds as usual. Validation:
 
 - Every parameter the law needs is present exactly once, with the right
   dimension (temperatures in `degC` or `kelvin`, pH as `dimensionless`
@@ -332,8 +420,8 @@ The law multiplies the configured rate by an activity that is one at its
 reference parameter: the optimum of a cardinal law, the reference temperature
 of the Arrhenius law. The law therefore rescales the reference value, and the
 kinetic constants of that strain, enzyme class and substrate (`km`, `kcat`,
-`vmax`, `specific_activity`, `assay_activity`) must be stated at the reference
-condition. For every condition at which such rows exist, the condition's
+`vmax`, `specific_activity`, `assay_activity`, `kcat_limiting`, `km_limiting`)
+must be stated at the reference condition. For every condition at which such rows exist, the condition's
 temperature or pH must equal the reference parameter exactly, or lie within
 the `reference_tolerance` stated on the reference parameter's row (a
 nonnegative number in that row's units; FungMod has no tolerance of its own).
@@ -343,7 +431,8 @@ the optimum); the declaration is recorded in provenance and not checked. A
 condition with an unknown temperature or pH cannot carry kinetic constants for
 a law on that condition. Otherwise the dataset is refused with a message
 naming the condition, the reference value and the difference. Concentrations
-and `enzyme_loading` are amounts, not rates, and are not checked or rescaled.
+and `enzyme_loading` are amounts, not rates, and are not checked or rescaled;
+nor are the pK values and the fitted pH range of the pH-ionization form.
 
 ### `genomes.csv` (optional): enzyme classes from a genome annotation
 
@@ -667,20 +756,25 @@ out of data you intend to simulate.
 | Record | Identifier |
 | --- | --- |
 | Fungus per strain, listing its namespaced classes (from `enzymes.csv` and `genomes.csv`) | `<dataset_id>__<strain_id>` |
-| Enzyme class per declared class, limited to homogeneous Michaelis-Menten | `<dataset_id>__<class>` |
+| Enzyme class per declared class, limited to the process law of its rate form (`homogeneous_michaelis_menten`, or `ph_ionization_michaelis_menten` for the pH-ionization form) | `<dataset_id>__<class>` |
 | Substrate per user-defined substrate (registry substrates are referenced) | `<dataset_id>__<substrate_id>` |
 | Environment per condition | `<dataset_id>__<condition_id>` |
-| Compatibility and case template per class and compatible substrate | `<dataset_id>__<class>__<substrate_id>__homogeneous_mm[_template]` |
+| Compatibility and case template per class and compatible substrate | `<dataset_id>__<class>__<substrate_id>__homogeneous_mm[_template]`, or `__ph_ionization_mm[_template]` in the pH-ionization form |
 | Parameter record per kinetics row of a role | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__<quantity>` |
 | Vmax record (explicit row, derived, or from an assay activity) | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__vmax` |
 | Response-law parameter record per `responses.csv` row | `<dataset_id>__<strain>__<class>__<substrate>__<law>__<parameter>` |
 | Explicit unknown per missing role or law parameter | the same identifier with `__gap` |
 
 The compatibility record binds the roles of the pair's rate form (`km`,
-`kcat`, `substrate_initial_concentration`, `enzyme_initial_concentration`, or
-`km`, `vmax`, `substrate_initial_concentration`) followed by the parameters of
-any bound law; the template of a Vmax-form pair has no enzyme state, and a
-pair with laws lists them under `process_state_metadata.process_modifiers`.
+`kcat`, `substrate_initial_concentration`, `enzyme_initial_concentration`;
+`km`, `vmax`, `substrate_initial_concentration`; or the ten roles of the
+pH-ionization form in the table [above](#three-rate-forms)) followed by the
+parameters of any bound law; the template of a Vmax-form pair has no enzyme
+state, and a pair with laws lists them under
+`process_state_metadata.process_modifiers`. The template of a pH-ionization
+pair has the process type `ph_ionization_michaelis_menten`, so its assembled
+model reads the pH of the environment and reports
+`environment_effect_status = active_response_model` for pH.
 `specific_activity`, `enzyme_loading` and `assay_activity` rows produce no
 records of their own; they appear in the provenance of the Vmax record.
 
@@ -723,7 +817,16 @@ request that names both forms:
 
 A started Vmax route with one of its two rows missing asks for that row (for
 example the enzyme loading needed to derive Vmax from the specific activity in
-a stated row). When a law is bound to an enzyme class and substrate for one
+a stated row). A missing constant of the pH-ionization form asks for a fit of
+the law over a pH series at the condition's temperature, for example:
+
+> Measure the lower pK of the free enzyme (pk_free_lower) of acid
+> phosphatase-like enzyme from Phosphatase source strain P1 on model alkyl
+> phosphate monoester (dimensionless) by fitting the diprotic pH-ionization law
+> to initial rates over a pH series at the temperature of condition c37_ph5
+> (37 degC).
+
+and a missing `ph_min` or `ph_max` asks for the end of the fitted pH series. When a law is bound to an enzyme class and substrate for one
 strain, every other strain of that pair gets a gap per law parameter (with
 no condition), asking for that parameter of that law.
 
@@ -985,7 +1088,8 @@ with `REVIEW:`: always the manifest's `contributor` and the simulation time grid
 temperature or pH that SABIO-RK gives only as a range, the product or yield of
 a reaction that does not name one product, the categorical fields of a
 substrate the registry does not know, the bond and substrate classes of a
-proposed enzyme class, and the enzyme loading a specific activity needs.
+proposed enzyme class, the enzyme loading a specific activity needs, and the
+`ph_min` and `ph_max` of a pH-ionization law whose entry states no pH range.
 `draft.review_fields` and the "Fields to fill" table of `review.md` list them
 with file, row and column, and `load_user_dataset` refuses the directory until
 each is filled:
@@ -1031,7 +1135,8 @@ Every application of these rules is recorded in `review.md`.
 | kcat | `kcat` | |
 | Vmax | `vmax` or `specific_activity` | `vmax` when the units are an amount per volume per time; `specific_activity` when they are an amount per time per enzyme mass, with an `enzyme_loading` row taken from `design` or left as `REVIEW:`. A mass rate is listed. |
 | Concentration of the substrate or the enzyme | `substrate_initial_concentration`, `enzyme_concentration` | The assay's values, usually the tested range; a `design` value replaces them (the replaced value is listed). |
-| kcat/Km, pKa, pH, Ki and other types | | Listed, not converted. |
+| `k0`, `Km0`, `pKe1`, `pKe2`, `pKes1`, `pKes2` and the pH variable of the diprotic "Michaelis-Menten (pH-dependent)" law | `kcat_limiting`, `km_limiting`, `pk_free_lower`, `pk_free_upper`, `pk_complex_lower`, `pk_complex_upper`, `ph_min`, `ph_max` | The [pH-ionization form](#three-rate-forms); see below. |
+| kcat/Km, pKa of any other law, Ki and other types | | Listed, not converted. |
 
 Values are copied, never converted: start and end values give `value` or
 `lower` and `upper`, the standard deviation becomes `sd`, and the evidence type
@@ -1058,16 +1163,47 @@ a conflict and none is converted; choose one with `entry_ids`. All cases of an
 enzyme class and substrate share one rate form, so when some entries give kcat
 and others Vmax the kcat form is kept and the Vmax values are listed.
 
-**pH-dependent laws.** A kinetic law with pKa parameters (SABIO-RK's
-"Michaelis-Menten (pH-dependent)") is not turned into a cardinal pH law. FungMod
-implements that law for registry cases (`ph_ionization_michaelis_menten`, see
-[environment response laws](environment-response.md)), but `responses.csv`
-cannot bind it yet, so the entry is listed under "pH-ionization laws" as
-"pH-ionization law not importable as user data yet"; only its Km and kcat are
-converted, at the entry's pH. SABIO-RK
-gives the pH of such an entry as the range of the pH profile, so that pH is a
-`REVIEW:` field, and the converted constants belong to a law that also contains
-pH terms: they need not equal the Km and kcat observed at any single pH.
+**pH-dependent laws.** An entry whose kinetic law carries the four pKa
+parameters with the limiting kcat and Km of SABIO-RK's diprotic
+"Michaelis-Menten (pH-dependent)" law (kinetic-law type 24, as in entries
+38522 to 38534 of Reaction 618) is drafted in the
+[pH-ionization form](#three-rate-forms). The converter recognises the law by
+its formula, compared with whitespace removed to
+`E*((k0)/((10^(pKes1-pH)+1)*(10^(pH-pKes2)+1)))*S/(((k0)/((10^(pKes1-pH)+1)*(10^(pH-pKes2)+1)))/(((k0)/(Km0))/((10^(pKe1-pH)+1)*(10^(pH-pKe2)+1)))+S)`,
+and by the parameter names in it: `k0` becomes `kcat_limiting`, `Km0`
+`km_limiting`, `pKe1` and `pKe2` `pk_free_lower` and `pk_free_upper`, `pKes1`
+and `pKes2` `pk_complex_lower` and `pk_complex_upper`, all as `literature`
+values with their standard deviations (SABIO-RK's `-` unit of a pKa is written
+`dimensionless`). `k0` and `Km0` are never written as `kcat` and `km`: they are
+the law's limiting constants, not the constants at the entry's pH. `ph_min`
+and `ph_max` are the pH range the entry states, the start and end of the law's
+pH variable or else of the assay pH (entry 38522 gives 4 to 8); when it states
+none, or two different ones, they are `REVIEW:` fields. The condition pH is the
+pH the case runs at: SABIO-RK gives the assay pH of such an entry as the range
+of the pH profile, so it stays a `REVIEW:` field, to be filled with one pH
+inside `ph_min` to `ph_max` (`unknown` is refused for this form). A law with
+pKa parameters whose formula or parameter names differ is listed, not
+converted, and none of its constants is written. Because one enzyme class uses
+one process law, pH-ionization entries are listed, not converted, when the
+selected entries give the same enzyme class in the kcat or Vmax form; select
+them alone with `entry_ids`. `review.md` lists every pH-dependent law under
+"pH-ionization laws" with its pKa values and whether it was converted.
+
+```python
+draft = fm.user_tables_from_sabiork(
+    "618",
+    dataset_id="bgl1a_sabiork",
+    entry_ids=["38522"],
+    design={
+        "substrate_initial_concentration": {"value": 5, "units": "mM"},
+        "enzyme_concentration": {"value": 0.001, "units": "mM"},
+    },
+)
+draft.write("bgl1a_sabiork")  # fill contributor, the time grid and the condition pH (one value from 4 to 8)
+```
+
+Once reviewed (pH 5, 14400 s, 145 points), the drafted entry 38522 simulates
+the same trajectory as the hand-written `bgl1a_ph_ionization` fixture.
 
 **What Reaction 618 gives.** Of the 29 entries of the frozen Reaction 618
 snapshot, five are converted (38521, 39245, 44879, 44888, 60725). Listed with a
@@ -1076,13 +1212,15 @@ two studies expressed in the same host and measured at 30 degC and pH 5; 38522
 with 38534, the pH-dependent laws of BGL1A and BGL1B), four entries whose EC
 numbers the registry does not resolve (3.2.1.74, 3.2.1.25, 3.2.1.58) and one
 entry without a Km, kcat or Vmax value.
-`entry_ids=["35622"]` converts the selected entry of the registry case.
+`entry_ids=["35622"]` converts the selected entry of the registry case, and
+`entry_ids=["38522"]` the pH-dependent law of the registry's BGL1A case.
 
 Limits of the SABIO-RK route:
 
 - SABIO-RK only, and only what an export contains; no other kinetics database.
-- Homogeneous Michaelis-Menten constants only; inhibition, cooperativity,
-  pH-ionization and multi-substrate laws are listed, not imported.
+- Homogeneous Michaelis-Menten constants and the diprotic pH-dependent law
+  only; inhibition, cooperativity, other pH laws and multi-substrate laws are
+  listed, not imported.
 - No value is converted between units, and SABIO-RK's normalised values are not
   used.
 - A SABIO-RK concentration range is the range tested in the assay; it is
@@ -1095,8 +1233,18 @@ Limits of the SABIO-RK route:
 
 ## Limitations of this increment
 
-- Homogeneous Michaelis-Menten kinetics only, in the kcat form or the Vmax
-  form, one form per enzyme class and substrate; dissolved substrates only.
+- Michaelis-Menten kinetics only, in the kcat form, the Vmax form or the
+  diprotic pH-ionization form, one form per enzyme class and substrate, and
+  the pH-ionization form on all substrates of an enzyme class or on none;
+  dissolved substrates only.
+- The pH-ionization form reads the pH once from the environment: no pH
+  dynamics, buffer identity, ionic strength or pH-dependent enzyme stability.
+  Its constants are not rescaled with temperature except through a bound
+  temperature law, which rescales the rate only. A grid pH outside `ph_min` to
+  `ph_max` warns rather than being refused. On this branch preflight does not
+  itself check that the environment pH is exact; a pH range cannot come from
+  `conditions.csv` or an `EnvironmentGrid`, and should one reach a case through
+  another environment, assembly refuses it.
 - No unit conversion between molar and mass concentrations or rates, and the
   product yield must be mol/mol. An assay activity is accepted only on the case
   substrate at saturation; activities are never converted between substrates.

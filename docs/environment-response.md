@@ -63,7 +63,10 @@ those parameters.
 User datasets bind `temperature_cardinal_rosso`, `ph_cardinal_rosso` and
 `temperature_arrhenius_reference` through the same mechanism from an optional
 `responses.csv`, with the kinetic constants required at the law's reference
-condition; see [user-supplied data](user-data.md).
+condition. They bind the `ph_ionization_michaelis_menten` process law through
+the pH-ionization rate form of `kinetics.csv` (limiting constants, four pK
+values and the fitted pH range), with the condition pH required inside that
+range and no pH modifier on top; see [user-supplied data](user-data.md).
 
 ## What the output tables say
 

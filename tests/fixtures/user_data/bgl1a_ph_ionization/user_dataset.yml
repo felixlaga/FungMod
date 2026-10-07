@@ -1,0 +1,19 @@
+dataset_id: bgl1a_ph_reentry
+contributor: FungMod maintainers
+date: 2026-10-06
+source: >-
+  Re-entry of the pH-dependent Michaelis-Menten law of SABIO-RK Reaction 618
+  kinetic-law entry 38522 (BGL1A wild type on cellobiose; Tsukada et al. 2008,
+  Biotechnol Bioeng 99:1295-1302, PMID 18023045) as user-supplied literature
+  values, with a stated assay design for the initial substrate and enzyme
+  concentrations.
+notes: >-
+  The limiting constants, the four pK values and the pH range are copied from
+  the registry records tsukada_2008_bgl1a_* in
+  data_registry/parameters/parameter_records.yml. The initial cellobiose and
+  enzyme concentrations are design choices equal to the registry case's
+  exploratory assay loadings, not values reported by the source.
+simulation:
+  duration: 14400
+  units: second
+  points: 145

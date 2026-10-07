@@ -1071,8 +1071,14 @@ at saturation. An optional `responses.csv` binds the cardinal temperature,
 cardinal pH or Arrhenius law to a strain, enzyme and substrate through the
 template modifiers, so an `EnvironmentGrid` over temperature or pH changes the
 rate through the law; the kinetic constants must then be stated at the law's
-reference condition. See `docs/user-data.md` for the table formats and
-limitations. An optional `genomes.csv` takes a strain's enzyme classes from
+reference condition. A third rate form takes a published pH-dependent law
+directly: `kcat_limiting`, `km_limiting`, the four pK values and the fitted
+`ph_min`/`ph_max` bind the diprotic `ph_ionization_michaelis_menten` law, so
+the rate follows the condition or grid pH, each condition's pH must lie inside
+the fitted range, and the SABIO-RK drafting below emits this form for entries
+of SABIO-RK's "Michaelis-Menten (pH-dependent)" law
+([three rate forms](docs/user-data.md#three-rate-forms)). See
+`docs/user-data.md` for the table formats and limitations. An optional `genomes.csv` takes a strain's enzyme classes from
 its dbCAN genome annotation: classes with a registry record join the
 strain, classes without one and unmapped families are reported, and every
 resolved class that can act on a dataset substrate but has no kinetics becomes

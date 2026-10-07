@@ -201,10 +201,15 @@ def test_every_entry_of_reaction_618_is_converted_or_listed(all_618: UserTablesD
 
 def test_reaction_618_lists_the_ph_dependent_laws(all_618: UserTablesDraft) -> None:
     section = all_618.review.split("## pH-ionization laws", 1)[1].split("\n## ", 1)[0]
-    assert "pH-ionization laws are not importable as user data yet" in section
+    assert "converted to the pH-ionization rate form of user data" in section
+    assert "not importable" not in all_618.review
+    # In the whole reaction every pH-dependent law is a mutant or one of the BGL1A/BGL1B conflict
+    # (tests/test_user_data_ph_ionization.py converts EntryID 38522 alone).
     for entry_id in PH_LAW_ENTRIES:
         assert f"| {entry_id} | Michaelis-Menten (pH-dependent) |" in section
+        assert entry_id not in all_618.converted_entry_ids
     assert "pKe1 = 4.4" in section
+    assert "pH-ionization form |" not in section
 
 
 def test_reaction_618_units_are_kept_or_listed(all_618: UserTablesDraft) -> None:
@@ -311,20 +316,28 @@ def test_loader_refuses_a_review_marker_in_any_manifest_value(tmp_path: Path) ->
     assert [(issue["file"], issue["column"]) for issue in error.value.issues] == [("user_dataset.yml", "simulation")]
 
 
-def test_ph_ionization_law_converts_only_km_and_kcat_at_the_entry_ph() -> None:
+def test_ph_ionization_law_is_drafted_in_the_ph_ionization_form() -> None:
     draft = user_tables_from_sabiork("618", dataset_id="ph_law_draft", entry_ids=["38522"])
     quantities = {row["quantity"]: row for row in draft.kinetics}
-    assert set(quantities) == {"km", "kcat"}
-    assert (quantities["km"]["value"], quantities["km"]["units"]) == ("6.8", "mM")
-    assert (quantities["kcat"]["value"], quantities["kcat"]["units"]) == ("1.81", "s^(-1)")
-    assert "parameter Km0" in quantities["km"]["method"]
-    assert quantities["kcat"]["method"].startswith("SABIO-RK kinetic law 38522, Michaelis-Menten (pH-dependent)")
+    # k0 and Km0 are limiting constants of the pH law, never written as kcat or km at the entry's pH.
+    assert set(quantities) == {
+        "kcat_limiting",
+        "km_limiting",
+        "pk_free_lower",
+        "pk_free_upper",
+        "pk_complex_lower",
+        "pk_complex_upper",
+        "ph_min",
+        "ph_max",
+    }
+    assert (quantities["km_limiting"]["value"], quantities["km_limiting"]["units"]) == ("6.8", "mM")
+    assert (quantities["kcat_limiting"]["value"], quantities["kcat_limiting"]["units"]) == ("1.81", "s^(-1)")
+    assert "parameter Km0" in quantities["km_limiting"]["method"]
+    assert quantities["kcat_limiting"]["method"].startswith("SABIO-RK kinetic law 38522, Michaelis-Menten (pH-dependent)")
     (condition,) = draft.conditions
     assert condition["condition_id"] == "c30_ph4_to_8"
     assert condition["ph"].startswith(REVIEW_MARKER)
-    pka = [item for item in draft.not_converted_parameters if item["parameter_type"] == "pKa"]
-    assert [item["parameter"] for item in pka] == ["pKe1", "pKe2", "pKes1", "pKes2"]
-    assert all("pH-ionization law not importable as user data yet" in item["reason"] for item in pka)
+    assert not any(item["parameter_type"] == "pKa" for item in draft.not_converted_parameters)
     assert "| 38522 | Michaelis-Menten (pH-dependent) |" in draft.review
     assert not any("cardinal" in row["quantity"] for row in draft.kinetics)
 
