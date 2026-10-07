@@ -38,6 +38,7 @@ def test_standard_result_saves_reports_tables_and_plots(tmp_path) -> None:
         "solver_report.json",
         "state_trajectories.csv",
         "process_rates.csv",
+        "state_rates.csv",
         "derived_quantities.csv",
         "figures/state_trajectories.png",
         "figures/process_rates.png",
@@ -60,6 +61,13 @@ def test_standard_result_saves_reports_tables_and_plots(tmp_path) -> None:
     assert rows
     assert rows[0]["time_units"] == "second"
     assert rows[0]["units"] == "mole / liter"
+
+    # This producer records no state-rate trajectory: the table is header-only, never inferred.
+    assert record["state_rates"] == {}
+    with (tmp_path / "state_rates.csv").open(encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        assert list(reader) == []
+        assert reader.fieldnames == ["kind", "name", "index", "time", "time_units", "value", "units"]
 
 
 def test_standard_result_state_and_rate_accessors() -> None:

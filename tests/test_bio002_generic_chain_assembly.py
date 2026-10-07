@@ -178,6 +178,13 @@ def test_virtual_experiment_tables_preserve_each_chain_process_rate_identity(tmp
     assert {"degradation_rate", "product_release_rate"}.issubset(
         {row["state"] for row in time_rows}
     )
+    # In a multi-process chain these are net state rates of the mapped substrate
+    # and product, not any single process rate.
+    assert {
+        row["source"]
+        for row in time_rows
+        if row["state"] in {"degradation_rate", "product_release_rate"}
+    } == {"simulation_state_rate"}
 
 
 def test_artificial_branching_pathway_assembles_and_runs(tmp_path: Path) -> None:

@@ -389,6 +389,38 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- Degradation and product-release rates in the virtual-experiment tables were
+  wrong (FIX-RATES-001). `time_series_long.csv` built `degradation_rate` and
+  `product_release_rate` from whichever process rate was listed last at each
+  time point and gave both rows that one value and unit; `final_metrics.csv`
+  reported `maximum_substrate_depletion_rate` and
+  `maximum_product_release_rate` as the largest rate of any process, whatever
+  its process or unit. For models with more than one process the reported
+  rates therefore belonged to an arbitrary process: the *T. harzianum* P49P11
+  culture case reported a maximum substrate depletion rate of about 45
+  `beta_glucosidase_assay_unit / hour / liter` for cellulose measured in g/L.
+  For single-process cases with a product yield other than one the product
+  release rate was the process rate, not d[product]/dt: the SABIO-RK Reaction
+  618 case (two glucose per cellobiose) reported half the true value. All
+  previously reported maximum rates and product-release rates from such cases
+  are wrong. `ProcessODESolver` now records `SimulationResult.state_rates`, the
+  net rate of change of every state at every returned time point, by
+  evaluating the compiled right-hand side it integrated (rates at
+  `max(state, 0)`, no finite differences), written to `state_rates.csv` and
+  `record.json`. The tables take `degradation_rate` = -d[substrate]/dt and
+  `product_release_rate` = +d[product]/dt from it, each in its own state's
+  units per time (source `simulation_state_rate`), and the maximum-rate
+  metrics are their maxima over the returned time points. A case without a
+  mapped substrate or product state, or a bundle without `state_rates.csv`,
+  reports these rows and metrics as `not_applicable` with the reason in a new
+  optional `notes` column of `time_series_long.csv` (and in `final_metrics.csv`
+  `notes`); process rates are never used in their place, and the
+  `process_rate.<process_id>` rows are unchanged. Output schema `2.0.0`
+  (was `1.8.0`): rows keep their names but change meaning, values, units and
+  source, so do not pool `1.8.0` and `2.0.0` bundles; regenerate earlier
+  virtual-experiment outputs that use these rates. No committed data or paper
+  artifact contains them.
+
 - SABIO-RK proposals gave every parameter of one type the same proposed symbol
   when its species did not distinguish them, so the four pKa values of a
   pH-dependent kinetic law collided (`proposed_sabiork_parameter_618_38522_pka`)
