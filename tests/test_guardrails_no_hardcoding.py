@@ -132,6 +132,12 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "xylose",
     "glucosamine",
     "amylase",
+    # FETCH-001 synthetic UniProt responses: organism names, proteome ids and accessions come from the responses.
+    "format-fixture organism",
+    "fixture mould",
+    "strain fix-",
+    "up9999900",
+    "x9b2p",
 )
 
 
@@ -203,6 +209,11 @@ def test_uniprot_route_modules_have_no_organism_substrate_or_enzyme_specific_tok
             "3.2.1.14",
             "x0test",
             "up000000000",
+            # FETCH-001: the name search names UniProt's query syntax, never an organism or a proteome.
+            "format-fixture organism",
+            "fixture mould",
+            "up9999900",
+            "x9b2p",
         ):
             assert forbidden not in module, (relative, forbidden)
 
