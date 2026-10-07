@@ -30,7 +30,12 @@ def test_load_toy_registry_index() -> None:
     assert registry.registry_id == "toy_registry"
     assert registry.version == "0.1.0"
     assert registry.maturity == "development"
-    assert registry.product_maps == {}
+    # REGISTRY-002: the complete-hydrolysis mass yields of the generic xylan, starch and chitin records.
+    assert set(registry.product_maps) == {
+        "xylan_to_d_xylose_equivalent_mass_yield",
+        "starch_to_beta_d_glucose_mass_yield",
+        "chitin_to_n_acetyl_d_glucosamine_equivalent_mass_yield",
+    }
 
 
 def test_product_map_record_loader_never_translates_participant_identity() -> None:

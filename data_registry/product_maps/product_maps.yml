@@ -1,4 +1,98 @@
 kind: fungmod_registry_records
 record_type: product_maps
 schema_version: "1.0.0"
-records: []
+records:
+  - record_id: xylan_to_d_xylose_equivalent_mass_yield
+    name: Xylan to D-xylose equivalents (complete-hydrolysis mass yield)
+    maturity: exploratory_metadata
+    provenance:
+      source: >-
+        Stoichiometry of the complete hydrolysis of anhydro-D-xylose units,
+        (C5H8O4)n + n H2O -> n C5H10O5, with the conventional atomic weights of
+        IUPAC (C 12.011, H 1.008, O 15.999).
+      formula: M(C5H10O5) / M(C5H8O4) = 150.130 / 132.115 = 1.136358 g/g
+      yield_basis: g/g
+      confidence_level: derived_stoichiometry
+      notes: >-
+        A theoretical yield of the generic registry substrate xylan, computed, not
+        measured; tests/test_registry_polysaccharide_classes.py recomputes it from
+        the atomic weights.
+    product_map_type: stoichiometric
+    reactants:
+      xylan: 1.0
+    products:
+      D_xylose_equivalent: 1.136358
+    notes: >-
+      Grams of D-xylose equivalents per gram of dry xylan consumed: one water is
+      added per anhydro-D-xylose unit, the high-degree-of-polymerization limit (the
+      water of the chain ends is neglected). A mass coefficient, not a molar one; the
+      water of hydrolysis is not a state, so the map does not conserve mass on its
+      own. It holds for an unsubstituted backbone; arabinosyl, glucuronosyl and
+      acetyl substituents of a real xylan change the true yield. No simulation route
+      reads this map automatically: a user dataset states its own yield in
+      substrates.csv, and FungMod neither fills nor checks it from this map.
+
+  - record_id: starch_to_beta_d_glucose_mass_yield
+    name: Starch to beta-D-glucose (complete-hydrolysis mass yield)
+    maturity: exploratory_metadata
+    provenance:
+      source: >-
+        Stoichiometry of the complete hydrolysis of anhydro-D-glucose units,
+        (C6H10O5)n + n H2O -> n C6H12O6, with the conventional atomic weights of
+        IUPAC (C 12.011, H 1.008, O 15.999).
+      formula: M(C6H12O6) / M(C6H10O5) = 180.156 / 162.141 = 1.111107 g/g
+      yield_basis: g/g
+      confidence_level: derived_stoichiometry
+      notes: >-
+        A theoretical yield of the generic registry substrate starch, computed, not
+        measured; tests/test_registry_polysaccharide_classes.py recomputes it from
+        the atomic weights.
+    product_map_type: stoichiometric
+    reactants:
+      starch: 1.0
+    products:
+      beta_D_glucose: 1.111107
+    notes: >-
+      Grams of beta-D-glucose per gram of dry starch consumed: one water is added
+      per anhydro-D-glucose unit, (1->4) and (1->6) linked alike, the
+      high-degree-of-polymerization limit (the water of the chain ends is
+      neglected). Glucoamylase (EC 3.2.1.3) releases glucose itself, so the product
+      is free glucose on complete hydrolysis. A mass coefficient, not a molar one;
+      the water of hydrolysis is not a state, so the map does not conserve mass on
+      its own. Lipid, protein and moisture of a real starch are outside it. No
+      simulation route reads this map automatically: a user dataset states its own
+      yield in substrates.csv, and FungMod neither fills nor checks it from this
+      map.
+
+  - record_id: chitin_to_n_acetyl_d_glucosamine_equivalent_mass_yield
+    name: Chitin to N-acetyl-D-glucosamine equivalents (complete-hydrolysis mass yield)
+    maturity: exploratory_metadata
+    provenance:
+      source: >-
+        Stoichiometry of the complete hydrolysis of anhydro-N-acetyl-D-glucosamine
+        units, (C8H13NO5)n + n H2O -> n C8H15NO6, with the conventional atomic
+        weights of IUPAC (C 12.011, H 1.008, N 14.007, O 15.999).
+      formula: M(C8H15NO6) / M(C8H13NO5) = 221.209 / 203.194 = 1.088659 g/g
+      yield_basis: g/g
+      confidence_level: derived_stoichiometry
+      notes: >-
+        A theoretical yield of the generic registry substrate chitin, computed, not
+        measured; tests/test_registry_polysaccharide_classes.py recomputes it from
+        the atomic weights.
+    product_map_type: stoichiometric
+    reactants:
+      chitin: 1.0
+    products:
+      N_acetyl_D_glucosamine_equivalent: 1.088659
+    notes: >-
+      Grams of N-acetyl-D-glucosamine equivalents per gram of dry chitin consumed:
+      one water is added per anhydro-N-acetyl-D-glucosamine unit, the
+      high-degree-of-polymerization limit (the water of the chain ends is
+      neglected). Chitinase releases mainly chitobiose and chito-oligosaccharides,
+      so the product is a monomer-equivalent mass, not free N-acetyl-D-glucosamine.
+      A mass coefficient, not a molar one; the water of hydrolysis is not a state,
+      so the map does not conserve mass on its own. It holds for a fully acetylated
+      polymer; deacetylated glucosamine units, protein and mineral of a real chitin
+      change the true yield. No simulation route reads this map automatically: a
+      user dataset states its own yield in substrates.csv, and FungMod neither fills
+      nor checks it from this map.

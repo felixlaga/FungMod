@@ -1125,7 +1125,13 @@ case with pint, and an optional `reactivity_exponent` that binds the existing
 conversion-dependent factor `(S/S0)^n`; activity routes to Vmax, the
 pH-ionization form, composite substrates and adsorption or surface-area inputs
 are refused, and no adsorption, synergy, product inhibition or LPMO kinetics
-are represented ([solid substrates](docs/user-data.md#solid-substrates)). See
+are represented ([solid substrates](docs/user-data.md#solid-substrates)). The
+registry's generic solid polymers `xylan`, `starch` and `chitin` can be
+referenced as such substrates; the registry classes `endo_xylanase`
+(GH10/GH11, EC 3.2.1.8), `glucoamylase` (GH15, EC 3.2.1.3) and `chitinase`
+(GH18, EC 3.2.1.14) act on them as categorical records without kinetics, and
+product maps give the complete-hydrolysis mass yields for reference
+([registry polymers](docs/user-data.md#registry-polymers)). See
 `docs/user-data.md` for the table formats and limitations. An optional `genomes.csv` takes a strain's enzyme classes from
 its dbCAN genome annotation: classes with a registry record join the
 strain, classes without one and unmapped families are reported, and every
