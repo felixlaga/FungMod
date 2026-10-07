@@ -37,6 +37,14 @@ turned into records. A genome states which classes a strain can encode, not a
 rate: every resolved class without kinetics becomes the usual explicit gaps,
 whose measurement requests name the annotation.
 
+A ``genomes.csv`` row may instead point to a UniProtKB TSV export of the
+strain's proteome (``annotation_tool`` ``UniProt`` with a release or download
+date). Its CAZy cross-references resolve through the same resolver and family
+map, its complete EC numbers through the registry's EC lookup, and a protein
+whose two annotations name different classes supports neither; see
+``fungal_model.capability.uniprot``. The outputs carry ``source_type``
+``uniprot_proteome`` and the accessions behind every class.
+
 An optional ``timecourse.csv`` holds measured substrate remaining and product
 formed over time for declared cases. Time courses are validated (references,
 units of the case's kind, finite values, nonnegative times, one row per time)
@@ -70,8 +78,19 @@ from typing import Any, TypeVar, cast
 import yaml
 
 from fungal_model.capability.dbcan import TOOL_COLUMNS, DbcanOverview, parse_overview
+from fungal_model.capability.uniprot import (
+    CLAIM_BOUNDARY as UNIPROT_CLAIM_BOUNDARY,
+    COMPARISON_RULE as UNIPROT_COMPARISON_RULE,
+    ProteomeClassSupport,
+    ProteomeResolution,
+    UniprotProteome,
+    decode_uniprot_tsv,
+    parse_uniprot_tsv,
+    resolve_uniprot_proteome,
+)
 from fungal_model.capability.resolution import (
     DIAGNOSTIC,
+    POLYSPECIFIC,
     CapabilityResolutionError,
     CapabilityResolver,
     CazymeAnnotation,
@@ -263,8 +282,14 @@ _RETIRED_QUANTITY_HINTS = {
 GENOME_TABLE = "genomes.csv"
 # Annotation tools whose output ``genomes.csv`` reads; the first token of
 # ``annotation_tool`` must name one of them, and the rest is its version.
-GENOME_ANNOTATION_TOOLS = ("dbCAN",)
+GENOME_ANNOTATION_TOOLS = ("dbCAN", "UniProt")
 _DBCAN_TOOL_PATTERN = re.compile(r"^(?:run_)?dbcan\d*$", re.IGNORECASE)
+_UNIPROT_TOOL_PATTERN = re.compile(r"^uniprot(?:kb)?$", re.IGNORECASE)
+# The source type of a genomes.csv row read from a UniProtKB TSV export; dbCAN entries keep their earlier form.
+UNIPROT_SOURCE_TYPE = "uniprot_proteome"
+_UNIPROT_PROTEOME_ID = re.compile(r"\bUP\d+\b")
+# Accessions quoted in one measurement request; the provenance lists them all.
+_REQUEST_ACCESSION_LIMIT = 10
 _GENOME_CLAIM_BOUNDARY = (
     "Enzyme classes inferred from a genome annotation state what the strain can encode, not what it "
     "expresses, secretes or how fast; no rate, kinetic constant or expression level is taken from the genome."
@@ -556,7 +581,12 @@ class UserDataset:
     ``unmodellable_enzyme_classes`` the resolved classes without a registry
     record (reported, never generated) and ``unmapped_families`` the families
     the CAZy family map assigns to no class. All four are empty without a
-    ``genomes.csv``.
+    ``genomes.csv``. Entries of a row read from a UniProt export carry
+    ``source_type`` ``uniprot_proteome`` and the accessions behind each class
+    or family (``accessions``, ``accession_count``); its ``genome_annotations``
+    entry also lists the unresolved and partial EC numbers and the proteins
+    whose EC numbers and CAZy families disagree. Entries of a dbCAN row keep
+    their earlier keys.
 
     With a ``timecourse.csv``, ``timecourses`` maps each generated case id to
     the case's ``UserTimecourse`` series (one per observable); it is empty
@@ -856,6 +886,88 @@ class _GenomeClassEvidence:
 
 
 @dataclass(frozen=True)
+class _ProteomeClassEvidence:
+    """The UniProt-proteome evidence for one enzyme class of one strain: the accessions behind it."""
+
+    genome_row: int
+    annotation_file: str
+    annotation_sha256: str
+    tool: str
+    tool_version: str
+    source: str
+    proteome_id: str | None
+    organism_id: str
+    review_column: bool
+    support: ProteomeClassSupport
+
+    @property
+    def label(self) -> str:
+        if self.proteome_id:
+            return f"UniProt proteome {self.proteome_id}"
+        return f"UniProt export {self.annotation_file}"
+
+    @property
+    def evidence_text(self) -> str:
+        count = len(self.support.accessions)
+        parts = [f"{count} {'protein' if count == 1 else 'proteins'}"]
+        if self.support.families:
+            parts.append(f"CAZy families {', '.join(self.support.families)}")
+        if self.support.ec_numbers:
+            parts.append(f"EC {', '.join(self.support.ec_numbers)}")
+        return f"{self.label} ({', '.join(parts)})"
+
+    def request_note(self) -> str:
+        """The clause a measurement request ends with: the proteome, the accessions and the evidence."""
+
+        accessions = self.support.accessions
+        shown = ", ".join(accessions[:_REQUEST_ACCESSION_LIMIT])
+        if len(accessions) > _REQUEST_ACCESSION_LIMIT:
+            shown = f"{shown} and {len(accessions) - _REQUEST_ACCESSION_LIMIT} more"
+        parts = [f"accessions {shown}"]
+        if self.support.families:
+            parts.append(f"CAZy families {', '.join(self.support.families)}")
+        if self.support.ec_numbers:
+            parts.append(f"EC {', '.join(self.support.ec_numbers)}")
+        parts.append(
+            f"{len(self.support.reviewed_accessions)} of {len(accessions)} reviewed in Swiss-Prot"
+            if self.review_column
+            else "review status not in the export"
+        )
+        if self.support.specificity == POLYSPECIFIC:
+            parts.append("family membership is polyspecific, so the activity itself needs confirming")
+        return f"the class was inferred from {self.label} ({'; '.join(parts)})"
+
+    def to_dict(self) -> dict[str, Any]:
+        support = self.support
+        return {
+            "file": GENOME_TABLE,
+            "row": self.genome_row,
+            "evidence": self.evidence_text,
+            "source": self.source,
+            "source_type": UNIPROT_SOURCE_TYPE,
+            "annotation_file": self.annotation_file,
+            "annotation_sha256": self.annotation_sha256,
+            "annotation_tool": self.tool,
+            "annotation_tool_version": self.tool_version,
+            "proteome_id": self.proteome_id,
+            "organism_id": self.organism_id or None,
+            "families": list(support.families),
+            "ec_numbers": list(support.ec_numbers),
+            "accessions": list(support.accessions),
+            "accession_count": len(support.accessions),
+            "accessions_by_basis": {basis: list(items) for basis, items in support.accessions_by_basis.items()},
+            "reviewed_accessions": list(support.reviewed_accessions),
+            "specificity": support.specificity,
+            "comparison_rule": UNIPROT_COMPARISON_RULE,
+            "claim_boundary": UNIPROT_CLAIM_BOUNDARY,
+        }
+
+
+# The genomes.csv evidence of one class: a dbCAN annotation or a UniProt proteome export.
+_ClassEvidence = _GenomeClassEvidence | _ProteomeClassEvidence
+
+
+@dataclass(frozen=True)
 class _StrainClass:
     row: int
     strain_id: str
@@ -865,7 +977,7 @@ class _StrainClass:
     # enzymes.csv for an explicit row; genomes.csv for a class the annotation alone declares.
     file: str = "enzymes.csv"
     # Genome evidence, also attached to an explicit row whose class the annotation resolves.
-    genome: _GenomeClassEvidence | None = None
+    genome: _ClassEvidence | None = None
 
     @property
     def genome_only(self) -> bool:
@@ -897,6 +1009,32 @@ class _GenomeAnnotation:
 
         wanted = {gene for family in families for gene in self.family_genes.get(family, ())}
         return tuple(gene.gene_id for gene in self.overview.genes if gene.gene_id in wanted)
+
+
+@dataclass(frozen=True)
+class _ProteomeAnnotation:
+    """One genomes.csv row whose UniProt TSV export was read and resolved."""
+
+    row: int
+    strain_id: str
+    annotation_file: str
+    annotation_sha256: str
+    tool: str
+    tool_version: str
+    source: str
+    proteome_id: str | None
+    proteome: UniprotProteome
+    resolution: ProteomeResolution
+    family_map_sha256: str
+    family_map_sources: tuple[str, ...]
+
+    @property
+    def capabilities(self) -> tuple[ProteomeClassSupport, ...]:
+        return self.resolution.capabilities
+
+    @property
+    def unmapped_families(self) -> tuple[str, ...]:
+        return tuple(self.resolution.unmapped_families)
 
 
 @dataclass(frozen=True)
@@ -1020,7 +1158,7 @@ class _Parsed:
     laws: dict[tuple[str, str, str], dict[str, dict[str, _Response]]] = field(default_factory=dict)
     # Resolved genome annotations, the annotation files read (relative path -> bytes), and the
     # genomes.csv row of every strain that has one (also rows that failed validation).
-    genomes: list[_GenomeAnnotation] = field(default_factory=list)
+    genomes: list[_GenomeAnnotation | _ProteomeAnnotation] = field(default_factory=list)
     annotation_files: dict[str, bytes] = field(default_factory=dict)
     genome_rows: dict[str, int] = field(default_factory=dict)
 
@@ -1473,7 +1611,7 @@ def _parse_strain_classes(
 
 @dataclass
 class _GenomeParse:
-    annotations: list[_GenomeAnnotation] = field(default_factory=list)
+    annotations: list[_GenomeAnnotation | _ProteomeAnnotation] = field(default_factory=list)
     files: dict[str, bytes] = field(default_factory=dict)
     rows: dict[str, int] = field(default_factory=dict)
 
@@ -1495,7 +1633,8 @@ def _parse_genomes(
     explicit ``enzymes.csv`` row for the same class wins and receives the
     genome evidence as well. Classes without a record and families the map
     does not assign stay on the annotation for the dataset report; no record is
-    generated for them, and no rate is taken from the annotation.
+    generated for them, and no rate is taken from the annotation. A row whose
+    ``annotation_tool`` names UniProt is read by ``_parse_proteome_row``.
     """
 
     file = table.name
@@ -1519,6 +1658,22 @@ def _parse_genomes(
                 result.rows[strain_id] = line
         tool = _genome_tool(row, file=file, line=line, context=context)
         source = _required_text(row, "source", file=file, line=line, context=context)
+        if _names_uniprot(row):
+            _parse_proteome_row(
+                row,
+                line=line,
+                strain_id=strain_id,
+                tool=tool,
+                source=source,
+                directory=directory,
+                strains=strains,
+                classes=classes,
+                strain_classes=strain_classes,
+                explicit=explicit,
+                result=result,
+                context=context,
+            )
+            continue
         min_tools = _optional_positive_int(row, "min_tools_agreeing", file=file, line=line, context=context)
         min_tools_value = None if isinstance(min_tools, bool) else min_tools
         relative = _annotation_path(row, directory=directory, file=file, line=line, context=context)
@@ -1631,14 +1786,26 @@ def _genome_tool(row: Mapping[str, str], *, file: str, line: int, context: _Cont
     parts = text.split(maxsplit=1)
     name = parts[0]
     version = parts[1].strip() if len(parts) > 1 else ""
-    if not _DBCAN_TOOL_PATTERN.fullmatch(name):
+    uniprot = bool(_UNIPROT_TOOL_PATTERN.fullmatch(name))
+    if not (_DBCAN_TOOL_PATTERN.fullmatch(name) or uniprot):
         context.add(
             file,
             line,
             "annotation_tool",
-            f"annotation_tool {text!r} is not a supported annotation tool. genomes.csv reads only dbCAN "
-            f"overview.txt files (tool columns {', '.join(TOOL_COLUMNS)}); give 'dbCAN' followed by its version, "
-            "or declare the strain's enzyme classes in enzymes.csv.",
+            f"annotation_tool {text!r} is not a supported annotation tool. genomes.csv reads dbCAN overview.txt "
+            f"files (tool columns {', '.join(TOOL_COLUMNS)}) and UniProtKB TSV exports; give 'dbCAN' followed by "
+            "its version or 'UniProt' followed by the UniProt release or download date, or declare the strain's "
+            "enzyme classes in enzymes.csv.",
+        )
+        return None
+    if not version and uniprot:
+        context.add(
+            file,
+            line,
+            "annotation_tool",
+            f"annotation_tool {text!r} names UniProt without a version; write the UniProt release or the download "
+            "date after the name, for example 'UniProt 2026_03' or 'UniProt downloaded 2026-10-01'. The TSV export "
+            "does not record it, and a resolution that cannot be traced to a UniProt release is not reproducible.",
         )
         return None
     if not version:
@@ -1652,6 +1819,155 @@ def _genome_tool(row: Mapping[str, str], *, file: str, line: int, context: _Cont
         )
         return None
     return name, version
+
+
+def _names_uniprot(row: Mapping[str, str]) -> bool:
+    """Whether the first token of ``annotation_tool`` names UniProt, whatever the rest of the cell says."""
+
+    parts = row.get("annotation_tool", "").split(maxsplit=1)
+    return bool(parts) and bool(_UNIPROT_TOOL_PATTERN.fullmatch(parts[0]))
+
+
+def _parse_proteome_row(
+    row: Mapping[str, str],
+    *,
+    line: int,
+    strain_id: str | None,
+    tool: tuple[str, str] | None,
+    source: str | None,
+    directory: Path,
+    strains: Mapping[str, _Strain],
+    classes: dict[str, _EnzymeClassInfo],
+    strain_classes: list[_StrainClass],
+    explicit: Mapping[tuple[str, str], int],
+    result: _GenomeParse,
+    context: _Context,
+) -> None:
+    """Read one genomes.csv row that points to a UniProtKB TSV export, resolve it and merge its classes.
+
+    The path rules, the digest and the merge (an explicit ``enzymes.csv`` row
+    wins and receives the evidence) are those of a dbCAN row. The proteins are
+    resolved by ``resolve_uniprot_proteome`` against the base registry: CAZy
+    families through ``CapabilityResolver`` and the curated family map, complete
+    EC numbers through the registry's EC lookup. ``min_tools_agreeing`` is
+    refused, because a UniProt export has no tool columns.
+    """
+
+    file = GENOME_TABLE
+    refused = False
+    if row.get("min_tools_agreeing", ""):
+        context.add(
+            file,
+            line,
+            "min_tools_agreeing",
+            "min_tools_agreeing counts agreeing tool columns of a dbCAN overview; a UniProt export has none, so "
+            "leave it blank on this row.",
+        )
+        refused = True
+    proteome_id: str | None = None
+    if source is not None:
+        identifiers = sorted(set(_UNIPROT_PROTEOME_ID.findall(source)))
+        if len(identifiers) > 1:
+            context.add(
+                file,
+                line,
+                "source",
+                f"source names several UniProt proteome identifiers ({', '.join(identifiers)}); one row reads one "
+                "proteome, so name only the one exported.",
+            )
+            refused = True
+        proteome_id = identifiers[0] if identifiers else None
+    relative = _annotation_path(row, directory=directory, file=file, line=line, context=context)
+    proteome: UniprotProteome | None = None
+    if relative is not None:
+        data = result.files.get(relative)
+        if data is None:
+            try:
+                data = (directory / relative).read_bytes()
+            except OSError as exc:
+                context.add(file, line, "annotation_file", f"Annotation file {relative!r} cannot be read: {exc}")
+            else:
+                result.files[relative] = data
+        if data is not None:
+            label = f"Annotation file {relative!r}"
+            try:
+                proteome = parse_uniprot_tsv(decode_uniprot_tsv(data, source=label), source=label)
+            except CapabilityResolutionError as exc:
+                context.add(file, line, "annotation_file", f"{exc} A UniProt row reads a UniProtKB TSV export.")
+    if refused or strain_id is None or tool is None or source is None or relative is None or proteome is None:
+        return
+    try:
+        resolver = CapabilityResolver(
+            family_map=CazymeFamilyMap.load(),
+            registry_enzyme_classes=tuple(sorted(context.base.enzyme_classes)),
+        )
+        family_map_sha256 = hashlib.sha256(default_family_map_path().read_bytes()).hexdigest()
+    except (OSError, yaml.YAMLError, CapabilityResolutionError, ProvenanceError) as exc:
+        context.add(file, None, None, f"The curated CAZy family map could not be loaded: {exc}")
+        return
+    tool_name, tool_version = tool
+    try:
+        resolution = resolve_uniprot_proteome(
+            proteome,
+            capability_resolver=resolver,
+            registry=context.base,
+            organism=strains[strain_id].name,
+            proteome_source=source,
+            annotation_tool=tool_name,
+            annotation_tool_version=tool_version,
+            # genomes.csv has no date column; this marker never leaves the resolver call.
+            annotation_date="not recorded in genomes.csv",
+        )
+    except (CapabilityResolutionError, ProvenanceError) as exc:
+        context.add(file, line, "annotation_file", f"The UniProt export could not be resolved: {exc}")
+        return
+    annotation = _ProteomeAnnotation(
+        row=line,
+        strain_id=strain_id,
+        annotation_file=relative,
+        annotation_sha256=hashlib.sha256(result.files[relative]).hexdigest(),
+        tool=tool_name,
+        tool_version=tool_version,
+        source=source,
+        proteome_id=proteome_id,
+        proteome=proteome,
+        resolution=resolution,
+        family_map_sha256=family_map_sha256,
+        family_map_sources=resolver.family_map.sources,
+    )
+    result.annotations.append(annotation)
+    for support in resolution.capabilities:
+        if not support.modellable:
+            continue
+        evidence = _ProteomeClassEvidence(
+            genome_row=line,
+            annotation_file=relative,
+            annotation_sha256=annotation.annotation_sha256,
+            tool=tool_name,
+            tool_version=tool_version,
+            source=source,
+            proteome_id=proteome_id,
+            organism_id=proteome.organism_id,
+            review_column=proteome.has_review_column,
+            support=support,
+        )
+        key = (strain_id, support.enzyme_class)
+        if key in explicit:
+            index = explicit[key]
+            strain_classes[index] = replace(strain_classes[index], genome=evidence)
+            continue
+        class_key = _registry_class_info(support.enzyme_class, classes=classes, context=context)
+        strain_classes.append(
+            _StrainClass(
+                row=line,
+                strain_id=strain_id,
+                class_key=class_key,
+                evidence=evidence.evidence_text,
+                source=source,
+                file=GENOME_TABLE,
+                genome=evidence,
+            )
+        )
 
 
 def _annotation_path(
@@ -2954,6 +3270,19 @@ def _quantity_units_error(quantity: str, units: str) -> str | None:
     return None
 
 
+def _proteome_without_class(strain_id: str, genome: _ProteomeAnnotation) -> str:
+    resolution = genome.resolution
+    return (
+        f"Strain {strain_id!r} declares no enzyme class in enzymes.csv, and its UniProt export ({GENOME_TABLE} row "
+        f"{genome.row}) resolved no enzyme class with a registry record (classes without a record: "
+        f"{', '.join(resolution.capabilities_without_model) or 'none'}; unmapped families: "
+        f"{', '.join(resolution.unmapped_families) or 'none'}; unresolved EC numbers: "
+        f"{', '.join(resolution.unresolved_ec_numbers) or 'none'}; proteins whose EC numbers and CAZy families "
+        f"disagree: {', '.join(item.accession for item in resolution.disagreements) or 'none'}). FungMod does not "
+        "create enzyme classes from a proteome; declare the strain's classes in enzymes.csv."
+    )
+
+
 def _cross_validate(parsed: _Parsed, context: _Context) -> None:
     declared_strains = {item.strain_id for item in parsed.strain_classes}
     resolved_genomes = {genome.strain_id: genome for genome in parsed.genomes}
@@ -2961,7 +3290,9 @@ def _cross_validate(parsed: _Parsed, context: _Context) -> None:
         if strain.strain_id in declared_strains:
             continue
         genome = resolved_genomes.get(strain.strain_id)
-        if genome is not None:
+        if isinstance(genome, _ProteomeAnnotation):
+            context.add("strains.csv", strain.row, "strain_id", _proteome_without_class(strain.strain_id, genome))
+        elif genome is not None:
             without_record = sorted({item.enzyme_class for item in genome.capabilities if not item.modellable})
             context.add(
                 "strains.csv",
@@ -3567,7 +3898,7 @@ class _CaseContext:
     form_started: bool
     laws: tuple[str, ...]
     # Set when the class of this strain comes from its genome annotation alone.
-    genome: _GenomeClassEvidence | None = None
+    genome: _ClassEvidence | None = None
 
 
 def _pair_laws(parsed: _Parsed, pair: tuple[str, str]) -> tuple[ResponseLaw, ...]:
@@ -4390,17 +4721,19 @@ _QUANTITY_LABEL = {
 }
 
 
-def _genome_gap_provenance(genome: _GenomeClassEvidence | None) -> dict[str, Any]:
+def _genome_gap_provenance(genome: _ClassEvidence | None) -> dict[str, Any]:
     if genome is None:
         return {}
     return {"class_evidence": "genome_annotation", "genome_annotation": genome.to_dict()}
 
 
-def _with_genome_note(request: str, genome: _GenomeClassEvidence | None) -> str:
+def _with_genome_note(request: str, genome: _ClassEvidence | None) -> str:
     """Say in a measurement request that the class rests on a genome annotation, not on a measurement."""
 
     if genome is None:
         return request
+    if isinstance(genome, _ProteomeClassEvidence):
+        return f"{request.rstrip('.')}; {genome.request_note()}."
     families = ", ".join(genome.families)
     specificity = (
         ""
@@ -4560,7 +4893,7 @@ def _response_gap_mapping(
     info: _EnzymeClassInfo,
     substrate: _Substrate,
     namespace: _Namespace,
-    genome: _GenomeClassEvidence | None = None,
+    genome: _ClassEvidence | None = None,
 ) -> dict[str, Any]:
     request = _with_genome_note(
         f"Measure the {parameter.label} of the {law.label} for {info.name} from {strain.name} on {substrate.name} "
@@ -4726,6 +5059,10 @@ _UNMODELLABLE_REASON = (
     "case, gap or measurement request is generated for this class"
 )
 _UNMAPPED_REASON = "the curated CAZy family map assigns no enzyme class to this family"
+_PROTEOME_UNMODELLABLE_REASON = (
+    "no enzyme-class record in the base registry; FungMod does not create one from a proteome annotation, so no "
+    "case, gap or measurement request is generated for this class"
+)
 
 
 def _genome_report(parsed: _Parsed, *, dataset_id: str) -> dict[str, tuple[Mapping[str, Any], ...]]:
@@ -4737,6 +5074,13 @@ def _genome_report(parsed: _Parsed, *, dataset_id: str) -> dict[str, tuple[Mappi
     unmapped: list[Mapping[str, Any]] = []
     declared = {(item.strain_id, item.class_key): item for item in parsed.strain_classes}
     for genome in parsed.genomes:
+        if isinstance(genome, _ProteomeAnnotation):
+            annotations.append(_proteome_annotation_entry(genome))
+            entries = _proteome_class_entries(genome, declared, dataset_id=dataset_id)
+            resolved.extend(entries["resolved"])
+            unmodellable.extend(entries["unmodellable"])
+            unmapped.extend(entries["unmapped"])
+            continue
         annotations.append(
             {
                 "strain_id": genome.strain_id,
@@ -4800,6 +5144,97 @@ def _genome_report(parsed: _Parsed, *, dataset_id: str) -> dict[str, tuple[Mappi
         "unmodellable_enzyme_classes": tuple(unmodellable),
         "unmapped_families": tuple(unmapped),
     }
+
+
+def _proteome_annotation_entry(genome: _ProteomeAnnotation) -> dict[str, Any]:
+    """The ``genome_annotations`` entry of a UniProt export, with its unresolved and partial EC numbers."""
+
+    proteome, resolution = genome.proteome, genome.resolution.to_dict()
+    return {
+        "strain_id": genome.strain_id,
+        "file": GENOME_TABLE,
+        "row": genome.row,
+        "source_type": UNIPROT_SOURCE_TYPE,
+        "annotation_file": genome.annotation_file,
+        "annotation_sha256": genome.annotation_sha256,
+        "annotation_tool": genome.tool,
+        "annotation_tool_version": genome.tool_version,
+        "source": genome.source,
+        "proteome_id": genome.proteome_id,
+        "organism": proteome.organism or None,
+        "organism_id": proteome.organism_id or None,
+        "read_columns": list(proteome.read_columns),
+        "ignored_columns": list(proteome.ignored_columns),
+        "entry_rows": len(proteome.entries),
+        "review_counts": proteome.review_counts(),
+        "protein_counts": resolution["protein_counts"],
+        "family_accession_counts": {family: len(items) for family, items in proteome.family_accessions().items()},
+        "ec_accession_counts": {ec: len(items) for ec, items in proteome.ec_accessions().items()},
+        "unresolved_ec_numbers": resolution["unresolved_ec_numbers"],
+        "partial_ec_numbers": resolution["partial_ec_numbers"],
+        "ec_cazy_disagreements": resolution["ec_cazy_disagreements"],
+        "ec_comparable_classes": resolution["ec_comparable_classes"],
+        "comparison_rule": resolution["comparison_rule"],
+        "family_map": {
+            "file": default_family_map_path().name,
+            "sha256": genome.family_map_sha256,
+            "sources": list(genome.family_map_sources),
+        },
+        "claim_boundary": UNIPROT_CLAIM_BOUNDARY,
+    }
+
+
+def _proteome_class_entries(
+    genome: _ProteomeAnnotation,
+    declared: Mapping[tuple[str, str], _StrainClass],
+    *,
+    dataset_id: str,
+) -> dict[str, list[Mapping[str, Any]]]:
+    """The resolved, unmodellable and unmapped entries of a UniProt export, each with its accessions."""
+
+    entries: dict[str, list[Mapping[str, Any]]] = {"resolved": [], "unmodellable": [], "unmapped": []}
+    for support in genome.capabilities:
+        entry: dict[str, Any] = {
+            "strain_id": genome.strain_id,
+            "enzyme_class": support.enzyme_class,
+            "source_type": UNIPROT_SOURCE_TYPE,
+            "families": list(support.families),
+            "ec_numbers": list(support.ec_numbers),
+            "accessions": list(support.accessions),
+            "accession_count": len(support.accessions),
+            "accessions_by_basis": {basis: list(items) for basis, items in support.accessions_by_basis.items()},
+            "reviewed_accessions": list(support.reviewed_accessions),
+            "specificity": support.specificity,
+            "genomes_row": genome.row,
+        }
+        if not support.modellable:
+            entries["unmodellable"].append({**entry, "reason": _PROTEOME_UNMODELLABLE_REASON})
+            continue
+        item = declared[(genome.strain_id, support.enzyme_class)]
+        assert item.genome is not None
+        entries["resolved"].append(
+            {
+                **entry,
+                "record_id": "__".join((dataset_id, support.enzyme_class)),
+                "declared_by": item.file,
+                "enzymes_row": None if item.genome_only else item.row,
+                "evidence": item.genome.evidence_text,
+                "source": genome.source,
+            }
+        )
+    for family, accessions in genome.resolution.unmapped_families.items():
+        entries["unmapped"].append(
+            {
+                "strain_id": genome.strain_id,
+                "family": family,
+                "source_type": UNIPROT_SOURCE_TYPE,
+                "accessions": list(accessions),
+                "accession_count": len(accessions),
+                "genomes_row": genome.row,
+                "reason": _UNMAPPED_REASON,
+            }
+        )
+    return entries
 
 
 # ---------------------------------------------------------------------------
@@ -5192,6 +5627,7 @@ __all__ = [
     "FIT_IDENTIFIED",
     "FIT_NOT_IDENTIFIED",
     "GENOME_ANNOTATION_TOOLS",
+    "UNIPROT_SOURCE_TYPE",
     "GENOME_TABLE",
     "KINETIC_QUANTITIES",
     "RATE_FORM_KCAT",

@@ -107,6 +107,9 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "xylanase",
     "cellobiohydrolase",
     "synthetic_g",
+    # USERDATA-007 UniProt-route fixture: accessions and the proteome id come from the export and genomes.csv.
+    "x0test",
+    "up000000000",
     # USERDATA-005: organisms and hosts of the Reaction 618 snapshot come from the source entries.
     "phanerochaete",
     "hordeum",
@@ -140,6 +143,32 @@ def test_command_line_has_no_organism_substrate_or_enzyme_specific_tokens() -> N
         source = (ROOT / relative).read_text(encoding="utf-8").lower()
         for forbidden in ORGANISM_SUBSTRATE_ENZYME_TOKENS:
             assert forbidden not in source, f"{relative}: {forbidden}"
+
+
+def test_uniprot_route_modules_have_no_organism_substrate_or_enzyme_specific_tokens() -> None:
+    """The UniProt parser, resolver and fetch client name UniProt's format, never an organism, class or EC number."""
+
+    for relative in ("src/fungal_model/capability/uniprot.py", "src/fungal_model/sources/uniprot.py"):
+        module = (ROOT / relative).read_text(encoding="utf-8").lower()
+        for forbidden in (
+            "glucosidase",
+            "cellobiose",
+            "cellulose",
+            "cellulase",
+            "cellobiohydrolase",
+            "glucoamylase",
+            "maltose",
+            "xylanase",
+            "laccase",
+            "esterase",
+            "trichoderma",
+            "aspergillus",
+            "3.2.1.21",
+            "3.2.1.3",
+            "x0test",
+            "up000000000",
+        ):
+            assert forbidden not in module, (relative, forbidden)
 
 
 def _python_files(paths: tuple[str, ...]) -> tuple[Path, ...]:

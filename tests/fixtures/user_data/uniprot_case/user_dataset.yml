@@ -1,0 +1,14 @@
+dataset_id: uniprot_demo
+contributor: FungMod maintainers
+date: 2026-10-06
+source: FungMod UniProt-route format fixture; synthetic accessions, not a real proteome
+notes: >-
+  UniProt-proteome case of the user-data route (USERDATA-007). The strain's
+  enzyme classes come only from a hand-written UniProtKB TSV export in UniProt's
+  column format; enzymes.csv holds its header only and kinetics.csv holds no
+  values, so every resolved class becomes explicit gaps with measurement
+  requests.
+simulation:
+  duration: 60
+  units: minute
+  points: 61

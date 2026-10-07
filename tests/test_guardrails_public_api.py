@@ -145,6 +145,36 @@ def test_pet_plugin_helpers_are_available_only_from_pet_plugin() -> None:
         assert name in pet_plugin.__all__
 
 
+def test_uniprot_route_api_is_exported_and_not_a_placeholder() -> None:
+    """USERDATA-007: the UniProt parser and resolver from ``fungal_model.capability``, the fetch client from
+    ``fungal_model.sources.uniprot``; complete functions, not top-level names."""
+
+    import fungal_model.capability as capability
+    import fungal_model.sources.uniprot as uniprot_source
+
+    for module, names in (
+        (capability, ("decode_uniprot_tsv", "parse_uniprot_tsv", "resolve_uniprot_proteome")),
+        (
+            uniprot_source,
+            (
+                "build_stream_url",
+                "fetch_proteome_snapshot",
+                "load_proteome_snapshot",
+                "organism_query",
+                "proteome_query",
+                "write_snapshot_to_user_dataset",
+            ),
+        ),
+    ):
+        for name in names:
+            assert name in module.__all__, name
+            assert not hasattr(fungal_model, name), name
+            source = inspect.getsource(getattr(module, name)).lower()
+            assert "notimplementederror" not in source, name
+            assert "placeholder" not in source, name
+            assert "todo" not in source, name
+
+
 def test_command_line_entry_point_is_complete_and_uses_the_public_api() -> None:
     import fungal_model.__main__ as module_entry
     import fungal_model.cli as cli
