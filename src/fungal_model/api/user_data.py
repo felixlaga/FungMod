@@ -26,6 +26,16 @@ pH response law (cardinal temperature, cardinal pH, Arrhenius) to a strain,
 enzyme class and substrate; the law enters the generated case template as a
 process modifier, and the kinetic constants of that case must be stated at the
 law's reference condition.
+
+An optional ``genomes.csv`` points each strain to a dbCAN ``overview.txt``
+inside the dataset directory. The annotation is resolved to enzyme classes
+with the existing ``CapabilityResolver`` and its curated CAZy family map.
+Resolved classes with a registry record join the strain's declared classes
+(an explicit ``enzymes.csv`` row wins and keeps both pieces of evidence);
+resolved classes without a record and unmapped families are reported, never
+turned into records. A genome states which classes a strain can encode, not a
+rate: every resolved class without kinetics becomes the usual explicit gaps,
+whose measurement requests name the annotation.
 """
 
 from __future__ import annotations
@@ -36,14 +46,25 @@ import io
 import math
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import MappingProxyType
 from typing import Any, TypeVar, cast
 
 import yaml
 
+from fungal_model.capability.dbcan import TOOL_COLUMNS, DbcanOverview, parse_overview
+from fungal_model.capability.resolution import (
+    DIAGNOSTIC,
+    CapabilityResolutionError,
+    CapabilityResolver,
+    CazymeAnnotation,
+    CazymeFamilyMap,
+    ResolvedCapability,
+    default_family_map_path,
+)
+from fungal_model.core.provenance import ProvenanceError
 from fungal_model.core.units import Q_, units_are_compatible
 from fungal_model.kinetics.arrhenius import arrhenius_reference_scaled_rate
 from fungal_model.kinetics.cardinal import cardinal_ph_activity, cardinal_temperature_activity
@@ -181,8 +202,18 @@ _RETIRED_QUANTITY_HINTS = {
     ),
 }
 
+GENOME_TABLE = "genomes.csv"
+# Annotation tools whose output ``genomes.csv`` reads; the first token of
+# ``annotation_tool`` must name one of them, and the rest is its version.
+GENOME_ANNOTATION_TOOLS = ("dbCAN",)
+_DBCAN_TOOL_PATTERN = re.compile(r"^(?:run_)?dbcan\d*$", re.IGNORECASE)
+_GENOME_CLAIM_BOUNDARY = (
+    "Enzyme classes inferred from a genome annotation state what the strain can encode, not what it "
+    "expresses, secretes or how fast; no rate, kinetic constant or expression level is taken from the genome."
+)
+
 _REQUIRED_TABLES = ("strains.csv", "enzymes.csv", "substrates.csv", "conditions.csv", "kinetics.csv")
-_OPTIONAL_TABLES = ("enzyme_classes.csv", "responses.csv")
+_OPTIONAL_TABLES = ("enzyme_classes.csv", "responses.csv", GENOME_TABLE)
 _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "strains.csv": (("strain_id", "name"), ("scientific_name", "aliases")),
     "enzymes.csv": (("strain_id", "enzyme_class", "evidence", "source"), ()),
@@ -203,6 +234,7 @@ _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("strain_id", "enzyme_class", "substrate_id", "law", "parameter", "value", "units", "evidence_type", "source"),
         ("method", "reference_tolerance", "kinetics_at_reference"),
     ),
+    GENOME_TABLE: (("strain_id", "annotation_file", "annotation_tool", "source"), ("min_tools_agreeing",)),
 }
 _TABLES_WITH_ROWS_REQUIRED = ("strains.csv", "enzymes.csv", "substrates.csv", "conditions.csv")
 _MANIFEST_FIELDS = frozenset({"dataset_id", "contributor", "date", "source", "notes", "simulation"})
@@ -357,8 +389,17 @@ class UserDataset:
     ``enzyme_classes``, ``substrates``, ``environments``,
     ``process_compatibility``, ``case_templates``, ``parameter_records``) to
     the generated mappings, each accepted by ``load_registry_record_mapping``.
-    ``digest`` is the SHA-256 over the manifest and table bytes in file-name
-    order; every generated parameter record cites it.
+    ``digest`` is the SHA-256 over the manifest, table and annotation-file
+    bytes in file-name order; every generated parameter record cites it.
+
+    With a ``genomes.csv``, ``genome_annotations`` describes each annotation
+    read (file, digest, tool and version, consensus rule, families),
+    ``genome_resolved_classes`` lists the resolved classes with a registry
+    record that joined a strain (or matched an explicit ``enzymes.csv`` row),
+    ``unmodellable_enzyme_classes`` the resolved classes without a registry
+    record (reported, never generated) and ``unmapped_families`` the families
+    the CAZy family map assigns to no class. All four are empty without a
+    ``genomes.csv``.
     """
 
     dataset_id: str
@@ -368,6 +409,10 @@ class UserDataset:
     manifest: Mapping[str, Any] = field(default_factory=dict)
     file_digests: Mapping[str, str] = field(default_factory=dict)
     base_registry_id: str = ""
+    genome_annotations: tuple[Mapping[str, Any], ...] = ()
+    genome_resolved_classes: tuple[Mapping[str, Any], ...] = ()
+    unmodellable_enzyme_classes: tuple[Mapping[str, Any], ...] = ()
+    unmapped_families: tuple[Mapping[str, Any], ...] = ()
     _record_objects: Mapping[str, tuple[RegistryRecord, ...]] = field(
         default_factory=dict, repr=False, compare=False
     )
@@ -453,6 +498,25 @@ class UserDataset:
             "file_digests": dict(self.file_digests),
             "base_registry_id": self.base_registry_id,
             "records": {name: [_plain(mapping) for mapping in self.records.get(name, ())] for name in _RECORD_TYPES},
+            **self._genome_lists(),
+        }
+
+    def summary(self) -> dict[str, Any]:
+        """Return the dataset id, digest, generated record counts and the genome-resolution lists."""
+
+        return {
+            "dataset_id": self.dataset_id,
+            "digest": self.digest,
+            "record_counts": {name: len(self.records.get(name, ())) for name in _RECORD_TYPES},
+            **self._genome_lists(),
+        }
+
+    def _genome_lists(self) -> dict[str, list[Any]]:
+        return {
+            "genome_annotations": [_plain(item) for item in self.genome_annotations],
+            "genome_resolved_classes": [_plain(item) for item in self.genome_resolved_classes],
+            "unmodellable_enzyme_classes": [_plain(item) for item in self.unmodellable_enzyme_classes],
+            "unmapped_families": [_plain(item) for item in self.unmapped_families],
         }
 
 
@@ -478,13 +542,24 @@ def load_user_dataset(
         )
     issues: list[dict[str, Any]] = []
     raw_files = _read_dataset_files(directory, issues)
-    digest = _dataset_digest(raw_files)
     manifest = _parse_manifest(raw_files.get(USER_DATASET_MANIFEST), issues)
-    tables = {name: _parse_table(name, raw_files[name], issues) for name in _TABLE_COLUMNS if name in raw_files}
+    # With a genome table the strain's classes may come from its annotation alone,
+    # so enzymes.csv may then hold only its header; every strain still needs a class.
+    rows_required = tuple(
+        name for name in _TABLES_WITH_ROWS_REQUIRED if not (name == "enzymes.csv" and GENOME_TABLE in raw_files)
+    )
+    tables = {
+        name: _parse_table(name, raw_files[name], issues, rows_required=name in rows_required)
+        for name in _TABLE_COLUMNS
+        if name in raw_files
+    }
     context = _Context(base=base, issues=issues)
-    parsed = _parse_rows(tables, context)
+    parsed = _parse_rows(tables, context, directory=directory)
     if parsed is not None:
         _cross_validate(parsed, context)
+        # Annotation files are inputs like the tables: their bytes enter the digest.
+        raw_files = {**raw_files, **parsed.annotation_files}
+    digest = _dataset_digest(raw_files)
     dataset_id = str(manifest.get("dataset_id", "")) if manifest else ""
     if issues or parsed is None or manifest is None:
         raise UserDataError(f"User dataset {str(directory)!r} is invalid.", issues=issues)
@@ -497,6 +572,7 @@ def load_user_dataset(
     )
     if issues:
         raise UserDataError(f"User dataset {str(directory)!r} is invalid.", issues=issues)
+    genome_report = _genome_report(parsed, dataset_id=dataset_id)
     dataset = UserDataset(
         dataset_id=dataset_id,
         digest=digest,
@@ -505,6 +581,10 @@ def load_user_dataset(
         manifest=MappingProxyType(dict(manifest)),
         file_digests=MappingProxyType({name: hashlib.sha256(data).hexdigest() for name, data in sorted(raw_files.items())}),
         base_registry_id=base.registry_id,
+        genome_annotations=genome_report["genome_annotations"],
+        genome_resolved_classes=genome_report["genome_resolved_classes"],
+        unmodellable_enzyme_classes=genome_report["unmodellable_enzyme_classes"],
+        unmapped_families=genome_report["unmapped_families"],
         _record_objects=MappingProxyType({name: tuple(generated.objects[name]) for name in _RECORD_TYPES}),
         _base_references=MappingProxyType(dict(generated.base_references)),
         _origins=MappingProxyType(dict(generated.origins)),
@@ -549,12 +629,90 @@ class _EnzymeClassInfo:
 
 
 @dataclass(frozen=True)
+class _GenomeClassEvidence:
+    """The genome-annotation evidence for one enzyme class of one strain."""
+
+    genome_row: int
+    annotation_file: str
+    annotation_sha256: str
+    tool: str
+    tool_version: str
+    families: tuple[str, ...]
+    gene_ids: tuple[str, ...]
+    specificity: str
+    consensus_rule: str
+    source: str
+
+    @property
+    def gene_count(self) -> int:
+        return len(self.gene_ids)
+
+    @property
+    def evidence_text(self) -> str:
+        genes = "gene" if self.gene_count == 1 else "genes"
+        return f"genome annotation ({self.tool}, {self.gene_count} {genes}, families {', '.join(self.families)})"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "file": GENOME_TABLE,
+            "row": self.genome_row,
+            "evidence": self.evidence_text,
+            "source": self.source,
+            "annotation_file": self.annotation_file,
+            "annotation_sha256": self.annotation_sha256,
+            "annotation_tool": self.tool,
+            "annotation_tool_version": self.tool_version,
+            "families": list(self.families),
+            "gene_count": self.gene_count,
+            "gene_ids": list(self.gene_ids),
+            "specificity": self.specificity,
+            "consensus_rule": self.consensus_rule,
+            "claim_boundary": _GENOME_CLAIM_BOUNDARY,
+        }
+
+
+@dataclass(frozen=True)
 class _StrainClass:
     row: int
     strain_id: str
     class_key: str
     evidence: str
     source: str
+    # enzymes.csv for an explicit row; genomes.csv for a class the annotation alone declares.
+    file: str = "enzymes.csv"
+    # Genome evidence, also attached to an explicit row whose class the annotation resolves.
+    genome: _GenomeClassEvidence | None = None
+
+    @property
+    def genome_only(self) -> bool:
+        return self.file == GENOME_TABLE
+
+
+@dataclass(frozen=True)
+class _GenomeAnnotation:
+    """One genomes.csv row whose annotation was read and resolved."""
+
+    row: int
+    strain_id: str
+    annotation_file: str
+    annotation_sha256: str
+    tool: str
+    tool_version: str
+    source: str
+    min_tools_agreeing: int | None
+    consensus_rule: str
+    overview: DbcanOverview
+    family_genes: Mapping[str, tuple[str, ...]]
+    capabilities: tuple[ResolvedCapability, ...]
+    unmapped_families: tuple[str, ...]
+    family_map_sha256: str
+    family_map_sources: tuple[str, ...]
+
+    def genes_for(self, families: Sequence[str]) -> tuple[str, ...]:
+        """Genes supporting any of ``families``, in the order of the annotation file."""
+
+        wanted = {gene for family in families for gene in self.family_genes.get(family, ())}
+        return tuple(gene.gene_id for gene in self.overview.genes if gene.gene_id in wanted)
 
 
 @dataclass(frozen=True)
@@ -649,6 +807,11 @@ class _Parsed:
     pair_forms: dict[tuple[str, str], str] = field(default_factory=dict)
     # (strain, class, substrate) -> law -> parameter -> row, set by cross-validation for valid laws.
     laws: dict[tuple[str, str, str], dict[str, dict[str, _Response]]] = field(default_factory=dict)
+    # Resolved genome annotations, the annotation files read (relative path -> bytes), and the
+    # genomes.csv row of every strain that has one (also rows that failed validation).
+    genomes: list[_GenomeAnnotation] = field(default_factory=list)
+    annotation_files: dict[str, bytes] = field(default_factory=dict)
+    genome_rows: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -782,7 +945,7 @@ def _parse_manifest(raw: bytes | None, issues: list[dict[str, Any]]) -> dict[str
     return dict(data)
 
 
-def _parse_table(name: str, raw: bytes, issues: list[dict[str, Any]]) -> _Table | None:
+def _parse_table(name: str, raw: bytes, issues: list[dict[str, Any]], *, rows_required: bool) -> _Table | None:
     try:
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
@@ -835,12 +998,12 @@ def _parse_table(name: str, raw: bytes, issues: list[dict[str, Any]]) -> _Table 
     except csv.Error as exc:
         issues.append(_issue(name, reader.line_num, None, f"Row is not valid CSV: {exc}"))
         return None
-    if name in _TABLES_WITH_ROWS_REQUIRED and not rows:
+    if rows_required and not rows:
         issues.append(_issue(name, None, None, "Table needs at least one data row."))
     return _Table(name=name, rows=tuple(rows))
 
 
-def _parse_rows(tables: Mapping[str, _Table | None], context: _Context) -> _Parsed | None:
+def _parse_rows(tables: Mapping[str, _Table | None], context: _Context, *, directory: Path) -> _Parsed | None:
     required_ok = all(tables.get(name) is not None for name in _REQUIRED_TABLES)
     if not required_ok:
         return None
@@ -849,6 +1012,19 @@ def _parse_rows(tables: Mapping[str, _Table | None], context: _Context) -> _Pars
     user_classes = _parse_user_classes(tables.get("enzyme_classes.csv"), resolver, context)
     classes: dict[str, _EnzymeClassInfo] = dict(user_classes)
     strain_classes = _parse_strain_classes(_table(tables, "enzymes.csv"), strains, classes, resolver, context)
+    # Genome-resolved classes join the declared classes before kinetics and responses are
+    # checked, so user kinetics may reference a class the annotation declared.
+    genome_table = tables.get(GENOME_TABLE)
+    genomes = _GenomeParse()
+    if genome_table is not None:
+        genomes = _parse_genomes(
+            genome_table,
+            directory=directory,
+            strains=strains,
+            classes=classes,
+            strain_classes=strain_classes,
+            context=context,
+        )
     substrates = _parse_substrates(_table(tables, "substrates.csv"), resolver, context)
     conditions = _parse_conditions(_table(tables, "conditions.csv"), resolver, context)
     kinetics = _parse_kinetics(
@@ -883,6 +1059,9 @@ def _parse_rows(tables: Mapping[str, _Table | None], context: _Context) -> _Pars
         conditions=conditions,
         kinetics=kinetics,
         responses=responses,
+        genomes=genomes.annotations,
+        annotation_files=genomes.files,
+        genome_rows=genomes.rows,
     )
 
 
@@ -989,7 +1168,13 @@ def _resolve_class(
             "nor a class_id defined in enzyme_classes.csv.",
         )
         return None
-    record = context.base.get_enzyme_class(resolved.record_id)
+    return _registry_class_info(resolved.record_id, classes=classes, context=context)
+
+
+def _registry_class_info(record_id: str, *, classes: dict[str, _EnzymeClassInfo], context: _Context) -> str:
+    """Register the class information of registry enzyme class ``record_id`` and return its key."""
+
+    record = context.base.get_enzyme_class(record_id)
     if record.record_id not in classes:
         classes[record.record_id] = _EnzymeClassInfo(
             key=record.record_id,
@@ -1039,6 +1224,304 @@ def _parse_strain_classes(
         seen[key] = line
         output.append(_StrainClass(row=line, strain_id=strain_id, class_key=class_key, evidence=evidence, source=source))
     return output
+
+
+@dataclass
+class _GenomeParse:
+    annotations: list[_GenomeAnnotation] = field(default_factory=list)
+    files: dict[str, bytes] = field(default_factory=dict)
+    rows: dict[str, int] = field(default_factory=dict)
+
+
+def _parse_genomes(
+    table: _Table,
+    *,
+    directory: Path,
+    strains: Mapping[str, _Strain],
+    classes: dict[str, _EnzymeClassInfo],
+    strain_classes: list[_StrainClass],
+    context: _Context,
+) -> _GenomeParse:
+    """Read genomes.csv, resolve each annotation, and merge the classes that have a registry record.
+
+    The annotation is resolved with ``CapabilityResolver`` and the curated CAZy
+    family map against the enzyme classes of the base registry. A resolved
+    class with a registry record joins the strain's declared classes; an
+    explicit ``enzymes.csv`` row for the same class wins and receives the
+    genome evidence as well. Classes without a record and families the map
+    does not assign stay on the annotation for the dataset report; no record is
+    generated for them, and no rate is taken from the annotation.
+    """
+
+    file = table.name
+    result = _GenomeParse()
+    explicit = {(item.strain_id, item.class_key): index for index, item in enumerate(strain_classes)}
+    resolver: CapabilityResolver | None = None
+    family_map_sha256 = ""
+    for line, row in table.rows:
+        strain_id = _reference(row, "strain_id", strains, "strains.csv", file=file, line=line, context=context)
+        if strain_id is not None:
+            if strain_id in result.rows:
+                context.add(
+                    file,
+                    line,
+                    "strain_id",
+                    f"Strain {strain_id!r} already has a genome annotation in row {result.rows[strain_id]}; give "
+                    "one annotation per strain.",
+                )
+                strain_id = None
+            else:
+                result.rows[strain_id] = line
+        tool = _genome_tool(row, file=file, line=line, context=context)
+        source = _required_text(row, "source", file=file, line=line, context=context)
+        min_tools = _optional_positive_int(row, "min_tools_agreeing", file=file, line=line, context=context)
+        min_tools_value = None if isinstance(min_tools, bool) else min_tools
+        relative = _annotation_path(row, directory=directory, file=file, line=line, context=context)
+        overview: DbcanOverview | None = None
+        if relative is not None:
+            data = result.files.get(relative)
+            if data is None:
+                try:
+                    data = (directory / relative).read_bytes()
+                except OSError as exc:
+                    context.add(file, line, "annotation_file", f"Annotation file {relative!r} cannot be read: {exc}")
+                else:
+                    result.files[relative] = data
+            if data is not None:
+                overview = _read_overview(data, relative, file=file, line=line, context=context)
+        family_genes: dict[str, tuple[str, ...]] | None = None
+        if overview is not None and min_tools is not False:
+            family_genes = _consensus_family_genes(
+                overview, min_tools_value, relative=relative, file=file, line=line, context=context
+            )
+        if strain_id is None or tool is None or source is None or relative is None or family_genes is None:
+            continue
+        assert overview is not None
+        if resolver is None:
+            try:
+                resolver = CapabilityResolver(
+                    family_map=CazymeFamilyMap.load(),
+                    registry_enzyme_classes=tuple(sorted(context.base.enzyme_classes)),
+                )
+                family_map_sha256 = hashlib.sha256(default_family_map_path().read_bytes()).hexdigest()
+            except (OSError, yaml.YAMLError, CapabilityResolutionError, ProvenanceError) as exc:
+                context.add(file, None, None, f"The curated CAZy family map could not be loaded: {exc}")
+                return result
+        tool_name, tool_version = tool
+        try:
+            resolution = resolver.resolve(
+                CazymeAnnotation(
+                    organism=strains[strain_id].name,
+                    families=tuple(family_genes),
+                    # The user's source column states which genome or proteome was annotated.
+                    genome_accession=source,
+                    annotation_tool=tool_name,
+                    annotation_tool_version=tool_version,
+                    # genomes.csv has no date column; this marker never leaves the resolver call.
+                    annotation_date="not recorded in genomes.csv",
+                )
+            )
+        except (CapabilityResolutionError, ProvenanceError) as exc:
+            context.add(file, line, "annotation_file", f"The annotation could not be resolved: {exc}")
+            continue
+        annotation = _GenomeAnnotation(
+            row=line,
+            strain_id=strain_id,
+            annotation_file=relative,
+            annotation_sha256=hashlib.sha256(result.files[relative]).hexdigest(),
+            tool=tool_name,
+            tool_version=tool_version,
+            source=source,
+            min_tools_agreeing=min_tools_value,
+            consensus_rule=_consensus_rule_text(overview, min_tools_value, line=line),
+            overview=overview,
+            family_genes=MappingProxyType(dict(family_genes)),
+            capabilities=resolution.capabilities,
+            unmapped_families=resolution.unmapped_families,
+            family_map_sha256=family_map_sha256,
+            family_map_sources=resolver.family_map.sources,
+        )
+        result.annotations.append(annotation)
+        for capability in resolution.capabilities:
+            if not capability.modellable:
+                continue
+            evidence = _GenomeClassEvidence(
+                genome_row=line,
+                annotation_file=relative,
+                annotation_sha256=annotation.annotation_sha256,
+                tool=tool_name,
+                tool_version=tool_version,
+                families=capability.families,
+                gene_ids=annotation.genes_for(capability.families),
+                specificity=capability.specificity,
+                consensus_rule=annotation.consensus_rule,
+                source=source,
+            )
+            key = (strain_id, capability.enzyme_class)
+            if key in explicit:
+                index = explicit[key]
+                strain_classes[index] = replace(strain_classes[index], genome=evidence)
+                continue
+            class_key = _registry_class_info(capability.enzyme_class, classes=classes, context=context)
+            strain_classes.append(
+                _StrainClass(
+                    row=line,
+                    strain_id=strain_id,
+                    class_key=class_key,
+                    evidence=evidence.evidence_text,
+                    source=source,
+                    file=GENOME_TABLE,
+                    genome=evidence,
+                )
+            )
+    return result
+
+
+def _genome_tool(row: Mapping[str, str], *, file: str, line: int, context: _Context) -> tuple[str, str] | None:
+    """Split ``annotation_tool`` into a supported tool name and the version the user states."""
+
+    text = _required_text(row, "annotation_tool", file=file, line=line, context=context)
+    if text is None:
+        return None
+    parts = text.split(maxsplit=1)
+    name = parts[0]
+    version = parts[1].strip() if len(parts) > 1 else ""
+    if not _DBCAN_TOOL_PATTERN.fullmatch(name):
+        context.add(
+            file,
+            line,
+            "annotation_tool",
+            f"annotation_tool {text!r} is not a supported annotation tool. genomes.csv reads only dbCAN "
+            f"overview.txt files (tool columns {', '.join(TOOL_COLUMNS)}); give 'dbCAN' followed by its version, "
+            "or declare the strain's enzyme classes in enzymes.csv.",
+        )
+        return None
+    if not version:
+        context.add(
+            file,
+            line,
+            "annotation_tool",
+            f"annotation_tool {text!r} names dbCAN without a version; write the version after the tool name, for "
+            "example 'dbCAN 4.1.4'. The overview file does not record it, and a resolution that cannot be traced "
+            "to a tool version is not reproducible.",
+        )
+        return None
+    return name, version
+
+
+def _annotation_path(
+    row: Mapping[str, str],
+    *,
+    directory: Path,
+    file: str,
+    line: int,
+    context: _Context,
+) -> str | None:
+    """Return ``annotation_file`` as a normalised path relative to the dataset directory, or refuse it."""
+
+    text = _required_text(row, "annotation_file", file=file, line=line, context=context)
+    if text is None:
+        return None
+    windows = PureWindowsPath(text)
+    if PurePosixPath(text).is_absolute() or windows.drive or windows.root:
+        context.add(
+            file,
+            line,
+            "annotation_file",
+            f"annotation_file {text!r} is an absolute path; give a path relative to the dataset directory, so the "
+            "dataset stays self-contained and its digest covers the file.",
+        )
+        return None
+    if "\\" in text:
+        context.add(file, line, "annotation_file", f"annotation_file {text!r} must separate directories with '/'.")
+        return None
+    parts = [part for part in PurePosixPath(text).parts if part != "."]
+    if ".." in parts:
+        context.add(
+            file,
+            line,
+            "annotation_file",
+            f"annotation_file {text!r} leaves the dataset directory; the annotation file must lie inside it.",
+        )
+        return None
+    relative = "/".join(parts)
+    if not relative or relative in {USER_DATASET_MANIFEST, *_TABLE_COLUMNS}:
+        context.add(
+            file,
+            line,
+            "annotation_file",
+            f"annotation_file {text!r} does not name an annotation file in the dataset directory.",
+        )
+        return None
+    path = directory / relative
+    if not path.resolve().is_relative_to(directory.resolve()):
+        context.add(
+            file,
+            line,
+            "annotation_file",
+            f"annotation_file {text!r} resolves outside the dataset directory (through a symbolic link); the "
+            "annotation file must lie inside it.",
+        )
+        return None
+    if not path.is_file():
+        reason = "is not a file" if path.exists() else "does not exist"
+        context.add(file, line, "annotation_file", f"Annotation file {relative!r} {reason} in the dataset directory.")
+        return None
+    return relative
+
+
+def _read_overview(data: bytes, relative: str, *, file: str, line: int, context: _Context) -> DbcanOverview | None:
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        context.add(file, line, "annotation_file", f"Annotation file {relative!r} is not UTF-8 text: {exc}")
+        return None
+    try:
+        return parse_overview(text, source=f"Annotation file {relative!r}")
+    except CapabilityResolutionError as exc:
+        context.add(file, line, "annotation_file", f"{exc} genomes.csv reads dbCAN overview.txt files.")
+        return None
+
+
+def _consensus_family_genes(
+    overview: DbcanOverview,
+    min_tools: int | None,
+    *,
+    relative: str | None,
+    file: str,
+    line: int,
+    context: _Context,
+) -> dict[str, tuple[str, ...]] | None:
+    """Families and their genes under the consensus rule of ``DbcanOverview.family_genes``."""
+
+    try:
+        family_genes = overview.family_genes(min_tools_agreeing=min_tools)
+    except CapabilityResolutionError as exc:
+        context.add(file, line, "min_tools_agreeing", str(exc))
+        return None
+    if not family_genes:
+        context.add(
+            file,
+            line,
+            "min_tools_agreeing",
+            f"No CAZy family in {relative!r} is called by at least {min_tools} of the tool columns present "
+            f"({', '.join(overview.tool_columns)}); lower min_tools_agreeing or leave it blank.",
+        )
+        return None
+    return family_genes
+
+
+def _consensus_rule_text(overview: DbcanOverview, min_tools: int | None, *, line: int) -> str:
+    columns = ", ".join(overview.tool_columns)
+    if min_tools is None:
+        return (
+            f"a family counts for a gene when any tool column present ({columns}) calls it, the rule of "
+            "fungal_model.capability.families_from_overview; min_tools_agreeing is blank"
+        )
+    return (
+        f"a family counts for a gene when at least {min_tools} of the tool columns present ({columns}) call it "
+        f"(min_tools_agreeing in {GENOME_TABLE} row {line})"
+    )
 
 
 def _parse_substrates(table: _Table, resolver: RegistryResolver, context: _Context) -> dict[str, _Substrate]:
@@ -1758,8 +2241,25 @@ def _quantity_units_error(quantity: str, units: str) -> str | None:
 
 def _cross_validate(parsed: _Parsed, context: _Context) -> None:
     declared_strains = {item.strain_id for item in parsed.strain_classes}
+    resolved_genomes = {genome.strain_id: genome for genome in parsed.genomes}
     for strain in parsed.strains.values():
-        if strain.strain_id not in declared_strains:
+        if strain.strain_id in declared_strains:
+            continue
+        genome = resolved_genomes.get(strain.strain_id)
+        if genome is not None:
+            without_record = sorted({item.enzyme_class for item in genome.capabilities if not item.modellable})
+            context.add(
+                "strains.csv",
+                strain.row,
+                "strain_id",
+                f"Strain {strain.strain_id!r} declares no enzyme class in enzymes.csv, and its genome annotation "
+                f"({GENOME_TABLE} row {genome.row}) resolved no enzyme class with a registry record (classes "
+                f"without a record: {', '.join(without_record) or 'none'}; unmapped families: "
+                f"{', '.join(genome.unmapped_families) or 'none'}). FungMod does not create enzyme classes from a "
+                "genome annotation; declare the strain's classes in enzymes.csv.",
+            )
+        elif strain.strain_id not in parsed.genome_rows:
+            # A strain whose genomes.csv row was refused is already reported on that row.
             context.add(
                 "strains.csv",
                 strain.row,
@@ -2215,7 +2715,7 @@ def _generate_records(
             _enzyme_class_mapping(parsed.classes[class_key], namespace),
             origin=("enzyme_classes.csv", parsed.classes[class_key].row, "class_id")
             if parsed.classes[class_key].origin == "user"
-            else ("enzymes.csv", _first_class_row(parsed, class_key), "enzyme_class"),
+            else (*_first_class_row(parsed, class_key), "enzyme_class"),
         )
     for strain in parsed.strains.values():
         declared = [item for item in parsed.strain_classes if item.strain_id == strain.strain_id]
@@ -2223,7 +2723,13 @@ def _generate_records(
             generated,
             context,
             "fungi",
-            _fungus_mapping(strain, declared, parsed.classes, namespace),
+            _fungus_mapping(
+                strain,
+                declared,
+                parsed.classes,
+                namespace,
+                genome_row=parsed.genome_rows.get(strain.strain_id),
+            ),
             origin=("strains.csv", strain.row, "strain_id"),
         )
     for substrate in parsed.substrates.values():
@@ -2276,6 +2782,7 @@ def _generate_records(
                     case_rows=case_rows,
                     form_started=started,
                     laws=tuple(strain_laws),
+                    genome=item.genome if item.genome_only else None,
                 )
                 for quantity in _FORM_QUANTITIES[form]:
                     mapping, origin = _role_mapping(quantity, case)
@@ -2305,6 +2812,7 @@ def _generate_records(
                             info=info,
                             substrate=substrate,
                             namespace=namespace,
+                            genome=item.genome if item.genome_only else None,
                         )
                         origin = ("responses.csv", None, "parameter")
                     record = _emit(generated, context, "parameter_records", mapping, origin=origin)
@@ -2343,6 +2851,8 @@ class _CaseContext:
     case_rows: Mapping[str, _Kinetics]
     form_started: bool
     laws: tuple[str, ...]
+    # Set when the class of this strain comes from its genome annotation alone.
+    genome: _GenomeClassEvidence | None = None
 
 
 def _pair_laws(parsed: _Parsed, pair: tuple[str, str]) -> tuple[ResponseLaw, ...]:
@@ -2431,8 +2941,11 @@ def _emit(
     return record
 
 
-def _first_class_row(parsed: _Parsed, class_key: str) -> int | None:
-    return next((item.row for item in parsed.strain_classes if item.class_key == class_key), None)
+def _first_class_row(parsed: _Parsed, class_key: str) -> tuple[str, int | None]:
+    return next(
+        ((item.file, item.row) for item in parsed.strain_classes if item.class_key == class_key),
+        ("enzymes.csv", None),
+    )
 
 
 def _enzyme_class_mapping(info: _EnzymeClassInfo, namespace: _Namespace) -> dict[str, Any]:
@@ -2479,8 +2992,19 @@ def _fungus_mapping(
     declared: Sequence[_StrainClass],
     classes: Mapping[str, _EnzymeClassInfo],
     namespace: _Namespace,
+    *,
+    genome_row: int | None = None,
 ) -> dict[str, Any]:
     aliases = list(dict.fromkeys((strain.strain_id, *strain.aliases)))
+    class_sources = (
+        "come from the user's enzymes.csv"
+        if genome_row is None
+        else (
+            f"come from the user's enzymes.csv and from the genome annotation in {GENOME_TABLE} row {genome_row} "
+            "(classes with a registry record only; an explicit enzymes.csv row wins). The annotation shows which "
+            "classes the strain can encode, not their expression or rates"
+        )
+    )
     mapping: dict[str, Any] = {
         "record_id": namespace.id(strain.strain_id),
         "name": strain.name,
@@ -2490,15 +3014,7 @@ def _fungus_mapping(
             "source": namespace.source,
             "confidence_level": "user_supplied",
             "enzyme_class_evidence": {
-                namespace.id(item.class_key): {
-                    "enzyme_class": item.class_key,
-                    "class_origin": classes[item.class_key].origin,
-                    "evidence": item.evidence,
-                    "source": item.source,
-                    "file": "enzymes.csv",
-                    "row": item.row,
-                }
-                for item in declared
+                namespace.id(item.class_key): _class_evidence(item, classes) for item in declared
             },
             USER_DATASET_PROVENANCE_KEY: namespace.provenance("strains.csv", strain.row),
         },
@@ -2506,12 +3022,29 @@ def _fungus_mapping(
         "assimilable_products": [],
         "notes": (
             f"User-supplied strain {strain.strain_id} from dataset {namespace.dataset_id}. Its enzyme classes "
-            "come from the user's enzymes.csv; no growth, secretion or uptake model is implied."
+            f"{class_sources}; no growth, secretion or uptake model is implied."
         ),
     }
     if strain.scientific_name:
         mapping["scientific_name"] = strain.scientific_name
     return mapping
+
+
+def _class_evidence(item: _StrainClass, classes: Mapping[str, _EnzymeClassInfo]) -> dict[str, Any]:
+    """The evidence for one declared class: the explicit row or the annotation, and the annotation when both."""
+
+    evidence: dict[str, Any] = {
+        "enzyme_class": item.class_key,
+        "class_origin": classes[item.class_key].origin,
+        "evidence": item.evidence,
+        "source": item.source,
+        "file": item.file,
+        "row": item.row,
+    }
+    if item.genome is not None:
+        evidence["declared_by"] = item.file
+        evidence["genome_annotation"] = item.genome.to_dict()
+    return evidence
 
 
 def _substrate_mapping(substrate: _Substrate, namespace: _Namespace) -> dict[str, Any]:
@@ -3049,6 +3582,7 @@ def _gap_mapping(quantity: str, *, case: _CaseContext) -> dict[str, Any]:
                 quantity=quantity,
                 condition_id=condition.condition_id,
                 required_dimension=dimension,
+                **_genome_gap_provenance(case.genome),
             ),
         },
         "notes": notes,
@@ -3083,7 +3617,34 @@ _QUANTITY_LABEL = {
 }
 
 
+def _genome_gap_provenance(genome: _GenomeClassEvidence | None) -> dict[str, Any]:
+    if genome is None:
+        return {}
+    return {"class_evidence": "genome_annotation", "genome_annotation": genome.to_dict()}
+
+
+def _with_genome_note(request: str, genome: _GenomeClassEvidence | None) -> str:
+    """Say in a measurement request that the class rests on a genome annotation, not on a measurement."""
+
+    if genome is None:
+        return request
+    families = ", ".join(genome.families)
+    specificity = (
+        ""
+        if genome.specificity == DIAGNOSTIC
+        else "; family membership is polyspecific, so the activity itself needs confirming"
+    )
+    return (
+        f"{request.rstrip('.')}; the class was inferred from the {genome.tool} annotation "
+        f"(families {families}{specificity})."
+    )
+
+
 def _measurement_request(quantity: str, *, case: _CaseContext, units_text: str) -> str:
+    return _with_genome_note(_measurement_request_text(quantity, case=case, units_text=units_text), case.genome)
+
+
+def _measurement_request_text(quantity: str, *, case: _CaseContext, units_text: str) -> str:
     strain, info, substrate, condition = case.strain, case.info, case.substrate, case.condition
     where = _condition_text(condition)
     if quantity in _KCAT_FORM_QUANTITIES and not case.form_started:
@@ -3226,11 +3787,13 @@ def _response_gap_mapping(
     info: _EnzymeClassInfo,
     substrate: _Substrate,
     namespace: _Namespace,
+    genome: _GenomeClassEvidence | None = None,
 ) -> dict[str, Any]:
-    request = (
+    request = _with_genome_note(
         f"Measure the {parameter.label} of the {law.label} for {info.name} from {strain.name} on {substrate.name} "
         f"({parameter.dimension_text}); responses.csv binds this law to {info.name} on {substrate.name} for "
-        "another strain."
+        "another strain.",
+        genome,
     )
     notes = (
         f"No responses.csv row gives {parameter.name} of {law.law} for this strain in dataset "
@@ -3256,6 +3819,7 @@ def _response_gap_mapping(
                 law=law.law,
                 parameter=parameter.name,
                 required_dimension=parameter.dimension_text,
+                **_genome_gap_provenance(genome),
             ),
         },
         "notes": notes,
@@ -3382,6 +3946,87 @@ def _shared_bonds(info: _EnzymeClassInfo, substrate: _Substrate) -> tuple[str, .
         return None
     shared = tuple(sorted(set(substrate.bond_classes).intersection(info.target_bond_classes)))
     return shared or None
+
+
+_UNMODELLABLE_REASON = (
+    "no enzyme-class record in the base registry; FungMod does not create one from a genome annotation, so no "
+    "case, gap or measurement request is generated for this class"
+)
+_UNMAPPED_REASON = "the curated CAZy family map assigns no enzyme class to this family"
+
+
+def _genome_report(parsed: _Parsed, *, dataset_id: str) -> dict[str, tuple[Mapping[str, Any], ...]]:
+    """The dataset-level genome lists: annotations read, classes resolved, classes without a record, unmapped families."""
+
+    annotations: list[Mapping[str, Any]] = []
+    resolved: list[Mapping[str, Any]] = []
+    unmodellable: list[Mapping[str, Any]] = []
+    unmapped: list[Mapping[str, Any]] = []
+    declared = {(item.strain_id, item.class_key): item for item in parsed.strain_classes}
+    for genome in parsed.genomes:
+        annotations.append(
+            {
+                "strain_id": genome.strain_id,
+                "file": GENOME_TABLE,
+                "row": genome.row,
+                "annotation_file": genome.annotation_file,
+                "annotation_sha256": genome.annotation_sha256,
+                "annotation_tool": genome.tool,
+                "annotation_tool_version": genome.tool_version,
+                "source": genome.source,
+                "tool_columns": list(genome.overview.tool_columns),
+                "min_tools_agreeing": genome.min_tools_agreeing,
+                "consensus_rule": genome.consensus_rule,
+                "gene_rows": len(genome.overview.genes),
+                "family_gene_counts": {family: len(genes) for family, genes in genome.family_genes.items()},
+                "family_map": {
+                    "file": default_family_map_path().name,
+                    "sha256": genome.family_map_sha256,
+                    "sources": list(genome.family_map_sources),
+                },
+                "claim_boundary": _GENOME_CLAIM_BOUNDARY,
+            }
+        )
+        for capability in genome.capabilities:
+            entry: dict[str, Any] = {
+                "strain_id": genome.strain_id,
+                "enzyme_class": capability.enzyme_class,
+                "families": list(capability.families),
+                "gene_count": len(genome.genes_for(capability.families)),
+                "specificity": capability.specificity,
+                "genomes_row": genome.row,
+            }
+            if not capability.modellable:
+                unmodellable.append({**entry, "reason": _UNMODELLABLE_REASON})
+                continue
+            item = declared[(genome.strain_id, capability.enzyme_class)]
+            assert item.genome is not None
+            resolved.append(
+                {
+                    **entry,
+                    "record_id": "__".join((dataset_id, capability.enzyme_class)),
+                    "declared_by": item.file,
+                    "enzymes_row": None if item.genome_only else item.row,
+                    "evidence": item.genome.evidence_text,
+                    "source": genome.source,
+                }
+            )
+        for family in genome.unmapped_families:
+            unmapped.append(
+                {
+                    "strain_id": genome.strain_id,
+                    "family": family,
+                    "gene_count": len(genome.family_genes.get(family, ())),
+                    "genomes_row": genome.row,
+                    "reason": _UNMAPPED_REASON,
+                }
+            )
+    return {
+        "genome_annotations": tuple(annotations),
+        "genome_resolved_classes": tuple(resolved),
+        "unmodellable_enzyme_classes": tuple(unmodellable),
+        "unmapped_families": tuple(unmapped),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -3683,6 +4328,8 @@ def _objects_of(
 
 __all__ = [
     "EVIDENCE_TYPES",
+    "GENOME_ANNOTATION_TOOLS",
+    "GENOME_TABLE",
     "KINETIC_QUANTITIES",
     "RATE_FORM_KCAT",
     "RATE_FORM_VMAX",

@@ -163,6 +163,122 @@ or resolved by a declared preference, and whether
 `selected_enzyme_class` (schema `2.1.0`) so that preflight-only bundles name the
 assessed class.
 
+## USERDATA-003 Enzyme Repertoire From A Genome Annotation
+
+Status: `complete` for the stated scope (2026-10-06); the third increment of
+the user-supplied-data route. It connects the existing genome capability
+resolver to virtual experiments: "fungus X on substrate Y in conditions Z"
+can now take the strain's enzyme classes from its genome annotation instead of
+a hand-written `enzymes.csv`, and every resolved class that can act on a
+dataset substrate but has no kinetics becomes an explicit, named measurement
+request. No rate is ever inferred from a genome.
+
+Changed:
+
+- `api/user_data.py`: optional `genomes.csv` (`strain_id`, `annotation_file`,
+  `annotation_tool`, `source`, optional `min_tools_agreeing`). The annotation
+  file is a dbCAN `overview.txt` addressed relative to the dataset directory
+  (absolute paths, `..`, backslashes and symbolic links leaving the directory
+  refused; missing files refused); its bytes enter the dataset digest and
+  `file_digests`. `annotation_tool` must be dbCAN followed by a version, which
+  is recorded as given; other tools and a missing version are refused. One
+  annotation per strain, strain declared in `strains.csv`. Families are
+  resolved with `CapabilityResolver` and the curated family map against the
+  base registry's enzyme classes. Classes with a registry record join the
+  strain's declared classes before kinetics and responses are checked (evidence
+  "genome annotation (dbCAN, N genes, families ...)", source from the row); an
+  explicit `enzymes.csv` row wins and the genome evidence is recorded beside it
+  in the fungus record. Classes without a record go to
+  `unmodellable_enzyme_classes` (class, families, gene count, specificity,
+  reason) and families without a class to `unmapped_families`; neither
+  produces a record. Gap requests of genome-only classes end with "; the class
+  was inferred from the dbCAN annotation (families ...)", plus a note for
+  polyspecific families, and their provenance carries `class_evidence:
+  genome_annotation`. With `genomes.csv`, `enzymes.csv` may hold only its
+  header; a strain whose annotation resolves no class with a record and that
+  has no explicit row is refused, naming the classes found. `UserDataset`
+  gains `genome_annotations`, `genome_resolved_classes`,
+  `unmodellable_enzyme_classes`, `unmapped_families` (in `to_dict()`) and
+  `summary()`. Datasets without `genomes.csv` generate byte-identical records
+  (the USERDATA-002 snapshot test passes unchanged).
+- Consensus rule: the existing code has no multi-tool threshold;
+  `families_from_overview` counts a family called in any tool column. That is
+  the default, applied per gene. `min_tools_agreeing` (user-given, between one
+  and the number of tool columns present) requires that many tool columns to
+  call the family for the same gene. No threshold is chosen by FungMod.
+- `capability/dbcan.py`: `parse_overview` and `DbcanOverview.family_genes`
+  (per-gene calls, gene counts, the optional threshold; refuses a header
+  without `Gene ID` or a tool column, repeated or blank gene identifiers, rows
+  wider than the header, files without calls). `capability/resolution.py`:
+  `default_family_map_path`. The family map's two citations containing ": "
+  were unquoted YAML and loaded as mappings; they are now quoted (no mapping
+  changed).
+- `api/virtual_experiment.py`: `VirtualExperiment.user_dataset_summary`;
+  `to_dict()` (and so `virtual_experiment_summary.json`) lists
+  `genome_resolved_classes`, `unmodellable_enzyme_classes` and
+  `unmapped_families` beside `user_dataset_id` (`null` without user data);
+  `write_preflight_report` also writes `user_dataset_genome_resolution.json`
+  when the dataset has a `genomes.csv`.
+- Docs: `docs/user-data.md` genome-annotation section (format, consensus rule,
+  three outcomes, gaps, outputs, limits), `docs/capabilities.md` (the genome
+  route is connected but assigns no rates), README user-data sentence,
+  changelog.
+
+Tests: `tests/test_user_data_genome.py` (30 tests) with the fixture
+`tests/fixtures/user_data/genome_case/` (a hand-written dbCAN overview in the
+documented format, marked in its README as a format fixture with synthetic
+gene identifiers, not a real genome; `enzymes.csv` header only, no kinetic
+values). With the shipped registry: `beta_glucosidase` (GH1, GH3, three genes,
+polyspecific) and `cellulase_generic` (GH5) join the strain;
+cellobiohydrolase, endo_xylanase, glucoamylase and laccase are listed as
+unmodellable and generate nothing; CBM1 and GT2 are unmapped; the four
+beta-glucosidase gaps on cellobiose carry the genome-aware request; preflight
+is `underparameterized` in both modes with the requests as suggested
+experiments and the preflight report writes the genome JSON; scientific and
+exploratory simulation are refused. An explicit `enzymes.csv` row wins with
+both pieces of evidence. With an in-memory registry extended by a test-only
+glucoamylase record, GH15 resolves to a class on the non-cellulose substrate
+maltose with its own gaps, and user estimates for beta-glucosidase make the
+cellobiose case run in exploratory mode (substrate falls, product is twice the
+substrate consumed) while the maltose case stays underparameterized. Also:
+`min_tools_agreeing` 2 and 3 change the classes and gene counts, and 4, 0 and
+"two" are refused; refusals for an absolute path, an escaping path, a symbolic
+link out of the directory, a missing file, an unknown tool, a tool without a
+version, an undeclared strain, a second annotation for a strain, a malformed
+header and a repeated gene; the digest changes when one annotation byte
+changes; datasets and experiments without a genome report empty or `null`
+lists; no genome-derived entry carries a rate; `parse_overview` keeps the
+family set of `families_from_overview`. The no-hardcoding guardrail forbids
+the new fixture's class and substrate words in `api/user_data.py`.
+
+Not changed: no process law, modifier, solver, registry record, family
+mapping, output table schema (still `1.8.0`) or shipped preflight text; the
+resolver's `require_diagnostic` filter is not exposed; user data never
+reaches `data_registry`.
+
+Scientific impact: a strain's enzyme repertoire can come from its genome
+annotation with every class traced to its genes, families, tool version and
+file digest, while kinetics stay explicit unknowns with measurement requests
+until measured or curated values are supplied. Classes FungMod cannot model
+are reported, not dropped or invented.
+
+Non-specific coverage: the shipped registry has no record for any family-map
+class acting on a non-cellulose substrate (its mapped classes with a record
+are `beta_glucosidase` and `cellulase_generic`), so the non-cellulose case
+uses a test-only in-memory glucoamylase record on maltose; no such record is
+shipped.
+
+Limitations: dbCAN `overview.txt` only, from the dataset directory, no
+download; family-level mapping (18 families, polyspecific families give
+candidates, `EC#` unused); only classes with a registry record are added;
+gene counts are annotated genes, not expression; no annotation date column.
+
+Recommended next task: curated registry enzyme-class records for the
+family-map classes that the genome route reports as unmodellable
+(cellobiohydrolase, endo-xylanase, LPMO), each with its own provenance and
+compatibility, so that annotations resolve to more modellable classes; then
+user time-course tables.
+
 ## USERDATA-002 Vmax, Activity And Environment Responses In User Data
 
 Status: `complete` for the stated scope (2026-10-06); the second increment of

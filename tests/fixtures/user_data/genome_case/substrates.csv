@@ -1,0 +1,3 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
+cellobiose,cellobiose,,,,,beta_D_glucose,2,mol/mol,"Reaction equation: cellobiose + H2O = 2 beta-D-glucose"
+maltose,,maltose,maltose,dissolved,alpha_1_4_glycosidic,D_glucose,2,mol/mol,"Reaction equation: maltose + H2O = 2 D-glucose"

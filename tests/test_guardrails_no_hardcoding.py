@@ -99,6 +99,12 @@ ORGANISM_SUBSTRATE_ENZYME_TOKENS = (
     "oryza",
     "laccase",
     "syringaldazine",
+    # USERDATA-003 genome-route fixture: the classes and substrates come from the family map and tables.
+    "maltose",
+    "glucoamylase",
+    "xylanase",
+    "cellobiohydrolase",
+    "synthetic_g",
 )
 
 
