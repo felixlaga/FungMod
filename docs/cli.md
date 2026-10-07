@@ -15,7 +15,7 @@ fungmod run --help
 
 | Command | What it does |
 | --- | --- |
-| `fungmod run` | Preflight, then simulate and write tables, manifest and report; `--compare-timecourses` also compares the simulation with your time courses. |
+| `fungmod run` | Preflight, then simulate and write tables, manifest and report; `--runnable-only` simulates the runnable cases when others are blocked (exit code 4); `--compare-timecourses` also compares the simulation with your time courses. |
 | `fungmod preflight` | Preflight only; optionally write the preflight tables. |
 | `fungmod check-data DIR` | Validate a [user dataset](user-data.md) and list its gaps, genome or proteome resolution, time courses, fitted values, or every unfilled `REVIEW:` field. |
 | `fungmod list` | List the fungi, substrates and environments that can be named. |
@@ -35,9 +35,10 @@ dataset or a frozen snapshot already on disk.
 The whole workflow for "fungus X on substrate Y in conditions Z" from a
 shell is: [`assemble`](#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)
 the sources you have into a draft, fill its `REVIEW:` fields,
-`check-data`, `run`, [compare](#compare-with-your-time-courses) with your
-time courses and [fit](#fit-kinetic-constants-to-your-time-courses) kinetic
-constants to them.
+`check-data`, `run` (with [`--runnable-only`](#run-the-runnable-cases-of-a-request)
+while the draft still has gaps), [compare](#compare-with-your-time-courses)
+with your time courses and [fit](#fit-kinetic-constants-to-your-time-courses)
+kinetic constants to them.
 
 ## Fungus X on substrate Y at 30 °C and pH 5
 
@@ -190,10 +191,92 @@ fungmod run \
 ```
 
 Several `--fungus`, `--substrate` and `--environment` (or grid) values form
-every combination. FungMod simulates only when every requested case passes
-the preflight in the requested mode; otherwise nothing is simulated and the
-command exits with 3, listing the blocked cases and their measurement
-requests.
+every combination. By default FungMod simulates only when every requested
+case passes the preflight in the requested mode; otherwise nothing is
+simulated and the command exits with 3, listing the blocked cases and their
+measurement requests, and suggests `--runnable-only` when some case is
+runnable.
+
+## Run the runnable cases of a request
+
+A real request almost always has gaps: most enzyme classes of a genome have
+no kinetics, and a condition without measured constants is a gap. With
+`--runnable-only`, `run` simulates the cases that pass the preflight in the
+requested mode and reports the others instead of refusing the whole request
+(the API's `VirtualExperiment.simulate(blocked="report")`):
+
+```bash
+fungmod run \
+  --fungus "beta-glucosidase source" --substrate cellobiose \
+  --environment "SABIO-RK Reaction 618 selected assay conditions" \
+  --environment toy_lab_environment \
+  --mode exploratory --samples 32 --seed 618 --output runs/partial \
+  --runnable-only
+```
+
+```text
+Preflight in exploratory mode:
+  #  fungus                           substrate   environment                               status              runnable
+  1  sabiork_beta_glucosidase_source  cellobiose  sabiork_reaction_618_selected_conditions  exploratory         yes
+  2  sabiork_beta_glucosidase_source  cellobiose  toy_lab_environment                       underparameterized  no
+...
+Not runnable: 1 of 2 case(s) cannot be simulated in exploratory mode.
+--runnable-only: simulating the 1 runnable case(s); the blocked case(s) are not simulated and are listed in case_summary.csv as not_simulated, with their missing inputs in missing_parameters.csv and their measurement requests in suggested_experiments.csv.
+Measurement requests:
+  - Measure or curate initial_cellobiose_concentration for the selected registry case.
+  - Measure or curate enzyme_concentration_beta_glucosidase for the selected registry case.
+
+Simulated 1 case(s) in exploratory mode: 32 sample(s) per case, seed 618.
+Partial run: 1 of 2 requested case(s) simulated; the others were blocked by the preflight.
+...
+Case case_0000: sabiork_beta_glucosidase_source + cellobiose + sabiork_reaction_618_selected_conditions
+  samples: 32 simulated, 0 failed
+  ...
+  Final metrics (median [5th, 95th percentile] over samples):
+    final_substrate_remaining          3.059 [3.044, 3.06] millimolar (n=32)
+    ...
+
+Case case_0001: sabiork_beta_glucosidase_source + cellobiose + toy_lab_environment
+  not simulated: blocked_by_preflight: the exploratory-mode preflight reports underparameterized (blocking reason missing_inputs; next action measure_or_curate_missing_inputs). ...
+...
+Partial run: 1 of 2 requested case(s) were blocked by the preflight and not simulated (case_0001); exit code 4.
+```
+
+- Which cases run is the preflight's rule for the mode, unchanged:
+  scientific mode simulates `modelable` cases only, exploratory mode also
+  `exploratory` ones. A scientific partial run keeps the scientific wording:
+  scientific means exact with current registry records and implemented
+  mechanisms; it does not mean experimentally validated.
+- The blocked cases are not simulated. They keep their place in the bundle:
+  `case_summary.csv` has a row with `case_status` `not_simulated` and the
+  reason, `modelability_preflight.csv`, `modelability_items.csv`,
+  `missing_parameters.csv` and `suggested_experiments.csv` give their status,
+  missing inputs and measurement requests, and `limitations_table.csv` a
+  blocking row. They have no row in the per-sample tables (time series,
+  final metrics, threshold times, sampled parameters). See
+  [partial runs](concepts/outputs.md#partial-runs).
+- `virtual_experiment_summary.json`, `output_manifest.json` and the report
+  say that the run is partial (`partial_run`, `requested_case_count`,
+  `simulated_case_count`) and list the blocked cases.
+- Every case keeps the `case_id` of its place in the requested grid
+  (`case_0001` above is the second requested case) and the seed of that
+  place, so the samples of a simulated case are the ones a run of the same
+  request without gaps gives, and the ones `simulate_screen(...,
+  cases=[that case])` gives on the same request. The Reaction 618 case is the
+  first case here, so its metrics equal those of the single-case run in
+  [registry environments](#registry-environments). A case that is not first
+  gets another seed in a request that names it alone.
+- The exit code is 4 ("partial: some cases blocked"), never 0, so that a
+  script notices the missing cases. When no case is runnable, nothing is
+  simulated and the exit code stays 3; when none is blocked, the run is a
+  full run (exit code 0).
+
+The flag is called `--runnable-only` rather than `--run-runnable`: it says
+which cases run (only the runnable ones) without repeating the subcommand
+(`fungmod run --run-runnable`), and a printed command that carries it shows
+at a glance that some requested cases may not run. The blocked cases are
+reported with or without it; the flag only decides whether the runnable ones
+are simulated.
 
 ## Your own data
 
@@ -339,8 +422,9 @@ Next:
   1. Fill the 8 REVIEW: field(s) above; g1_draft/review.md explains every decision.
   2. fungmod check-data g1_draft
   3. Run it (exploratory mode samples ranges and estimates; scientific mode takes exact measured, literature or design values only):
-     fungmod run --user-data g1_draft --fungus 'Genome-annotated strain G1' --substrate cellobiose --condition c30_ph5 --condition c40_ph5 \
+     fungmod run --user-data g1_draft --fungus 'Genome-annotated strain G1' --substrate cellobiose --condition c30_ph5 --condition c40_ph5 --runnable-only \
        --mode exploratory --samples N --seed S --output RUN_DIR
+     --runnable-only because 1 case(s) of this command have no kinetics in the draft (beta_glucosidase on cellobiose at c40_ph5 (gap)): the preflight blocks them, so without the flag nothing is simulated (exit code 3); with it the runnable cases are simulated and the blocked ones are listed with their measurement requests (exit code 4).
 ```
 
 The options map one to one onto the arguments of `assemble_user_tables`:
@@ -412,21 +496,32 @@ Enzyme classes resolved from them: 3
 its points, time range, units and how many observations carry an `sd`) and,
 for a fitted dataset, the fitted values with their identifiability verdicts.
 
-**Run it.** The printed command asks for both conditions. The 40 degC case
-is a gap, so the preflight blocks it (exit code 3, with the measurement
-requests above) and nothing is simulated; run the 30 degC case, whose
-transferred kinetics are estimates and therefore run in exploratory mode only:
+**Run it.** The printed command asks for both conditions and carries
+`--runnable-only`, because the 40 degC case is a gap that the preflight
+blocks. The 30 degC case, whose transferred kinetics are estimates and
+therefore run in exploratory mode only, is simulated; the 40 degC case is
+listed with its measurement requests, and the exit code is 4:
 
 ```bash
 fungmod run --user-data g1_draft --fungus "Genome-annotated strain G1" \
-  --substrate cellobiose --condition c30_ph5 \
-  --mode exploratory --samples 32 --seed 1 --output runs/g1_c30
+  --substrate cellobiose --condition c30_ph5 --condition c40_ph5 --runnable-only \
+  --mode exploratory --samples 32 --seed 1 --output runs/g1
 ```
 
 ```text
 Preflight in exploratory mode:
-  #  fungus                                substrate   environment        status       runnable
-  1  g1_draft__genome_annotated_strain_g1  cellobiose  g1_draft__c30_ph5  exploratory  yes
+  #  fungus                                substrate   environment        status              runnable
+  1  g1_draft__genome_annotated_strain_g1  cellobiose  g1_draft__c30_ph5  exploratory         yes
+  2  g1_draft__genome_annotated_strain_g1  cellobiose  g1_draft__c40_ph5  underparameterized  no
+...
+Not runnable: 1 of 2 case(s) cannot be simulated in exploratory mode.
+--runnable-only: simulating the 1 runnable case(s); the blocked case(s) are not simulated and are listed in case_summary.csv as not_simulated, with their missing inputs in missing_parameters.csv and their measurement requests in suggested_experiments.csv.
+Measurement requests:
+  - Measure km of beta-glucosidase from Genome-annotated strain G1 on Cellobiose at 40 degC, pH 5 (concentration units); kinetics.csv states kinetic constants of this strain, enzyme class and substrate only at c30_ph5 (30 degC, pH 5), and FungMod does not reuse kinetics measured at another condition; ...
+  ...
+
+Simulated 1 case(s) in exploratory mode: 32 sample(s) per case, seed 1.
+Partial run: 1 of 2 requested case(s) simulated; the others were blocked by the preflight.
 ...
 Case case_0000: g1_draft__genome_annotated_strain_g1 + cellobiose + g1_draft__c30_ph5
   samples: 32 simulated, 0 failed
@@ -435,12 +530,21 @@ Case case_0000: g1_draft__genome_annotated_strain_g1 + cellobiose + g1_draft__c3
     final_substrate_remaining          25.34 [4.461, 67.46] millimolar (n=32)
     final_substrate_degraded_fraction  0.1056 [0.05378, 0.2058] dimensionless (n=32)
     ...
+
+Case case_0001: g1_draft__genome_annotated_strain_g1 + cellobiose + g1_draft__c40_ph5
+  not simulated: blocked_by_preflight: the exploratory-mode preflight reports underparameterized (blocking reason missing_inputs; next action measure_or_curate_missing_inputs). ...
+...
+Partial run: 1 of 2 requested case(s) were blocked by the preflight and not simulated (case_0001); exit code 4.
 ```
 
 The spread comes from the other organism's assay concentration range, which
 the transfer keeps as a range; it describes that input range, not a
-calibrated uncertainty of this fungus. In scientific mode the same case is
-refused with exit code 3, because transferred values are estimates.
+calibrated uncertainty of this fungus. The 30 degC case is the first case of
+the request, so a run of `--condition c30_ph5` alone with the same seed gives
+the same samples, byte for byte. Without `--runnable-only` the command
+simulates nothing and exits with 3. In scientific mode no case of this draft
+is runnable (the transferred values are estimates), so the command exits with
+3 even with the flag.
 
 A condition that a temperature or pH law reaches from the measured one (see
 [assembling](user-data.md#assembling-fungus-substrate-and-conditions)) is
@@ -642,6 +746,8 @@ with `--aliases`, the aliases that `--fungus`, `--substrate` and
   used is printed first.
 - `--report` adds the HTML report and `index.html`; the Markdown report is
   always written. `--no-plots` skips the quick-look figures.
+- `--runnable-only` is an explicit opt-in: without it a request with a
+  blocked case simulates nothing (exit code 3), as before.
 - `assemble` and `draft-kinetics` require `--dataset-id`; `fit` names the
   fitted dataset `<input id>_fitted` (the API's default) unless
   `--fitted-dataset-id` is given. All three require a new or empty
@@ -659,4 +765,5 @@ with `--aliases`, the aliases that `--fungus`, `--substrate` and
 | 0 | Success (`preflight`: every case is runnable). |
 | 1 | The simulation failed after a passing preflight. |
 | 2 | Usage or input error: missing or invalid arguments, unknown or ambiguous names, an invalid registry or user dataset (including unfilled `REVIEW:` fields), a draft the API refuses (`UserTablesSourceError`, `UserTablesAssemblyError`), a refused fit (`UserDataFitError`: not identified, not converged, invalid bounds), a refused time-course comparison (printed after the complete simulation bundle), a non-empty output directory. Issues that carry a file, row and column are printed as `file:row:column: message`. |
-| 3 | The preflight blocks at least one requested case in the requested mode; nothing is simulated. |
+| 3 | The preflight blocks at least one requested case in the requested mode; nothing is simulated (with `--runnable-only`: no requested case is runnable). |
+| 4 | Partial run (`run --runnable-only`): the runnable cases were simulated and the bundle written; the blocked cases are listed with their measurement requests and marked `not_simulated` in the tables. |

@@ -2,12 +2,14 @@
 
 ``fungmod run`` resolves the names on the registry (with an optional user
 dataset overlaid in memory), runs the modelability preflight, simulates when
-every requested case is runnable in the requested mode, and writes the
-standard output bundle: tables, manifest, Markdown report and, with
-``--report``, the HTML report; with ``--compare-timecourses`` it also compares
-the simulation with the user dataset's time courses. ``fungmod preflight``
-stops after the preflight, ``fungmod check-data`` validates a user dataset
-directory, and ``fungmod list`` shows what can be named.
+every requested case is runnable in the requested mode (with
+``--runnable-only``, the runnable cases of a request whose other cases are
+blocked), and writes the standard output bundle: tables, manifest, Markdown
+report and, with ``--report``, the HTML report; with ``--compare-timecourses``
+it also compares the simulation with the user dataset's time courses.
+``fungmod preflight`` stops after the preflight, ``fungmod check-data``
+validates a user dataset directory, and ``fungmod list`` shows what can be
+named.
 
 The user-data workflow: ``fungmod assemble`` drafts one reviewable user
 dataset for a fungus on substrates at conditions from the sources a user has
@@ -27,7 +29,9 @@ that is not given leaves the API's own default (stated in the help) in place.
 
 Exit codes: 0 success; 1 the simulation failed after a passing preflight;
 2 usage or input error (including invalid user data, a refused draft and a
-refused fit); 3 the preflight blocks a requested case in the requested mode.
+refused fit); 3 the preflight blocks a requested case in the requested mode and
+nothing is simulated; 4 partial run: with ``--runnable-only`` the runnable
+cases were simulated and the blocked ones are listed as not simulated.
 """
 
 from __future__ import annotations
@@ -47,7 +51,7 @@ from typing import Any, cast
 
 from fungal_model import __version__
 from fungal_model.api.environment_grid import EnvironmentGrid, environment_grid
-from fungal_model.api.result_tables import preflight_policy
+from fungal_model.api.result_tables import CASE_STATUS_NOT_SIMULATED, preflight_policy
 from fungal_model.api.user_data import (
     FIT_ERROR_MODELS,
     REVIEW_MARKER,
@@ -56,7 +60,12 @@ from fungal_model.api.user_data import (
     UserDataset,
     load_user_dataset,
 )
-from fungal_model.api.user_data_assembly import AssembledTablesDraft, assemble_user_tables
+from fungal_model.api.user_data_assembly import (
+    STATUS_CONFLICT,
+    STATUS_GAP,
+    AssembledTablesDraft,
+    assemble_user_tables,
+)
 from fungal_model.api.user_data_fit import TimecourseComparison, UserDataFitError, UserDatasetFit, fit_user_dataset
 from fungal_model.api.user_data_sources import (
     DESIGN_QUANTITIES,
@@ -79,6 +88,14 @@ EXIT_OK = 0
 EXIT_SIMULATION_FAILED = 1
 EXIT_USAGE = 2
 EXIT_NOT_RUNNABLE = 3
+EXIT_PARTIAL = 4
+
+RUNNABLE_ONLY_HELP = (
+    "simulate the runnable cases when the preflight blocks others (VirtualExperiment.simulate(blocked=\"report\")): "
+    "the blocked cases are not simulated, are listed with their measurement requests and appear in the tables as "
+    f"not_simulated, and the exit code is {EXIT_PARTIAL} (partial run); when no case is runnable nothing is "
+    f"simulated (exit {EXIT_NOT_RUNNABLE})"
+)
 
 MODE_CHOICES = ("exploratory", "scientific")
 EXPLORATORY_MODE_HELP = (
@@ -113,7 +130,8 @@ exit codes:
   0  success
   1  the simulation failed after a passing preflight
   2  usage or input error (unknown names, invalid user data, a refused draft or fit, missing arguments)
-  3  the preflight blocks a requested case in the requested mode
+  3  the preflight blocks a requested case in the requested mode; nothing is simulated
+  4  partial run (run --runnable-only): the runnable cases were simulated, the blocked ones are listed
 
 examples:
   fungmod list --aliases
@@ -130,6 +148,7 @@ user-data workflow (see docs/cli.md):
   fungmod check-data my_draft
   fungmod run --user-data my_draft --fungus NAME --substrate NAME --condition CONDITION_ID \\
       --mode exploratory --samples 32 --seed 1 --output runs/mine --compare-timecourses
+  (add --runnable-only when the draft has gaps: the runnable cases run, the gaps are listed, exit code 4)
   fungmod fit my_draft --case STRAIN_ID ENZYME_CLASS SUBSTRATE_ID --fit km 10 5000 uM \\
       --fit kcat 1 300 1/min --output my_draft_fitted
 """
@@ -244,7 +263,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="preflight, simulate and write tables, manifest and report",
         description=(
             "Preflight every fungus x substrate x condition case, then simulate when every case is runnable "
-            "in the requested mode and write the standard output bundle."
+            "in the requested mode (with --runnable-only: the runnable cases, listing the blocked ones) and write "
+            "the standard output bundle."
         ),
         epilog=_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -278,6 +298,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip the quick-look PNG figures; tables, manifest and report are still written",
     )
+    run.add_argument("--runnable-only", action="store_true", help=RUNNABLE_ONLY_HELP)
     run.add_argument(
         "--compare-timecourses",
         action="store_true",
@@ -775,9 +796,11 @@ def _run(args: argparse.Namespace) -> int:
     _print_experiment(study)
     reports = study.preflight(mode=mode)
     blocked = _print_preflight(reports, mode=mode)
+    partial = bool(blocked) and args.runnable_only and len(blocked) < len(reports)
     if blocked:
-        _print_blocked(blocked, total=len(reports), mode=mode, command="run")
-        return EXIT_NOT_RUNNABLE
+        _print_blocked(blocked, total=len(reports), mode=mode, command="run", runnable_only=args.runnable_only)
+        if not partial:
+            return EXIT_NOT_RUNNABLE
     try:
         result = study.simulate(
             mode=mode,
@@ -785,6 +808,7 @@ def _run(args: argparse.Namespace) -> int:
             seed=args.seed,
             output_dir=output,
             quicklook=not args.no_plots,
+            blocked="report" if args.runnable_only else "refuse",
         )
         report_path = result.write_report(include_html=args.report, include_index=args.report)
     except (RegistryScreenSimulationError, VirtualExperimentError) as exc:
@@ -802,6 +826,14 @@ def _run(args: argparse.Namespace) -> int:
             )
             raise _user_data_error(exc) from exc
         _print_comparison(comparison)
+    if result.partial_run:
+        blocked_ids = ", ".join(case["case_id"] for case in result.blocked_cases())
+        print()
+        print(
+            f"Partial run: {len(result.blocked_reports)} of {len(result.preflight_reports)} requested case(s) were "
+            f"blocked by the preflight and not simulated ({blocked_ids}); exit code {EXIT_PARTIAL}."
+        )
+        return EXIT_PARTIAL
     return EXIT_OK
 
 
@@ -1366,14 +1398,30 @@ def _report_item_lines(report: ModelabilityReport, policy: Mapping[str, Any]) ->
     return lines
 
 
-def _print_blocked(blocked: Sequence[ModelabilityReport], *, total: int, mode: str, command: str) -> None:
+def _print_blocked(
+    blocked: Sequence[ModelabilityReport], *, total: int, mode: str, command: str, runnable_only: bool = False
+) -> None:
     print()
     print(f"Not runnable: {len(blocked)} of {total} case(s) cannot be simulated in {mode} mode.")
-    if command == "run":
+    some_runnable = len(blocked) < total
+    if command == "run" and runnable_only and some_runnable:
+        print(
+            f"--runnable-only: simulating the {total - len(blocked)} runnable case(s); the blocked case(s) are not "
+            "simulated and are listed in case_summary.csv as not_simulated, with their missing inputs in "
+            "missing_parameters.csv and their measurement requests in suggested_experiments.csv."
+        )
+    elif command == "run":
         print(
             "Nothing was simulated: FungMod simulates only when every requested case passes the preflight. "
             "Supply the missing inputs, choose other cases, or check the mode."
         )
+        if runnable_only:
+            print("--runnable-only has nothing to simulate: no requested case is runnable.")
+        elif some_runnable:
+            print(
+                f"Add --runnable-only to simulate the {total - len(blocked)} runnable case(s) and list the blocked "
+                f"one(s) as not simulated (exit code {EXIT_PARTIAL})."
+            )
     if mode == "scientific":
         print(
             "Scientific simulation requires exact, non-exploratory, non-toy modelable cases. Scientific means "
@@ -1387,7 +1435,7 @@ def _print_blocked(blocked: Sequence[ModelabilityReport], *, total: int, mode: s
             print(f"  - {request}")
     else:
         print("No measurement request applies: the blocking reasons above are not missing parameter values.")
-    if command == "run":
+    if command == "run" and not (runnable_only and some_runnable):
         print("Run `fungmod preflight` with the same arguments and --output DIR to write the preflight tables.")
 
 
@@ -1396,7 +1444,8 @@ def _print_run_summary(result: DegradationScreenResult, *, report_path: Path, ht
     manifest_path = root / "output_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     tables: Mapping[str, str] = manifest["tables"]
-    cases = result.case_summary()
+    all_cases = result.case_summary()
+    cases = [case for case in all_cases if case["case_status"] != CASE_STATUS_NOT_SIMULATED]
     print()
     if result.mode == "exploratory":
         print(
@@ -1405,16 +1454,24 @@ def _print_run_summary(result: DegradationScreenResult, *, report_path: Path, ht
         )
     else:
         print(f"Simulated {len(cases)} case(s) in scientific mode: one exact run per case.")
+    if manifest["partial_run"]:
+        print(
+            f"Partial run: {manifest['simulated_case_count']} of {manifest['requested_case_count']} requested case(s) "
+            "simulated; the others were blocked by the preflight."
+        )
     print(f"Run label: {manifest['run_label']}")
     if manifest["scientific_mode_note"]:
         print(manifest["scientific_mode_note"])
     final_metrics = result.final_metrics()
     threshold_times = result.threshold_times()
     summary_metrics = result.summary_metrics()
-    for case in cases:
+    for case in all_cases:
         case_id = case["case_id"]
         print()
         print(f"Case {case_id}: {case['fungus_id']} + {case['substrate_id']} + {case['environment_id']}")
+        if case["case_status"] == CASE_STATUS_NOT_SIMULATED:
+            print(f"  not simulated: {case['not_simulated_reason']}")
+            continue
         print(f"  samples: {case['sample_count']} simulated, {case['sample_failure_count']} failed")
         response = case["environment_response_model"]
         effect = case["environment_effect_status"]
@@ -1665,17 +1722,51 @@ def _print_assembly_next_steps(draft: AssembledTablesDraft, output: Path) -> Non
     listed = [item for item in report["requested_conditions"] if item["in_conditions_csv"]]
     grid = [item for item in report["requested_conditions"] if not item["in_conditions_csv"]]
     commands = []
+    notes = []
     if listed:
         conditions = [part for item in listed for part in ("--condition", shell_quote(item["condition_id"]))]
-        commands.append(" ".join(("fungmod run", *selection, *conditions)))
+        command, note = _assembly_run_command(report, selection, conditions, [item["condition_id"] for item in listed])
+        commands.append(command)
+        notes.extend(note)
     for item in grid:
         values = item["environment_grid"]
         grid_parts = [
             *(part for value in values["temperature_C"] for part in ("--temperature-c", _value_text(value))),
             *(part for value in values["ph"] for part in ("--ph", _value_text(value))),
         ]
-        commands.append(" ".join(("fungmod run", *selection, *grid_parts)))
-    _print_next_steps(draft, output, commands)
+        command, note = _assembly_run_command(report, selection, grid_parts, [item["condition_id"]])
+        commands.append(command)
+        notes.extend(note)
+    _print_next_steps(draft, output, commands, notes)
+
+
+def _assembly_run_command(
+    report: Mapping[str, Any], selection: Sequence[str], conditions: Sequence[str], condition_ids: Sequence[str]
+) -> tuple[str, list[str]]:
+    """The ``fungmod run`` command for some conditions of a draft, with ``--runnable-only`` when a case is a gap.
+
+    A gap or conflict case has no kinetics in the draft, so once loaded its roles are explicit gaps and the
+    preflight blocks it; without ``--runnable-only`` the whole command would then simulate nothing (exit 3).
+    """
+
+    gaps = [
+        case
+        for case in report["cases"]
+        if case["condition"] in condition_ids and case["kinetics_status"] in {STATUS_GAP, STATUS_CONFLICT}
+    ]
+    if not gaps:
+        return " ".join(("fungmod run", *selection, *conditions)), []
+    listed = "; ".join(
+        f"{case['enzyme_class']} on {case['substrate_id']} at {case['condition']} ({case['kinetics_status']})"
+        for case in gaps
+    )
+    note = (
+        f"--runnable-only because {len(gaps)} case(s) of this command have no kinetics in the draft ({listed}): "
+        "the preflight blocks them, so without the flag nothing is simulated (exit code 3); with it the runnable "
+        f"cases are simulated and the blocked ones are listed with their measurement requests (exit code "
+        f"{EXIT_PARTIAL})."
+    )
+    return " ".join(("fungmod run", *selection, *conditions, "--runnable-only")), [note]
 
 
 def _print_draft_next_steps(draft: UserTablesDraft, output: Path) -> None:
@@ -1684,7 +1775,9 @@ def _print_draft_next_steps(draft: UserTablesDraft, output: Path) -> None:
     _print_next_steps(draft, output, [command])
 
 
-def _print_next_steps(draft: UserTablesDraft, output: Path, commands: Sequence[str]) -> None:
+def _print_next_steps(
+    draft: UserTablesDraft, output: Path, commands: Sequence[str], notes: Sequence[str] = ()
+) -> None:
     directory = shell_quote(str(output))
     step = 1
     print()
@@ -1700,6 +1793,8 @@ def _print_next_steps(draft: UserTablesDraft, output: Path, commands: Sequence[s
     for command in commands:
         print(f"     {command} \\")
         print("       --mode exploratory --samples N --seed S --output RUN_DIR")
+    for note in notes:
+        print(f"     {note}")
 
 
 def _print_fit(fit: UserDatasetFit) -> None:

@@ -96,7 +96,10 @@ case, the limitations count and where the provenance and limitations tables
 are. `--mode`, and in exploratory mode `--samples` and `--seed`, are
 required, because there is no hidden default; scientific mode means exact
 inputs and implemented mechanisms, not experimental validation. A case the
-preflight blocks exits with code 3 and its measurement requests.
+preflight blocks exits with code 3 and its measurement requests; with
+`--runnable-only` the runnable cases are simulated, the blocked ones are
+listed as not simulated with their measurement requests, and the exit code
+is 4 (a partial run).
 `fungmod preflight`, `fungmod check-data DIR` and `fungmod list` cover the
 other steps ([command line](docs/cli.md)).
 
@@ -117,8 +120,12 @@ fungmod assemble --fungus "My strain" --substrate cellobiose \
 # fill the REVIEW: fields it lists (my_strain/review.md explains each), then
 fungmod check-data my_strain
 fungmod run --user-data my_strain --fungus "My strain" --substrate cellobiose \
-  --condition c30_ph5 --mode exploratory --samples 32 --seed 1 --output runs/my_strain
+  --condition c30_ph5 --condition c40_ph5 --runnable-only \
+  --mode exploratory --samples 32 --seed 1 --output runs/my_strain
 ```
+
+`assemble` prints the `run` command with `--runnable-only` when the draft has
+gaps, so that the cases with kinetics run while the gaps are reported.
 
 `fungmod draft-kinetics SOURCE --provider sabiork` drafts tables from
 SABIO-RK entries alone ([user-data workflow](docs/cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
@@ -137,7 +144,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
 | Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) on dissolved substrates, or kcat or Vmax as an apparent Michaelis-Menten law on one suspended solid polymer in dry mass per volume (the enzyme as protein mass, assay activity or a dose per gram of substrate, with an optional conversion-dependent reactivity exponent), plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
-| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts; the user-data workflow `assemble` (fungus X on substrate Y at conditions Z from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's status and the `REVIEW:` fields), `draft-kinetics`, `check-data`, `run --compare-timecourses` and `fit`, with nothing fetched ([command line](docs/cli.md)) |
+| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts (`--runnable-only`: the runnable cases of a request with gaps, exit code 4); the user-data workflow `assemble` (fungus X on substrate Y at conditions Z from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's status and the `REVIEW:` fields), `draft-kinetics`, `check-data`, `run --compare-timecourses` and `fit`, with nothing fetched ([command line](docs/cli.md)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
@@ -893,8 +900,9 @@ configured conservation diagnostics copied from existing per-sample
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
-In output schema `2.0.0` (current: `2.1.0`, which adds the on-request
-`timecourse_comparison.csv`), `time_series_long.csv` reports `degradation_rate`
+In output schema `2.0.0` (current: `2.2.0`; `2.1.0` added the on-request
+`timecourse_comparison.csv`, `2.2.0` the `case_status` and
+`not_simulated_reason` columns of `case_summary.csv` for partial runs), `time_series_long.csv` reports `degradation_rate`
 as -d[substrate]/dt and `product_release_rate` as +d[product]/dt of the case's
 mapped substrate and product states (source `simulation_state_rate`), each in
 that state's units per time unit. They are read from the per-sample

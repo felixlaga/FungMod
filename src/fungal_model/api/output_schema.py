@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "2.1.0"
+OUTPUT_SCHEMA_VERSION = "2.2.0"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 
@@ -32,7 +32,12 @@ def _column(
 
 COMMON_CASE_COLUMNS = (
     _column("output_schema_version", "Version of this virtual-experiment output schema."),
-    _column("case_id", "Stable case identifier within one output bundle.", semantic_type="identifier"),
+    _column(
+        "case_id",
+        "Stable case identifier within one output bundle: case_<position> in the requested fungus x substrate x "
+        "environment grid, so a case keeps its id when blocked cases are not simulated.",
+        semantic_type="identifier",
+    ),
     _column("fungus_id", "Registry ID for the fungus or enzyme-source record.", semantic_type="identifier"),
     _column("fungus_name", "Display name for the fungus or enzyme-source record."),
     _column("substrate_id", "Registry ID for the substrate record.", semantic_type="identifier"),
@@ -136,7 +141,8 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
         primary_key=("case_id", "item_index"),
     ),
     "case_summary": _table(
-        "One-row simulation summary per case.",
+        "One row per requested case: simulated cases with their sample counts and, in a partial run "
+        "(simulate(blocked=\"report\")), the cases the preflight blocked, marked not_simulated with the reason.",
         (
             *COMMON_CASE_COLUMNS,
             _column("modelability_status", "Preflight modelability status used as a simulation guardrail."),
@@ -144,6 +150,18 @@ OUTPUT_TABLE_SCHEMAS: dict[str, dict[str, Any]] = {
             _column("sample_failure_count", "Number of failed samples.", semantic_type="integer"),
             _column("simulated", "Whether at least one sample was simulated.", semantic_type="boolean"),
             _column("preflight_guardrail", "Guardrail family applied before simulation."),
+            _column(
+                "case_status",
+                "Whether the case was simulated, or blocked by the preflight and not simulated (schema 2.2.0). "
+                "A not_simulated case has no row in the per-sample tables.",
+                allowed_values="simulated; not_simulated",
+            ),
+            _column(
+                "not_simulated_reason",
+                "Why a not_simulated case was not simulated: preflight mode, status, blocking reason and next "
+                "action (schema 2.2.0); blank for simulated cases.",
+                required=False,
+            ),
         ),
         primary_key=("case_id",),
     ),

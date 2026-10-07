@@ -14,7 +14,14 @@ from fungal_model.api.environment_grid import EnvironmentCase, EnvironmentGrid
 from fungal_model.api.output_schema import OUTPUT_SCHEMA_VERSION
 from fungal_model.api.quicklook import write_quicklook_plots as write_quicklook_plot_files
 from fungal_model.api.report import write_virtual_experiment_report
-from fungal_model.api.result_tables import WrittenTables, write_preflight_tables, write_standard_tables
+from fungal_model.api.result_tables import (
+    WrittenTables,
+    not_simulated_reason,
+    preflight_policy,
+    standard_case_id,
+    write_preflight_tables,
+    write_standard_tables,
+)
 from fungal_model.api.user_data import UserDataset, load_user_dataset
 from fungal_model.resources import default_registry_path
 from fungal_model.registry.records import ParameterRecord
@@ -31,6 +38,13 @@ if TYPE_CHECKING:
     from fungal_model.api.user_data_fit import TimecourseComparison
 
 VirtualExperimentMode = Literal["exploratory", "scientific"]
+BlockedCasePolicy = Literal["refuse", "report"]
+"""What ``VirtualExperiment.simulate`` does when the preflight blocks some requested cases.
+
+``"refuse"`` (the default) simulates nothing and raises; ``"report"`` simulates
+the runnable cases and lists the blocked ones in the outputs as not simulated.
+"""
+BLOCKED_CASE_POLICIES: tuple[BlockedCasePolicy, ...] = ("refuse", "report")
 DEFAULT_REGISTRY_REFERENCE = "data_registry/registry_index.yml"
 USER_DATASET_GENOME_RESOLUTION_FILE = "user_dataset_genome_resolution.json"
 # Genome-resolution lists of a user dataset that ``VirtualExperiment.to_dict`` carries beside
@@ -211,16 +225,38 @@ class VirtualExperiment:
         seed: int | None = None,
         output_dir: str | Path = "outputs/virtual_experiment",
         quicklook: bool = True,
+        blocked: BlockedCasePolicy = "refuse",
     ) -> "DegradationScreenResult":
-        """Run registry cases and write standard virtual-experiment tables."""
+        """Run registry cases and write standard virtual-experiment tables.
+
+        Every requested case is preflighted in ``mode`` first; a case runs only
+        when ``preflight_policy`` allows simulation in that mode (scientific:
+        ``modelable``; exploratory: ``modelable`` or ``exploratory``).
+        ``blocked`` says what happens when some cases are blocked:
+
+        - ``"refuse"`` (default): nothing is simulated and
+          ``VirtualExperimentError`` lists the blocked reports.
+        - ``"report"``: a partial run. Only the runnable cases are simulated
+          (``simulate_screen(cases=...)``, in grid order); the blocked cases
+          are not simulated and are listed in the tables as ``not_simulated``
+          with their status, missing items and measurement requests, and in
+          the summary, manifest and report, which say that the run is partial.
+          A case keeps its grid position as ``case_id`` and its seed, so its
+          samples are the ones a full run of the same request gives. When no
+          case is runnable, it refuses exactly as ``"refuse"`` does.
+        """
 
         _validate_simulation_mode(mode)
+        _validate_blocked_policy(blocked)
         reports = self.preflight(mode=mode)
-        allowed_statuses = {"modelable"} if mode == "scientific" else {"modelable", "exploratory"}
-        blocked = tuple(report for report in reports if report.status not in allowed_statuses)
-        if blocked:
-            statuses = ", ".join(report.summary() for report in blocked)
-            details = json.dumps([report.to_dict() for report in blocked], sort_keys=True)
+        runnable = tuple(bool(preflight_policy(report)["simulation_allowed_for_mode"]) for report in reports)
+        blocked_cases = {
+            index: report for index, (report, allowed) in enumerate(zip(reports, runnable, strict=True)) if not allowed
+        }
+        if blocked_cases and (blocked == "refuse" or not any(runnable)):
+            blocked_reports = tuple(blocked_cases.values())
+            statuses = ", ".join(report.summary() for report in blocked_reports)
+            details = json.dumps([report.to_dict() for report in blocked_reports], sort_keys=True)
             if mode == "scientific":
                 message = (
                     "Scientific simulation requires exact, non-exploratory, non-toy modelable cases. "
@@ -241,6 +277,16 @@ class VirtualExperiment:
             seed=seed,
             output_dir=root,
             mode=mode,
+            # A partial run selects the runnable cases in grid order; a full run keeps the whole grid.
+            cases=(
+                tuple(
+                    (report.fungus_id, report.substrate_id, report.environment_id)
+                    for report, allowed in zip(reports, runnable, strict=True)
+                    if allowed
+                )
+                if blocked_cases
+                else None
+            ),
         )
         result = DegradationScreenResult(
             experiment=self,
@@ -250,6 +296,8 @@ class VirtualExperiment:
             output_directory=str(root),
             preflight_reports=reports,
             screen_result=screen,
+            blocked_policy=blocked,
+            blocked_reports=blocked_cases,
         )
         result.write_tables()
         if quicklook:
@@ -296,9 +344,42 @@ class DegradationScreenResult:
     screen_result: RegistryScreenResult
     tables: WrittenTables | None = None
     quicklook_paths: tuple[str, ...] = field(default_factory=tuple)
+    blocked_policy: BlockedCasePolicy = "refuse"
+    blocked_reports: Mapping[int, ModelabilityReport] = field(default_factory=dict)
+    """Preflight reports of the requested cases that were blocked and not simulated, by grid position."""
+
+    @property
+    def partial_run(self) -> bool:
+        """Whether some requested cases were blocked by the preflight and not simulated."""
+
+        return bool(self.blocked_reports)
+
+    def blocked_cases(self) -> list[dict[str, Any]]:
+        """Return the blocked, not simulated cases with status, missing items and measurement requests."""
+
+        cases: list[dict[str, Any]] = []
+        for index, report in sorted(self.blocked_reports.items()):
+            policy = preflight_policy(report)
+            cases.append(
+                {
+                    "case_id": standard_case_id(index),
+                    "fungus_id": report.fungus_id,
+                    "substrate_id": report.substrate_id,
+                    "environment_id": report.environment_id,
+                    "assessment_mode": report.mode,
+                    "status": report.status,
+                    "blocking_reason": policy["blocking_reason"],
+                    "recommended_next_action": policy["recommended_next_action"],
+                    "missing": [item.item_id for item in report.missing],
+                    "incompatible": [item.item_id for item in report.incompatible],
+                    "suggested_experiments": list(report.suggested_experiments),
+                    "not_simulated_reason": not_simulated_reason(report),
+                }
+            )
+        return cases
 
     def write_tables(self, output_dir: str | Path | None = None) -> WrittenTables:
-        """Write standard API-001 CSV tables."""
+        """Write standard API-001 CSV tables (blocked cases of a partial run included)."""
 
         destination = Path(output_dir) if output_dir is not None else Path(self.output_directory)
         self.tables = write_standard_tables(
@@ -306,6 +387,7 @@ class DegradationScreenResult:
             registry=self.experiment.registry,
             preflight_reports=self.preflight_reports,
             output_dir=destination,
+            blocked_reports=self.blocked_reports,
         )
         return self.tables
 
@@ -504,6 +586,7 @@ class DegradationScreenResult:
             "output_directory": str(root),
             "user_dataset_id": self.experiment.user_dataset_id,
             "user_dataset_digest": self.experiment.user_dataset_digest,
+            **self._run_scope(),
             "tables": None if self.tables is None else self.tables.to_dict(),
             "quicklook_paths": list(self.quicklook_paths),
             "files": [*files, destination.name],
@@ -520,9 +603,21 @@ class DegradationScreenResult:
             "seed": self.seed,
             "output_directory": self.output_directory,
             "preflight": [report.to_dict() for report in self.preflight_reports],
+            **self._run_scope(),
             "screen_summary": self.screen_result.to_dict(),
             "tables": None if self.tables is None else self.tables.to_dict(),
             "quicklook_paths": list(self.quicklook_paths),
+        }
+
+    def _run_scope(self) -> dict[str, Any]:
+        """Which requested cases ran: the blocked-case policy, the counts and the blocked cases."""
+
+        return {
+            "blocked_policy": self.blocked_policy,
+            "partial_run": self.partial_run,
+            "requested_case_count": len(self.preflight_reports),
+            "simulated_case_count": len(self.screen_result.case_results),
+            "blocked_cases": self.blocked_cases(),
         }
 
     def _table_rows(self, table_name: str, filename: str) -> list[dict[str, str]]:
@@ -716,7 +811,14 @@ def _validate_simulation_mode(mode: str) -> None:
         raise VirtualExperimentError("simulation mode must be one of: exploratory, scientific.")
 
 
+def _validate_blocked_policy(blocked: str) -> None:
+    if blocked not in BLOCKED_CASE_POLICIES:
+        raise VirtualExperimentError(f"blocked must be one of: {', '.join(BLOCKED_CASE_POLICIES)}.")
+
+
 __all__ = [
+    "BLOCKED_CASE_POLICIES",
+    "BlockedCasePolicy",
     "DegradationScreenResult",
     "VirtualExperiment",
     "VirtualExperimentError",

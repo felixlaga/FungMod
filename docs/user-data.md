@@ -118,6 +118,14 @@ From a shell, `fungmod assemble --fungus ... --substrate ... --temperature-c
 --kinetics-source ... --entry-id 35622 --dataset-id ... --output ...` writes the
 same draft and prints the per-case report, the `REVIEW:` fields and the next
 commands ([command line](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
+When a case of the draft is a `gap` or a `conflict`, the printed `fungmod
+run` command carries `--runnable-only` and a line says why: once loaded, that
+case's kinetic constants are explicit gaps, so the preflight blocks it, and
+without the flag the whole command would simulate nothing (exit code 3).
+With it the runnable cases are simulated and the gaps are listed with their
+measurement requests (exit code 4, a
+[partial run](concepts/outputs.md#partial-runs)); in Python the same is
+`study.simulate(..., blocked="report")`.
 
 With the hand-written annotation of the `genome_case` fixture and the frozen
 Reaction 618 snapshot (`tests/test_user_data_assembly.py`), the strain has
@@ -132,8 +140,11 @@ read "Measure km of beta-glucosidase from Genome-annotated strain G1 on
 Cellobiose at 40 degC, pH 5 (mM); kinetics.csv states kinetic constants of this
 strain, enzyme class and substrate only at c30_ph5 (30 degC, pH 5), and FungMod
 does not reuse kinetics measured at another condition; ...". The draft loads
-once its contributor is filled in, runs in exploratory mode, and is refused in
-scientific mode because the transferred values are estimates.
+once its contributor is filled in. In exploratory mode the request for both
+conditions runs as a partial run (`blocked="report"`, or `--runnable-only`):
+the 30 degC case is simulated and the 40 degC gap is listed as not simulated
+with those requests; without the opt-in the request is refused. In scientific
+mode both cases are refused, because the transferred values are estimates.
 
 ### Inputs
 
