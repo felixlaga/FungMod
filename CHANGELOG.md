@@ -441,6 +441,26 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- A case could be preflighted on one enzyme class and built from another
+  (FIX-SELECT-001). When a fungus listed several enzyme classes acting on one
+  substrate (common once genome annotations or proteomes add classes to a user
+  strain), `assess_modelability` evaluated every compatible process record and
+  selected one, but kept only its process type; `select_registry_case_compatibility`
+  then took the first compatible record in the fungus's listing order. A case
+  reported modelable on the complete parameters of class B was assembled from
+  class A, listed first: an assembly error after a passing preflight, or a
+  simulation of an enzyme the preflight did not assess. `ModelabilityReport`
+  now records `selected_compatibility_id` and `selected_enzyme_class` (also in
+  `to_dict()`, so in `virtual_experiment_summary.json` and
+  `screen_summary.json`); config assembly, the exploratory and scientific
+  screens and the result tables build the case from exactly that record,
+  checked against the case, and the tables resolve it once per case and refuse
+  a preflight report that selected a different record. A report built without
+  the new fields is resolved only when the case has one candidate record, and
+  refused with the candidates named otherwise. Every shipped case has one
+  candidate: selection, assembled configs and the standard CSV tables are
+  unchanged, and the output schema stays `2.0.0`.
+
 - Degradation and product-release rates in the virtual-experiment tables were
   wrong (FIX-RATES-001). `time_series_long.csv` built `degradation_rate` and
   `product_release_rate` from whichever process rate was listed last at each

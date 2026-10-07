@@ -153,6 +153,143 @@ so that the listed pH-dependent SABIO-RK laws can be imported as laws rather
 than as constants at one pH; then a second frozen SABIO-RK snapshot with Vmax and
 specific-activity entries to test those routes on real data.
 
+## FIX-SELECT-001 One Compatibility Record Per Case, From Preflight To Tables
+
+Status: `complete` for the stated scope (2026-10-07).
+
+Defect: when a fungus lists several enzyme classes that act on one substrate
+(common once genome annotations or UniProt proteomes add classes to a user
+strain), the preflight and config assembly could pick different classes.
+`assess_modelability` evaluated every compatible process record and selected
+one with `max(..., key=_compatibility_evaluation_priority)`
+(`screening/modelability.py:261-273` at `e300702`), but the report kept only
+the selected process type (`:280`, `:304`). `select_registry_case_compatibility`
+(`screening/case_builder.py:449-476`) then walked `fungus.enzyme_classes` in
+listing order and returned the first record of that process type whose bond
+classes fit (`:458`, `:472`). Config assembly (`case_builder.py:175`), both
+screens (`screening/ensemble.py:223`) and five result-table helpers
+(`api/result_tables.py:851, 2182, 2409, 2522, 2577`) used that second rule. A
+case reported modelable on the complete parameters of class B was built from
+class A, listed first: on a test registry, scientific assembly failed with
+"No registry parameter record found for role 'kcat'", both screens failed the
+same way, and a user dataset failed with "Requested registry case mode
+'scientific' disagrees with case template ...esterase_a...". Where class A's
+records had been complete but different, the case would have simulated
+another enzyme than the one assessed, with no error.
+
+Changed:
+
+- `ModelabilityReport` gains `selected_compatibility_id` (the `record_id` of
+  the selected `ProcessCompatibilityRecord`) and `selected_enzyme_class`,
+  both defaulting to `None` and written by `to_dict()`. `assess_modelability`
+  sets them from the record its existing priority rule selects; the rule
+  itself is unchanged.
+- `select_registry_case_compatibility` returns the record the report names,
+  looked up by id and checked against the case (the report's fungus and
+  substrate, its enzyme class, its required process, and membership among the
+  standalone records of the fungus's classes for the substrate's class and
+  bonds); any mismatch is refused with the reasons. It never re-derives the
+  choice. A report without a selected record (built by hand) is resolved only
+  when the case has exactly one candidate record; with several it is refused
+  with each candidate's id, enzyme class and process type; with none it is
+  refused as before.
+- `api/result_tables.py`: `_case_compatibility` resolves the record once per
+  case from the report the screen built the case from and passes it to the
+  role-record, provenance, limitation, suggested-experiment and mechanism
+  helpers, which no longer select on their own. A preflight report that
+  selected a different record is refused (the tables would mix two records);
+  selection failures other than "no compatible record at all" are raised
+  instead of silently dropping rows.
+- Config assembly, `registry_case_config_factory` (the Gelain research
+  factories) and both screens are fixed through
+  `select_registry_case_compatibility` without code changes of their own.
+- Docs: CHANGELOG (Unreleased, Fixed).
+
+Decision on reports without the new fields: no code in the repository builds
+a `ModelabilityReport` by hand; every caller passes a report from
+`assess_modelability`. Keeping the old first-listed rule for such reports
+would preserve the defect for any external caller, so the old behaviour is
+kept only where it cannot differ from the preflight (one candidate) and every
+ambiguous case is refused with the candidates named.
+
+Tests: `tests/test_case_class_selection.py` (new, 21 tests).
+An in-memory copy of the shipped registry adds a labelled test-only source
+listing two esterase classes on one dissolved substrate through
+`homogeneous_michaelis_menten`; class A has an explicit unknown kcat, class B
+complete exact test-only values. In both listing orders and both modes the
+preflight selects B and records it; scientific assembly, the exploratory and
+the scientific screens build from B's compatibility, template and parameter
+records (sample config provenance, `provenance_table.csv`,
+`sampled_parameters.csv`, `mechanism_summary.csv`), and A's records appear in
+no table except as an assessed candidate in `modelability_items.csv`. The
+table writer refuses a preflight report naming A. Hand-built reports: refused
+with both candidates named when ambiguous, resolved when the user-data
+esterase fixture has one candidate; a report with no compatible record, a
+missing record id, a wrong enzyme class, a component-only record, a process
+type outside the report and a report for another fungus are refused.
+Non-specific case: a user dataset (`load_user_dataset`, as the user-data route
+generates records) whose strain lists an estimate-only class A and a
+literature-style class B on one substrate; scientific mode selects and builds
+B, exploratory mode may select either, and in each mode the screen and tables
+use the record that mode's preflight selected. Shipped registry: for every
+fungus, substrate, environment and mode, the recorded selection equals the
+single candidate the old rule returned.
+Before the fix (source stashed, tests kept): 20 of 21 failed. The behavioural
+failures were the assembly and screen errors quoted above for class A listed
+first, the user-dataset mode error, and the ambiguous hand-built report, which
+the old code resolved silently to class A ("DID NOT RAISE"); with B listed
+first the old code already built B and failed only on the missing report
+fields.
+
+Commands: `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`
+(all checks passed); `pyright` on the changed files and on the whole project
+(0 errors); `mkdocs build --strict` (passed; `site/` removed); the new tests
+with the modelability, case-builder, config-driven assembly,
+virtual-experiment, user-data, guardrail, documentation-sync and hygiene
+suites (182 passed) and the registry-case, ensemble, CLI and state-rate suites
+(204 passed); the full suite (2093 passed in 31 min).
+
+Not changed: the selection rule, process laws, parameter resolution, templates,
+registry records, the CSV tables, the output schema (`2.0.0`) and the command
+line. A before/after comparison of all 2604 fungus, substrate, environment and
+mode combinations of the shipped registry and both user-data fixtures gave
+identical selections, report contents (apart from the two new keys) and
+assembled configs, and six simulated cases (Reaction 618 re-entry scientific,
+Reaction 618, BGL1A pH 5, the enzyme chain and the esterase fixture
+exploratory, *T. harzianum* scientific) gave byte-identical CSV tables.
+
+Scientific impact: multi-class cases now simulate the enzyme class the
+preflight assessed. No shipped case changes; earlier results from user or
+in-memory registries in which a fungus lists several classes acting on one
+substrate may have been built from a different class than the preflight
+reported, and should be re-run.
+
+Backward compatibility: additive fields with defaults; a report built without
+them still resolves single-candidate cases. Ambiguous hand-built reports, and
+reports whose selected record does not fit the case, are now refused instead
+of silently taking the first listed class. `virtual_experiment_summary.json`
+(`preflight`) and `screen_summary.json` (`modelability_report`) gain the two
+keys; no CSV table or schema version changes.
+
+Ambiguities and limitations: the existing priority rule breaks ties by listing
+order (equal status, template presence and known-item count), so two equally
+assessable classes still resolve to the first listed; the choice is now
+recorded and every consumer follows it, but it is not a scientific preference.
+In the user-dataset test, exploratory mode selects the estimate-only class A
+over the literature-style class B for that reason alone.
+The selected record is visible in `provenance_table.csv` (process
+compatibility row) for simulated cases, but `modelability_preflight.csv` does
+not name it; adding a column would be a minor schema bump.
+
+Risk: low. Shipped selections, configs and tables are unchanged; the new
+refusals affect only reports that were inconsistent or ambiguous.
+
+Next: decide whether ties between equally assessable classes should be refused
+or resolved by a declared preference, and whether
+`modelability_preflight.csv` should carry `selected_compatibility_id` and
+`selected_enzyme_class` (schema `2.1.0`) so that preflight-only bundles name the
+assessed class.
+
 ## USERDATA-003 Enzyme Repertoire From A Genome Annotation
 
 Status: `complete` for the stated scope (2026-10-06); the third increment of
