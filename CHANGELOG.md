@@ -6,6 +6,36 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Enzyme repertoire from a UniProt proteome in user data (USERDATA-007): a
+  `genomes.csv` row with `annotation_tool` `UniProt` followed by the release or
+  download date (a missing version is refused) points a strain to a UniProtKB
+  TSV export inside the dataset directory, under the path rules of a dbCAN row;
+  its bytes enter the dataset digest and `min_tools_agreeing` is refused on it.
+  `fungal_model.capability.parse_uniprot_tsv` reads UniProt's own columns
+  (`Entry` required; `EC number` or `CAZy`; `Entry Name`, `Protein names`,
+  `Gene Names`, `Organism`, `Organism (ID)`, `Reviewed` optional; other
+  columns ignored and listed), keeps partial EC numbers partial and refuses
+  missing columns, repeated accessions, malformed cells and more than one
+  organism per file. `resolve_uniprot_proteome` resolves each protein's CAZy
+  families through the existing `CapabilityResolver` and family map and its
+  complete EC numbers through `RegistryResolver.resolve_enzyme_class`; a
+  protein whose two annotations name different classes (compared on the
+  classes the EC side can speak about) supports no class and is listed in
+  `ec_cazy_disagreements` with both sides. Classes with a registry record join
+  the strain, others go to `unmodellable_enzyme_classes`; unmapped families,
+  unresolved and partial EC numbers are listed. No rate is taken from the
+  proteome; gap requests name the proteome, the accessions, the families, the
+  EC numbers and how many entries are reviewed. UniProt entries in the dataset
+  lists and `user_dataset_genome_resolution.json` carry `source_type`
+  `uniprot_proteome` and accessions; dbCAN entries are unchanged.
+  `fungal_model.sources.uniprot` builds the UniProt REST stream URL for a
+  proteome or taxonomy id, fetches only with `refresh=True`, stores a
+  SHA-256-checked snapshot with URL, query, retrieval time and release headers,
+  refuses to overwrite a snapshot with a different digest unless asked, and
+  copies the TSV into a dataset with a suggested `genomes.csv` row; the REST
+  field names were not verified against a live response
+  (`docs/user-data.md#from-a-uniprot-proteome`).
+
 - Enzyme repertoire from a genome annotation in user data (USERDATA-003): an
   optional `genomes.csv` (`strain_id`, `annotation_file`, `annotation_tool`,
   `source`, optional `min_tools_agreeing`) points a strain to a dbCAN

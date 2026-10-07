@@ -37,7 +37,7 @@ A loaded `UserDataset` can be passed as `user_data=` as well; it carries the
 `dataset_id`, a SHA-256 `digest` over the manifest and table bytes, the
 generated registry mappings (`records`) and `to_dict()`.
 
-Four complete examples live in the test fixtures:
+Five complete examples live in the test fixtures:
 `tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on a
 user-defined aryl ester, `kcat` form, estimates only),
 `tests/fixtures/user_data/literature_reentry/` (the published SABIO-RK Reaction
@@ -49,7 +49,9 @@ loading, with cardinal temperature and pH laws in `responses.csv`; estimates
 only) and `tests/fixtures/user_data/genome_case/` (a strain whose enzyme
 classes come only from a hand-written dbCAN overview in `genomes.csv`; a format
 fixture with synthetic gene identifiers, not a real genome, and no kinetic
-values, so every resolved class is a gap).
+values, so every resolved class is a gap). `tests/fixtures/user_data/uniprot_case/`
+does the same from a hand-written UniProtKB TSV export (a format fixture with
+synthetic accessions, not a real proteome).
 
 ## Directory layout
 
@@ -63,8 +65,8 @@ values, so every resolved class is a gap).
 | `conditions.csv` | yes | Assay conditions (temperature and pH). |
 | `kinetics.csv` | yes | Kinetic values, one row per quantity and case. |
 | `responses.csv` | no | Temperature and pH response laws bound to a strain, enzyme class and substrate. |
-| `genomes.csv` | no | A dbCAN genome annotation per strain, from which enzyme classes are resolved. |
-| annotation files | with `genomes.csv` | The dbCAN `overview.txt` files that `genomes.csv` names, anywhere inside the directory. |
+| `genomes.csv` | no | A dbCAN genome annotation or a UniProt proteome export per strain, from which enzyme classes are resolved. |
+| annotation files | with `genomes.csv` | The dbCAN `overview.txt` files and UniProt TSV exports that `genomes.csv` names, anywhere inside the directory. |
 
 Any other CSV file in the directory (for example a time-course table) is
 refused as unsupported in this version rather than ignored. Columns not listed
@@ -341,6 +343,10 @@ strain_id,annotation_file,annotation_tool,source
 strain_g1,annotations/strain_g1_overview.txt,dbCAN 4.1.4,"run_dbcan on the predicted proteome of assembly <accession>, 2026-09-30"
 ```
 
+A row may instead point to a UniProtKB TSV export of the strain's proteome;
+see [From a UniProt proteome](#from-a-uniprot-proteome). The rest of this
+section describes dbCAN rows.
+
 Instead of (or besides) listing a strain's enzyme classes by hand, point it to
 the dbCAN annotation of its genome or proteome. FungMod resolves the
 annotation to enzyme classes with its existing capability resolver and curated
@@ -421,8 +427,9 @@ sources), `genome_resolved_classes`, `unmodellable_enzyme_classes` and
 
 Limits of the genome route:
 
-- dbCAN `overview.txt` only, read from the dataset directory; no other
-  annotation format and no download at run time.
+- A dbCAN row reads a dbCAN `overview.txt` from the dataset directory; the
+  only other format is a UniProtKB TSV export ([below](#from-a-uniprot-proteome)),
+  and nothing is downloaded at run time.
 - Family-level mapping: the curated map covers 18 CAZy families, a
   polyspecific family gives only a candidate class, and the `EC#` column is not
   used. With the shipped registry only `beta_glucosidase` and
@@ -433,6 +440,170 @@ Limits of the genome route:
   expression.
 - The test fixture is a format fixture written by hand; no real genome
   annotation is bundled.
+
+### From a UniProt proteome
+
+Most fungi with a sequenced genome have a UniProt proteome whose entries carry
+EC numbers and CAZy cross-references. A `genomes.csv` row can point to a
+UniProtKB TSV export of that proteome instead of a dbCAN overview, so no
+annotation tool has to be run:
+
+```text
+strain_id,annotation_file,annotation_tool,source
+strain_u1,annotations/strain_u1_uniprot.tsv,UniProt 2026_03,"UniProt proteome UP000xxxxxx, all UniProtKB entries, downloaded 2026-10-01"
+```
+
+**Downloading the export.** On uniprot.org, find the organism's proteome
+(Proteomes, search the organism, open the reference proteome and note its
+`UP...` identifier), then list its UniProtKB entries (the query
+`proteome:UP000xxxxxx`). Choose *Download*, format *TSV*, *Compressed: No*,
+and customise the columns so that the export holds at least `Entry` and one of
+`EC number` and `CAZy`; FungMod also reads `Entry Name`, `Protein names`,
+`Gene Names`, `Organism`, `Organism (ID)` and `Reviewed`, and these are
+worth selecting. The column names are UniProt's own; where each sits in the
+website's column picker may change (the CAZy column is among the
+cross-references to protein family databases). Any other column is allowed and
+ignored; its name is listed under `ignored_columns`. Save the file inside the
+dataset directory.
+
+**The row.**
+
+- `annotation_tool` is `UniProt` (or `UniProtKB`) followed by the UniProt
+  release (for example `2026_03`, shown on the website and in the
+  `X-UniProt-Release` header) or the download date, recorded as written. The
+  export does not record either, so a row without one is refused.
+- `annotation_file` follows the path rules of a dbCAN row: relative to the
+  dataset directory, `/`-separated, no absolute path, no `..`, no symbolic link
+  out of the directory. The file's bytes enter the dataset `digest` and
+  `file_digests`, so changing any byte (even in an ignored column) changes the
+  digest.
+- `source` says which proteome was exported. When it names one UniProt
+  proteome identifier (`UP` followed by digits) that identifier is recorded as
+  `proteome_id` and named in the measurement requests; a `source` naming
+  several identifiers is refused. Without one, requests name the export file.
+- `min_tools_agreeing` counts agreeing dbCAN tool columns; a UniProt export has
+  none, so a value on a UniProt row is refused.
+
+**Reading the export.** `Entry` is required and must be unique; the format of
+an accession is not checked. `EC number` cells hold EC numbers separated by
+`"; "`; a partial number such as `3.2.1.-` is kept as partial and never
+completed or resolved. `CAZy` cells hold family identifiers separated by `;`,
+usually with a trailing `;`; a subfamily suffix is dropped as in the dbCAN
+route (`GH5_5` counts as `GH5`). An export must describe one organism: more
+than one `Organism (ID)` (or, without that column, more than one `Organism`)
+is refused, because mixed sets are not supported. Also refused: a header
+without `Entry` or without both `EC number` and `CAZy`, a repeated header
+column, a malformed EC number or CAZy identifier, a `Reviewed` cell other than
+`reviewed` or `unreviewed`, a gzip-compressed file and an export in which no
+entry has an EC number or a CAZy family.
+
+**Resolution.** Nothing new decides a class. The CAZy families of each
+protein go through the same `CapabilityResolver` and curated family map as a
+dbCAN annotation; each complete EC number goes through the registry's enzyme
+class lookup (`RegistryResolver.resolve_enzyme_class`, which matches the
+`ec_number` of a registry record), so an EC number resolves only to a class
+with a registry record. An EC number no record carries is listed under
+`unresolved_ec_numbers`; one that two records carry is listed there as
+ambiguous, and FungMod picks neither.
+
+**When CAZy and EC disagree.** For a protein that has a mapped CAZy family
+and a complete EC number, FungMod compares the classes its families name with
+the classes its EC numbers resolve to, on every class the EC side can speak
+about: the classes its EC numbers resolve to and every registry class whose
+record carries an EC number. The two disagree when such a class is named by
+one side and not by the other. A disagreeing protein supports **no** class:
+it is listed under `ec_cazy_disagreements` with both sides (families and the
+classes they name, EC numbers and the classes they resolve to, and the
+contested classes), and FungMod does not choose between them. With the
+shipped registry, a GH7 protein annotated EC 3.2.1.21 (GH7 names
+cellobiohydrolase, the EC number beta-glucosidase) and a GH3 protein annotated
+EC 3.2.1.37 only (GH3 names beta-glucosidase, whose record carries EC
+3.2.1.21) both disagree. A protein whose EC numbers resolve to nothing and
+whose family classes carry no registry EC number cannot be compared: its
+family classes count, and its EC numbers are listed as unresolved. Every
+other protein supports the classes its families or EC numbers name, and each
+class records which accessions support it through both annotations
+(`cazy_and_ec`), the families only (`cazy`) or the EC numbers only (`ec`).
+
+**Outcomes.** As for a dbCAN row: a class with a registry record joins the
+strain (an explicit `enzymes.csv` row wins and keeps the proteome evidence
+beside it), a class without one is listed in `unmodellable_enzyme_classes`
+and generates nothing, and a family without a class is listed in
+`unmapped_families`. A class that only EC numbers support has no family
+specificity (`specificity` is `null`). No rate, kinetic constant, enzyme
+concentration or expression level is taken from the proteome: every resolved
+class that can act on a dataset substrate but has no kinetics becomes
+`user_dataset_gap` unknowns whose requests name the evidence:
+
+> Measure km of beta-glucosidase from Proteome-annotated strain U1 on
+> Cellobiose at 30 degC, pH 5.0 (concentration units); the class was inferred
+> from UniProt proteome UP000000000 (accessions X0TEST01, X0TEST02, X0TEST03;
+> CAZy families GH1, GH3; EC 3.2.1.21; 1 of 3 reviewed in Swiss-Prot; family
+> membership is polyspecific, so the activity itself needs confirming).
+
+A request quotes at most ten accessions and says how many more there are; the
+provenance lists all. Preflight is `underparameterized` and scientific and
+exploratory simulation are refused for such a class until kinetics are
+supplied, exactly as for a dbCAN class.
+
+**Outputs.** Every entry a UniProt row adds to `genome_annotations`,
+`genome_resolved_classes`, `unmodellable_enzyme_classes` and
+`unmapped_families` (and so to `virtual_experiment_summary.json` and
+`user_dataset_genome_resolution.json`) carries `source_type`
+`uniprot_proteome` and the accessions behind it (`accessions`,
+`accession_count`; classes also `accessions_by_basis`, `reviewed_accessions`
+and `ec_numbers`). Its `genome_annotations` entry adds the `proteome_id`,
+organism and taxonomy id, the columns read and ignored, `review_counts`,
+`protein_counts` (agreeing, CAZy only, EC only, disagreement, no class),
+`unresolved_ec_numbers`, `partial_ec_numbers`, `ec_cazy_disagreements`,
+`ec_comparable_classes` and the comparison rule. Entries of a dbCAN row keep
+exactly their earlier keys (no `source_type`); a dataset may mix both kinds of
+rows, one per strain.
+
+**Fetching an export on request.** `fungal_model.sources.uniprot` builds the
+UniProt REST stream URL for a proteome identifier or an NCBI taxonomy id and
+fetches it only when you pass `refresh=True`:
+
+```python
+from fungal_model.sources.uniprot import fetch_proteome_snapshot, write_snapshot_to_user_dataset
+
+snapshot = fetch_proteome_snapshot(proteome_id="UP000xxxxxx", refresh=True)
+# https://rest.uniprot.org/uniprotkb/stream?query=(proteome:UP000xxxxxx)
+#   &fields=accession,id,protein_name,gene_names,organism_name,organism_id,ec,xref_cazy,reviewed&format=tsv
+row = write_snapshot_to_user_dataset(snapshot, "path/to/my_dataset", strain_id="strain_u1")
+# row: a genomes.csv row to review and add yourself (genomes.csv is not written)
+```
+
+The response is parsed before it is stored; it is frozen under
+`data/source_snapshots/uniprot/<query>/` (by default) as `uniprotkb.tsv` with
+`snapshot.json` (SHA-256, URL, query, retrieval time, HTTP status and the
+`X-UniProt-Release` and `X-UniProt-Release-Date` headers when sent). Without
+`refresh=True` only that snapshot is read and its digest verified; a missing
+or changed snapshot is refused. A new response whose digest differs from the
+stored one is refused unless you pass `overwrite=True`. A taxonomy id query
+(`organism_id:<id>`) returns every UniProtKB entry of that organism, which may
+be more than its reference proteome. There is no lookup from a free-text
+organism name to a proteome: choosing the proteome is left to you (possible
+future work, which would show candidates rather than guess). The URL and the
+return-field names follow UniProt's REST documentation as known when the
+client was written; they were not checked against a live response in the
+environment it was written in, which could not reach rest.uniprot.org.
+
+Limits of the UniProt route:
+
+- UniProtKB annotation is mostly automatic: unreviewed (TrEMBL) entries carry
+  EC numbers and names assigned by prediction rules. `Reviewed` is reported
+  per class and in each request, never used to filter.
+- A protein in the proteome is not an expressed or secreted enzyme, and the
+  number of accessions is not a copy number or an activity.
+- CAZy cross-references cover only part of a proteome; a protein without one
+  can still be a CAZyme. An export without CAZy cross-references resolves
+  through EC numbers alone.
+- EC numbers resolve only to registry classes that carry an EC number (with
+  the shipped registry, only `beta_glucosidase`), so most EC numbers are
+  listed as unresolved, and an EC number can contradict a family only through
+  such a class.
+- One organism per export; no merging of proteomes or strains.
 
 ## Evidence types, maturity and modes
 
@@ -556,7 +727,8 @@ both appear in `virtual_experiment_summary.json` (under `experiment`) and in
 `output_manifest.json` (`null` without user data). Beside them,
 `virtual_experiment_summary.json` lists `genome_resolved_classes`,
 `unmodellable_enzyme_classes` and `unmapped_families` (empty lists for a
-dataset without `genomes.csv`, `null` without user data), and
+dataset without `genomes.csv`, `null` without user data; entries from a
+UniProt export carry `source_type` and accessions), and
 `VirtualExperiment.write_preflight_report` writes
 `user_dataset_genome_resolution.json` with these lists and the annotations
 read when the dataset has a `genomes.csv`. In the standard tables,
@@ -586,8 +758,9 @@ unchanged.
 - No enzyme cocktails or multi-step chains, no time-course responses or
   fitting, no growth, secretion or uptake.
 - A genome annotation adds enzyme classes, never rates; only dbCAN
-  `overview.txt` files are read, and only classes with a registry record are
-  added (see the limits of the genome route above).
+  `overview.txt` files and UniProtKB TSV exports are read, and only classes
+  with a registry record are added (see the limits of the genome and UniProt
+  routes above).
 - One substrate per substrate class for each enzyme class, because FungMod
   selects a process by enzyme class and substrate class.
 - A namespaced copy of a registry class keeps the parent's EC number, so

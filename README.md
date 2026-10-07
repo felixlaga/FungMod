@@ -1042,7 +1042,13 @@ limitations. An optional `genomes.csv` takes a strain's enzyme classes from
 its dbCAN genome annotation: classes with a registry record join the
 strain, classes without one and unmapped families are reported, and every
 resolved class that can act on a dataset substrate but has no kinetics becomes
-a named measurement request, since no rate is ever taken from a genome.
+a named measurement request, since no rate is ever taken from a genome. A
+`genomes.csv` row can instead point to a UniProtKB TSV export of the strain's
+proteome: its CAZy cross-references resolve through the same family map, its
+EC numbers through the registry, a protein whose two annotations disagree
+supports neither, and the requests name the proteome and accessions.
+`fungal_model.sources.uniprot` fetches such an export only on explicit
+`refresh=True`, into a digest-checked snapshot.
 
 ## Public API
 

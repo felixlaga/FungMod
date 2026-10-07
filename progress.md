@@ -26,6 +26,169 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## USERDATA-007 Enzyme Repertoire From A UniProt Proteome
+
+Status: `complete` for the stated scope (2026-10-06); the second repertoire
+route of the user-supplied-data work. "Fungus X on substrate Y in conditions
+Z" can now take the strain's enzyme classes from a UniProtKB TSV export of its
+proteome, which most users can download in one click, instead of a dbCAN run
+on its genome. FungMod can also fetch that export from the UniProt REST API,
+but only on explicit request. No rate is ever taken from a proteome.
+
+Changed:
+
+- `capability/uniprot.py` (new): `decode_uniprot_tsv` (refuses gzip and
+  non-UTF-8 bytes), `parse_uniprot_tsv` and `resolve_uniprot_proteome`, with
+  `UniprotProteome`, `UniprotEntry`, `ProteomeResolution`,
+  `ProteomeClassSupport` and `EcCazyDisagreement`. The parser reads UniProt's
+  own column names: `Entry` required and unique; at least one of `EC number`
+  (EC numbers separated by "; ", partial numbers such as `3.2.1.-` kept partial)
+  and `CAZy` (identifiers separated by ";", trailing ";" allowed, subfamily
+  suffix dropped as in the dbCAN route); `Entry Name`, `Protein names`, `Gene
+  Names`, `Organism`, `Organism (ID)`, `Reviewed` optional; any other column
+  ignored and listed. Refused: no header, no `Entry`, neither evidence column,
+  repeated header columns, blank, whitespace-bearing or repeated accessions,
+  rows wider than the header, malformed EC numbers or CAZy identifiers,
+  `Reviewed` other than reviewed/unreviewed, a non-numeric taxonomy id, more
+  than one organism per file (mixed sets are not supported) and an export with
+  no EC number or CAZy family. Resolution uses existing machinery only: each
+  protein's families go through `CapabilityResolver` and the curated family map
+  (one `CazymeAnnotation` per protein), each complete EC number through
+  `RegistryResolver.resolve_enzyme_class` (the lookup the SABIO-RK user-table
+  converter of USERDATA-005 uses), so an EC number resolves only to a class with a registry
+  record; an ambiguous EC number resolves to none and is listed with the
+  candidates.
+- EC and CAZy disagreement, precisely: for a protein with a mapped family and a
+  complete EC number, the class sets are compared on every class its EC
+  numbers resolve to and every registry class whose record carries an EC
+  number; they disagree when such a class is named by one side only. A
+  disagreeing protein supports no class and is listed with both sides
+  (families and classes, EC numbers and classes, contested classes); FungMod
+  does not choose. A protein whose EC numbers resolve to nothing and whose
+  family classes carry no registry EC number cannot be compared: its family
+  classes count and its EC numbers are listed as unresolved. Each class
+  records its accessions per basis (`cazy_and_ec`, `cazy`, `ec`), its
+  reviewed accessions, its families, EC numbers and family specificity (`null`
+  when only EC numbers support it).
+- `api/user_data.py` (additive): `annotation_tool` accepts `UniProt` or
+  `UniProtKB` followed by a release or download date (a missing version is
+  refused with its own message; the unknown-tool message now names both
+  routes). A UniProt row goes to `_parse_proteome_row`: the dbCAN path rules
+  (`_annotation_path`), the file bytes in the digest, `min_tools_agreeing`
+  refused, a `UP` identifier in `source` recorded as `proteome_id` (several
+  refused). Classes with a registry record join the strain with
+  `_ProteomeClassEvidence` (an explicit `enzymes.csv` row wins and keeps it);
+  classes without one go to `unmodellable_enzyme_classes`; the
+  `genome_annotations` entry lists unresolved and partial EC numbers,
+  disagreements, protein and review counts, columns read and ignored.
+  Gap requests end with "; the class was inferred from UniProt proteome UP...
+  (accessions ...; CAZy families ...; EC ...; n of m reviewed in Swiss-Prot[;
+  polyspecific note])" (at most ten accessions quoted, all in the
+  provenance). Every UniProt entry carries `source_type` `uniprot_proteome`
+  and accessions, which `virtual_experiment_summary.json` and
+  `user_dataset_genome_resolution.json` pass through unchanged. A strain whose
+  export resolves no registry class is refused, naming unmodellable classes,
+  unmapped families, unresolved EC numbers and disagreeing proteins. dbCAN
+  rows are untouched: their code path, records and report entries are
+  byte-identical (checked against a dump taken before the change).
+- `sources/uniprot.py` (new): `proteome_query`, `organism_query`,
+  `build_stream_url` (the documented stream URL with fields `accession, id,
+  protein_name, gene_names, organism_name, organism_id, ec, xref_cazy,
+  reviewed` and `format=tsv`), `fetch_proteome_snapshot` (network only with
+  `refresh=True`; the response is parsed before it is stored; snapshot
+  `uniprotkb.tsv` plus `snapshot.json` with SHA-256, URL, query, retrieval
+  time, HTTP status and the `X-UniProt-Release` and `X-UniProt-Release-Date`
+  headers; same digest returns the stored snapshot, a different digest is
+  refused unless `overwrite=True`), `load_proteome_snapshot` (digest checked)
+  and `write_snapshot_to_user_dataset` (copies the TSV into a dataset and
+  returns a `genomes.csv` row to review; `genomes.csv` is not written). No
+  free-text organism-to-proteome lookup; named as future work.
+- Docs: `docs/user-data.md` "From a UniProt proteome" (download steps and
+  columns, the row, reading rules, resolution, the disagreement rule,
+  outcomes, outputs, the fetch client, limits), `docs/capabilities.md`,
+  `docs/api.md` (both new modules), README, changelog.
+
+Tests: `tests/test_user_data_uniprot.py` (59 tests) with the fixture
+`tests/fixtures/user_data/uniprot_case/` (a hand-written UniProtKB TSV in
+UniProt's column format; its README says "format fixture; synthetic
+accessions; not a real proteome"; accessions `X0TEST01` to `X0TEST12`,
+placeholder proteome `UP000000000`, taxonomy id `0`). With the shipped
+registry: beta_glucosidase from one agreeing, one CAZy-only and one EC-only
+protein; cellulase_generic from GH5 (its EC 3.2.1.4 not comparable);
+cellobiohydrolase and glucoamylase unmodellable; CBM1 and GT2 unmapped; five
+unresolved EC numbers, one partial; two disagreements (GH7 with EC 3.2.1.21;
+GH3 with EC 3.2.1.37 only) supporting nothing; gap requests name the proteome
+and accessions; preflight `underparameterized` in both modes, both simulation
+modes refused, the preflight JSON carries source type and accessions; user
+estimates run the cellobiose case in exploratory mode; an explicit
+`enzymes.csv` row wins. Non-cellulose case: an in-memory registry with a
+test-only glucoamylase record (EC 3.2.1.3, labelled test-only) makes GH15 with
+EC 3.2.1.3 agree, adds the class and its maltose gaps. Also: EC-only and
+CAZy-only exports, an export without a proteome id or review column, dbCAN and
+UniProt rows in one dataset, dbCAN entries keeping exactly their earlier keys,
+refusals (absolute, escaping and symlinked paths, missing file, missing
+version, `min_tools_agreeing`, two proteome ids, mixed organisms, repeated
+accession, missing `Entry`, a dbCAN overview under a UniProt row, unknown
+tool), a strain with no registry class refused, determinism and the digest
+changing with one byte, no rate-like keys, 15 parser refusals, gzip and
+non-UTF-8 bytes, an ambiguous EC number, and the fetch client with
+`urllib.request.urlopen` patched to fail in every test and a patched response
+where needed (URL built, snapshot written and digest checked, refusal without
+`refresh`, same-digest refresh unchanged, different digest refused unless
+`overwrite`, tampered snapshot refused, unusable responses and network errors
+refused with nothing stored, a fetched snapshot written into a dataset that
+then loads with the suggested row). Guardrails: the two new modules are in the
+no-shortcut high-risk paths and a new no-hardcoding test (no organism, class,
+substrate, EC or fixture token); the user-data token list gains the fixture's
+accessions and proteome id; the public-API test checks the new functions are
+exported from their packages, complete and not top-level.
+
+Commands and results: `ruff check src tests scripts/run_*.py
+scripts/reproduce_paper.py` clean; `pyright` on the four changed source files
+0 errors; `mkdocs build --strict` passes with no warnings; the new tests with
+`tests/test_user_data_*.py`, `tests/test_capability_resolution.py`, the five
+guardrail modules, `tests/test_phase1_documentation_sync.py`,
+`tests/test_repository_hygiene.py`, `tests/test_virtual_experiment_api.py` and
+`tests/test_canonical_fungmod_api.py`: 245 passed; full suite: 2170 passed.
+A JSON dump of the dbCAN, esterase, literature and oxidase fixtures taken
+before the change is byte-identical after it.
+
+Not changed: no process law, modifier, solver, registry record, family
+mapping, output table schema or dbCAN behaviour; the resolver's
+`require_diagnostic` filter is still not exposed; nothing is fetched unless a
+caller passes `refresh=True`; user data never reaches `data_registry`.
+
+Scientific impact: a strain's enzyme repertoire can come from its UniProt
+proteome with every class traced to accessions, families, EC numbers, review
+status, the export's digest and the UniProt release, while kinetics stay
+explicit unknowns with measurement requests. Contradictory annotations are
+reported, not resolved by preference. Presence of a protein is not expression
+or secretion, most UniProtKB annotation is automatic, and CAZy
+cross-references are incomplete; the docs say so.
+
+Compatibility: additive. `GENOME_ANNOTATION_TOOLS` gains `UniProt`; the
+unknown-tool refusal message now names both routes; dbCAN entries keep their
+keys (no `source_type`), and datasets without a UniProt row produce
+byte-identical records and reports.
+
+Ambiguities: the REST field names and the release headers were not verified
+against a live response (rest.uniprot.org was unreachable here); dbCAN entries
+carry no `source_type` so that the dbCAN route stays byte-identical, so a
+consumer tells them apart by its absence or by `annotation_tool`; the proteome
+id is read from the `source` cell rather than from a dedicated column; EC
+numbers resolve only against the base registry (not `enzyme_classes.csv`), as
+families do.
+
+Risk: low to medium. The new route is additive and fully refused on malformed
+input, but the disagreement rule is a FungMod definition that depends on which
+registry classes carry EC numbers, and the live UniProt format is unverified.
+
+Recommended next task: curated registry enzyme-class records with EC numbers
+for the family-map classes reported as unmodellable (cellobiohydrolase,
+endo-xylanase, LPMO), so that both repertoire routes resolve to more
+modellable classes and more EC numbers become comparable; then verify the
+UniProt client against a live response from a networked environment.
+
 ## USERDATA-003 Enzyme Repertoire From A Genome Annotation
 
 Status: `complete` for the stated scope (2026-10-06); the third increment of

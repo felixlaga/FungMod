@@ -19,6 +19,32 @@
         - UserDataset
         - UserDataError
 
+## Enzyme repertoire from a UniProt proteome
+
+::: fungal_model.capability.uniprot
+    options:
+      members:
+        - parse_uniprot_tsv
+        - decode_uniprot_tsv
+        - resolve_uniprot_proteome
+        - UniprotProteome
+        - UniprotEntry
+        - ProteomeResolution
+        - ProteomeClassSupport
+        - EcCazyDisagreement
+
+::: fungal_model.sources.uniprot
+    options:
+      members:
+        - fetch_proteome_snapshot
+        - load_proteome_snapshot
+        - write_snapshot_to_user_dataset
+        - build_stream_url
+        - proteome_query
+        - organism_query
+        - UniprotSnapshot
+        - UniprotFetchError
+
 ## Environment grids
 
 ::: fungal_model.api.environment_grid
