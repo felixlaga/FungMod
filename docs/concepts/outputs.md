@@ -8,6 +8,7 @@ should be recoverable from an exported artifact.
 | Artifact | Purpose |
 | --- | --- |
 | `modelability_preflight.csv` | One preflight outcome per case. |
+| `case_summary.csv` | One row per requested case: sample counts, and `case_status` (`simulated`, or `not_simulated` with the reason in a [partial run](#partial-runs)). |
 | `modelability_items.csv` | Known, uncertain, missing, or unsupported inputs. |
 | `time_series_long.csv` | Long-form state and derived trajectories. |
 | `final_metrics.csv` | Final substrate/product metrics and maximum rates. |
@@ -29,6 +30,35 @@ should be recoverable from an exported artifact.
 
 Header-only diagnostic tables mean that the corresponding configured evidence
 was unavailable. Missing diagnostics are not converted to zeros.
+
+## Partial runs
+
+By default `VirtualExperiment.simulate` refuses a request in which the
+preflight blocks any case. With `simulate(..., blocked="report")` (from a
+shell: `fungmod run --runnable-only`, exit code 4) it simulates the cases
+that pass the preflight in the requested mode and reports the others; when
+no case is runnable it refuses as before. Output schema `2.2.0` records this:
+
+| Where | What a blocked case gets |
+| --- | --- |
+| `case_summary.csv` | A row with `case_status` `not_simulated`, `simulated` `false`, `sample_count` 0 and `not_simulated_reason`: the preflight mode, status, blocking reason and next action. Simulated cases have `case_status` `simulated` and an empty reason. |
+| `modelability_preflight.csv`, `modelability_items.csv` | Its preflight outcome and items, with `simulation_allowed_for_mode` `false` and the blocking reason. |
+| `missing_parameters.csv`, `suggested_experiments.csv` | Its missing inputs and measurement requests. |
+| `limitations_table.csv` | A `not_simulated` row of severity `blocking`, beside its missing-input rows. |
+| `assumption_summary.csv` | Its preflight assumptions and items. |
+| Per-sample tables | Nothing: a blocked case has no samples, trajectories, metrics or threshold times. `environment_summary.csv` and `comparison_summary.csv` cover simulated cases only. |
+| `virtual_experiment_summary.json`, `output_manifest.json` | `partial_run`, `blocked_policy`, `requested_case_count`, `simulated_case_count` and `blocked_cases` (case id, ids, status, blocking reason, next action, missing and incompatible items, measurement requests, reason). A full run has `partial_run` `false` and an empty list. |
+| Report | A "Partial run" statement in the run summary and a "Not simulated" note on each blocked case. |
+
+`case_id` is `case_<position>` in the requested fungus x substrate x
+environment grid, so the ids of a partial run are those of the full request
+and the blocked rows sit in grid order between the simulated ones. Each
+case's seed is drawn from the run seed by the same position, so the samples
+of a simulated case equal those of a run of the same request in which every
+case is runnable, and those of `simulate_screen(..., cases=[that case])` on
+the same request. A request that names the case alone gives it position 0 and
+therefore the same samples only when it is the first case of the larger
+request.
 
 ## Degradation and product-release rates
 

@@ -338,16 +338,29 @@ def _render_report(
 def _case_summary_lines(rows: Sequence[Mapping[str, str]]) -> list[str]:
     if not rows:
         return ["No case-summary rows were present in the standard tables."]
+    not_simulated = [row for row in rows if row.get("case_status") == "not_simulated"]
     lines = []
+    if not_simulated:
+        blocked_ids = ", ".join(f"`{_value(row, 'case_id')}`" for row in not_simulated)
+        lines.extend(
+            [
+                f"**Partial run:** {len(rows) - len(not_simulated)} of {len(rows)} requested cases were simulated. "
+                f"Not simulated, because the preflight blocked them: {blocked_ids}. These cases have no samples, "
+                "trajectories, metrics or threshold times; their missing inputs and measurement requests are listed "
+                "under Missing parameters and Suggested follow-up experiments.",
+                "",
+            ]
+        )
     for row in rows:
         case_id = _value(row, "case_id")
         fungus_id = _value(row, "fungus_id")
         substrate_id = _value(row, "substrate_id")
         environment_id = _value(row, "environment_id")
         status = _value(row, "modelability_status")
-        lines.append(
-            f"- `{case_id}`: `{fungus_id}` on `{substrate_id}` in `{environment_id}`; modelability `{status}`."
-        )
+        line = f"- `{case_id}`: `{fungus_id}` on `{substrate_id}` in `{environment_id}`; modelability `{status}`."
+        if row.get("case_status") == "not_simulated":
+            line += f" **Not simulated:** {_value(row, 'not_simulated_reason')}"
+        lines.append(line)
     return lines
 
 

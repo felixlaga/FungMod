@@ -1,5 +1,8 @@
 """The user-data workflow from the command line (CLI-002): assemble, draft-kinetics, check-data, run, compare, fit.
 
+The printed run command of a draft with gaps carries --runnable-only (RUN-001): its runnable cases run and its gaps
+are listed with their measurement requests (exit code 4).
+
 Inputs are the repository's own fixtures only: the frozen SABIO-RK Reaction 618
 export (real entries), the hand-written dbCAN format fixture of
 ``tests/fixtures/user_data/genome_case`` (synthetic gene identifiers, not a real
@@ -41,6 +44,7 @@ from fungal_model.calibration.bayesian import BOUNDED_ABOVE_ONLY, BOUNDED_BELOW_
 from fungal_model.cli import (
     EXIT_NOT_RUNNABLE,
     EXIT_OK,
+    EXIT_PARTIAL,
     EXIT_USAGE,
     IN_SAMPLE_HELP,
     NO_FETCH_HELP,
@@ -197,6 +201,13 @@ def _printed_run_commands(stdout: str) -> list[list[str]]:
     return commands
 
 
+def _trajectories(run_directory: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(run_directory).as_posix(): path.read_bytes()
+        for path in sorted(run_directory.glob("*/trajectories/*.csv"))
+    }
+
+
 def _set_contributor(directory: Path) -> None:
     path = directory / "user_dataset.yml"
     manifest = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -262,30 +273,58 @@ def test_assemble_fill_check_data_and_run_end_to_end(tmp_path: Path) -> None:
     assert "Families without an enzyme class: 2" in out_check
     assert "Time courses" not in out_check
 
-    # The printed run command works as printed: the 40 degC gap blocks it, the 30 degC case runs.
+    # The printed run command works as printed: the 40 degC gap is blocked and listed, the 30 degC case runs.
     (selection,) = _printed_run_commands(out)
     assert selection[:6] == ["run", "--user-data", str(draft_dir), "--fungus", G1, "--substrate"]
-    assert selection[-4:] == ["--condition", "c30_ph5", "--condition", "c40_ph5"]
-    blocked = tmp_path / "blocked"
-    code, out_run, err_run = _cli(
-        *selection, "--mode", "exploratory", "--samples", "2", "--seed", "5", "--output", blocked, "--no-plots"
+    assert selection[-5:] == ["--condition", "c30_ph5", "--condition", "c40_ph5", "--runnable-only"]
+    assert (
+        "--runnable-only because 1 case(s) of this command have no kinetics in the draft (beta_glucosidase on "
+        "cellobiose at c40_ph5 (gap)): the preflight blocks them, so without the flag nothing is simulated (exit code "
+        "3); with it the runnable cases are simulated and the blocked ones are listed with their measurement requests "
+        "(exit code 4)."
+    ) in out
+    run = ("--mode", "exploratory", "--samples", "2", "--seed", "5", "--no-plots")
+    partial = tmp_path / "partial"
+    code, out_run, err_run = _cli(*selection, *run, "--output", partial)
+    assert code == EXIT_PARTIAL, err_run
+    assert "Not runnable: 1 of 2 case(s) cannot be simulated in exploratory mode." in out_run
+    assert "Measure km of beta-glucosidase from Genome-annotated strain G1 on Cellobiose at 40 degC, pH 5" in out_run
+    assert "Simulated 1 case(s) in exploratory mode: 2 sample(s) per case, seed 5." in out_run
+    assert "(case_0001); exit code 4." in out_run
+    cases = _csv_rows(partial / "case_summary.csv")
+    assert [(row["case_id"], row["environment_id"], row["case_status"]) for row in cases] == [
+        ("case_0000", "g1_cli__c30_ph5", "simulated"),
+        ("case_0001", "g1_cli__c40_ph5", "not_simulated"),
+    ]
+    manifest = json.loads((partial / "output_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["user_dataset_id"] == "g1_cli"
+    assert manifest["user_dataset_digest"] == dataset.digest
+    assert manifest["partial_run"] is True
+    (blocked_case,) = manifest["blocked_cases"]
+    assert blocked_case["environment_id"] == "g1_cli__c40_ph5"
+    assert any(
+        request.startswith("Measure km of beta-glucosidase from Genome-annotated strain G1 on Cellobiose at 40 degC")
+        for request in blocked_case["suggested_experiments"]
     )
+
+    # Without --runnable-only the same command is refused as before: exit 3, nothing written.
+    blocked = tmp_path / "blocked"
+    code, out_run, err_run = _cli(*selection[:-1], *run, "--output", blocked)
     assert code == EXIT_NOT_RUNNABLE, err_run
     assert "Measure km of beta-glucosidase from Genome-annotated strain G1 on Cellobiose at 40 degC, pH 5" in out_run
     assert not blocked.exists()
 
+    # The 30 degC case alone gives the partial run's trajectories byte for byte (same seed, first grid position).
     output = tmp_path / "run_c30"
-    code, out_run, err_run = _cli(
-        *selection[:-2], "--mode", "exploratory", "--samples", "2", "--seed", "5", "--output", output, "--no-plots"
-    )
+    code, out_run, err_run = _cli(*selection[:-3], *run, "--output", output)
     assert code == EXIT_OK, err_run
-    manifest = json.loads((output / "output_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["user_dataset_id"] == "g1_cli"
-    assert manifest["user_dataset_digest"] == dataset.digest
     assert "Simulated 1 case(s) in exploratory mode: 2 sample(s) per case, seed 5." in out_run
+    assert _trajectories(output) == _trajectories(partial) != {}
 
-    code, out_run, err_run = _cli(*selection[:-2], "--mode", "scientific", "--output", tmp_path / "scientific")
+    # In scientific mode no case is runnable (the transfer is an estimate, c40 is a gap): exit 3, even with the flag.
+    code, out_run, err_run = _cli(*selection, "--mode", "scientific", "--output", tmp_path / "scientific")
     assert code == EXIT_NOT_RUNNABLE, err_run
+    assert "--runnable-only has nothing to simulate: no requested case is runnable." in out_run
     assert not (tmp_path / "scientific").exists()
 
 

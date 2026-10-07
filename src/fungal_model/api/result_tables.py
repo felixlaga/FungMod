@@ -52,6 +52,11 @@ from fungal_model.screening.parameter_resolution import (
 )
 
 
+# ``case_status`` of a ``case_summary.csv`` row.
+CASE_STATUS_SIMULATED = "simulated"
+CASE_STATUS_NOT_SIMULATED = "not_simulated"
+
+
 @dataclass(frozen=True)
 class WrittenTables:
     """Paths written by the standard virtual-experiment table writer."""
@@ -68,8 +73,22 @@ def write_standard_tables(
     registry: FungModRegistry,
     preflight_reports: Sequence[ModelabilityReport],
     output_dir: str | Path,
+    blocked_reports: Mapping[int, ModelabilityReport] | None = None,
 ) -> WrittenTables:
-    """Write API-001 biological output tables."""
+    """Write API-001 biological output tables.
+
+    ``blocked_reports`` maps the grid position of every requested case that the
+    preflight blocked, and that was therefore not simulated (a partial run,
+    ``VirtualExperiment.simulate(blocked="report")``), to its preflight report.
+    Each such case is ``case_<position>`` and gets rows in
+    ``modelability_preflight``, ``modelability_items``, ``case_summary``
+    (``case_status`` ``not_simulated`` with ``not_simulated_reason``),
+    ``assumption_summary``, ``limitations_table``, ``missing_parameters`` and
+    ``suggested_experiments``; it has no samples, so it has no row in the
+    per-sample tables. With blocked reports, the case rows follow the grid
+    order. A report that allows simulation in its mode, or a position that
+    was simulated, is refused.
+    """
 
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
@@ -80,6 +99,7 @@ def write_standard_tables(
         screen_result=screen_result,
         registry=registry,
         reports_by_case=reports_by_case,
+        blocked_reports=blocked_reports or {},
     )
     paths = {
         "modelability_preflight": destination / "modelability_preflight.csv",
@@ -155,11 +175,39 @@ def write_preflight_tables(
     return WrittenTables(paths={name: str(path) for name, path in paths.items()})
 
 
+def standard_case_id(case_index: int) -> str:
+    """Return the ``case_id`` of the case at ``case_index`` in the requested grid."""
+
+    return f"case_{case_index:04d}"
+
+
+def not_simulated_reason(report: ModelabilityReport) -> str:
+    """Return why a case that its preflight blocks was not simulated (``case_summary.csv``).
+
+    Refuses a report whose preflight allows simulation in its mode: only a
+    blocked case is ever reported as not simulated.
+    """
+
+    policy = preflight_policy(report)
+    if policy["simulation_allowed_for_mode"]:
+        raise ValueError(
+            f"{report.fungus_id} + {report.substrate_id} + {report.environment_id} passes the {report.mode}-mode "
+            "preflight, so it is not a blocked case."
+        )
+    return (
+        f"blocked_by_preflight: the {report.mode}-mode preflight reports {report.status} (blocking reason "
+        f"{policy['blocking_reason']}; next action {policy['recommended_next_action']}). The case was not simulated, "
+        "so it has no samples, trajectories, metrics or threshold times; its missing inputs and measurement requests "
+        "are in missing_parameters.csv and suggested_experiments.csv."
+    )
+
+
 def _build_table_rows(
     *,
     screen_result: RegistryScreenResult,
     registry: FungModRegistry,
     reports_by_case: Mapping[tuple[str, str, str], ModelabilityReport],
+    blocked_reports: Mapping[int, ModelabilityReport],
 ) -> dict[str, list[dict[str, Any]]]:
     rows: dict[str, list[dict[str, Any]]] = {
         "modelability_preflight": [],
@@ -186,7 +234,12 @@ def _build_table_rows(
         "suggested_experiments": [],
     }
     varying_conditions = _varying_environment_conditions(registry, screen_result.case_results)
-    for case_index, case in enumerate(screen_result.case_results):
+    for case_index, case in _case_slots(screen_result, blocked_reports):
+        if case is None:
+            _add_not_simulated_case_rows(
+                rows, registry=registry, report=blocked_reports[case_index], case_index=case_index
+            )
+            continue
         report = reports_by_case.get(
             (case.fungus_id, case.substrate_id, case.environment_id),
             case.modelability_report,
@@ -213,7 +266,7 @@ def _build_table_rows(
         )
         rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
         rows["suggested_experiments"].extend(
-            _suggested_experiment_rows(context, registry, case, report, compatibility)
+            _suggested_experiment_rows(context, registry, report, compatibility)
         )
         rows["assumption_summary"].extend(_assumption_summary_rows(context, report))
         rows["mechanism_summary"].extend(
@@ -269,14 +322,17 @@ def _build_table_rows(
                 _solver_diagnostic_rows(sample_context=sample_context, sample=sample)
             )
     rows["summary_metrics"] = _summary_metric_rows(rows["final_metrics"], rows["threshold_times"])
+    # Environment and comparison summaries describe simulated cases; a blocked case has no outputs to summarize.
+    simulated_case_rows = [row for row in rows["case_summary"] if row["case_status"] == CASE_STATUS_SIMULATED]
+    simulated_case_ids = {row["case_id"] for row in simulated_case_rows}
     rows["environment_summary"] = _environment_summary_rows(
-        case_summary_rows=rows["case_summary"],
+        case_summary_rows=simulated_case_rows,
         final_metric_rows=rows["final_metrics"],
         threshold_rows=rows["threshold_times"],
-        limitation_rows=rows["limitations_table"],
+        limitation_rows=[row for row in rows["limitations_table"] if row["case_id"] in simulated_case_ids],
     )
     rows["comparison_summary"] = _comparison_summary_rows(
-        case_summary_rows=rows["case_summary"],
+        case_summary_rows=simulated_case_rows,
         final_metric_rows=rows["final_metrics"],
         threshold_rows=rows["threshold_times"],
         environment_summary_rows=rows["environment_summary"],
@@ -287,6 +343,88 @@ def _build_table_rows(
     )
     rows["trajectory_quantiles"] = _trajectory_quantile_rows(rows["time_series_long"])
     return rows
+
+
+def _case_slots(
+    screen_result: RegistryScreenResult,
+    blocked_reports: Mapping[int, ModelabilityReport],
+) -> list[tuple[int, RegistryCaseEnsemble | None]]:
+    """Return ``(grid position, simulated case or None for a blocked case)`` for every case to tabulate.
+
+    Without blocked reports the simulated cases keep the screen's order;
+    with them, every case is listed in grid order.
+    """
+
+    slots: list[tuple[int, RegistryCaseEnsemble | None]] = [
+        (_case_index(case, position), case) for position, case in enumerate(screen_result.case_results)
+    ]
+    simulated = [index for index, _case in slots]
+    if len(set(simulated)) != len(simulated):
+        raise ValueError(f"The screen result lists a case position more than once: {simulated}.")
+    if not blocked_reports:
+        return slots
+    for index, report in blocked_reports.items():
+        if index in simulated:
+            raise ValueError(
+                f"Case position {index} ({report.fungus_id} + {report.substrate_id} + {report.environment_id}) "
+                "was simulated, so it cannot also be reported as blocked."
+            )
+        not_simulated_reason(report)  # refuses a report that allows simulation
+        slots.append((index, None))
+    return sorted(slots, key=lambda slot: slot[0])
+
+
+def _case_index(case: RegistryCaseEnsemble, position: int) -> int:
+    """The case's grid position (``case_index``), or its position in the screen result when it carries none."""
+
+    return position if case.case_index is None else case.case_index
+
+
+def _add_not_simulated_case_rows(
+    rows: dict[str, list[dict[str, Any]]],
+    *,
+    registry: FungModRegistry,
+    report: ModelabilityReport,
+    case_index: int,
+) -> None:
+    """Add the case-level rows of a case that the preflight blocked: what is missing, why, and what to measure."""
+
+    context = _preflight_context(registry=registry, report=report, case_index=case_index)
+    compatibility = (
+        None
+        if report.selected_compatibility_id is None
+        else registry.process_compatibility.get(report.selected_compatibility_id)
+    )
+    rows["modelability_preflight"].append(_preflight_row(context, report))
+    rows["modelability_items"].extend(_modelability_item_rows(context, report))
+    rows["case_summary"].append(
+        {
+            **_case_columns(context),
+            "modelability_status": report.status,
+            "sample_count": 0,
+            "sample_failure_count": 0,
+            "simulated": False,
+            "preflight_guardrail": "modelability",
+            "case_status": CASE_STATUS_NOT_SIMULATED,
+            "not_simulated_reason": not_simulated_reason(report),
+        }
+    )
+    rows["limitations_table"].append(
+        _limitation_row(context, "not_simulated", "blocking", not_simulated_reason(report), "modelability")
+    )
+    for assumption in report.assumptions:
+        rows["limitations_table"].append(_limitation_row(context, "preflight", "info", assumption, "modelability"))
+    for item in report.missing:
+        rows["limitations_table"].append(
+            _limitation_row(context, "missing_input", "blocking", item.message, item.item_id)
+        )
+    for item in report.incompatible:
+        rows["limitations_table"].append(
+            _limitation_row(context, "incompatible_input", "blocking", item.message, item.item_id)
+        )
+    rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
+    rows["suggested_experiments"].extend(_suggested_experiment_rows(context, registry, report, compatibility))
+    rows["assumption_summary"].extend(_assumption_summary_rows(context, report))
 
 
 def _build_preflight_table_rows(
@@ -331,7 +469,7 @@ def _case_context(
     )
     return {
         "output_schema_version": OUTPUT_SCHEMA_VERSION,
-        "case_id": f"case_{case_index:04d}",
+        "case_id": standard_case_id(case_index),
         "fungus_id": case.fungus_id,
         "fungus_name": fungus.name,
         "substrate_id": case.substrate_id,
@@ -361,7 +499,7 @@ def _preflight_context(
     environment_policy = _environment_policy("preflight_only")
     return {
         "output_schema_version": OUTPUT_SCHEMA_VERSION,
-        "case_id": f"case_{case_index:04d}",
+        "case_id": standard_case_id(case_index),
         "fungus_id": report.fungus_id,
         "fungus_name": fungus.name,
         "substrate_id": report.substrate_id,
@@ -697,6 +835,8 @@ def _case_summary_row(
         "sample_failure_count": len(case.sample_failures),
         "simulated": bool(case.samples),
         "preflight_guardrail": "modelability",
+        "case_status": CASE_STATUS_SIMULATED,
+        "not_simulated_reason": "",
     }
 
 
@@ -2480,7 +2620,6 @@ def _missing_parameter_rows(
 def _suggested_experiment_rows(
     context: Mapping[str, Any],
     registry: FungModRegistry,
-    case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
@@ -3011,4 +3150,12 @@ def _float_or_blank(value: Any) -> Any:
     return "" if number is None else number
 
 
-__all__ = ["WrittenTables", "preflight_policy", "write_standard_tables"]
+__all__ = [
+    "CASE_STATUS_NOT_SIMULATED",
+    "CASE_STATUS_SIMULATED",
+    "WrittenTables",
+    "not_simulated_reason",
+    "preflight_policy",
+    "standard_case_id",
+    "write_standard_tables",
+]

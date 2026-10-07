@@ -26,6 +26,252 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## RUN-001 Run The Runnable Cases Of A Request
+
+Status: `complete` for the stated scope (2026-10-07). For the owner's goal
+("fungus X on substrate Y in conditions Z, the code calculates"), an assembled
+dataset for a real fungus almost always has gaps: most enzyme classes of a
+genome have no kinetics, and a condition without measured constants is a gap.
+`VirtualExperiment.simulate` refused the whole request when any case failed
+its preflight (the command line: exit 3), so a draft with one gap simulated
+nothing, even when other cases were fully runnable. CLI-002 named this as the
+next task.
+
+Changed:
+
+- API, an explicit opt-in: `VirtualExperiment.simulate(..., blocked="refuse" |
+  "report")` (`BlockedCasePolicy`, `BLOCKED_CASE_POLICIES` in
+  `fungal_model.api.virtual_experiment`; an unknown value is refused).
+  `"refuse"` is the default and refuses exactly as before (same exception and
+  message). `"report"` simulates exactly the cases whose
+  `preflight_policy(report)["simulation_allowed_for_mode"]` is true (the
+  existing rule: scientific `modelable` only, exploratory also
+  `exploratory`), does not simulate the others, and lists them; with no
+  runnable case it refuses exactly as `"refuse"` does. A request without
+  blocked cases runs as a full run under either policy.
+  `DegradationScreenResult` gains `blocked_policy`, `blocked_reports` (grid
+  position -> preflight report), `partial_run` and `blocked_cases()` (case id,
+  ids, mode, status, blocking reason, next action, missing and incompatible
+  item ids, measurement requests, reason).
+- Simulating a subset: `simulate_screen(..., cases=None)`. `cases` lists
+  `(fungus_id, substrate_id, environment_id)` triples of the requested grid
+  (`itertools.product` order); they are simulated in the order given (no
+  reordering); a triple outside the grid, a repeated triple, an empty list
+  and a grid that repeats a combination are refused. The run seed draws one
+  case seed per grid position, in grid order, whether or not the position is
+  simulated (the same draws as before, taken up front), and each case gets
+  the seed of its position, so a case's samples are the same in a full run, a
+  partial run and a one-case selection of the same request.
+  `RegistryCaseEnsemble.case_index` records the grid position (also in
+  `to_dict()` and `screen_summary.json`, and as the `case` column of the
+  screen's own CSVs).
+- Tables, output schema `2.2.0` (minor bump, `OUTPUT_SCHEMA_VERSION`):
+  `write_standard_tables(..., blocked_reports=None)` names every case
+  `case_<grid position>` (`standard_case_id`), so ids do not shift when cases
+  are skipped, and adds for each blocked case rows in
+  `modelability_preflight.csv`, `modelability_items.csv`, `case_summary.csv`,
+  `assumption_summary.csv`, `limitations_table.csv` (a `not_simulated` row of
+  severity `blocking`, then its assumption and missing-input rows),
+  `missing_parameters.csv` and `suggested_experiments.csv` (the preflight's
+  requests, plus the case template's when the report selected a compatibility
+  record), in grid order between the simulated cases. A blocked case has no
+  samples and therefore no row in the per-sample tables;
+  `environment_summary.csv` and `comparison_summary.csv` cover simulated cases
+  only. `case_summary.csv` gains `case_status` (`simulated`,
+  `not_simulated`) and `not_simulated_reason` (`not_simulated_reason(report)`:
+  "blocked_by_preflight: the <mode>-mode preflight reports <status>
+  (blocking reason ...; next action ...). The case was not simulated, so it
+  has no samples, trajectories, metrics or threshold times; ..."; empty for
+  simulated cases). The `case_id` column description states the grid-position
+  rule. The writer refuses a blocked report whose preflight allows simulation
+  and a position that was also simulated.
+- Summary, manifest and report: `virtual_experiment_summary.json` and
+  `output_manifest.json` gain `blocked_policy`, `partial_run`,
+  `requested_case_count`, `simulated_case_count` and `blocked_cases` (a full
+  run: `false` and `[]`); the Markdown report's run summary starts with
+  "**Partial run:** N of M requested cases were simulated. Not simulated,
+  because the preflight blocked them: ..." and marks each blocked case "Not
+  simulated:" with the reason (read from `case_summary.csv`, so earlier
+  bundles render as before).
+- Command line: `fungmod run --runnable-only` -> `simulate(blocked="report")`.
+  It prints the preflight table and the blocked cases with their measurement
+  requests, says that it simulates the runnable ones, prints each blocked case
+  as "not simulated" with the reason beside the simulated cases' metrics, and
+  ends with "Partial run: K of M requested case(s) were blocked by the
+  preflight and not simulated (case ids); exit code 4". New exit code 4
+  (`EXIT_PARTIAL`, "partial run"), never 0 or 3 for a partial run; no runnable
+  case: exit 3 ("--runnable-only has nothing to simulate"); nothing blocked: a
+  full run, exit 0. Without the flag the behaviour and exit code (3) are
+  unchanged; the refusal adds one line suggesting the flag when some case is
+  runnable. Name: `--runnable-only` rather than the suggested `--run-runnable`,
+  because it says which cases run without repeating the subcommand (`fungmod
+  run --run-runnable`), and a printed command carrying it shows that some
+  requested cases may not run; the blocked cases are reported either way, the
+  flag only decides whether the runnable ones are simulated. Module
+  docstring, `--help` epilog (exit-code table) and `RUNNABLE_ONLY_HELP` state
+  code 4.
+- `fungmod assemble` prints its `run` command with `--runnable-only` when a
+  case of that command's conditions has kinetics status `gap` or `conflict`
+  (`STATUS_GAP`, `STATUS_CONFLICT` from the API), followed by a line that
+  names those cases and why (the preflight blocks them; without the flag
+  nothing is simulated, exit 3; with it the runnable cases run and the gaps
+  are listed, exit 4). A draft without gaps prints the command as before.
+- Docs: `docs/cli.md` (command table; new section "Run the runnable cases of
+  a request" with a real registry example, what blocked cases get, seeds and
+  ids, exit code 4 and the name; the assemble -> check-data -> run example now
+  runs the G1 draft partially with real output, whose 30 degC metrics equal
+  the earlier one-condition run; defaults; exit-code table with 3 and 4),
+  `docs/concepts/outputs.md` (`case_summary.csv` row, "Partial runs" section:
+  per-table rows, JSON keys, report, case ids and seeds),
+  `docs/concepts/virtual-experiments.md` ("Requests with blocked cases"),
+  `docs/user-data.md` (assembly section: the printed `--runnable-only`
+  command and why; the G1 example runs partially), `README.md` (command-line
+  quick start and capability row, schema `2.2.0`), `CHANGELOG.md`.
+
+Not changed: no process law, solver, registry record, user-data rule, loader,
+assembly, drafting, fit, comparison or preflight status; the default
+`blocked="refuse"` path simulates, samples and refuses as before. A
+before/after run of two seeded multi-case exploratory requests (base commit
+`adff1f2` against this change, outputs normalised for the directory name)
+gave byte-identical trajectories, sample configs and bundles; the standard
+tables differed only in `output_schema_version`, the two new `case_summary`
+columns and the `case_id` description of the data dictionary and schema, the
+JSON summaries only in the new keys, and `run_environment.json` only in its
+timestamp.
+
+Tests: new `tests/test_partial_runs.py` (10 tests):
+- refuse is the default and its message is unchanged and identical to
+  `blocked="refuse"`; with no runnable case `"report"` refuses with the same
+  message, nothing written; an unknown policy is refused;
+- registry mixed request (Reaction 618 runnable in exploratory mode, the toy
+  lab environment underparameterized): `"report"` simulates exactly the cases
+  `preflight_policy` allows; the simulated case's trajectories are
+  byte-identical, and its sampled values equal, to a run of that case alone
+  (same seed); the blocked case appears in `case_summary.csv`
+  (`not_simulated`, reason, zero samples), `modelability_preflight.csv`,
+  `modelability_items.csv`, `missing_parameters.csv`,
+  `suggested_experiments.csv` and `limitations_table.csv`, in no per-sample
+  table and not in the environment or comparison summaries; summary and
+  manifest say partial and list it with status, missing items and requests;
+  the report says "Partial run";
+- blocked case before the runnable one: ids `case_0000` (blocked) and
+  `case_0001` (simulated), samples and trajectories equal to
+  `simulate_screen(..., cases=[that case])` on the same request;
+- a fully runnable request under `"report"` writes the same tables as the
+  default (`partial_run` false);
+- scientific mode on T. harzianum and the BGL1A source x Celufloc 200 and
+  cellobiose at the Gelain 10 g/L culture: only the scientifically modelable
+  organism case runs (the BGL1A case, runnable in exploratory mode, is
+  blocked), the manifest keeps `scientific_exact_unvalidated` and the
+  not-validation note, the refusal keeps "it does not mean experimentally
+  validated", the trajectory equals a one-case scientific run; the same
+  request in exploratory mode also runs the BGL1A case;
+- seeds, on a user dataset written by the test (the esterase fixture at three
+  conditions with sampled kcat ranges): full run, `cases=` the whole grid, two
+  cases, one case and the two cases reversed give each case the same sampled
+  values and byte-identical trajectories (and keep the given order); a
+  dataset without kinetics at the middle condition runs partially with the
+  other two cases' samples equal to the full run's;
+- `simulate_screen` refuses triples outside the grid, repeats, an empty list
+  and a grid with a repeated combination; the table writer refuses a runnable
+  report or a simulated position as blocked; the `case_summary` schema
+  columns and version `2.2.0`.
+`tests/test_cli.py`: `--runnable-only` on the registry mixed request (exit 4,
+blocked list and requests, metrics of the simulated case only, the closing
+partial line, manifest, `case_summary.csv`, suggested experiments, report);
+without the flag exit 3 with the hint and nothing written; nothing runnable
+with the flag exit 3; nothing blocked with the flag exit 0; scientific
+`--runnable-only` (exit 4, scientific wording kept); help lines for exit codes
+3 and 4 and the flag; exit codes 0-4 distinct and code 4 in `docs/cli.md`.
+`tests/test_cli_user_data_workflow.py`: the printed G1 command now ends with
+`--runnable-only` and the reason line is printed; executed as printed it exits
+4, simulates c30_ph5, lists c40_ph5 with its measurement request in the
+output, `case_summary.csv` and the manifest; without the flag exit 3 and
+nothing written; the c30_ph5 case alone gives byte-identical trajectories;
+scientific mode exits 3 even with the flag (nothing runnable).
+`tests/test_virtual_experiment_api.py` and `tests/test_user_data_timecourse.py`:
+schema version `2.2.0`.
+
+Commands and results (worktree on `claude/run-runnable-cases`, stacked on
+`claude/cli-assemble-fit` bdec94a, Python 3.11 venv; the base's
+`shell_quote` quotes the `--runnable-only` command like every other printed
+command):
+- `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`: all
+  checks passed.
+- `pyright --pythonpath <venv python>` on `cli.py`, `api/__init__.py`,
+  `api/virtual_experiment.py`, `api/result_tables.py`, `api/output_schema.py`,
+  `api/report.py`, `screening/ensemble.py`, `tests/test_partial_runs.py`,
+  `tests/test_cli.py`, `tests/test_cli_user_data_workflow.py` and
+  `tests/test_user_data_timecourse.py`: 0 errors, 0 warnings.
+  `tests/test_virtual_experiment_api.py` (one changed line) reports the same
+  4 errors as on the base commit (`in` on `object`-typed JSON values, lines
+  108-111), none from this change.
+- `mkdocs build --strict`: built without warnings; `site/` removed; the new
+  anchors `#partial-runs` and `#run-the-runnable-cases-of-a-request` and
+  their links checked in the built HTML.
+- Targeted: `pytest tests/test_cli.py tests/test_cli_user_data_workflow.py
+  tests/test_partial_runs.py tests/test_virtual_experiment_api.py
+  tests/test_virtual_experiment_environment_grid.py
+  tests/test_virtual_experiment_name_resolution.py
+  tests/test_registry_ensemble_simulation.py
+  tests/test_registry_ensemble_homogeneous_mm.py
+  tests/test_case_class_selection.py
+  tests/test_api003_researcher_virtual_experiment.py tests/test_guardrails_*.py
+  tests/test_user_data*.py tests/test_phase1_documentation_sync.py
+  tests/test_repository_hygiene.py tests/test_release_configuration.py
+  tests/test_shared_progress.py tests/test_active_instruction_hierarchy.py
+  tests/test_roadmap_orchestration_status.py`: 520 passed (590.0 s). After
+  merging bdec94a: `pytest tests/test_cli.py tests/test_cli_user_data_workflow.py
+  tests/test_partial_runs.py tests/test_guardrails_no_hardcoding.py
+  tests/test_guardrails_public_api.py tests/test_guardrails_no_shortcuts.py`:
+  111 passed (197.6 s).
+- Full suite `pytest -q` (background, log in the session scratchpad, after the
+  merge): 2423 passed in 2428.3 s.
+
+Scientific impact: none on any simulated value. A request with gaps now
+yields the simulations it can support plus an explicit list of what blocks the
+rest, instead of nothing; the blocked cases are never simulated, never given
+guessed values and are labelled `not_simulated` with the reason and the
+measurement requests. Partial runs need an explicit opt-in and exit with a
+code of their own.
+
+Compatibility: the default refuses as before. Output schema `2.2.0` (minor):
+every row's `output_schema_version`, two new `case_summary.csv` columns, the
+`case_id` description, new keys in the summary, manifest and
+`RegistryCaseEnsemble.to_dict()` (`case_index`); readers that ignore unknown
+columns and keys are unaffected. `write_standard_tables` and `simulate_screen`
+gain optional keywords; `_suggested_experiment_rows` (private) lost an unused
+argument. New public names: `BlockedCasePolicy`, `BLOCKED_CASE_POLICIES`,
+`EXIT_PARTIAL`, `RUNNABLE_ONLY_HELP`, `CASE_STATUS_SIMULATED`,
+`CASE_STATUS_NOT_SIMULATED`, `standard_case_id`, `not_simulated_reason`.
+
+Ambiguities and limitations: seeds follow the case's position in the
+requested grid (the rule the screen has always used), so a case's samples are
+identical across full, partial and `cases=` runs of the same request, but a
+request that names the case alone gives it position 0 and therefore the same
+samples only when it is the first case of the larger request; a seed keyed on
+the case's ids would make them independent of the request but would change
+every existing seeded multi-case run. `VirtualExperiment.simulate` has no
+`cases=` of its own (use `simulate_screen`). Blocked cases get no rows in the
+per-sample tables (no samples exist); their reason is in `case_summary.csv`
+and `limitations_table.csv`. `assemble` adds `--runnable-only` for `gap` and
+`conflict` cases only; a requested substrate on which no class of the fungus
+acts has no case and still blocks its printed command (exit 3). The preflight
+table printed by `run` numbers cases from 1 while the tables use
+`case_0000`, as before. A partial run with `--compare-timecourses` whose
+comparison is refused exits with 2 (the comparison's code) after a complete
+partial bundle.
+
+Risk: low to moderate. The default path is unchanged (checked byte for byte
+on simulated outputs); the new path reuses the preflight policy, the table
+writers and the screen with an explicit subset, and refuses inconsistent
+inputs instead of guessing.
+
+Recommended next task: a machine-readable `--json` summary for `run`,
+`assemble` and `fit` (partial-run fields included), then `cases=` on
+`VirtualExperiment.simulate` for re-running chosen cases of a request with
+their original seeds.
+
 ## CLI-002 The User-Data Workflow From The Command Line
 
 Status: `complete` for the stated scope (2026-10-07). The owner's goal, "i want

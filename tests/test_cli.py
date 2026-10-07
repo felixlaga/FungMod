@@ -1,4 +1,4 @@
-"""The ``fungmod`` command line (CLI-001): run, preflight, check-data, list and --version."""
+"""The ``fungmod`` command line (CLI-001): run, preflight, check-data, list and --version; run --runnable-only (RUN-001)."""
 
 from __future__ import annotations
 
@@ -19,8 +19,11 @@ from fungal_model.api import VirtualExperimentError, environment_grid, virtual_e
 from fungal_model.cli import (
     EXIT_NOT_RUNNABLE,
     EXIT_OK,
+    EXIT_PARTIAL,
+    EXIT_SIMULATION_FAILED,
     EXIT_USAGE,
     EXPLORATORY_MODE_HELP,
+    RUNNABLE_ONLY_HELP,
     SCIENTIFIC_MODE_HELP,
     main,
 )
@@ -49,6 +52,8 @@ ORGANISM_CASE = (
     "--environment",
     "gelain_2020_cellulose_batch_10gl",
 )
+# Reaction 618 runs in exploratory mode; the toy lab environment has no assay concentrations (underparameterized).
+MIXED_REQUEST = (*REACTION_618, "--environment", "toy_lab_environment")
 ESTERASE_SELECTION = (
     "--fungus",
     "Esterase source strain E1",
@@ -272,6 +277,125 @@ def test_run_user_data_exploratory_and_scientific_routes(
 
 
 # ---------------------------------------------------------------------------
+# run --runnable-only (RUN-001)
+
+
+def test_run_runnable_only_simulates_the_runnable_cases_lists_the_blocked_ones_and_exits_4(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    sampling = ("--mode", "exploratory", "--samples", "2", "--seed", "618", "--no-plots")
+    refused = tmp_path / "refused"
+    code, out, err = _cli(capsys, "run", *MIXED_REQUEST, *sampling, "--output", refused)
+
+    # Without the flag nothing changes: exit 3, nothing written; the flag is suggested.
+    assert code == EXIT_NOT_RUNNABLE, err
+    assert not refused.exists()
+    assert "Nothing was simulated: FungMod simulates only when every requested case passes the preflight." in out
+    assert (
+        "Add --runnable-only to simulate the 1 runnable case(s) and list the blocked one(s) as not simulated "
+        "(exit code 4)."
+    ) in out
+
+    output = tmp_path / "partial"
+    code, out, err = _cli(capsys, "run", *MIXED_REQUEST, *sampling, "--output", output, "--runnable-only", "--report")
+
+    assert code == EXIT_PARTIAL == 4, err
+    assert "Not runnable: 1 of 2 case(s) cannot be simulated in exploratory mode." in out
+    assert "--runnable-only: simulating the 1 runnable case(s); the blocked case(s) are not simulated" in out
+    assert (
+        "Measurement requests:\n"
+        "  - Measure or curate initial_cellobiose_concentration for the selected registry case.\n"
+        "  - Measure or curate enzyme_concentration_beta_glucosidase for the selected registry case."
+    ) in out
+    assert "Nothing was simulated" not in out
+    assert "Simulated 1 case(s) in exploratory mode: 2 sample(s) per case, seed 618." in out
+    assert "Partial run: 1 of 2 requested case(s) simulated; the others were blocked by the preflight." in out
+    assert (
+        "Case case_0001: sabiork_beta_glucosidase_source + cellobiose + toy_lab_environment\n"
+        "  not simulated: blocked_by_preflight: the exploratory-mode preflight reports underparameterized"
+    ) in out
+    assert _metric_line(out, "final_substrate_remaining")  # printed once, for the simulated case only
+    assert out.rstrip().endswith(
+        "Partial run: 1 of 2 requested case(s) were blocked by the preflight and not simulated (case_0001); exit code 4."
+    )
+
+    manifest = json.loads((output / "output_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["partial_run"] is True
+    assert [case["case_id"] for case in manifest["blocked_cases"]] == ["case_0001"]
+    assert {
+        "case_summary.csv",
+        "modelability_preflight.csv",
+        "missing_parameters.csv",
+        "suggested_experiments.csv",
+        "report/virtual_experiment_report.md",
+        "report/virtual_experiment_report.html",
+    } <= set(manifest["files"])
+    cases = _csv_rows(output / "case_summary.csv")
+    assert [(row["case_id"], row["environment_id"], row["case_status"]) for row in cases] == [
+        ("case_0000", "sabiork_reaction_618_selected_conditions", "simulated"),
+        ("case_0001", "toy_lab_environment", "not_simulated"),
+    ]
+    requests = {
+        row["suggested_experiment"] for row in _csv_rows(output / "suggested_experiments.csv") if row["case_id"] == "case_0001"
+    }
+    assert "Measure or curate enzyme_concentration_beta_glucosidase for the selected registry case." in requests
+    report = (output / "report" / "virtual_experiment_report.md").read_text(encoding="utf-8")
+    assert "**Partial run:** 1 of 2 requested cases were simulated." in report
+
+
+def test_runnable_only_exits_3_when_nothing_is_runnable_and_0_when_nothing_is_blocked(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    sampling = ("--mode", "exploratory", "--samples", "1", "--seed", "1", "--no-plots", "--runnable-only")
+    blocked_only = (*REACTION_618[:4], "--environment", "toy_lab_environment")
+    output = tmp_path / "nothing_runnable"
+    code, out, err = _cli(capsys, "run", *blocked_only, *sampling, "--output", output)
+
+    assert code == EXIT_NOT_RUNNABLE, err
+    assert not output.exists()
+    assert "--runnable-only has nothing to simulate: no requested case is runnable." in out
+    assert "Measure or curate initial_cellobiose_concentration for the selected registry case." in out
+
+    output = tmp_path / "nothing_blocked"
+    code, out, err = _cli(capsys, "run", *REACTION_618, *sampling, "--output", output)
+
+    assert code == EXIT_OK, err
+    assert "Partial run" not in out and "Not runnable" not in out
+    manifest = json.loads((output / "output_manifest.json").read_text(encoding="utf-8"))
+    assert (manifest["partial_run"], manifest["blocked_cases"]) == (False, [])
+
+
+def test_scientific_runnable_only_simulates_only_modelable_cases_and_keeps_the_scientific_wording(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    output = tmp_path / "scientific"
+    code, out, err = _cli(
+        capsys,
+        "run",
+        *ORGANISM_CASE,
+        "--environment",
+        "toy_lab_environment",
+        "--mode",
+        "scientific",
+        "--output",
+        output,
+        "--no-plots",
+        "--runnable-only",
+    )
+
+    assert code == EXIT_PARTIAL, err
+    assert "it does not mean experimentally validated" in out
+    assert "Simulated 1 case(s) in scientific mode: one exact run per case." in out
+    assert "It is not a claim of experimental validation." in out
+    assert "the scientific-mode preflight reports underparameterized" in out
+    manifest = json.loads((output / "output_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["run_label"] == "scientific_exact_unvalidated"
+    assert [(case["case_id"], case["environment_id"]) for case in manifest["blocked_cases"]] == [
+        ("case_0001", "toy_lab_environment")
+    ]
+
+
+# ---------------------------------------------------------------------------
 # preflight
 
 
@@ -475,7 +599,22 @@ def test_help_explains_both_modes_with_the_api_wording(capsys: pytest.CaptureFix
         lines = text.splitlines()
         assert f"  {EXPLORATORY_MODE_HELP}" in lines
         assert f"  {SCIENTIFIC_MODE_HELP}" in lines
+        assert "  3  the preflight blocks a requested case in the requested mode; nothing is simulated" in lines
+        assert (
+            "  4  partial run (run --runnable-only): the runnable cases were simulated, the blocked ones are listed"
+            in lines
+        )
     assert "--mode" in run_help and "required" in run_help
+    assert "--runnable-only" in run_help
+    assert " ".join(RUNNABLE_ONLY_HELP.split()) in " ".join(run_help.split())
+
+
+def test_exit_code_4_is_distinct_and_documented() -> None:
+    codes = (EXIT_OK, EXIT_SIMULATION_FAILED, EXIT_USAGE, EXIT_NOT_RUNNABLE, EXIT_PARTIAL)
+    assert codes == (0, 1, 2, 3, 4)
+    docs = (ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    assert "| 4 | Partial run" in docs
+    assert "--runnable-only" in docs
 
 
 def test_version_and_missing_command(capsys: pytest.CaptureFixture[str]) -> None:

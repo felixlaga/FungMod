@@ -6,6 +6,37 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Partial runs: simulate the runnable cases of a request and report the
+  blocked ones (RUN-001). `VirtualExperiment.simulate(..., blocked="report")`
+  simulates exactly the cases whose preflight allows simulation in the
+  requested mode (`preflight_policy`; scientific mode: `modelable` only) and
+  lists the others as not simulated; the default `blocked="refuse"` refuses
+  the request as before, and a request without any runnable case is refused
+  identically under both. Blocked cases get rows in
+  `modelability_preflight.csv`, `modelability_items.csv`,
+  `missing_parameters.csv`, `suggested_experiments.csv`,
+  `assumption_summary.csv`, `limitations_table.csv` (a blocking
+  `not_simulated` row) and `case_summary.csv`, and none in the per-sample
+  tables. Output schema `2.2.0` adds `case_summary.csv` columns `case_status`
+  (`simulated`, `not_simulated`) and `not_simulated_reason`;
+  `virtual_experiment_summary.json` and `output_manifest.json` gain
+  `blocked_policy`, `partial_run`, `requested_case_count`,
+  `simulated_case_count` and `blocked_cases`; the report states a partial
+  run. `DegradationScreenResult` gains `blocked_policy`, `blocked_reports`,
+  `partial_run` and `blocked_cases()`. `simulate_screen(..., cases=...)`
+  simulates listed triples of the requested grid in the order given; every
+  case keeps its grid position (`RegistryCaseEnsemble.case_index`, the
+  `case_<position>` id) and the seed of that position, so its samples are the
+  same in a full run, a partial run and a one-case selection of the same
+  request. `fungmod run --runnable-only` is the command-line form: it lists
+  the blocked cases with their measurement requests and exits with the new
+  code 4 (partial run); without the flag the exit code stays 3, and the
+  message suggests the flag when some case is runnable. `fungmod assemble`
+  prints its `run` command with `--runnable-only`, and says why, when a case
+  of the draft is a gap or a conflict
+  ([command line](docs/cli.md#run-the-runnable-cases-of-a-request),
+  [partial runs](docs/concepts/outputs.md#partial-runs)).
+
 - The user-data workflow from the command line (CLI-002), so that "fungus X
   on substrate Y in conditions Z" runs end to end from a shell:
   `fungmod assemble` (`assemble_user_tables`: one `--fungus`, `--substrate`,

@@ -81,6 +81,7 @@ from fungal_model.api.user_data_assembly import (
     assemble_user_tables,
 )
 from fungal_model.api.virtual_experiment import (
+    BlockedCasePolicy,
     DegradationScreenResult,
     VirtualExperiment,
     VirtualExperimentError,
@@ -157,5 +158,6 @@ __all__ = [
     "VirtualExperiment",
     "VirtualExperimentError",
     "VirtualExperimentMode",
+    "BlockedCasePolicy",
     "virtual_experiment",
 ]
