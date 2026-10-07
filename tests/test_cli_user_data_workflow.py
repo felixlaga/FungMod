@@ -255,7 +255,9 @@ def test_assemble_fill_check_data_and_run_end_to_end(tmp_path: Path) -> None:
     assert f"Digest: {dataset.digest}" in out_check
     assert "Kinetic values: 4; gaps: 4" in out_check
     assert "Genome and proteome annotations (genomes.csv): 1" in out_check
-    assert "Enzyme classes resolved from them: 2" in out_check
+    # beta-glucosidase, cellobiohydrolase (registry class since USERDATA-008) and the generic cellulase class.
+    assert len(dataset.genome_resolved_classes) == 3
+    assert f"Enzyme classes resolved from them: {len(dataset.genome_resolved_classes)}" in out_check
     for item in dataset.genome_resolved_classes:
         assert item["evidence"] in out_check
     assert f"Resolved classes without a registry record: {len(dataset.unmodellable_enzyme_classes)}" in out_check
