@@ -94,7 +94,9 @@ all files in the bundle.
 ## Next
 
 - Run the same study from a shell with the [command line](cli.md)
-  (`fungmod run`, `fungmod preflight`, `fungmod list`).
+  (`fungmod run`, `fungmod preflight`, `fungmod list`), and your own data
+  with `fungmod assemble`, `check-data`, `run --compare-timecourses` and
+  `fit`.
 - Run the same workflow on your own measurements with
   [user-supplied data](user-data.md).
 - Run the [zero-to-report notebook](notebooks.md#zero-to-a-complete-report).

@@ -26,6 +26,231 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CLI-002 The User-Data Workflow From The Command Line
+
+Status: `complete` for the stated scope (2026-10-07). The owner's goal, "i want
+fungi X on substrate Y in conditions Z, and then it automatically fetches (or
+from stored data, or even better input data) the different enzymes and stuff
+in the fungi, and then the code calculates all the stuff", now runs end to end
+from a shell: `fungmod assemble` gathers what the user's sources say about
+fungus X into one reviewable draft, the user fills its `REVIEW:` fields,
+`fungmod check-data` validates it, `fungmod run` simulates it (and with
+`--compare-timecourses` compares it with the user's time courses), and
+`fungmod fit` fits kinetic constants to those time courses. Every step was
+already in the API (ASSEMBLE-001, USERDATA-004, USERDATA-005); the command line
+before this exposed only `run`, `preflight`, `check-data` and `list`.
+
+Changed:
+
+- `fungal_model.cli`, three new subcommands and two extensions; the command
+  line only parses arguments and prints what the API returns, and an option
+  that is not given is not passed, so the API's own rule applies (a `REVIEW:`
+  field, or its documented default, stated in `--help`):
+  - `assemble` -> `assemble_user_tables`: `--fungus` (one per call; a second
+    is refused), `--substrate` (repeatable), conditions as every
+    `--temperature-c` x `--ph` pair in degC (the `run` grid's validation is
+    shared through `_grid_values`: both are needed), `--scientific-name`,
+    `--annotation`, `--annotation-tool`, `--annotation-source`,
+    `--enzyme-class CLASS` and `--enzyme-class-evidence CLASS EVIDENCE SOURCE`
+    (`enzyme_classes`, names or mappings, in command-line order),
+    `--kinetics-source` (`kinetics_sources`), `--entry-id`, `--same-species`,
+    `--user-data`, `--responses FILE` (a CSV with the `responses.csv` columns
+    and `substrate`), `--design QUANTITY=VALUE UNITS` or
+    `QUANTITY=LOWER:UPPER UNITS`, `--time-grid DURATION UNITS POINTS`,
+    `--cache-dir`, `--registry`, `--dataset-id` and `--output` (new or empty).
+    It writes the draft with `AssembledTablesDraft.write` and prints the
+    fungus, substrates and conditions as resolved, the enzyme classes with
+    their evidence, unmodellable classes and unmapped families, which classes
+    act on each substrate, the case table (fungus, class, substrate,
+    condition, kinetics status, condition route, source ids) with each case's
+    reason, transferred entries, every kinetic-law entry with its use and
+    reason, unused user rows, stored registry cases, the draft's limitations,
+    the files written, every `REVIEW:` field as `file:row:column: note`, and
+    the next commands (`check-data`, then `run` with the strain name,
+    substrates and `--condition` ids; a separate `--temperature-c`/`--ph`
+    command for each condition carried by a response law, which is an
+    `EnvironmentGrid` condition and not a `conditions.csv` row).
+  - `draft-kinetics SOURCE --provider PROVIDER` -> the provider's drafting
+    function (`user_tables_from_sabiork`): `--entry-id`, `--strain-for
+    ORGANISM=STRAIN_ID` (`strain_id_for_organism`), `--design`,
+    `--propose-enzyme-classes`, `--cache-dir`, `--registry`, `--dataset-id`,
+    `--output`. Prints the converted entry ids, every entry and parameter not
+    converted with the API's reason, the tables' row counts, strains,
+    substrates and conditions, the `REVIEW:` fields and the next commands.
+    Name: `draft-sabiork` was suggested, but
+    `tests/test_guardrails_no_hardcoding.py` forbids the token `sabio` in
+    `cli.py` ("the command line names no source database"), so the command
+    is source-neutral and the provider comes from a new table in the API (below).
+  - `fit DIR --case STRAIN_ID ENZYME_CLASS SUBSTRATE_ID --fit QUANTITY LOWER
+    UPPER UNITS ...` -> `fit_user_dataset` with every keyword: `--initial
+    QUANTITY VALUE`, `--condition`, `--error-model sd_weighted|unweighted`
+    (the API's names), `--allow-unidentified`, `--fitted-dataset-id`,
+    `--confidence-level`, `--profile-points`, `--diff-step`, `--max-nfev`,
+    `--registry` (`base_registry`), `--output` (new or empty;
+    `UserDatasetFit.write`). The suggested `--fit QUANTITY:LOWER:UPPER` and
+    `--case CASE_ID` became four and three separate values, because the API
+    takes bounds with units and a case as (strain, class, substrate) tuples
+    and units such as `1/min` would make a separator ambiguous. Prints the
+    case, conditions, observations and timecourse rows, error model,
+    objective, convergence, per quantity the value, units, interval at the
+    confidence level, identifiability verdict, bounds, start and the verdict's
+    method and reason, the warnings and the in-sample claim boundary, then the
+    fitted dataset's id, digest and report file and the next commands. A
+    refused fit (`UserDataFitError`) prints the verdicts the report holds and
+    exits with code 2; nothing is written.
+  - `run --compare-timecourses` -> `DegradationScreenResult.compare_with_timecourses()`
+    after the bundle is written: prints per series (case, observable) the
+    observation count, observations with `sd`, RMSE with units, mean residual,
+    fraction inside the 5-95 % band and observations used in a fit, the
+    case-to-time-course mapping, the not-compared series, the API's in-sample
+    note and interpolation rule and the table path. A flag of `run`, not a
+    `compare` subcommand, because the API compares a result in memory with the
+    dataset that built it and there is no API to reload a result. Without
+    `--user-data`, or with a dataset without `timecourse.csv`, it exits with 2
+    before simulating; a comparison the API refuses after the simulation
+    (observations beyond the simulated time) exits with 2, says that the
+    bundle is complete, and prints the issues.
+  - `check-data` also prints the genome or proteome resolution
+    (`genome_annotations` with the proteome id, unresolved EC numbers and
+    EC/CAZy disagreement counts where present and the claim boundary,
+    `genome_resolved_classes`, `unmodellable_enzyme_classes`,
+    `unmapped_families`), the time courses (`UserDataset.timecourses`: per
+    series strain, class, substrate, condition, observable, points, time range,
+    units, observations with `sd`) and a fitted dataset's `fit` block
+    (quantities, verdicts, intervals, claim boundary). After unfilled
+    `REVIEW:` fields (the loader's refusal, every field as
+    `file:row:column: message`) it adds one line saying to fill them.
+  - Exit codes unchanged in meaning: `UserTablesSourceError`,
+    `UserTablesAssemblyError`, `UserDataError` and `UserDataFitError` are
+    usage or input errors (2), printed as `file:row:column: message` where the
+    error carries issues. The non-empty-output message names the reason per
+    kind of output. The top-level help lists the workflow; `assemble` and
+    `draft-kinetics` help say that nothing is fetched, `fit` and `run` help
+    carry the in-sample note.
+- API, additive and behaviour-neutral: `USER_TABLE_PROVIDERS` in
+  `fungal_model.api.user_data_sources` (in its `__all__` and the API
+  reference), a read-only mapping from the provider name `sabiork` (the name
+  `source_proposal` uses, `AVAILABLE_SOURCE_PROVIDERS`) to
+  `user_tables_from_sabiork`, so that the command line offers the providers
+  without naming a database.
+- Docs: `docs/cli.md` (command table; new sections "Fungus X on substrate Y at
+  conditions Z, from your sources" with the whole assemble -> review ->
+  check-data -> run example and real output, the option-to-argument table,
+  "Draft tables from SABIO-RK", "Compare with your time courses", "Fit kinetic
+  constants to your time courses" with real output and the option table;
+  defaults and exit codes), `README.md` (Command line subsection with the
+  fungus-X-substrate-Y-conditions-Z workflow, capability row),
+  `docs/user-data.md` (the shell form of every step, linked from each
+  section; the "There is no command-line subcommand yet" limit replaced by
+  what `assemble` does not expose), `docs/quickstart.md`, `docs/api.md`,
+  `CHANGELOG.md`.
+
+Not changed: no process law, solver, registry record, user-data rule, loader
+check, assembly, drafting, comparison or fit behaviour, output table or schema,
+preflight status or numerical result. `run`, `preflight`, `list` and the
+existing `check-data` lines print what they printed before.
+
+Tests: new `tests/test_cli_user_data_workflow.py` (45 tests), every test with
+`urllib.request.urlopen`, the SABIO-RK fetch module's `urlopen` and
+`socket.socket.connect` patched to fail (module-scoped, so the module's
+datasets and fits are covered too):
+- assemble end to end on the `genome_case` annotation and the frozen Reaction
+  618 export (entry 35622, 30 and 40 degC at pH 5): the written draft is
+  byte-identical to `assemble_user_tables` with the same arguments; the case
+  table shows `transferred_estimate` at c30_ph5 and `gap` at c40_ph5 with each
+  reason; all eight `REVIEW:` fields are listed as the API reports them;
+  `check-data` refuses the draft (exit 2, every field, the hint), the fields
+  are filled with the assembly tests' reviewer answers, `check-data` passes
+  and prints the genome resolution; the printed `run` command, executed as
+  printed, exits 3 on the 40 degC gap with its measurement request, the
+  30 degC case runs in exploratory mode (exit 0, dataset id and digest in the
+  manifest) and is refused in scientific mode (exit 3);
+- the options reach the API unchanged (byte-identical drafts): annotation
+  source, `--same-species` (the rice entry becomes
+  `literature_same_organism`), a design value and a design range, the time
+  grid and cache directory (only the reviewer left to fill); asserted classes
+  by name and with evidence; a response law from `--responses` on the oxidase
+  dataset, whose law-carried 40 degC condition gets the printed grid command,
+  and both printed commands run (exit 0, `active_response_model`);
+- `draft-kinetics` on the export: byte-identical to `user_tables_from_sabiork`,
+  the five converted entries, all 24 listed entries and every listed parameter
+  with the API's reason, the review fields; the reaction-id form with
+  `--cache-dir`, `--entry-id 35622`, `--strain-for` and `--design`;
+  `--propose-enzyme-classes`; `USER_TABLE_PROVIDERS` equals
+  `{"sabiork": user_tables_from_sabiork}` and its keys
+  `AVAILABLE_SOURCE_PROVIDERS`;
+- `check-data` on the UniProt fixture prints the proteome resolution;
+- `run --compare-timecourses` on the synthetic esterase time courses of
+  `tests/test_user_data_timecourse.py` (helpers reused): the printed RMSE and
+  counts equal `timecourse_comparison.csv`, which joins the manifest;
+- `fit` on the same dataset (the fit tests' bounds and starting values,
+  `--profile-points 11`): printed values, intervals and verdicts equal
+  `fit_report.json`, which records the forwarded profile points; the fitted
+  dataset loads, `check-data` prints its fit block, the printed run command
+  works and its comparison marks all 8 observations per series as used in the
+  fit, and scientific mode refuses it (exit 3); the saturating case exits 2
+  with the API's refusal, the verdicts printed and nothing written, and with
+  `--allow-unidentified --fitted-dataset-id` writes the labelled dataset;
+- comparison refusals (no user data, no time courses: exit 2, nothing
+  simulated; observations beyond the simulated duration: exit 2 after a
+  complete bundle without `timecourse_comparison.csv`);
+- 29 usage and input errors (exit 2, nothing written), the API's bound check,
+  non-empty output for each new subcommand, help texts, and a source check
+  that `cli.py` names no source database and imports no network module.
+`tests/test_cli.py` and the guardrail tests are unchanged and pass
+(`cli.py` stays free of organism, substrate, enzyme and source-database tokens).
+
+Commands and results (worktree on `main` 5ac677e, Python 3.11 venv):
+- `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`: all
+  checks passed.
+- `pyright --pythonpath <venv python> src/fungal_model/cli.py
+  src/fungal_model/api/user_data_sources.py tests/test_cli.py
+  tests/test_cli_user_data_workflow.py`: 0 errors, 0 warnings. (Without
+  `--pythonpath`, pyright picks an interpreter without pytest and reports only
+  that `pytest` cannot be resolved in the test file.)
+- `mkdocs build --strict`: built without warnings; `site/` removed afterwards;
+  the eight new cross-page anchors checked in the built HTML.
+- `pytest tests/test_cli.py tests/test_cli_user_data_workflow.py
+  tests/test_guardrails_*.py tests/test_user_data*.py
+  tests/test_phase1_documentation_sync.py tests/test_repository_hygiene.py
+  tests/test_release_configuration.py tests/test_shared_progress.py
+  tests/test_active_instruction_hierarchy.py`: 420 passed (373.5 s).
+- Full suite `pytest -q` (background, log in the session scratchpad): 2408
+  passed in 2429.8 s.
+- After the last edit (the `--allow-unidentified` hint line of a refused
+  fit), `pytest tests/test_cli.py tests/test_cli_user_data_workflow.py
+  tests/test_guardrails_*.py tests/test_phase1_documentation_sync.py
+  tests/test_repository_hygiene.py tests/test_release_configuration.py
+  tests/test_active_instruction_hierarchy.py`: 125 passed (154.7 s).
+
+Scientific impact: none on any result. The same drafts, fits and comparisons
+become reachable from a shell; the command line adds no value, threshold or
+default of its own, and prints the API's honesty texts (transferred values
+are estimates, gaps with their measurement requests, the in-sample claim
+boundary and comparison note) beside the numbers.
+
+Compatibility: additive. Existing subcommands, options, output and exit codes
+are unchanged; `USER_TABLE_PROVIDERS` is a new public name.
+
+Ambiguities and limitations: `assemble` takes conditions as a degC grid of
+`--temperature-c` x `--ph` (as `run` does); kelvin, explicit condition ids
+and notes, and a new substrate's categories are not options (review the
+tables or use the Python API). Design values take the API's default source
+and method text. The printed `run` commands leave the mode, samples, seed and
+output to the user (no hidden defaults) and ask for every requested
+condition, so a draft with gaps is blocked (exit 3) until those cases are
+dropped or measured. The comparison is a flag of `run`; there is no way to
+compare an earlier run directory. `fit` prints values to four significant
+figures; `fit_report.json` holds full precision. No JSON output mode.
+
+Risk: low. The command line calls public API functions with the user's
+arguments and prints their results; the API change is one read-only mapping.
+
+Recommended next task: per-case selection in `run` so that the runnable
+cases of an assembled draft run while its gap cases are reported (today the
+40 degC gap blocks the whole printed command), then a machine-readable
+`--json` summary for `assemble`, `fit` and `run`.
+
 ## ASSEMBLE-001 One Dataset For Fungus, Substrate And Conditions
 
 Status: `complete` for the stated scope (2026-10-06). The step the owner's goal

@@ -100,6 +100,29 @@ preflight blocks exits with code 3 and its measurement requests.
 `fungmod preflight`, `fungmod check-data DIR` and `fungmod list` cover the
 other steps ([command line](docs/cli.md)).
 
+For fungus X on substrate Y at conditions Z from your own sources, the whole
+user-data workflow runs from the shell too: `fungmod assemble` gathers the
+fungus's annotation, the enzyme classes you assert, a user dataset and
+SABIO-RK entries (an export file or a frozen snapshot; nothing is fetched)
+into one draft and prints every case's kinetics status, sources and reason
+and the `REVIEW:` fields to fill; then `check-data`, `run` (with
+`--compare-timecourses` to compare with your time courses) and `fit` (Km with
+kcat or Vmax, with identifiability verdicts; in-sample, exploratory only):
+
+```bash
+fungmod assemble --fungus "My strain" --substrate cellobiose \
+  --temperature-c 30 --temperature-c 40 --ph 5 \
+  --annotation overview.txt --annotation-tool "dbCAN 4.1.4" \
+  --kinetics-source sabiork_export.json --dataset-id my_strain --output my_strain
+# fill the REVIEW: fields it lists (my_strain/review.md explains each), then
+fungmod check-data my_strain
+fungmod run --user-data my_strain --fungus "My strain" --substrate cellobiose \
+  --condition c30_ph5 --mode exploratory --samples 32 --seed 1 --output runs/my_strain
+```
+
+`fungmod draft-kinetics SOURCE --provider sabiork` drafts tables from
+SABIO-RK entries alone ([user-data workflow](docs/cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
+
 Start with the [installation guide](https://fungmod.readthedocs.io/en/latest/install/),
 run a complete workflow in
 [`20_zero_to_complete_virtual_experiment.ipynb`](notebooks/examples/20_zero_to_complete_virtual_experiment.ipynb),
@@ -114,7 +137,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
 | Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
-| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts ([command line](docs/cli.md)) |
+| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts; the user-data workflow `assemble` (fungus X on substrate Y at conditions Z from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's status and the `REVIEW:` fields), `draft-kinetics`, `check-data`, `run --compare-timecourses` and `fit`, with nothing fetched ([command line](docs/cli.md)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
