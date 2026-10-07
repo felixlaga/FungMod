@@ -84,6 +84,24 @@ All notable public releases of FungMod are documented here.
   the rate form the user started, or both forms when none was
   (`docs/user-data.md`).
 
+- Command-line virtual experiments (CLI-001): the `fungmod` console script
+  (`fungal_model.cli:main`, also `python -m fungal_model`) with `run`,
+  `preflight`, `check-data` and `list`. `fungmod run --fungus NAME
+  --substrate NAME` with `--environment`/`--condition` names or a
+  `--temperature-c`/`--ph`/`--oxygen` grid, optional `--user-data` and
+  `--registry`, prints the preflight table (status, missing items and their
+  suggested experiments), simulates through `VirtualExperiment.simulate`, writes
+  the tables, manifest and Markdown report (`--report` adds the HTML report),
+  and prints each case's final metrics and threshold times, the limitations
+  count and the provenance and limitations table paths. `--mode` is required;
+  exploratory mode requires `--samples` and `--seed`, scientific mode refuses
+  them; `--output` must be new or empty. Exit codes: 0 success, 1 simulation
+  failure, 2 usage or input error (user-data issues as `file:row:column:
+  message`), 3 a case blocked by the preflight, with its measurement requests.
+  `DegradationScreenResult.case_summary()` and `summary_metrics()` read the
+  existing tables, and `fungal_model.api.result_tables.preflight_policy` (was
+  private) gives the per-mode simulation policy (`docs/cli.md`).
+
 - User-supplied enzyme and kinetics tables into virtual experiments
   (USERDATA-001): `load_user_dataset` reads a directory with
   `user_dataset.yml` and CSV tables of strains, enzyme classes, substrates,
@@ -425,6 +443,50 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- Degradation and product-release rates in the virtual-experiment tables were
+  wrong (FIX-RATES-001). `time_series_long.csv` built `degradation_rate` and
+  `product_release_rate` from whichever process rate was listed last at each
+  time point and gave both rows that one value and unit; `final_metrics.csv`
+  reported `maximum_substrate_depletion_rate` and
+  `maximum_product_release_rate` as the largest rate of any process, whatever
+  its process or unit. For models with more than one process the reported
+  rates therefore belonged to an arbitrary process: the *T. harzianum* P49P11
+  culture case reported a maximum substrate depletion rate of about 45
+  `beta_glucosidase_assay_unit / hour / liter` for cellulose measured in g/L.
+  For single-process cases with a product yield other than one the product
+  release rate was the process rate, not d[product]/dt: the SABIO-RK Reaction
+  618 case (two glucose per cellobiose) reported half the true value. All
+  previously reported maximum rates and product-release rates from such cases
+  are wrong. `ProcessODESolver` now records `SimulationResult.state_rates`, the
+  net rate of change of every state at every returned time point, by
+  evaluating the compiled right-hand side it integrated (rates at
+  `max(state, 0)`, no finite differences), written to `state_rates.csv` and
+  `record.json`. The tables take `degradation_rate` = -d[substrate]/dt and
+  `product_release_rate` = +d[product]/dt from it, each in its own state's
+  units per time (source `simulation_state_rate`), and the maximum-rate
+  metrics are their maxima over the returned time points. A case without a
+  mapped substrate or product state, or a bundle without `state_rates.csv`,
+  reports these rows and metrics as `not_applicable` with the reason in a new
+  optional `notes` column of `time_series_long.csv` (and in `final_metrics.csv`
+  `notes`); process rates are never used in their place, and the
+  `process_rate.<process_id>` rows are unchanged. Output schema `2.0.0`
+  (was `1.8.0`): rows keep their names but change meaning, values, units and
+  source, so do not pool `1.8.0` and `2.0.0` bundles; regenerate earlier
+  virtual-experiment outputs that use these rates. No committed data or paper
+  artifact contains them.
+
+- SABIO-RK proposals gave every parameter of one type the same proposed symbol
+  when its species did not distinguish them, so the four pKa values of a
+  pH-dependent kinetic law collided (`proposed_sabiork_parameter_618_38522_pka`)
+  and the whole Reaction 618 proposal could not be reviewed. The SABIO-RK
+  parameter name now completes such symbols (`pka_pke1`, `pka_pkes2`); symbols
+  whose name adds nothing are unchanged (FIX-DOCS001).
+- Preflight reported the pH-ionization Michaelis-Menten case as modelable in an
+  environment whose pH is a range, after which every simulation sample failed.
+  Preflight now checks the environment conditions each process law reads
+  (`PROCESS_ENVIRONMENT_CONDITIONS`: pH for the ionization law, temperature for
+  thermal inactivation) and reports a range or unknown as blocking, with the
+  remedy (FIX-DOCS001).
 - Importing the COPASI stack through `fungal_model.standards.copasi` no longer
   leaves the process in the C locale. COPASI's static initialiser calls
   `setlocale(LC_ALL, "C")`, which switched Python's preferred text encoding to

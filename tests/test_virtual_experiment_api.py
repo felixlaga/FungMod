@@ -9,6 +9,7 @@ import pytest
 from fungal_model import EnvironmentGrid, VirtualExperiment
 from fungal_model.api import DegradationScreenResult, VirtualExperimentError
 from fungal_model.api.output_schema import OUTPUT_SCHEMA_VERSION
+from fungal_model.api.result_tables import preflight_policy
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -102,7 +103,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     output_manifest = _json_mapping(output_dir / "output_manifest.json")
     output_schema = _json_mapping(output_dir / "virtual_experiment_output_schema.json")
 
-    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "1.8.0"
+    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "2.0.0"
     assert output_schema["schema_version"] == OUTPUT_SCHEMA_VERSION
     assert "conservation_diagnostics.csv" in output_manifest["files"]
     assert "conservation_diagnostics" in output_manifest["tables"]
@@ -135,6 +136,15 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     assert any(row["metric"] == "time_to_10_percent_substrate_degradation" for row in threshold_rows)
     assert any(row["metric"] == "final_product_concentration" and row["count"] == "6" for row in summary_rows)
     assert result.comparison_summary() == comparison_rows
+    assert result.summary_metrics() == summary_rows
+    assert result.case_summary() == _csv_rows(output_dir / "case_summary.csv")
+    assert [row["case_id"] for row in result.case_summary()] == ["case_0000"]
+    policy = preflight_policy(result.preflight_reports[0])
+    assert {key: str(value).lower() for key, value in policy.items()} == {
+        "simulation_allowed_for_mode": preflight_rows[0]["simulation_allowed_for_mode"],
+        "blocking_reason": preflight_rows[0]["blocking_reason"],
+        "recommended_next_action": preflight_rows[0]["recommended_next_action"],
+    }
     assert result.uncertainty_summary() == uncertainty_rows
     assert result.trajectory_quantiles() == trajectory_quantile_rows
     assert result.conservation_diagnostics() == conservation_diagnostic_rows
