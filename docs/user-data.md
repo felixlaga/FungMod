@@ -37,6 +37,15 @@ A loaded `UserDataset` can be passed as `user_data=` as well; it carries the
 `dataset_id`, a SHA-256 `digest` over the manifest and table bytes, the
 generated registry mappings (`records`) and `to_dict()`.
 
+Every step on this page also runs from a shell ([command line](cli.md)):
+`fungmod check-data DIR` loads a directory and prints its gaps, genome or
+proteome resolution, time courses and fitted values, or every issue as
+`file:row:column: message`; `fungmod run --user-data DIR` simulates it;
+`fungmod assemble`, `fungmod draft-kinetics`, `fungmod run
+--compare-timecourses` and `fungmod fit` are the command-line forms of
+`assemble_user_tables`, `user_tables_from_sabiork`, `compare_with_timecourses`
+and `fit_user_dataset` (see [the user-data workflow from a shell](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
+
 Seven complete examples live in the test fixtures:
 `tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on a
 user-defined aryl ester, `kcat` form, estimates only),
@@ -103,6 +112,12 @@ draft.write("strain_g1_on_cellobiose")  # tables, annotations/, user_dataset.yml
 for case in draft.assembly["cases"]:
     print(case["enzyme_class"], case["condition"], case["kinetics_status"], case["reason"])
 ```
+
+From a shell, `fungmod assemble --fungus ... --substrate ... --temperature-c
+30 --temperature-c 40 --ph 5 --annotation ... --annotation-tool ...
+--kinetics-source ... --entry-id 35622 --dataset-id ... --output ...` writes the
+same draft and prints the per-case report, the `REVIEW:` fields and the next
+commands ([command line](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
 
 With the hand-written annotation of the `genome_case` fixture and the frozen
 Reaction 618 snapshot (`tests/test_user_data_assembly.py`), the strain has
@@ -234,7 +249,12 @@ cases of a registry fungus.
   [solid substrate](#solid-substrates) is refused (the drafted tables carry no
   `amount_basis`); load such a dataset with `load_user_dataset` directly.
   Everything else is as for any user dataset (below).
-- There is no command-line subcommand yet.
+- From a shell, `fungmod assemble` takes the request as a grid of
+  `--temperature-c` and `--ph` values in degC, substrates by name and asserted
+  classes by name or with their evidence and source
+  ([command line](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)); kelvin temperatures, explicit condition ids
+  and notes, and the categories of a new substrate are set in the Python API
+  or while reviewing the tables.
 
 ## Directory layout
 
@@ -1336,6 +1356,11 @@ for series in comparison.series:
     print(series["series_id"], series["rmse"], series["units"], series["fraction_inside_band"])
 ```
 
+From a shell, `fungmod run --user-data DIR ... --compare-timecourses` does
+the same after simulating and prints each series' RMSE, mean residual,
+fraction inside the band and observations used in a fit
+([command line](cli.md#compare-with-your-time-courses)).
+
 For each simulated case with time courses, the median (`p50`) and the 5-95 %
 band (`p05`, `p95`) of `trajectory_quantiles.csv` are brought to each observed
 time by **linear interpolation on the simulated output grid** and converted to
@@ -1373,6 +1398,13 @@ for item in fit.quantities:
     print(item.quantity, item.value, item.units, item.identifiability, item.interval)
 fitted = fit.write("path/to/esterase_case_fitted")   # a new user dataset
 ```
+
+From a shell: `fungmod fit DIR --case strain_e1 carboxylesterase
+p_nitrophenyl_butyrate --fit km 10 5000 µM --fit kcat 1 300 1/min --initial km
+1000 --initial kcat 5 --output DIR_fitted` prints the fitted values, intervals
+and verdicts and writes the fitted dataset; an unidentified quantity exits
+with code 2 unless `--allow-unidentified`
+([command line](cli.md#fit-kinetic-constants-to-your-time-courses)).
 
 What the fit does:
 
@@ -1487,6 +1519,12 @@ draft = fm.user_tables_from_sabiork(
 draft.write("os3bglu6_sabiork")  # the tables, user_dataset.yml and review.md
 print(draft.review)                # every decision, and everything not converted
 ```
+
+From a shell: `fungmod draft-kinetics SOURCE --provider sabiork --dataset-id ID
+--output DIR`, with `SOURCE` an export file or a reaction ID read from the
+local snapshots and `--entry-id`, `--design QUANTITY=VALUE UNITS`,
+`--strain-for ORGANISM=STRAIN_ID` and `--propose-enzyme-classes` for the
+arguments above ([command line](cli.md#draft-tables-from-sabio-rk)).
 
 The draft does not load yet. Every field that needs a person's decision begins
 with `REVIEW:`: always the manifest's `contributor` and the simulation time grid

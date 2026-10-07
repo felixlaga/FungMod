@@ -6,6 +6,37 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- The user-data workflow from the command line (CLI-002), so that "fungus X
+  on substrate Y in conditions Z" runs end to end from a shell:
+  `fungmod assemble` (`assemble_user_tables`: one `--fungus`, `--substrate`,
+  a `--temperature-c` x `--ph` grid, `--annotation` with `--annotation-tool`
+  and `--annotation-source`, `--enzyme-class` and `--enzyme-class-evidence`,
+  `--kinetics-source`, `--entry-id`, `--same-species`, `--user-data`,
+  `--responses` CSV, `--design QUANTITY=VALUE UNITS`, `--time-grid`,
+  `--cache-dir`, `--dataset-id`, `--output`) writes the draft and prints the
+  per-case report (class, substrate, condition, kinetics status, route,
+  source ids, reason), the `REVIEW:` fields as `file:row:column: note` and
+  the next `check-data` and `run` commands (with a grid command for a
+  law-carried condition); `fungmod draft-kinetics SOURCE --provider sabiork`
+  (`user_tables_from_sabiork` on an export file or a frozen snapshot) prints
+  the converted entries and every entry and parameter not converted with the
+  reason; `fungmod fit DIR --case ... --fit QUANTITY LOWER UPPER UNITS`
+  (`fit_user_dataset`, every keyword mapped) prints fitted values, intervals,
+  identifiability verdicts and the in-sample claim boundary and writes the
+  fitted dataset, and exits with code 2 when the API refuses the fit (an
+  unidentified quantity unless `--allow-unidentified`); `fungmod run
+  --compare-timecourses` (`DegradationScreenResult.compare_with_timecourses`)
+  writes `timecourse_comparison.csv` and prints RMSE, mean residual, band
+  coverage and observations used in a fit per series; `fungmod check-data`
+  also prints the genome or proteome resolution, the time courses, the fit
+  block of a fitted dataset and a hint after unfilled `REVIEW:` fields. No
+  subcommand fetches. `USER_TABLE_PROVIDERS` in
+  `fungal_model.api.user_data_sources` maps the provider name `sabiork` to
+  `user_tables_from_sabiork`, so that the command line names no source
+  database (`docs/cli.md`). The printed next-step commands quote their
+  arguments for the platform's shell (POSIX quoting, or the double quotes
+  `cmd` and PowerShell read on Windows).
+
 - Solid substrates in user data (USERDATA-008): a `substrates.csv` row may
   declare one suspended solid polymer, `physical_state` `solid_polymer` with
   the new column `amount_basis` `dry_mass` and `yield_basis` `g/g`; a registry
