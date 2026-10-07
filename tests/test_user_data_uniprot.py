@@ -77,6 +77,8 @@ DATASET_ID = "uniprot_demo"
 FUNGUS = "uniprot_demo__strain_u1"
 STRAIN_NAME = "Proteome-annotated strain U1"
 BGL = "uniprot_demo__beta_glucosidase"
+# USERDATA-008: the registry has a cellobiohydrolase record (EC 3.2.1.91), so X0TEST05 now supports it.
+CBH = "uniprot_demo__cellobiohydrolase"
 CELLULASE = "uniprot_demo__cellulase_generic"
 GLUCOAMYLASE = "uniprot_demo__glucoamylase"
 BGL_PREFIX = "uniprot_demo__strain_u1__beta_glucosidase__cellobiose__c30_ph5__"
@@ -157,7 +159,7 @@ def extended_registry(base_registry: FungModRegistry) -> FungModRegistry:
 
 def test_classes_with_a_record_join_the_strain_with_the_accessions_behind_them(proteome: UserDataset) -> None:
     fungus = _records(proteome, "fungi")[FUNGUS]
-    assert fungus["enzyme_classes"] == [BGL, CELLULASE]
+    assert fungus["enzyme_classes"] == [BGL, CBH, CELLULASE]
 
     evidence = fungus["provenance"]["enzyme_class_evidence"][BGL]
     assert evidence["evidence"] == "UniProt proteome UP000000000 (3 proteins, CAZy families GH1, GH3, EC 3.2.1.21)"
@@ -178,7 +180,7 @@ def test_classes_with_a_record_join_the_strain_with_the_accessions_behind_them(p
     assert "unreviewed" in annotation["claim_boundary"]
 
     resolved = {item["enzyme_class"]: item for item in proteome.genome_resolved_classes}
-    assert set(resolved) == {"beta_glucosidase", "cellulase_generic"}
+    assert set(resolved) == {"beta_glucosidase", "cellobiohydrolase", "cellulase_generic"}
     assert resolved["beta_glucosidase"]["source_type"] == UNIPROT_SOURCE_TYPE
     assert resolved["beta_glucosidase"]["accession_count"] == 3
     assert resolved["beta_glucosidase"]["ec_numbers"] == ["3.2.1.21"]
@@ -186,6 +188,13 @@ def test_classes_with_a_record_join_the_strain_with_the_accessions_behind_them(p
     # GH5 resolves to cellulase_generic; the protein's EC 3.2.1.4 resolves to no class and cannot be compared.
     assert resolved["cellulase_generic"]["accessions_by_basis"]["cazy"] == ["X0TEST06"]
     assert resolved["cellulase_generic"]["ec_numbers"] == []
+    # GH7 and EC 3.2.1.91 both name the cellobiohydrolase record: the reviewed X0TEST05 agrees.
+    assert resolved["cellobiohydrolase"]["accessions_by_basis"] == {"cazy_and_ec": ["X0TEST05"], "cazy": [], "ec": []}
+    assert resolved["cellobiohydrolase"]["ec_numbers"] == ["3.2.1.91"]
+    assert resolved["cellobiohydrolase"]["specificity"] == DIAGNOSTIC
+    assert fungus["provenance"]["enzyme_class_evidence"][CBH]["evidence"] == (
+        "UniProt proteome UP000000000 (1 protein, CAZy families GH7, EC 3.2.1.91)"
+    )
 
 
 def test_annotation_entry_reports_columns_counts_and_every_ec_outcome(proteome: UserDataset) -> None:
@@ -197,13 +206,14 @@ def test_annotation_entry_reports_columns_counts_and_every_ec_outcome(proteome: 
     assert "Reviewed" in read["read_columns"]
     assert read["entry_rows"] == 12
     assert read["review_counts"] == {"reviewed": 2, "unreviewed": 10, "not_stated": 0}
-    assert read["protein_counts"] == {"cazy_and_ec": 1, "cazy": 4, "ec": 1, "disagreement": 2, "no_class": 3}
+    # USERDATA-008: X0TEST05 (GH7, EC 3.2.1.91) moved from CAZy-only to agreeing CAZy and EC evidence.
+    assert read["protein_counts"] == {"cazy_and_ec": 2, "cazy": 3, "ec": 1, "disagreement": 2, "no_class": 3}
     assert read["family_map"]["sources"] == list(CazymeFamilyMap.load().sources)
-    assert read["ec_comparable_classes"] == ["beta_glucosidase"]
+    assert read["ec_comparable_classes"] == ["beta_glucosidase", "cellobiohydrolase"]
 
     unresolved = {item["ec_number"]: item for item in read["unresolved_ec_numbers"]}
-    assert set(unresolved) == {"3.1.1.73", "3.2.1.3", "3.2.1.37", "3.2.1.4", "3.2.1.91"}
-    assert unresolved["3.2.1.91"]["accessions"] == ["X0TEST05"]
+    assert set(unresolved) == {"3.1.1.73", "3.2.1.3", "3.2.1.37", "3.2.1.4"}
+    assert unresolved["3.2.1.4"]["accessions"] == ["X0TEST06"]
     assert all(item["reason"] == "no registry enzyme class carries this EC number" for item in unresolved.values())
     # A partial EC number is kept as written and never resolved, also beside a complete one.
     assert read["partial_ec_numbers"] == [
@@ -220,7 +230,8 @@ def test_disagreeing_proteins_are_reported_with_both_sides_and_support_no_class(
     gh7 = disagreements["X0TEST04"]
     assert (gh7["cazy_families"], gh7["cazy_classes"]) == (["CBM1", "GH7"], ["cellobiohydrolase"])
     assert (gh7["ec_numbers"], gh7["ec_classes"]) == (["3.2.1.21"], ["beta_glucosidase"])
-    assert gh7["contested_classes"] == ["beta_glucosidase"]
+    # Both classes carry a registry EC number now, so both are contested (USERDATA-008).
+    assert gh7["contested_classes"] == ["beta_glucosidase", "cellobiohydrolase"]
     # GH3 names beta_glucosidase, whose registry record carries an EC number the protein's EC does not match.
     gh3 = disagreements["X0TEST10"]
     assert (gh3["cazy_classes"], gh3["ec_numbers"], gh3["ec_classes"]) == (["beta_glucosidase"], ["3.2.1.37"], [])
@@ -236,9 +247,10 @@ def test_classes_without_a_registry_record_are_listed_not_fabricated(
     base_registry: FungModRegistry,
 ) -> None:
     unmodellable = {item["enzyme_class"]: item for item in proteome.unmodellable_enzyme_classes}
-    assert set(unmodellable) == {"cellobiohydrolase", "glucoamylase"}
-    assert unmodellable["cellobiohydrolase"]["accessions"] == ["X0TEST05"]
-    assert unmodellable["cellobiohydrolase"]["specificity"] == DIAGNOSTIC
+    # USERDATA-008: cellobiohydrolase has a registry record now and is no longer listed here.
+    assert set(unmodellable) == {"glucoamylase"}
+    assert unmodellable["glucoamylase"]["accessions"] == ["X0TEST09"]
+    assert unmodellable["glucoamylase"]["specificity"] == DIAGNOSTIC
     assert unmodellable["glucoamylase"]["families"] == ["GH15"]
     assert all(item["source_type"] == UNIPROT_SOURCE_TYPE for item in unmodellable.values())
     assert all("from a proteome annotation" in item["reason"] for item in unmodellable.values())
@@ -248,7 +260,7 @@ def test_classes_without_a_registry_record_are_listed_not_fabricated(
     for enzyme_class in unmodellable:
         assert f"{DATASET_ID}__{enzyme_class}" not in generated
         assert not any(record_id.endswith(enzyme_class) for record_id in overlaid.enzyme_classes)
-    assert proteome.summary()["record_counts"]["enzyme_classes"] == 2
+    assert proteome.summary()["record_counts"]["enzyme_classes"] == 3
 
 
 def test_unmapped_families_are_listed_with_their_accessions(proteome: UserDataset) -> None:
@@ -303,7 +315,6 @@ def test_preflight_is_underparameterized_and_simulation_is_refused(proteome: Use
     assert annotation["source_type"] == UNIPROT_SOURCE_TYPE
     assert {item["accession"] for item in annotation["ec_cazy_disagreements"]} == {"X0TEST04", "X0TEST10"}
     assert {item["enzyme_class"]: item["accessions"] for item in resolution["unmodellable_enzyme_classes"]} == {
-        "cellobiohydrolase": ["X0TEST05"],
         "glucoamylase": ["X0TEST09"],
     }
     assert all(item["source_type"] == UNIPROT_SOURCE_TYPE for item in resolution["genome_resolved_classes"])
@@ -372,14 +383,14 @@ def test_a_proteome_class_on_a_non_cellulose_substrate_follows_the_base_registry
 ) -> None:
     dataset = load_user_dataset(UNIPROT, registry=extended_registry)
 
-    assert _records(dataset, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CELLULASE, GLUCOAMYLASE]
+    assert _records(dataset, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CBH, CELLULASE, GLUCOAMYLASE]
     resolved = {item["enzyme_class"]: item for item in dataset.genome_resolved_classes}
     # With an EC number on the class, GH15 and EC 3.2.1.3 of X0TEST09 agree.
     assert resolved["glucoamylase"]["accessions_by_basis"]["cazy_and_ec"] == ["X0TEST09"]
     assert "glucoamylase" not in {item["enzyme_class"] for item in dataset.unmodellable_enzyme_classes}
     (read,) = dataset.genome_annotations
     assert "3.2.1.3" not in {item["ec_number"] for item in read["unresolved_ec_numbers"]}
-    assert read["ec_comparable_classes"] == ["beta_glucosidase", "glucoamylase"]
+    assert read["ec_comparable_classes"] == ["beta_glucosidase", "cellobiohydrolase", "glucoamylase"]
 
     gap = _parameter(dataset, "uniprot_demo__strain_u1__glucoamylase__maltose__c30_ph5__km__gap")
     assert gap.substrate_id == "uniprot_demo__maltose"
@@ -545,13 +556,15 @@ def test_export_reached_through_a_symbolic_link_outside_the_directory_is_refused
 
 def test_strain_whose_proteome_resolves_no_registry_class_is_refused(tmp_path: Path) -> None:
     lines = _tsv_lines()
-    tsv = lines[0] + "".join(line for line in lines if line.startswith(("X0TEST04", "X0TEST05", "X0TEST07")))
+    # USERDATA-008: X0TEST05 (GH7, EC 3.2.1.91) resolves to the cellobiohydrolase record now, so the export
+    # keeps X0TEST09 (GH15, EC 3.2.1.3), whose class has no registry record.
+    tsv = lines[0] + "".join(line for line in lines if line.startswith(("X0TEST04", "X0TEST09", "X0TEST07")))
     issues = _issues(tmp_path, {ANNOTATION: tsv})
 
     message = next(issue["message"] for issue in issues if issue["file"] == "strains.csv")
     assert "its UniProt export (genomes.csv row 2) resolved no enzyme class with a registry record" in message
-    assert "cellobiohydrolase" in message
-    assert "3.2.1.91" in message
+    assert "glucoamylase" in message
+    assert "3.2.1.3" in message
     assert "disagree: X0TEST04" in message
     assert "FungMod does not create enzyme classes from a proteome" in message
 
@@ -883,7 +896,11 @@ def test_a_fetched_snapshot_written_into_a_dataset_loads_with_the_suggested_row(
     assert read["annotation_tool_version"] == "release fixture_release"
     assert snapshot.sha256 in read["source"] and STREAM_URL in read["source"]
     assert read["annotation_sha256"] == snapshot.sha256
-    assert {item["enzyme_class"] for item in dataset.genome_resolved_classes} == {"beta_glucosidase", "cellulase_generic"}
+    assert {item["enzyme_class"] for item in dataset.genome_resolved_classes} == {
+        "beta_glucosidase",
+        "cellobiohydrolase",
+        "cellulase_generic",
+    }
 
     with pytest.raises(UniprotFetchError, match="different content"):
         (dataset_dir / row["annotation_file"]).write_bytes(b"Entry\tCAZy\nX0TEST01\tGH3;\n")

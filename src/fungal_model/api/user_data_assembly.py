@@ -1038,8 +1038,19 @@ class _Assembler:
 
     def _user_target(self, index: int, text: str, row: dict[str, str]) -> _Target:
         reference = row.get("registry_substrate", "")
-        if reference:
-            record = self.base.get_substrate(self.resolver.resolve_substrate(reference).record_id)
+        record = (
+            self.base.get_substrate(self.resolver.resolve_substrate(reference).record_id) if reference else None
+        )
+        state = record.physical_state if record is not None else row.get("physical_state", "")
+        if state != "dissolved":
+            # A solid substrate of a user dataset is stated on a dry-mass basis (amount_basis, a g/g yield);
+            # drafted tables carry dissolved substrates only, so the row would lose its basis here.
+            raise UserTablesAssemblyError(
+                f"substrates[{index}] ({text!r}) is substrate {row['substrate_id']!r} of the user dataset with "
+                f"physical state {state!r}; assembled drafts cover dissolved substrates only. Load that dataset "
+                "with load_user_dataset directly."
+            )
+        if record is not None:
             return _Target(
                 index=index,
                 input=text,

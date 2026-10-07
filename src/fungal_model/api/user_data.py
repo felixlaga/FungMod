@@ -25,7 +25,22 @@ environment pH. ``Vmax`` comes from exactly one route per case: an explicit
 ``vmax`` row, a specific activity times an enzyme loading (a derived record
 whose maturity is the weaker input's), or an assay activity measured on the
 case substrate at saturation. Products are stoichiometric with an explicit
-mol/mol yield. An optional ``responses.csv`` binds the parameters of an
+mol/mol yield.
+
+A substrate may instead be a single suspended solid polymer
+(``physical_state`` ``solid_polymer`` with ``amount_basis`` ``dry_mass``):
+every substrate-side amount is then a dry mass per volume, the product yield
+is g/g, and the same homogeneous Michaelis-Menten law runs as an apparent bulk
+saturation law (kcat form, with the enzyme as a protein mass or an assay
+activity per volume and kcat checked by pint against both, or an explicit
+Vmax). An ``enzyme_dose`` per substrate mass times the case's initial
+substrate concentration gives the enzyme concentration as one derived record,
+and an optional ``reactivity_exponent`` binds the existing conversion-dependent
+``substrate_reactivity`` modifier, ``(S / S0)^n`` with ``S0`` the case's own
+initial-substrate record. The activity routes to Vmax and the pH-ionization
+form are refused on solids, and so are composite substrates, molar amounts and
+adsorption or surface-area inputs, which no implemented law of this route
+consumes. An optional ``responses.csv`` binds the parameters of an
 existing temperature or pH response law (cardinal temperature, cardinal pH,
 Arrhenius) to a strain, enzyme class and substrate; the law enters the
 generated case template as a process modifier, and the kinetic constants of
@@ -104,9 +119,10 @@ from fungal_model.capability.resolution import (
     default_family_map_path,
 )
 from fungal_model.core.provenance import ProvenanceError
-from fungal_model.core.units import Q_, units_are_compatible
+from fungal_model.core.units import ASSAY_BASE_UNITS, Q_, units_are_compatible
 from fungal_model.kinetics.arrhenius import arrhenius_reference_scaled_rate
 from fungal_model.kinetics.cardinal import cardinal_ph_activity, cardinal_temperature_activity
+from fungal_model.modifiers.reactivity import KADAM_2004_SOURCE, SUBSTRATE_REACTIVITY_MODIFIER_TYPE
 from fungal_model.provenance import USER_DATASET_PROVENANCE_KEY
 from fungal_model.registry.loaders import (
     RegistryLoadError,
@@ -225,6 +241,22 @@ USER_DATASET_MATURITY_ORDER = (
 )
 _MATURITY_ORDER_TEXT = " < ".join(USER_DATASET_MATURITY_ORDER)
 
+# Physical states a substrate of a user dataset may have. A dissolved substrate
+# is stated in amounts per volume with a mol/mol yield; a solid polymer is one
+# suspended polymer stated on a dry-mass basis (mass per volume) with a g/g
+# yield, and runs the same Michaelis-Menten law as an apparent bulk law.
+PHYSICAL_STATE_DISSOLVED = "dissolved"
+PHYSICAL_STATE_SOLID_POLYMER = "solid_polymer"
+SUBSTRATE_PHYSICAL_STATES = (PHYSICAL_STATE_DISSOLVED, PHYSICAL_STATE_SOLID_POLYMER)
+AMOUNT_BASIS_DRY_MASS = "dry_mass"
+# The amount basis each physical state requires in substrates.csv (blank: amounts per volume).
+_AMOUNT_BASIS = MappingProxyType({PHYSICAL_STATE_DISSOLVED: "", PHYSICAL_STATE_SOLID_POLYMER: AMOUNT_BASIS_DRY_MASS})
+_SOLID_YIELD_BASIS = "g/g"
+# Physical states of the registry vocabulary that describe composite materials (several polymer fractions).
+_COMPOSITE_PHYSICAL_STATES = frozenset({"mixed_solid", "solid_biomass"})
+# The template role of the exponent n of the conversion-dependent reactivity factor (S / S0)^n.
+REACTIVITY_EXPONENT_ROLE = "reactivity_exponent"
+
 KINETIC_QUANTITIES = (
     "km",
     "kcat",
@@ -242,6 +274,8 @@ KINETIC_QUANTITIES = (
     "pk_complex_upper",
     "ph_min",
     "ph_max",
+    "enzyme_dose",
+    "reactivity_exponent",
 )
 # The quantities only the pH-ionization rate form has; its enzyme concentration
 # and initial substrate are shared with the kcat form. The roles are those of the
@@ -272,6 +306,7 @@ _QUANTITY_ROLE = {
     "pk_complex_upper": "complex_upper_pk",
     "ph_min": "minimum_ph",
     "ph_max": "maximum_ph",
+    "reactivity_exponent": REACTIVITY_EXPONENT_ROLE,
 }
 _ROLE_QUANTITY = {role: quantity for quantity, role in _QUANTITY_ROLE.items()}
 _CONCENTRATION_QUANTITIES = ("substrate_initial_concentration", "km", "enzyme_concentration", "km_limiting")
@@ -292,6 +327,9 @@ _RATE_CONSTANT_QUANTITIES = frozenset({"kcat", "kcat_limiting"})
 _POSITIVE_QUANTITIES = frozenset({"km", "km_limiting"})
 _PH_SCALE = (0.0, 14.0)
 _YIELD_BASIS = "mol/mol"
+_YIELD_BASIS_BY_STATE = MappingProxyType(
+    {PHYSICAL_STATE_DISSOLVED: _YIELD_BASIS, PHYSICAL_STATE_SOLID_POLYMER: _SOLID_YIELD_BASIS}
+)
 _UNKNOWN_CELL = "unknown"
 # A cell or manifest value starting with this marker is a field a drafted
 # dataset left for a person to decide; it is refused until it is replaced.
@@ -334,6 +372,8 @@ _PROCESS_ID_SUFFIX = {
     USER_DATASET_PH_IONIZATION_PROCESS_TYPE: "ph_ionization_mm",
 }
 _KCAT_FORM_QUANTITIES = ("kcat", "enzyme_concentration")
+# Rows that start the kcat form of a case: an enzyme dose sets its enzyme concentration.
+_KCAT_FORM_ROW_QUANTITIES = (*_KCAT_FORM_QUANTITIES, "enzyme_dose")
 # Routes to Vmax; one case uses exactly one.
 VMAX_ROUTES = ("vmax", "specific_activity", "assay_activity")
 _VMAX_ROUTE_QUANTITIES = {
@@ -357,6 +397,83 @@ _RETIRED_QUANTITY_HINTS = {
         "measured on the case substrate at saturation)."
     ),
 }
+# Inputs of adsorption and surface rate laws (Langmuir coverage, binding capacity,
+# accessible area). No law of the user-data route reads them yet, so they are
+# refused rather than stored unused: as kinetics.csv quantities and as
+# substrates.csv columns. Each maps to what it describes.
+_SURFACE_LAW_QUANTITIES = MappingProxyType(
+    {
+        "adsorption_constant": "an adsorption (Langmuir) constant",
+        "adsorption_dissociation_constant": "an adsorption dissociation constant",
+        "binding_capacity": "an enzyme binding capacity",
+        "accessible_surface_area": "an accessible surface area",
+        "specific_surface_area": "a specific surface area",
+        "surface_rate_constant": "a surface rate constant",
+    }
+)
+_SURFACE_LAW_SUBSTRATE_COLUMNS = MappingProxyType(
+    {
+        "specific_surface_area": "a specific surface area",
+        "accessible_surface_area": "an accessible surface area",
+        "surface_area": "a surface area",
+        "binding_capacity": "an enzyme binding capacity",
+        "adsorption_capacity": "an enzyme adsorption capacity",
+        "crystallinity_index": "a crystallinity index",
+        "particle_size": "a particle size",
+        "accessible_fraction": "an accessible fraction",
+    }
+)
+_SURFACE_LAW_LIMIT = (
+    "no rate law of the user-data route reads it in this version: a solid substrate runs the apparent "
+    "Michaelis-Menten law on its dry mass per volume (km with kcat and an enzyme concentration or enzyme_dose, or "
+    "vmax, and optionally reactivity_exponent). Adsorption, binding capacity and surface area enter with the law "
+    "that consumes them (a Langmuir surface law is a later increment), and FungMod does not store a value no law "
+    "uses."
+)
+# Quantities refused on a solid substrate, with the reason.
+_SOLID_REFUSED_QUANTITIES = MappingProxyType(
+    {
+        "specific_activity": (
+            "specific_activity is refused on a solid substrate: an activity in amount per time per enzyme mass "
+            "would need the molar mass of a repeat unit of the polymer, which FungMod does not assume, and in "
+            "substrate mass per time per enzyme mass it is the kcat of the kcat form with a protein-mass enzyme "
+            "concentration. Give kcat (for example g/(mg h)) with enzyme_concentration or enzyme_dose, or vmax."
+        ),
+        "enzyme_loading": (
+            "enzyme_loading belongs to the specific_activity route to Vmax, which is refused on a solid substrate; "
+            "give the enzyme as enzyme_concentration (protein mass or assay activity per volume) or as enzyme_dose "
+            "per substrate mass, with kcat."
+        ),
+        "assay_activity": (
+            "assay_activity is refused on a solid substrate: a saturating activity is not defined for an "
+            "interfacial substrate, and an assay activity (for example FPU) is not a rate in substrate units. "
+            "Give the activity as an enzyme concentration in assay units per volume with kcat, or give vmax."
+        ),
+        **{
+            quantity: (
+                f"{quantity} belongs to the pH-ionization form, which is refused on a solid substrate: the diprotic "
+                "law makes Km a function of the ionization of a dissolved enzyme-substrate complex, while the Km of "
+                "the apparent law on a solid is a half-saturation constant, not a binding constant. Use the kcat or "
+                "Vmax form, with a cardinal pH law in responses.csv if the rate depends on pH."
+            )
+            for quantity in PH_IONIZATION_QUANTITIES
+        },
+    }
+)
+# Quantities that only a solid substrate on a dry-mass basis can carry, with the reason.
+_SOLID_ONLY_QUANTITIES = MappingProxyType(
+    {
+        "enzyme_dose": (
+            "enzyme_dose is an enzyme amount per substrate mass and applies only to a solid_polymer substrate on a "
+            "dry-mass basis; give a dissolved substrate's enzyme as enzyme_concentration."
+        ),
+        "reactivity_exponent": (
+            "reactivity_exponent applies only to a solid_polymer substrate: the conversion-dependent reactivity "
+            "factor (S / S0)^n describes the remaining material of a particulate substrate becoming less "
+            "accessible, which is not a property of a dissolved substrate."
+        ),
+    }
+)
 
 GENOME_TABLE = "genomes.csv"
 # Annotation tools whose output ``genomes.csv`` reads; the first token of
@@ -389,7 +506,7 @@ _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ),
     "substrates.csv": (
         ("substrate_id", "product", "product_yield", "yield_basis", "source"),
-        ("registry_substrate", "name", "substrate_class", "physical_state", "bond_classes"),
+        ("registry_substrate", "name", "substrate_class", "physical_state", "bond_classes", "amount_basis"),
     ),
     "conditions.csv": (("condition_id", "temperature", "temperature_units", "ph"), ("notes",)),
     "kinetics.csv": (
@@ -418,6 +535,8 @@ _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("sd", "replicates"),
     ),
 }
+# Columns a table refuses with a specific reason instead of the generic unsupported-column message.
+_REFUSED_COLUMNS: Mapping[str, Mapping[str, str]] = MappingProxyType({"substrates.csv": _SURFACE_LAW_SUBSTRATE_COLUMNS})
 _TABLES_WITH_ROWS_REQUIRED = ("strains.csv", "enzymes.csv", "substrates.csv", "conditions.csv")
 _MANIFEST_FIELDS = frozenset({"dataset_id", "contributor", "date", "source", "notes", "simulation", "fit"})
 _SIMULATION_FIELDS = frozenset({"duration", "units", "points"})
@@ -438,6 +557,9 @@ _SPECIFIC_ACTIVITY_REFERENCE_UNITS = "mol / second / gram"
 _TEMPERATURE_REFERENCE_UNITS = "kelvin"
 _DIMENSIONLESS_REFERENCE_UNITS = "dimensionless"
 _MOLAR_ENERGY_REFERENCE_UNITS = "joule / mole"
+# Enzyme amounts a solid case may use: a protein mass, or an activity in one of
+# the registry's assay units (never converted to protein mass or molarity).
+_ENZYME_ASSAY_UNITS = ASSAY_BASE_UNITS
 
 
 @dataclass(frozen=True)
@@ -1127,6 +1249,16 @@ class _Substrate:
     product: str
     product_yield: float
     source: str
+    physical_state: str = PHYSICAL_STATE_DISSOLVED
+    amount_basis: str = ""
+
+    @property
+    def is_solid(self) -> bool:
+        return self.physical_state != PHYSICAL_STATE_DISSOLVED
+
+    @property
+    def yield_basis(self) -> str:
+        return _YIELD_BASIS_BY_STATE[self.physical_state]
 
 
 @dataclass(frozen=True)
@@ -1235,6 +1367,8 @@ class _Parsed:
     pair_forms: dict[tuple[str, str], str] = field(default_factory=dict)
     # Enzyme classes whose started pairs all use the pH-ionization form; their unstarted pairs use it too.
     ionization_classes: set[str] = field(default_factory=set)
+    # (class, substrate) pairs on a solid substrate whose cases bind the conversion-dependent reactivity factor.
+    reactivity_pairs: set[tuple[str, str]] = field(default_factory=set)
     # (strain, class, substrate) -> law -> parameter -> row, set by cross-validation for valid laws.
     laws: dict[tuple[str, str, str], dict[str, dict[str, _Response]]] = field(default_factory=dict)
     # Resolved genome annotations, the annotation files read (relative path -> bytes), and the
@@ -1411,6 +1545,13 @@ def _parse_table(name: str, raw: bytes, issues: list[dict[str, Any]], *, rows_re
     if duplicates:
         issues.append(_issue(name, 1, None, f"Duplicate column(s): {', '.join(duplicates)}."))
     unknown = [column for column in header if column not in (*required, *optional)]
+    refused = _REFUSED_COLUMNS.get(name, {})
+    for column in unknown:
+        if column in refused:
+            issues.append(
+                _issue(name, 1, column, f"Column {column!r} ({refused[column]}) is refused: {_SURFACE_LAW_LIMIT}")
+            )
+    unknown = [column for column in unknown if column not in refused]
     if unknown:
         issues.append(
             _issue(
@@ -2178,14 +2319,6 @@ def _parse_substrates(table: _Table, resolver: RegistryResolver, context: _Conte
         if product_yield is not None and product_yield <= 0.0:
             context.add(file, line, "product_yield", "product_yield must be positive.")
             product_yield = None
-        basis = row.get("yield_basis", "")
-        if basis != _YIELD_BASIS:
-            context.add(
-                file,
-                line,
-                "yield_basis",
-                f"yield_basis must be {_YIELD_BASIS!r}; the yield is always explicit and never inferred.",
-            )
         registry_text = row.get("registry_substrate", "")
         if registry_text:
             parsed = _registry_substrate(
@@ -2202,16 +2335,19 @@ def _parse_substrates(table: _Table, resolver: RegistryResolver, context: _Conte
             parsed = _user_substrate(row, file=file, line=line, context=context)
             named = (("substrate_id", substrate_id), ("name", row.get("name", "") or None))
             _terms_are_free(named, "substrates", resolver, {}, file=file, line=line, context=context)
+        # The bases follow the physical state: the parsed one, else the one the row states.
+        state = parsed[4] if parsed is not None else row.get("physical_state", "")
+        bases_ok = _substrate_bases_ok(row, state, file=file, line=line, context=context)
         if (
             substrate_id is None
             or product is None
             or source is None
             or product_yield is None
-            or basis != _YIELD_BASIS
+            or not bases_ok
             or parsed is None
         ):
             continue
-        registry_id, name, substrate_class, bond_classes = parsed
+        registry_id, name, substrate_class, bond_classes, physical_state = parsed
         if substrate_id in substrates:
             context.add(file, line, "substrate_id", f"substrate_id {substrate_id!r} repeats row {substrates[substrate_id].row}.")
             continue
@@ -2235,8 +2371,95 @@ def _parse_substrates(table: _Table, resolver: RegistryResolver, context: _Conte
             product=product,
             product_yield=product_yield,
             source=source,
+            physical_state=physical_state,
+            amount_basis=_AMOUNT_BASIS[physical_state],
         )
     return substrates
+
+
+def _substrate_bases_ok(row: Mapping[str, str], state: str, *, file: str, line: int, context: _Context) -> bool:
+    """Check yield_basis and amount_basis against the substrate's physical state.
+
+    A dissolved substrate is stated in amounts per volume (``amount_basis``
+    blank) with a mol/mol yield. A solid polymer is stated on a dry-mass basis
+    (``amount_basis`` ``dry_mass``) with a g/g yield: grams of product per gram
+    of dry substrate consumed. The yield is always explicit and never inferred,
+    and no basis is converted to another. With a state that is not supported
+    (reported elsewhere) only the yield basis is checked against the supported
+    ones.
+    """
+
+    basis = row.get("yield_basis", "")
+    amount_basis = row.get("amount_basis", "")
+    if state not in SUBSTRATE_PHYSICAL_STATES:
+        if basis not in _YIELD_BASIS_BY_STATE.values():
+            context.add(
+                file,
+                line,
+                "yield_basis",
+                f"yield_basis must be {_YIELD_BASIS!r} for a dissolved substrate or {_SOLID_YIELD_BASIS!r} for a "
+                "solid_polymer substrate; the yield is always explicit and never inferred.",
+            )
+            return False
+        return True
+    ok = True
+    if state == PHYSICAL_STATE_DISSOLVED:
+        if basis != _YIELD_BASIS:
+            context.add(
+                file,
+                line,
+                "yield_basis",
+                f"yield_basis must be {_YIELD_BASIS!r}; the yield is always explicit and never inferred.",
+            )
+            ok = False
+        if amount_basis:
+            context.add(
+                file,
+                line,
+                "amount_basis",
+                f"amount_basis {amount_basis!r} applies to solid_polymer substrates only; a dissolved substrate is "
+                "stated in amounts per volume, so leave amount_basis blank.",
+            )
+            ok = False
+        return ok
+    if basis != _SOLID_YIELD_BASIS:
+        context.add(
+            file,
+            line,
+            "yield_basis",
+            f"yield_basis must be {_SOLID_YIELD_BASIS!r} for a {state} substrate: grams of product per gram of dry "
+            "substrate consumed. A molar yield on a solid polymer would need the molar mass of a repeat unit, which "
+            "FungMod does not assume; the yield is always explicit and never inferred.",
+        )
+        ok = False
+    expected = _AMOUNT_BASIS[state]
+    if amount_basis != expected:
+        stated = "is blank" if not amount_basis else f"is {amount_basis!r}"
+        context.add(
+            file,
+            line,
+            "amount_basis",
+            f"amount_basis {stated}, but a {state} substrate must state amount_basis {expected!r}: its amounts are "
+            "dry mass per volume (for example g/L). No other basis (monomer equivalents, moles of repeat units) is "
+            "supported in this version.",
+        )
+        ok = False
+    return ok
+
+
+def _physical_state_problem(state: str, *, what: str) -> str | None:
+    """Why a physical state is not supported for a user-dataset substrate, or None when it is."""
+
+    if state in SUBSTRATE_PHYSICAL_STATES:
+        return None
+    supported = " or ".join(SUBSTRATE_PHYSICAL_STATES)
+    if state in _COMPOSITE_PHYSICAL_STATES:
+        return (
+            f"{what} has physical_state {state!r}, a composite material: its polymer fractions, their bonds and "
+            "their accessibility would need a composition model, which user data does not support, so composite "
+            f"substrates are refused. Supported states are {supported} (one polymer)."
+        )
+    return f"{what} has physical_state {state!r}; supported states are {supported}."
 
 
 def _registry_substrate(
@@ -2249,7 +2472,7 @@ def _registry_substrate(
     file: str,
     line: int,
     context: _Context,
-) -> tuple[str, str, str, tuple[str, ...]] | None:
+) -> tuple[str, str, str, tuple[str, ...], str] | None:
     filled = [column for column in _USER_SUBSTRATE_FIELDS if row.get(column, "")]
     if filled:
         context.add(
@@ -2269,14 +2492,9 @@ def _registry_substrate(
         return None
     record = context.base.get_substrate(resolved.record_id)
     ok = not filled
-    if record.physical_state != "dissolved":
-        context.add(
-            file,
-            line,
-            "registry_substrate",
-            f"Registry substrate {record.record_id!r} has physical_state {record.physical_state!r}; this "
-            "increment supports only dissolved substrates.",
-        )
+    problem = _physical_state_problem(record.physical_state, what=f"Registry substrate {record.record_id!r}")
+    if problem is not None:
+        context.add(file, line, "registry_substrate", problem)
         ok = False
     if product is not None and product not in record.products:
         context.add(
@@ -2303,7 +2521,7 @@ def _registry_substrate(
             ok = False
     if not ok:
         return None
-    return record.record_id, record.name, record.substrate_class, tuple(record.bond_classes)
+    return record.record_id, record.name, record.substrate_class, tuple(record.bond_classes), record.physical_state
 
 
 def _user_substrate(
@@ -2312,25 +2530,22 @@ def _user_substrate(
     file: str,
     line: int,
     context: _Context,
-) -> tuple[str, str, str, tuple[str, ...]] | None:
+) -> tuple[str, str, str, tuple[str, ...], str] | None:
     name = _required_text(row, "name", file=file, line=line, context=context)
     substrate_class = _required_text(row, "substrate_class", file=file, line=line, context=context)
     if substrate_class is not None and not _CLASS_TOKEN_PATTERN.fullmatch(substrate_class):
         context.add(file, line, "substrate_class", "substrate_class must be lowercase snake_case.")
         substrate_class = None
     physical_state = _required_text(row, "physical_state", file=file, line=line, context=context)
-    if physical_state is not None and physical_state != "dissolved":
-        context.add(
-            file,
-            line,
-            "physical_state",
-            f"physical_state {physical_state!r} is not supported; this increment supports only dissolved substrates.",
-        )
-        physical_state = None
+    if physical_state is not None:
+        problem = _physical_state_problem(physical_state, what=f"Substrate in row {line}")
+        if problem is not None:
+            context.add(file, line, "physical_state", problem)
+            physical_state = None
     bonds = _class_tokens(row, "bond_classes", file=file, line=line, context=context)
     if name is None or substrate_class is None or physical_state is None or bonds is None:
         return None
-    return "", name, substrate_class, bonds
+    return "", name, substrate_class, bonds, physical_state
 
 
 def _parse_conditions(table: _Table, resolver: RegistryResolver, context: _Context) -> dict[str, _Condition]:
@@ -2409,14 +2624,20 @@ def _parse_kinetics(
                 file,
                 line,
                 "quantity",
-                _RETIRED_QUANTITY_HINTS.get(
-                    quantity, f"quantity {quantity!r} is not one of {', '.join(KINETIC_QUANTITIES)}."
-                ),
+                _unsupported_quantity_text(quantity),
             )
             quantity = None
         strain_id = _reference(row, "strain_id", strains, "strains.csv", file=file, line=line, context=context)
         substrate_id = _reference(row, "substrate_id", substrates, "substrates.csv", file=file, line=line, context=context)
         condition_id = _reference(row, "condition_id", conditions, "conditions.csv", file=file, line=line, context=context)
+        # Whether the row's substrate is a solid decides which quantities and units it may carry.
+        solid = substrate_id is not None and substrates[substrate_id].is_solid
+        if quantity is not None and substrate_id is not None:
+            refusal = (_SOLID_REFUSED_QUANTITIES if solid else _SOLID_ONLY_QUANTITIES).get(quantity)
+            if refusal is not None:
+                state = substrates[substrate_id].physical_state
+                context.add(file, line, "quantity", f"Substrate {substrate_id!r} is {state}: {refusal}")
+                quantity = None
         class_text = _required_text(row, "enzyme_class", file=file, line=line, context=context)
         class_key = (
             None
@@ -2446,7 +2667,7 @@ def _parse_kinetics(
                 substrate_id = None
         units = _required_text(row, "units", file=file, line=line, context=context)
         if units is not None and quantity is not None:
-            message = _quantity_units_error(quantity, units)
+            message = _quantity_units_error(quantity, units, solid=solid)
             if message is not None:
                 context.add(file, line, "units", message)
                 units = None
@@ -2733,6 +2954,17 @@ def _parse_timecourses(
                 "substrate_id",
                 f"Enzyme class {class_key!r} cannot act on substrate {substrate_id!r}, so no simulated case can "
                 "produce this time course.",
+            )
+            substrate_id = None
+        if substrate_id is not None and substrates[substrate_id].is_solid:
+            context.add(
+                file,
+                line,
+                "substrate_id",
+                f"Substrate {substrate_id!r} is {substrates[substrate_id].physical_state}: time courses of solid "
+                "substrates are not compared or fitted in this version (the comparison and the fit read amounts per "
+                "volume with a mol/mol yield). Simulate the solid case and compare it outside FungMod, or leave its "
+                "rows out of timecourse.csv.",
             )
             substrate_id = None
         observable = _required_text(row, "observable", file=file, line=line, context=context)
@@ -3320,10 +3552,38 @@ def _kinetic_values(
     return None, lower, upper
 
 
-def _quantity_units_error(quantity: str, units: str) -> str | None:
+def _unsupported_quantity_text(quantity: str) -> str:
+    """Why a kinetics.csv quantity is refused: a retired name, an input of an unbound law, or unknown."""
+
+    if quantity in _RETIRED_QUANTITY_HINTS:
+        return _RETIRED_QUANTITY_HINTS[quantity]
+    if quantity in _SURFACE_LAW_QUANTITIES:
+        return f"quantity {quantity!r} ({_SURFACE_LAW_QUANTITIES[quantity]}) is refused: {_SURFACE_LAW_LIMIT}"
+    return f"quantity {quantity!r} is not one of {', '.join(KINETIC_QUANTITIES)}."
+
+
+def _quantity_units_error(quantity: str, units: str, *, solid: bool = False) -> str | None:
+    """Check the dimension of a kinetics.csv value; ``solid`` selects the dry-mass rules of a solid substrate."""
+
     error = _unit_parse_error(units)
     if error is not None:
         return f"units {units!r} cannot be parsed: {error}"
+    if quantity == "reactivity_exponent":
+        if _unit_dimension_error(units, _DIMENSIONLESS_REFERENCE_UNITS) is not None:
+            return (
+                f"reactivity_exponent units {units!r} must be dimensionless (write dimensionless): it is the exponent "
+                "n of the factor (S / S0)^n."
+            )
+        return None
+    if quantity == "enzyme_dose":
+        if _is_enzyme_amount_per(units, "gram"):
+            return None
+        return (
+            f"enzyme_dose units {units!r} must be an enzyme amount per dry substrate mass: a protein mass per "
+            "substrate mass (for example mg/g) or an assay activity per substrate mass (for example FPU/g)."
+        )
+    if solid:
+        return _solid_quantity_units_error(quantity, units)
     if quantity in _RATE_CONSTANT_QUANTITIES:
         if _unit_dimension_error(units, _RATE_CONSTANT_REFERENCE_UNITS) is not None:
             return f"{quantity} units {units!r} must have the dimension 1/time (for example 1/s or 1/min)."
@@ -3364,6 +3624,77 @@ def _quantity_units_error(quantity: str, units: str) -> str | None:
             f"{quantity} units {units!r} must be a substrate concentration (amount or mass per volume, "
             "for example mM, uM or g/L)."
         )
+    return None
+
+
+def _is_enzyme_amount_per(units: str, denominator: str) -> bool:
+    """Whether ``units`` are a protein mass or an assay activity per ``denominator`` (never a molar amount)."""
+
+    return units_are_compatible(units, f"gram / {denominator}") or any(
+        units_are_compatible(units, f"{assay} / {denominator}") for assay in _ENZYME_ASSAY_UNITS
+    )
+
+
+def _solid_quantity_units_error(quantity: str, units: str) -> str | None:
+    """The dimension rules of a case on a solid substrate stated on a dry-mass basis.
+
+    Substrate-side amounts (``km``, ``substrate_initial_concentration``) are dry
+    mass per volume and ``vmax`` a dry mass per volume per time; a molar amount
+    of a solid polymer would need the molar mass of a repeat unit, which FungMod
+    does not assume. The enzyme is a protein mass or an assay activity per
+    volume. ``kcat`` is a substrate mass per time per enzyme amount: with a
+    protein-mass enzyme that is 1/time (gram per gram per time), with an assay
+    activity a mass per time per assay unit. Whether ``kcat`` fits the case's
+    own enzyme and substrate units is checked per case.
+    """
+
+    if quantity in {"km", "substrate_initial_concentration"}:
+        kind = _concentration_kind(units)
+        if kind == "mass":
+            return None
+        if kind == "molar":
+            return (
+                f"{quantity} units {units!r} are a molar concentration, but the substrate is a solid polymer stated "
+                "on a dry-mass basis: give a dry mass per volume (for example g/L). A molar amount of a polymer would "
+                "need the molar mass of a repeat unit, which FungMod does not assume."
+            )
+        return f"{quantity} units {units!r} must be a dry mass of the solid substrate per volume (for example g/L)."
+    if quantity == "enzyme_concentration":
+        if _is_enzyme_amount_per(units, "liter"):
+            return None
+        if _concentration_kind(units) == "molar":
+            return (
+                f"enzyme_concentration units {units!r} are a molar concentration; on a solid substrate the enzyme "
+                "is a protein mass per volume (for example mg/L) or an assay activity per volume (for example FPU/L), "
+                "and kcat carries the conversion to substrate mass."
+            )
+        return (
+            f"enzyme_concentration units {units!r} must be a protein mass per volume (for example mg/L) or an assay "
+            f"activity per volume in one of the registry's assay units ({', '.join(_ENZYME_ASSAY_UNITS)}, for "
+            "example FPU/L)."
+        )
+    if quantity == "kcat":
+        if units_are_compatible(units, _RATE_CONSTANT_REFERENCE_UNITS) or any(
+            units_are_compatible(units, f"gram / second / {assay}") for assay in _ENZYME_ASSAY_UNITS
+        ):
+            return None
+        return (
+            f"kcat units {units!r} must be a substrate mass per time per enzyme amount on a solid substrate: per "
+            "protein mass (for example g/(mg h), which is 1/time) or per assay unit (for example g/(FPU h)), so that "
+            "kcat x E is a dry mass per volume per time."
+        )
+    if quantity == "vmax":
+        if units_are_compatible(units, _MASS_RATE_REFERENCE_UNITS):
+            return None
+        if units_are_compatible(units, _MOLAR_RATE_REFERENCE_UNITS):
+            return (
+                f"vmax units {units!r} are an amount per volume per time, but the substrate is a solid polymer "
+                "stated on a dry-mass basis: give a dry mass per volume per time (for example g/L/h)."
+            )
+        return (
+            f"vmax units {units!r} must be a dry mass of the solid substrate per volume per time (for example g/L/h)."
+        )
+    # Every other quantity is refused on a solid substrate before its units are read.
     return None
 
 
@@ -3434,6 +3765,9 @@ def _cross_validate(parsed: _Parsed, context: _Context) -> None:
     for row in parsed.kinetics:
         by_case.setdefault(row.case_key, []).append(row)
     for case_key, rows in by_case.items():
+        if parsed.substrates[case_key[2]].is_solid:
+            # A solid case states dry masses; its units were checked per row and are checked per case below.
+            continue
         concentration_rows = [row for row in rows if row.quantity in _CONCENTRATION_QUANTITIES]
         kinds = {row.row: _concentration_kind(row.units) for row in concentration_rows}
         molar = [row for row in concentration_rows if kinds[row.row] == "molar"]
@@ -3457,6 +3791,7 @@ def _cross_validate(parsed: _Parsed, context: _Context) -> None:
                 f"{_YIELD_BASIS}; applying it would need molar masses. Use amount-per-volume units (for example mM).",
             )
     _validate_rate_forms(parsed, context)
+    _validate_solid_cases(parsed, context)
     _validate_ph_ionization(parsed, context)
     _validate_responses(parsed, context)
     _validate_pairs(parsed, context)
@@ -3474,11 +3809,12 @@ def _case_form_rows(
 ) -> tuple[list[_Kinetics], dict[str, list[_Kinetics]], list[_Kinetics]]:
     """Split a case's rows into kcat-form rows, Vmax-route rows (route name to rows) and pH-ionization rows.
 
-    The enzyme concentration is listed with the kcat-form rows; the pH-ionization
-    form uses it too, which ``_validate_rate_forms`` takes into account.
+    The enzyme concentration (and the enzyme dose of a solid case, which sets
+    it) is listed with the kcat-form rows; the pH-ionization form uses the
+    enzyme concentration too, which ``_validate_rate_forms`` takes into account.
     """
 
-    kcat_rows = [row for row in rows if row.quantity in _KCAT_FORM_QUANTITIES]
+    kcat_rows = [row for row in rows if row.quantity in _KCAT_FORM_ROW_QUANTITIES]
     routes: dict[str, list[_Kinetics]] = {}
     for row in rows:
         route = _QUANTITY_VMAX_ROUTE.get(row.quantity)
@@ -3658,6 +3994,102 @@ def _validate_class_processes(parsed: _Parsed, context: _Context) -> None:
                 "preflight looks for a compatibility of every listed law on each substrate of the class, so in this "
                 "version a class uses the pH-ionization form on all of its substrates or on none.",
             )
+
+
+def _validate_solid_cases(parsed: _Parsed, context: _Context) -> None:
+    """Check the enzyme route and the dimension of kcat in every case on a solid substrate.
+
+    A solid case states its enzyme either as ``enzyme_concentration`` or as an
+    ``enzyme_dose`` per substrate mass, never both; the dose is multiplied by
+    the case's exact ``substrate_initial_concentration`` (a sampled initial
+    substrate would be drawn independently of the enzyme derived from it). The
+    units of ``kcat`` must make ``kcat x E`` a substrate concentration per time
+    in the case's own units, which pint checks against the case's enzyme and
+    substrate rows. A pair with a ``reactivity_exponent`` row binds the
+    conversion-dependent reactivity factor and is stored in
+    ``parsed.reactivity_pairs``. An enzyme class in the pH-ionization form
+    cannot act on a solid substrate, because a class runs one process law on all
+    of its substrates and that form is refused on solids.
+    """
+
+    file = "kinetics.csv"
+    by_case: dict[tuple[str, str, str, str], dict[str, _Kinetics]] = {}
+    for row in parsed.kinetics:
+        if parsed.substrates[row.substrate_id].is_solid:
+            by_case.setdefault(row.case_key, {}).setdefault(row.quantity, row)
+            if row.quantity == "reactivity_exponent":
+                parsed.reactivity_pairs.add(row.pair_key)
+    for case_key, quantities in by_case.items():
+        binding = _binding_text((case_key[0], case_key[1], case_key[2]))
+        where = f"{binding}, condition {case_key[3]!r}"
+        dose = quantities.get("enzyme_dose")
+        explicit = quantities.get("enzyme_concentration")
+        initial = quantities.get("substrate_initial_concentration")
+        enzyme_units: str | None = None
+        enzyme_text = ""
+        if dose is not None and explicit is not None:
+            context.add(
+                file,
+                dose.row,
+                "quantity",
+                f"Row {dose.row} gives enzyme_dose and row {explicit.row} gives enzyme_concentration for {where}: both "
+                "set the enzyme concentration of the case. Give one; the dose route derives enzyme_concentration = "
+                "enzyme_dose x substrate_initial_concentration.",
+            )
+        elif dose is not None and initial is not None and not initial.is_exact:
+            context.add(
+                file,
+                dose.row,
+                "quantity",
+                f"Row {dose.row} gives enzyme_dose for {where}, but substrate_initial_concentration (row "
+                f"{initial.row}) is a range. The derived enzyme concentration would be sampled independently of the "
+                "initial substrate it is derived from, so the dose route needs an exact initial substrate "
+                "concentration (the dose itself may be a range).",
+            )
+        elif explicit is not None:
+            enzyme_units, enzyme_text = explicit.units, f"enzyme_concentration, row {explicit.row}"
+        elif dose is not None and initial is not None:
+            enzyme_units = _dose_product_units(dose, initial)[0]
+            enzyme_text = f"enzyme_dose x substrate_initial_concentration, rows {dose.row} and {initial.row}"
+        kcat = quantities.get("kcat")
+        if kcat is None or enzyme_units is None:
+            continue
+        substrate_row = initial or quantities.get("km")
+        substrate_units = _MASS_REFERENCE_UNITS if substrate_row is None else substrate_row.units
+        expected = f"({substrate_units}) / second / ({enzyme_units})"
+        if units_are_compatible(kcat.units, expected):
+            continue
+        product = (Q_(1.0, kcat.units) * Q_(1.0, enzyme_units)).to_reduced_units().units
+        context.add(
+            file,
+            kcat.row,
+            "units",
+            f"kcat units {kcat.units!r} do not fit the enzyme concentration of {where} in {enzyme_units!r} "
+            f"({enzyme_text}): kcat x E x S / (Km + S) must be a substrate concentration per time "
+            f"({substrate_units} per time), but kcat x E has units {product}. Give kcat as substrate mass per time "
+            "per unit of the case's enzyme, for example g/(FPU h) with FPU/L or g/(mg h) with mg/L.",
+        )
+    for class_key in sorted(parsed.ionization_classes):
+        info = parsed.classes[class_key]
+        for substrate in parsed.substrates.values():
+            if substrate.is_solid and _shared_bonds(info, substrate) is not None:
+                context.add(
+                    "substrates.csv",
+                    substrate.row,
+                    "physical_state",
+                    f"Enzyme class {class_key!r} uses the pH-ionization form in kinetics.csv and acts on the "
+                    f"{substrate.physical_state} substrate {substrate.substrate_id!r}. A class runs one process law on "
+                    "all of its substrates, and the pH-ionization form is refused on solid substrates; give that "
+                    "class's kinetics in the kcat or Vmax form, or leave the solid substrate out of this dataset.",
+                )
+
+
+def _dose_product_units(dose: _Kinetics, initial: _Kinetics) -> tuple[str, float]:
+    """Units and pint factor of enzyme_dose x substrate_initial_concentration (an enzyme amount per volume)."""
+
+    product = Q_(1.0, dose.units) * Q_(1.0, initial.units)
+    units = str(product.to_reduced_units().units)
+    return units, float(product.to(units).magnitude)
 
 
 def _validate_ph_ionization(parsed: _Parsed, context: _Context) -> None:
@@ -4122,6 +4554,9 @@ def _generate_records(
         form = _pair_form(parsed, pair)
         process_type = _FORM_PROCESS_TYPE[form]
         laws = _pair_laws(parsed, pair)
+        # A pair with a reactivity_exponent row binds the reactivity factor; its other cases get gaps for it.
+        reactive = pair in parsed.reactivity_pairs
+        role_quantities = (*_FORM_QUANTITIES[form], *(("reactivity_exponent",) if reactive else ()))
         info = parsed.classes[class_key]
         pair_records: list[ParameterRecord] = []
         for item in parsed.strain_classes:
@@ -4150,7 +4585,7 @@ def _generate_records(
                     genome=item.genome if item.genome_only else None,
                     measured_elsewhere=elsewhere,
                 )
-                for quantity in _FORM_QUANTITIES[form]:
+                for quantity in role_quantities:
                     mapping, origin = _role_mapping(quantity, case)
                     record = _emit(generated, context, "parameter_records", mapping, origin=origin)
                     if isinstance(record, ParameterRecord):
@@ -4194,14 +4629,16 @@ def _generate_records(
             generated,
             context,
             "case_templates",
-            _template_mapping(info, substrate, namespace, scientific=scientific, form=form, laws=laws),
+            _template_mapping(
+                info, substrate, namespace, scientific=scientific, form=form, laws=laws, reactivity=reactive
+            ),
             origin=("substrates.csv", substrate.row, "substrate_id"),
         )
         _emit(
             generated,
             context,
             "process_compatibility",
-            _compatibility_mapping(info, substrate, namespace, form=form, laws=laws),
+            _compatibility_mapping(info, substrate, namespace, form=form, laws=laws, reactivity=reactive),
             origin=("substrates.csv", substrate.row, "substrate_id"),
         )
     return generated
@@ -4262,6 +4699,10 @@ def _role_mapping(quantity: str, case: _CaseContext) -> tuple[dict[str, Any], tu
     row = case.case_rows.get(quantity)
     if row is not None:
         return _parameter_mapping(row, case=case), ("kinetics.csv", row.row, "quantity")
+    if quantity == "enzyme_concentration":
+        dose, initial = case.case_rows.get("enzyme_dose"), case.case_rows.get("substrate_initial_concentration")
+        if dose is not None and initial is not None:
+            return _derived_enzyme_mapping(dose, initial, case=case), ("kinetics.csv", dose.row, "quantity")
     return _gap_mapping(quantity, case=case), ("kinetics.csv", None, "quantity")
 
 
@@ -4423,6 +4864,14 @@ def _class_evidence(item: _StrainClass, classes: Mapping[str, _EnzymeClassInfo])
 
 
 def _substrate_mapping(substrate: _Substrate, namespace: _Namespace) -> dict[str, Any]:
+    if substrate.is_solid:
+        notes = (
+            f"User-defined {substrate.physical_state} substrate {substrate.substrate_id} from dataset "
+            f"{namespace.dataset_id}; amounts are dry mass per volume (amount_basis {substrate.amount_basis}) and the "
+            f"product yield is {substrate.yield_basis}. No surface area, crystallinity or particle size is recorded."
+        )
+    else:
+        notes = f"User-defined dissolved substrate {substrate.substrate_id} from dataset {namespace.dataset_id}."
     return {
         "record_id": namespace.id(substrate.substrate_id),
         "name": substrate.name,
@@ -4434,11 +4883,11 @@ def _substrate_mapping(substrate: _Substrate, namespace: _Namespace) -> dict[str
             USER_DATASET_PROVENANCE_KEY: namespace.provenance("substrates.csv", substrate.row),
         },
         "substrate_class": substrate.substrate_class,
-        "physical_state": "dissolved",
+        "physical_state": substrate.physical_state,
         "bond_classes": list(substrate.bond_classes),
         "products": [substrate.product],
         "properties": {},
-        "notes": f"User-defined dissolved substrate {substrate.substrate_id} from dataset {namespace.dataset_id}.",
+        "notes": notes,
     }
 
 
@@ -4506,12 +4955,13 @@ def _compatibility_mapping(
     *,
     form: str,
     laws: Sequence[ResponseLaw],
+    reactivity: bool = False,
 ) -> dict[str, Any]:
     shared = _shared_bonds(info, substrate) or ()
     process_type = _FORM_PROCESS_TYPE[form]
+    roles = (*_FORM_ROLES[form], *((REACTIVITY_EXPONENT_ROLE,) if reactivity else ()))
     symbols = {
-        role: _parameter_symbol(namespace, _ROLE_QUANTITY[role], info.key, substrate.substrate_id)
-        for role in _FORM_ROLES[form]
+        role: _parameter_symbol(namespace, _ROLE_QUANTITY[role], info.key, substrate.substrate_id) for role in roles
     }
     for law in laws:
         for parameter in law.parameters:
@@ -4539,6 +4989,11 @@ def _compatibility_mapping(
         "notes": (
             f"{_PROCESS_SENTENCE_LABEL[process_type]} compatibility generated from user dataset "
             f"{namespace.dataset_id}; the enzyme class and substrate share the listed bond classes."
+            + (
+                f" The law runs as an apparent bulk law on the {substrate.physical_state} substrate (dry-mass basis)."
+                if substrate.is_solid
+                else ""
+            )
         ),
     }
 
@@ -4556,6 +5011,7 @@ def _template_mapping(
     scientific: bool,
     form: str,
     laws: Sequence[ResponseLaw],
+    reactivity: bool = False,
 ) -> dict[str, Any]:
     template_id = _template_id(namespace, info, substrate, form=form)
     process_type = _FORM_PROCESS_TYPE[form]
@@ -4586,11 +5042,22 @@ def _template_mapping(
         "product_map_name": f"{substrate.name} to {substrate.product} product map ({namespace.dataset_id})",
         "public_path": True,
     }
-    if laws:
-        process_state_metadata["process_modifiers"] = [
-            {"type": law.law, **{f"{parameter.name}_role": parameter.name for parameter in law.parameters}}
-            for law in laws
-        ]
+    modifiers: list[dict[str, Any]] = []
+    if reactivity:
+        # (S / S0)^n: the reference S0 is the case's own initial-substrate record, never a separate constant.
+        modifiers.append(
+            {
+                "type": SUBSTRATE_REACTIVITY_MODIFIER_TYPE,
+                "substrate_state_role": "substrate",
+                "reference_concentration_role": "substrate_initial_concentration",
+                "exponent_role": REACTIVITY_EXPONENT_ROLE,
+            }
+        )
+    modifiers.extend(
+        {"type": law.law, **{f"{parameter.name}_role": parameter.name for parameter in law.parameters}} for law in laws
+    )
+    if modifiers:
+        process_state_metadata["process_modifiers"] = modifiers
     rate_limitation = _RATE_FORM_LIMITATION.get(form)
     if form == RATE_FORM_PH_IONIZATION:
         law_limitation = (
@@ -4639,7 +5106,10 @@ def _template_mapping(
             "product_state_role": "product",
             "stoichiometric_yield": yield_value,
             "notes": (
-                f"User-stated yield {_number_text(yield_value)} mol {substrate.product} per mol "
+                f"User-stated yield {_number_text(yield_value)} g {substrate.product} per g dry "
+                f"{substrate.substrate_id} (substrates.csv row {substrate.row})."
+                if substrate.is_solid
+                else f"User-stated yield {_number_text(yield_value)} mol {substrate.product} per mol "
                 f"{substrate.substrate_id} (substrates.csv row {substrate.row})."
             ),
         },
@@ -4655,16 +5125,23 @@ def _template_mapping(
         "output_state_roles": dict(states),
         "process_state_metadata": process_state_metadata,
         "limitations": [
-            f"Dissolved {process_label} kinetics from user dataset {namespace.dataset_id}.",
+            (
+                f"Apparent {process_label} kinetics on a suspended {substrate.physical_state} substrate (dry-mass "
+                f"basis) from user dataset {namespace.dataset_id}."
+                if substrate.is_solid
+                else f"Dissolved {process_label} kinetics from user dataset {namespace.dataset_id}."
+            ),
             "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or uptake model.",
             law_limitation,
             *([rate_limitation] if rate_limitation is not None else []),
+            *(_solid_limitations(reactivity) if substrate.is_solid else []),
         ],
         "validity_notes": [
             f"Values come from user dataset {namespace.dataset_id} (sha256 {namespace.digest}); "
             "FungMod did not check them against an external source.",
-            f"Product formation uses the user-stated yield of {_number_text(yield_value)} mol/mol.",
+            f"Product formation uses the user-stated yield of {_number_text(yield_value)} {substrate.yield_basis}.",
             *([_PH_IONIZATION_VALIDITY_NOTE] if form == RATE_FORM_PH_IONIZATION else []),
+            *([_SOLID_VALIDITY_NOTE] if substrate.is_solid else []),
         ],
         "notes": (
             f"Assembly template generated from user dataset {namespace.dataset_id} for enzyme class "
@@ -4686,6 +5163,38 @@ _RATE_FORM_LIMITATION = {
         "dynamics, buffer identity, ionic strength or pH-dependent enzyme stability is represented."
     ),
 }
+# Limitations every case on a solid substrate carries: what the apparent law stands for and what it leaves out.
+_SOLID_APPARENT_LAW_LIMITATION = (
+    "Apparent bulk saturation law on a suspended solid polymer: the dry mass per volume stands in for the "
+    "accessible substrate, Km is an apparent half-saturation constant and not a binding constant, and kcat or Vmax "
+    "and Km are specific to the substrate preparation and to the enzyme and solids loadings at which they were "
+    "measured. No enzyme adsorption or partitioning between free and bound enzyme, accessible surface area, "
+    "crystallinity, synergy between enzyme classes, product inhibition, or oxidative (LPMO) action is represented."
+)
+_SOLID_NO_REACTIVITY_LIMITATION = (
+    "No conversion-dependent slowdown is represented: without a reactivity_exponent the rate depends on the "
+    "remaining substrate only through the saturation term."
+)
+_SOLID_REACTIVITY_LIMITATION = (
+    "Conversion-dependent reactivity: the rate is multiplied by (S / S0)^n, with S0 the case's own initial "
+    "substrate concentration and n the reactivity_exponent from kinetics.csv (the existing substrate_reactivity "
+    "modifier; n = 1 is the linear substrate reactivity factor of Kadam et al. 2004, n = 0 removes it). The factor is "
+    f"phenomenological and resolves no surface or structure. Source of the factor: {KADAM_2004_SOURCE}."
+)
+_SOLID_VALIDITY_NOTE = (
+    "The substrate is a solid polymer on a dry-mass basis: every substrate-side amount is a dry mass per volume, in "
+    "the kcat form kcat was checked with pint to make kcat x E a dry mass per volume per time, and no molar mass, "
+    "hydration factor or conversion between assay units and protein mass was applied."
+)
+
+
+def _solid_limitations(reactivity: bool) -> list[str]:
+    return [
+        _SOLID_APPARENT_LAW_LIMITATION,
+        _SOLID_REACTIVITY_LIMITATION if reactivity else _SOLID_NO_REACTIVITY_LIMITATION,
+    ]
+
+
 _PH_IONIZATION_VALIDITY_NOTE = (
     "The pH of every condition with pH-ionization values lies within that case's ph_min to ph_max (checked when "
     "the dataset is loaded); an EnvironmentGrid pH outside the fitted range runs with an environmental validity "
@@ -4994,6 +5503,110 @@ def _derived_vmax_mapping(activity: _Kinetics, loading: _Kinetics, *, case: _Cas
     return mapping
 
 
+def _derived_enzyme_mapping(dose: _Kinetics, initial: _Kinetics, *, case: _CaseContext) -> dict[str, Any]:
+    """Enzyme concentration = enzyme dose x initial substrate concentration, converted with pint.
+
+    One derived parameter record for the enzyme-concentration role of a solid
+    case: the dose row produces no record of its own, the initial-substrate row
+    keeps its own record for the initial-substrate role. The maturity is the
+    weaker input's; a dose range scaled by the exact initial substrate is again
+    a uniform range, and a range of the initial substrate is refused during
+    validation.
+    """
+
+    strain, info, substrate, condition, namespace = (
+        case.strain,
+        case.info,
+        case.substrate,
+        case.condition,
+        case.namespace,
+    )
+    units, factor = _dose_product_units(dose, initial)
+    evidence_type = _weakest_evidence((dose.evidence_type, initial.evidence_type))
+    maturity = _EVIDENCE_MATURITY[evidence_type]
+    confidence = _confidence(evidence_type)
+    exact = dose.is_exact and initial.is_exact
+    source = dose.source if dose.source == initial.source else f"{dose.source}; {initial.source}"
+    value: dict[str, Any] = {
+        "kind": "exact" if exact else "range",
+        "units": units,
+        "source": source,
+        "confidence_level": confidence,
+        "notes": (
+            f"Derived in user dataset {namespace.dataset_id} as enzyme_dose (kinetics.csv row {dose.row}) x "
+            f"substrate_initial_concentration (row {initial.row}); ({dose.units}) x ({initial.units}) converted to "
+            f"{units} with factor {_number_text(factor)}."
+        ),
+    }
+    assert initial.value is not None
+    if dose.value is not None:
+        value["value"] = dose.value * initial.value * factor
+    else:
+        assert dose.lower is not None and dose.upper is not None
+        value["lower"] = dose.lower * initial.value * factor
+        value["upper"] = dose.upper * initial.value * factor
+    derivation = {
+        "route": "enzyme_dose",
+        "formula": "enzyme_concentration = enzyme_dose x substrate_initial_concentration",
+        "units_conversion": f"({dose.units}) x ({initial.units}) -> {units}, factor {_number_text(factor)} (pint)",
+        "maturity_rule": f"weakest input in the order {_MATURITY_ORDER_TEXT}",
+        "inputs": [_input_summary(dose), _input_summary(initial)],
+    }
+    method = (
+        f"Derived: enzyme_concentration = enzyme_dose x substrate_initial_concentration from kinetics.csv rows "
+        f"{dose.row} and {initial.row} (pint unit conversion)"
+    )
+    provenance: dict[str, Any] = {
+        "source": source,
+        "confidence_level": confidence,
+        "measurement_method": method,
+        "validity_range": _validity_range(condition, case.laws, form=case.form),
+        USER_DATASET_PROVENANCE_KEY: namespace.provenance(
+            "kinetics.csv",
+            None,
+            rows=[dose.row, initial.row],
+            source=source,
+            method=method,
+            evidence_type=evidence_type,
+            sd=None,
+            replicates=None,
+            condition_id=condition.condition_id,
+            derivation=derivation,
+        ),
+    }
+    if evidence_type == "estimate":
+        provenance["exploratory_prior"] = True
+    mapping: dict[str, Any] = {
+        "record_id": namespace.id(
+            strain.strain_id, info.key, substrate.substrate_id, condition.condition_id, "enzyme_concentration"
+        ),
+        "name": (
+            f"Enzyme concentration from enzyme dose and initial substrate for {info.name} from {strain.name} on "
+            f"{substrate.name} at {condition.condition_id} ({namespace.dataset_id})"
+        ),
+        "maturity": maturity,
+        "provenance": provenance,
+        "notes": (
+            f"Derived enzyme concentration in dataset {namespace.dataset_id}: enzyme_dose (kinetics.csv row "
+            f"{dose.row}) x substrate_initial_concentration (row {initial.row}); maturity {maturity} is the weaker "
+            "input's."
+        ),
+        **_selectors(
+            namespace, strain, info, substrate, condition, "enzyme_concentration", process_type=case.process_type
+        ),
+        "value": value,
+        "allowed_use": _allowed_use(evidence_type, exact=exact),
+    }
+    if not exact:
+        mapping["range_scope"] = "user_supplied_range"
+        mapping["range_interpretation"] = (
+            "user_supplied_exploratory_prior_not_literature_curated"
+            if evidence_type == "estimate"
+            else "user_stated_bounds_not_calibrated_uncertainty"
+        )
+    return mapping
+
+
 def _input_summary(row: _Kinetics) -> dict[str, Any]:
     return {
         "file": "kinetics.csv",
@@ -5020,9 +5633,14 @@ def _gap_mapping(quantity: str, *, case: _CaseContext) -> dict[str, Any]:
         case.condition,
         case.namespace,
     )
-    units = _gap_units(quantity, case.case_rows)
-    dimension = _GAP_DIMENSION.get(quantity, "substrate concentration (amount per volume)")
-    units_text = units if units is not None else _GAP_UNITS_TEXT.get(quantity, "concentration units")
+    if case.substrate.is_solid:
+        units = _solid_gap_units(quantity, case.case_rows)
+        dimension = _SOLID_GAP_DIMENSION[quantity]
+        units_text = units if units is not None else _SOLID_GAP_UNITS_TEXT[quantity]
+    else:
+        units = _gap_units(quantity, case.case_rows)
+        dimension = _GAP_DIMENSION.get(quantity, "substrate concentration (amount per volume)")
+        units_text = units if units is not None else _GAP_UNITS_TEXT.get(quantity, "concentration units")
     request = _measurement_request(quantity, case=case, units_text=units_text)
     notes = f"No kinetics.csv row gives {quantity} for this case in dataset {namespace.dataset_id}."
     if units is None:
@@ -5075,6 +5693,41 @@ _GAP_UNITS_TEXT = {
 }
 
 
+# The dimension and the units wording of each gap of a case on a solid substrate (dry-mass basis).
+_SOLID_GAP_DIMENSION = MappingProxyType(
+    {
+        "km": "dry mass of the solid substrate per volume",
+        "substrate_initial_concentration": "dry mass of the solid substrate per volume",
+        "kcat": "substrate mass per time per enzyme amount (per protein mass, which is 1/time, or per assay unit)",
+        "enzyme_concentration": "enzyme protein mass per volume or an assay activity per volume",
+        "vmax": "dry mass of the solid substrate per volume per time",
+        "reactivity_exponent": "dimensionless",
+    }
+)
+_SOLID_GAP_UNITS_TEXT = MappingProxyType(
+    {
+        "km": "dry mass per volume, for example g/L",
+        "substrate_initial_concentration": "dry mass per volume, for example g/L",
+        "kcat": "substrate mass per time per enzyme amount, for example g/(FPU h) or g/(mg h)",
+        "enzyme_concentration": "protein mass or assay activity per volume, for example mg/L or FPU/L",
+        "vmax": "dry mass per volume per time, for example g/L/h",
+        "reactivity_exponent": "dimensionless",
+    }
+)
+
+
+def _solid_gap_units(quantity: str, case_rows: Mapping[str, _Kinetics]) -> str | None:
+    """Units of a solid case's gap: a substrate amount takes the case's own dry-mass units, nothing else is guessed."""
+
+    if quantity not in {"km", "substrate_initial_concentration"}:
+        return None
+    for other in ("substrate_initial_concentration", "km"):
+        row = case_rows.get(other)
+        if row is not None:
+            return row.units
+    return None
+
+
 _QUANTITY_LABEL = {
     "km": "km",
     "kcat": "kcat",
@@ -5089,6 +5742,7 @@ _QUANTITY_LABEL = {
     "pk_complex_upper": "upper enzyme-substrate complex pK pk_complex_upper",
     "ph_min": "lowest fitted pH ph_min",
     "ph_max": "highest fitted pH ph_max",
+    "reactivity_exponent": "substrate reactivity exponent",
 }
 # What a measurement request asks for, per pH-ionization quantity.
 _PH_IONIZATION_REQUEST = {
@@ -5161,6 +5815,10 @@ def _measurement_request_text(quantity: str, *, case: _CaseContext, units_text: 
             f"{substrate.name} was fitted over ({quantity}, {units_text}); the pH of condition "
             f"{condition.condition_id} must lie inside the fitted range."
         )
+    if substrate.is_solid:
+        solid_request = _solid_measurement_request_text(quantity, case=case, units_text=units_text)
+        if solid_request is not None:
+            return solid_request
     if quantity in _KCAT_FORM_QUANTITIES and not case.form_started and case.form != RATE_FORM_PH_IONIZATION:
         return (
             f"Measure kcat and the enzyme concentration of {info.name} from {strain.name} on {substrate.name} "
@@ -5195,6 +5853,44 @@ def _measurement_request_text(quantity: str, *, case: _CaseContext, units_text: 
         f"Measure or specify the {info.name} concentration from {strain.name} in the {substrate.name} assay "
         f"at {where} ({units_text})."
     )
+
+
+def _solid_measurement_request_text(quantity: str, *, case: _CaseContext, units_text: str) -> str | None:
+    """The requests that differ on a solid substrate; ``None`` keeps the common wording.
+
+    A solid case has no activity route to Vmax, may state its enzyme as a dose
+    per substrate mass, and may bind the reactivity exponent.
+    """
+
+    strain, info, substrate, condition = case.strain, case.info, case.substrate, case.condition
+    where = _condition_text(condition)
+    if quantity == "reactivity_exponent":
+        return (
+            f"Measure or state the substrate reactivity exponent (reactivity_exponent, {units_text}) of {info.name} "
+            f"from {strain.name} on {substrate.name} at {where}: the exponent n of the factor (S / S0)^n by which the "
+            "rate slows with conversion, for example from rates of fresh enzyme on partially converted substrate."
+        )
+    if quantity in _KCAT_FORM_QUANTITIES and not case.form_started:
+        return (
+            f"Measure kcat and the enzyme concentration of {info.name} from {strain.name} on {substrate.name} at "
+            f"{where} (kcat as substrate mass per time per enzyme amount; the enzyme as a protein mass or assay "
+            "activity per volume, or as an enzyme_dose per substrate mass), or Vmax (dry mass per volume per time)."
+        )
+    if quantity == "vmax":
+        return f"Measure Vmax of {info.name} from {strain.name} on {substrate.name} at {where} ({units_text})."
+    if quantity == "enzyme_concentration":
+        dose = case.case_rows.get("enzyme_dose")
+        if dose is not None:
+            return (
+                f"Specify the initial {substrate.name} concentration (dry mass per volume) for {info.name} from "
+                f"{strain.name} at {where} to derive the enzyme concentration from the enzyme_dose in kinetics.csv "
+                f"row {dose.row}."
+            )
+        return (
+            f"Measure or specify the {info.name} concentration from {strain.name} in the {substrate.name} assay at "
+            f"{where} ({units_text}), or the enzyme_dose per substrate mass."
+        )
+    return None
 
 
 def _response_mapping(

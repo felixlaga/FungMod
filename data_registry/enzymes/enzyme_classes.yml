@@ -87,3 +87,46 @@ records:
       the registry as the filter_paper_unit assay dimension. Preparation-specific
       effective constants that use this pool are not universal cellulose rate
       constants.
+
+  - record_id: cellobiohydrolase
+    name: Cellobiohydrolase
+    display_name: cellobiohydrolase
+    ec_number: 3.2.1.91
+    aliases:
+      - cellulose 1,4-beta-cellobiosidase
+      - EC 3.2.1.91
+      - 3.2.1.176
+      - EC 3.2.1.176
+    maturity: literature_metadata
+    provenance:
+      source: >-
+        IUBMB Enzyme Nomenclature (ExplorEnz): EC 3.2.1.91, cellulose
+        1,4-beta-cellobiosidase (non-reducing end), and EC 3.2.1.176, cellulose
+        1,4-beta-cellobiosidase (reducing end). CAZy families GH6 and GH7: Drula E,
+        Garron ML, Dogan S, Lombard V, Henrissat B, Terrapon N. The carbohydrate-active
+        enzyme database: functions and literature. Nucleic Acids Res.
+        2022;50(D1):D571-D577. doi:10.1093/nar/gkab1045
+      confidence_level: literature_curated
+      notes: >-
+        Categorical capability only: exo-acting hydrolysis of 1,4-beta-D-glucosidic
+        bonds in cellulose that releases cellobiose from a chain end. No kinetic value
+        is recorded or implied; processivity, chain-end specificity, adsorption,
+        binding modules and synergy with other cellulolytic enzymes are not
+        represented.
+    target_bond_classes:
+      - beta_1_4_glycosidic
+    compatible_substrate_classes:
+      - cellulose_particulate
+      - cellulose_film_generic
+    compatible_processes:
+      - homogeneous_michaelis_menten
+    notes: >-
+      Exo-acting cellobiohydrolase capability, the class the curated CAZy family map
+      assigns to GH6 and GH7. The record carries EC 3.2.1.91 (non-reducing-end
+      acting, typical of GH6 cellobiohydrolase II); EC 3.2.1.176 (reducing-end
+      acting, typical of GH7 cellobiohydrolase I) is recorded as an alias, so both
+      EC numbers resolve to this class. GH7 also contains endoglucanase I (EC 3.2.1.4),
+      which this class does not represent. Kinetics come only from user data or a
+      future curated record: the only process law listed is the apparent
+      Michaelis-Menten law on a suspended solid, with no adsorption, surface or
+      synergy law.

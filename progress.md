@@ -497,6 +497,207 @@ cases of an assembled draft run while its gap cases are reported (today the
 40 degC gap blocks the whole printed command), then a machine-readable
 `--json` summary for `assemble`, `fit` and `run`.
 
+## USERDATA-008 Solid Substrates In User Data
+
+Status: `complete` for the stated scope (2026-10-07); the eighth increment of
+the user-supplied-data route. Until now every user substrate had to be
+dissolved, although the registry already ran an apparent bulk
+Michaelis-Menten law on a suspended solid in scientific mode (the
+*T. harzianum* culture case: cellulose in g/L, filter-paper activity in FPU/L,
+`k_h` in g/FPU/h, `K_h` in g/L). That law, and the existing conversion-dependent
+reactivity modifier, are now reachable from user tables for one suspended solid
+polymer on a dry-mass basis. No new numerics, process type or modifier.
+
+Changed:
+
+- `api/user_data.py`: `substrates.csv` accepts `physical_state`
+  `solid_polymer` with the new optional column `amount_basis` (`dry_mass`,
+  required for a solid, blank for a dissolved substrate) and `yield_basis`
+  `g/g` (a solid) or `mol/mol` (dissolved); a `solid_polymer` registry
+  substrate may be referenced. On a solid case `km` and
+  `substrate_initial_concentration` are dry mass per volume, `vmax` dry mass
+  per volume per time, the enzyme a protein mass or an activity in one of
+  `ASSAY_BASE_UNITS` per volume, and `kcat` a substrate mass per time per
+  enzyme amount, checked per case with pint against the case's own enzyme and
+  substrate rows (`kcat x E` must be the substrate's units per time). New
+  quantities: `enzyme_dose` (enzyme per dry substrate mass; times the case's
+  exact `substrate_initial_concentration` it is one derived
+  enzyme-concentration record whose provenance lists both rows, the formula and
+  the pint factor, at the weaker input's maturity, exactly like the
+  specific-activity route; a dose range is scaled, a ranged initial substrate,
+  an explicit `enzyme_concentration` beside a dose, and a dose on a dissolved
+  substrate are refused) and `reactivity_exponent` (binds the existing
+  `substrate_reactivity` modifier through the generated template with
+  `reference_concentration_role` `substrate_initial_concentration`, so `S0` is
+  the case's own initial-substrate record; dimensionless, zero or positive; a
+  pair with one row gives every other case of the pair a gap; refused on
+  dissolved substrates). Refused on a solid, each naming file, row and column:
+  `specific_activity`, `enzyme_loading` and `assay_activity` (an amount-based
+  activity needs a molar mass of a repeat unit, a mass-based one is the `kcat`
+  of the kcat form, and a saturating activity is undefined on an interface),
+  the pH-ionization quantities (its Km(pH) is the ionization of a dissolved
+  Michaelis complex) and an ionization class acting on a solid substrate,
+  molar units on substrate-side rows, `vmax` and the enzyme, composite
+  (`mixed_solid`, `solid_biomass`) and `unknown` states, a wrong yield or amount
+  basis, adsorption, binding-capacity and surface quantities in `kinetics.csv`
+  and the corresponding `substrates.csv` columns (with a dedicated message, not
+  the generic unsupported-column one), and `timecourse.csv` rows. Generated
+  substrate records carry the real physical state; templates carry the
+  apparent-law limitation (Km not a binding constant, constants preparation-
+  and loading-specific, no adsorption or partitioning, surface area,
+  crystallinity, synergy, product inhibition or LPMO action), either "no
+  conversion-dependent slowdown is represented" or the reactivity limitation
+  citing `KADAM_2004_SOURCE`, a g/g product-map note and a dry-mass validity
+  note; gap units and measurement requests use dry-mass wording and never
+  suggest the activity routes on a solid.
+- `screening/case_builder.py`, generic fix (a): the Michaelis-Menten (and
+  pH-ionization) assembler wrote every substrate entity as `generic_dissolved`,
+  `physical_state: dissolved`, `default_degradation_model:
+  homogeneous_dissolved`. It now reads the registry substrate's physical state
+  through the existing `_configured_physical_state`: dissolved keeps exactly
+  those labels, anything else gets `generic_solid`, its own state and an
+  `unknown` degradation model (no branch on substrate names).
+  `_template_process_modifiers` accepts `substrate_reactivity` with
+  `substrate_state_role`, `reference_concentration_role` and `exponent_role`,
+  none defaulted.
+- Generic fix (b) was verified and **not made, because the defect does not
+  exist**: the overlay keeps the parent registry class unchanged beside the new
+  `<dataset>__<class>` record, so nothing overwrites the parent's
+  `compatible_processes`. The namespaced copy deliberately lists only the law
+  its dataset generates compatibility records for; inheriting the parent's list
+  (for `cellulase_total_filter_paper_activity`, `culture_physiology`) would make
+  every case of the copy `underparameterized`, because preflight looks for a
+  compatibility record of every listed law. A test pins both facts with a
+  counterfactual registry.
+- `data_registry/enzymes/enzyme_classes.yml`: new class `cellobiohydrolase`
+  (EC 3.2.1.91; aliases `cellulose 1,4-beta-cellobiosidase`, `EC 3.2.1.91`,
+  `3.2.1.176`, `EC 3.2.1.176` so the reducing-end EC resolves too, explained in
+  the notes; bond class `beta_1_4_glycosidic`; substrate classes
+  `cellulose_particulate` and `cellulose_film_generic`, the registry's existing
+  insoluble cellulose classes; process `homogeneous_michaelis_menten`;
+  provenance IUBMB ExplorEnz EC 3.2.1.91/3.2.1.176 and CAZy GH6/GH7, Drula et
+  al. 2022; maturity `literature_metadata`; no kinetic value, parameter or
+  compatibility record). The CAZy family map is unchanged; no endoglucanase or
+  LPMO record.
+- `api/user_data_assembly.py`: a requested substrate of `user_data` that is
+  not dissolved is refused (drafts carry no `amount_basis`, so the row would
+  lose its basis).
+- Docs: `docs/user-data.md` section "Solid substrates" (declaration, units,
+  worked example, dose route, reactivity, refusals, scientific mode, limits)
+  and updates to the substrates, kinetics, genome, UniProt, generated-records,
+  gaps, time-course and limitations text; `docs/capabilities.md`, README
+  capability row and user-data subsection, `data_registry/README.md`,
+  changelog (Added, Fixed); fixture READMEs of `genome_case` and
+  `uniprot_case`.
+
+Tests: new `tests/test_user_data_solid_substrates.py` (24 test functions, 52 cases) with
+the fixture `tests/fixtures/user_data/solid_case/` (the registry's apparent
+hydrolysis constants re-entered as estimates on a user-defined particulate
+substrate, 20 g/L design, doses 5 and 1.25 FPU/g, reactivity exponent 1 as an
+assumption). Parity: the registry culture case, with cellulase synthesis and
+loss set to zero and the initial filter-paper activity set to 100 FPU/L
+through `value_overrides` (the culture's enzyme pool otherwise changes in
+time, so parity is not exact by construction), gives the same cellulose
+trajectory as the user case without the exponent (largest difference
+6.3e-8 g/L over 97 points; both within rtol 1e-6 of the Lambert W
+solution). Analytic: the integrated law at 100 and 25 FPU/L with mass closure
+`S + P/Y = S0`; with `n` = 1 and 2.5 the simulated times match an independent
+quadrature of `dt = dS / r(S)` to 1e-5 (and the closed form for `n` = 1). Dose
+route: derived values, provenance, weaker maturity, range scaling, the
+`FPU/kg` factor and a protein-mass dose. Reactivity: `S0` is the case's
+initial-substrate symbol. Fix (a): solid entity labels, and the BGL1A
+scientific config digest equals the base commit's. Fix (b): parent unchanged,
+counterfactual underparameterized. Modes: scientific with measured, literature
+and design inputs, exploratory once the exponent, the dose or `km` is an
+estimate. A user-defined endo-xylanase-like class on a user-defined xylan-like
+solid (protein-mass enzyme, estimates) runs exploratory and is refused in
+scientific mode. Genome and UniProt routes: GH7 / EC 3.2.1.91 cellobiohydrolase
+becomes four gaps with dry-mass requests on an added particulate substrate;
+EC 3.2.1.176 resolves through the alias and GH7 with EC 3.2.1.4 is a
+disagreement. 26 parametrized refusals with file, row and column, plus the
+refusals on dissolved substrates, of an ionization class acting on a solid and
+of solid time courses, the assembly refusal and
+the registry record. The records of the four dissolved fixtures hash to the
+values computed with base commit 5ac677e, and (checked with a script against
+an export of that commit) their assembled exploratory configs are
+byte-identical before and after.
+
+Changed expectations (all because `cellobiohydrolase` now has a registry
+record, except the last):
+`tests/test_user_data_genome.py` (the strain's classes gain
+`cellobiohydrolase` between `beta_glucosidase` and `cellulase_generic`; it is
+in `genome_resolved_classes` and no longer in `unmodellable_enzyme_classes`,
+whose expected set is endo-xylanase, glucoamylase and laccase; generated
+enzyme classes 2 -> 3; with `min_tools_agreeing` 2 and 3 the GH7 gene, called
+by three tools, keeps the class; the "no registry class" refusal now uses a
+GH10-only annotation), `tests/test_user_data_uniprot.py` (classes and resolved
+set gain it; `X0TEST05` moves from CAZy-only to agreeing CAZy and EC, so
+`protein_counts` become `cazy_and_ec` 2 and `cazy` 3; `ec_comparable_classes`
+gain it; 3.2.1.91 leaves `unresolved_ec_numbers`; `X0TEST04` contests both
+classes; `unmodellable_enzyme_classes` is glucoamylase only; generated enzyme
+classes 2 -> 3; the refusal export uses `X0TEST09` instead of `X0TEST05`),
+`tests/test_user_data_assembly.py` (the G1 repertoire gains
+`cellobiohydrolase`, reported as not acting on cellobiose; three classes
+without a record), `tests/test_capability_resolution.py` (cellobiohydrolase
+is modellable; LPMO stays without a model), and
+`tests/test_user_data_import.py` (a `solid_polymer` registry substrate is no
+longer refused for its state; the row is now refused for its mol/mol yield and
+missing `amount_basis`, and a `toy_solid` registry substrate is refused for
+its state). The guardrail token list gains `xylan` and `celufloc`. The
+assembled-config snapshot is unchanged and passes.
+
+Commands and results: `ruff check src tests scripts/run_*.py
+scripts/reproduce_paper.py` clean; `pyright` on the three changed source
+files 0 errors; `mkdocs build --strict` passes (site removed); targeted run
+(`tests/test_user_data_*.py`, `tests/test_registry_*.py`,
+`tests/test_guardrails_*.py`, case-builder, class-selection, config-driven
+assembly, organism-case, culture-process, capability-resolution, reactivity,
+docs-sync, instruction-hierarchy, hygiene, CLI, modelability, packaging,
+release, quality-config, BGL1A, Reaction 618, virtual-experiment and canonical
+API tests): 846 passed; full suite (`pytest`, run with nohup): 2415 passed in 46 min.
+
+Not changed: no process law, modifier, solver, family mapping or output table
+schema; the surface-catalysis assembler and its geometry fallbacks are
+untouched; the SABIO-RK and assembly drafting routes stay dissolved-only;
+datasets with dissolved substrates generate byte-identical records and
+configs; user data never reaches `data_registry`.
+
+Scientific impact: laboratory data on insoluble polymers (dry-mass loadings,
+protein or assay-unit enzyme amounts, loadings per gram) reach a simulation
+through a law FungMod already implements, with every amount's basis explicit
+and dimensions checked by pint, and with the law's apparent, loading-specific
+nature stated in every template. Nothing is converted between mass, moles and
+assay units. The `cellobiohydrolase` record turns a genome- or
+proteome-resolved CBH from an unmodellable class into explicit measurement
+requests on a solid cellulose substrate; it adds no kinetic value.
+
+Compatibility: additive for datasets (new optional column and quantities);
+refusal messages for non-dissolved physical states changed wording. Genome and
+UniProt outputs change wherever GH6/GH7 or EC 3.2.1.91/3.2.1.176 occur (listed
+above). Shipped and dissolved configs are byte-identical.
+
+Limitations: one polymer per substrate as a bulk dry mass; no adsorption or
+enzyme partitioning, Langmuir surface law, synergy, product inhibition or LPMO
+kinetics; constants are apparent and not extrapolated by any check; no time
+courses or fits on solids; the process class's own validity text still reads
+"Dissolved, well-mixed" (the template limitations override it in outputs, as
+for the registry culture case).
+
+Ambiguities: whether `cellulose_film_generic` (the BIO-001 scaffold class)
+belongs among the record's substrate classes; it is an insoluble cellulose
+class of the registry, so it was included. `3.2.1.176` is an alias of the
+record rather than a second record, so both EC numbers name one class.
+
+Risk: medium-low. Most changes are additive and refused on malformed input;
+the record changes genome and UniProt outputs for GH6/GH7, which the updated
+tests pin.
+
+Recommended next task: USERDATA-009, the Langmuir surface law for user data:
+refactor `_surface_catalysis_config_data` to the template-driven pattern (no
+BIO-001 or toy branch, no geometry fallback, scientific mode) and accept
+adsorption constant, surface rate constant and accessible area on a solid
+substrate in the amount convention.
+
 ## ASSEMBLE-001 One Dataset For Fungus, Substrate And Conditions
 
 Status: `complete` for the stated scope (2026-10-06). The step the owner's goal
