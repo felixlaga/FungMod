@@ -111,8 +111,9 @@ def test_resolution_separates_modellable_from_merely_present_capability() -> Non
     resolution = CapabilityResolver.from_registry().resolve(_annotation())
 
     assert "beta_glucosidase" in resolution.modellable_enzyme_classes
-    # The cellulose workhorse is encoded but has no registry enzyme class yet.
-    assert "cellobiohydrolase" in resolution.capabilities_without_model
+    # USERDATA-008: the cellulose workhorse has a registry enzyme class (categorical metadata, no kinetics).
+    assert "cellobiohydrolase" in resolution.modellable_enzyme_classes
+    # The oxidative LPMO is encoded but has no registry enzyme class: no implemented rate law exists for it.
     assert "lytic_polysaccharide_monooxygenase" in resolution.capabilities_without_model
     assert set(resolution.modellable_enzyme_classes).isdisjoint(resolution.capabilities_without_model)
 

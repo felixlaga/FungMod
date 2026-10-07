@@ -18,7 +18,7 @@ registry and CAZy family map:
 | `synthetic_g001` | GH3 by three tools | beta_glucosidase (polyspecific) | record exists |
 | `synthetic_g002` | GH1 by two tools | beta_glucosidase (polyspecific) | record exists |
 | `synthetic_g003` | GH3 by DIAMOND only | beta_glucosidase (polyspecific) | record exists |
-| `synthetic_g004` | GH7 | cellobiohydrolase | no record |
+| `synthetic_g004` | GH7 | cellobiohydrolase | record exists since USERDATA-008 (acts on solid cellulose classes only, so no case on these substrates) |
 | `synthetic_g005` | GH10 | endo_xylanase | no record |
 | `synthetic_g006` | AA1 (subfamily AA1_1) | laccase | no record |
 | `synthetic_g007` | GH5 by HMMER only, CBM1 by two tools | GH5: cellulase_generic; CBM1: unmapped | record exists (GH5) |

@@ -1,0 +1,3 @@
+condition_id,temperature,temperature_units,ph,notes
+dose_5,29,degC,5.0,Enzyme dose 5 FPU per g dry substrate
+dose_1_25,29,degC,5.0,Enzyme dose 1.25 FPU per g dry substrate
