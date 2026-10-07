@@ -55,7 +55,16 @@ class ReportItem:
 
 @dataclass(frozen=True)
 class ModelabilityReport:
-    """Structured report for whether a registry case can be modelled."""
+    """Structured report for whether a registry case can be modelled.
+
+    ``selected_compatibility_id`` is the ``record_id`` of the process
+    compatibility record the assessment selected among every compatible record
+    of the case, and ``selected_enzyme_class`` is that record's enzyme class.
+    Config assembly, the exploratory and scientific screens and the result
+    tables build the case from exactly this record. Both are ``None`` when no
+    compatible record exists; a report built by hand without them is resolved
+    only when the case has a single candidate record.
+    """
 
     fungus_id: str
     substrate_id: str
@@ -71,6 +80,8 @@ class ModelabilityReport:
     required_parameters: tuple[str, ...]
     suggested_experiments: tuple[str, ...]
     assumptions: tuple[str, ...]
+    selected_compatibility_id: str | None = None
+    selected_enzyme_class: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -88,6 +99,8 @@ class ModelabilityReport:
             "required_parameters": list(self.required_parameters),
             "suggested_experiments": list(self.suggested_experiments),
             "assumptions": list(self.assumptions),
+            "selected_compatibility_id": self.selected_compatibility_id,
+            "selected_enzyme_class": self.selected_enzyme_class,
         }
 
     def summary(self) -> str:
@@ -257,6 +270,7 @@ def assess_modelability(
 
     selected_required_parameters: tuple[str, ...] = ()
     selected_processes: tuple[str, ...] = tuple(record.process_type for record in compatibility_records)
+    selected_compatibility: ProcessCompatibilityRecord | None = None
     if compatibility_records:
         selected = max(
             (
@@ -277,9 +291,11 @@ def assess_modelability(
         missing.extend(selected["missing"])
         incompatible.extend(selected["incompatible"])
         selected_required_parameters = tuple(selected["required_parameters"])
-        selected_processes = (selected["compatibility"].process_type,)
+        chosen: ProcessCompatibilityRecord = selected["compatibility"]
+        selected_compatibility = chosen
+        selected_processes = (chosen.process_type,)
         condition_missing, condition_incompatible = _environment_condition_items(
-            process_type=selected["compatibility"].process_type,
+            process_type=chosen.process_type,
             environment=environment,
         )
         missing.extend(condition_missing)
@@ -310,6 +326,8 @@ def assess_modelability(
             "Registry records may be toy, exploratory, or curated scientific records; mode-specific maturity rules decide how they are used.",
             f"Mode-specific classification used mode={mode!r}.",
         ),
+        selected_compatibility_id=None if selected_compatibility is None else selected_compatibility.record_id,
+        selected_enzyme_class=None if selected_compatibility is None else selected_compatibility.enzyme_class,
     )
 
 
