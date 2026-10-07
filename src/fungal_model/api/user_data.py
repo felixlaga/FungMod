@@ -36,6 +36,11 @@ resolved classes without a record and unmapped families are reported, never
 turned into records. A genome states which classes a strain can encode, not a
 rate: every resolved class without kinetics becomes the usual explicit gaps,
 whose measurement requests name the annotation.
+
+A table cell or manifest value that begins with ``REVIEW:`` is an unfilled
+review field left by a drafted dataset (for example tables drafted from a
+public kinetics source). Such a dataset is refused, naming every review field,
+before any other table is interpreted.
 """
 
 from __future__ import annotations
@@ -166,6 +171,10 @@ _CONCENTRATION_QUANTITIES = ("substrate_initial_concentration", "km", "enzyme_co
 _KINETIC_CONSTANT_QUANTITIES = frozenset({"km", "kcat", "vmax", "specific_activity", "assay_activity"})
 _YIELD_BASIS = "mol/mol"
 _UNKNOWN_CELL = "unknown"
+# A cell or manifest value starting with this marker is a field a drafted
+# dataset left for a person to decide; it is refused until it is replaced.
+REVIEW_MARKER = "REVIEW:"
+_REVIEW_ISSUE_PREFIX = "Unfilled review field"
 _YES = "yes"
 _NO = "no"
 
@@ -553,6 +562,13 @@ def load_user_dataset(
         for name in _TABLE_COLUMNS
         if name in raw_files
     }
+    if any(str(issue["message"]).startswith(_REVIEW_ISSUE_PREFIX) for issue in issues):
+        # A drafted dataset is interpreted only after a person has filled every review field.
+        raise UserDataError(
+            f"User dataset {str(directory)!r} still has unfilled review fields (cells or manifest values "
+            f"beginning with {REVIEW_MARKER!r}).",
+            issues=issues,
+        )
     context = _Context(base=base, issues=issues)
     parsed = _parse_rows(tables, context, directory=directory)
     if parsed is not None:
@@ -886,6 +902,9 @@ def _parse_manifest(raw: bytes | None, issues: list[dict[str, Any]]) -> dict[str
         issues.append(_issue(file, None, None, "Manifest must be a YAML mapping."))
         return None
     count = len(issues)
+    reviewed = _review_marker_paths(data)
+    for path, text in reviewed.items():
+        issues.append(_review_issue(file, None, path, text))
     unknown = sorted(str(key) for key in data if str(key) not in _MANIFEST_FIELDS)
     if unknown:
         issues.append(_issue(file, None, None, f"Unsupported manifest field(s): {', '.join(unknown)}."))
@@ -910,6 +929,8 @@ def _parse_manifest(raw: bytes | None, issues: list[dict[str, Any]]) -> dict[str
             issues.append(_issue(file, None, "date", "date must be an ISO date (YYYY-MM-DD)."))
     simulation = data.get("simulation")
     if not isinstance(simulation, Mapping):
+        if "simulation" in reviewed:
+            return None
         issues.append(
             _issue(
                 file,
@@ -924,8 +945,9 @@ def _parse_manifest(raw: bytes | None, issues: list[dict[str, Any]]) -> dict[str
             issues.append(
                 _issue(file, None, "simulation", f"Unsupported simulation field(s): {', '.join(unknown_sim)}.")
             )
+        # A field still holding a review marker is reported once, as unfilled, above.
         duration = simulation.get("duration")
-        if (
+        if "simulation.duration" not in reviewed and (
             isinstance(duration, bool)
             or not isinstance(duration, (int, float))
             or not math.isfinite(float(duration))
@@ -933,12 +955,16 @@ def _parse_manifest(raw: bytes | None, issues: list[dict[str, Any]]) -> dict[str
         ):
             issues.append(_issue(file, None, "simulation.duration", "simulation.duration must be a positive number."))
         units = simulation.get("units")
-        if not isinstance(units, str) or _unit_dimension_error(units, _TIME_REFERENCE_UNITS) is not None:
+        if "simulation.units" not in reviewed and (
+            not isinstance(units, str) or _unit_dimension_error(units, _TIME_REFERENCE_UNITS) is not None
+        ):
             issues.append(
                 _issue(file, None, "simulation.units", "simulation.units must be a time unit such as second, minute or hour.")
             )
         points = simulation.get("points")
-        if isinstance(points, bool) or not isinstance(points, int) or points < 2:
+        if "simulation.points" not in reviewed and (
+            isinstance(points, bool) or not isinstance(points, int) or points < 2
+        ):
             issues.append(_issue(file, None, "simulation.points", "simulation.points must be an integer of at least 2."))
     if len(issues) > count:
         return None
@@ -994,6 +1020,9 @@ def _parse_table(name: str, raw: bytes, issues: list[dict[str, Any]], *, rows_re
             values = {column: (cells[index].strip() if index < len(cells) else "") for index, column in enumerate(header)}
             for column in optional:
                 values.setdefault(column, "")
+            for column, text in values.items():
+                if text.startswith(REVIEW_MARKER):
+                    issues.append(_review_issue(name, line, column, text))
             rows.append((line, values))
     except csv.Error as exc:
         issues.append(_issue(name, reader.line_num, None, f"Row is not valid CSV: {exc}"))
@@ -4155,6 +4184,30 @@ def _issue(file: str, row: int | None, column: str | None, message: str) -> dict
     return {"file": file, "row": row, "column": column, "message": message}
 
 
+def _review_issue(file: str, row: int | None, column: str, text: str) -> dict[str, Any]:
+    return _issue(
+        file,
+        row,
+        column,
+        f"{_REVIEW_ISSUE_PREFIX} {column}: {text!r}. Replace it with a reviewed value before loading.",
+    )
+
+
+def _review_marker_paths(value: Any, prefix: str = "") -> dict[str, str]:
+    """Dotted paths of every manifest string that still begins with the review marker."""
+
+    found: dict[str, str] = {}
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            found.update(_review_marker_paths(item, f"{prefix}.{key}" if prefix else str(key)))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            found.update(_review_marker_paths(item, f"{prefix}[{index}]"))
+    elif isinstance(value, str) and value.strip().startswith(REVIEW_MARKER):
+        found[prefix] = value.strip()
+    return found
+
+
 def _issue_text(issue: Mapping[str, Any]) -> str:
     location = str(issue.get("file", ""))
     if issue.get("row") is not None:
@@ -4335,6 +4388,7 @@ __all__ = [
     "RATE_FORM_VMAX",
     "RESPONSE_EVIDENCE_TYPES",
     "RESPONSE_LAWS",
+    "REVIEW_MARKER",
     "ResponseLaw",
     "ResponseLawParameter",
     "USER_DATASET_MANIFEST",
