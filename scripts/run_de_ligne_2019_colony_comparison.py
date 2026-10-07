@@ -8,7 +8,8 @@ Stage 0 (software checks, no fit)::
 Stage 0 fits the plan's error model to the committed observations, times one
 condition on the radial calibration grid, and records the grid, solver and
 symmetry checks the plan requires before any fit. ``--skip-cartesian`` records
-the symmetry check as not run; ``--cartesian-cells`` sets the reference grid.
+the symmetry check as not run; ``--cartesian-cells`` overrides the plan's
+reference grid (recorded as not as declared).
 Every output cites the plan's SHA-256.
 
 Checking recorded stage 0 outputs against the current code and plan::
@@ -40,7 +41,7 @@ def _stage_0(args: argparse.Namespace) -> int:
     colony_comparison.run_stage_0(
         ROOT,
         Path(args.output) if args.output else None,
-        cartesian_cells=None if args.skip_cartesian else int(args.cartesian_cells),
+        cartesian_cells=None if args.skip_cartesian else ("declared" if args.cartesian_cells is None else int(args.cartesian_cells)),
         log=_log,
     )
     return 0
@@ -85,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     stage_0 = subparsers.add_parser("stage-0", help="record the plan's software checks and error models")
     stage_0.add_argument("--output", default=None, help="results directory (default: the plan's)")
-    stage_0.add_argument("--cartesian-cells", default=80, type=int, help="cells per axis of the cartesian reference grid")
+    stage_0.add_argument("--cartesian-cells", default=None, type=int, help="cells per axis of the cartesian reference grid (default: the plan's)")
     stage_0.add_argument("--skip-cartesian", action="store_true", help="record the symmetry check as not run")
     stage_0.set_defaults(handler=_stage_0)
     check = subparsers.add_parser("check", help="verify recorded stage 0 outputs against the plan and the data")

@@ -577,7 +577,8 @@ def test_ranged_ph_reaching_assembly_is_refused_by_the_process_law_check(
 ) -> None:
     """A user condition cannot be a pH range (conditions.csv takes one number or unknown), and
     an EnvironmentGrid pH is always one number. Should an environment with a pH range reach the
-    case anyway, assembly refuses it through PROCESS_ENVIRONMENT_CONDITIONS."""
+    case anyway, the preflight check of PROCESS_ENVIRONMENT_CONDITIONS reports it incompatible
+    and assembly refuses the case."""
 
     overlay = bgl1a.overlay(base_registry)
     environment = overlay.get_environment(ENVIRONMENT)
@@ -610,7 +611,7 @@ def test_ranged_ph_reaching_assembly_is_refused_by_the_process_law_check(
         case_templates=overlay.case_templates.values(),
         product_maps=overlay.product_maps.values(),
     )
-    with pytest.raises(RegistryCaseBuildError, match="requires exact environment condition 'ph'.*kind 'range'"):
+    with pytest.raises(RegistryCaseBuildError, match=r"modelability status is 'underparameterized'.*reads the environment condition 'ph', which is a range"):
         build_model_config_from_registry_case(
             fungus_id=FUNGUS, substrate_id="cellobiose", environment_id=ranged.record_id, registry=registry, mode="scientific"
         )

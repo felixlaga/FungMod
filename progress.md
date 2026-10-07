@@ -161,16 +161,359 @@ Limitations: the pH is read once from the environment (no pH dynamics, buffer
 identity, ionic strength or pH-dependent stability); the pK values and the
 fitted range are not rescaled with temperature; a grid pH outside the fitted
 range warns rather than being refused; a class uses the form on all of its
-substrates or on none; preflight on this branch has no check that the
-environment pH is exact (`PROCESS_ENVIRONMENT_CONDITIONS` is used by assembly
-in `screening/template_environment_modifiers.py`, not by `modelability.py`),
-but user conditions and grid values cannot be pH ranges and assembly refuses
-one that arrives otherwise; the converter recognises only SABIO-RK's type-24
-formula with its standard parameter names.
+substrates or on none; the converter recognises only SABIO-RK's type-24
+formula with its standard parameter names. User conditions and grid values
+cannot be pH ranges; an environment with a pH range that arrives otherwise is
+reported incompatible by the preflight check of the conditions a law reads
+(`PROCESS_ENVIRONMENT_CONDITIONS` in `screening/modelability.py`, FIX-DOCS001,
+merged before this entry), so assembly refuses it.
 
-Next: a preflight check of `PROCESS_ENVIRONMENT_CONDITIONS` in
-`screening/modelability.py`, so a case whose environment lacks an exact pH is
-reported before assembly.
+Next: assemble pH-ionization SABIO-RK entries as laws in
+`assemble_user_tables` (ASSEMBLE-001).
+
+## USERDATA-007 Enzyme Repertoire From A UniProt Proteome
+
+Status: `complete` for the stated scope (2026-10-06); the second repertoire
+route of the user-supplied-data work. "Fungus X on substrate Y in conditions
+Z" can now take the strain's enzyme classes from a UniProtKB TSV export of its
+proteome, which most users can download in one click, instead of a dbCAN run
+on its genome. FungMod can also fetch that export from the UniProt REST API,
+but only on explicit request. No rate is ever taken from a proteome.
+
+Changed:
+
+- `capability/uniprot.py` (new): `decode_uniprot_tsv` (refuses gzip and
+  non-UTF-8 bytes), `parse_uniprot_tsv` and `resolve_uniprot_proteome`, with
+  `UniprotProteome`, `UniprotEntry`, `ProteomeResolution`,
+  `ProteomeClassSupport` and `EcCazyDisagreement`. The parser reads UniProt's
+  own column names: `Entry` required and unique; at least one of `EC number`
+  (EC numbers separated by "; ", partial numbers such as `3.2.1.-` kept partial)
+  and `CAZy` (identifiers separated by ";", trailing ";" allowed, subfamily
+  suffix dropped as in the dbCAN route); `Entry Name`, `Protein names`, `Gene
+  Names`, `Organism`, `Organism (ID)`, `Reviewed` optional; any other column
+  ignored and listed. Refused: no header, no `Entry`, neither evidence column,
+  repeated header columns, blank, whitespace-bearing or repeated accessions,
+  rows wider than the header, malformed EC numbers or CAZy identifiers,
+  `Reviewed` other than reviewed/unreviewed, a non-numeric taxonomy id, more
+  than one organism per file (mixed sets are not supported) and an export with
+  no EC number or CAZy family. Resolution uses existing machinery only: each
+  protein's families go through `CapabilityResolver` and the curated family map
+  (one `CazymeAnnotation` per protein), each complete EC number through
+  `RegistryResolver.resolve_enzyme_class` (the lookup the SABIO-RK user-table
+  converter of USERDATA-005 uses), so an EC number resolves only to a class with a registry
+  record; an ambiguous EC number resolves to none and is listed with the
+  candidates.
+- EC and CAZy disagreement, precisely: for a protein with a mapped family and a
+  complete EC number, the class sets are compared on every class its EC
+  numbers resolve to and every registry class whose record carries an EC
+  number; they disagree when such a class is named by one side only. A
+  disagreeing protein supports no class and is listed with both sides
+  (families and classes, EC numbers and classes, contested classes); FungMod
+  does not choose. A protein whose EC numbers resolve to nothing and whose
+  family classes carry no registry EC number cannot be compared: its family
+  classes count and its EC numbers are listed as unresolved. Each class
+  records its accessions per basis (`cazy_and_ec`, `cazy`, `ec`), its
+  reviewed accessions, its families, EC numbers and family specificity (`null`
+  when only EC numbers support it).
+- `api/user_data.py` (additive): `annotation_tool` accepts `UniProt` or
+  `UniProtKB` followed by a release or download date (a missing version is
+  refused with its own message; the unknown-tool message now names both
+  routes). A UniProt row goes to `_parse_proteome_row`: the dbCAN path rules
+  (`_annotation_path`), the file bytes in the digest, `min_tools_agreeing`
+  refused, a `UP` identifier in `source` recorded as `proteome_id` (several
+  refused). Classes with a registry record join the strain with
+  `_ProteomeClassEvidence` (an explicit `enzymes.csv` row wins and keeps it);
+  classes without one go to `unmodellable_enzyme_classes`; the
+  `genome_annotations` entry lists unresolved and partial EC numbers,
+  disagreements, protein and review counts, columns read and ignored.
+  Gap requests end with "; the class was inferred from UniProt proteome UP...
+  (accessions ...; CAZy families ...; EC ...; n of m reviewed in Swiss-Prot[;
+  polyspecific note])" (at most ten accessions quoted, all in the
+  provenance). Every UniProt entry carries `source_type` `uniprot_proteome`
+  and accessions, which `virtual_experiment_summary.json` and
+  `user_dataset_genome_resolution.json` pass through unchanged. A strain whose
+  export resolves no registry class is refused, naming unmodellable classes,
+  unmapped families, unresolved EC numbers and disagreeing proteins. dbCAN
+  rows are untouched: their code path, records and report entries are
+  byte-identical (checked against a dump taken before the change).
+- `sources/uniprot.py` (new): `proteome_query`, `organism_query`,
+  `build_stream_url` (the documented stream URL with fields `accession, id,
+  protein_name, gene_names, organism_name, organism_id, ec, xref_cazy,
+  reviewed` and `format=tsv`), `fetch_proteome_snapshot` (network only with
+  `refresh=True`; the response is parsed before it is stored; snapshot
+  `uniprotkb.tsv` plus `snapshot.json` with SHA-256, URL, query, retrieval
+  time, HTTP status and the `X-UniProt-Release` and `X-UniProt-Release-Date`
+  headers; same digest returns the stored snapshot, a different digest is
+  refused unless `overwrite=True`), `load_proteome_snapshot` (digest checked)
+  and `write_snapshot_to_user_dataset` (copies the TSV into a dataset and
+  returns a `genomes.csv` row to review; `genomes.csv` is not written). No
+  free-text organism-to-proteome lookup; named as future work.
+- Docs: `docs/user-data.md` "From a UniProt proteome" (download steps and
+  columns, the row, reading rules, resolution, the disagreement rule,
+  outcomes, outputs, the fetch client, limits), `docs/capabilities.md`,
+  `docs/api.md` (both new modules), README, changelog.
+
+Tests: `tests/test_user_data_uniprot.py` (59 tests) with the fixture
+`tests/fixtures/user_data/uniprot_case/` (a hand-written UniProtKB TSV in
+UniProt's column format; its README says "format fixture; synthetic
+accessions; not a real proteome"; accessions `X0TEST01` to `X0TEST12`,
+placeholder proteome `UP000000000`, taxonomy id `0`). With the shipped
+registry: beta_glucosidase from one agreeing, one CAZy-only and one EC-only
+protein; cellulase_generic from GH5 (its EC 3.2.1.4 not comparable);
+cellobiohydrolase and glucoamylase unmodellable; CBM1 and GT2 unmapped; five
+unresolved EC numbers, one partial; two disagreements (GH7 with EC 3.2.1.21;
+GH3 with EC 3.2.1.37 only) supporting nothing; gap requests name the proteome
+and accessions; preflight `underparameterized` in both modes, both simulation
+modes refused, the preflight JSON carries source type and accessions; user
+estimates run the cellobiose case in exploratory mode; an explicit
+`enzymes.csv` row wins. Non-cellulose case: an in-memory registry with a
+test-only glucoamylase record (EC 3.2.1.3, labelled test-only) makes GH15 with
+EC 3.2.1.3 agree, adds the class and its maltose gaps. Also: EC-only and
+CAZy-only exports, an export without a proteome id or review column, dbCAN and
+UniProt rows in one dataset, dbCAN entries keeping exactly their earlier keys,
+refusals (absolute, escaping and symlinked paths, missing file, missing
+version, `min_tools_agreeing`, two proteome ids, mixed organisms, repeated
+accession, missing `Entry`, a dbCAN overview under a UniProt row, unknown
+tool), a strain with no registry class refused, determinism and the digest
+changing with one byte, no rate-like keys, 15 parser refusals, gzip and
+non-UTF-8 bytes, an ambiguous EC number, and the fetch client with
+`urllib.request.urlopen` patched to fail in every test and a patched response
+where needed (URL built, snapshot written and digest checked, refusal without
+`refresh`, same-digest refresh unchanged, different digest refused unless
+`overwrite`, tampered snapshot refused, unusable responses and network errors
+refused with nothing stored, a fetched snapshot written into a dataset that
+then loads with the suggested row). Guardrails: the two new modules are in the
+no-shortcut high-risk paths and a new no-hardcoding test (no organism, class,
+substrate, EC or fixture token); the user-data token list gains the fixture's
+accessions and proteome id; the public-API test checks the new functions are
+exported from their packages, complete and not top-level.
+
+Commands and results: `ruff check src tests scripts/run_*.py
+scripts/reproduce_paper.py` clean; `pyright` on the four changed source files
+0 errors; `mkdocs build --strict` passes with no warnings; the new tests with
+`tests/test_user_data_*.py`, `tests/test_capability_resolution.py`, the five
+guardrail modules, `tests/test_phase1_documentation_sync.py`,
+`tests/test_repository_hygiene.py`, `tests/test_virtual_experiment_api.py` and
+`tests/test_canonical_fungmod_api.py`: 245 passed; full suite: 2170 passed.
+A JSON dump of the dbCAN, esterase, literature and oxidase fixtures taken
+before the change is byte-identical after it.
+
+Not changed: no process law, modifier, solver, registry record, family
+mapping, output table schema or dbCAN behaviour; the resolver's
+`require_diagnostic` filter is still not exposed; nothing is fetched unless a
+caller passes `refresh=True`; user data never reaches `data_registry`.
+
+Scientific impact: a strain's enzyme repertoire can come from its UniProt
+proteome with every class traced to accessions, families, EC numbers, review
+status, the export's digest and the UniProt release, while kinetics stay
+explicit unknowns with measurement requests. Contradictory annotations are
+reported, not resolved by preference. Presence of a protein is not expression
+or secretion, most UniProtKB annotation is automatic, and CAZy
+cross-references are incomplete; the docs say so.
+
+Compatibility: additive. `GENOME_ANNOTATION_TOOLS` gains `UniProt`; the
+unknown-tool refusal message now names both routes; dbCAN entries keep their
+keys (no `source_type`), and datasets without a UniProt row produce
+byte-identical records and reports.
+
+Ambiguities: the REST field names and the release headers were not verified
+against a live response (rest.uniprot.org was unreachable here); dbCAN entries
+carry no `source_type` so that the dbCAN route stays byte-identical, so a
+consumer tells them apart by its absence or by `annotation_tool`; the proteome
+id is read from the `source` cell rather than from a dedicated column; EC
+numbers resolve only against the base registry (not `enzyme_classes.csv`), as
+families do.
+
+Risk: low to medium. The new route is additive and fully refused on malformed
+input, but the disagreement rule is a FungMod definition that depends on which
+registry classes carry EC numbers, and the live UniProt format is unverified.
+
+Recommended next task: curated registry enzyme-class records with EC numbers
+for the family-map classes reported as unmodellable (cellobiohydrolase,
+endo-xylanase, LPMO), so that both repertoire routes resolve to more
+modellable classes and more EC numbers become comparable; then verify the
+UniProt client against a live response from a networked environment.
+
+## USERDATA-004 Time Courses: Compare And Fit
+
+Status: `complete` for the stated scope (2026-10-06); the fourth increment of
+the user-supplied-data route. A user's own time courses (substrate remaining
+and product formed over time) can now be compared with a virtual experiment,
+and selected kinetic constants of a case can be fitted to them with the
+existing least-squares calibration. The fit returns a new user dataset whose
+fitted constants are labelled `fitted`: in-sample estimates, limited to
+exploratory screening and refused by scientific mode, never validated values.
+
+Changed:
+
+- `api/user_data.py`: optional `timecourse.csv` (`strain_id`,
+  `enzyme_class`, `substrate_id`, `condition_id`, `observable` = `substrate`
+  or `product`, `time`, `time_units`, `value`, `units`, optional `sd`,
+  `replicates`, `source`, `method`). References must be declared (the class
+  for the strain, a substrate the class acts on); times finite and nonnegative
+  in a time unit; values finite in amount per volume, the kind of the case's
+  states (wrong dimensions and mass concentrations are refused with the
+  case's units in the message); `sd` positive; one time unit, one value unit
+  and one row per time per series. `UserDataset.timecourses` holds
+  `UserTimecourse` series keyed by the generated case id; `to_dict()` and
+  `summary()` list them; the file enters the digest; no record is generated.
+  `timecourse.csv` is no longer refused as an unsupported table. New evidence
+  type `fitted` (maturity `user_fitted`, allowed use exploratory screening,
+  `km`, `kcat` or `vmax`, exact only), accepted only with the manifest `fit`
+  block that lists its case, condition, quantity, value and units and a fit
+  report file whose SHA-256 matches (its bytes enter the digest). The fitted
+  record's provenance carries the fit method, objective, error model, input
+  digest, data rows, bounds, starting value, identifiability verdict, method
+  and interval, and the scientific-mode boundary.
+- `api/user_data_fit.py` (new): `compare_with_timecourses` interpolates the
+  `trajectory_quantiles` median and 5-95 % band linearly to the observed times
+  (substrate state; `product_formed`), refuses observations outside the
+  simulated range, computes residuals with `residuals_between`, RMSE, mean
+  residual, fraction inside the band and observations with sd, and writes
+  `timecourse_comparison.csv` (added to the result's tables and manifest).
+  `fit_user_dataset` fits `km` with `kcat` or `vmax` of one case across
+  conditions of one known temperature and pH: the case is rebuilt for every
+  candidate by the registry assembler from the records the screen resolves
+  (the fitted roles start from a working copy of the dataset with the
+  starting values) and integrated by `ConfiguredConditionPredictor`; the
+  optimizer is `fit_least_squares` on ln(value) with a declared
+  finite-difference step of 1e-3. Bounds are required; residuals are divided
+  by the reported sd, or, only with an explicit `error_model="unweighted"`,
+  left raw. Identifiability: profile likelihood (`profile_likelihood`, chi-
+  square one-dof threshold at `confidence_level`, crossings bisected ten times)
+  for sd weighting; local information (`local_information_analysis`) with
+  linearized intervals for the unweighted objective. Unidentified quantities
+  refuse the fit unless `allow_unidentified=True` (rows then labelled "NOT
+  IDENTIFIED"); non-converged fits are always refused; fits are not chained.
+  `UserDatasetFit.write` writes the input files byte for byte except
+  `kinetics.csv` (fitted rows replace the fitted quantities, and a fitted
+  `vmax` the whole Vmax route, at the fitted conditions) and the manifest (new
+  dataset id and `fit` block), plus `fit_report.json`.
+- `api/virtual_experiment.py`: `VirtualExperiment.user_dataset` (the overlaid
+  dataset); `DegradationScreenResult.compare_with_timecourses()` and
+  `timecourse_comparison()`.
+- `api/output_schema.py`: table `timecourse_comparison`, schema `1.8.0` ->
+  `1.9.0` (a new table is a minor bump); the table is written only on request.
+  On merging FIX-RATES-001 (schema `2.0.0`) the bump became `2.0.0` ->
+  `2.1.0`.
+- `api/result_tables.py`: `user_fitted` is a user maturity (source class
+  `user_fitted_exact_value`); a case with a fitted value reports mechanism
+  maturity `software_tested_user_fitted_in_sample_unvalidated`.
+- `calibration/profile.py`: optional `diff_step` passed to nuisance refits
+  (default unchanged). `screening/ensemble.py`: public
+  `resolve_screen_role_records` wrapping the screen's existing role
+  resolution.
+- Docs: `docs/user-data.md` time-course, comparison and fitting section with
+  the in-sample honesty note; `docs/api.md`; `docs/concepts/outputs.md`;
+  README user-data subsection, capability row and public API list;
+  changelog.
+
+Tests: `tests/test_user_data_timecourse.py` (31 tests). (a) Synthetic recovery
+on the non-specific esterase case at three initial substrate concentrations:
+time courses from a FungMod simulation with km 150 µM and kcat 30 1/min plus
+seeded noise, labelled synthetic; from starting values 1000 µM and 5 1/min the
+fit identifies both, with the truth inside the profile intervals; the fitted
+dataset reloads, its rows are `fitted`/`user_fitted` with the fit provenance,
+exploratory preflight is modelable and scientific preflight and simulation
+are refused. A second, materially different case fits km and vmax of the
+oxidase case (Vmax form from specific activity and enzyme loading, with
+cardinal laws) and replaces the Vmax route. (b) On the literature re-entry
+with the integrated Michaelis-Menten (Lambert W) solution as observations the
+RMSE is below 1e-5 mM, the fraction inside the band and the observations with
+sd are reported, off-grid times match linear interpolation, and observations
+beyond 10 h are refused by row. (c) Product observed only at 20000 µM
+substrate: km is not identified and the fit is refused; kcat is identified
+with an interval covering the truth; with `allow_unidentified=True` the km
+rows are labelled. (d) Wrong dimension, mass/molar mismatch, duplicate time,
+negative time, undeclared strain, condition and class, non-time units,
+non-finite value, unknown observable, non-positive sd, mixed units and a
+missing method are refused by file, row and column; missing sd refuses the fit
+unless `error_model="unweighted"`; bounds, units, starting values, cases,
+forms, conditions and settings are validated; hand-typed or edited fitted rows,
+a changed report and a fit of a fitted dataset are refused. (e) Datasets
+without time courses keep their record digests (the USERDATA-002 snapshot test
+passes unchanged). `tests/test_user_data_import.py` uses `growth_curve.csv` as
+the unsupported-table example; the no-hardcoding guardrail covers the new
+module; `tests/test_virtual_experiment_api.py` expects schema `1.9.0`.
+
+Not changed: no process law, modifier, solver, registry record or shipped
+case; the standard tables of every run are unchanged except their
+`output_schema_version` value; time courses never reach `data_registry`;
+fitted values never reach scientific mode.
+
+Scientific impact: user time courses become a first-class, validated input,
+and their agreement with a simulation is quantified with explicit
+interpolation and no extrapolation. Kinetic constants can be estimated from
+progress curves with identifiability made explicit and unidentified constants
+refused or labelled, and every fitted value is traceable to the rows, bounds,
+error model and report that produced it. None of this is validation.
+
+Limitations: one case per fit, constants shared only across conditions of one
+temperature and pH; km, kcat and vmax only; one starting point; independent
+Gaussian errors with the reported sd (or equal variances when unweighted);
+verdicts conditional on the bounds and a finite grid; substrate and product
+observables only; exploratory bands collapse to zero width when every input
+is exact.
+
+Recommended next task: hold-out comparison of a fitted dataset against time
+courses that were not used in the fit (a second assay or substrate
+concentration), reported through the existing independent-validation
+contract.
+
+## COLONY-002 Stage 0 Of The Colony Comparison Recorded Under Amendments 2 And 3
+
+Date: 2026-10-06
+
+Status: complete for stage 0 (software checks, no fit). Stage A not run.
+
+Stage 0 was recorded three times, each under the plan as it then stood, and
+failed twice; each failure was traced, the plan was amended before any fit,
+and the superseded record is kept as the amendment's evidence.
+
+- Under amendment 1 (`results/stage_0_superseded_ea6e2e72/`): grid 0.574 /
+  0.102 and symmetry 0.760 / 0.192 failed, solver passed. Cause: the active
+  translocation term aggregates tips like Keller-Segel chemotaxis (the spike
+  grows without bound with refinement). Amendment 2 removed the term, added a
+  well-posedness guard and decision rule R0.
+- Under amendment 2 (`results/stage_0_superseded_ca0e016c/`): grid (5.3e-5,
+  0.0056) and solver (1.1e-7) passed, symmetry (0.382, 0.059) failed. Cause:
+  the radial wall at the window's half-diagonal (28.3 mm) and the cartesian
+  walls on the window differ, and neither is physical; the radial tip front
+  also leads the detected hull by about 4.7 mm. Amendment 3 moved the radial
+  wall to a 9 cm dish (declared assumption), declared the window separately,
+  and set the symmetry comparison to the leading hours with at most 0.1
+  percent of radial tips beyond the window half side, with a 0.25 mm cartesian
+  reference; that window rule was recorded before any finer cartesian result.
+- Under amendment 3 (`results/stage_0/`, plan `2ce70b6b...`): grid 4.0e-5
+  (tips) and 0.0054 (area) against 0.02; solver 1.7e-8 and 0 against 0.005;
+  symmetry over hours 1 to 12, 0.026 and 0.016 against 0.03. All passed. The
+  radial model runs 62 h in 0.8 s; the cartesian reference took 4.1 hours.
+  An independent probe confirmed the numbers and showed that the tip
+  difference at 12 to 14 h does not change between 0.5 and 0.25 mm cells
+  (wall reflection, not discretisation).
+
+Changed: `data/benchmarks/de_ligne_2019_colony/plan.json` (amendments 2 and
+3); `results/stage_0/` and the two superseded records with READMEs;
+`research/colony_comparison.py` (no active term, the grid guard, the window
+and dish domain from the plan, `tip_fraction_beyond_radius`, the
+plan-declared cartesian grid and comparison window); `mycelium/hyphae.py`
+(the aggregation failure mode declared on active translocation);
+`scripts/run_de_ligne_2019_colony_comparison.py` (the plan's cartesian grid by
+default); `docs/colony-comparison.md` (amendments 2 and 3, the stage 0
+record), `docs/spatial-mycelium.md`, `docs/capabilities.md`,
+`docs/paper-readiness.md`, `README.md`, `CHANGELOG.md`, the state document.
+
+Tests: the plan test pins the amendment chain and digest, the amendment
+contents and the superseded records' verdicts; the stage 0 test records a
+run on small grids with the comparison window and the minimum-hours rule;
+`tip_fraction_beyond_radius` is tested on the radial reference and refused on
+a cartesian grid.
+
+Not changed: any data, observation operator, hold-out, bound or decision
+rule. Scientific impact: none on biology; stage 0 shows the radial model is
+grid- and solver-converged and agrees with the two-dimensional model while
+the colony is inside the window, at artificial check values.
+
 
 ## USERDATA-005 Public Kinetics Into User Tables
 
@@ -298,6 +641,143 @@ Recommended next task: let user data bind the existing
 so that the listed pH-dependent SABIO-RK laws can be imported as laws rather
 than as constants at one pH; then a second frozen SABIO-RK snapshot with Vmax and
 specific-activity entries to test those routes on real data.
+
+## FIX-SELECT-001 One Compatibility Record Per Case, From Preflight To Tables
+
+Status: `complete` for the stated scope (2026-10-07).
+
+Defect: when a fungus lists several enzyme classes that act on one substrate
+(common once genome annotations or UniProt proteomes add classes to a user
+strain), the preflight and config assembly could pick different classes.
+`assess_modelability` evaluated every compatible process record and selected
+one with `max(..., key=_compatibility_evaluation_priority)`
+(`screening/modelability.py:261-273` at `e300702`), but the report kept only
+the selected process type (`:280`, `:304`). `select_registry_case_compatibility`
+(`screening/case_builder.py:449-476`) then walked `fungus.enzyme_classes` in
+listing order and returned the first record of that process type whose bond
+classes fit (`:458`, `:472`). Config assembly (`case_builder.py:175`), both
+screens (`screening/ensemble.py:223`) and five result-table helpers
+(`api/result_tables.py:851, 2182, 2409, 2522, 2577`) used that second rule. A
+case reported modelable on the complete parameters of class B was built from
+class A, listed first: on a test registry, scientific assembly failed with
+"No registry parameter record found for role 'kcat'", both screens failed the
+same way, and a user dataset failed with "Requested registry case mode
+'scientific' disagrees with case template ...esterase_a...". Where class A's
+records had been complete but different, the case would have simulated
+another enzyme than the one assessed, with no error.
+
+Changed:
+
+- `ModelabilityReport` gains `selected_compatibility_id` (the `record_id` of
+  the selected `ProcessCompatibilityRecord`) and `selected_enzyme_class`,
+  both defaulting to `None` and written by `to_dict()`. `assess_modelability`
+  sets them from the record its existing priority rule selects; the rule
+  itself is unchanged.
+- `select_registry_case_compatibility` returns the record the report names,
+  looked up by id and checked against the case (the report's fungus and
+  substrate, its enzyme class, its required process, and membership among the
+  standalone records of the fungus's classes for the substrate's class and
+  bonds); any mismatch is refused with the reasons. It never re-derives the
+  choice. A report without a selected record (built by hand) is resolved only
+  when the case has exactly one candidate record; with several it is refused
+  with each candidate's id, enzyme class and process type; with none it is
+  refused as before.
+- `api/result_tables.py`: `_case_compatibility` resolves the record once per
+  case from the report the screen built the case from and passes it to the
+  role-record, provenance, limitation, suggested-experiment and mechanism
+  helpers, which no longer select on their own. A preflight report that
+  selected a different record is refused (the tables would mix two records);
+  selection failures other than "no compatible record at all" are raised
+  instead of silently dropping rows.
+- Config assembly, `registry_case_config_factory` (the Gelain research
+  factories) and both screens are fixed through
+  `select_registry_case_compatibility` without code changes of their own.
+- Docs: CHANGELOG (Unreleased, Fixed).
+
+Decision on reports without the new fields: no code in the repository builds
+a `ModelabilityReport` by hand; every caller passes a report from
+`assess_modelability`. Keeping the old first-listed rule for such reports
+would preserve the defect for any external caller, so the old behaviour is
+kept only where it cannot differ from the preflight (one candidate) and every
+ambiguous case is refused with the candidates named.
+
+Tests: `tests/test_case_class_selection.py` (new, 21 tests).
+An in-memory copy of the shipped registry adds a labelled test-only source
+listing two esterase classes on one dissolved substrate through
+`homogeneous_michaelis_menten`; class A has an explicit unknown kcat, class B
+complete exact test-only values. In both listing orders and both modes the
+preflight selects B and records it; scientific assembly, the exploratory and
+the scientific screens build from B's compatibility, template and parameter
+records (sample config provenance, `provenance_table.csv`,
+`sampled_parameters.csv`, `mechanism_summary.csv`), and A's records appear in
+no table except as an assessed candidate in `modelability_items.csv`. The
+table writer refuses a preflight report naming A. Hand-built reports: refused
+with both candidates named when ambiguous, resolved when the user-data
+esterase fixture has one candidate; a report with no compatible record, a
+missing record id, a wrong enzyme class, a component-only record, a process
+type outside the report and a report for another fungus are refused.
+Non-specific case: a user dataset (`load_user_dataset`, as the user-data route
+generates records) whose strain lists an estimate-only class A and a
+literature-style class B on one substrate; scientific mode selects and builds
+B, exploratory mode may select either, and in each mode the screen and tables
+use the record that mode's preflight selected. Shipped registry: for every
+fungus, substrate, environment and mode, the recorded selection equals the
+single candidate the old rule returned.
+Before the fix (source stashed, tests kept): 20 of 21 failed. The behavioural
+failures were the assembly and screen errors quoted above for class A listed
+first, the user-dataset mode error, and the ambiguous hand-built report, which
+the old code resolved silently to class A ("DID NOT RAISE"); with B listed
+first the old code already built B and failed only on the missing report
+fields.
+
+Commands: `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`
+(all checks passed); `pyright` on the changed files and on the whole project
+(0 errors); `mkdocs build --strict` (passed; `site/` removed); the new tests
+with the modelability, case-builder, config-driven assembly,
+virtual-experiment, user-data, guardrail, documentation-sync and hygiene
+suites (182 passed) and the registry-case, ensemble, CLI and state-rate suites
+(204 passed); the full suite (2093 passed in 31 min).
+
+Not changed: the selection rule, process laws, parameter resolution, templates,
+registry records, the CSV tables, the output schema (`2.0.0`) and the command
+line. A before/after comparison of all 2604 fungus, substrate, environment and
+mode combinations of the shipped registry and both user-data fixtures gave
+identical selections, report contents (apart from the two new keys) and
+assembled configs, and six simulated cases (Reaction 618 re-entry scientific,
+Reaction 618, BGL1A pH 5, the enzyme chain and the esterase fixture
+exploratory, *T. harzianum* scientific) gave byte-identical CSV tables.
+
+Scientific impact: multi-class cases now simulate the enzyme class the
+preflight assessed. No shipped case changes; earlier results from user or
+in-memory registries in which a fungus lists several classes acting on one
+substrate may have been built from a different class than the preflight
+reported, and should be re-run.
+
+Backward compatibility: additive fields with defaults; a report built without
+them still resolves single-candidate cases. Ambiguous hand-built reports, and
+reports whose selected record does not fit the case, are now refused instead
+of silently taking the first listed class. `virtual_experiment_summary.json`
+(`preflight`) and `screen_summary.json` (`modelability_report`) gain the two
+keys; no CSV table or schema version changes.
+
+Ambiguities and limitations: the existing priority rule breaks ties by listing
+order (equal status, template presence and known-item count), so two equally
+assessable classes still resolve to the first listed; the choice is now
+recorded and every consumer follows it, but it is not a scientific preference.
+In the user-dataset test, exploratory mode selects the estimate-only class A
+over the literature-style class B for that reason alone.
+The selected record is visible in `provenance_table.csv` (process
+compatibility row) for simulated cases, but `modelability_preflight.csv` does
+not name it; adding a column would be a minor schema bump.
+
+Risk: low. Shipped selections, configs and tables are unchanged; the new
+refusals affect only reports that were inconsistent or ambiguous.
+
+Next: decide whether ties between equally assessable classes should be refused
+or resolved by a declared preference, and whether
+`modelability_preflight.csv` should carry `selected_compatibility_id` and
+`selected_enzyme_class` (schema `2.1.0`) so that preflight-only bundles name the
+assessed class.
 
 ## USERDATA-003 Enzyme Repertoire From A Genome Annotation
 
@@ -514,6 +994,218 @@ strains of the pair need the law's parameters.
 Recommended next task: user time-course tables (`timecourse.csv`) compared
 against the simulated trajectories with the existing comparison metrics, then
 fitting of user kinetic constants to them.
+
+## FIX-RATES-001 Degradation And Product-Release Rates From State Rates
+
+Status: `complete` for the stated scope (2026-10-06).
+
+Defect: `result_tables._time_series_rows` built `degradation_rate` and
+`product_release_rate` from `_rate_by_index`, which kept whichever process
+rate was listed last at each time index, and gave both rows that value and
+unit; `_maximum_process_rate` took the largest value of any process for both
+`maximum_product_release_rate` and `maximum_substrate_depletion_rate`. In
+multi-process cases the rates belonged to an arbitrary process with arbitrary
+units (the *T. harzianum* P49P11 culture case on Celufloc 200 reported a
+maximum substrate depletion rate of 45.07
+`beta_glucosidase_assay_unit / hour / liter` for cellulose in g/L); in
+single-process cases with a product yield other than one the product release
+rate was the process rate (SABIO-RK Reaction 618: half of d[glucose]/dt).
+
+Changed:
+
+- `ProcessODESolver.run` records `SimulationResult.state_rates`: at every
+  returned time point, `CompiledModel.rhs` (the right-hand side the solver
+  integrated, rates at `max(state, 0)`) gives the net rate of every state in
+  state units per time unit. No finite differences. The field defaults to
+  empty, so other producers (legacy engine results, the mycelium model) are
+  unaffected; `save()` always writes `state_rates.csv` (`kind=state_rate`,
+  header-only when empty) and `to_dict()` includes `state_rates`.
+- Result tables: `degradation_rate` = -d[substrate]/dt and
+  `product_release_rate` = +d[product]/dt from `state_rates.csv` for the
+  case's substrate and product state roles, each with its own units, source
+  `simulation_state_rate`; `maximum_substrate_depletion_rate` and
+  `maximum_product_release_rate` are their maxima over the returned time
+  points, with a note naming the state. Without a mapped role or without
+  `state_rates.csv` the rows are `not_applicable` (empty value, `units` and
+  `source` `not_applicable`, reason in a new optional `notes` column of
+  `time_series_long.csv`) and the metrics are `not_applicable` with the
+  reason; there is no process-rate fallback. `_rate_by_index` and
+  `_maximum_process_rate` are removed. `process_rate.<id>` rows are unchanged.
+- The report's degradation-rate section and the `degradation_rate_vs_time.png`
+  quicklook select `simulation_state_rate` rows.
+- Output schema `2.0.0` (was `1.8.0`): the rows keep their names but change
+  meaning, values, units and source; `time_series_long` gains the optional
+  `notes` column and documents its `source` values.
+- Docs: `docs/concepts/outputs.md` rate section, README output-schema and
+  `AssembledModel.run()` paragraphs, CHANGELOG (Unreleased, Fixed).
+
+Tests: `tests/test_state_rate_metrics.py` (new): Reaction 618 product release
+equals the template yield (2) times the degradation rate at every time point
+and the degradation rate equals the single process rate, in concentration per
+time; the *T. harzianum* culture case reports the maximum depletion rate in
+cellulose mass concentration per time, agreeing with an independent
+second-order finite-difference estimate on a 20-fold refined grid within
+1e-4 of the peak rate, and reports `product_release_rate` as not applicable
+(the template maps no product); a two-process mass-action/decay model with
+mixed time units has `state_rates` equal to S·r computed by hand, in
+`record.json` and `state_rates.csv`; a bundle without `state_rates.csv`
+reports the rows and metrics as not applicable with the reason. Updated:
+bundle file lists in `test_results.py`, `test_configured_model_workflow.py`,
+`test_full_integration_workflow.py` and
+`test_configured_output_bundle_reproducibility.py` include `state_rates.csv`;
+`test_results.py` checks the header-only table for a producer without state
+rates; `test_virtual_experiment_api.py` pins schema `2.0.0`;
+`test_bio002_generic_chain_assembly.py` checks that the chain's rate rows are
+state rates. No assertion pinned the old wrong values.
+
+Not changed: no process law, rate kernel, integration, tolerance, trajectory,
+process-rate value, registry record or template. Trajectories and
+`process_rates.csv` are bit-identical.
+
+Scientific impact: degradation and product-release rates and their maxima are
+now the simulated net change of the mapped substrate and product. Earlier
+reported maximum rates and product-release rates from multi-process cases or
+yields other than one were wrong. No committed data, benchmark or paper
+artifact contains these rows or metrics.
+
+Backward compatibility: consumers selecting these rows by
+`source == simulation_process_rate` must use `simulation_state_rate`;
+`1.8.0` and `2.0.0` bundles must not be pooled. Bundles without
+`state_rates.csv` give `not_applicable` rate rows when re-tabulated.
+
+Limitations: maxima are over the returned time points, not the continuous
+maximum between them; well-mixed `ProcessODESolver` runs only.
+
+## CLI-001 Command-Line Virtual Experiments
+
+Status: `complete` for the stated scope (2026-10-06); the command-line form of
+the product goal ("fungus X on substrate Y in conditions Z, and the software
+calculates") over the existing virtual-experiment API.
+
+Changed:
+
+- `fungal_model.cli` (`main(argv=None) -> int`, `build_parser()`), registered
+  as the console script `fungmod = "fungal_model.cli:main"` in
+  `[project.scripts]` (setup.py keeps only the resource-staging build step and
+  declares no entry points), and `fungal_model/__main__.py` for
+  `python -m fungal_model`. argparse, four subcommands:
+  - `run`: `--fungus`, `--substrate` (repeatable names, aliases or ids);
+    conditions as `--environment`/`--condition` (registry environments or a
+    user-data `condition_id`) or a `--temperature-c`/`--ph`/`--oxygen` grid
+    (`environment_grid`); `--user-data DIR`, `--registry PATH` (default: the
+    packaged registry, printed); `--mode` required; `--samples` and `--seed`
+    required in exploratory mode and refused in scientific mode;
+    `--output DIR` required, new or empty; `--report` adds the HTML report and
+    `index.html`; `--no-plots`. It prints the resolved names, the preflight
+    table with missing items and their suggested experiments, simulates
+    through `VirtualExperiment.simulate`, always writes the Markdown report,
+    and prints per case the environment effect and guardrail, the final
+    metrics and threshold times (median and 5th to 95th percentile from
+    `summary_metrics.csv`, statuses from `final_metrics.csv` and
+    `threshold_times.csv`), then the output directory, manifest, report,
+    limitations count by severity and the provenance and limitations paths.
+  - `preflight`: the same selection, no simulation, optional `--output` for
+    the preflight tables (`write_preflight_report`).
+  - `check-data DIR`: dataset id, digest, directory, time grid, generated
+    record counts, kinetic values and gaps with each measurement request.
+  - `list`: registry fungi, substrates and environments with id, name and
+    maturity, `--aliases`, `--user-data` overlay.
+  - Exit codes: 0 success; 1 the simulation failed after a passing preflight;
+    2 usage or input errors (argparse errors, unknown or ambiguous names, an
+    invalid registry, a non-empty output directory, `UserDataError` with every
+    issue as `file:row:column: message`); 3 the preflight blocks a requested
+    case in the requested mode (nothing is simulated or written; the blocked
+    cases, the API's scientific-mode wording and the measurement requests are
+    printed).
+- API, no behaviour change: `DegradationScreenResult.case_summary()` and
+  `summary_metrics()` read the existing tables; `preflight_policy(report)` in
+  `fungal_model.api.result_tables` (previously `_preflight_policy`) is public
+  so that the command line uses the same per-mode simulation rule as
+  `modelability_preflight.csv`.
+- CI: the installed-wheel smoke also runs `fungmod --version` and
+  `fungmod list`.
+- Docs: `docs/cli.md` (in the nav after the quickstart; every subcommand, the
+  "fungus X on substrate Y at 30 °C and pH 5" example with its real output,
+  modes, user data, exit codes), README "Command line" subsection and
+  capability row, API reference section, install, quickstart and home links,
+  changelog.
+
+Tests: `tests/test_cli.py` (30 tests): Reaction 618 exploratory run with the
+default packaged registry (manifest, report files, figures, printed metrics
+matching `summary_metrics.csv`, limitations count and table paths); the
+T. harzianum culture case in scientific mode (run label, printed threshold
+time matching `threshold_times.csv`); a temperature/pH grid in exploratory
+mode and the same grid blocked in scientific mode with the registry
+suggestions; the esterase fixture in exploratory mode (dataset id and digest
+in output and manifest) and blocked in scientific mode; the literature
+re-entry in scientific mode; a kcat gap exiting 3 from `preflight` and `run`
+with the measurement request printed and in the preflight tables;
+`check-data` success, gaps, and bad units (both issues as
+`kinetics.csv:row:units:`, exit 2); `list` with and without user data and
+aliases; nine `run` usage errors and seven selection input errors (exit 2,
+nothing written); a non-empty output directory; help texts with the API's
+scientific-mode wording; `--version`; the pyproject console script; and
+`python -m fungal_model --version` in a subprocess. Guardrails now cover
+`cli.py` and `__main__.py` (no-hardcoding paths and an organism/substrate/
+enzyme token test, no-shortcut patterns, no low-level solver construction,
+complete public entry point using the public API); the release-configuration
+test pins `[project.scripts]` and the wheel smoke; the API test covers the
+two accessors and `preflight_policy`.
+
+Not changed: no process law, solver, registry record, output table or schema
+(still `1.8.0`), preflight status, simulation rule or numerical result. The
+command line adds no default for any scientific value.
+
+Scientific impact: none on results; the same simulations become reachable
+from a shell, with the mode, sample count and seed always stated by the user
+and the environment-effect guardrail, limitations and provenance printed with
+the numbers.
+
+Limitations: one invocation simulates only when every requested case passes
+the preflight (the API rule), so a mixed request must be split; the printed
+numbers are four significant figures of the tables, which hold full
+precision; no JSON output mode; `python -m fungmod` is not provided (the
+`fungmod` namespace has no real submodules).
+
+Recommended next task: a machine-readable `--json` summary for `run` and
+`preflight`, then per-case selection so that runnable cases of a mixed
+request can be simulated while the blocked ones are reported.
+
+## FIX-DOCS001 Two Defects Found By The Documentation Audit
+
+Date: 2026-10-06
+
+Status: complete. The README and docs audit (DOCS-001) ran every documented
+example and found two code defects; both are fixed with regression tests.
+
+- SABIO-RK proposals: `_proposed_parameter_symbol` mapped every parameter of a
+  type it does not special-case to the bare type token, so the four `pKa`
+  parameters of the pH-dependent entries (38522 and seven others in Reaction
+  618) all became `pka` and `review_source_proposal` refused the whole
+  reaction with a duplicate record ID. The parameter's SABIO-RK name now
+  completes the symbol when it differs from the type (`pka_pke1`, `pka_pke2`,
+  `pka_pkes1`, `pka_pkes2`); `Km_<species>`, `kcat_<substrate>`, the
+  concentration symbols and types whose name adds nothing (`ph`) are unchanged.
+- Preflight: `assess_modelability` now checks the environment conditions the
+  selected process law reads at run time, declared by the law modules
+  (`PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS = ("ph",)`,
+  `THERMAL_INACTIVATION_ENVIRONMENT_CONDITIONS = ("temperature",)`, collected
+  in `PROCESS_ENVIRONMENT_CONDITIONS`). A missing or unknown value is a
+  missing item; a range or distribution is incompatible ("the law needs one
+  value per run; use an environment with an exact pH, or an EnvironmentGrid
+  point"). The *P. chrysosporium* K-3 case in `toy_lab_environment` (pH range)
+  is therefore no longer modelable; in the Tsukada assay environments and
+  EnvironmentGrid points it is unchanged.
+
+Tests: `tests/test_preflight_fixes_docs001.py` (distinct symbols in every
+Reaction 618 entry, the whole proposal reviewable, ranged pH blocking in both
+modes, exact pH unchanged, the declared conditions, processes without
+environment reads unaffected).
+
+Not changed: any rate law, parameter record or registry record; the
+homogeneous Michaelis-Menten and culture cases. Scientific impact: a case that
+could only fail at run time is now refused at preflight.
+
 
 ## DOCS-001 README And Docs Accuracy Audit
 
@@ -768,10 +1460,10 @@ assumption, not a measurement.
 
 ## COLONY-001 Frozen Plan For The De Ligne 2019 Colony Comparison
 
-Status: `partial` (plan frozen 2026-10-06 and amended once the same day, before any check was recorded, to make the area operator's detection density a grid-independent constant; stage 0 core pieces built under SPATIAL-002, the runner and the recorded checks not; no fit run).
+Status: `partial` (plan frozen 2026-10-06 and amended three times the same day before any fit: amendment 1 made the area operator's detection density a grid-independent constant, amendment 2 removed the ill-posed active translocation term and added a grid guard, amendment 3 moved the radial wall to the dish and set the symmetry check's comparison window by the tips; stage 0 software built under SPATIAL-002; stage 0 recorded under amendments 1 and 2, both superseded, and re-recorded under amendment 3 (COLONY-002); no fit run).
 
 `data/benchmarks/de_ligne_2019_colony/plan.json` (SHA-256
-`ea6e2e7270b809fee092655f7e6882cf266e16d86d955c276ba5e2edc5ad959e`, pinned by
+`2ce70b6b21b2d254f4d01d3fb5ec1523442299f2ed6ce2853c270fab712acd9d`, pinned by
 `tests/test_colony_comparison_plan.py`) declares the within-study transfer test
 of the continuum mycelium (SPATIAL-001) against DATA-003 before anything is
 run: an axisymmetric geometry on the scan window with the inoculum disc, the

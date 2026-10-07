@@ -1,0 +1,2 @@
+strain_id,annotation_file,annotation_tool,source
+strain_u1,annotations/strain_u1_uniprot.tsv,UniProt format fixture (hand-written; no UniProt release),"FungMod UniProt-route format fixture standing in for UniProt proteome UP000000000 (a placeholder id); synthetic accessions, not a real proteome"

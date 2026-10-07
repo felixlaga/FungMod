@@ -10,6 +10,17 @@
         - VirtualExperimentError
         - virtual_experiment
 
+## Command line
+
+The `fungmod` console script (also `python -m fungal_model`); see
+[command line](cli.md) for the subcommands and exit codes.
+
+::: fungal_model.cli
+    options:
+      members:
+        - main
+        - build_parser
+
 ## User-supplied data
 
 ::: fungal_model.api.user_data
@@ -17,8 +28,45 @@
       members:
         - load_user_dataset
         - UserDataset
+        - UserTimecourse
+        - TimecoursePoint
         - UserDataError
 
+## Enzyme repertoire from a UniProt proteome
+
+::: fungal_model.capability.uniprot
+    options:
+      members:
+        - parse_uniprot_tsv
+        - decode_uniprot_tsv
+        - resolve_uniprot_proteome
+        - UniprotProteome
+        - UniprotEntry
+        - ProteomeResolution
+        - ProteomeClassSupport
+        - EcCazyDisagreement
+
+::: fungal_model.sources.uniprot
+    options:
+      members:
+        - fetch_proteome_snapshot
+        - load_proteome_snapshot
+        - write_snapshot_to_user_dataset
+        - build_stream_url
+        - proteome_query
+        - organism_query
+        - UniprotSnapshot
+        - UniprotFetchError
+
+::: fungal_model.api.user_data_fit
+    options:
+      members:
+        - compare_with_timecourses
+        - TimecourseComparison
+        - fit_user_dataset
+        - UserDatasetFit
+        - FittedQuantity
+        - UserDataFitError
 ::: fungal_model.api.user_data_sources
     options:
       members:

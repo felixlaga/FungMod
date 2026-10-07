@@ -647,6 +647,14 @@ class LocalUptake(FieldProcess):
         return tendency
 
 
+ACTIVE_TRANSLOCATION_AGGREGATION = (
+    "finite-time aggregation: carrying substrate up the tip-density gradient while a branching process makes tips "
+    "where the substrate is forms a chemotaxis-like positive feedback (Keller-Segel type) that can concentrate tips "
+    "into a spike whose height grows without bound as the grid is refined; check grid convergence of every result "
+    "that uses the active term (COLONY-001 stage 0: the 24 h tip count doubled with each halving of the cell)"
+)
+
+
 @dataclass(frozen=True, kw_only=True)
 class Translocation(FieldProcess):
     """Internal substrate moves through the mycelium: diffusion plus an optional active flux towards tips.
@@ -689,7 +697,11 @@ class Translocation(FieldProcess):
             ),
             labels=("transport", "substrate"),
             limitations=("translocation not gated by hyphal density",),
-            failure_modes=("negative diffusivity refused at compile time",),
+            failure_modes=(
+                ("negative diffusivity refused at compile time", ACTIVE_TRANSLOCATION_AGGREGATION)
+                if self.active_diffusivity_symbol is not None
+                else ("negative diffusivity refused at compile time",)
+            ),
             rate_units=_per_time(self.internal_units, "hour"),
         )
 

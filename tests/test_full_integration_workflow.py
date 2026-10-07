@@ -32,6 +32,7 @@ def test_pet_surface_integration_workflow_saves_full_output_folder(tmp_path) -> 
         "solver_report.json",
         "state_trajectories.csv",
         "process_rates.csv",
+        "state_rates.csv",
         "figures/state_trajectories.png",
         "figures/process_rates.png",
         "figures/mass_balance.png",

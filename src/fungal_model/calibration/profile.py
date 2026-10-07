@@ -56,7 +56,7 @@ def profile_likelihood(
     *, result: LeastSquaresCalibrationResult, predict: PredictionFunction,
     observations: Mapping[str, Quantity], residual_scales: Mapping[str, Quantity],
     grids: Mapping[str, Quantity], source: str, train_indices: Sequence[int] | None = None,
-    max_nfev: int | None = None,
+    max_nfev: int | None = None, diff_step: float | None = None,
 ) -> ProfileLikelihoodResult:
     """Profile the original fit's training objective on explicit unit-bearing grids.
 
@@ -64,6 +64,8 @@ def profile_likelihood(
     scales as independent Gaussian standard deviations. Failed points remain
     explicit with null costs; they are never replaced by successful neighbours.
     Validation observations must not be passed as training observations.
+    ``diff_step`` is passed to every nuisance refit (see ``fit_least_squares``);
+    ``None`` keeps scipy's default, as before.
     """
     if not has_text(source):
         raise ProvenanceError('Profile likelihood requires a source for its analysis and noise assumptions.')
@@ -107,7 +109,7 @@ def profile_likelihood(
                     fit = fit_least_squares(base_parameters=fixed, fittable_parameters=nuisance,
                         predict=predict, observations=observations, train_indices=train_indices,
                         validation_indices=(), residual_scales=residual_scales,
-                        calibration_source=source, max_nfev=max_nfev)
+                        calibration_source=source, max_nfev=max_nfev, diff_step=diff_step)
                     if not fit.success or fit.training_residuals is None:
                         raise ValueError(fit.message)
                     vector = fit.training_residuals.flattened_scaled()

@@ -519,27 +519,135 @@ def select_registry_case_compatibility(
     substrate_id: str,
     report: ModelabilityReport,
 ) -> ProcessCompatibilityRecord:
+    """Return the process compatibility record the modelability report selected.
+
+    ``assess_modelability`` evaluates every compatible record of a case and
+    records the one it selected in ``report.selected_compatibility_id``. Config
+    assembly, the exploratory and scientific screens and the result tables all
+    resolve the case through this function, so a case is built from exactly the
+    record, and therefore the enzyme class, that the preflight assessed. The
+    record is looked up by its identifier and checked against the case; it is
+    never re-derived.
+
+    A report without a selected record (built by hand, or by an older caller)
+    is resolved only when the case has exactly one candidate record; with
+    several candidates it is refused with the candidates named, because any
+    choice could differ from the one the preflight assessed.
+    """
+
+    if report.fungus_id != fungus_id or report.substrate_id != substrate_id:
+        raise RegistryCaseBuildError(
+            f"Modelability report for {report.fungus_id!r} + {report.substrate_id!r} cannot select the "
+            f"process compatibility record of case {fungus_id!r} + {substrate_id!r}."
+        )
+    if report.selected_compatibility_id is not None:
+        return _reported_compatibility(
+            registry=registry,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            report=report,
+            compatibility_id=report.selected_compatibility_id,
+        )
+    candidates = _compatibility_candidates(
+        registry=registry,
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        process_types=report.required_processes,
+    )
+    if len(candidates) == 1:
+        return candidates[0]
+    if not candidates:
+        raise RegistryCaseBuildError(
+            "Modelability report selects no process compatibility record, and no compatible process "
+            f"record of case {fungus_id!r} + {substrate_id!r} could be selected for config assembly."
+        )
+    listed = "; ".join(
+        f"{record.record_id} (enzyme class {record.enzyme_class}, process type {record.process_type})"
+        for record in candidates
+    )
+    raise RegistryCaseBuildError(
+        "Modelability report does not name its selected process compatibility record, and case "
+        f"{fungus_id!r} + {substrate_id!r} has {len(candidates)} candidate records: {listed}. "
+        "Assess the case with assess_modelability, which records the selected record, instead of "
+        "choosing one here."
+    )
+
+
+def _reported_compatibility(
+    *,
+    registry: FungModRegistry,
+    fungus_id: str,
+    substrate_id: str,
+    report: ModelabilityReport,
+    compatibility_id: str,
+) -> ProcessCompatibilityRecord:
+    compatibility = registry.process_compatibility.get(compatibility_id)
+    if compatibility is None:
+        raise RegistryCaseBuildError(
+            f"Modelability report selected process compatibility record {compatibility_id!r}, "
+            "which this registry does not hold; assess the case against the registry used for assembly."
+        )
+    problems: list[str] = []
+    if report.selected_enzyme_class not in (None, compatibility.enzyme_class):
+        problems.append(
+            f"the report names enzyme class {report.selected_enzyme_class!r}, the record "
+            f"{compatibility.enzyme_class!r}"
+        )
+    if compatibility.process_type not in report.required_processes:
+        problems.append(
+            f"the record's process type {compatibility.process_type!r} is not among the report's "
+            f"required processes {list(report.required_processes)!r}"
+        )
+    candidate_ids = {
+        record.record_id
+        for record in _compatibility_candidates(
+            registry=registry,
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            process_types=(compatibility.process_type,),
+        )
+    }
+    if compatibility.record_id not in candidate_ids:
+        problems.append(
+            "the record is not a standalone compatibility record of the fungus's enzyme classes for the "
+            "substrate's class and bond classes"
+        )
+    if problems:
+        raise RegistryCaseBuildError(
+            f"Modelability report selected process compatibility record {compatibility_id!r}, which does "
+            f"not fit case {fungus_id!r} + {substrate_id!r}: {'; '.join(problems)}."
+        )
+    return compatibility
+
+
+def _compatibility_candidates(
+    *,
+    registry: FungModRegistry,
+    fungus_id: str,
+    substrate_id: str,
+    process_types: tuple[str, ...],
+) -> tuple[ProcessCompatibilityRecord, ...]:
+    """Every standalone compatibility record of the case for the given process types."""
+
     fungus = registry.get_fungus(fungus_id)
     substrate = registry.get_substrate(substrate_id)
+    candidates: dict[str, ProcessCompatibilityRecord] = {}
     for enzyme_class_id in fungus.enzyme_classes:
-        for process_type in report.required_processes:
+        for process_type in process_types:
             try:
-                candidates = registry.get_process_compatibility(
+                records = registry.get_process_compatibility(
                     enzyme_class=enzyme_class_id,
                     substrate_class=substrate.substrate_class,
                     process_type=process_type,
                 )
             except RegistryLookupError:
                 # An organism may carry enzyme classes that do not act on this
-                # substrate; only classes with a compatibility record can select.
+                # substrate; only classes with a compatibility record are candidates.
                 continue
-            for compatibility in candidates:
+            for compatibility in records:
                 if set(compatibility.required_bond_classes).issubset(substrate.bond_classes):
-                    return compatibility
-    raise RegistryCaseBuildError(
-        "Modelability reported a modelable case, but no compatible process "
-        "record could be selected for config assembly."
-    )
+                    candidates.setdefault(compatibility.record_id, compatibility)
+    return tuple(candidates.values())
 
 
 def _exact_role_parameters(

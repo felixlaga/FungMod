@@ -1,0 +1,13 @@
+Entry	Entry Name	Protein names	Gene Names	Organism	Organism (ID)	EC number	CAZy	Reviewed	Length
+X0TEST01	SYN01_XTEST	Synthetic protein 01 (format fixture)	synth01	Synthetic format-fixture organism	0	3.2.1.21	GH3;	reviewed	812
+X0TEST02	SYN02_XTEST	Synthetic protein 02 (format fixture)	synth02	Synthetic format-fixture organism	0		GH1;	unreviewed	480
+X0TEST03	SYN03_XTEST	Synthetic protein 03 (format fixture)	synth03	Synthetic format-fixture organism	0	3.2.1.21		unreviewed	610
+X0TEST04	SYN04_XTEST	Synthetic protein 04 (format fixture)	synth04	Synthetic format-fixture organism	0	3.2.1.21	CBM1;GH7;	unreviewed	505
+X0TEST05	SYN05_XTEST	Synthetic protein 05 (format fixture)	synth05	Synthetic format-fixture organism	0	3.2.1.91	CBM1;GH7;	reviewed	513
+X0TEST06	SYN06_XTEST	Synthetic protein 06 (format fixture)	synth06	Synthetic format-fixture organism	0	3.2.1.4	GH5;	unreviewed	418
+X0TEST07	SYN07_XTEST	Synthetic protein 07 (format fixture)	synth07	Synthetic format-fixture organism	0	3.2.1.-		unreviewed	390
+X0TEST08	SYN08_XTEST	Synthetic protein 08 (format fixture)	synth08	Synthetic format-fixture organism	0		GT2;	unreviewed	720
+X0TEST09	SYN09_XTEST	Synthetic protein 09 (format fixture)	synth09	Synthetic format-fixture organism	0	3.2.1.3	GH15;	unreviewed	640
+X0TEST10	SYN10_XTEST	Synthetic protein 10 (format fixture)	synth10	Synthetic format-fixture organism	0	3.2.1.37	GH3;	unreviewed	797
+X0TEST11	SYN11_XTEST	Synthetic protein 11 (format fixture)	synth11	Synthetic format-fixture organism	0	3.1.1.73; 3.2.1.-		unreviewed	355
+X0TEST12	SYN12_XTEST	Synthetic protein 12 (format fixture)	synth12	Synthetic format-fixture organism	0			unreviewed	201
