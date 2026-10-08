@@ -1571,7 +1571,7 @@ checks.
 | --- | --- | --- | --- | --- |
 | `substrate_initial_concentration` | blank | `initial_substrate` | dry mass per volume | `g/L` |
 | `initial_biomass` | blank | `initial_biomass` | biomass dry mass per volume, written exactly like the initial substrate's units | `g/L` |
-| `biomass_yield` | blank | `biomass_yield` | dimensionless, above 0 and at most 1 | `g/g` |
+| `biomass_yield` | blank | `biomass_yield` | dimensionless, above 0 and at most 1 g/g; `mg/g` or `percent` are converted with pint (350 mg/g is 0.35 g/g) | `g/g` |
 | `biomass_loss_rate` | blank | `biomass_loss_rate` | 1/time | `1/h` |
 | `induction_half_saturation` | blank | `induction_half_saturation` | dry mass per volume, above 0 | `g/L` |
 | `hydrolysis_capacity` | the consuming pool | `hydrolysis_capacity` | substrate dry mass per time per pool amount | `g/FPU/h`, `g/mg/h` |

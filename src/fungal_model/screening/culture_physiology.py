@@ -413,6 +413,8 @@ def _coefficients(
             record = _template_parameter_record(parameter_records, parameter_role)
             numeric = _record_exact_value(record, role=parameter_role)
             record_units = _dimensional_record_units(record, role=parameter_role)
+            if record_units is None:
+                numeric = _plain_fraction(numeric, record, role=parameter_role)
             if record_units is not None:
                 if field == "complement_of_parameter_role":
                     raise RegistryCaseBuildError(
@@ -467,6 +469,23 @@ def _dimensional_record_units(record: ParameterRecord, *, role: str) -> str | No
     except Exception as exc:  # pint raises several unrelated exception types for bad strings
         raise RegistryCaseBuildError(f"Role {role!r} record units {text!r} cannot be parsed: {exc}") from exc
     return None if dimensionless else text
+
+
+def _plain_fraction(numeric: float, record: ParameterRecord, *, role: str) -> float:
+    """A dimensionless record's value as a plain number: 400 mg/g is 0.4 and 40 percent is 0.4.
+
+    A product-map coefficient is a plain number, so a record stated in scaled
+    dimensionless units is converted with pint, never read as its magnitude.
+    """
+
+    if record.value.units is None:
+        return numeric
+    try:
+        return float(Q_(numeric, str(record.value.units)).to("dimensionless").magnitude)
+    except Exception as exc:  # pint raises several unrelated exception types for bad strings
+        raise RegistryCaseBuildError(
+            f"Role {role!r} record units {record.value.units!r} cannot be read as a plain fraction: {exc}"
+        ) from exc
 
 
 def _process_template_specs(

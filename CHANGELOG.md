@@ -918,6 +918,14 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- A dimensionless parameter bound to a product-map coefficient in scaled units
+  was read as its raw number: a `culture.csv` `biomass_yield` of `0.5 mg/g`
+  acted as 0.5 g/g, a thousand times too large, and `350 mg/g` or `35 percent`
+  were refused as above 1 g/g. The composition builder now converts such a
+  record to a plain fraction with pint, and the culture bound is judged in
+  g/g. Records in `g/g` or `dimensionless`, every registry case and every
+  fixture are unchanged (their configs hash as before).
+
 - `final_metrics.csv` named a product stated in micromolar
   `final_product_amount` (and would have called an amount per mass such as
   `millimole / gram` a concentration): the label was chosen by matching unit
