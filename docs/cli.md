@@ -28,7 +28,10 @@ Name resolution, the preflight, the simulation rule of each mode, sampling,
 the tables and the report are the ones described in
 [virtual experiments](concepts/virtual-experiments.md) and
 [outputs](concepts/outputs.md); assembling, drafting, comparing and fitting
-are the ones described in [user-supplied data](user-data.md). Nothing is
+are the ones described in [user-supplied data](user-data.md). `run`,
+`assemble`, `check-data` and `fit` also write a
+[machine-readable JSON summary](#machine-readable-summaries-json) with
+`--json PATH` (`--json -` for standard output). Nothing is
 fetched from the network unless you pass `fungmod assemble --fetch`, the one
 network opt-in of the command line (it queries UniProt for the proteome of
 `--proteome` or `--fetch-proteome`, and SABIO-RK for the kinetics of
@@ -1113,6 +1116,319 @@ written. `--allow-unidentified` writes it labelled `NOT IDENTIFIED` instead.
 A fit that does not converge, a dataset that is itself a fit, too few
 observations and invalid bounds are refused the same way.
 
+## Machine-readable summaries: --json
+
+`run`, `assemble`, `check-data` and `fit` take `--json PATH`. Besides the
+printed text, the command then writes one JSON document that summarizes what
+it computed, printed and wrote, so that a script or pipeline reads results
+without parsing prose (`fungal_model.cli_summary`; CLI-003). The summary
+adds no result of its own: it holds the values of the printed text (at full
+precision instead of four significant figures), the tables and files of the
+output directory, and the API's reports.
+
+```bash
+fungmod check-data path/to/esterase_case --json check.json
+fungmod run --user-data path/to/esterase_case \
+  --fungus "Esterase source strain E1" --substrate "p-nitrophenyl butyrate" \
+  --condition c37_ph7_5 \
+  --mode exploratory --samples 32 --seed 5 --output runs/esterase \
+  --json - > esterase_summary.json
+```
+
+- `--json PATH` writes the summary to a new file. The text stays on standard
+  output. The path must not exist (nothing is overwritten), its directory
+  must exist (FungMod creates none for it), and it must lie outside
+  `--output`, which holds only the files the command writes. These checks run
+  before the command does anything; a refused path exits with 2 and writes no
+  summary.
+- `--json -` writes the summary alone to standard output and moves the
+  printed text to standard error. Standard output is then one JSON document
+  and nothing else. Error messages go to standard error, as always.
+- The text and the exit code are those of the same command without `--json`.
+  The summary is written for every exit code once the arguments are parsed,
+  errors included (`exit_code` 2 with the `error` object). An argument error
+  that the parser reports (an unknown option, a missing required argument,
+  `--help`) writes no summary, because the command never started. A summary
+  file that cannot be written (an I/O error) exits with 2.
+- `preflight`, `list` and `draft-kinetics` have no `--json`. The comparison
+  with your time courses is part of the `run` summary (`run
+  --compare-timecourses`), because there is no `compare` subcommand.
+
+### The document
+
+| Key | Value |
+| --- | --- |
+| `kind` | `"fungmod_command_summary"` |
+| `schema_version` | The version of this summary format, `"1.0.0"`. It changes when a key is renamed or removed or its type or meaning changes. `tests/test_cli_json.py` pins it. |
+| `fungmod_version` | The FungMod version that wrote the summary. |
+| `command` | `run`, `assemble`, `check-data` or `fit`. |
+| `arguments` | The arguments as given, after `fungmod`. |
+| `exit_code` | The exit code of the command (see [exit codes](#exit-codes)). |
+| `exit_meaning` | The meaning of the exit code, as `fungmod --help` lists it. |
+| `error` | `{"message", "details"}`, the error message and its detail lines as printed after `fungmod COMMAND: error:`. It is `null` when the command reported no error. |
+| `result` | The result object of the command (below). |
+
+Three rules hold everywhere in the document:
+
+- **Units are explicit.** Every number of a physical quantity has its units
+  as a string beside it: a `units` key in the same object (metrics, fitted
+  values, intervals, bounds, residuals, comparison series), or
+  `temperature_units` and `time_units`. No unit is converted. Counts are plain
+  integers, `ph` is on the pH scale, and `fraction_inside_band` is a fraction
+  of the observations.
+- **Unknowns are `null` with a reason.** Nothing is filled with a default.
+  Every `null` is listed in the `null_reasons` object of the object that holds
+  it, with the reason: an explicit unknown (a threshold not reached, a
+  release header UniProt did not send) or a value that does not apply (no
+  seed in scientific mode, no error). A section the command did not reach
+  because it stopped first is `null` with the reason `not reached: the command
+  stopped before this step (see exit_code and error)`.
+- **No NaN or Infinity.** A non-finite number of a table or report becomes
+  `null`, with the value quoted in its reason.
+
+Paths are written as the command prints them. A relative `--output` stays
+relative to the current directory.
+
+### `run`
+
+| Key of `result` | Value |
+| --- | --- |
+| `request` | `mode`, `samples_per_case`, `seed` (`null` in scientific mode), `runnable_only`, `html_report`, `quicklook_figures`, `compare_timecourses`, `output_directory`. |
+| `experiment` | `registry` (`path`, `registry_id`, `version`, `maturity`), `user_dataset` (`dataset_id`, `digest`; `null` without `--user-data`), `resolved_names` (`record_type`, `query`, `record_id`, `name`), `environment_grid_cases` (`environment_id`, `temperature`, `temperature_units`, `ph`, `oxygen`), and the fungus, substrate, environment and case counts. |
+| `cases` | One object per requested case, in grid order: `case_id` (as in the tables), `number` (the `#` of the printed preflight table), `fungus_id`, `substrate_id`, `environment_id`, `preflight` (`mode`, `status`, `runnable`, `blocking_reason`, `recommended_next_action`, `uncertain_inputs`, `missing_inputs`, `incompatible_inputs`, `measurement_requests`), `status`, `reason`, `samples` (`simulated`, `failed`), `environment_effect` (`status`, `response_model`, `guardrail`), `final_metrics` and `threshold_times`. |
+| `measurement_requests` | The measurement requests of the blocked cases, each once, as printed under `Measurement requests:`. |
+| `simulation` | The output bundle: `run_label`, `scientific_mode_note`, `samples_per_case`, `seed`, `partial_run`, `requested_case_count`, `simulated_case_count`, `output_directory`, `manifest`, `report`, `html_report` and `report_index` (with `--report`), `tables` (name to path, as in `output_manifest.json`), `figures`, `file_count` (the manifest lists every file), `limitations` (`count`, `by_severity`, `table`), `provenance` (`rows`, `table`) and `suggested_experiments` (`rows`, `table`). It is `null` when nothing was simulated. |
+| `timecourse_comparison` | With `--compare-timecourses`: `dataset_id`, `dataset_digest`, `table`, `series` (`case_id`, `timecourse_case_id`, `series_id`, `observable`, `simulated_state`, `n_observations`, `n_with_sd`, `rmse` and `mean_residual` in `units`, `time_units`, `fraction_inside_band`, `used_in_fit`), `not_compared`, `note` and `interpolation`. The agreement is in-sample, not validation. A refused comparison is `null` with the reason. |
+
+The `status` of a case:
+
+| Status | Meaning |
+| --- | --- |
+| `ran` | Simulated. Its samples, metrics and threshold times are in the bundle. |
+| `blocked` | The preflight blocks the case in the requested mode. `reason` is the `not_simulated_reason` of `case_summary.csv`, or, when nothing was written, the blocking reason and next action. |
+| `refused` | Runnable, but not simulated, because another requested case is blocked and `--runnable-only` was not given (exit code 3). |
+| `failed` | Runnable, but the simulation failed after a passing preflight (exit code 1). |
+
+Each entry of `final_metrics` and `threshold_times` holds `metric`, `units`,
+`samples` (the samples with a row for the metric), `computed_samples`, and
+`median`, `p05`, `p95`, `mean`, `min` and `max` from `summary_metrics.csv`,
+plus `not_computed` (`status`, `samples`, `notes`) for the samples that did
+not compute it. When no sample computed a metric, for example a degradation
+threshold not reached within the simulated time, the statistics are `null`
+and the reason is the text that `run` prints.
+
+Excerpts of the summary of the [partial run](#run-the-runnable-cases-of-a-request)
+above (Reaction 618, 32 samples, seed 618, with `--json -` added): the
+blocked case, then the first final metric and the first threshold time of the
+simulated case.
+
+```json
+{
+  "case_id": "case_0001",
+  "number": 2,
+  "fungus_id": "sabiork_beta_glucosidase_source",
+  "substrate_id": "cellobiose",
+  "environment_id": "toy_lab_environment",
+  "preflight": {
+    "mode": "exploratory",
+    "status": "underparameterized",
+    "runnable": false,
+    "blocking_reason": "missing_inputs",
+    "recommended_next_action": "measure_or_curate_missing_inputs",
+    "uncertain_inputs": [
+      "Km_cellobiose",
+      "kcat_cellobiose"
+    ],
+    "missing_inputs": [
+      "initial_cellobiose_concentration",
+      "enzyme_concentration_beta_glucosidase"
+    ],
+    "incompatible_inputs": [],
+    "measurement_requests": [
+      "Measure or curate initial_cellobiose_concentration for the selected registry case.",
+      "Measure or curate enzyme_concentration_beta_glucosidase for the selected registry case."
+    ]
+  },
+  "status": "blocked",
+  "reason": "blocked_by_preflight: the exploratory-mode preflight reports underparameterized (blocking reason missing_inputs; next action measure_or_curate_missing_inputs). The case was not simulated, so it has no samples, trajectories, metrics or threshold times; its missing inputs and measurement requests are in missing_parameters.csv and suggested_experiments.csv.",
+  "samples": null,
+  "environment_effect": null,
+  "final_metrics": null,
+  "threshold_times": null,
+  "null_reasons": {
+    "samples": "the case was not simulated (blocked), so it has no samples or results",
+    "environment_effect": "the case was not simulated (blocked), so it has no samples or results",
+    "final_metrics": "the case was not simulated (blocked), so it has no samples or results",
+    "threshold_times": "the case was not simulated (blocked), so it has no samples or results"
+  }
+}
+```
+
+```json
+{
+  "metric": "final_substrate_remaining",
+  "units": "millimolar",
+  "samples": 32,
+  "computed_samples": 32,
+  "median": 3.058789452894057,
+  "p05": 3.044080693153092,
+  "p95": 3.0599243315485896,
+  "mean": 3.0559338103240625,
+  "min": 3.043082496529516,
+  "max": 3.059969971311963,
+  "not_computed": []
+}
+```
+
+```json
+{
+  "metric": "time_to_10_percent_substrate_degradation",
+  "units": "second",
+  "samples": 32,
+  "computed_samples": 0,
+  "median": null,
+  "p05": null,
+  "p95": null,
+  "mean": null,
+  "min": null,
+  "max": null,
+  "not_computed": [
+    {
+      "status": "not_reached",
+      "samples": 32,
+      "notes": [
+        "Threshold was not reached within the simulated time span."
+      ]
+    }
+  ],
+  "null_reasons": {
+    "median": "no sample computed this metric: not_reached in 32 of 32 samples (Threshold was not reached within the simulated time span.)",
+    "p05": "no sample computed this metric: not_reached in 32 of 32 samples (Threshold was not reached within the simulated time span.)",
+    "p95": "no sample computed this metric: not_reached in 32 of 32 samples (Threshold was not reached within the simulated time span.)",
+    "mean": "no sample computed this metric: not_reached in 32 of 32 samples (Threshold was not reached within the simulated time span.)",
+    "min": "no sample computed this metric: not_reached in 32 of 32 samples (Threshold was not reached within the simulated time span.)",
+    "max": "no sample computed this metric: not_reached in 32 of 32 samples (Threshold was not reached within the simulated time span.)"
+  }
+}
+```
+
+The text prints the same median as `3.059 [3.044, 3.06] millimolar (n=32)`.
+
+### `assemble`
+
+| Key of `result` | Value |
+| --- | --- |
+| `request` | `dataset_id`, `output_directory`, `fungus`, `substrates`, `conditions` (`temperature`, `temperature_units`, `ph`), `network`, `fetch`, `fetch_kinetics`. |
+| `proteome` | With `--proteome` or `--fetch-proteome`: `proteome_id`, `chosen_by`, `name_searched`, `name_from`, `match_rule` and `candidates` (`proteome_id`, `organism`, `taxonomy_id`, `proteome_type`, `protein_count`, `chosen`) of a name search, `network_used`, `snapshot_directory`, `search_snapshot`, `export_snapshot`, `export_query`, `organism`, `entry_rows`, `sha256`, `retrieved_at` and `uniprot_release` (`null` when UniProt sent no release header). It is `null` without either option. |
+| `draft` | The draft, described in the rows below. |
+| `draft.directory`, `draft.dataset_id` | The draft's directory and id. |
+| `draft.fungus`, `draft.substrates`, `draft.conditions` | The names as resolved (`registry_fungus_id`, `registry_substrate` and `network_role` are `null` with the reason when they do not apply), and the requested conditions with `temperature_units`. |
+| `draft.enzyme_classes` | The classes found: `enzyme_class`, `declared_in`, `evidence`. |
+| `draft.acting_classes` | Per substrate: `acting`, `not_acting` and `acting_without_evidence` (each with the reason) and `undetermined`. |
+| `draft.unmodellable_enzyme_classes`, `draft.unmapped_families` | Annotated classes without a registry record, and families without a class, with the reason. |
+| `draft.cases` | Per case (class x substrate x condition): `number`, `enzyme_class`, `substrate_id`, `condition`, `kinetics_status`, `condition_route`, `source_ids`, `reason`. |
+| `draft.kinetics_status_counts` | The number of cases of each of the five kinetics statuses: `user_data`, `literature_same_organism`, `transferred_estimate`, `conflict`, `gap`. |
+| `draft.kinetics_lookup` | With `--fetch-kinetics`: `database`, `endpoint`, `query_form`, `cache_directory`, `network_used`, `queries` (`enzyme_class`, `class_defined_in`, `substrate_id`, `ec_number`, `query`, `snapshot`, `export`, `retrieved_at`, `http_status`, `raw_sha256`, `entries`, `counts`, `converted`, `not_converted`) and `not_queried`. |
+| `draft.network` | With `--network`: `entry_substrates`, and per network the `pools`, the `members` with their `kinetics_status` per condition, `not_members`, `undetermined_pools`, and the `conditions` with `status`, `initial_concentration` and `blocked_by`. |
+| `draft.transferred_entry_ids`, `draft.entries_considered`, `draft.limitations` | As printed. |
+| `draft.written_files` | Each written file, relative name to path. |
+| `draft.review_fields` | Each `REVIEW:` field left to fill: `file`, `line` (the spreadsheet line; `null` for a field of `user_dataset.yml`), `column`, `note`, and `location` as printed (`file:line:column`). |
+| `draft.snapshots` | The frozen snapshot directories read or written: `proteome` (search and export) and `kinetics` (one per query). |
+| `draft.next_steps` | `review_fields_to_fill`, `review_file`, and `commands`: each printed next command with `complete_with` and `notes`. `complete_with` holds the options the printed command continues with, such as `--mode exploratory --samples N --seed S --output RUN_DIR`. N, S and RUN_DIR are yours to choose. FungMod chooses no sample count, seed or directory. |
+
+### `check-data`
+
+| Key of `result` | Value |
+| --- | --- |
+| `directory` | The directory checked. |
+| `base_registry` | `path` and `registry_id`. |
+| `valid` | `true` when the dataset loads (exit code 0), `false` when it is refused (exit code 2). |
+| `errors` | Each issue: `file`, `line` (the spreadsheet line, header = line 1; `null` for a file-level issue), `column`, `message`, and `location` as printed (`file:line:column`). |
+| `dataset` | For a loaded dataset: `dataset_id`, `digest`, `directory`, `time_grid` (`duration`, `units`, `points`), `record_counts`, `kinetic_values`, `gap_count`, the counts of genome annotations, resolved classes, cultures and enzyme networks, `timecourses` (`series`, `cases`), and `fitted_values` (the fit block of a fitted dataset, or `null`). |
+| `gaps` | Each gap: `record_id` and `measurement_request`. |
+
+The esterase fixture, run from the repository root (the absolute directory
+shortened to `...`):
+
+```bash
+fungmod check-data tests/fixtures/user_data/esterase_case --json -
+```
+
+```json
+{
+  "kind": "fungmod_command_summary",
+  "schema_version": "1.0.0",
+  "fungmod_version": "0.1.1",
+  "command": "check-data",
+  "arguments": [
+    "check-data",
+    "tests/fixtures/user_data/esterase_case",
+    "--json",
+    "-"
+  ],
+  "exit_code": 0,
+  "exit_meaning": "success",
+  "error": null,
+  "result": {
+    "directory": "tests/fixtures/user_data/esterase_case",
+    "base_registry": {
+      "path": ".../data_registry/registry_index.yml",
+      "registry_id": "toy_registry"
+    },
+    "valid": true,
+    "errors": [],
+    "dataset": {
+      "dataset_id": "esterase_demo",
+      "digest": "de74a07c236345be875cb64551c82041490b516d8d448a7e619cb2b8747fc345",
+      "directory": ".../tests/fixtures/user_data/esterase_case",
+      "time_grid": {
+        "duration": 60,
+        "units": "minute",
+        "points": 61
+      },
+      "record_counts": {
+        "fungi": 1,
+        "enzyme_classes": 1,
+        "substrates": 1,
+        "environments": 1,
+        "process_compatibility": 1,
+        "case_templates": 1,
+        "parameter_records": 4
+      },
+      "kinetic_values": 4,
+      "gap_count": 0,
+      "genome_annotations": 0,
+      "genome_resolved_classes": 0,
+      "cultures": 0,
+      "enzyme_networks": 0,
+      "timecourses": {
+        "series": 0,
+        "cases": 0
+      },
+      "fitted_values": null,
+      "null_reasons": {
+        "fitted_values": "the dataset holds no fit block (it was not written by fungmod fit)"
+      }
+    },
+    "gaps": []
+  },
+  "null_reasons": {
+    "error": "the command reported no error"
+  }
+}
+```
+
+### `fit`
+
+| Key of `result` | Value |
+| --- | --- |
+| `request` | `directory`, `case`, `quantities` (`quantity`, `lower`, `upper`, `units`, `initial`) as given, `output_directory`. |
+| `fit` | What the fit found (from `fit_report.json`): `input_dataset_id`, `input_dataset_digest`, `case`, `conditions`, `error_model`, `objective`, `confidence_level`, `n_observations`, `n_parameters`, `residual_degrees_of_freedom`, `timecourse_file`, `timecourse_rows`, `converged`, `optimizer_message`, `identified`, `quantities` (`quantity`, `value`, `units`, `interval` with `lower`, `upper`, `units` and `confidence_level`, `identifiability`, `identifiability_method`, `reason`, `bounds`, `initial`), `residuals` per series (`series_id`, `condition_id`, `observable`, `n_observations`, `rmse`, `units`, `time_units`), `warnings` and `claim_boundary`. A refused fit keeps what it found; a fit refused before it ran is `null` with the reason. |
+| `fitted_dataset` | `dataset_id`, `digest`, `directory`, `fit_report`. It is `null` when the fit is refused. |
+| `next_steps` | `note`, and the printed `commands` with `complete_with`. |
+
+The fitted values are in-sample estimates, not validation (`claim_boundary`).
+
 ## Discover names
 
 ```bash
@@ -1161,6 +1477,9 @@ with `--aliases`, the aliases that `--fungus`, `--substrate` and
   `data/source_snapshots/uniprot` and `--cache-dir` to
   `data/source_snapshots/sabiork`, relative to the current directory.
   `draft-kinetics --provider` and every `fit --fit` bound are required.
+- `--json PATH` is an explicit opt-in: without it only the text is written.
+  The path must be a new file outside `--output`; `-` writes the summary to
+  standard output and the text to standard error.
 
 ## Exit codes
 
@@ -1171,3 +1490,8 @@ with `--aliases`, the aliases that `--fungus`, `--substrate` and
 | 2 | Usage or input error: missing or invalid arguments, unknown or ambiguous names, an invalid registry or user dataset (including unfilled `REVIEW:` fields), a draft the API refuses (`UserTablesSourceError`, `UserTablesAssemblyError`), a refused fit (`UserDataFitError`: not identified, not converged, invalid bounds), a refused UniProt proteome (no candidate or several for a name, a missing, changed or superseded snapshot, an HTTP error), a refused kinetics lookup (`--fetch-kinetics`: a missing, changed, doubled or superseded snapshot, an HTTP error, an unusable or truncated answer), a refused time-course comparison (printed after the complete simulation bundle), a non-empty output directory. Issues that carry a file, row and column are printed as `file:row:column: message`. |
 | 3 | The preflight blocks at least one requested case in the requested mode; nothing is simulated (with `--runnable-only`: no requested case is runnable). |
 | 4 | Partial run (`run --runnable-only`): the runnable cases were simulated and the bundle written; the blocked cases are listed with their measurement requests and marked `not_simulated` in the tables. |
+
+`--json` does not change the exit code; the summary states it (`exit_code`)
+with its meaning (`exit_meaning`). A refused `--json PATH` (an existing file,
+a missing directory, a path inside `--output`) exits with 2 before the command
+runs.

@@ -19,6 +19,7 @@ GENERIC_SOURCE_PATHS = (
     "src/fungal_model/api/user_data.py",
     "src/fungal_model/api/user_data_fit.py",
     "src/fungal_model/cli.py",
+    "src/fungal_model/cli_summary.py",
     "src/fungal_model/__main__.py",
 )
 
@@ -261,7 +262,7 @@ def test_enzyme_network_assembler_has_no_organism_substrate_or_enzyme_specific_t
 
 
 def test_command_line_has_no_organism_substrate_or_enzyme_specific_tokens() -> None:
-    for relative in ("src/fungal_model/cli.py", "src/fungal_model/__main__.py"):
+    for relative in ("src/fungal_model/cli.py", "src/fungal_model/cli_summary.py", "src/fungal_model/__main__.py"):
         source = (ROOT / relative).read_text(encoding="utf-8").lower()
         for forbidden in ORGANISM_SUBSTRATE_ENZYME_TOKENS:
             assert forbidden not in source, f"{relative}: {forbidden}"
