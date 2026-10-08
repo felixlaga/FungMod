@@ -167,6 +167,10 @@ prints per query the entries converted (and the cases they feed) and why the
 others were not; classes without an EC number are listed, not queried. The
 query form was not verified against a live SABIO-RK response
 ([kinetics looked up by EC number](docs/cli.md#kinetics-looked-up-by-ec-number-fetch-kinetics)).
+The whole route, from a fungus name to the run and its outputs, is shown step
+by step with real output on synthetic test fixtures, together with the script
+that checks the live UniProt and SABIO-RK formats, in
+[from a fungus name to a simulation](docs/walkthrough.md).
 
 `fungmod draft-kinetics SOURCE --provider sabiork` drafts tables from
 SABIO-RK entries alone ([user-data workflow](docs/cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).

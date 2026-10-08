@@ -6,6 +6,29 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- A walkthrough from a fungus name to a simulation (DOCS-WALK-001):
+  `docs/walkthrough.md` runs `fungmod assemble --fetch-proteome
+  --fetch-kinetics --network`, resolves the draft's conflict with
+  `--entry-id`, fills its `REVIEW:` fields, then `fungmod check-data` and
+  `fungmod run --runnable-only` (exit codes 0, 3 and 4), reads the metrics,
+  rates, threshold times, provenance, limitations and measurement requests,
+  and shows how your own measurements replace the transferred estimates.
+  Every output shown is real output on frozen snapshots of the existing
+  synthetic UniProt and SABIO-RK test responses
+  (`tests/fixtures/walkthrough/`, said on the page to be synthetic, not
+  biology); `tests/test_walkthrough_doc.py` reruns every command shown and
+  checks every line shown, so the page cannot drift. New
+  `scripts/verify_live_sources.py` checks, once, on a machine with internet
+  access, the live UniProt proteome search, UniProtKB export and SABIO-RK
+  EC-number query through FungMod's own query builders, parsers and snapshot
+  checks, and reports per endpoint the URL, HTTP status, the headers FungMod
+  relies on, the columns or fields found against those expected, the entries
+  and every mismatch (exit code 1 on a mismatch, 3 when an endpoint could not
+  be checked); it writes only to a new temporary directory or an
+  `--output-dir` outside the repository. Its tests run it offline with
+  patched `urlopen`. No scientific or numerical behaviour changed; the live
+  formats remain unverified until the script is run against the services.
+
 - Kinetics of the fungus's enzyme classes looked up in SABIO-RK by EC number
   (FETCH-002): `assemble_user_tables(fetch_kinetics=True)` and `fungmod
   assemble --fetch-kinetics` query SABIO-RK's kinetic-law export once per

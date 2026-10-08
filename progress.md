@@ -26,6 +26,82 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## DOCS-WALK-001 Walkthrough From A Fungus Name To A Simulation, And A Live-Source Check
+
+Status: `complete` for the stated scope (2026-10-08). Documentation, fixtures,
+tests and one repository script; no change to `src/`, so no scientific or
+numerical behaviour changed. The live UniProt and SABIO-RK formats remain
+unverified: the script that checks them needs internet access, which the
+environment of this task did not have.
+
+- `docs/walkthrough.md` ("From a fungus name to a simulation", in the nav
+  after "Command line"): the owner's route "fungus X on substrate Y in
+  conditions Z" from a shell, in seven steps: `fungmod assemble
+  --fetch-proteome --fetch-kinetics --network` (each option and the `--fetch`
+  opt-in explained), the draft report read from the top (proteome choice,
+  repertoire, acting classes, network, kinetics lookup, per-case kinetics
+  status with a table of the five statuses, `REVIEW:` fields, next commands),
+  resolving a `conflict` with `--entry-id` (a scientific decision; the page
+  says its choice is arbitrary because the entries are synthetic), filling
+  the `REVIEW:` fields (the drafted row and the reviewed row shown),
+  `check-data` (refused, then loaded with its gaps and measurement requests),
+  `run --runnable-only` (exit code 4; without the flag exit code 3; scientific
+  mode refused for transferred estimates), reading the outputs (time series,
+  metrics and rates, threshold times, what the percentiles mean, a provenance
+  extract, limitations, measurement requests, the manifest) and replacing the
+  estimates with your own measurements (a row template with placeholders).
+  A warning box says the organism, proteome, entries and organisms are
+  synthetic test fixtures, not biology, and that a real run needs network
+  access.
+- Every output on the page is real: the worked example runs offline against
+  `tests/fixtures/walkthrough/` (README), FungMod's own snapshots of the
+  existing synthetic fixtures (`search_fixture_mould_b2.tsv`,
+  `proteome_UP999990002_uniprotkb.tsv`, `ecnumber_3_2_1_21_cellobiose.json`),
+  made once by running the assemble command with `--fetch` while the tests'
+  fakes served those fixtures (a throwaway script outside the repository);
+  `.gitattributes` marks the directory `-text` (FungMod checks its SHA-256).
+- `tests/test_walkthrough_doc.py` (13 tests) reads the page's marked blocks
+  (`<!-- walkthrough-<kind>: <key> -->`), reruns every marked command as shown
+  in a temporary directory (only the snapshot directories become absolute
+  paths), applies the page's edits, and checks that every line of every
+  marked output occurs in the real output in order (`...` is any text), the
+  provenance table against `provenance_table.csv`, the drafted row against
+  the draft, the claims about scientific mode and about your own values
+  (filled with test values that are not measurements: no gap, both
+  conditions run, scientific mode runs), the snapshots against the source
+  fixtures byte for byte, and the script's sample report.
+- `scripts/verify_live_sources.py`: one request to each of UniProt's proteome
+  search, UniProtKB's export and SABIO-RK's kinetic-law export, through
+  `search_proteomes_by_name`, `choose_proteome`, `fetch_proteome_snapshot`
+  and `fetch_kinlaw_query_snapshot` (refresh), then `parse_reaction_records`
+  and `user_tables_from_sabiork` on the answer; `urllib.request.urlopen` is
+  wrapped while FungMod's UniProt functions run, and the SABIO-RK request uses
+  the documented `transport`, so the report shows the response FungMod
+  parsed. Per endpoint: URL, HTTP status, `X-UniProt-Release`,
+  `X-UniProt-Release-Date`, `X-Total-Results`, `Link`, SABIO-RK's
+  `meta.total_count`/`meta.total_pages`, columns or fields found against
+  those expected, entries, parser outcome, EC numbers, organisms, parameters
+  and substrate names of the entries, and the conversion. Mismatch (exit
+  code 1): a non-200 answer other than a server error, a missing column or
+  envelope field, a parser refusal, a missing or inconsistent
+  `X-Total-Results`, entries of another EC number, no entry naming the
+  substrate; not checked (exit code 3): no network, a server error, a name
+  without exactly one proteome (`--proteome` chooses), a query without
+  entries. Defaults *Trichoderma reesei* and EC 3.2.1.21 on "Cellobiose",
+  printed as probes only. Writes snapshots and `verification_report.json`
+  only to a new temporary directory or an empty `--output-dir` outside the
+  repository (refused inside it). `tests/test_verify_live_sources.py` (24
+  tests) runs it offline with patched `urlopen` on the synthetic fixtures:
+  the passing path, each mismatch, the not-checked paths, usage errors, and
+  that nothing is written inside the repository.
+- Links: `README.md`, `docs/index.md`, `docs/quickstart.md` (one each);
+  `docs/user-data.md` "From a fungus name" and "Fetching kinetics" each point
+  to the script in one sentence.
+
+Not verified: the live services (the script is for the owner to run); the
+walkthrough's numbers come from synthetic fixtures and a design enzyme
+concentration and say nothing about any fungus.
+
 ## FETCH-002 Kinetics Of The Fungus's Enzyme Classes Looked Up By EC Number
 
 Status: `complete` for the stated scope (2026-10-08); not verified against a
