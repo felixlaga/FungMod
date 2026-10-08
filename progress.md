@@ -354,6 +354,214 @@ Next task: CULTURE-002 (above: a growing culture whose secreted pools act
 together); then carrying `responses.csv` laws into assembled network drafts, and the
 unit-bearing release for single-class solid cases.
 
+## FETCH-002 Kinetics Of The Fungus's Enzyme Classes Looked Up By EC Number
+
+Status: `complete` for the stated scope (2026-10-08); not verified against a
+live SABIO-RK response. For the owner's goal ("i want fungi X on substrate Y
+in conditions Z, and then it automatically fetches (or from stored data, or
+even better input data) the different enzymes and stuff in the fungi, and then
+the code calculates all the stuff"), FETCH-001 fetched the enzyme repertoire
+by name, but kinetics still had to be supplied as local SABIO-RK export files
+or reaction ids already frozen on disk. Now `assemble_user_tables(fetch_kinetics=True)`
+and `fungmod assemble --fetch-kinetics` look them up for the fungus's own
+classes, opt-in, through the existing SABIO-RK snapshot layout and the
+existing per-case rules, with no new numerics.
+
+Design decisions (design note kept outside the repository):
+
+- **The query.** For every class of the repertoire that acts on a requested
+  substrate by the categorical rule (with `network=True`, on every pool of a
+  network), one query per complete EC number of the class's registry record:
+  its `ec_number` and the EC numbers among its aliases that the registry
+  resolves back to that class (the converter resolves an entry's EC number
+  the same way; `cellobiohydrolase` gives 3.2.1.91 and 3.2.1.176). Each query
+  is restricted to the substrate's name, the name the entry is matched on
+  afterwards (the registry record's name, otherwise the user dataset's row or
+  the request): `ECNumber:"<EC number>" AND Substrate:"<substrate name>"`,
+  built by the existing `_freeform_source_query_from_filters` (the form
+  `discover_for_virtual_experiment(refresh=True)` already sends). No query
+  names an enzyme or organism, none is broader; aliases of the substrate are
+  not queried (entries filed under another name are not found; documented).
+- **Not queried, listed with the reason:** a class without a complete EC
+  number; a class of the user dataset's `enzyme_classes.csv` (the SABIO-RK
+  conversion resolves EC numbers against the registry only, so no fetched
+  entry could become its kinetics); an EC number resolving to another class
+  or ambiguously; a substrate whose categories are `REVIEW:` fields; a
+  substrate name with a double quote, backslash or control character (no
+  escaping guessed). A fungus without any repertoire is refused (the existing
+  refusal, which now says why the lookup needs one).
+- **Snapshots in the existing layout.** `fungal_model.sources.sabiork.query_snapshots`
+  (new, generic) runs `fetch_and_save_export` itself into a temporary
+  directory (every page of a paginated answer, a second apart), verifies the
+  bundle there and only then copies it to
+  `<cache_dir>/<query_bundle_key>/<snapshot id>/` (`raw/page_NNNN.json`,
+  `derived/combined_export.json`, `fetch_metadata.json`: query, URLs,
+  retrieval time, HTTP status, `total_count`, SHA-256 and size of every raw
+  page and of the export). Verification on every read: one snapshot per query
+  (several are refused, FungMod does not choose), the recorded query, the
+  immutable-bundle layout, every raw page's digest, size, order, URL and HTTP
+  200, the export's digest, the export equal to the concatenated raw pages,
+  and the entry count equal to `total_count`.
+- **Refusals.** Without `refresh` every missing snapshot is refused together
+  (`MissingKineticsSnapshotError` with each query, class, EC number, substrate
+  and directory; the command line prints the exact command with `--fetch`,
+  quoted with `shell_quote`). An HTTP error, an unreachable host, a body that
+  is not the export envelope (or not UTF-8 JSON), a page that fails, and an
+  answer whose entries do not add up to its `total_count` (truncated or
+  incompletely paginated) store nothing (`KineticsLookupError`; snapshots of
+  earlier queries stay). A snapshot changed after it was stored, two
+  snapshots of one query, and a new answer whose raw bytes differ from the
+  stored one are refused and the snapshot kept
+  (`KineticsSnapshotConflictError`, naming the query directory to remove). An
+  answer equal to the stored one leaves it unchanged.
+- **The existing rules.** Each snapshot with entries is one more source of
+  the existing `collect_entries` (labelled `SABIO-RK query <query>`): own
+  species literature, other organisms transferred estimates, several
+  candidates a conflict, nothing at the condition a gap, no reuse across
+  conditions without a law, `entry_ids` and `same_species` across local and
+  looked-up entries, different content under one EntryID refused.
+- **Report.** `assembly["kinetics_lookup"]` (only with `fetch_kinetics`):
+  database, endpoint, query form, every query (class, EC number, substrate,
+  query, snapshot relative to `cache_dir`, URLs, retrieval time, HTTP status,
+  entries, raw-page and export SHA-256, counts by use, the entries converted
+  with the cases they feed, every other entry with its use, reason and, from
+  the conversion's own plan, each unconverted parameter's reason) and what
+  was not queried. `review.md` gains a "Kinetics looked up by EC number"
+  section; the manifest `source` names each query and snapshot; the
+  limitations replace "Nothing is fetched" by the lookup's statement and add
+  two (the query form; not verified live). Nothing in a draft depends on
+  whether the run reached the network, so an offline rerun is byte-identical.
+
+Changed:
+
+- `sources/sabiork/query_snapshots.py` (new): `complete_ec_number`,
+  `ec_number_query`, `KinlawQuerySnapshot`, `load_kinlaw_query_snapshot`,
+  `fetch_kinlaw_query_snapshot(s)`, `kinlaw_query_directory`,
+  `kinlaw_query_snapshot_exists`, `KINLAW_QUERY_FORM`, `KINLAW_EXPORT_URL`,
+  `DEFAULT_SNAPSHOT_DIR`, and the errors `KinlawSnapshotError`,
+  `MissingKinlawSnapshotError`, `KinlawSnapshotConflictError`,
+  `KinlawFetchError`.
+- `api/user_data_assembly.py`: `assemble_user_tables(fetch_kinetics=False,
+  refresh=False)` (`refresh` without `fetch_kinetics` refused);
+  `_Assembler.lookup_kinetics`, `_lookup_ec_numbers`,
+  `_unconverted_parameters`, `_lookup_report`, `_lookup_markdown`,
+  `_limitations`; `collect_entries(fetched=...)` (labels instead of indices
+  in its messages, the same text for `kinetics_sources`); `_EntryInfo.parameters`;
+  `_LookupQuery`; `_query_label`, `_query_source`; constants
+  `DEFAULT_KINETICS_CACHE_DIR` (the default of `cache_dir`, same value),
+  `KINETICS_LOOKUP_DATABASE`; errors `KineticsLookupError`,
+  `MissingKineticsSnapshotError`, `KineticsSnapshotConflictError`.
+- `cli.py`: `assemble --fetch-kinetics`; `--fetch` also refreshes the lookup
+  (still refused without a proteome option or `--fetch-kinetics`);
+  `--cache-dir` help names the default; the lookup block printed before the
+  cases (network line, per query the snapshot, counts, converted entries with
+  their cases, every other entry with its reason and unconverted parameters,
+  what was not queried); missing-snapshot and conflict refusals with the
+  command or the directory; help epilog paragraph and example; module
+  docstring. cli.py still names no database and opens no connection.
+- Fixtures `tests/fixtures/sabiork_kinetics_queries/` (README; three
+  synthetic responses in SABIO-RK's export format: seven EC 3.2.1.21 entries
+  on Cellobiose covering own species, transfer, condition, mutant,
+  unparsed units, another substrate and kcat/Km only; two EC 3.2.1.3 Vmax-form
+  entries on maltose; an empty answer); `.gitattributes` `-text` for them.
+- Docs: `docs/user-data.md` "Fetching kinetics" (query, not queried,
+  snapshots, fetching, rules, report, not verified live, the synthetic
+  example, limits) with links from the assembly section, its inputs, rules and
+  limits, "Starting from SABIO-RK" and the limitations; `docs/cli.md` "Kinetics
+  looked up by EC number: --fetch-kinetics" (example, output from the
+  synthetic responses, refusals), options table, intro, arguments, exit codes;
+  `README.md` (assembly paragraph, command-line paragraph, two capability
+  rows); `docs/capabilities.md`; `CHANGELOG.md` (Added; Changed: text only).
+
+Tests (`tests/test_fetch_kinetics.py`, 20 test functions, 30 cases; `urlopen`
+of `urllib.request` and of the SABIO-RK fetch module and `socket.connect`
+patched to fail in every test, synthetic responses served by `_FakeSabio`):
+the default run cannot reach the network; the query form and its refusals; an
+answer frozen in the existing layout (raw page byte for byte, metadata,
+`frozen_source_urls` and `SabioRKSource.fetch_kinlaw_entries` read it), read
+back offline, and a refetch of equal bytes keeping the one snapshot; a
+two-page answer combined, a failing second page and a truncated answer storing
+nothing; HTTP 500, an unreachable host, HTML, an envelope without `meta`,
+non-UTF-8 bytes and HTTP 203 storing nothing; a superseded answer, a changed
+raw page, a changed export and two snapshots of one query refused and kept;
+own-species literature at 30 degC and a gap at 40 degC with the full per-query
+report, and an offline rerun byte-identical (`_draft_digest`), a changed
+snapshot refused by the assembly; transfers, a conflict, `entry_ids`,
+`same_species` and a local export together with the lookup; a registry
+network in which beta-glucosidase gets literature kinetics on the
+intermediate pool while cellobiohydrolase's two queries (3.2.1.91, 3.2.1.176)
+come back empty and keep the network blocked; the materially different case
+(glucoamylase, EC 3.2.1.3, on a described maltose substrate, a Vmax-form
+transfer that loads and is `modelable` in exploratory mode and
+`underparameterized` in scientific mode, beside a test-only class without an
+EC number listed and not queried); user classes with and without an EC number
+and an undetermined substrate listed and not queried, with no request made;
+argument checks; six drafts without `fetch_kinetics` byte-identical to
+8a35ae5 (pinned digests: two sources with duplicates, `same_species`, two
+entry ids, the registry-chain network, the user-chain network, the parallel
+network as `user_data`) and the stdout of a network `assemble` (POSIX only);
+the command line fetching, printing, rerunning offline byte for byte,
+`check-data` and a scientific `run` at 30 degC (exit 0); a user class listed
+and not queried, with no request and no network line; the missing-snapshot
+refusal with the exact command; superseded and changed snapshots; HTTP error
+and truncated answer; no repertoire; `--fetch` and `--snapshot-dir` scoping;
+help. Also `tests/test_guardrails_no_hardcoding.py` (tokens of the synthetic
+responses; the new module names no class, substrate, organism or EC number),
+`tests/test_guardrails_public_api.py` (the lookup API is exported and
+complete) and `tests/test_cli_user_data_workflow.py` (cli.py passes `refresh`
+to the assembly only from `--fetch` with `--fetch-kinetics`).
+
+Commands and results (worktree on `claude/fetch-kinetics`, based on
+`8a35ae5`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on the new module, the assembly, the
+  CLI and the changed tests: 0 errors.
+- `mkdocs build --strict`: built, no warnings; the anchors `fetching-kinetics`
+  and `kinetics-looked-up-by-ec-number-fetch-kinetics` exist.
+- `tests/test_fetch_kinetics.py`: 30 passed.
+- Targeted run (new tests, assembly, fetch by name, network, UniProt, genome,
+  SABIO-RK sources, discovery, fetch script, parser, source adapter, provider
+  API, partial runs, CLI, CLI workflow, guardrails, documentation sync,
+  hygiene, instruction hierarchy, roadmap, release configuration, canonical
+  API): 467 passed in 3 min 17 s.
+- Full suite (`pytest`, background, the code as committed): 2745 passed in 25 min.
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13); live
+  SABIO-RK (unreachable from the environment).
+
+Not verified live: the query form, the `ECNumber` and `Substrate` fields and
+their quoting, SABIO-RK's compound-name matching (letter case, synonyms), its
+answer to a query without matches (assumed: `total_count` 0 and no entries)
+and its pagination fields; anything else is refused and nothing stored.
+
+Not changed: `api/user_data.py`, `api/user_data_sources.py` (the conversion
+and its refusal texts), `sources/sabiork/fetch.py` and the adapter, the core,
+any process law, rate form, registry record, preflight rule or output schema
+of a run; drafts without `fetch_kinetics` (pinned digests) and the
+`fungmod assemble` output without `--fetch-kinetics`.
+
+Scientific impact: none on any simulated value. The lookup only adds
+SABIO-RK entries as one more source of the existing conversion and status
+rules; a transfer stays an estimate, kinetics are never reused at another
+condition, and nothing is written for a class whose entries cannot be its
+kinetics.
+
+Compatibility: additive (two keyword arguments, a CLI flag, report keys and
+three exception classes, all only with `fetch_kinetics`); `--fetch` help and
+its refusal text changed.
+
+Remaining ambiguities: substrate aliases and synonyms are not queried (a
+second query per alias would broaden by the registry's own names; left for a
+decision); user-defined classes cannot receive SABIO-RK kinetics until the
+conversion resolves EC numbers through the user's `enzyme_classes.csv`; what
+SABIO-RK answers for a query without matches is assumed; SABIO-RK may answer
+the same query with different bytes over time (a refresh is then refused until
+the snapshot is removed).
+
+Next task: verify the query form against live SABIO-RK from a networked
+environment and freeze a real snapshot (replacing nothing silently); then let
+the conversion resolve EC numbers through a user dataset's `enzyme_classes.csv`
+so user-defined classes can receive looked-up kinetics.
+
 ## CI-001 Parallel Tests In CI And Runner Labels From Repository Variables
 
 Status: `complete` (2026-10-08). Each CI test job ran the whole suite serially
