@@ -185,7 +185,9 @@ on `e97e8e6`, Python 3.11 venv, `PYTHONPATH=src`):
   experiment, BIO-001 notebook, compiled models, guardrails, documentation
   sync, hygiene, instruction hierarchy, roadmap, quality config, user-data v2
   and the cross-basis digests): 570 passed.
-- Full suite: see the commit report (`-n 2 --dist loadfile`, background).
+- Full suite (`pytest -n 2 --dist loadfile`, background, the code as
+  committed in d8925c4): 2859 passed in 1 h 10 min; no xdist-only failure.
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13).
 
 Not changed: `processes/surface.py`, the process factory (its own label and
 rate-unit defaults for configs written by hand), the law, the solver, the
