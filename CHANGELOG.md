@@ -138,6 +138,34 @@ All notable public releases of FungMod are documented here.
   patched `urlopen`. No scientific or numerical behaviour changed; the live
   formats remain unverified until the script is run against the services.
 
+- Enzyme inactivation in user data (USERDATA-011): a `kinetics.csv` row of
+  quantity `inactivation_rate` (1/time, checked with pint, at the row's
+  condition) binds the existing `first_order` process law to the enzyme state of
+  its case, `dE/dt = -k_d E`, in the kcat and pH-ionization forms (dissolved or
+  solid substrates) and to each member of an enzyme network (every class by its
+  own constant); the `responses.csv` law `thermal_inactivation`
+  (`activation_energy`, `reference_temperature`, with the `inactivation_rate`
+  stated at the reference temperature) binds the existing
+  `thermal_inactivation` process law instead, so `k_d` follows the Arrhenius law
+  in the environment temperature without rescaling any catalytic constant. The
+  enzyme-kinetics assembler gains an optional template-declared loss process of
+  the enzyme state (`process_state_metadata.enzyme_inactivation`, `first_order`
+  or `thermal_inactivation`, refused on a role set without an enzyme state).
+  All cases of one class and substrate share the loss (a case without its row is
+  an explicit gap with a measurement request); without any row the enzyme is not
+  lost and no default constant is applied, and a dataset that states
+  inactivation names every other enzyme state's activity as assumed constant.
+  Refused: wrong units (a half-life included), negative values, duplicate rows,
+  `fitted` evidence, the Vmax form (no enzyme state), and culture pools, which
+  keep their own `enzyme_loss_rate`. New `UserDataset.enzyme_inactivation`
+  (also in `to_dict()`), `processes[].enzyme_inactivation` of
+  `enzyme_networks`, a `fungmod check-data` section, and one mechanism-summary
+  row per loss process. Fixtures `inactivation_case` (a single class on a
+  dissolved substrate) and `inactivation_network` (two classes on a solid, one
+  with the Arrhenius law); illustrative estimates only. Every earlier fixture
+  and registry case generates byte-identical records and configs. No new
+  process law, numerics or output schema.
+
 - A growing culture whose secreted pools act together (CULTURE-002): in
   `culture.csv` every pool whose class acts on the culture substrate now
   consumes it, each by its own existing homogeneous Michaelis-Menten law with

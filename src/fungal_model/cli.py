@@ -1039,6 +1039,7 @@ def _check_data(args: argparse.Namespace) -> int:
     _print_genome_resolution(dataset)
     _print_cultures(dataset)
     _print_enzyme_networks(dataset)
+    _print_enzyme_inactivation(dataset)
     _print_timecourses(dataset)
     _print_fit_block(dataset)
     return EXIT_OK
@@ -2459,6 +2460,28 @@ def _print_enzyme_networks(dataset: UserDataset) -> None:
         print(f"  from {item['entry_substrate']}: {links}; strains {', '.join(item['strains'])}")
     headers = ("enzyme class", "pool", "rate form", "competitive inhibitor", *(("response laws",) if laws else ()))
     for line in _table(headers, rows):
+        print(f"  {line}")
+
+
+def _print_enzyme_inactivation(dataset: UserDataset) -> None:
+    # Printed only when a kinetics.csv inactivation_rate row or the thermal_inactivation law binds one (USERDATA-011).
+    if not dataset.enzyme_inactivation:
+        return
+    print(
+        "Enzyme inactivation (kinetics.csv inactivation_rate, responses.csv thermal_inactivation; every other enzyme "
+        f"state is not lost): {len(dataset.enzyme_inactivation)}"
+    )
+    rows = [
+        (
+            str(item["enzyme_class"]),
+            str(item["substrate_id"]),
+            str(item["law"]),
+            ", ".join(str(row) for row in item["kinetics_rows"]) or "none",
+            ", ".join(str(row) for row in item["responses_rows"]) or "none",
+        )
+        for item in dataset.enzyme_inactivation
+    ]
+    for line in _table(("enzyme class", "substrate", "process law", "kinetics.csv rows", "responses.csv rows"), rows):
         print(f"  {line}")
 
 

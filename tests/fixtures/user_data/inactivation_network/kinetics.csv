@@ -1,0 +1,10 @@
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source
+strain_w7,fast_cutter_w7,solid_w7,c55_ph5,km,8,,,g/L,estimate,illustrative estimate,Illustrative test note IW-7 p. 3
+strain_w7,fast_cutter_w7,solid_w7,c55_ph5,kcat,0.05,,,g/(mg*h),estimate,illustrative estimate,Illustrative test note IW-7 p. 3
+strain_w7,fast_cutter_w7,solid_w7,c55_ph5,substrate_initial_concentration,20,,,g/L,estimate,illustrative estimate,Illustrative test note IW-7 p. 3
+strain_w7,fast_cutter_w7,solid_w7,c55_ph5,enzyme_concentration,10,,,mg/L,estimate,illustrative estimate,Illustrative test note IW-7 p. 3
+strain_w7,fast_cutter_w7,solid_w7,c55_ph5,inactivation_rate,0.1,,,1/h,estimate,illustrative estimate (a half-life of about 6.9 h at the reference temperature),Illustrative test note IW-7 p. 4
+strain_w7,stable_cutter_w7,solid_w7,c55_ph5,km,15,,,g/L,estimate,illustrative estimate,Illustrative test note IW-7 p. 5
+strain_w7,stable_cutter_w7,solid_w7,c55_ph5,kcat,0.01,,,g/(mg*h),estimate,illustrative estimate,Illustrative test note IW-7 p. 5
+strain_w7,stable_cutter_w7,solid_w7,c55_ph5,substrate_initial_concentration,20,,,g/L,estimate,illustrative estimate,Illustrative test note IW-7 p. 5
+strain_w7,stable_cutter_w7,solid_w7,c55_ph5,enzyme_concentration,10,,,mg/L,estimate,illustrative estimate,Illustrative test note IW-7 p. 5

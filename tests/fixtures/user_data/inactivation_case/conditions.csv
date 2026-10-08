@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c40_ph6,40,degC,6,Illustrative assay condition for the enzyme-inactivation fixture

@@ -1133,6 +1133,204 @@ Not verified: the live services (the script is for the owner to run); the
 walkthrough's numbers come from synthetic fixtures and a design enzyme
 concentration and say nothing about any fungus.
 
+## USERDATA-011 Enzyme Inactivation Over The Run In User Data
+
+Status: `complete` for the stated scope (2026-10-08). For the owner's goal ("i
+want fungi X on substrate Y in conditions Z ... and then the code calculates all
+the stuff"), every user enzyme was assumed perfectly stable over a long
+degradation run, although the core implements first-order enzyme inactivation
+(ENV-003: the `thermal_inactivation` process law with an Arrhenius constant;
+the `first_order` law the culture template uses for `enzyme_loss_rate`). Now a
+user's tables reach it, with no new process law or numerics.
+
+Design decisions:
+
+- **The quantity.** `kinetics.csv` quantity `inactivation_rate`: the constant
+  `k_d` of `dE/dt = -k_d E` at the row's condition, 1/time checked with pint
+  (the same rule on dissolved and solid substrates), zero or positive, exact or
+  a range, evidence type and method like every kinetics row, never `fitted`
+  (only `km`, `kcat` and `vmax` are fitted). A half-life is refused by its
+  dimension; FungMod converts none.
+- **Which law.** A row binds the existing `first_order` process law to the
+  enzyme state of its case (the law the culture's `enzyme_loss_rate` already
+  uses). The existing `thermal_inactivation` law needs an inactivation energy
+  and a reference temperature; binding it with an invented zero energy would be
+  a fabricated value, so it is bound only when `responses.csv` gives the
+  Arrhenius pair: new law `thermal_inactivation` (`activation_energy`,
+  `reference_temperature`), `ResponseLaw.scales = "inactivation"`. It
+  multiplies no rate: it replaces the constant loss by
+  `k_d(T) = k_d(T_ref) exp(-E_d/R (1/T - 1/T_ref))`, so it composes with a
+  temperature law on the rate of the same pair (its roles carry the law name:
+  `thermal_inactivation__activation_energy`), and the reference rule checks
+  the `inactivation_rate` (exact, `reference_tolerance` or
+  `kinetics_at_reference`) instead of the kinetic constants. Its
+  `ResponseLaw.condition` is empty (`reads` is temperature): it carries no
+  catalytic constant to another condition, so `assemble_user_tables` never
+  treats it as a route to another temperature.
+- **Where.** Single-class cases in the kcat and pH-ionization forms (dissolved
+  or solid; an enzyme in molar, protein-mass or assay units, or from an
+  `enzyme_dose`, decays in its own units) and every kcat-form member of an
+  enzyme network, each class's enzyme state by its own constant. Refused: the
+  Vmax form (no enzyme state) and culture pools, which keep their own
+  first-order `enzyme_loss_rate`: a second loss law on one pool would be one
+  constant stated twice (`culture.csv` stays the place for a culture pool's
+  loss, and the law stays refused on cultures).
+- **Pair-level binding, never a default.** All strains and conditions of one
+  class and substrate share one generated process, so any `inactivation_rate`
+  row or law on a pair binds the loss to every case of the pair, and a case
+  without its own row gets an explicit gap with a measurement request (as the
+  reactivity factor and response laws do). A pair without any row has no loss
+  term. When a dataset states inactivation for some pair, every other enzyme
+  state of the dataset gets the limitation "Enzyme activity assumed constant
+  over the run ... (FungMod applies no default constant)"; a dataset without
+  any row keeps every earlier record byte for byte (the parent's requirement of
+  an explicit limitation could not also hold for datasets without the rows
+  without changing their pinned records; the docs state the assumption there).
+- **Assembly.** The single-class enzyme-kinetics assembler built exactly one
+  process, so `screening/case_builder.py` gains an optional template-declared
+  loss of the enzyme state, `process_state_metadata.enzyme_inactivation`
+  (process id, law `first_order` or `thermal_inactivation`, exactly the law's
+  parameter roles, an assumption), built as a second process on the enzyme
+  state, its read conditions added to the environment entity; refused on a role
+  set without an enzyme state, for another law, for missing, extra or
+  unresolved roles, without an assumption and with the main process id. A
+  network template appends one process template per decaying class after the
+  Michaelis-Menten processes (the composition builder needed no change).
+- **Outputs.** Template limitations per enzyme state (the law with its scope:
+  irreversible single-exponential loss, no unfolding, proteolysis, protection,
+  adsorption or inactive pool); `UserDataset.enzyme_inactivation` and
+  `processes[].enzyme_inactivation` of `enzyme_networks`; a `fungmod
+  check-data` section printed only when a row binds one; one mechanism-summary
+  row per loss process (single-process cases get rows for every configured
+  process after the first; network rows of a process without a product map
+  carry that law's limitations); `environment_response` names
+  `thermal_inactivation` as the process law that reads temperature.
+
+Changed:
+
+- `api/user_data.py`: `inactivation_rate` quantity, units rule and gap
+  wording; `INACTIVATION_RATE_QUANTITY`, `INACTIVATION_LAW`,
+  `LAW_SCALES_RATE`/`LAW_SCALES_INACTIVATION`; `ResponseLaw.scales`, `reads`,
+  `condition`; the `thermal_inactivation` law and its domain check;
+  `_validate_inactivation`; culture refusals; the reference rule per law
+  (`_law_reference_quantities`, `_reference_conditions(..., law)`); single-class
+  records, roles (`_single_law_role`), template declaration, compatibility and
+  limitations; network roles, law roles, process templates, limitations and
+  report; `_inactivation_report`; docstrings.
+- `screening/case_builder.py`: `ENZYME_INACTIVATION_TEMPLATE_KEY`,
+  `ENZYME_INACTIVATION_PROCESS_LAWS`, `_template_enzyme_inactivation` in the
+  enzyme-kinetics assembler.
+- `api/result_tables.py`: mechanism rows for configured processes after the
+  first of a single-process case (`_companion_process_mechanism_rows`, shared
+  row builder with the network rows), families, laws and limitations of
+  `first_order` and `thermal_inactivation`.
+- `cli.py`: `check-data` prints the enzyme inactivation table.
+- Fixtures `tests/fixtures/user_data/inactivation_case/` (a user-defined amide
+  hydrolase-like class on a dissolved amide-like substrate, kcat form,
+  `k_d` 0.3 1/h) and `tests/fixtures/user_data/inactivation_network/` (two
+  user-defined cutter-like classes in parallel on a particulate polymer-like
+  solid, one with `k_d` 0.1 1/h at 55 degC and `E_d` 200 kJ/mol, one stable);
+  illustrative estimates, READMEs.
+- Docs: `docs/user-data.md` (new "Enzyme inactivation over the run" with the
+  quantity, the temperature law, worked examples with real `check-data` and
+  `run` output, the network case, generated records, refusals and scope; the
+  kinetics.csv table, the Vmax form, `responses.csv`, the reference rule, the
+  culture and network refusals, generated records and limits),
+  `docs/environment-response.md`, `docs/capabilities.md`, `README.md`,
+  `CHANGELOG.md`.
+
+Tests: new `tests/test_user_data_inactivation.py` (31 test functions, 74
+cases): the law is the existing process law and the losses are registered
+factories; the record, template declaration, compatibility role, limitation
+and `enzyme_inactivation` entry; the assembled config runs the `first_order`
+loss after the Michaelis-Menten process and reads no condition; analytic checks
+at every output time: `E(t) = E0 exp(-k_d t)` (rtol 1e-8), the exact substrate
+`Km ln(S/S0) + S - S0 = -kcat E0 (1 - exp(-k_d t))/k_d` through the Lambert W
+function (rtol 1e-6), `S + P = S0`, the loss rate `k_d E` and the degradation
+`kcat E S/(Km + S)`; with `S0/Km = 1e-4` the first-order closed form
+`S0 exp(-(kcat E0/Km)(1 - exp(-k_d t))/k_d)` within `1.5 S0/Km`; a range
+sampled per sample; a fit of `kcat` to time courses of the decaying enzyme
+recovers it (identified) and `inactivation_rate` is not fittable; an assembled
+draft keeps the rows and the law and turns another temperature into a gap; a
+second strain without the row gets a gap and is underparameterized; another
+pair of the dataset says its activity is assumed constant; byte identity of
+the records and configs of all 16 earlier fixtures and the 19 registry cases
+pinned to digests of 6567464; measured rows make the case scientific until
+`k_d` is an estimate; the network fixture binds the thermal law to one member
+only (roles, records in kelvin without environment, provenance); on a grid of
+50, 55 and 60 degC each enzyme follows its own closed form with
+`k_d(T)` computed independently, the stable one stays at 10 mg/L, each process
+rate is `kcat E S/(Km + S)` with its own enzyme, the degradation is their sum,
+`S + P = 20 g/L`, and hotter runs degrade less; `environment_response` and the
+mechanism rows name the law; a rate law and the inactivation law compose on one
+pair (kcat and `k_d` each rescaled by their own Arrhenius factor, exact
+substrate solution); a tolerance-admitted reference rescales `k_d`; the
+pH-ionization form and an FPU/L enzyme from a dose on a solid decay by the same
+law; refusals (molar units, a half-life, negative value, `fitted`, duplicate
+rows, the Vmax form for the row and the law, a culture pool for the row and the
+law, the law off its reference, a negative energy, a missing parameter,
+temperature bounds, energy units, an unknown temperature); the assembler's
+refusals of a malformed declaration and of a role set without an enzyme;
+`fungmod check-data` (table, absent without rows, a refusal as
+`file:row:column`) and `fungmod run` (a temperature grid of the network, the
+single-class case). Modified: `tests/test_user_data_v2.py` (the importable
+rate laws are modifiers; the inactivation law is the one process law),
+`tests/test_guardrails_no_hardcoding.py` (fixture and test-only tokens).
+
+Not changed: no process law, kernel, factory, modifier, solver, composition
+builder, registry record or case template, output schema (2.2.1), preflight
+rule or result-table policy. Every earlier fixture and the shipped registry
+generate byte-identical records and configs, and a seeded two-sample run of
+every runnable earlier fixture gives byte-identical case summaries, time
+series, final metrics, thresholds, sampled parameters, modelability,
+assumption, mechanism, uncertainty, conservation, limitation, missing-parameter,
+suggested-experiment and provenance tables (after normalising paths), compared
+by a digest script against 6567464. `to_dict()` gains `enzyme_inactivation`
+(empty) and `processes[].enzyme_inactivation` (null).
+
+Scientific impact: a user's enzyme can now lose activity over the run at a
+stated first-order constant, or at a constant that follows the Arrhenius law in
+temperature, so the substrate loss, product release, rates, threshold times and
+conversion plateaus (the enzyme's integrated activity `kcat E0/k_d`) reflect
+it; in a network each class decays by its own constant. An enzyme without a
+row is still assumed stable, and a dataset that states inactivation for some
+enzyme says so for the others.
+
+Compatibility: additive (new quantity, law, keys, template field, CLI section
+and mechanism rows only where inactivation is bound).
+
+Remaining ambiguities: a thermal law on the inactivation only makes a
+temperature grid `active_response_model` (ranking allowed) although the
+catalytic constants do not respond (the template says so; the result-table
+guardrail is per condition, not per process); the "assumed constant" sentence
+appears only in datasets that state inactivation somewhere; the loss acts on
+the whole enzyme state (no free and bound enzyme, no inactive pool, no substrate
+protection); pH-dependent stability and a temperature law on a culture's
+`enzyme_loss_rate` are not bound.
+
+Commands and results (worktree on `claude/user-data-enzyme-inactivation`, based
+on 6567464, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` (project-wide, as CI): 0 errors.
+- `mkdocs build --strict`: built (exit 0); the anchors
+  `enzyme-inactivation-over-the-run` and `in-an-enzyme-network` exist.
+- `tests/test_user_data_inactivation.py`: 74 passed.
+- Targeted run (v2, network responses, network, culture, culture pools, CLI,
+  CLI workflow, import, pH-ionization, solid, assembly, assemble network,
+  cross-basis, time courses, guardrails, genome, UniProt, sources,
+  documentation sync, hygiene, environment grids, partial runs, config-driven
+  assembly, BGL1A, thermal inactivation process, organism case, registry case
+  builder, no-shortcut and public-API guardrails): 814 passed.
+- Digest script over all 16 earlier fixtures and the registry against
+  6567464: records, configs and the 15 output tables identical.
+- Full suite `pytest -n 2 --dist loadfile tests` (pytest-xdist): 2906 passed in
+  41 min 43 s; no xdist-only failure to rerun serially.
+
+Next task: a temperature (and pH) law on a culture pool's `enzyme_loss_rate`
+(response laws on cultures); an inactive enzyme pool and reversible unfolding
+(new numerics, to be sourced); sourced inactivation constants for registry
+cases; carrying `responses.csv` laws into assembled network drafts.
+
 ## CULTURE-002 A Growing Culture Whose Secreted Pools Act Together
 
 Status: `partial` (2026-10-08): complete for several pools consuming the

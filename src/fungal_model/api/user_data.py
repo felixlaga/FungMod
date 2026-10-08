@@ -51,6 +51,20 @@ network process of its class on its pool (whose ``ki`` must then also be stated
 at the reference condition); the law scales that process's rate only, and a
 process without a law keeps the constants of its rows' condition.
 
+A ``kinetics.csv`` row of quantity ``inactivation_rate`` (1/time, at the row's
+condition) binds the existing ``first_order`` process law to the enzyme state
+of its case, ``dE/dt = -k_d E``: in a single-class case the enzyme-kinetics
+template declares the loss process (``enzyme_inactivation``), and in an enzyme
+network each class's enzyme state decays by its own constant. The
+``thermal_inactivation`` law of ``responses.csv`` (an activation energy and the
+reference temperature at which ``inactivation_rate`` is stated) binds the
+existing ``thermal_inactivation`` process law instead, so ``k_d`` follows the
+Arrhenius law in the environment temperature; it scales no catalytic constant.
+All cases of one enzyme class and substrate share the loss process (a case
+without the row gets an explicit gap); without any row the enzyme state is not
+lost and no default constant is applied. The Vmax form (no enzyme state) and
+culture pools (which keep their own ``enzyme_loss_rate``) refuse it.
+
 An optional ``culture.csv`` binds the existing ``culture_physiology``
 composition to a strain growing on one solid substrate: the substrate is
 consumed by the strain's enzyme pools that act on it, each by its own
@@ -175,7 +189,9 @@ from fungal_model.core.provenance import ProvenanceError
 from fungal_model.core.units import ASSAY_BASE_UNITS, Q_, units_are_compatible
 from fungal_model.kinetics.arrhenius import arrhenius_reference_scaled_rate
 from fungal_model.kinetics.cardinal import cardinal_ph_activity, cardinal_temperature_activity
+from fungal_model.kinetics.inactivation import arrhenius_inactivation_rate_constant
 from fungal_model.modifiers.reactivity import KADAM_2004_SOURCE, SUBSTRATE_REACTIVITY_MODIFIER_TYPE
+from fungal_model.processes.inactivation import THERMAL_INACTIVATION_PROCESS_TYPE
 from fungal_model.provenance import USER_DATASET_PROVENANCE_KEY
 from fungal_model.registry.loaders import (
     RegistryLoadError,
@@ -203,6 +219,8 @@ from fungal_model.registry.resolver import AmbiguousResolutionError, RegistryRes
 from fungal_model.registry.store import FungModRegistry, RegistryValidationError
 from fungal_model.resources import default_registry_path
 from fungal_model.screening.case_builder import (
+    ENZYME_INACTIVATION_PROCESS_LAWS,
+    ENZYME_INACTIVATION_TEMPLATE_KEY,
     HOMOGENEOUS_MM_PARAMETER_ROLES,
     HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES,
     PH_IONIZATION_MM_PARAMETER_ROLES,
@@ -348,6 +366,7 @@ KINETIC_QUANTITIES = (
     "enzyme_dose",
     "reactivity_exponent",
     "ki",
+    "inactivation_rate",
 )
 # The quantities only the pH-ionization rate form has; its enzyme concentration
 # and initial substrate are shared with the kcat form. The roles are those of the
@@ -379,6 +398,7 @@ _QUANTITY_ROLE = {
     "ph_min": "minimum_ph",
     "ph_max": "maximum_ph",
     "reactivity_exponent": REACTIVITY_EXPONENT_ROLE,
+    "inactivation_rate": "inactivation_rate",
 }
 _ROLE_QUANTITY = {role: quantity for quantity, role in _QUANTITY_ROLE.items()}
 _CONCENTRATION_QUANTITIES = ("substrate_initial_concentration", "km", "enzyme_concentration", "km_limiting")
@@ -477,6 +497,16 @@ INHIBITOR_COLUMN = "inhibitor"
 COMPETITIVE_INHIBITION_LAW_SOURCE = "https://pubmed.ncbi.nlm.nih.gov/7985803/"
 COMPETITIVE_INHIBITION_LAW_MATURITY = "literature_backed_software_tested"
 COMPETITIVE_INHIBITION_EQUATION = "rate x (Km + S) / (Km (1 + I / Ki) + S), i.e. Vmax S / (Km (1 + I / Ki) + S)"
+# First-order inactivation of the enzyme state of a case (USERDATA-011): kinetics.csv gives the constant k_d of
+# dE/dt = -k_d E at the row's condition, which binds the existing first_order process law to the enzyme state. The
+# Arrhenius pair of the existing thermal_inactivation process law (an activation energy and the reference temperature
+# of k_d) comes from responses.csv and binds that law instead. Without either the enzyme state is not lost.
+INACTIVATION_RATE_QUANTITY = "inactivation_rate"
+INACTIVATION_LAW = THERMAL_INACTIVATION_PROCESS_TYPE
+_FIRST_ORDER_LOSS = "first_order"
+# What a responses.csv law scales: the catalytic rate (a process modifier) or the inactivation constant (a process law).
+LAW_SCALES_RATE = "rate"
+LAW_SCALES_INACTIVATION = "inactivation"
 # The manifest switch of enzyme networks: entry_substrates lists the substrates each network starts from.
 NETWORK_MANIFEST_FIELD = "enzyme_network"
 NETWORK_ENTRY_FIELD = "entry_substrates"
@@ -723,11 +753,15 @@ class ResponseLawParameter:
 class ResponseLaw:
     """An existing environment-response law that ``responses.csv`` may bind.
 
-    ``law`` is the process-modifier type the case-template machinery already
+    A law that scales the catalytic rate (``scales`` ``rate``) is the
+    process-modifier type ``law`` the case-template machinery already
     implements; ``parameters`` are its template roles, each bound through the
     modifier field ``<name>_role``; ``reference_parameter`` names the parameter
     at whose value the law's activity is one, so kinetic constants scaled by
-    the law must be stated there.
+    the law must be stated there. A law that scales the enzyme's first-order
+    inactivation constant (``scales`` ``inactivation``) is the existing process
+    law ``law`` that then replaces the first-order loss of the enzyme state; the
+    ``inactivation_rate`` it scales must be stated at its reference parameter.
     """
 
     law: str
@@ -735,10 +769,25 @@ class ResponseLaw:
     parameters: tuple[ResponseLawParameter, ...]
     reference_parameter: str
     formula: str
+    scales: str = LAW_SCALES_RATE
+
+    @property
+    def reads(self) -> str:
+        """The environment condition the law reads."""
+
+        if self.scales == LAW_SCALES_RATE:
+            return ENVIRONMENT_MODIFIER_CONDITIONS[self.law]
+        return PROCESS_ENVIRONMENT_CONDITIONS[self.law][0]
 
     @property
     def condition(self) -> str:
-        return ENVIRONMENT_MODIFIER_CONDITIONS[self.law]
+        """The condition through which the law rescales the catalytic rate of a case.
+
+        Empty for a law that scales the inactivation constant: it carries no
+        catalytic constant to another condition.
+        """
+
+        return self.reads if self.scales == LAW_SCALES_RATE else ""
 
     @property
     def parameter_names(self) -> tuple[str, ...]:
@@ -796,6 +845,22 @@ RESPONSE_LAWS: Mapping[str, ResponseLaw] = MappingProxyType(
                 ),
                 reference_parameter="reference_temperature",
                 formula="rate(T) = rate(T_ref) x exp(-Ea / R x (1/T - 1/T_ref))",
+            ),
+            ResponseLaw(
+                law=INACTIVATION_LAW,
+                label="Arrhenius law of the first-order inactivation constant",
+                parameters=(
+                    ResponseLawParameter(
+                        "activation_energy",
+                        "activation energy of inactivation",
+                        _MOLAR_ENERGY_REFERENCE_UNITS,
+                        "an energy per amount (for example kJ/mol)",
+                    ),
+                    _temperature_parameter("reference_temperature", "reference temperature of the inactivation rate"),
+                ),
+                reference_parameter="reference_temperature",
+                formula="k_d(T) = k_d(T_ref) x exp(-E_d / R x (1/T - 1/T_ref))",
+                scales=LAW_SCALES_INACTIVATION,
             ),
         )
     }
@@ -953,8 +1018,17 @@ class UserDataset:
     one entry per entry substrate: its chain of pools, the final product, the
     links with their yields, the processes (enzyme class, pool, rate form,
     process id, competitive inhibitor if a ki row binds one, the responses.csv
-    laws bound to it), the member classes, the strains, and the generated
-    template and compatibility ids. It is empty without the block.
+    laws bound to it, the loss law of its enzyme state), the member classes,
+    the strains, and the generated template and compatibility ids. It is empty
+    without the block.
+
+    ``enzyme_inactivation`` lists one entry per enzyme class and substrate
+    whose enzyme state is lost by first-order inactivation (an
+    ``inactivation_rate`` row in kinetics.csv, or the ``thermal_inactivation``
+    law in responses.csv): the class, the substrate, the process law
+    (``first_order`` or ``thermal_inactivation``), the generated process and
+    template ids, and the rows behind it. It is empty when no row binds one;
+    every other enzyme state of the dataset is then not lost.
     """
 
     dataset_id: str
@@ -971,6 +1045,7 @@ class UserDataset:
     timecourses: Mapping[str, tuple[UserTimecourse, ...]] = field(default_factory=dict)
     cultures: tuple[Mapping[str, Any], ...] = ()
     enzyme_networks: tuple[Mapping[str, Any], ...] = ()
+    enzyme_inactivation: tuple[Mapping[str, Any], ...] = ()
     # The bytes of every input file (tables, manifest, annotation and fit-report files) by relative
     # path, and the parsed rows; ``fit_user_dataset`` writes its copies of the dataset from them.
     _raw_files: Mapping[str, bytes] = field(default_factory=dict, repr=False, compare=False)
@@ -1066,6 +1141,7 @@ class UserDataset:
             },
             "cultures": [_plain(item) for item in self.cultures],
             "enzyme_networks": [_plain(item) for item in self.enzyme_networks],
+            "enzyme_inactivation": [_plain(item) for item in self.enzyme_inactivation],
         }
 
     def summary(self) -> dict[str, Any]:
@@ -1175,6 +1251,7 @@ def load_user_dataset(
         timecourses=_timecourse_series(parsed, dataset_id=dataset_id),
         cultures=_culture_report(parsed, dataset_id=dataset_id),
         enzyme_networks=_network_report(parsed, dataset_id=dataset_id),
+        enzyme_inactivation=_inactivation_report(parsed, dataset_id=dataset_id),
         _raw_files=MappingProxyType(dict(raw_files)),
         _parsed=parsed,
         _record_objects=MappingProxyType({name: tuple(generated.objects[name]) for name in _RECORD_TYPES}),
@@ -1617,7 +1694,11 @@ class _NetworkProcess:
     reactive: bool = False
     # The responses.csv laws bound to this class on this pool (by any strain of the network), in RESPONSE_LAWS order;
     # each enters the process template as its environment modifier. Empty: the constants hold at their rows' condition.
+    # Only laws that scale the rate; the inactivation law is the process law of ``inactivation``.
     laws: tuple[str, ...] = ()
+    # The process law through which this class's enzyme state is lost (USERDATA-011): "first_order" with the
+    # inactivation_rate of kinetics.csv, the thermal_inactivation law of responses.csv, or blank (not lost).
+    inactivation: str = ""
 
 
 @dataclass(frozen=True)
@@ -1692,6 +1773,9 @@ class _Parsed:
     # and, set by cross-validation, the enzyme network of every valid entry.
     network_entries: tuple[str, ...] | None = None
     networks: dict[str, _Network] = field(default_factory=dict)
+    # (class, substrate) -> the process law through which the pair's enzyme state is lost ("first_order" or
+    # "thermal_inactivation"), set by cross-validation for pairs with inactivation_rate rows or the inactivation law.
+    inactivation_pairs: dict[tuple[str, str], str] = field(default_factory=dict)
 
     @property
     def network_dataset(self) -> bool:
@@ -4373,6 +4457,15 @@ def _quantity_units_error(quantity: str, units: str, *, solid: bool = False) -> 
             f"enzyme_dose units {units!r} must be an enzyme amount per dry substrate mass: a protein mass per "
             "substrate mass (for example mg/g) or an assay activity per substrate mass (for example FPU/g)."
         )
+    if quantity == INACTIVATION_RATE_QUANTITY:
+        # The same rule on a dissolved and a solid substrate: a first-order constant of the enzyme state.
+        if _unit_dimension_error(units, _RATE_CONSTANT_REFERENCE_UNITS) is not None:
+            return (
+                f"inactivation_rate units {units!r} must have the dimension 1/time (for example 1/h or 1/min): it is "
+                "the first-order constant k_d of dE/dt = -k_d E. A half-life is not a rate constant; FungMod does not "
+                "convert one (k_d = ln 2 / t_half is yours to state)."
+            )
+        return None
     if solid:
         return _solid_quantity_units_error(quantity, units)
     if quantity == INHIBITION_CONSTANT_QUANTITY:
@@ -4600,6 +4693,7 @@ def _cross_validate(parsed: _Parsed, context: _Context) -> None:
     _validate_solid_cases(parsed, context)
     _validate_ph_ionization(parsed, context)
     _validate_responses(parsed, context)
+    _validate_inactivation(parsed, context)
     _validate_networks(parsed, context)
     _validate_pairs(parsed, context)
 
@@ -4740,7 +4834,20 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
     kept: list[_Kinetics] = []
     for row in parsed.kinetics:
         consuming = parsed.cultured.get((row.strain_id, row.substrate_id))
-        if consuming is not None:
+        if row.quantity == INACTIVATION_RATE_QUANTITY and (
+            consuming is not None
+            or (row.class_key, row.substrate_id) in consumer_pairs
+            or row.class_key in culture_classes
+        ):
+            if consuming is not None:
+                what = (
+                    f"strain {row.strain_id!r} has a culture on substrate {row.substrate_id!r} ({file} "
+                    f"{_rows_text(by_culture[(row.strain_id, row.substrate_id)])})"
+                )
+            else:
+                what = f"enzyme class {row.class_key!r} runs the culture form ({file} {culture_rows_text[row.class_key]})"
+            context.add("kinetics.csv", row.row, "quantity", _culture_inactivation_refusal(what))
+        elif consuming is not None:
             culture = by_culture[(row.strain_id, row.substrate_id)]
             context.add(
                 "kinetics.csv",
@@ -4874,7 +4981,13 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
                 f"Strain {response.strain_id!r}, class {response.class_key!r} and substrate {response.substrate_id!r} "
                 "belong to a culture, and response laws are not bound to culture cases in this version: the culture "
                 "model applies no temperature or pH law (the condition's temperature and pH are metadata), so a "
-                "culture's constants hold at the condition of their rows only.",
+                "culture's constants hold at the condition of their rows only."
+                + (
+                    f" {INACTIVATION_LAW} scales the inactivation_rate of an enzyme-assay case; a culture pool is lost "
+                    "at its own enzyme_loss_rate in culture.csv, which no temperature law rescales."
+                    if response.law == INACTIVATION_LAW
+                    else ""
+                ),
             )
         else:
             kept_responses.append(response)
@@ -4891,6 +5004,18 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
                 f"The culture model of class {pair[0]!r} on substrate {pair[1]!r} would give two of its states one "
                 f"name ({', '.join(names)}); rename the substrate or the enzyme class.",
             )
+
+
+def _culture_inactivation_refusal(what: str) -> str:
+    """Why an inactivation_rate row is refused for a culture: its pools already have their own first-order loss."""
+
+    return (
+        f"inactivation_rate binds first-order inactivation to the enzyme state of an enzyme-assay case, but {what}. A "
+        f"culture's enzyme pools are already lost at their own first-order rate, enzyme_loss_rate in {CULTURE_TABLE} "
+        "(the existing first_order law), and FungMod adds no second loss law to a culture pool: two first-order losses "
+        "of one pool are one constant stated twice, which no data could tell apart. State the loss of the pool as "
+        f"enzyme_loss_rate in {CULTURE_TABLE}, or keep the enzyme-assay case in a separate dataset."
+    )
 
 
 def _validate_culture_case_units(parsed: _Parsed, context: _Context) -> None:
@@ -5395,6 +5520,9 @@ def _validate_responses(parsed: _Parsed, context: _Context) -> None:
     for binding, laws in valid.items():
         by_condition: dict[str, list[str]] = {}
         for law_name in laws:
+            if RESPONSE_LAWS[law_name].scales != LAW_SCALES_RATE:
+                # The inactivation law scales the inactivation constant, not the rate: it composes with a rate law.
+                continue
             by_condition.setdefault(RESPONSE_LAWS[law_name].condition, []).append(law_name)
         for condition, names in by_condition.items():
             for law_name in names[1:]:
@@ -5410,6 +5538,49 @@ def _validate_responses(parsed: _Parsed, context: _Context) -> None:
         for law_name, chosen in laws.items():
             _validate_reference_condition(parsed, binding, RESPONSE_LAWS[law_name], chosen, context)
     parsed.laws = valid
+
+
+def _validate_inactivation(parsed: _Parsed, context: _Context) -> None:
+    """Find the enzyme class and substrate pairs whose enzyme state is lost, and refuse a loss with no enzyme state.
+
+    A pair binds enzyme inactivation when a case of it gives
+    ``inactivation_rate`` or a strain binds the ``thermal_inactivation`` law of
+    responses.csv to it. All strains and conditions of a pair share one
+    generated process, so every case of the pair then runs the loss process
+    (a case without the row gets an explicit gap, never a default value): the
+    existing ``first_order`` law with the stated constant, or the existing
+    ``thermal_inactivation`` law when a strain binds it. The Vmax form has no
+    enzyme state, so both are refused there. Valid pairs are stored in
+    ``parsed.inactivation_pairs``; culture rows were refused before.
+    """
+
+    rows: dict[tuple[str, str], list[_Kinetics]] = {}
+    for row in parsed.kinetics:
+        if row.quantity == INACTIVATION_RATE_QUANTITY:
+            rows.setdefault(row.pair_key, []).append(row)
+    law_rows: dict[tuple[str, str], list[_Response]] = {}
+    for binding, laws in parsed.laws.items():
+        if INACTIVATION_LAW in laws:
+            law_rows.setdefault((binding[1], binding[2]), []).extend(laws[INACTIVATION_LAW].values())
+    for pair in dict.fromkeys((*rows, *law_rows)):
+        form = _pair_form(parsed, pair)
+        if form in _ENZYME_FORMS:
+            parsed.inactivation_pairs[pair] = INACTIVATION_LAW if pair in law_rows else _FIRST_ORDER_LOSS
+            continue
+        reason = (
+            f"enzyme class {pair[0]!r} on substrate {pair[1]!r} uses the {_FORM_LABEL[form]} form, which has no enzyme "
+            "state: Vmax is a rate of the simulated system, so there is no enzyme amount to lose. Give the case in the "
+            "kcat form (kcat with an enzyme concentration) to simulate enzyme inactivation."
+        )
+        for row in rows.get(pair, []):
+            context.add("kinetics.csv", row.row, "quantity", f"inactivation_rate binds first-order inactivation, but {reason}")
+        if pair in law_rows:
+            context.add(
+                "responses.csv",
+                min(row.row for row in law_rows[pair]),
+                "law",
+                f"{INACTIVATION_LAW} scales the first-order inactivation constant of an enzyme state, but {reason}",
+            )
 
 
 def _refuse_laws_read_by_the_process(
@@ -5486,26 +5657,34 @@ def _validate_reference_condition(
     equals the reference value exactly, or within the reference row's own
     ``reference_tolerance``; ``kinetics_at_reference = yes`` records the
     user's declaration that the values are reference values. In an enzyme
-    network a process's ``ki`` is checked with its other constants.
+    network a process's ``ki`` is checked with its other constants. The
+    inactivation law scales the ``inactivation_rate`` only, so that is the
+    constant it checks.
     """
 
     reference = chosen[law.reference_parameter]
+    inactivation = law.scales == LAW_SCALES_INACTIVATION
     rows_by_condition: dict[str, list[_Kinetics]] = {}
     for row in parsed.kinetics:
-        if (row.strain_id, row.class_key, row.substrate_id) == binding and row.quantity in _LAW_REFERENCE_QUANTITIES:
+        if (row.strain_id, row.class_key, row.substrate_id) == binding and row.quantity in _law_reference_quantities(law):
             rows_by_condition.setdefault(row.condition_id, []).append(row)
     for condition_id in sorted(rows_by_condition):
         condition = parsed.conditions[condition_id]
         rows = rows_by_condition[condition_id]
-        current = condition.temperature_kelvin if law.condition == "temperature" else condition.ph
+        current = condition.temperature_kelvin if law.reads == "temperature" else condition.ph
         if current is None:
+            scaled = (
+                f"the inactivation_rate there for {_binding_text(binding)}, which {law.law} scales with the {law.reads}"
+                if inactivation
+                else f"kinetic constants there for {_binding_text(binding)}, whose rate {law.law} scales with the "
+                f"{law.reads}"
+            )
             context.add(
                 "responses.csv",
                 reference.row,
                 "value",
-                f"Condition {condition_id!r} has an unknown {law.condition}, but kinetics.csv {_rows_text(rows)} give "
-                f"kinetic constants there for {_binding_text(binding)}, whose rate {law.law} scales with the "
-                f"{law.condition}. State the {law.condition} in conditions.csv.",
+                f"Condition {condition_id!r} has an unknown {law.reads}, but kinetics.csv {_rows_text(rows)} give "
+                f"{scaled}. State the {law.reads} in conditions.csv.",
             )
             continue
         if reference.kinetics_at_reference:
@@ -5523,6 +5702,20 @@ def _validate_reference_condition(
             if tolerance is None
             else f"reference_tolerance is {_number_text(tolerance)} {reference.units}"
         )
+        if inactivation:
+            context.add(
+                "responses.csv",
+                reference.row,
+                "value",
+                f"The inactivation_rate of {_binding_text(binding)} at condition {condition_id!r} "
+                f"({_condition_text(condition)}; kinetics.csv {_rows_text(rows)}) is not at the reference temperature "
+                f"of {law.law}, {law.reference_parameter} {_number_text(reference.value)} {reference.units} (differs by "
+                f"{_number_text(difference)} {reference.units}; {tolerance_text}). The law rescales the inactivation "
+                f"constant from its reference value ({law.formula}), so the inactivation_rate must be stated at the "
+                "reference temperature. State it there, give a reference_tolerance on this row that covers the "
+                "difference, or set kinetics_at_reference to yes if the value is already the reference value.",
+            )
+            continue
         context.add(
             "responses.csv",
             reference.row,
@@ -5570,6 +5763,16 @@ def _check_arrhenius_reference(values: Mapping[str, Any]) -> None:
     )
 
 
+def _check_thermal_inactivation(values: Mapping[str, Any]) -> None:
+    arrhenius_inactivation_rate_constant(
+        reference_rate_constant=Q_(1.0, _RATE_CONSTANT_REFERENCE_UNITS),
+        inactivation_energy=values["activation_energy"],
+        temperature=values["reference_temperature"],
+        reference_temperature=values["reference_temperature"],
+        source=_LAW_CHECK_SOURCE,
+    )
+
+
 # Each check evaluates the implemented law at its reference value, so the law's
 # own domain rules (ordering of cardinal values, the CTMI midpoint condition,
 # nonnegative activation energy) decide; nothing is re-implemented here.
@@ -5577,7 +5780,16 @@ _LAW_DOMAIN_CHECKS = {
     "temperature_cardinal_rosso": _check_cardinal_temperature,
     "ph_cardinal_rosso": _check_cardinal_ph,
     "temperature_arrhenius_reference": _check_arrhenius_reference,
+    INACTIVATION_LAW: _check_thermal_inactivation,
 }
+
+
+def _law_reference_quantities(law: ResponseLaw) -> frozenset[str]:
+    """The kinetics.csv quantities a law rescales, which must be stated at its reference condition."""
+
+    if law.scales == LAW_SCALES_INACTIVATION:
+        return frozenset({INACTIVATION_RATE_QUANTITY})
+    return _LAW_REFERENCE_QUANTITIES
 
 
 def _law_domain_problem(law: ResponseLaw, chosen: Mapping[str, _Response]) -> str | None:
@@ -5732,9 +5944,16 @@ def _generate_records(
         form = _pair_form(parsed, pair)
         process_type = _FORM_PROCESS_TYPE[form]
         laws = _pair_laws(parsed, pair)
+        rate_laws = tuple(law for law in laws if law.scales == LAW_SCALES_RATE)
         # A pair with a reactivity_exponent row binds the reactivity factor; its other cases get gaps for it.
         reactive = pair in parsed.reactivity_pairs
-        role_quantities = (*_FORM_QUANTITIES[form], *(("reactivity_exponent",) if reactive else ()))
+        # Likewise a pair whose enzyme state is lost (an inactivation_rate row or the inactivation law).
+        inactivation = parsed.inactivation_pairs.get(pair, "")
+        role_quantities = (
+            *_FORM_QUANTITIES[form],
+            *(("reactivity_exponent",) if reactive else ()),
+            *((INACTIVATION_RATE_QUANTITY,) if inactivation else ()),
+        )
         info = parsed.classes[class_key]
         pair_records: list[ParameterRecord] = []
         for item in parsed.strain_classes:
@@ -5758,10 +5977,11 @@ def _generate_records(
                     namespace=namespace,
                     case_rows=case_rows,
                     form_started=started,
-                    laws=tuple(strain_laws),
+                    laws=tuple(name for name in strain_laws if RESPONSE_LAWS[name].scales == LAW_SCALES_RATE),
                     form=form,
                     genome=item.genome if item.genome_only else None,
                     measured_elsewhere=elsewhere,
+                    inactivation=inactivation,
                 )
                 for quantity in role_quantities:
                     mapping, origin = _role_mapping(quantity, case)
@@ -5780,7 +6000,7 @@ def _generate_records(
                             info=info,
                             substrate=substrate,
                             namespace=namespace,
-                            reference_conditions=_reference_conditions(parsed, response.binding_key),
+                            reference_conditions=_reference_conditions(parsed, response.binding_key, law),
                             process_type=process_type,
                         )
                         origin: tuple[str, int | None, str | None] = ("responses.csv", response.row, "parameter")
@@ -5808,7 +6028,15 @@ def _generate_records(
             context,
             "case_templates",
             _template_mapping(
-                info, substrate, namespace, scientific=scientific, form=form, laws=laws, reactivity=reactive
+                info,
+                substrate,
+                namespace,
+                scientific=scientific,
+                form=form,
+                laws=rate_laws,
+                reactivity=reactive,
+                inactivation=inactivation,
+                inactivation_stated=bool(parsed.inactivation_pairs),
             ),
             origin=("substrates.csv", substrate.row, "substrate_id"),
         )
@@ -5816,7 +6044,9 @@ def _generate_records(
             generated,
             context,
             "process_compatibility",
-            _compatibility_mapping(info, substrate, namespace, form=form, laws=laws, reactivity=reactive),
+            _compatibility_mapping(
+                info, substrate, namespace, form=form, laws=laws, reactivity=reactive, inactivation=inactivation
+            ),
             origin=("substrates.csv", substrate.row, "substrate_id"),
         )
     _generate_culture_records(parsed, context, generated, namespace)
@@ -5851,6 +6081,8 @@ class _CaseContext:
     measured_elsewhere: tuple[_Condition, ...] = ()
     # The name of the pool that competitively inhibits this process in an enzyme network (its ki gap names it).
     inhibitor_name: str = ""
+    # The process law through which the case's enzyme state is lost ("first_order", "thermal_inactivation" or blank).
+    inactivation: str = ""
 
     @property
     def process_type(self) -> str:
@@ -5869,14 +6101,15 @@ def _pair_laws(parsed: _Parsed, pair: tuple[str, str]) -> tuple[ResponseLaw, ...
     return tuple(law for name, law in RESPONSE_LAWS.items() if name in used)
 
 
-def _reference_conditions(parsed: _Parsed, binding: tuple[str, str, str]) -> list[str]:
-    """Conditions at which the binding has kinetic constants, all checked against the law's reference."""
+def _reference_conditions(parsed: _Parsed, binding: tuple[str, str, str], law: ResponseLaw) -> list[str]:
+    """Conditions at which the binding has the constants the law scales, all checked against the law's reference."""
 
+    quantities = _law_reference_quantities(law)
     return sorted(
         {
             row.condition_id
             for row in parsed.kinetics
-            if (row.strain_id, row.class_key, row.substrate_id) == binding and row.quantity in _LAW_REFERENCE_QUANTITIES
+            if (row.strain_id, row.class_key, row.substrate_id) == binding and row.quantity in quantities
         }
     )
 
@@ -6162,19 +6395,26 @@ def _compatibility_mapping(
     form: str,
     laws: Sequence[ResponseLaw],
     reactivity: bool = False,
+    inactivation: str = "",
 ) -> dict[str, Any]:
     shared = _shared_bonds(info, substrate) or ()
     process_type = _FORM_PROCESS_TYPE[form]
-    roles = (*_FORM_ROLES[form], *((REACTIVITY_EXPONENT_ROLE,) if reactivity else ()))
+    roles = (
+        *_FORM_ROLES[form],
+        *((REACTIVITY_EXPONENT_ROLE,) if reactivity else ()),
+        *((INACTIVATION_RATE_QUANTITY,) if inactivation else ()),
+    )
     symbols = {
         role: _parameter_symbol(namespace, _ROLE_QUANTITY[role], info.key, substrate.substrate_id) for role in roles
     }
     for law in laws:
         for parameter in law.parameters:
-            # Law parameters never share a name with a form role: a law on a condition the
-            # form's process law reads (a pH law on a pH-ionization pair) is refused at load.
-            assert parameter.name not in symbols, parameter.name
-            symbols[parameter.name] = _law_symbol(namespace, law, parameter, info.key, substrate.substrate_id)
+            # Law parameters never share a role with a form role: a law on a condition the
+            # form's process law reads (a pH law on a pH-ionization pair) is refused at load,
+            # and the inactivation law's roles carry the law's name.
+            role = _single_law_role(law, parameter)
+            assert role not in symbols, role
+            symbols[role] = _law_symbol(namespace, law, parameter, info.key, substrate.substrate_id)
     return {
         "record_id": namespace.id(info.key, substrate.substrate_id, _PROCESS_ID_SUFFIX[process_type]),
         "name": f"{info.name} on {substrate.name} {_PROCESS_LABEL[process_type]} ({namespace.dataset_id})",
@@ -6204,6 +6444,17 @@ def _compatibility_mapping(
     }
 
 
+def _single_law_role(law: ResponseLaw, parameter: ResponseLawParameter) -> str:
+    """The template role of a law parameter of a single-class case.
+
+    A rate law's parameter keeps its own name (one law per condition, so the
+    names never collide); the inactivation law's carry the law's name, since
+    an Arrhenius rate law on the same pair has parameters of the same names.
+    """
+
+    return parameter.name if law.scales == LAW_SCALES_RATE else f"{law.law}__{parameter.name}"
+
+
 def _template_id(namespace: _Namespace, info: _EnzymeClassInfo, substrate: _Substrate, *, form: str) -> str:
     suffix = _PROCESS_ID_SUFFIX[_FORM_PROCESS_TYPE[form]]
     return namespace.id(info.key, substrate.substrate_id, f"{suffix}_template")
@@ -6218,7 +6469,19 @@ def _template_mapping(
     form: str,
     laws: Sequence[ResponseLaw],
     reactivity: bool = False,
+    inactivation: str = "",
+    inactivation_stated: bool = False,
 ) -> dict[str, Any]:
+    """The case template of one enzyme class and substrate.
+
+    ``laws`` are the rate laws (process modifiers). ``inactivation`` names the
+    loss law of the enzyme state (USERDATA-011), declared under
+    ``enzyme_inactivation`` for the enzyme-kinetics assembler. When the dataset
+    states inactivation for some pair (``inactivation_stated``), a pair with an
+    enzyme state but no inactivation says that its activity is assumed
+    constant; a dataset without inactivation keeps every earlier text.
+    """
+
     template_id = _template_id(namespace, info, substrate, form=form)
     process_type = _FORM_PROCESS_TYPE[form]
     process_label = _PROCESS_LABEL[process_type]
@@ -6264,8 +6527,29 @@ def _template_mapping(
     )
     if modifiers:
         process_state_metadata["process_modifiers"] = modifiers
+    if inactivation:
+        process_state_metadata[ENZYME_INACTIVATION_TEMPLATE_KEY] = _inactivation_template(
+            info.name,
+            law=inactivation,
+            process_id=namespace.id(info.key, substrate.substrate_id, "enzyme_inactivation"),
+            rate_role=INACTIVATION_RATE_QUANTITY,
+            law_roles={
+                parameter.name: _single_law_role(RESPONSE_LAWS[INACTIVATION_LAW], parameter)
+                for parameter in RESPONSE_LAWS[INACTIVATION_LAW].parameters
+            },
+        )
     rate_limitation = _RATE_FORM_LIMITATION.get(form)
-    if form == RATE_FORM_PH_IONIZATION:
+    if form == RATE_FORM_PH_IONIZATION and not laws and inactivation == INACTIVATION_LAW:
+        law_limitation = (
+            "No temperature response law scales the catalytic rate; its constants apply at the temperature of their "
+            "condition only."
+        )
+    elif not laws and inactivation == INACTIVATION_LAW:
+        law_limitation = (
+            "No temperature or pH response law scales the catalytic rate; its constants apply at their stated "
+            "condition only."
+        )
+    elif form == RATE_FORM_PH_IONIZATION:
         law_limitation = (
             "No temperature response law is bound; the constants apply at the temperature of their condition only."
             if not laws
@@ -6341,6 +6625,11 @@ def _template_mapping(
             law_limitation,
             *([rate_limitation] if rate_limitation is not None else []),
             *(_solid_limitations(reactivity) if substrate.is_solid else []),
+            *(
+                [_inactivation_limitation(info.name, law=inactivation, where=substrate.name)]
+                if inactivation_stated and form in _ENZYME_FORMS
+                else []
+            ),
         ],
         "validity_notes": [
             f"Values come from user dataset {namespace.dataset_id} (sha256 {namespace.digest}); "
@@ -6392,6 +6681,82 @@ _SOLID_VALIDITY_NOTE = (
     "the kcat form kcat was checked with pint to make kcat x E a dry mass per volume per time, and no molar mass, "
     "hydration factor or conversion between assay units and protein mass was applied."
 )
+
+
+def _inactivation_parameter_roles(law: str, *, rate_role: str, law_roles: Mapping[str, str]) -> dict[str, str]:
+    """The parameter fields of the loss law of an enzyme state, bound to the template's roles."""
+
+    if law == INACTIVATION_LAW:
+        return {
+            "reference_rate_constant": rate_role,
+            "inactivation_energy": law_roles["activation_energy"],
+            "reference_temperature": law_roles["reference_temperature"],
+        }
+    return {"rate_constant": rate_role}
+
+
+def _inactivation_assumptions(name: str, *, law: str) -> list[str]:
+    if law == INACTIVATION_LAW:
+        return [
+            f"{name} loses activity irreversibly at a first-order rate whose constant follows the Arrhenius reference "
+            "form, k_d(T) = k_d(T_ref) exp(-E_d / R (1/T - 1/T_ref)), with k_d(T_ref) the inactivation_rate of "
+            "kinetics.csv and E_d and T_ref from responses.csv; the temperature is read once from the environment, "
+            "and no inactive enzyme pool is represented."
+        ]
+    return [
+        f"{name} loses activity irreversibly at a constant first-order rate, dE/dt = -k_d E, with k_d the "
+        "inactivation_rate of kinetics.csv at the case's condition; no inactive enzyme pool is represented."
+    ]
+
+
+def _inactivation_template(
+    name: str,
+    *,
+    law: str,
+    process_id: str,
+    rate_role: str,
+    law_roles: Mapping[str, str],
+) -> dict[str, Any]:
+    """The ``enzyme_inactivation`` declaration of a single-class template: the loss law of its enzyme state."""
+
+    return {
+        "process_id": process_id,
+        "process_type": law,
+        "parameter_roles": _inactivation_parameter_roles(law, rate_role=rate_role, law_roles=law_roles),
+        "assumptions": _inactivation_assumptions(name, law=law),
+    }
+
+
+_INACTIVATION_SCOPE = (
+    "Irreversible single-exponential loss only: no reversible unfolding, proteolysis, aggregation, substrate or "
+    "product protection, adsorption to a solid, or inactive enzyme pool is represented, and the constant is only as "
+    "transferable as the preparation and medium it was measured in."
+)
+
+
+def _inactivation_limitation(name: str, *, law: str, where: str) -> str:
+    """What the enzyme inactivation of one enzyme state is, or that the state is not lost (USERDATA-011)."""
+
+    if not law:
+        return (
+            f"Enzyme activity assumed constant over the run for {name} on {where}: kinetics.csv gives no "
+            "inactivation_rate for it, so its enzyme state has no inactivation term (FungMod applies no default "
+            "constant)."
+        )
+    if law == INACTIVATION_LAW:
+        return (
+            f"Enzyme inactivation of {name} on {where}: the existing thermal_inactivation process law, "
+            "dE/dt = -k_d(T) E with k_d(T) = k_d(T_ref) exp(-E_d / R (1/T - 1/T_ref)), k_d(T_ref) the inactivation_rate "
+            "of kinetics.csv stated at the reference temperature, and E_d and T_ref from responses.csv; it rescales "
+            "the inactivation constant only, never the catalytic constants, and reads the temperature once from the "
+            f"environment. {_INACTIVATION_SCOPE}"
+        )
+    return (
+        f"Enzyme inactivation of {name} on {where}: the existing first_order process law, dE/dt = -k_d E with k_d the "
+        "inactivation_rate of kinetics.csv at the case's condition, so E(t) = E0 exp(-k_d t); no temperature law "
+        "rescales k_d, so at any other temperature (an EnvironmentGrid condition) it keeps its stated value. "
+        f"{_INACTIVATION_SCOPE}"
+    )
 
 
 def _solid_limitations(reactivity: bool) -> list[str]:
@@ -6453,7 +6818,11 @@ def _parameter_mapping(
         "source": row.source,
         "confidence_level": confidence,
         "measurement_method": row.method or "user estimate without a stated method",
-        "validity_range": _validity_range(condition, case.laws, form=case.form),
+        "validity_range": (
+            _inactivation_validity_range(condition, law=case.inactivation)
+            if quantity == INACTIVATION_RATE_QUANTITY
+            else _validity_range(condition, case.laws, form=case.form)
+        ),
         USER_DATASET_PROVENANCE_KEY: namespace.provenance(
             "kinetics.csv",
             row.row,
@@ -6888,6 +7257,7 @@ def _gap_mapping(quantity: str, *, case: _CaseContext) -> dict[str, Any]:
 _GAP_DIMENSION = {
     "ki": "concentration of the inhibiting product (amount per volume)",
     "kcat": "1/time",
+    INACTIVATION_RATE_QUANTITY: "1/time",
     "vmax": "concentration per time (amount per volume per time)",
     "kcat_limiting": "1/time",
     **{quantity: "dimensionless" for quantity in sorted(_DIMENSIONLESS_QUANTITIES)},
@@ -6895,6 +7265,7 @@ _GAP_DIMENSION = {
 _GAP_UNITS_TEXT = {
     "ki": "amount of the inhibiting product per volume, for example mM",
     "kcat": "units of 1/time",
+    INACTIVATION_RATE_QUANTITY: "units of 1/time, for example 1/h",
     "vmax": "concentration per time",
     "kcat_limiting": "units of 1/time",
     **{quantity: "dimensionless" for quantity in sorted(_DIMENSIONLESS_QUANTITIES)},
@@ -6910,6 +7281,7 @@ _SOLID_GAP_DIMENSION = MappingProxyType(
         "enzyme_concentration": "enzyme protein mass per volume or an assay activity per volume",
         "vmax": "dry mass of the solid substrate per volume per time",
         "reactivity_exponent": "dimensionless",
+        INACTIVATION_RATE_QUANTITY: "1/time",
     }
 )
 _SOLID_GAP_UNITS_TEXT = MappingProxyType(
@@ -6920,6 +7292,7 @@ _SOLID_GAP_UNITS_TEXT = MappingProxyType(
         "enzyme_concentration": "protein mass or assay activity per volume, for example mg/L or FPU/L",
         "vmax": "dry mass per volume per time, for example g/L/h",
         "reactivity_exponent": "dimensionless",
+        INACTIVATION_RATE_QUANTITY: "units of 1/time, for example 1/h",
     }
 )
 
@@ -6952,6 +7325,7 @@ _QUANTITY_LABEL = {
     "ph_max": "highest fitted pH ph_max",
     "reactivity_exponent": "substrate reactivity exponent",
     "ki": "competitive inhibition constant Ki",
+    INACTIVATION_RATE_QUANTITY: "first-order inactivation rate constant",
 }
 # What a measurement request asks for, per pH-ionization quantity.
 _PH_IONIZATION_REQUEST = {
@@ -7023,6 +7397,20 @@ def _measurement_request_text(quantity: str, *, case: _CaseContext, units_text: 
             f"State the {bound} pH of the pH series the pH-ionization law of {info.name} from {strain.name} on "
             f"{substrate.name} was fitted over ({quantity}, {units_text}); the pH of condition "
             f"{condition.condition_id} must lie inside the fitted range."
+        )
+    if quantity == INACTIVATION_RATE_QUANTITY:
+        reference = (
+            f"; the {INACTIVATION_LAW} law of responses.csv rescales it from the reference temperature, so state it "
+            "there"
+            if case.inactivation == INACTIVATION_LAW
+            else ""
+        )
+        return (
+            f"Measure the first-order inactivation rate constant k_d of {info.name} from {strain.name} in the "
+            f"{substrate.name} system at {where} ({units_text}), for example from the decay of its activity over time "
+            f"at that condition{reference}. Enzyme inactivation is bound to {info.name} on {substrate.name} (by an "
+            f"inactivation_rate row or the {INACTIVATION_LAW} law), and every case of one enzyme class and substrate "
+            "runs it."
         )
     if substrate.is_solid:
         solid_request = _solid_measurement_request_text(quantity, case=case, units_text=units_text)
@@ -7147,10 +7535,14 @@ def _response_mapping(
         f"{response.row}); evidence type {response.evidence_type}; law maturity {maturity} (weakest of {rows_text}).{conversion}"
     )
     extra: dict[str, Any] = {}
+    inactivation = law.scales == LAW_SCALES_INACTIVATION
     if response.parameter == law.reference_parameter:
         extra["reference_condition"] = {
             "rule": (
-                "kinetic constants of this strain, enzyme class and substrate must be stated at this reference "
+                "the inactivation_rate of this strain, enzyme class and substrate must be stated at this reference "
+                "temperature, exactly or within the row's reference_tolerance, or be declared the reference value"
+                if inactivation
+                else "kinetic constants of this strain, enzyme class and substrate must be stated at this reference "
                 "value, exactly or within the row's reference_tolerance, or be declared reference values"
             ),
             "kinetics_conditions": list(reference_conditions),
@@ -7164,7 +7556,12 @@ def _response_mapping(
         "measurement_method": response.method or "user estimate without a stated method",
         "validity_range": (
             f"{law.label} for {info.name} from {strain.name} on {substrate.name}: {law.formula}; it applies at "
-            "every condition of the case and rescales the reference kinetic constants."
+            + (
+                "every condition of the case and rescales the reference inactivation constant, not the catalytic "
+                "constants."
+                if inactivation
+                else "every condition of the case and rescales the reference kinetic constants."
+            )
         ),
         USER_DATASET_PROVENANCE_KEY: namespace.provenance(
             "responses.csv",
@@ -7359,6 +7756,19 @@ def _validity_range(condition: _Condition, laws: Sequence[str] = (), *, form: st
     return (
         f"Condition {condition.condition_id}: {_condition_text(condition)}; the response law(s) "
         f"{', '.join(laws)} from responses.csv rescale the rate away from their reference condition."
+    )
+
+
+def _inactivation_validity_range(condition: _Condition, *, law: str) -> str:
+    if law == INACTIVATION_LAW:
+        return (
+            f"Condition {condition.condition_id}: {_condition_text(condition)}; the reference value of the "
+            f"{INACTIVATION_LAW} law from responses.csv, which rescales it away from the reference temperature; the "
+            "catalytic constants are not rescaled by it."
+        )
+    return (
+        f"Condition {condition.condition_id}: {_condition_text(condition)}; the first-order inactivation constant at "
+        "this condition, which no temperature law rescales."
     )
 
 
@@ -8983,12 +9393,22 @@ def _bind_network_laws(parsed: _Parsed) -> None:
     binds no law another strain binds gets explicit gaps for the law's
     parameters when the records are generated. A binding whose process belongs
     to a refused network has no process here; the network's refusal names the
-    reason.
+    reason. The enzyme inactivation of the class on its pool (USERDATA-011) is
+    bound the same way: ``inactivation`` names the loss law of the process's
+    enzyme state, and the thermal_inactivation law is not one of its rate laws.
     """
 
     for entry, network in list(parsed.networks.items()):
         processes = tuple(
-            replace(process, laws=tuple(law.law for law in _pair_laws(parsed, (process.class_key, process.pool))))
+            replace(
+                process,
+                laws=tuple(
+                    law.law
+                    for law in _pair_laws(parsed, (process.class_key, process.pool))
+                    if law.scales == LAW_SCALES_RATE
+                ),
+                inactivation=parsed.inactivation_pairs.get((process.class_key, process.pool), ""),
+            )
             for process in network.processes
         )
         parsed.networks[entry] = replace(network, processes=processes)
@@ -9049,7 +9469,23 @@ def _network_roles(network: _Network) -> tuple[tuple[str, str, str, str], ...]:
             roles.append((f"{REACTIVITY_EXPONENT_ROLE}__{key}__{pool}", REACTIVITY_EXPONENT_ROLE, key, pool))
         if process.inhibitor:
             roles.append((f"ki__{key}__{pool}", INHIBITION_CONSTANT_QUANTITY, key, pool))
+        if process.inactivation:
+            roles.append((_network_inactivation_role(process), INACTIVATION_RATE_QUANTITY, key, pool))
     return tuple(roles)
+
+
+def _network_inactivation_role(process: _NetworkProcess) -> str:
+    return f"{INACTIVATION_RATE_QUANTITY}__{process.class_key}__{process.pool}"
+
+
+def _network_law_role(law_name: str, parameter: ResponseLawParameter, process: _NetworkProcess) -> str:
+    return f"{law_name}__{parameter.name}__{process.class_key}__{process.pool}"
+
+
+def _network_process_laws(process: _NetworkProcess) -> tuple[str, ...]:
+    """Every responses.csv law of a network process: its rate laws, then the inactivation law of its enzyme state."""
+
+    return (*process.laws, *((INACTIVATION_LAW,) if process.inactivation == INACTIVATION_LAW else ()))
 
 
 def _network_law_roles(network: _Network) -> tuple[tuple[str, ResponseLaw, ResponseLawParameter, str, str], ...]:
@@ -9061,16 +9497,10 @@ def _network_law_roles(network: _Network) -> tuple[tuple[str, ResponseLaw, Respo
 
     roles: list[tuple[str, ResponseLaw, ResponseLawParameter, str, str]] = []
     for process in network.processes:
-        for law_name in process.laws:
+        for law_name in _network_process_laws(process):
             law = RESPONSE_LAWS[law_name]
             roles.extend(
-                (
-                    f"{law.law}__{parameter.name}__{process.class_key}__{process.pool}",
-                    law,
-                    parameter,
-                    process.class_key,
-                    process.pool,
-                )
+                (_network_law_role(law.law, parameter, process), law, parameter, process.class_key, process.pool)
                 for parameter in law.parameters
             )
     return tuple(roles)
@@ -9170,11 +9600,15 @@ def _generate_network_records(
                         namespace=namespace,
                         case_rows=case_rows,
                         form_started=(class_key, pool) in parsed.pair_forms,
-                        # The process's own laws for its constants; the entry's shared initial amount is no constant.
+                        # The process's own rate laws for its constants; the entry's shared initial amount is no constant.
                         laws=(
                             ()
                             if role == _NETWORK_INITIAL_ROLE
-                            else tuple(parsed.laws.get((strain_id, class_key, pool), {}))
+                            else tuple(
+                                name
+                                for name in parsed.laws.get((strain_id, class_key, pool), {})
+                                if RESPONSE_LAWS[name].scales == LAW_SCALES_RATE
+                            )
                         ),
                         form=process.form,
                         genome=item.genome if item.genome_only else None,
@@ -9186,6 +9620,7 @@ def _generate_network_records(
                         inhibitor_name=(
                             _network_pool_name(parsed, network, process.inhibitor) if process.inhibitor else ""
                         ),
+                        inactivation=process.inactivation,
                     )
                     mapping, origin = _role_mapping(quantity, case)
                     if role == _NETWORK_INITIAL_ROLE and entry_row is None:
@@ -9361,7 +9796,7 @@ def _network_law_mapping(
             info=info,
             substrate=substrate,
             namespace=namespace,
-            reference_conditions=_reference_conditions(parsed, response.binding_key),
+            reference_conditions=_reference_conditions(parsed, response.binding_key, law),
             process_type=USER_DATASET_NETWORK_PROCESS_TYPE,
         )
         origin: tuple[str, int | None, str | None] = ("responses.csv", response.row, "parameter")
@@ -9502,6 +9937,12 @@ def _network_law_limitation(parsed: _Parsed, process: _NetworkProcess) -> str:
 
     info = parsed.classes[process.class_key]
     pool = parsed.substrates[process.pool].name
+    if not process.laws and process.inactivation == INACTIVATION_LAW:
+        return (
+            f"No temperature or pH response law scales the rate of {info.name} on {pool}: its catalytic constants "
+            "apply at the condition of their rows only, and at any other temperature or pH (an EnvironmentGrid "
+            f"condition) only its inactivation constant changes, through the {INACTIVATION_LAW} law."
+        )
     if not process.laws:
         return (
             f"No temperature or pH response law is bound to {info.name} on {pool}: its constants apply at the condition "
@@ -9714,6 +10155,30 @@ def _network_template_mapping(
         if modifiers:
             spec["modifiers"] = modifiers
         process_templates.append(spec)
+    # The loss of each enzyme state that kinetics.csv or responses.csv binds (USERDATA-011), after the
+    # Michaelis-Menten processes: one existing first_order or thermal_inactivation process per class.
+    for process in network.processes:
+        if not process.inactivation:
+            continue
+        process_templates.append(
+            {
+                "id": namespace.id(process.class_key, process.pool, "enzyme_inactivation"),
+                "enzyme_class": namespace.id(process.class_key),
+                "process_type": process.inactivation,
+                "state_roles": {
+                    ENZYME_INACTIVATION_PROCESS_LAWS[process.inactivation][0]: _network_enzyme_role(process.class_key)
+                },
+                "parameter_roles": _inactivation_parameter_roles(
+                    process.inactivation,
+                    rate_role=_network_inactivation_role(process),
+                    law_roles={
+                        parameter.name: _network_law_role(INACTIVATION_LAW, parameter, process)
+                        for parameter in RESPONSE_LAWS[INACTIVATION_LAW].parameters
+                    },
+                ),
+                "assumptions": _inactivation_assumptions(parsed.classes[process.class_key].name, law=process.inactivation),
+            }
+        )
     substrate_entities = []
     for pool in network.pools:
         substrate = parsed.substrates[pool]
@@ -9814,7 +10279,9 @@ def _network_template_mapping(
             f"{_number_text(float(converting.product_yield))} {converting.yield_units}"
         )
     vmax_processes = [process for process in network.processes if process.form == RATE_FORM_VMAX]
-    with_laws = any(process.laws for process in network.processes)
+    # A temperature law on an inactivation constant is a law of the network too: the last generic sentence ("no
+    # temperature or pH response law is bound") would no longer hold.
+    with_laws = any(process.laws or process.inactivation == INACTIVATION_LAW for process in network.processes)
     limitations = [
         (
             f"Enzyme network of user dataset {namespace.dataset_id} from {entry.substrate_id}: the pools {chain} "
@@ -9835,6 +10302,17 @@ def _network_template_mapping(
     if entry.is_solid:
         limitations.extend(_solid_limitations(any(process.reactive for process in network.processes)))
     limitations.extend(_network_conversion_limitation(parsed, network, pool) for pool in network.unit_bearing_yield_pools)
+    if parsed.inactivation_pairs:
+        # A dataset that states inactivation says, for every enzyme state of the network, whether and how it is lost.
+        limitations.extend(
+            _inactivation_limitation(
+                parsed.classes[process.class_key].name,
+                law=process.inactivation,
+                where=parsed.substrates[process.pool].name,
+            )
+            for process in network.processes
+            if process.form in _ENZYME_FORMS
+        )
     rows = sorted(
         {
             row.row
@@ -10005,6 +10483,8 @@ def _network_report(parsed: _Parsed, *, dataset_id: str) -> tuple[Mapping[str, A
                             "inhibitor": process.inhibitor or None,
                             "reactivity_factor": process.reactive,
                             "response_laws": list(process.laws),
+                            # The loss law of the class's enzyme state (USERDATA-011), or None: not lost.
+                            "enzyme_inactivation": process.inactivation or None,
                         }
                         for process in network.processes
                     ],
@@ -10018,6 +10498,52 @@ def _network_report(parsed: _Parsed, *, dataset_id: str) -> tuple[Mapping[str, A
                         for process in network.processes
                         if process.pool == network.entry
                     ],
+                }
+            )
+        )
+    return tuple(entries)
+
+
+def _inactivation_report(parsed: _Parsed, *, dataset_id: str) -> tuple[Mapping[str, Any], ...]:
+    """One entry per enzyme class and substrate whose enzyme state is lost: its law, ids and rows (USERDATA-011)."""
+
+    namespace = _Namespace(dataset_id=dataset_id, digest="", manifest={})
+    entries: list[Mapping[str, Any]] = []
+    for (class_key, substrate_id), law in parsed.inactivation_pairs.items():
+        if parsed.network_dataset:
+            template_ids = [
+                _network_template_id(namespace, network)
+                for network in parsed.networks.values()
+                if any((process.class_key, process.pool) == (class_key, substrate_id) for process in network.processes)
+            ]
+        else:
+            template_ids = [
+                _template_id(
+                    namespace,
+                    parsed.classes[class_key],
+                    parsed.substrates[substrate_id],
+                    form=_pair_form(parsed, (class_key, substrate_id)),
+                )
+            ]
+        entries.append(
+            MappingProxyType(
+                {
+                    "enzyme_class": class_key,
+                    "substrate_id": substrate_id,
+                    "law": law,
+                    "process_id": namespace.id(class_key, substrate_id, "enzyme_inactivation"),
+                    "case_template_ids": template_ids,
+                    "kinetics_rows": sorted(
+                        row.row
+                        for row in parsed.kinetics
+                        if row.pair_key == (class_key, substrate_id) and row.quantity == INACTIVATION_RATE_QUANTITY
+                    ),
+                    "responses_rows": sorted(
+                        response.row
+                        for binding, laws in parsed.laws.items()
+                        if (binding[1], binding[2]) == (class_key, substrate_id)
+                        for response in laws.get(INACTIVATION_LAW, {}).values()
+                    ),
                 }
             )
         )

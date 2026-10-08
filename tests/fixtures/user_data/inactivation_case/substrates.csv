@@ -1,0 +1,2 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
+amide_a1,,Dissolved amide-like substrate A1,amide_like,dissolved,amide_like_bond,amine_v1,1,mol/mol,Illustrative test note IV-1 p. 2 (one amine-like product per substrate molecule; an assumed stoichiometry)

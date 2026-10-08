@@ -243,6 +243,26 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "chain_laws",
     "nw-2",
     "test-only stated law",
+
+    # USERDATA-011 enzyme inactivation: the fixtures and the test-only classes of tests/test_user_data_inactivation.py
+    # come from the tables.
+    "inactivation_case",
+    "inactivation_network",
+    "inactivation_demo",
+    "strain_v1",
+    "strain_v2",
+    "strain_w7",
+    "amide_a1",
+    "amine_v1",
+    "amide_hydrolase_like",
+    "ester_hydrolase_like",
+    "ester_e1",
+    "fast_cutter_w7",
+    "stable_cutter_w7",
+    "solid_w7",
+    "fragment_w7",
+    "c40_ph6",
+    "c55_ph5",
 )
 
 
