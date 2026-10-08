@@ -8,3 +8,5 @@ data/benchmarks/** -text
 data/kinetic_records/** -text
 # User-dataset digests (USERDATA-001 to 005) are taken over exact table bytes.
 tests/fixtures/user_data/** -text
+# FETCH-001 synthetic UniProt responses: tests compare stored snapshots with these exact bytes.
+tests/fixtures/uniprot_proteome_search/** -text

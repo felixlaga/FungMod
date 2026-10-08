@@ -171,6 +171,17 @@ def test_uniprot_route_api_is_exported_and_not_a_placeholder() -> None:
                 "organism_query",
                 "proteome_query",
                 "write_snapshot_to_user_dataset",
+                # FETCH-001: from an organism name to a reference proteome, through its candidates.
+                "build_proteome_search_url",
+                "choose_proteome",
+                "fetch_proteome_by_name",
+                "load_proteome_search_snapshot",
+                "normalize_organism_name",
+                "parse_proteome_search_tsv",
+                "proteome_name_query",
+                "resolve_proteome_name",
+                "search_key",
+                "search_proteomes_by_name",
             ),
         ),
     ):

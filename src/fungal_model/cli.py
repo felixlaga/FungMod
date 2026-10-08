@@ -16,16 +16,22 @@ dataset for a fungus on substrates at conditions from the sources a user has
 (``assemble_user_tables``), ``fungmod draft-kinetics`` drafts user tables from
 a public kinetics export or frozen snapshot (the API's provider table,
 ``USER_TABLE_PROVIDERS``), and ``fungmod fit`` fits kinetic constants of one
-case to the dataset's time courses (``fit_user_dataset``). Nothing is fetched
-from the network by any subcommand.
+case to the dataset's time courses (``fit_user_dataset``). The enzyme
+repertoire of ``assemble`` can be a UniProt proteome (``--proteome UP...``, or
+``--fetch-proteome`` for the reference proteome found under the fungus's name
+by ``fungal_model.sources.uniprot``); its frozen snapshots are read from disk,
+and the network is reached only with ``assemble --fetch``, the one network
+opt-in of the command line.
 
 The command line only parses arguments and prints what the API returns; every
 scientific decision (name resolution, modelability, the simulation rule of each
 mode, sampling, tables and reports, assembly, drafting and fitting) stays in
-``fungal_model.api``. Every value comes from the command line, the registry or
-the API: the mode, the sample count, the seed and the output directory have no
-defaults, a condition grid needs both temperature and pH values, and an option
-that is not given leaves the API's own default (stated in the help) in place.
+``fungal_model.api``, and the choice of a proteome for an organism name in
+``fungal_model.sources.uniprot``. Every value comes from the command line, the
+registry or the API: the mode, the sample count, the seed and the output
+directory have no defaults, a condition grid needs both temperature and pH
+values, and an option that is not given leaves the API's own default (stated
+in the help) in place.
 
 Exit codes: 0 success; 1 the simulation failed after a passing preflight;
 2 usage or input error (including invalid user data, a refused draft and a
@@ -83,6 +89,18 @@ from fungal_model.registry import FungModRegistry, load_registry
 from fungal_model.resources import default_registry_path
 from fungal_model.screening import ModelabilityReport, RegistryScreenSimulationError
 from fungal_model.screening.modelability import missing_item_suggestion
+from fungal_model.sources.uniprot import (
+    DEFAULT_SNAPSHOT_DIR,
+    MissingSnapshotError,
+    ProteomeCandidate,
+    ProteomeChoiceError,
+    ProteomeNameResolution,
+    SnapshotConflictError,
+    UniprotFetchError,
+    UniprotSnapshot,
+    fetch_proteome_by_name,
+    fetch_proteome_snapshot,
+)
 
 EXIT_OK = 0
 EXIT_SIMULATION_FAILED = 1
@@ -108,8 +126,14 @@ SCIENTIFIC_MODE_HELP = (
     "it does not mean experimentally validated."
 )
 NO_FETCH_HELP = (
-    "Nothing is fetched from the network: sources are local files, a user dataset, or frozen snapshots already on "
-    "disk."
+    "Nothing is fetched from the network unless you pass fungmod assemble --fetch, the one network opt-in of the "
+    "command line: sources are local files, a user dataset, or frozen snapshots already on disk."
+)
+FETCH_HELP = (
+    "the network opt-in: query UniProt for --proteome or --fetch-proteome and freeze each response (SHA-256, URL, "
+    "query, retrieval time, release header) under --snapshot-dir; an existing snapshot whose bytes differ from the "
+    "new response is kept and the command refused. Without --fetch only frozen snapshots are read, and a missing "
+    "one is refused with the command that fetches it."
 )
 IN_SAMPLE_HELP = (
     "Agreement with, and values fitted to, your own time courses are in-sample: they are not validation, and "
@@ -144,6 +168,8 @@ user-data workflow (see docs/cli.md):
   fungmod assemble --fungus NAME --substrate NAME --temperature-c 30 --ph 5 \\
       --annotation overview.txt --annotation-tool "dbCAN 4.1.4" --kinetics-source export.json \\
       --dataset-id my_draft --output my_draft
+  (or, for the enzyme repertoire of the UniProt reference proteome found under the fungus's name:
+   --fetch-proteome --fetch in place of --annotation and --annotation-tool)
   (fill the REVIEW: fields listed by assemble and in my_draft/review.md)
   fungmod check-data my_draft
   fungmod run --user-data my_draft --fungus NAME --substrate NAME --condition CONDITION_ID \\
@@ -162,12 +188,23 @@ _ASSEMBLE_EPILOG = f"""what the draft holds:
   source) are REVIEW: fields unless an option gives them; check-data refuses the draft until each is filled.
   {NO_FETCH_HELP}
 
-example:
+the enzyme repertoire from a UniProt proteome (instead of --annotation):
+  --proteome UP... takes that proteome; --fetch-proteome searches UniProt's reference proteomes for the name of
+  --scientific-name (or, without it, of --fungus) and takes the one candidate whose organism name equals it
+  (case-insensitive), or the only candidate; none, or several without one exact match, is refused with every
+  candidate listed (add --proteome UP... to choose among them). Its UniProtKB export becomes the draft's
+  genomes.csv row (UniProt release, or the retrieval date when no release header was sent) and its EC numbers and
+  CAZy cross-references give the classes; no kinetic value comes from a proteome. --fetch is the only route to
+  the network; without it the frozen snapshots under --snapshot-dir are read.
+
+examples:
   fungmod assemble --fungus "Strain G1" --substrate NAME --temperature-c 30 --temperature-c 40 --ph 5 \\
       --annotation overview.txt --annotation-tool "dbCAN 4.1.4" \\
       --kinetics-source export.json --entry-id 12345 \\
       --design substrate_initial_concentration=10 mM --time-grid 10 hour 61 \\
       --dataset-id strain_g1_draft --output strain_g1_draft
+  fungmod assemble --fungus "Strain G2" --scientific-name "Genus species" --fetch-proteome --fetch \\
+      --substrate NAME --temperature-c 30 --ph 5 --dataset-id strain_g2_draft --output strain_g2_draft
 """
 _DRAFT_EPILOG = f"""what the draft holds:
   One strain per organism and expression host, enzyme classes resolved by EC number, substrates resolved by name,
@@ -222,10 +259,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the ``fungmod`` command line and return its exit code."""
 
     parser = build_parser()
+    arguments = list(sys.argv[1:] if argv is None else argv)
     try:
-        args = parser.parse_args(None if argv is None else list(argv))
+        args = parser.parse_args(arguments)
     except SystemExit as exc:
         return _system_exit_code(exc)
+    # The command as given, for printed commands that repeat it with one option more.
+    args.command_line = [str(argument) for argument in arguments]
     handlers = {
         "run": _run,
         "preflight": _preflight,
@@ -412,22 +452,57 @@ def _add_assemble_parser(commands: Any) -> None:
         metavar="NAME",
         help="species of a new strain; kinetic-law entries of that organism count as the fungus's own species",
     )
-    repertoire = assemble.add_argument_group("enzyme repertoire of the fungus (evidence, never a name)")
+    repertoire = assemble.add_argument_group(
+        "enzyme repertoire of the fungus (evidence; a name at most selects a UniProt proteome)"
+    )
     repertoire.add_argument(
         "--annotation",
         type=Path,
         metavar="FILE",
-        help="dbCAN overview.txt of the fungus, copied into the draft and listed in genomes.csv",
+        help=(
+            "dbCAN overview.txt of the fungus, or a UniProtKB TSV export of its proteome when --annotation-tool "
+            "names UniProt; copied into the draft and listed in genomes.csv"
+        ),
     )
     repertoire.add_argument(
         "--annotation-tool",
         metavar="TOOL",
-        help='the annotation tool and its version, for example "dbCAN 4.1.4" (required with --annotation)',
+        help=(
+            'the annotation tool and its version, for example "dbCAN 4.1.4", or "UniProt" with the release or '
+            'download date, for example "UniProt 2026_03" (required with --annotation)'
+        ),
     )
     repertoire.add_argument(
         "--annotation-source",
         metavar="TEXT",
         help="the genome or proteome that was annotated, ideally with its accession; without it a REVIEW: field",
+    )
+    repertoire.add_argument(
+        "--proteome",
+        metavar="PROTEOME_ID",
+        help=(
+            "a UniProt proteome identifier (UP followed by digits) whose UniProtKB export gives the fungus's classes "
+            "(instead of --annotation); with --fetch-proteome it chooses among the name's candidates"
+        ),
+    )
+    repertoire.add_argument(
+        "--fetch-proteome",
+        action="store_true",
+        help=(
+            "take the enzyme repertoire from the UniProt reference proteome found under --scientific-name (or, "
+            "without it, --fungus); the one exact organism-name match or the only candidate is taken, anything else "
+            "is refused with the candidates listed"
+        ),
+    )
+    repertoire.add_argument("--fetch", action="store_true", help=FETCH_HELP)
+    repertoire.add_argument(
+        "--snapshot-dir",
+        type=Path,
+        metavar="DIR",
+        help=(
+            f"directory of the frozen UniProt snapshots (default: {DEFAULT_SNAPSHOT_DIR}, the API's "
+            "DEFAULT_SNAPSHOT_DIR, relative to the current directory; --cache-dir holds the kinetics snapshots)"
+        ),
     )
     repertoire.add_argument(
         "--enzyme-class",
@@ -948,12 +1023,16 @@ def _assemble(args: argparse.Namespace) -> int:
     conditions = _assembly_conditions(args)
     output = cast(Path, args.output)
     _require_new_output(output, _DATASET_OUTPUT_REASON)
+    registry_path = _registry_path(args)
+    proteome, selection = _assembly_proteome(args, fungi[0])
     optional = {
         "scientific_name": args.scientific_name,
         "same_species": args.same_species,
         "annotation": args.annotation,
         "annotation_tool": args.annotation_tool,
         "annotation_source": args.annotation_source,
+        "proteome": proteome,
+        "proteome_selection": selection,
         "enzyme_classes": _asserted_classes(args.enzyme_classes),
         "kinetics_sources": args.kinetics_sources,
         "user_data": args.user_data,
@@ -963,7 +1042,6 @@ def _assemble(args: argparse.Namespace) -> int:
         "entry_ids": args.entry_ids,
         "cache_dir": args.cache_dir,
     }
-    registry_path = _registry_path(args)
     try:
         draft = assemble_user_tables(
             dataset_id=args.dataset_id,
@@ -983,6 +1061,104 @@ def _assemble(args: argparse.Namespace) -> int:
     _print_review_fields(draft.review_fields)
     _print_assembly_next_steps(draft, output)
     return EXIT_OK
+
+
+def _assembly_proteome(args: argparse.Namespace, fungus: str) -> tuple[UniprotSnapshot | None, str | None]:
+    """The UniProt proteome snapshot of ``--proteome`` or ``--fetch-proteome`` and how it was chosen.
+
+    The network is reached only with ``--fetch`` (``refresh`` of the sources
+    module); otherwise the frozen snapshots are read and a missing one is
+    refused with the command that fetches it.
+    """
+
+    proteome_id = cast("str | None", args.proteome)
+    by_name = bool(args.fetch_proteome)
+    if proteome_id is None and not by_name:
+        given = [flag for flag, value in (("--fetch", args.fetch), ("--snapshot-dir", args.snapshot_dir)) if value]
+        if given:
+            raise _UsageError(
+                f"{' and '.join(given)} {'apply' if len(given) > 1 else 'applies'} to the UniProt proteome of "
+                "--proteome or --fetch-proteome; nothing else is fetched."
+            )
+        return None, None
+    route = "--fetch-proteome" if by_name else "--proteome"
+    annotated = [
+        flag
+        for flag, value in (
+            ("--annotation", args.annotation),
+            ("--annotation-tool", args.annotation_tool),
+            ("--annotation-source", args.annotation_source),
+        )
+        if value is not None
+    ]
+    if annotated:
+        raise _UsageError(
+            f"{', '.join(annotated)} and {route} both give the fungus's annotation, and genomes.csv holds one "
+            "annotation per strain: give --annotation FILE --annotation-tool TOOL, or the UniProt proteome, not both."
+        )
+    snapshot_dir = cast("Path | None", args.snapshot_dir) or Path(DEFAULT_SNAPSHOT_DIR)
+    refresh = bool(args.fetch)
+    resolution: ProteomeNameResolution | None = None
+    name_from = "--scientific-name" if args.scientific_name is not None else "--fungus"
+    try:
+        if by_name:
+            name = args.scientific_name if args.scientific_name is not None else fungus
+            resolution, snapshot = fetch_proteome_by_name(
+                name, proteome_id=proteome_id, snapshot_dir=snapshot_dir, refresh=refresh
+            )
+        else:
+            assert proteome_id is not None
+            snapshot = fetch_proteome_snapshot(proteome_id=proteome_id, snapshot_dir=snapshot_dir, refresh=refresh)
+    except ProteomeChoiceError as exc:
+        raise _proteome_choice_error(exc, args, name_from) from exc
+    except MissingSnapshotError as exc:
+        raise _UsageError(
+            f"no frozen snapshot of {exc.description} in {exc.directory}; the command line reaches UniProt only "
+            "with --fetch.",
+            [
+                f"To query UniProt and freeze the response(s) under {snapshot_dir}, run the same command with --fetch:",
+                f"  {_command_with(args, '--fetch')}",
+            ],
+        ) from exc
+    except SnapshotConflictError as exc:
+        raise _UsageError(
+            str(exc),
+            [
+                f"The frozen snapshot is kept. To store UniProt's new response instead, remove {exc.directory} (or "
+                "choose another --snapshot-dir) and run the command again with --fetch.",
+            ],
+        ) from exc
+    except UniprotFetchError as exc:
+        raise _UsageError(str(exc)) from exc
+    _print_proteome(snapshot, resolution, snapshot_dir=snapshot_dir, fetched=refresh, name_from=name_from)
+    return snapshot, None if resolution is None else resolution.statement
+
+
+def _proteome_choice_error(exc: ProteomeChoiceError, args: argparse.Namespace, name_from: str) -> _UsageError:
+    details = [f"name searched: {exc.name!r} (from {name_from}); search snapshot {exc.search.text()}"]
+    if exc.candidates:
+        details.append(f"candidates ({len(exc.candidates)}):")
+        details.extend(f"  {line}" for line in _candidate_table(exc.candidates))
+        if len(exc.candidates) > _CANDIDATE_ROWS:
+            details.append(f"  ... and {len(exc.candidates) - _CANDIDATE_ROWS} more in {exc.search.tsv_path}")
+        details.append(
+            "Choose one and run the same command with --proteome PROTEOME_ID; with --fetch-proteome kept, it must "
+            "be one of these candidates:"
+        )
+        details.append(f"  {_command_with(args, '--proteome', 'PROTEOME_ID')}")
+    else:
+        details.append(
+            "To use a proteome UniProt lists under another name, or one that is not a reference proteome, find its "
+            "identifier on uniprot.org (Proteomes) and run the command without --fetch-proteome, with --proteome "
+            "PROTEOME_ID."
+        )
+    return _UsageError(exc.reason, details)
+
+
+def _command_with(args: argparse.Namespace, *extra: str) -> str:
+    """The command as given, quoted for the platform's shell, with ``extra`` arguments appended."""
+
+    return " ".join(("fungmod", *(shell_quote(argument) for argument in args.command_line), *extra))
 
 
 def _draft_kinetics(args: argparse.Namespace) -> int:
@@ -1246,6 +1422,8 @@ def _build_experiment(args: argparse.Namespace) -> VirtualExperiment:
 
 
 _RUN_OUTPUT_REASON = "so that the manifest lists only the files of this run"
+# Proteome-search candidates printed; the rest are counted and stay in the frozen search snapshot.
+_CANDIDATE_ROWS = 25
 _DATASET_OUTPUT_REASON = "so that the directory holds only this dataset's files; nothing is overwritten"
 
 
@@ -1563,6 +1741,53 @@ def _print_comparison(comparison: TimecourseComparison) -> None:
     print(f"Comparison table: {comparison.path}")
 
 
+def _print_proteome(
+    snapshot: UniprotSnapshot,
+    resolution: ProteomeNameResolution | None,
+    *,
+    snapshot_dir: Path,
+    fetched: bool,
+    name_from: str,
+) -> None:
+    print("Proteome of the fungus (UniProt):")
+    if fetched:
+        print(f"  network: --fetch given; UniProt was queried and the responses are frozen under {snapshot_dir}")
+    else:
+        print(f"  network: not used; frozen snapshots under {snapshot_dir} (--fetch queries UniProt)")
+    if resolution is not None:
+        search = resolution.search
+        print(f"  name searched: {resolution.name!r} (from {name_from})")
+        print(f"  search: {search.query} -> {len(resolution.candidates)} candidate(s); snapshot {search.text()}")
+        for line in _candidate_table(resolution.candidates, chosen=resolution.proteome_id):
+            print(f"    {line}")
+        if len(resolution.candidates) > _CANDIDATE_ROWS:
+            print(f"    ... and {len(resolution.candidates) - _CANDIDATE_ROWS} more in {search.tsv_path}")
+        print(f"  chosen: {resolution.proteome_id} ({resolution.chosen.organism}) because {resolution.match_rule}")
+    release = f"UniProt release {snapshot.uniprot_release}" if snapshot.uniprot_release else "no UniProt release header"
+    print(
+        f"  export: {snapshot.query}, {snapshot.metadata.get('entry_rows')} UniProtKB entries of "
+        f"{snapshot.metadata.get('organism') or 'an unnamed organism'}; snapshot {snapshot.directory} (SHA-256 "
+        f"{snapshot.sha256}; retrieved {snapshot.retrieved_at}; {release})"
+    )
+    print()
+
+
+def _candidate_table(candidates: Sequence[ProteomeCandidate], *, chosen: str | None = None) -> list[str]:
+    rows = [
+        (
+            str(index),
+            item.proteome_id,
+            item.organism,
+            item.organism_id or "-",
+            item.proteome_type,
+            "-" if item.protein_count is None else str(item.protein_count),
+            "chosen" if item.proteome_id == chosen else "",
+        )
+        for index, item in enumerate(candidates[:_CANDIDATE_ROWS], start=1)
+    ]
+    return _table(("#", "proteome", "organism", "taxonomy", "type", "proteins", ""), rows)
+
+
 def _print_assembly(draft: AssembledTablesDraft) -> None:
     report = draft.assembly
     fungus = report["fungus"]
@@ -1600,6 +1825,19 @@ def _print_assembly(draft: AssembledTablesDraft) -> None:
         print("Annotated families without an enzyme class:")
         for item in report["unmapped_families"]:
             print(f"  - {item['family']}: {item['reason']}")
+    annotation = report.get("annotation") or {}
+    if annotation.get("unresolved_ec_numbers"):
+        print("EC numbers of the proteome without a registry class (listed, not resolved):")
+        for item in annotation["unresolved_ec_numbers"]:
+            print(f"  - {item['ec_number']} ({item['accession_count']} protein(s)): {item['reason']}")
+    if annotation.get("ec_cazy_disagreements"):
+        print("Proteins whose CAZy and EC annotations name different classes (they support no class):")
+        for item in annotation["ec_cazy_disagreements"]:
+            print(
+                f"  - {item['accession']}: CAZy {', '.join(item['cazy_families'])} -> "
+                f"{', '.join(item['cazy_classes']) or 'no class'}; EC {', '.join(item['ec_numbers'])} -> "
+                f"{', '.join(item['ec_classes']) or 'no class'}"
+            )
     for item in report["substrate_compatibility"]:
         acting = ", ".join(entry["enzyme_class"] for entry in item["acting"]) or "none"
         print(f"On {item['substrate']} ({item['substrate_id']}): acting classes {acting}")
