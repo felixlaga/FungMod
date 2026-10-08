@@ -1,0 +1,19 @@
+dataset_id: network_chain_laws
+contributor: FungMod maintainers
+date: 2026-10-08
+source: >-
+  Illustrative estimates for a user-defined strain whose two user-defined enzyme classes
+  degrade a soluble polymer-like substrate through an oligomer-like pool to a monomer-like
+  product, with illustrative temperature and pH response laws; no measurement, literature
+  value or registry record stands behind them
+notes: >-
+  Non-specific enzyme-network case with response laws (NETWORK-003): the kinetics of the
+  network_chain fixture at their reference condition (30 degC, pH 5), a cardinal temperature
+  and a cardinal pH law on the first class and an Arrhenius law on the second, every value an
+  estimate, so the case runs in exploratory mode only and scientific mode refuses it.
+simulation:
+  duration: 480
+  units: minute
+  points: 97
+enzyme_network:
+  entry_substrates: [polymer_p1]

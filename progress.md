@@ -26,6 +26,166 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## NETWORK-003 Temperature And pH Response Laws Inside Enzyme Networks
+
+Status: `complete` for the stated scope (2026-10-08). For the owner's goal ("i
+want fungi X on substrate Y in conditions Z ... and then the code calculates all
+the stuff"), `responses.csv` laws (cardinal temperature, cardinal pH, Arrhenius)
+bound only to single-class cases, and an `enzyme_network` dataset refused
+`responses.csv`, so in a network the conditions Z acted only through
+condition-specific constants. Now each `responses.csv` row binds to the network
+process of its strain, enzyme class and pool, with no new numerics: the
+composition builder already accepted environment modifiers per process template.
+(The unit-bearing release for single-class solid cases, named NETWORK-003 in the
+FIX-UNITS-001 entry, stays open as a later increment.)
+
+Design decisions:
+
+- **Binding.** A row names a strain, a class the strain declares and a substrate
+  the class acts on (both checked when the row is parsed); in a network dataset
+  that is exactly the process of that class on that pool, so the law binds there
+  and in every network that runs the process (an intermediate that is also an
+  entry). `_bind_network_laws` sets `_NetworkProcess.laws` (in `RESPONSE_LAWS`
+  order) from `parsed.laws` after the networks are built.
+- **The single-class rules, per process.** `_validate_responses` runs unchanged
+  on network bindings: every parameter once, the law's own domain, one law per
+  condition and process, the same law for a condition across the strains of a
+  process (they share one template), `design` refused, kinetic constants at the
+  law's reference condition (exact, within `reference_tolerance`, or
+  `kinetics_at_reference`), an unknown temperature or pH refused. Addition for
+  networks: the process's `ki` is one of the constants required at the
+  reference (`_LAW_REFERENCE_QUANTITIES`; `ki` exists only in networks, so
+  single-class datasets are unaffected). A row naming a class that is no member
+  (not declared by the strain) or a pool its class does not act on is refused by
+  the existing parse checks.
+- **Template.** Each law is the existing environment modifier on that process
+  template, with per-process roles `<law>__<parameter>__<class>__<pool>`, after
+  the reactivity and competitive-inhibition modifiers; the compatibility lists
+  the roles after the kinetics roles. A law changes only that process's rate.
+- **Records.** One per strain and law parameter, the single-class
+  `_response_mapping` (value, kelvin conversion, weakest-row maturity,
+  reference-condition provenance) or `_response_gap_mapping` (a strain without
+  the rows another strain gives), re-keyed by `_network_law_mapping`: id
+  `<dataset>__network__<entry>__<strain>__<role>`, the network symbol, process
+  type `enzyme_network`, empty enzyme-class selector, the entry's substrate
+  selectors, **no environment selector** (a law applies at every environment, so
+  `EnvironmentGrid` conditions reach it; the kinetics records of the dataset's
+  one condition are reused there exactly as for single-class cases), and the
+  network, role, class and pool in provenance. The process's kinetics records
+  name the laws in their validity range (`_CaseContext.laws`); the entry's
+  shared initial concentration does not.
+- **Honest limits in the outputs.** A network with laws replaces the last
+  network limitation ("... no temperature or pH response law is bound ...") by
+  "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or
+  uptake model." and adds one sentence per process: the laws that scale it (only
+  its rate; Km, Ki, concentrations and yields not rescaled), or that it has none
+  and keeps its rows' condition at any other temperature or pH, so the network
+  responds to that condition only through the other processes' laws. A network
+  without laws keeps its earlier text word for word. `environment_response`
+  names each law with the process it scales; `active_response_model` is
+  reported when one law reads the condition (unchanged result-table policy).
+
+Changed:
+
+- `api/user_data.py`: `_NetworkProcess.laws`; `_LAW_REFERENCE_QUANTITIES` in
+  `_validate_reference_condition` and `_reference_conditions`;
+  `_bind_network_laws`; `_network_law_roles`; `_network_law_mapping`; law
+  records in `_generate_network_records`; law modifiers and limitations in
+  `_network_template_mapping` (`_NETWORK_NOT_A_CULTURE`,
+  `_network_law_limitation`); law roles in `_network_compatibility_mapping`;
+  `response_laws` per process in `UserDataset.enzyme_networks`; the
+  `responses.csv` entry removed from `_NETWORK_TABLE_REFUSALS`.
+- `cli.py`: `check-data` adds a `response laws` column to the network table only
+  when a law is bound (the earlier table is unchanged otherwise).
+- Fixture `tests/fixtures/user_data/network_chain_laws/` (the `network_chain`
+  network at its reference condition, 30 degC and pH 5, with a cardinal
+  temperature law 5/30/45 degC and a cardinal pH law 3/5/8 on the first class
+  and an Arrhenius law 50 kJ/mol at 30 degC on the second; illustrative
+  estimates, README).
+- Docs: `docs/user-data.md` (new "Response laws in a network" with rules and a
+  worked example with real `check-data` and `run` output; the network formula,
+  roles, `enzyme_networks` keys, refusals, what is and is not modelled, the
+  drafting refusal wording, `responses.csv`, the generated-records table and
+  the limitations), `docs/environment-response.md` (where laws bind),
+  `docs/capabilities.md`, `README.md`, `CHANGELOG.md`.
+
+Tests: new `tests/test_user_data_network_responses.py` (20 test functions, 24
+cases): laws bind to the process of their class and pool (modifiers, roles,
+compatibility symbols, `response_laws`); law records equal the single-class
+records re-keyed (kelvin, maturity, no environment, provenance with the
+reference condition and the network role); the template names the laws per
+process and keeps a law-free network's text word for word; analytic checks on
+an `EnvironmentGrid` (30 and 37 degC x pH 5.0 and 5.5): each process rate equals
+`kcat E S / (Km + S)` times its own factors (CTMI x CPM for the first class,
+Arrhenius for the second) at every output time (rtol 1e-9) and the closure
+`8 P + 2 O + M = 40 mM` holds; the reference condition reproduces the
+`network_chain` run (rtol 1e-9); `environment_response` lists each law with its
+process; the materially different case (a cardinal pH law on the class that
+cuts the cellulose-like solid of `network_solid_chain`, g/L -> mmol/L through
+the stated yield, no law on the competitively inhibited disaccharide step): the
+solid rate follows `gamma_pH`, the dimer rate stays its own competitive law at
+every pH, the mass-to-mole closure holds, pH 5 degrades fastest; a one-class
+network with the oxidase fixture's two laws reproduces the single-class case on
+a six-point grid (rtol 1e-7); measured kinetics and laws make the network
+scientific (`scientific_exact_unvalidated` at a grid condition) until one law row
+is an estimate; a second strain without the laws gets eight law gaps with the
+single-class request and is underparameterized; refusals (kinetics off the
+reference, a tolerance admitting them, a `ki` off the reference condition,
+two temperature laws on one process, a pool the class does not act on, a class
+that is no member, a law `responses.csv` does not bind, different laws for one
+process across strains, an unknown temperature); `fungmod check-data` (the
+column, and no column without laws), a refusal as `file:row:column`, and `fungmod
+run` on a temperature grid (exit 0, `active_response_model`). Byte identity: the
+records and assembled configs of the two NETWORK-002 fixtures are pinned to
+digests of base commit `b8e3abe`; the earlier fixtures and the 19 shipped
+registry cases stay pinned by `tests/test_user_data_network_cross_basis.py`.
+Modified: `tests/test_user_data_network.py` (`responses.csv` is no longer a
+refused table; culture.csv still is); `tests/test_guardrails_no_hardcoding.py`
+(fixture and test-only tokens).
+
+Not changed: no process law, modifier, factory, solver, kernel, registry record
+or case template, result-table policy, output schema (2.2.1), preflight rule,
+fit or comparison; the assembler (`api/user_data_assembly.py`, worked on in
+parallel) still refuses laws in network drafts. Every existing dataset
+generates byte-identical records and assembled configs (checked with a script
+over all 13 earlier fixtures and the 19 registry cases against an export of
+`b8e3abe`); `UserDataset.to_dict()` of the four earlier network fixtures gains
+only `processes[].response_laws: []`.
+
+Scientific impact: in a user's enzyme network a temperature or pH (a registry
+condition or an `EnvironmentGrid` point) now changes each class's rate through
+that class's own stated law, so the substrate loss, intermediates, product
+release, rates and threshold times respond to the conditions Z of the request;
+a process without a law is honestly constant in temperature and pH and says so.
+
+Compatibility: additive (a new kind of accepted `responses.csv` row, a new
+`processes[].response_laws` key, a conditional CLI column).
+
+Remaining ambiguities: with a law on only some processes, a grid varying that
+condition is "covered" for ranking although the law-free processes do not
+respond (the per-process limitation says so; the result-table guardrail is
+per condition, not per process); laws are per strain, class and pool, so one
+class acting on a pool in two networks runs the same law in both.
+
+Commands and results (worktree on `claude/network-responses-culture`, based on
+`b8e3abe`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on `api/user_data.py`, `cli.py` and the
+  new test file: 0 errors.
+- `mkdocs build --strict`: built (exit 0); the anchor
+  `response-laws-in-a-network` exists.
+- `tests/test_user_data_network_responses.py`: 24 passed.
+- Targeted run (the new tests, network, cross-basis, v2, culture, import,
+  pH-ionization, solid, guardrails, CLI, CLI workflow, documentation sync,
+  hygiene, instruction hierarchy, roadmap, shared progress, partial runs,
+  environment grids, network assembly): 555 passed in 5 min 51 s.
+- Digest script over every fixture and the shipped registry against an export
+  of `b8e3abe`: records and assembled configs identical.
+
+Next task: CULTURE-002 (a growing culture whose secreted pools act together);
+then carrying `responses.csv` laws into assembled network drafts, and the
+unit-bearing release for single-class solid cases.
+
 ## FIX-UNITS-001 A Dimensionless Coefficient In Scaled Units Is A Plain Fraction
 
 Status: `complete` (2026-10-08). Reported by the NETWORK-002 work: the

@@ -180,6 +180,10 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "cello_oligosaccharide",
     "cleaver_t1",
     "entry_e1",
+    # NETWORK-003 response laws in networks: the fixture and the test-only class of tests/test_user_data_network_responses.py
+    # come from the tables.
+    "network_chain_laws",
+    "other_cutter",
 )
 
 

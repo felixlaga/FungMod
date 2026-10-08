@@ -2275,12 +2275,15 @@ def _print_enzyme_networks(dataset: UserDataset) -> None:
         f"Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, "
         f"enzyme_network): {len(dataset.enzyme_networks)}"
     )
+    # The response-law column appears only when a responses.csv law is bound to a process (NETWORK-003).
+    laws = any(process.get("response_laws") for item in dataset.enzyme_networks for process in item["processes"])
     rows = [
         (
             str(process["enzyme_class"]),
             str(process["pool"]),
             str(process["rate_form"]),
             str(process["inhibitor"] or "none"),
+            *((", ".join(process["response_laws"]) or "none",) if laws else ()),
         )
         for item in dataset.enzyme_networks
         for process in item["processes"]
@@ -2294,7 +2297,7 @@ def _print_enzyme_networks(dataset: UserDataset) -> None:
             for link in item["links"]
         )
         print(f"  from {item['entry_substrate']}: {links}; strains {', '.join(item['strains'])}")
-    headers = ("enzyme class", "pool", "rate form", "competitive inhibitor")
+    headers = ("enzyme class", "pool", "rate form", "competitive inhibitor", *(("response laws",) if laws else ()))
     for line in _table(headers, rows):
         print(f"  {line}")
 

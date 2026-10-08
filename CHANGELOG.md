@@ -6,6 +6,29 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Temperature and pH response laws inside enzyme networks (NETWORK-003): in a
+  dataset with an `enzyme_network` block, a `responses.csv` row (cardinal
+  temperature, cardinal pH or Arrhenius) binds to the network process of its
+  strain, enzyme class and pool by the single-class rules: the existing
+  environment modifier of the composition builder scales that process's rate
+  and no other, the process's kinetic constants (and its `ki`) are required at
+  the law's reference condition, the law's parameter records (role
+  `<law>__<parameter>__<class>__<pool>`, one per strain, no environment
+  selector) reach `EnvironmentGrid` conditions, a strain without the rows
+  another strain gives gets law gaps with measurement requests, and the case
+  reports `active_response_model` with each law and the process it scales. A
+  process without a law keeps the constants of its rows' condition, and its
+  template says so. Refused, with file, row and column, as for single-class
+  cases (also a `ki` off the reference condition), and a row naming a class the
+  strain does not declare or a pool its class does not act on. `fungmod
+  check-data` adds a `response laws` column to the network table when a law is
+  bound, and `UserDataset.enzyme_networks` lists `response_laws` per process.
+  Fixture `network_chain_laws` (the `network_chain` network with a cardinal
+  temperature and a cardinal pH law on the first class and an Arrhenius law on
+  the second; illustrative estimates only). Networks without `responses.csv`
+  generate and assemble byte-identically (pinned record and config digests);
+  no process law, modifier, solver or output schema changes.
+
 - Enzyme-network links across amount bases through a stated, unit-bearing
   yield (NETWORK-002): in a network dataset a solid pool (dry mass per volume)
   may release a dissolved pool (amount per volume), or a molar final product,
@@ -826,6 +849,10 @@ All notable public releases of FungMod are documented here.
   remain explicit; no validated organism model or registry promotion is claimed.
 
 ### Changed
+
+- `responses.csv` is no longer refused in an enzyme-network dataset
+  (NETWORK-003); its laws bind per network process (see Added). Assembled
+  network drafts still carry no response law.
 
 - Text only (ASSEMBLE-002): the refusal of a network dataset as `user_data` of
   `assemble_user_tables` now names `network=True` (`fungmod assemble

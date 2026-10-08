@@ -46,6 +46,10 @@ Arrhenius) to a strain, enzyme class and substrate; the law enters the
 generated case template as a process modifier, and the kinetic constants of
 that case must be stated at the law's reference condition. A pH law on a
 pH-ionization pair is refused, since the ionization law already reads the pH.
+In an enzyme-network dataset a row binds the law, by the same rules, to the
+network process of its class on its pool (whose ``ki`` must then also be stated
+at the reference condition); the law scales that process's rate only, and a
+process without a law keeps the constants of its rows' condition.
 
 An optional ``culture.csv`` binds the existing ``culture_physiology``
 composition to a strain growing on one solid substrate: the substrate is
@@ -379,6 +383,9 @@ _CONCENTRATION_QUANTITIES = ("substrate_initial_concentration", "km", "enzyme_co
 _KINETIC_CONSTANT_QUANTITIES = frozenset(
     {"km", "kcat", "vmax", "specific_activity", "assay_activity", "kcat_limiting", "km_limiting"}
 )
+# The constants a bound response law requires at its reference condition: the kinetic constants and, in an enzyme
+# network, the competitive inhibition constant of the process (like Km, a constant of the rate at that condition).
+_LAW_REFERENCE_QUANTITIES = _KINETIC_CONSTANT_QUANTITIES | {"ki"}
 # The two ionizations of the diprotic law: (lower pK, upper pK, what ionizes).
 _PK_PAIRS = (
     ("pk_free_lower", "pk_free_upper", "free enzyme"),
@@ -940,9 +947,9 @@ class UserDataset:
     With an ``enzyme_network`` block in the manifest, ``enzyme_networks`` lists
     one entry per entry substrate: its chain of pools, the final product, the
     links with their yields, the processes (enzyme class, pool, rate form,
-    process id, competitive inhibitor if a ki row binds one), the member classes,
-    the strains, and the generated template and compatibility ids. It is empty
-    without the block.
+    process id, competitive inhibitor if a ki row binds one, the responses.csv
+    laws bound to it), the member classes, the strains, and the generated
+    template and compatibility ids. It is empty without the block.
     """
 
     dataset_id: str
@@ -1589,6 +1596,9 @@ class _NetworkProcess:
     inhibitor: str = ""
     # Whether the process binds the conversion-dependent reactivity factor (a solid entry pool only).
     reactive: bool = False
+    # The responses.csv laws bound to this class on this pool (by any strain of the network), in RESPONSE_LAWS order;
+    # each enters the process template as its environment modifier. Empty: the constants hold at their rows' condition.
+    laws: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -5401,13 +5411,14 @@ def _validate_reference_condition(
     rescaled as if they were reference values. A condition matches when it
     equals the reference value exactly, or within the reference row's own
     ``reference_tolerance``; ``kinetics_at_reference = yes`` records the
-    user's declaration that the values are reference values.
+    user's declaration that the values are reference values. In an enzyme
+    network a process's ``ki`` is checked with its other constants.
     """
 
     reference = chosen[law.reference_parameter]
     rows_by_condition: dict[str, list[_Kinetics]] = {}
     for row in parsed.kinetics:
-        if (row.strain_id, row.class_key, row.substrate_id) == binding and row.quantity in _KINETIC_CONSTANT_QUANTITIES:
+        if (row.strain_id, row.class_key, row.substrate_id) == binding and row.quantity in _LAW_REFERENCE_QUANTITIES:
             rows_by_condition.setdefault(row.condition_id, []).append(row)
     for condition_id in sorted(rows_by_condition):
         condition = parsed.conditions[condition_id]
@@ -5783,7 +5794,7 @@ def _reference_conditions(parsed: _Parsed, binding: tuple[str, str, str]) -> lis
         {
             row.condition_id
             for row in parsed.kinetics
-            if (row.strain_id, row.class_key, row.substrate_id) == binding and row.quantity in _KINETIC_CONSTANT_QUANTITIES
+            if (row.strain_id, row.class_key, row.substrate_id) == binding and row.quantity in _LAW_REFERENCE_QUANTITIES
         }
     )
 
@@ -8303,13 +8314,6 @@ _NETWORK_TABLE_REFUSALS = (
         "substrate and product of a single-class case, and the intermediate pools of a network are not observables "
         "of either yet.",
     ),
-    (
-        "responses.csv",
-        "responses",
-        "responses.csv is not combined with enzyme_network in this version: response laws are bound per enzyme class "
-        "and substrate of a single-class case, and their binding to the processes of a network is a later increment. "
-        "Network kinetics apply at the condition of their rows.",
-    ),
 )
 
 
@@ -8409,6 +8413,7 @@ def _validate_networks(parsed: _Parsed, context: _Context) -> None:
         if network is not None:
             parsed.networks[entry] = network
     _validate_network_inhibitors(parsed, context)
+    _bind_network_laws(parsed)
 
 
 def _follow_network_links(
@@ -8743,6 +8748,31 @@ def _validate_network_inhibitors(parsed: _Parsed, context: _Context) -> None:
         parsed.networks[network.entry] = replace(network, processes=network_processes)
 
 
+def _bind_network_laws(parsed: _Parsed) -> None:
+    """Bind each valid responses.csv law to the network process of its enzyme class and pool.
+
+    ``parsed.laws`` holds the laws that passed the single-class rules (every
+    parameter once, the law's own domain, one law per condition, the same law
+    for a condition across the strains of a class and pool, kinetic constants
+    and Ki at the reference condition). A responses.csv row names a strain, a
+    class the strain declares and a substrate the class acts on, so in a network
+    dataset it names the process of that class on that pool; the law then
+    scales that process only, in every network that runs it (an intermediate
+    that is also an entry runs it in both). Every strain of the network that
+    binds no law another strain binds gets explicit gaps for the law's
+    parameters when the records are generated. A binding whose process belongs
+    to a refused network has no process here; the network's refusal names the
+    reason.
+    """
+
+    for entry, network in list(parsed.networks.items()):
+        processes = tuple(
+            replace(process, laws=tuple(law.law for law in _pair_laws(parsed, (process.class_key, process.pool))))
+            for process in network.processes
+        )
+        parsed.networks[entry] = replace(network, processes=processes)
+
+
 def _network_pool_role(network_pools: Sequence[str], pool: str) -> str:
     """The template state role of a pool: ``substrate`` for the entry, ``intermediate_<position>`` after it."""
 
@@ -8798,6 +8828,30 @@ def _network_roles(network: _Network) -> tuple[tuple[str, str, str, str], ...]:
             roles.append((f"{REACTIVITY_EXPONENT_ROLE}__{key}__{pool}", REACTIVITY_EXPONENT_ROLE, key, pool))
         if process.inhibitor:
             roles.append((f"ki__{key}__{pool}", INHIBITION_CONSTANT_QUANTITY, key, pool))
+    return tuple(roles)
+
+
+def _network_law_roles(network: _Network) -> tuple[tuple[str, ResponseLaw, ResponseLawParameter, str, str], ...]:
+    """(template role, law, law parameter, enzyme class, pool) of every response-law parameter of a network.
+
+    A role is ``<law>__<parameter>__<class>__<pool>``: one law per condition and process, so a process's roles never
+    collide, and they never share a name with a kinetics role (which starts with the kinetics quantity).
+    """
+
+    roles: list[tuple[str, ResponseLaw, ResponseLawParameter, str, str]] = []
+    for process in network.processes:
+        for law_name in process.laws:
+            law = RESPONSE_LAWS[law_name]
+            roles.extend(
+                (
+                    f"{law.law}__{parameter.name}__{process.class_key}__{process.pool}",
+                    law,
+                    parameter,
+                    process.class_key,
+                    process.pool,
+                )
+                for parameter in law.parameters
+            )
     return tuple(roles)
 
 
@@ -8895,7 +8949,12 @@ def _generate_network_records(
                         namespace=namespace,
                         case_rows=case_rows,
                         form_started=(class_key, pool) in parsed.pair_forms,
-                        laws=(),
+                        # The process's own laws for its constants; the entry's shared initial amount is no constant.
+                        laws=(
+                            ()
+                            if role == _NETWORK_INITIAL_ROLE
+                            else tuple(parsed.laws.get((strain_id, class_key, pool), {}))
+                        ),
                         form=process.form,
                         genome=item.genome if item.genome_only else None,
                         measured_elsewhere=(
@@ -8924,6 +8983,22 @@ def _generate_network_records(
                     record = _emit(generated, context, "parameter_records", mapping, origin=origin)
                     if isinstance(record, ParameterRecord):
                         network_records.append(record)
+            for role, law, parameter, class_key, pool in _network_law_roles(network):
+                law_mapping, law_origin = _network_law_mapping(
+                    parsed,
+                    namespace=namespace,
+                    network=network,
+                    role=role,
+                    law=law,
+                    parameter=parameter,
+                    strain=strain,
+                    class_key=class_key,
+                    pool=pool,
+                    genome=items[class_key].genome if items[class_key].genome_only else None,
+                )
+                record = _emit(generated, context, "parameter_records", law_mapping, origin=law_origin)
+                if isinstance(record, ParameterRecord):
+                    network_records.append(record)
         scientific = bool(network_records) and all(
             record.value.is_exact and parameter_record_is_mode_eligible(record, mode="scientific")
             for record in network_records
@@ -9028,6 +9103,88 @@ def _network_yield_mapping(
     }
 
 
+def _network_law_mapping(
+    parsed: _Parsed,
+    *,
+    namespace: _Namespace,
+    network: _Network,
+    role: str,
+    law: ResponseLaw,
+    parameter: ResponseLawParameter,
+    strain: _Strain,
+    class_key: str,
+    pool: str,
+    genome: _ClassEvidence | None,
+) -> tuple[dict[str, Any], tuple[str, int | None, str | None]]:
+    """One response-law parameter of one network process for one strain: the single-class record, re-keyed.
+
+    The value, units (temperatures in kelvin), maturity (the weakest row of the
+    law), reference-condition provenance and allowed use are exactly those of
+    the single-class route (``_response_mapping``), or its gap with the
+    measurement request when another strain binds the law and this one does
+    not. Like every law parameter the record applies at every environment of
+    the case (no environment selector), so a law reaches EnvironmentGrid
+    conditions; it carries the network's symbol and names the class and pool.
+    """
+
+    info = parsed.classes[class_key]
+    substrate = parsed.substrates[pool]
+    law_rows = parsed.laws.get((strain.strain_id, class_key, pool), {}).get(law.law, {})
+    response = law_rows.get(parameter.name)
+    if response is not None:
+        mapping = _response_mapping(
+            response,
+            law=law,
+            law_rows=law_rows,
+            strain=strain,
+            info=info,
+            substrate=substrate,
+            namespace=namespace,
+            reference_conditions=_reference_conditions(parsed, response.binding_key),
+            process_type=USER_DATASET_NETWORK_PROCESS_TYPE,
+        )
+        origin: tuple[str, int | None, str | None] = ("responses.csv", response.row, "parameter")
+    else:
+        mapping = _response_gap_mapping(
+            law,
+            parameter,
+            strain=strain,
+            info=info,
+            substrate=substrate,
+            namespace=namespace,
+            genome=genome,
+            process_type=USER_DATASET_NETWORK_PROCESS_TYPE,
+        )
+        origin = ("responses.csv", None, "parameter")
+    entry = parsed.substrates[network.entry]
+    gap = mapping["maturity"] == USER_DATASET_MATURITY_GAP
+    provenance = dict(mapping["provenance"])
+    dataset = dict(provenance[USER_DATASET_PROVENANCE_KEY])
+    dataset["enzyme_network"] = {
+        "entry_substrate": network.entry,
+        "role": role,
+        "enzyme_class": namespace.id(class_key),
+        "pool": pool,
+    }
+    provenance[USER_DATASET_PROVENANCE_KEY] = dataset
+    record_id = namespace.id("network", network.entry, strain.strain_id, role)
+    return (
+        {
+            **mapping,
+            "record_id": f"{record_id}__gap" if gap else record_id,
+            "name": f"{mapping['name']} in the enzyme network from {entry.name}",
+            "provenance": provenance,
+            "parameter_symbol": _network_symbol(namespace, network, role),
+            "process_type": USER_DATASET_NETWORK_PROCESS_TYPE,
+            "enzyme_class": None,
+            "substrate_class": entry.substrate_class,
+            "substrate_id": entry.registry_id or namespace.id(entry.substrate_id),
+            "environment_id": None,
+        },
+        origin,
+    )
+
+
 def _network_initial_gap(
     mapping: Mapping[str, Any],
     *,
@@ -9114,6 +9271,31 @@ _NETWORK_LIMITATIONS = (
     "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or uptake model; no temperature or pH "
     "response law is bound, so the values apply at the condition of their rows only.",
 )
+
+
+_NETWORK_NOT_A_CULTURE = "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or uptake model."
+
+
+def _network_law_limitation(parsed: _Parsed, process: _NetworkProcess) -> str:
+    """What the response laws of one process do, or that the process has none and keeps its rows' condition."""
+
+    info = parsed.classes[process.class_key]
+    pool = parsed.substrates[process.pool].name
+    if not process.laws:
+        return (
+            f"No temperature or pH response law is bound to {info.name} on {pool}: its constants apply at the condition "
+            "of their rows only, and at any other temperature or pH (an EnvironmentGrid condition) its rate is "
+            "unchanged, so the network responds to that condition only through the other processes' laws."
+        )
+    laws = "; ".join(f"{law_name} ({RESPONSE_LAWS[law_name].formula})" for law_name in process.laws)
+    read = sorted({RESPONSE_LAWS[law_name].condition for law_name in process.laws})
+    read_text = " and ".join("pH" if condition == "ph" else condition for condition in read)
+    return (
+        f"Response laws from responses.csv scale the rate of {info.name} on {pool}: {laws}. Its kinetic constants "
+        "(Km, kcat or Vmax, and Ki when bound) are reference values at each law's reference condition; only this "
+        f"process's rate is rescaled (Km, Ki, the concentrations and the yields are not), and no condition other than "
+        f"{read_text} acts on it."
+    )
 
 
 _NETWORK_CONVERSION_VALIDITY_NOTE = (
@@ -9276,6 +9458,18 @@ def _network_template_mapping(
                     "maturity": COMPETITIVE_INHIBITION_LAW_MATURITY,
                 }
             )
+        # A responses.csv law of this class on this pool: the existing environment modifier, as in single-class
+        # templates, with the network's per-process roles; it multiplies this process's rate only.
+        modifiers.extend(
+            {
+                "type": law_name,
+                **{
+                    f"{parameter.name}_role": f"{law_name}__{parameter.name}__{process.class_key}__{process.pool}"
+                    for parameter in RESPONSE_LAWS[law_name].parameters
+                },
+            }
+            for law_name in process.laws
+        )
         spec: dict[str, Any] = {
             "id": _network_process_id(namespace, process),
             "enzyme_class": namespace.id(process.class_key),
@@ -9399,14 +9593,17 @@ def _network_template_mapping(
             f"{_number_text(float(converting.product_yield))} {converting.yield_units}"
         )
     vmax_processes = [process for process in network.processes if process.form == RATE_FORM_VMAX]
+    with_laws = any(process.laws for process in network.processes)
     limitations = [
         (
             f"Enzyme network of user dataset {namespace.dataset_id} from {entry.substrate_id}: the pools {chain} "
             f"({basis}), with {len(network.processes)} homogeneous Michaelis-Menten process(es) of the classes "
             f"{', '.join(network.classes)}."
         ),
-        *_NETWORK_LIMITATIONS,
+        # Without a response law the network's last limitation says that none is bound, as before.
+        *(_NETWORK_LIMITATIONS if not with_laws else (*_NETWORK_LIMITATIONS[:-1], _NETWORK_NOT_A_CULTURE)),
         *(_network_inhibition_limitation(parsed, network, process) for process in network.processes),
+        *(_network_law_limitation(parsed, process) for process in network.processes if with_laws),
     ]
     if vmax_processes:
         limitations.append(
@@ -9527,6 +9724,7 @@ def _network_compatibility_mapping(
     info = parsed.classes[class_key]
     entry = parsed.substrates[network.entry]
     symbols = {role: _network_symbol(namespace, network, role) for role, *_rest in _network_roles(network)}
+    symbols.update((role, _network_symbol(namespace, network, role)) for role, *_rest in _network_law_roles(network))
     return {
         "record_id": namespace.id(class_key, network.entry, USER_DATASET_NETWORK_PROCESS_TYPE),
         "name": f"{info.name} on {entry.name} enzyme network ({namespace.dataset_id})",
@@ -9585,6 +9783,7 @@ def _network_report(parsed: _Parsed, *, dataset_id: str) -> tuple[Mapping[str, A
                             "process_id": _network_process_id(namespace, process),
                             "inhibitor": process.inhibitor or None,
                             "reactivity_factor": process.reactive,
+                            "response_laws": list(process.laws),
                         }
                         for process in network.processes
                     ],

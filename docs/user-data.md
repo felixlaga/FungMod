@@ -381,7 +381,8 @@ for condition in network["conditions"]:
   blocked.
 - **Refused**, with the reason, as `load_user_dataset` refuses them in a
   network: `responses` and `responses.csv` rows of `user_data` on its pools
-  (laws are not bound to network processes yet), a cycle of products, a
+  (the loader binds laws to network processes since NETWORK-003, but a draft
+  does not carry them yet: add them while reviewing), a cycle of products, a
   product that equals the registry substrate of a row with another
   `substrate_id`, a product that is a solid substrate (drafts hold dissolved
   substrates only), a class acting on two pools of one network, an entry no
@@ -767,7 +768,9 @@ Each row binds one parameter of one existing environment-response law to a
 strain, enzyme class and substrate. The law enters the generated case template
 as a process modifier, the same mechanism registry templates use, so a
 temperature or pH grid changes the rate through the law and the result tables
-report `environment_effect_status = active_response_model`.
+report `environment_effect_status = active_response_model`. In a dataset with
+an `enzyme_network` block the row binds to the network process of that class on
+that pool, by the same rules ([response laws in a network](#response-laws-in-a-network)).
 
 ```text
 strain_id,enzyme_class,substrate_id,law,parameter,value,units,evidence_type,method,source,reference_tolerance,kinetics_at_reference
@@ -1783,6 +1786,7 @@ every process, so processes on one pool add their rates:
 pool i:  dS_i/dt = - sum over classes j acting on i of  r_ij  +  y_(i-1) x sum over classes k acting on pool i-1 of  r_(i-1)k
 each r:  Vmax S / (Km + S)  or  kcat E S / (Km + S)          (the pair's own rate form and rows)
 with ki: r x (Km + S) / (Km (1 + I / Ki) + S)                 (competitive inhibition by a downstream pool I)
+with a responses.csv law: r x gamma(T or pH)                     (that process only; see response laws in a network)
 ```
 
 ```yaml
@@ -2055,6 +2059,104 @@ yield of 2460.6 umol/g, so the product is in umol/L, it equals
 `2460.6 umol/g x (S0 - S)` at every output time, and with the initial solid far
 below both Km the solid decays as `S0 exp(-(Vmax_A / Km_A + Vmax_B / Km_B) t)`.
 
+### Response laws in a network
+
+A [`responses.csv`](#responsescsv-optional) row names a strain, an enzyme class
+and a substrate. In a dataset with an `enzyme_network` block that is the
+network process of that class on that pool, and the law binds to it exactly as
+it binds to a single-class case: the existing environment modifier multiplies
+the rate of that process, and of no other. The single-class rules apply per
+process:
+
+- The kinetic constants of the process (`km`, `kcat` or `vmax`, every route to
+  Vmax, and in a network also its `ki`) must be stated at the law's reference
+  condition: exactly, within the reference row's `reference_tolerance`, or
+  declared with `kinetics_at_reference`. The concentrations, the enzyme
+  concentration, the yields (a unit-bearing one included), Km, Ki and the
+  `reactivity_exponent` are not rescaled; only the rate is.
+- One law per condition and process. Every strain of a network runs one
+  template, so the strains bind the same law for a condition of a process, and
+  a strain without the rows another strain gives gets explicit gaps with
+  measurement requests for the law's parameters.
+- A law's records apply at every environment of the case (no environment
+  selector), so the temperature and pH of an `EnvironmentGrid` condition reach
+  it, while the kinetics records of the dataset's one condition are reused
+  there, as for single-class cases. With several conditions in
+  `conditions.csv` (gap records included) no condition-specific record is
+  copied and the grid case reports the roles as missing.
+- A process without a law keeps the constants of its rows' condition: at
+  another temperature or pH its rate does not change, and its template says so
+  for that process. The network then responds to a condition only through the
+  laws it has; `environment_effect_status` is `active_response_model` whenever
+  one law reads the condition, and the config's `environment_response` names
+  each law with the process it scales.
+- The laws are the importable ones of `responses.csv` (cardinal temperature,
+  cardinal pH, Arrhenius). The pH-ionization form stays refused in a network,
+  so no law can count a pH effect twice.
+
+`tests/fixtures/user_data/network_chain_laws/` is the
+[chain example](#worked-example-a-chain-and-a-parallel-pair) at its reference
+condition (30 degC, pH 5) with a cardinal temperature law (5, 30 and 45 degC)
+and a cardinal pH law (3, 5 and 8) on the first class and an Arrhenius law
+(50 kJ/mol, reference 30 degC) on the second; every value is an illustrative
+estimate:
+
+```text
+strain_id,enzyme_class,substrate_id,law,parameter,value,units,evidence_type,method,source,reference_tolerance,kinetics_at_reference
+strain_n1,depolymerase_like,polymer_p1,temperature_cardinal_rosso,minimum_temperature,5,degC,estimate,,<source>,,
+strain_n1,depolymerase_like,polymer_p1,temperature_cardinal_rosso,optimum_temperature,30,degC,estimate,,<source>,,
+strain_n1,depolymerase_like,polymer_p1,temperature_cardinal_rosso,maximum_temperature,45,degC,estimate,,<source>,,
+strain_n1,depolymerase_like,polymer_p1,ph_cardinal_rosso,minimum_ph,3,dimensionless,estimate,,<source>,,
+strain_n1,depolymerase_like,polymer_p1,ph_cardinal_rosso,optimum_ph,5,dimensionless,estimate,,<source>,,
+strain_n1,depolymerase_like,polymer_p1,ph_cardinal_rosso,maximum_ph,8,dimensionless,estimate,,<source>,,
+strain_n1,oligomer_hydrolase_like,oligomer_o1,temperature_arrhenius_reference,activation_energy,50,kJ/mol,estimate,,<source>,,
+strain_n1,oligomer_hydrolase_like,oligomer_o1,temperature_arrhenius_reference,reference_temperature,30,degC,estimate,,<source>,,
+```
+
+```text
+$ fungmod check-data tests/fixtures/user_data/network_chain_laws
+...
+Kinetic values: 15; gaps: 0
+Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, enzyme_network): 1
+  from polymer_p1: polymer_p1 -> oligomer_o1 (4 mol/mol), oligomer_o1 -> monomer_m1 (2 mol/mol); strains strain_n1
+  enzyme class             pool         rate form  competitive inhibitor  response laws
+  depolymerase_like        polymer_p1   kcat       none                   temperature_cardinal_rosso, ph_cardinal_rosso
+  oligomer_hydrolase_like  oligomer_o1  kcat       none                   temperature_arrhenius_reference
+
+$ fungmod run --user-data tests/fixtures/user_data/network_chain_laws --fungus strain_n1 \
+    --substrate polymer_p1 --temperature-c 30 --temperature-c 37 --ph 5 \
+    --mode exploratory --samples 8 --seed 1 --output network_laws_run
+...
+Case case_0000: network_chain_laws__strain_n1 + network_chain_laws__polymer_p1 + temp_30C_ph_5p0_not_specified
+  environment effect: active_response_model (ph:ph_cardinal_rosso;temperature:temperature_cardinal_rosso;temperature:temperature_arrhenius_reference)
+...
+    time_to_50_percent_substrate_degradation  64.77 [64.77, 64.77] minute (n=8)
+...
+Case case_0001: network_chain_laws__strain_n1 + network_chain_laws__polymer_p1 + temp_37C_ph_5p0_not_specified
+  environment effect: active_response_model (ph:ph_cardinal_rosso;temperature:temperature_cardinal_rosso;temperature:temperature_arrhenius_reference)
+...
+    maximum_product_release_rate       0.1585 [0.1585, 0.1585] millimolar / minute (n=8)
+    maximum_substrate_depletion_rate   0.03425 [0.03425, 0.03425] millimolar / minute (n=8)
+...
+    time_to_50_percent_substrate_degradation  81.05 [81.05, 81.05] minute (n=8)
+```
+
+At 30 degC and pH 5, the reference condition of every law, the run equals the
+network without laws (64.77 minutes to half the entry). At 37 degC the first
+class runs at `gamma_T(37) = 0.799` of its reference rate, so the polymer-like
+pool degrades more slowly (81.05 minutes), while the Arrhenius law speeds the
+second class up by `exp(-E_a / R (1/310.15 K - 1/303.15 K)) = 1.565`, so the
+monomer-like product is released faster (0.1585 against 0.1095 mM/min at
+most). The tests check that each process rate equals its own law times its
+own factors at every output time of every grid condition, that the closure
+`8 P + 2 O + M` holds, that a one-class network with the oxidase example's two
+laws reproduces the single-class case on a grid, and the materially different
+case: a cardinal pH law on the class that cuts the cellulose-like solid of the
+[cross-basis example](#a-solid-releasing-a-dissolved-pool) (g/L), with no law on
+the competitively inhibited disaccharide step, whose rate stays its own law at
+every pH while the solid's rate follows `gamma_pH`
+(`tests/test_user_data_network_responses.py`).
+
 ### What a network generates
 
 | Record | Identifier |
@@ -2068,7 +2170,12 @@ The roles are `substrate_initial_concentration` (the entry's), then
 `product_yield__<pool>` for a [unit-bearing yield](#a-solid-releasing-a-dissolved-pool),
 and per process `km__<class>__<pool>`, `kcat__<class>__<pool>` with
 `enzyme_initial_concentration__<class>` or `vmax__<class>__<pool>`, plus
-`ki__<class>__<pool>` and `reactivity_exponent__<class>__<pool>` when bound.
+`ki__<class>__<pool>` and `reactivity_exponent__<class>__<pool>` when bound,
+and `<law>__<parameter>__<class>__<pool>` for each parameter of a
+[response law](#response-laws-in-a-network). A law parameter's record is one per
+strain, `<dataset_id>__network__<entry>__<strain>__<role>`, with no environment
+selector (it applies at every condition), its value in the single-class
+record's units (temperatures in kelvin).
 Each record keeps the value, evidence, maturity and provenance of its row (or
 derivation, or gap) and adds the network, role, class and pool under
 `fungmod_user_dataset.enzyme_network`; its enzyme-class selector is empty
@@ -2077,8 +2184,8 @@ entry. The generated classes list `enzyme_network` as their only process, so a
 network dataset has no single-class cases: the preflight never chooses between
 a network and one of its classes. `UserDataset.enzyme_networks` (also in
 `to_dict()` and `summary()`) lists each network's pools, links and yields,
-processes (class, pool, rate form, process id, inhibitor), classes, strains and
-generated ids. The template is scientific only when every record bound to it is
+processes (class, pool, rate form, process id, inhibitor, response laws),
+classes, strains and generated ids. The template is scientific only when every record bound to it is
 exact and scientific-eligible, as for every user template.
 
 ### Gaps of a network
@@ -2114,8 +2221,15 @@ Each refusal names its file, row and column:
 - On an intermediate pool: an initial concentration (unless the pool is an
   entry), an `enzyme_dose` and a `reactivity_exponent`. Different initial
   concentrations of one entry on the rows of its classes (they are one pool).
-- The pH-ionization form in a network; `culture.csv`, `timecourse.csv` and
-  `responses.csv` in a network dataset.
+- The pH-ionization form in a network; `culture.csv` and `timecourse.csv` in
+  a network dataset.
+- A `responses.csv` law that a single-class case refuses (see
+  [`responses.csv`](#responsescsv-optional)), applied per process: kinetic
+  constants or a `ki` of the process off the law's reference condition, two
+  laws on one condition of a process, different laws for one process across
+  strains, a condition with an unknown temperature or pH; and a row naming a
+  class the strain does not declare (no member of the network) or a pool its
+  class does not act on ([response laws in a network](#response-laws-in-a-network)).
 - `ki` outside a network dataset (a network of one class is the single-class
   case with inhibition), on a solid substrate (the apparent Km is not a binding
   constant), naming a pool that is not downstream (the substrate itself or an
@@ -2133,8 +2247,9 @@ Modelled: several enzyme classes of one strain acting on a chain of
 well-mixed pools, each by its own Michaelis-Menten law at its stated
 concentration, classes on one pool in parallel with additive rates, each pool
 released into the next with the stated yield (from a solid to a dissolved pool
-through a unit-bearing yield you state), and optional competitive inhibition of
-a process by one downstream pool.
+through a unit-bearing yield you state), optional competitive inhibition of a
+process by one downstream pool, and optional temperature and pH response laws
+that scale the rate of the process they are bound to.
 
 Not modelled, and the template and outputs say so:
 
@@ -2151,12 +2266,17 @@ Not modelled, and the template and outputs say so:
   final product, and only through a yield you state with its evidence; no
   dissolved pool releases a solid one, and FungMod derives no conversion from a
   molar mass.
-- No response laws, time courses, comparison, fitting or cultures in a
-  network yet; the values hold at the condition of their rows. Networks are
-  drafted for a fungus by `assemble_user_tables(network=True)`
+- A response law scales the rate of its own process only: Km, Ki, the
+  yields and the concentrations are not rescaled, a process without a law
+  keeps the constants of its rows' condition at every temperature and pH, and
+  no thermal inactivation, pH dynamics or interaction between conditions
+  beyond the product of the factors is represented.
+- No time courses, comparison, fitting or cultures in a network yet. Networks
+  are drafted for a fungus by `assemble_user_tables(network=True)`
   ([drafting an enzyme network](#drafting-an-enzyme-network)); drafts follow
   dissolved pools only, so a link from a solid to a dissolved pool, with its
-  yield, is written in `substrates.csv` by hand.
+  yield, is written in `substrates.csv` by hand, and they carry no response
+  law (add the `responses.csv` rows while reviewing).
 - An enzyme-kinetics model at stated enzyme concentrations, not a fungus
   growing and secreting; the strain's class list decides which classes act.
 
@@ -2217,7 +2337,7 @@ out of data you intend to simulate.
 | Compatibility and case template per class and compatible substrate | `<dataset_id>__<class>__<substrate_id>__homogeneous_mm[_template]`, or `__ph_ionization_mm[_template]` in the pH-ionization form |
 | Parameter record per kinetics row of a role | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__<quantity>` |
 | Vmax record (explicit row, derived, or from an assay activity) | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__vmax` |
-| Response-law parameter record per `responses.csv` row | `<dataset_id>__<strain>__<class>__<substrate>__<law>__<parameter>` |
+| Response-law parameter record per `responses.csv` row | `<dataset_id>__<strain>__<class>__<substrate>__<law>__<parameter>`, or in a network `<dataset_id>__network__<entry>__<strain>__<law>__<parameter>__<class>__<pool>` |
 | Explicit unknown per missing role or law parameter | the same identifier with `__gap` |
 | Culture compatibility and case template per consuming class and culture substrate ([fungal culture](#fungal-culture-growth-and-secretion)) | `<dataset_id>__<class>__<substrate_id>__culture_physiology`, `<dataset_id>__<class>__<substrate_id>__culture_template` |
 | Enzyme-network template per entry substrate, compatibility per class acting on it, and records per strain, condition and role ([several enzymes acting together](#what-a-network-generates)) | `<dataset_id>__<entry>__enzyme_network_template`, `<dataset_id>__<class>__<entry>__enzyme_network`, `<dataset_id>__network__<entry>__<strain>__<condition>__<role>` |
@@ -2762,9 +2882,9 @@ Limits of the SABIO-RK route:
   independent Michaelis-Menten processes whose rates add on shared pools, a
   chain of pools linked by explicit products with at most one basis change
   (from a solid, through a stated unit-bearing yield), and
-  optionally one competitive inhibitor per process; no synergy, competition for
-  sites, competing substrates of one enzyme, other inhibition forms, response
-  laws, time courses or cultures in a network. Growth and secretion only through
+  optionally one competitive inhibitor per process and response laws per
+  process; no synergy, competition for sites, competing substrates of one
+  enzyme, other inhibition forms, time courses or cultures in a network. Growth and secretion only through
   `culture.csv`, which binds the registry's culture model (one consuming pool,
   an explicit yield, induced synthesis; see
   [what is and is not modelled](#what-is-and-is-not-modelled)); no uptake of
@@ -2800,4 +2920,5 @@ Limits of the SABIO-RK route:
   [assembling fungus, substrate and conditions](#assembling-fungus-substrate-and-conditions)).
   A network draft follows pools only through stated products that equal a
   `substrate_id` or a registry substrate ID, holds dissolved pools only, and
-  carries no response law ([drafting an enzyme network](#drafting-an-enzyme-network)).
+  carries no response law, although the loader binds `responses.csv` laws to
+  network processes ([drafting an enzyme network](#drafting-an-enzyme-network)).
