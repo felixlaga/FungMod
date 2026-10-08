@@ -43,7 +43,8 @@ Rules:
   concentration of the kcat form, an enzyme loading, a product yield the
   stoichiometry does not settle, a new substrate's categories, the source of
   an annotation) are ``REVIEW:`` fields unless given.
-- Nothing is fetched, and the same inputs give byte-identical files.
+- Nothing is fetched unless ``fetch_kinetics`` and ``refresh`` ask for it
+  (below), and the same inputs give byte-identical files.
 
 With ``network=True`` (ASSEMBLE-002) the draft is one enzyme network per
 requested substrate (``enzyme_network`` in ``user_dataset.yml``, the
@@ -60,6 +61,17 @@ take no initial concentration, an entry has one, and what a network cannot run
 pools, a class on two pools of one network, an entry no class acts on) is
 refused or reported as a gap with the reason. Without ``network`` nothing
 changes.
+
+With ``fetch_kinetics=True`` (FETCH-002) the SABIO-RK entries need not be
+supplied: for every class of the repertoire that acts on a requested substrate
+(or, in a network draft, on a pool) the draft looks up SABIO-RK by the class's
+EC numbers from its registry record and the substrate's name,
+``ECNumber:"<EC number>" AND Substrate:"<substrate name>"``, through frozen,
+digest-checked query snapshots (``fungal_model.sources.sabiork.query_snapshots``);
+SABIO-RK itself is queried only with ``refresh=True``. The answers join the
+kinetics sources and follow the rules above unchanged; classes without an EC
+number or defined in a user dataset are listed and not queried. Without
+``fetch_kinetics`` nothing changes.
 """
 
 from __future__ import annotations
@@ -105,6 +117,7 @@ from fungal_model.api.user_data_sources import (
     UserTablesDraft,
     UserTablesSourceError,
     _csv_text,
+    _DraftBuilder,
     _id_number,
     _load_entries,
     _manifest_text,
@@ -122,7 +135,20 @@ from fungal_model.registry.records import FungusRecord, SubstrateRecord
 from fungal_model.registry.resolver import AmbiguousResolutionError, RegistryResolver, ResolutionError
 from fungal_model.registry.store import FungModRegistry
 from fungal_model.resources import default_registry_path
-from fungal_model.sources.sabiork import RegistryProposal, stable_sabiork_token
+from fungal_model.sources.sabiork import RegistryProposal, SabioRKSourceError, stable_sabiork_token
+from fungal_model.sources.sabiork.query_snapshots import (
+    DEFAULT_SNAPSHOT_DIR,
+    KINLAW_EXPORT_URL,
+    KINLAW_QUERY_FORM,
+    KinlawQuerySnapshot,
+    KinlawSnapshotConflictError,
+    KinlawSnapshotError,
+    complete_ec_number,
+    ec_number_query,
+    fetch_kinlaw_query_snapshots,
+    kinlaw_query_directory,
+    kinlaw_query_snapshot_exists,
+)
 from fungal_model.sources.uniprot import UniprotFetchError, UniprotSnapshot, load_proteome_snapshot, query_key
 
 # Kinetics statuses of a case, as reported in ``AssembledTablesDraft.assembly["cases"]``.
@@ -247,6 +273,8 @@ _TIME_GRID_KEYS = frozenset({"duration", "units", "points"})
 # Two conditions are the same when their temperatures (in kelvin) and pH values are equal numbers;
 # this relative tolerance only absorbs the floating-point rounding of the degC-to-kelvin conversion.
 _FLOAT_EQUALITY = 1e-12
+# What became of a SABIO-RK entry (``assembly["entries"][...]["use"]``), in report order.
+_ENTRY_USES = ("converted", "listed", "not used", "not convertible", "not selected")
 
 _LIMITATIONS = (
     "One fungus per call; its enzyme repertoire comes only from its genome annotation or proteome export, the "
@@ -275,10 +303,56 @@ _NETWORK_LIMITATIONS = (
     "Response laws, the pH-ionization form, cultures and time courses are not combined with an enzyme network in "
     "this version; the network's kinetics apply at the condition of their rows.",
 )
+#: Where ``fetch_kinetics`` reads, and with ``refresh`` stores, its query snapshots unless ``cache_dir`` names another.
+DEFAULT_KINETICS_CACHE_DIR = DEFAULT_SNAPSHOT_DIR
+#: The kinetics database ``fetch_kinetics`` queries, by EC number and substrate name.
+KINETICS_LOOKUP_DATABASE = "SABIO-RK"
+# With fetch_kinetics the second limitation ("Offline sources only ...") is replaced by the first of these.
+_LOOKUP_LIMITATIONS = (
+    "Sources: a dbCAN overview.txt file or a UniProtKB TSV export (a file or a frozen UniProt proteome snapshot), a "
+    "user dataset directory, SABIO-RK entries from a RegistryProposal, a frozen snapshot or an export JSON, and the "
+    "SABIO-RK kinetic-law exports looked up by EC number (fetch_kinetics), read from frozen, digest-checked query "
+    "snapshots. SABIO-RK is queried only with refresh=True; nothing else is fetched while assembling.",
+    "Kinetics looked up by EC number: one SABIO-RK query per complete EC number of a registry enzyme class of the "
+    f"fungus (its EC number and the EC numbers among its aliases that resolve to it) and substrate name, "
+    f"{KINLAW_QUERY_FORM}. Entries filed under another name of the substrate are not found, and classes without an "
+    "EC number or defined in a user dataset are not looked up (each is listed with the reason).",
+    "The query form, the ECNumber and Substrate fields and SABIO-RK's answer to a query without matches were not "
+    "checked against a live response when the lookup was written. An answer that is not the kinetic-law export "
+    "envelope, or whose entry count differs from its total_count, is refused and nothing is stored.",
+)
 
 
 class UserTablesAssemblyError(UserTablesSourceError):
     """Raised when a fungus, substrate and condition request cannot be assembled into user tables."""
+
+
+class KineticsLookupError(UserTablesAssemblyError):
+    """Raised when the kinetics lookup of ``fetch_kinetics`` cannot read, fetch or store a query snapshot.
+
+    ``directory`` is the snapshot directory concerned, when there is one. An
+    HTTP error and an unusable or incomplete answer store nothing.
+    """
+
+    def __init__(self, message: str, *, directory: Path | None = None) -> None:
+        super().__init__(message)
+        self.directory = directory
+
+
+class MissingKineticsSnapshotError(KineticsLookupError):
+    """Raised without ``refresh`` when query snapshots are missing.
+
+    ``missing`` lists every missing query with its enzyme class, EC number,
+    substrate and the directory it would be stored in.
+    """
+
+    def __init__(self, message: str, *, missing: Sequence[Mapping[str, str]]) -> None:
+        super().__init__(message, directory=Path(missing[0]["directory"]) if missing else None)
+        self.missing = tuple(dict(item) for item in missing)
+
+
+class KineticsSnapshotConflictError(KineticsLookupError):
+    """Raised when a stored query snapshot may not be used or replaced; it is kept, and ``directory`` is what to remove."""
 
 
 @dataclass(frozen=True)
@@ -398,8 +472,10 @@ def assemble_user_tables(
     time_grid: Mapping[str, Any] | None = None,
     entry_ids: Sequence[str] | None = None,
     registry: str | Path | FungModRegistry | None = None,
-    cache_dir: str | Path = "data/source_snapshots/sabiork",
+    cache_dir: str | Path = DEFAULT_KINETICS_CACHE_DIR,
     network: bool = False,
+    fetch_kinetics: bool = False,
+    refresh: bool = False,
 ) -> AssembledTablesDraft:
     """Assemble one reviewable user dataset for a fungus on substrates at stated conditions.
 
@@ -470,11 +546,34 @@ def assemble_user_tables(
     state names, and disagreeing initial concentrations of an entry in the
     user's rows.
 
+    ``fetch_kinetics=True`` (FETCH-002) looks up SABIO-RK kinetics for every
+    class of the repertoire that acts on a requested substrate (with
+    ``network=True``, on a pool of a network): one query per complete EC
+    number of the class's registry record (its EC number and the EC numbers
+    among its aliases that the registry resolves to it) and substrate name,
+    ``ECNumber:"<EC number>" AND Substrate:"<substrate name>"`` (the name of the
+    registry record, else of the user dataset's row or the request), never a
+    name guess and never broader. Classes without an EC number, classes of the
+    user dataset (SABIO-RK entries become kinetics of registry classes only)
+    and substrates whose categories are ``REVIEW:`` fields are listed and not
+    queried. Each answer is a frozen, digest-checked snapshot under
+    ``cache_dir`` (``fungal_model.sources.sabiork.query_snapshots``); without
+    ``refresh`` only those snapshots are read and a missing one is refused
+    (``MissingKineticsSnapshotError``), and ``refresh=True`` is the network
+    opt-in that queries SABIO-RK and stores each answer (an HTTP error, an
+    unusable or truncated answer stores nothing; an answer that differs from a
+    stored snapshot is refused and the snapshot kept,
+    ``KineticsSnapshotConflictError``). The entries then join
+    ``kinetics_sources`` and follow the same per-case rules, and
+    ``assembly["kinetics_lookup"]`` reports every query, its snapshot, its
+    entries and what became of each.
+
     Returns an ``AssembledTablesDraft``; ``draft.write(directory)`` writes the
     tables, the annotation file, ``user_dataset.yml`` and ``review.md``, and
     ``draft.assembly`` is the per-case report. ``load_user_dataset`` refuses
-    the directory until every ``REVIEW:`` field is filled. Nothing is fetched:
-    a proteome snapshot is fetched beforehand, on explicit request, by
+    the directory until every ``REVIEW:`` field is filled. Nothing is fetched
+    unless ``fetch_kinetics`` and ``refresh`` are both given: a proteome
+    snapshot is fetched beforehand, on explicit request, by
     ``fungal_model.sources.uniprot``.
     """
 
@@ -485,6 +584,14 @@ def assemble_user_tables(
         )
     if not isinstance(network, bool):
         raise UserTablesAssemblyError("network must be True or False.")
+    for name, value in (("fetch_kinetics", fetch_kinetics), ("refresh", refresh)):
+        if not isinstance(value, bool):
+            raise UserTablesAssemblyError(f"{name} must be True or False.")
+    if refresh and not fetch_kinetics:
+        raise UserTablesAssemblyError(
+            "refresh is the network opt-in of fetch_kinetics (the SABIO-RK lookup by EC number); give it with "
+            "fetch_kinetics=True. Nothing else is fetched while assembling."
+        )
     base = _base_registry(registry)
     try:
         design_values = _validated_design(design)
@@ -492,6 +599,7 @@ def assemble_user_tables(
         raise UserTablesAssemblyError(str(exc)) from exc
     assembler = _Assembler(dataset_id=dataset_id, base=base, design=design, cache_dir=cache_dir)
     assembler.network = network
+    assembler.fetch_kinetics = fetch_kinetics
     assembler.design_values = dict(design_values)
     assembler.design_quantities = tuple(design_values)
     assembler.simulation = _validated_time_grid(time_grid)
@@ -509,7 +617,10 @@ def assemble_user_tables(
         proteome=proteome,
         proteome_selection=proteome_selection,
     )
-    assembler.collect_entries(_source_tuple(kinetics_sources), entry_ids=entry_ids, same_species=same_species)
+    fetched = assembler.lookup_kinetics(refresh=refresh) if fetch_kinetics else ()
+    assembler.collect_entries(
+        _source_tuple(kinetics_sources), entry_ids=entry_ids, same_species=same_species, fetched=fetched
+    )
     assembler.collect_user_candidates()
     assembler.collect_laws(responses)
     return assembler.build()
@@ -900,6 +1011,8 @@ class _EntryInfo:
     measured: _Measured | None = None
     target: _Target | None = None
     use: str = ""
+    # fetch_kinetics only: the entry's parameters that the conversion did not convert, with the reason.
+    parameters: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -922,6 +1035,16 @@ class _Candidate:
     @property
     def has_constants(self) -> bool:
         return any(row["quantity"] in _CONSTANT_QUANTITIES for row in self.rows)
+
+
+@dataclass
+class _LookupQuery:
+    """One query of the kinetics lookup: a complete EC number of a class of the fungus on one substrate (pool)."""
+
+    class_key: str
+    ec_number: str
+    target: _Target
+    query: str
 
 
 @dataclass
@@ -992,6 +1115,13 @@ class _Assembler:
         self.networks: list[_NetworkDraft] = []
         # (substrate_id, condition_id) whose initial concentration a kinetics.csv row states (value or REVIEW field)
         self.network_initials: set[tuple[str, str]] = set()
+        # the kinetics lookup by EC number (fetch_kinetics=True only)
+        self.fetch_kinetics = False
+        self.lookup_queries: list[_LookupQuery] = []
+        self.lookup_not_queried: list[dict[str, str]] = []
+        self.lookup_snapshots: dict[str, KinlawQuerySnapshot] = {}
+        # EntryIDs of each looked-up query's snapshot (an entry seen in several sources is reported under each)
+        self.lookup_entry_ids: dict[str, list[str]] = {}
 
     # -- the fungus ----------------------------------------------------------
 
@@ -1472,6 +1602,12 @@ class _Assembler:
                 f"No enzyme class has evidence for {self.strain_name!r}: give a genome annotation, enzyme_classes you "
                 "assert, a registry fungus, or a user dataset that declares its classes. FungMod never takes a "
                 "repertoire from a name."
+                + (
+                    " fetch_kinetics looks kinetics up by the EC numbers of that repertoire's classes, so without a "
+                    "repertoire there is nothing to look up."
+                    if self.fetch_kinetics
+                    else ""
+                )
             )
 
     def _class_from_registry(self, record_id: str) -> _Class:
@@ -1938,6 +2074,134 @@ class _Assembler:
                 }
             )
 
+    # -- the kinetics lookup by EC number (fetch_kinetics) --------------------
+
+    def lookup_kinetics(self, *, refresh: bool) -> list[KinlawQuerySnapshot]:
+        """Plan one SABIO-RK query per EC number of each class acting on a substrate, and read their snapshots.
+
+        A class is looked up on every requested substrate (with ``network``,
+        every pool) it acts on by the categorical rule. Without ``refresh`` the
+        frozen snapshots are read, every missing one is refused together; with
+        it SABIO-RK is queried and each answer frozen
+        (``fetch_kinlaw_query_snapshots``). What is not queried is listed with
+        the reason.
+        """
+
+        for target in self.targets:
+            if not target.determined:
+                self.lookup_not_queried.append(
+                    {
+                        "enzyme_class": "",
+                        "substrate_id": target.substrate_id,
+                        "substrate": target.name,
+                        "reason": (
+                            f"the substrate class and bond classes of {target.name or target.substrate_id} are REVIEW "
+                            "fields, so the classes acting on it are decided only when the reviewed tables are loaded; "
+                            "nothing was queried for it"
+                        ),
+                    }
+                )
+                continue
+            for item in self.classes.values():
+                if not item.acts_on(target):
+                    continue
+                numbers, reason = self._lookup_ec_numbers(item)
+                planned: list[_LookupQuery] = []
+                for ec in numbers:
+                    try:
+                        query = ec_number_query(ec, substrate=target.name)
+                    except SabioRKSourceError as exc:
+                        reason = (
+                            f"the substrate {target.substrate_id} cannot be named in a SABIO-RK query: {exc} Nothing "
+                            "was queried"
+                        )
+                        break
+                    planned.append(_LookupQuery(class_key=item.key, ec_number=ec, target=target, query=query))
+                if reason:
+                    self.lookup_not_queried.append(
+                        {
+                            "enzyme_class": item.key,
+                            "substrate_id": target.substrate_id,
+                            "substrate": target.name,
+                            "reason": reason,
+                        }
+                    )
+                    continue
+                self.lookup_queries.extend(planned)
+        queries = list(dict.fromkeys(item.query for item in self.lookup_queries))
+        if not refresh:
+            missing = [
+                {
+                    "query": item.query,
+                    "enzyme_class": item.class_key,
+                    "ec_number": item.ec_number,
+                    "substrate_id": item.target.substrate_id,
+                    "directory": str(kinlaw_query_directory(item.query, cache_dir=self.cache_dir)),
+                }
+                for item in self.lookup_queries
+                if not kinlaw_query_snapshot_exists(item.query, cache_dir=self.cache_dir)
+            ]
+            if missing:
+                listing = "; ".join(
+                    f"{item['query']} ({item['enzyme_class']} on {item['substrate_id']}, in {item['directory']})"
+                    for item in missing
+                )
+                raise MissingKineticsSnapshotError(
+                    f"fetch_kinetics found no frozen SABIO-RK snapshot for {len(missing)} of its {len(queries)} "
+                    f"queries: {listing}. FungMod reaches SABIO-RK only on explicit request: pass refresh=True to "
+                    "query it and freeze the answers.",
+                    missing=missing,
+                )
+        try:
+            self.lookup_snapshots = fetch_kinlaw_query_snapshots(queries, cache_dir=self.cache_dir, refresh=refresh)
+        except KinlawSnapshotConflictError as exc:
+            raise KineticsSnapshotConflictError(str(exc), directory=exc.directory) from exc
+        except KinlawSnapshotError as exc:
+            raise KineticsLookupError(str(exc), directory=exc.directory) from exc
+        return [self.lookup_snapshots[query] for query in queries]
+
+    def _lookup_ec_numbers(self, item: _Class) -> tuple[tuple[str, ...], str]:
+        """The complete EC numbers to query for a class, or why it is not queried."""
+
+        if item.origin == "user":
+            ec = str((item.user_class_row or {}).get("ec_number", "")).strip()
+            stated = f"EC {ec}" if ec else "no EC number"
+            return (), (
+                f"{item.key} is an enzyme class of the user dataset (enzyme_classes.csv, {stated}); SABIO-RK entries "
+                "become kinetics only of the registry enzyme class their EC number resolves to, so no entry could "
+                f"become kinetics of {item.key}; nothing was queried"
+            )
+        record = self.base.get_enzyme_class(item.key)
+        numbers: list[str] = []
+        elsewhere: list[str] = []
+        for text in (record.ec_number or "", *record.aliases):
+            ec = complete_ec_number(text)
+            if ec is None or ec in numbers:
+                continue
+            try:
+                resolved = self.resolver.resolve_enzyme_class(ec).record_id
+            except AmbiguousResolutionError:
+                elsewhere.append(f"EC {ec} is ambiguous in the registry")
+                continue
+            except ResolutionError:
+                elsewhere.append(f"EC {ec} does not resolve to an enzyme class")
+                continue
+            if resolved != item.key:
+                elsewhere.append(f"EC {ec} resolves to registry enzyme class {resolved}")
+                continue
+            numbers.append(ec)
+        if numbers:
+            return tuple(numbers), ""
+        if elsewhere:
+            return (), (
+                f"{'; '.join(elsewhere)}, so its SABIO-RK entries would not become kinetics of {item.key}; nothing "
+                "was queried"
+            )
+        return (), (
+            f"the registry record of {item.key} states no complete EC number, and SABIO-RK is queried by EC number "
+            "only, never by a class or enzyme name; nothing was queried"
+        )
+
     # -- SABIO-RK entries ----------------------------------------------------
 
     def collect_entries(
@@ -1946,7 +2210,15 @@ class _Assembler:
         *,
         entry_ids: Sequence[str] | None,
         same_species: Sequence[str],
+        fetched: Sequence[KinlawQuerySnapshot] = (),
     ) -> None:
+        """Convert the SABIO-RK entries of ``kinetics_sources`` and of the looked-up query snapshots into candidates.
+
+        A snapshot of ``fetch_kinetics`` is one more source after ``sources``:
+        its entries follow exactly the rules of a local export (``entry_ids``,
+        ``same_species``, duplicates across sources, the conversion).
+        """
+
         if isinstance(same_species, str):
             raise UserTablesAssemblyError("same_species must be a sequence of organism names, not one string.")
         mapped = [str(name).strip() for name in same_species]
@@ -1962,40 +2234,52 @@ class _Assembler:
             bad = [value for value in wanted if not _DECIMAL_ID.fullmatch(value)]
             if bad:
                 raise UserTablesAssemblyError(f"entry_ids must be positive decimal SABIO-RK EntryIDs; got {bad}.")
-            if not sources:
+            if not sources and not self.fetch_kinetics:
                 raise UserTablesAssemblyError("entry_ids select SABIO-RK entries, but no kinetics source is given.")
-        if mapped and not sources:
+        if mapped and not sources and not self.fetch_kinetics:
             raise UserTablesAssemblyError("same_species maps SABIO-RK organisms, but no kinetics source is given.")
-        seen: dict[str, tuple[int, Mapping[str, Any]]] = {}
-        selected: list[tuple[int, RegistryProposal | str | Path, Any]] = []
-        for index, source in enumerate(sources):
+        seen: dict[str, tuple[str, Mapping[str, Any]]] = {}
+        selected: list[tuple[str, RegistryProposal | str | Path, Any]] = []
+        items: list[tuple[str, RegistryProposal | str | Path, KinlawQuerySnapshot | None]] = [
+            (f"kinetics_sources[{index}]", source, None) for index, source in enumerate(sources)
+        ]
+        items.extend((_query_label(snapshot.query), snapshot.export_path, snapshot) for snapshot in fetched)
+        looked_up = {_query_label(snapshot.query) for snapshot in fetched}
+        for index, (label, source, snapshot) in enumerate(items):
+            if snapshot is not None:
+                self.sources.append(_query_source(index, snapshot))
+                if snapshot.entry_count == 0:
+                    continue
             try:
                 loaded = _load_entries(source, cache_dir=self.cache_dir)
             except UserTablesSourceError as exc:
-                raise UserTablesAssemblyError(f"kinetics_sources[{index}]: {exc}") from exc
-            self.sources.append(
-                {
-                    "index": index,
-                    "kind": "sabiork",
-                    "description": loaded.description,
-                    "snapshots": [
-                        {"file": snapshot.file_name, "sha256": snapshot.sha256, "query": snapshot.query}
-                        for snapshot in loaded.snapshots
-                    ],
-                    "entries": len(loaded.entries),
-                }
-            )
+                raise UserTablesAssemblyError(f"{label}: {exc}") from exc
+            if snapshot is not None:
+                self.lookup_entry_ids[snapshot.query] = [entry.entry_id for entry in loaded.entries]
+            else:
+                self.sources.append(
+                    {
+                        "index": index,
+                        "kind": "sabiork",
+                        "description": loaded.description,
+                        "snapshots": [
+                            {"file": item.file_name, "sha256": item.sha256, "query": item.query}
+                            for item in loaded.snapshots
+                        ],
+                        "entries": len(loaded.entries),
+                    }
+                )
             for entry in loaded.entries:
                 earlier = seen.get(entry.entry_id)
                 if earlier is not None:
                     if dict(earlier[1]) != dict(entry.raw):
                         raise UserTablesAssemblyError(
-                            f"EntryID {entry.entry_id} appears in kinetics_sources[{earlier[0]}] and "
-                            f"kinetics_sources[{index}] with different content; FungMod does not choose between them."
+                            f"EntryID {entry.entry_id} appears in {earlier[0]} and {label} with different content; "
+                            "FungMod does not choose between them."
                         )
                     continue
-                seen[entry.entry_id] = (index, entry.raw)
-                selected.append((index, source, entry))
+                seen[entry.entry_id] = (label, entry.raw)
+                selected.append((label, source, entry))
         if wanted is not None:
             missing = [value for value in dict.fromkeys(wanted) if value not in seen]
             if missing:
@@ -2012,7 +2296,7 @@ class _Assembler:
             )
         self.species.extend(mapped)
         species = {_norm(name) for name in self.species}
-        for index, source, entry in selected:
+        for label, source, entry in selected:
             raw_enzyme = entry.raw.get("enzyme_description")
             host = str(raw_enzyme.get("expressed_in") or "").strip() if isinstance(raw_enzyme, Mapping) else ""
             record = entry.record
@@ -2021,7 +2305,7 @@ class _Assembler:
                 organism=record.organism.strip(),
                 host=host,
                 enzyme=f"{record.enzyme_name} (EC {record.ec_number})" if record.ec_number else record.enzyme_name,
-                source_label=f"kinetics_sources[{index}]",
+                source_label=label,
             )
             self.entries.append(info)
             if wanted is not None and entry.entry_id not in wanted:
@@ -2040,9 +2324,28 @@ class _Assembler:
             except UserTablesSourceError as exc:
                 info.use = "not convertible"
                 info.reason = _entry_reason(str(exc), entry.entry_id)
+                if label in looked_up:
+                    info.parameters = self._unconverted_parameters(entry)
                 continue
             info.draft = draft
+            if label in looked_up:
+                info.parameters = [
+                    dict(item) for item in draft.not_converted_parameters if item.get("entry_id") == entry.entry_id
+                ]
             self._entry_candidate(info, draft, same=_norm(info.organism) in species)
+
+    def _unconverted_parameters(self, entry: Any) -> list[dict[str, str]]:
+        """The parameters of an entry that cannot be converted, with the conversion's own reasons (lookup report)."""
+
+        builder = _DraftBuilder(
+            dataset_id=self.dataset_id,
+            resolver=RegistryResolver(self.base),
+            registry=self.base,
+            organism_map={},
+            design=self.design_values,
+            propose_enzyme_classes=False,
+        )
+        return [dict(item) for item in builder._plan(entry).skipped]
 
     def _entry_candidate(self, info: _EntryInfo, draft: UserTablesDraft, *, same: bool) -> None:
         (enzyme_row,) = draft.enzymes
@@ -2259,6 +2562,8 @@ class _Assembler:
         report = self._report(cases, compatibility, slots, grid, included)
         if self.network:
             report = self._with_network_report(report, cases, compatibility, slots, tables)
+        if self.fetch_kinetics:
+            report = {**report, "kinetics_lookup": self._lookup_report(report)}
         converted = tuple(
             dict.fromkeys(candidate.entry.entry_id for candidate in included if candidate.entry is not None)
         )
@@ -3604,7 +3909,77 @@ class _Assembler:
                 for candidate in included
                 if candidate.level == 2 and candidate.entry is not None
             ],
-            "limitations": list(_LIMITATIONS),
+            "limitations": self._limitations(),
+        }
+
+    def _limitations(self) -> list[str]:
+        if not self.fetch_kinetics:
+            return list(_LIMITATIONS)
+        # The lookup replaces "Offline sources only" by its own statement of what is fetched and when.
+        return [_LIMITATIONS[0], _LOOKUP_LIMITATIONS[0], *_LIMITATIONS[2:], *_LOOKUP_LIMITATIONS[1:]]
+
+    def _lookup_report(self, report: Mapping[str, Any]) -> dict[str, Any]:
+        """``assembly["kinetics_lookup"]``: every query with its snapshot and what became of each entry."""
+
+        infos = {info.entry_id: info for info in self.entries}
+        prefix = "SABIO-RK EntryID "
+        cases_by_entry: dict[str, list[dict[str, str]]] = {}
+        for case in report["cases"]:
+            for source_id in case["source_ids"]:
+                if source_id.startswith(prefix):
+                    cases_by_entry.setdefault(source_id[len(prefix) :], []).append(
+                        {
+                            "enzyme_class": case["enzyme_class"],
+                            "substrate_id": case["substrate_id"],
+                            "condition": case["condition"],
+                            "kinetics_status": case["kinetics_status"],
+                        }
+                    )
+        queries = []
+        for item in self.lookup_queries:
+            snapshot = self.lookup_snapshots[item.query]
+            converted: list[dict[str, Any]] = []
+            others: list[dict[str, Any]] = []
+            counts: dict[str, int] = {}
+            for entry_id in self.lookup_entry_ids.get(item.query, ()):
+                info = infos[entry_id]
+                counts[info.use] = counts.get(info.use, 0) + 1
+                described = {
+                    "entry_id": entry_id,
+                    "organism": info.organism,
+                    "enzyme_class": info.class_key or None,
+                    "substrate": info.substrate_text or None,
+                    "measured_condition": None if info.measured is None else info.measured.text,
+                    "cases": cases_by_entry.get(entry_id, []),
+                    "parameters_not_converted": [
+                        {key: item.get(key, "") for key in ("parameter", "parameter_type", "value", "units", "reason")}
+                        for item in info.parameters
+                    ],
+                }
+                if info.use == "converted":
+                    converted.append(described)
+                else:
+                    others.append({**described, "use": info.use, "reason": info.reason or info.use})
+            queries.append(
+                {
+                    "enzyme_class": item.class_key,
+                    "ec_number": item.ec_number,
+                    "substrate_id": item.target.substrate_id,
+                    "substrate": item.target.name,
+                    **snapshot.to_dict(),
+                    "counts": {
+                        use: counts[use] for use in (*_ENTRY_USES, *sorted(set(counts) - set(_ENTRY_USES))) if use in counts
+                    },
+                    "converted": converted,
+                    "not_converted": others,
+                }
+            )
+        return {
+            "database": KINETICS_LOOKUP_DATABASE,
+            "endpoint": KINLAW_EXPORT_URL,
+            "query_form": KINLAW_QUERY_FORM,
+            "queries": queries,
+            "not_queried": [dict(item) for item in self.lookup_not_queried],
         }
 
     def _slot_id(self, slots: Sequence[Mapping[str, Any]], measured: _Measured) -> str:
@@ -3671,7 +4046,13 @@ class _Assembler:
             "",
             "Assembled by `assemble_user_tables` for one fungus, the requested substrates and the requested "
             "conditions. This is a draft: `load_user_dataset` refuses the directory until every field that begins "
-            f"with `{REVIEW_MARKER}` is replaced by a reviewed value. Nothing was fetched while assembling.",
+            f"with `{REVIEW_MARKER}` is replaced by a reviewed value. "
+            + (
+                "The SABIO-RK kinetics looked up by EC number (fetch_kinetics) come from frozen, digest-checked query "
+                "snapshots, fetched only on explicit request (refresh=True); nothing else is fetched while assembling."
+                if self.fetch_kinetics
+                else "Nothing was fetched while assembling."
+            ),
             "",
             "## Request",
             "",
@@ -3844,6 +4225,8 @@ class _Assembler:
             lines.extend(["", "Measured conditions in conditions.csv that were not requested:", ""])
             for item in report["measured_conditions"]:
                 lines.append(f"- {item['condition_id']} ({_md(item['condition'])}): {item['reason']}.")
+        if "kinetics_lookup" in report:
+            lines.extend(self._lookup_markdown(report["kinetics_lookup"]))
         lines.extend(["", "## SABIO-RK entries", ""])
         examined = [item for item in report["entries"] if item["use"] != "not selected"]
         skipped = [item["entry_id"] for item in report["entries"] if item["use"] == "not selected"]
@@ -3890,6 +4273,52 @@ class _Assembler:
         lines.extend(f"- {_md_text(item)}" for item in report["limitations"])
         lines.append("")
         return "\n".join(lines)
+
+    def _lookup_markdown(self, lookup: Mapping[str, Any]) -> list[str]:
+        lines = [
+            "",
+            "## Kinetics looked up by EC number",
+            "",
+            f"`fetch_kinetics` queried {lookup['database']} ({lookup['endpoint']}) once per complete EC number of each "
+            "registry enzyme class of the fungus and substrate it acts on, "
+            f"`{lookup['query_form']}`. Each answer is a frozen, digest-checked snapshot; its entries were examined "
+            "with the other kinetics sources, by the same rules.",
+            "",
+        ]
+        if lookup["queries"]:
+            lines.extend(
+                [
+                    "| Class | EC | Substrate | Query | Snapshot | Retrieved | Entries | Converted | Not converted |",
+                    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+                ]
+            )
+            for item in lookup["queries"]:
+                converted = "; ".join(
+                    f"{entry['entry_id']} -> "
+                    + (
+                        ", ".join(
+                            f"{case['enzyme_class']} on {case['substrate_id']} at {case['condition']} "
+                            f"({case['kinetics_status']})"
+                            for case in entry["cases"]
+                        )
+                        or "no requested case"
+                    )
+                    for entry in item["converted"]
+                )
+                others = "; ".join(f"{entry['entry_id']} {entry['use']}: {entry['reason']}" for entry in item["not_converted"])
+                lines.append(
+                    f"| {item['enzyme_class']} | {item['ec_number']} | {item['substrate_id']} | `{_md(item['query'])}` | "
+                    f"`{item['snapshot']}` (export sha256 `{item['export_sha256']}`) | {item['retrieved_at']} "
+                    f"(HTTP {item['http_status']}) | {item['entries']} | {_md(converted) or '-'} | {_md(others) or '-'} |"
+                )
+        else:
+            lines.append("No query was made.")
+        if lookup["not_queried"]:
+            lines.extend(["", "Not queried:", ""])
+            for item in lookup["not_queried"]:
+                who = f"{item['enzyme_class']} on " if item["enzyme_class"] else ""
+                lines.append(f"- {who}{item['substrate_id']}: {_md(item['reason'])}.")
+        return lines
 
     def _network_markdown(self, network: Mapping[str, Any]) -> list[str]:
         lines = [
@@ -4003,6 +4432,28 @@ def _evidence_text(evidence: str, source: str) -> str:
         return "a REVIEW field" if text.startswith(REVIEW_MARKER) else text
 
     return f"{shown(evidence)} (source: {shown(source)})" if source else shown(evidence)
+
+
+def _query_label(query: str) -> str:
+    """How an entry of a looked-up query names its source in the report."""
+
+    return f"SABIO-RK query {query}"
+
+
+def _query_source(index: int, snapshot: KinlawQuerySnapshot) -> dict[str, Any]:
+    """The ``assembly["sources"]`` item of one looked-up query snapshot."""
+
+    return {
+        "index": index,
+        "kind": "sabiork_query",
+        "query": snapshot.query,
+        "description": (
+            f"query {snapshot.query} ({snapshot.entry_count} entries, retrieved {snapshot.retrieved_at}, HTTP "
+            f"{snapshot.http_status}; {', '.join(snapshot.source_urls)})"
+        ),
+        "snapshots": [{"file": snapshot.relative_export, "sha256": snapshot.export_sha256, "query": snapshot.query}],
+        "entries": snapshot.entry_count,
+    }
 
 
 def _entry_reason(message: str, entry_id: str) -> str:
@@ -4167,7 +4618,12 @@ def _plain(value: Any) -> Any:
 
 __all__ = [
     "ASSEMBLY_STATUSES",
+    "DEFAULT_KINETICS_CACHE_DIR",
+    "KINETICS_LOOKUP_DATABASE",
     "AssembledTablesDraft",
+    "KineticsLookupError",
+    "KineticsSnapshotConflictError",
+    "MissingKineticsSnapshotError",
     "UserTablesAssemblyError",
     "assemble_user_tables",
 ]

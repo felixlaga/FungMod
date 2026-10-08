@@ -19,7 +19,7 @@ fungmod run --help
 | `fungmod preflight` | Preflight only; optionally write the preflight tables. |
 | `fungmod check-data DIR` | Validate a [user dataset](user-data.md) and list its gaps, genome or proteome resolution, [cultures](user-data.md#fungal-culture-growth-and-secretion), [enzyme networks](user-data.md#several-enzymes-acting-together), time courses, fitted values, or every unfilled `REVIEW:` field. |
 | `fungmod list` | List the fungi, substrates and environments that can be named. |
-| `fungmod assemble` | Draft one reviewable user dataset for a fungus on substrates at conditions from its annotation (or its UniProt proteome, by identifier or [found under its name](#from-a-fungus-name-its-uniprot-reference-proteome)), the classes you assert, a user dataset and kinetics sources (`assemble_user_tables`); with [`--network`](#several-enzymes-acting-together-network), one enzyme network of every class acting on the substrates and the pools they release. |
+| `fungmod assemble` | Draft one reviewable user dataset for a fungus on substrates at conditions from its annotation (or its UniProt proteome, by identifier or [found under its name](#from-a-fungus-name-its-uniprot-reference-proteome)), the classes you assert, a user dataset and kinetics sources (`assemble_user_tables`), or with [`--fetch-kinetics`](#kinetics-looked-up-by-ec-number-fetch-kinetics) the SABIO-RK kinetics of the fungus's classes looked up by EC number; with [`--network`](#several-enzymes-acting-together-network), one enzyme network of every class acting on the substrates and the pools they release. |
 | `fungmod draft-kinetics SOURCE` | Draft user tables from a SABIO-RK export or frozen snapshot (`user_tables_from_sabiork`). |
 | `fungmod fit DIR` | Fit Km with kcat or Vmax of one case to the dataset's time courses and write the fitted dataset (`fit_user_dataset`). |
 
@@ -31,15 +31,17 @@ the tables and the report are the ones described in
 are the ones described in [user-supplied data](user-data.md). Nothing is
 fetched from the network unless you pass `fungmod assemble --fetch`, the one
 network opt-in of the command line (it queries UniProt for the proteome of
-`--proteome` or `--fetch-proteome` and freezes the responses as snapshots);
-otherwise every source is a local file, a user dataset or a frozen snapshot
-already on disk.
+`--proteome` or `--fetch-proteome`, and SABIO-RK for the kinetics of
+`--fetch-kinetics`, and freezes the responses as snapshots); otherwise every
+source is a local file, a user dataset or a frozen snapshot already on disk.
 
 The whole workflow for "fungus X on substrate Y in conditions Z" from a
 shell is: [`assemble`](#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)
 the sources you have into a draft (the enzyme repertoire can come from the
 UniProt reference proteome
-[found under the fungus's name](#from-a-fungus-name-its-uniprot-reference-proteome)),
+[found under the fungus's name](#from-a-fungus-name-its-uniprot-reference-proteome),
+and its kinetics from SABIO-RK
+[by EC number](#kinetics-looked-up-by-ec-number-fetch-kinetics)),
 with [`--network`](#several-enzymes-acting-together-network) for all of its
 enzyme classes acting together, fill its `REVIEW:` fields,
 `check-data`, `run` (with [`--runnable-only`](#run-the-runnable-cases-of-a-request)
@@ -451,12 +453,13 @@ The options map one to one onto the arguments of `assemble_user_tables`:
 | `--enzyme-class CLASS`, `--enzyme-class-evidence CLASS EVIDENCE SOURCE` (repeatable) | `enzyme_classes` (a name, or a mapping with evidence and source) |
 | `--kinetics-source SOURCE` (repeatable) | `kinetics_sources`: a SABIO-RK export JSON, or a reaction id read from the frozen snapshots |
 | `--entry-id ID`, `--same-species ORGANISM` (repeatable) | `entry_ids`, `same_species` |
+| `--fetch-kinetics` (with `--fetch` to query) | `fetch_kinetics=True` (with `refresh=True`): SABIO-RK kinetics of the repertoire's classes by EC number and substrate name; see [kinetics looked up by EC number](#kinetics-looked-up-by-ec-number-fetch-kinetics) |
 | `--user-data DIR` | `user_data` |
 | `--responses FILE` | `responses`: a CSV with the columns of `responses.csv`, `substrate` in place of `strain_id` and `substrate_id` |
 | `--design QUANTITY=VALUE UNITS` or `QUANTITY=LOWER:UPPER UNITS` (repeatable) | `design` (`substrate_initial_concentration`, `enzyme_concentration`, `enzyme_loading`) |
 | `--network` | `network=True`: an enzyme network instead of single-class cases (see [several enzymes acting together](#several-enzymes-acting-together-network)) |
 | `--time-grid DURATION UNITS POINTS` | `time_grid` |
-| `--cache-dir DIR`, `--registry PATH` | `cache_dir`, `registry` |
+| `--cache-dir DIR`, `--registry PATH` | `cache_dir` (the frozen kinetics snapshots: reaction ids of `--kinetics-source`, query snapshots of `--fetch-kinetics`; default `data/source_snapshots/sabiork`), `registry` |
 | `--dataset-id ID`, `--output DIR` | `dataset_id`; the new or empty directory `draft.write` writes |
 
 Nothing is defaulted that the API leaves to you: an option you do not give
@@ -826,6 +829,90 @@ snapshot kept; remove that snapshot directory (or choose another
 `--snapshot-dir`) and run with `--fetch` again to store the new one. An HTTP
 error stores nothing.
 
+## Kinetics looked up by EC number: --fetch-kinetics
+
+With `--fetch-kinetics`, `assemble` looks up the kinetics of the fungus's own
+enzyme classes in SABIO-RK instead of reading an export you downloaded
+(`assemble_user_tables(fetch_kinetics=True)`; see
+[fetching kinetics](user-data.md#fetching-kinetics)). For every class of the
+repertoire that acts on a requested substrate (with `--network`, on a pool),
+one query per EC number of the class's registry record (its EC number and the
+EC numbers among its aliases) and the substrate's name,
+`ECNumber:"<EC number>" AND Substrate:"<substrate name>"`; never a name of the
+enzyme and never broader. The entries join `--kinetics-source` and follow the
+same per-case rules: the fungus's species (`--scientific-name`,
+`--same-species`) is literature, another organism a transfer (estimates), two
+candidates at one condition a conflict (choose with `--entry-id`), nothing at
+a condition a gap. Classes without an EC number and classes of `--user-data`
+are listed and not queried.
+
+```bash
+fungmod assemble --fungus "Strain K1" --scientific-name "Genus species" \
+  --enzyme-class beta_glucosidase \
+  --substrate cellobiose --temperature-c 30 --temperature-c 40 --ph 5 \
+  --fetch-kinetics --fetch \
+  --dataset-id k1_draft --output k1_draft
+```
+
+Each answer is a frozen, digest-checked snapshot under `--cache-dir` (default
+`data/source_snapshots/sabiork`, relative to the current directory) in the
+layout of the existing SABIO-RK fetch (raw pages, combined export,
+`fetch_metadata.json` with query, URLs, retrieval time, HTTP status,
+`total_count` and SHA-256). `--fetch` is the network opt-in: without it only
+the snapshots are read, and the same command gives the same draft, byte for
+byte. Every page of a paginated answer is fetched; an HTTP error, an answer
+that is not the export envelope, or one whose entries do not add up to its
+`total_count` stores nothing.
+
+The output below was produced with **synthetic test responses written by
+hand** in SABIO-RK's export format (`tests/fixtures/sabiork_kinetics_queries/`,
+not SABIO-RK data; the organism named in `--scientific-name` was the
+synthetic organism K1 of those responses), served through a patched `urlopen`
+by `tests/test_fetch_kinetics.py`; the environment the lookup was written in
+could not reach sabio.h-its.org, so the query form and SABIO-RK's answers were
+not verified live:
+
+```text
+Kinetics looked up by EC number (--fetch-kinetics; SABIO-RK https://sabio.h-its.org/export-api/sabio/kinlaw-entry/json, one query per EC number of a class and substrate name: ECNumber:"<EC number>" AND Substrate:"<substrate name>")
+  network: --fetch given; each query below was sent to the database and its answer is frozen under data/source_snapshots/sabiork
+  beta_glucosidase on cellobiose, EC 3.2.1.21: ECNumber:"3.2.1.21" AND Substrate:"Cellobiose"
+    snapshot ecnumber_3.2.1.21_and_substrate_cellobiose-5a9fabef44f3/20261008T095745431061Z-1570b51f... (retrieved 2026-10-08T09:57:45Z, HTTP 200, raw SHA-256 846c8df5...): 7 entries; 1 converted, 1 listed, 2 not used, 3 not convertible
+    converted 9900001 (Synthetic kinetics organism K1) -> beta_glucosidase on cellobiose at c30_ph5 (literature_same_organism), beta_glucosidase on cellobiose at c40_ph5 (gap)
+    listed 9900002 (Synthetic kinetics organism K2): SABIO-RK EntryID 9900001 (Synthetic kinetics organism K1): the organism is Strain K1's species, ...; not used at this condition (weaker evidence): SABIO-RK EntryID 9900002 (Synthetic kinetics organism K2)
+    not used 9900003 (Synthetic kinetics organism K3): stated at 45 degC, pH 6, which is not a requested condition, and no case needs it as its measured condition
+    not convertible 9900004 (Synthetic kinetics organism K2): mutant enzyme (synthetic variant V1): an engineered variant, not an enzyme of Synthetic kinetics organism K2, so it is not entered as the organism's kinetics
+    not convertible 9900005 (Synthetic kinetics organism K3): no Km, kcat or Vmax could be converted (its parameters are listed under Parameters not converted)
+      parameter kcat (7 arbitrary units): units 'arbitrary units' are not parsed by the unit registry and are not in the SABIO-RK unit table
+      parameter Km (1.0 arbitrary units): units 'arbitrary units' are not parsed by the unit registry and are not in the SABIO-RK unit table
+    not used 9900006 (Synthetic kinetics organism K3): its substrate 'Synthetic acceptor A9' is not a requested substrate
+    not convertible 9900007 (Synthetic kinetics organism K2): no Km, kcat or Vmax could be converted (its parameters are listed under Parameters not converted)
+      parameter kcat_Km (11 mM^(-1)*s^(-1)): kcat/Km is not a user-data quantity; FungMod never derives Km or kcat from it
+
+Cases: 2 (enzyme class x substrate x condition)
+  #  fungus     class             substrate   condition  kinetics status           route           source ids
+  1  Strain K1  beta_glucosidase  cellobiose  c30_ph5    literature_same_organism  same_condition  SABIO-RK EntryID 9900001
+  2  Strain K1  beta_glucosidase  cellobiose  c40_ph5    gap                       none            SABIO-RK EntryID 9900001
+  ...
+```
+
+Without `--fetch` and without a snapshot, the command is refused (exit code 2)
+with every missing query and the command that fetches them:
+
+```text
+fungmod assemble: error: no frozen snapshot of 1 kinetics query of --fetch-kinetics in data/source_snapshots/sabiork; the command line reaches the kinetics database only with --fetch.
+    beta_glucosidase on cellobiose, EC 3.2.1.21: ECNumber:"3.2.1.21" AND Substrate:"Cellobiose" (would be stored in data/source_snapshots/sabiork/ecnumber_3.2.1.21_and_substrate_cellobiose-5a9fabef44f3)
+  To query the kinetics database and freeze the answer(s) under data/source_snapshots/sabiork, run the same command with --fetch:
+    fungmod assemble --fungus 'Strain K1' --scientific-name 'Genus species' --enzyme-class beta_glucosidase --substrate cellobiose --temperature-c 30 --temperature-c 40 --ph 5 --fetch-kinetics --dataset-id k1_draft --output k1_draft --fetch
+```
+
+A snapshot whose bytes changed after it was stored, two snapshots of one
+query, and a new answer whose bytes differ from the stored snapshot are
+refused (exit code 2) and the snapshot kept; the message names the directory
+to remove (or choose another `--cache-dir`) before running with `--fetch`
+again. `--fetch-kinetics` for a fungus without any repertoire is refused like
+any assembly without one: the lookup is by the EC numbers of that
+repertoire.
+
 ## Draft tables from SABIO-RK
 
 `fungmod draft-kinetics` is the command-line form of
@@ -1034,9 +1121,11 @@ with `--aliases`, the aliases that `--fungus`, `--substrate` and
   not passed to the API: the decision stays a `REVIEW:` field of the draft, or
   the API's own documented default applies (stated in `--help`).
 - `assemble --fetch` is the only option that reaches the network, and only
-  for `--proteome` or `--fetch-proteome`; `--fetch` or `--snapshot-dir`
-  without them is refused. `--snapshot-dir` defaults to the API's
-  `data/source_snapshots/uniprot`, relative to the current directory.
+  for `--proteome` or `--fetch-proteome` (UniProt) and `--fetch-kinetics`
+  (SABIO-RK); `--fetch` without any of them, or `--snapshot-dir` without a
+  proteome option, is refused. `--snapshot-dir` defaults to the API's
+  `data/source_snapshots/uniprot` and `--cache-dir` to
+  `data/source_snapshots/sabiork`, relative to the current directory.
   `draft-kinetics --provider` and every `fit --fit` bound are required.
 
 ## Exit codes
@@ -1045,6 +1134,6 @@ with `--aliases`, the aliases that `--fungus`, `--substrate` and
 | --- | --- |
 | 0 | Success (`preflight`: every case is runnable). |
 | 1 | The simulation failed after a passing preflight. |
-| 2 | Usage or input error: missing or invalid arguments, unknown or ambiguous names, an invalid registry or user dataset (including unfilled `REVIEW:` fields), a draft the API refuses (`UserTablesSourceError`, `UserTablesAssemblyError`), a refused fit (`UserDataFitError`: not identified, not converged, invalid bounds), a refused UniProt proteome (no candidate or several for a name, a missing, changed or superseded snapshot, an HTTP error), a refused time-course comparison (printed after the complete simulation bundle), a non-empty output directory. Issues that carry a file, row and column are printed as `file:row:column: message`. |
+| 2 | Usage or input error: missing or invalid arguments, unknown or ambiguous names, an invalid registry or user dataset (including unfilled `REVIEW:` fields), a draft the API refuses (`UserTablesSourceError`, `UserTablesAssemblyError`), a refused fit (`UserDataFitError`: not identified, not converged, invalid bounds), a refused UniProt proteome (no candidate or several for a name, a missing, changed or superseded snapshot, an HTTP error), a refused kinetics lookup (`--fetch-kinetics`: a missing, changed, doubled or superseded snapshot, an HTTP error, an unusable or truncated answer), a refused time-course comparison (printed after the complete simulation bundle), a non-empty output directory. Issues that carry a file, row and column are printed as `file:row:column: message`. |
 | 3 | The preflight blocks at least one requested case in the requested mode; nothing is simulated (with `--runnable-only`: no requested case is runnable). |
 | 4 | Partial run (`run --runnable-only`): the runnable cases were simulated and the bundle written; the blocked cases are listed with their measurement requests and marked `not_simulated` in the tables. |
