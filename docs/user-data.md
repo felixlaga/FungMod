@@ -213,7 +213,9 @@ mode both cases are refused, because the transferred values are estimates.
   from frozen snapshots under `cache_dir` (`refresh=True` fetches them;
   [fetching kinetics](#fetching-kinetics)).
 - `responses`: response-law rows for the fungus, with the columns of
-  `responses.csv` and `substrate` in place of `strain_id` and `substrate_id`.
+  `responses.csv` and `substrate` in place of `strain_id` and `substrate_id`
+  (in a network draft, `substrate` may also name a pool a requested substrate
+  releases: [response laws in a network draft](#response-laws-in-a-network-draft)).
 - `design` and `time_grid`: the virtual assay's amounts
   (`substrate_initial_concentration`, `enzyme_concentration`,
   `enzyme_loading`) and the simulation time grid. Without them these are
@@ -382,6 +384,11 @@ for condition in network["conditions"]:
   listed, source values that disagree with each other become one `REVIEW:`
   field naming each value, and `design={'substrate_initial_concentration':
   ...}` is written once per entry and condition where nothing states it.
+- **Response laws.** `responses` and the `responses.csv` rows of `user_data`
+  are written against the network member (strain, class and pool) they name,
+  and a law carries a member's kinetics to another requested condition only
+  from the law's reference condition
+  ([response laws in a network draft](#response-laws-in-a-network-draft)).
 - **Per condition**, `draft.assembly["network"]` says whether each network can
   run: `all_members_have_kinetics` (every member has kinetics from a source
   and the entry an initial concentration; `check-data` lists any role still
@@ -391,8 +398,8 @@ for condition in network["conditions"]:
   substrates only and carries `--runnable-only` when a network case of it is
   blocked.
 - **Refused**, with the reason, as `load_user_dataset` refuses them in a
-  network: `responses` and `responses.csv` rows of `user_data` on its pools
-  (laws are not bound to network processes yet), a cycle of products, a
+  network: a response law on a class that is no member, or on a pool its
+  class does not act on, a cycle of products, a
   product that equals the registry substrate of a row with another
   `substrate_id`, a product that is a solid substrate (drafts hold dissolved
   substrates only), a class acting on two pools of one network, an entry no
@@ -442,6 +449,107 @@ xylanase and chitinase classes are listed as not members, and the network
 runs), the parallel network fixture as `user_data` with its `ki` row, and a
 registry fungus whose same-species literature network is `modelable` in
 scientific mode.
+
+#### Response laws in a network draft
+
+The conditions you request act on a network draft through the temperature and
+pH laws you state, never through a law fitted to anything (ASSEMBLE-003):
+
+- **Bound to a member.** Each `responses` row (and each `responses.csv` row of
+  `user_data` for the fungus) is written to the draft's `responses.csv`
+  against the strain, the member class and the pool it names: `substrate` is a
+  requested substrate or a pool it releases. The checks of a single-class
+  draft apply (the columns, a law `responses.csv` binds, a class with evidence
+  in the fungus, a law the dataset already binds), and two more: a class that
+  is no member of the network (it acts on none of its pools) and a pool its
+  class does not act on are refused with the reason. A law scales only its
+  member's rate, at every condition; Km, `ki`, concentrations and yields are
+  not rescaled.
+- **From the reference condition only.** A law rescales the rate from its
+  reference condition (the optimum of a cardinal law, the reference
+  temperature of the Arrhenius law). It carries a member's kinetics to another
+  requested condition, which then becomes an `EnvironmentGrid` condition as in
+  a single-class draft, only when the member's kinetic constants sit at that
+  reference condition by the loader's rule: equal to the reference parameter,
+  within the `reference_tolerance` on its row, or declared with
+  `kinetics_at_reference = yes` there. Otherwise the member is a gap at that
+  condition, with the reason, and its measurement requests name the condition
+  its kinetics were stated at. A member without a law keeps the condition of
+  its rows, as a single-class case does, so a requested condition its rows do
+  not state is a gap for it: the network then needs that condition as a
+  `conditions.csv` row, the other members' laws cannot carry their kinetics
+  there either, and the network is blocked there (all or nothing).
+- **Reported per member.** Each member in `draft.assembly["network"]` gets
+  `response_laws` (each law with its reference parameter and value, where it
+  comes from, and per condition at which the draft states the member's kinetic
+  constants whether they sit at the law's reference condition, and why) and
+  `reference_condition`: `at_reference`, `not_at_reference`, `undetermined` (a
+  `REVIEW:` field decides), `no_kinetic_constants` or `no_law`, explained in
+  `reference_condition_meaning`. Each condition says whether it is a
+  `conditions.csv` row (`in_conditions_csv`) and, for an `EnvironmentGrid`
+  condition, which row's kinetics the laws carry (`carried_from`); an entry's
+  initial concentration is then that row's (and `design` writes it there).
+- **Never a law from data at several conditions.** SABIO-RK entries measured
+  at several temperatures or pH values stay listed as kinetics stated at other
+  conditions; with a stated law, several candidates that it could carry are a
+  `conflict` until `entry_ids` chooses one. FungMod derives no law and no
+  reference condition from them.
+- **What this version's loader does with them.** `load_user_dataset` of this
+  version refuses `responses.csv` in an `enzyme_network` dataset ("responses.csv
+  is not combined with enzyme_network in this version: ..."), so `check-data`
+  refuses a network draft that holds laws; `draft.assembly["network"]["loader_refusal"]`,
+  the limitations and the command line say so. The draft's rows already name
+  the member and pool each law scales, which is what a loader that binds laws
+  to network processes reads. To run the laws now, assemble without `network`
+  with each pool a law names as a requested substrate: each law then binds to
+  its single-class case.
+
+With the `my_chain` copy above and a `chain_laws.csv` of the illustrative laws
+of `tests/test_assemble_network_responses.py` (a cardinal temperature law of
+5, 30 and 45 degC and a cardinal pH law of 3, 5 and 8 on the depolymerase-like
+class, an Arrhenius law of 50 kJ/mol at 30 degC on the oligomer
+hydrolase-like class; not measurements):
+
+```text
+enzyme_class,substrate,law,parameter,value,units,evidence_type,method,source,reference_tolerance,kinetics_at_reference
+depolymerase_like,polymer_p1,temperature_cardinal_rosso,minimum_temperature,5,degC,estimate,,Illustrative test note NW-2 p. 5,,
+depolymerase_like,polymer_p1,temperature_cardinal_rosso,optimum_temperature,30,degC,estimate,,Illustrative test note NW-2 p. 5,,
+depolymerase_like,polymer_p1,temperature_cardinal_rosso,maximum_temperature,45,degC,estimate,,Illustrative test note NW-2 p. 5,,
+depolymerase_like,polymer_p1,ph_cardinal_rosso,minimum_ph,3,dimensionless,estimate,,Illustrative test note NW-2 p. 6,,
+depolymerase_like,polymer_p1,ph_cardinal_rosso,optimum_ph,5,dimensionless,estimate,,Illustrative test note NW-2 p. 6,,
+depolymerase_like,polymer_p1,ph_cardinal_rosso,maximum_ph,8,dimensionless,estimate,,Illustrative test note NW-2 p. 6,,
+oligomer_hydrolase_like,oligomer_o1,temperature_arrhenius_reference,activation_energy,50,kJ/mol,estimate,,Illustrative test note NW-2 p. 7,,
+oligomer_hydrolase_like,oligomer_o1,temperature_arrhenius_reference,reference_temperature,30,degC,estimate,,Illustrative test note NW-2 p. 7,,
+```
+
+`fungmod assemble --fungus strain_n1 --user-data my_chain --substrate
+polymer_p1 --temperature-c 30 --temperature-c 40 --ph 5 --network --responses
+chain_laws.csv --dataset-id chain_laws_draft --output chain_laws_draft` writes
+these rows, with `strain_n1` as `strain_id` and the pool as `substrate_id`, to
+the draft's `responses.csv` and prints:
+
+```text
+Enzyme network (--network; user_dataset.yml enzyme_network, entry substrates polymer_p1): the member classes act together, all or nothing per condition
+  from polymer_p1: polymer_p1 -> oligomer_o1 (4 mol/mol), oligomer_o1 -> monomer_m1 (2 mol/mol, final product)
+  member class             pool                        c30_ph5    c40_ph5
+  depolymerase_like        polymer_p1 (entry)          user_data  user_data
+  oligomer_hydrolase_like  oligomer_o1 (intermediate)  user_data  user_data
+  response laws (responses.csv; each scales its member's rate from the law's reference condition):
+    depolymerase_like on polymer_p1: temperature_cardinal_rosso (optimum_temperature 30 degC), ph_cardinal_rosso (optimum_ph 5) from the responses argument; at_reference: c30_ph5: 30 degC equals optimum_temperature 30 degC; c30_ph5: pH 5 equals optimum_ph 5
+    oligomer_hydrolase_like on oligomer_o1: temperature_arrhenius_reference (reference_temperature 30 degC) from the responses argument; at_reference: c30_ph5: 30 degC equals reference_temperature 30 degC
+  c30_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated)
+  c40_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated; an EnvironmentGrid condition, not a conditions.csv row: the laws carry the kinetics of c30_ph5)
+  check-data: load_user_dataset of this version refuses responses.csv in an enzyme_network dataset (its message is in the limitations below); assemble without --network, with each pool a law names as a --substrate, to run the laws as single-class cases
+```
+
+The draft's only `conditions.csv` row is `c30_ph5`, and its next steps run
+`--condition c30_ph5` and the grid `--temperature-c 40 --ph 5`. With the
+Arrhenius reference temperature stated as 25 degC instead, the oligomer
+hydrolase-like member is `not_at_reference` ("30 degC differs from
+reference_temperature 25 degC by 5 degC; no reference_tolerance is given"),
+both members are gaps at 40 degC (which becomes a `conditions.csv` row) and the
+network is blocked there; a `reference_tolerance` of 5 degC on that row, or
+`kinetics_at_reference = yes`, lets the law carry the kinetics again.
 
 ### Fetching kinetics
 
@@ -2357,7 +2465,10 @@ Not modelled, and the template and outputs say so:
   drafted for a fungus by `assemble_user_tables(network=True)`
   ([drafting an enzyme network](#drafting-an-enzyme-network)); drafts follow
   dissolved pools only, so a link from a solid to a dissolved pool, with its
-  yield, is written in `substrates.csv` by hand.
+  yield, is written in `substrates.csv` by hand, and they write the response
+  laws you give against their members
+  ([response laws in a network draft](#response-laws-in-a-network-draft)),
+  which this loader refuses.
 - An enzyme-kinetics model at stated enzyme concentrations, not a fungus
   growing and secreting; the strain's class list decides which classes act.
 
@@ -3012,4 +3123,6 @@ Limits of the SABIO-RK route:
   [assembling fungus, substrate and conditions](#assembling-fungus-substrate-and-conditions)).
   A network draft follows pools only through stated products that equal a
   `substrate_id` or a registry substrate ID, holds dissolved pools only, and
-  carries no response law ([drafting an enzyme network](#drafting-an-enzyme-network)).
+  writes the response laws you give against their members, which this
+  version's loader refuses in a network
+  ([response laws in a network draft](#response-laws-in-a-network-draft)).

@@ -1213,17 +1213,35 @@ def test_what_a_network_cannot_run_is_refused(tmp_path: Path) -> None:
             ],
         )
 
-    # Response laws are not bound to network processes: the argument and a dataset's responses.csv.
-    with pytest.raises(UserTablesAssemblyError, match="responses.csv is not combined with enzyme_network"):
-        _chain_draft(_without_network_block(tmp_path / "laws", CHAIN), responses=[])
-    with pytest.raises(UserTablesAssemblyError, match=r"binds response laws to 'strain_l1' .*responses.csv rows 2"):
-        assemble_user_tables(
-            dataset_id="oxidase_network",
-            fungus="strain_l1",
-            substrates=["syringaldazine_like"],
-            conditions=[{**C40_PH5, "temperature": 50}],
-            user_data=OXIDASE,
-            network=True,
+    # Response laws are no longer refused (ASSEMBLE-003, tests/test_assemble_network_responses.py): an empty responses
+    # argument drafts what no argument drafts, and a dataset's responses.csv rows on a pool are kept against its
+    # member. What is refused is a law on a class that is no member or on a pool its class does not act on.
+    laws_plain = _without_network_block(tmp_path / "laws", CHAIN)
+    assert _draft_digest(_chain_draft(laws_plain, responses=[])) == _draft_digest(_chain_draft(laws_plain))
+    oxidase = assemble_user_tables(
+        dataset_id="oxidase_network",
+        fungus="strain_l1",
+        substrates=["syringaldazine_like"],
+        conditions=[{**C40_PH5, "temperature": 50}],
+        user_data=OXIDASE,
+        network=True,
+    )
+    assert [dict(row) for row in oxidase.responses] == _csv_rows(OXIDASE / "responses.csv")
+    with pytest.raises(UserTablesAssemblyError, match=r"but that class does not act on that pool"):
+        _chain_draft(
+            laws_plain,
+            responses=[
+                {
+                    "enzyme_class": "depolymerase_like",
+                    "substrate": "oligomer_o1",
+                    "law": "temperature_arrhenius_reference",
+                    "parameter": "activation_energy",
+                    "value": 50,
+                    "units": "kJ/mol",
+                    "evidence_type": "estimate",
+                    "source": "Illustrative test note",
+                }
+            ],
         )
 
     # An entry no class of the fungus acts on.
@@ -1266,6 +1284,8 @@ def test_disagreeing_user_initial_concentrations_of_an_entry_are_refused(tmp_pat
 
 
 def test_the_command_line_reports_a_refusal_with_exit_code_2(tmp_path: Path) -> None:
+    # The oxidase dataset's responses.csv is now carried into a network draft (ASSEMBLE-003); a refusal of the network
+    # rules still exits 2 and writes nothing: here no class of the strain acts on the requested entry substrate.
     code, _out, err = _cli(
         "assemble",
         "--fungus",
@@ -1273,7 +1293,7 @@ def test_the_command_line_reports_a_refusal_with_exit_code_2(tmp_path: Path) -> 
         "--user-data",
         OXIDASE,
         "--substrate",
-        "syringaldazine_like",
+        "cellobiose",
         "--temperature-c",
         "50",
         "--ph",
@@ -1287,7 +1307,7 @@ def test_the_command_line_reports_a_refusal_with_exit_code_2(tmp_path: Path) -> 
         tmp_path / "draft",
     )
     assert code == EXIT_USAGE
-    assert "responses.csv is not combined with enzyme_network in this version" in err
+    assert "No enzyme class of Oxidase source strain L1 acts on Cellobiose (cellobiose)" in err
     assert not (tmp_path / "draft" / "user_dataset.yml").exists()
 
 

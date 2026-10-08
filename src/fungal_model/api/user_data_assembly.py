@@ -57,10 +57,23 @@ Every class of the repertoire that acts on a pool is a member, with the same
 per-case kinetics status; a member without kinetics is a gap, never dropped.
 The loader's network rules are applied while drafting: intermediate pools
 take no initial concentration, an entry has one, and what a network cannot run
-(response laws, the pH-ionization form, cycles, ambiguous products, solid
-pools, a class on two pools of one network, an entry no class acts on) is
-refused or reported as a gap with the reason. Without ``network`` nothing
-changes.
+(the pH-ionization form, cycles, ambiguous products, solid pools, a class on
+two pools of one network, an entry no class acts on) is refused or reported as
+a gap with the reason. Without ``network`` nothing changes.
+
+Response laws in a network draft (ASSEMBLE-003): the ``responses`` argument and
+the ``responses.csv`` rows of ``user_data`` are written against the network
+member (strain, enzyme class and pool) they name, with the single-class
+validation plus two refusals: a class that is no member of the network, and a
+pool its class does not act on. A law carries a member's kinetics to another
+requested condition (an ``EnvironmentGrid`` condition) only when they sit at
+the law's reference condition (the loader's rule: equal, within the
+``reference_tolerance`` of the reference row, or declared with
+``kinetics_at_reference``); otherwise the member is a gap there, and the report
+says per member whether its drafted kinetic constants are at the reference
+condition. No law is ever derived from kinetics measured at several
+conditions. A loader that refuses ``responses.csv`` in an ``enzyme_network``
+dataset is named in the draft's limitations, in its own words.
 
 With ``fetch_kinetics=True`` (FETCH-002) the SABIO-RK entries need not be
 supplied: for every class of the repertoire that acts on a requested substrate
@@ -96,9 +109,12 @@ from types import MappingProxyType
 from typing import Any
 
 from fungal_model.api.user_data import (
+    _KINETIC_CONSTANT_QUANTITIES,
+    _NETWORK_TABLE_REFUSALS,
     _UNIPROT_PROTEOME_ID,
     CULTURE_TABLE,
     GENOME_TABLE,
+    INHIBITION_CONSTANT_QUANTITY,
     INHIBITOR_COLUMN,
     NETWORK_ENTRY_FIELD,
     NETWORK_MANIFEST_FIELD,
@@ -187,6 +203,33 @@ NETWORK_CONDITION_STATUSES: Mapping[str, str] = MappingProxyType(
 ROUTE_SAME_CONDITION = "same_condition"
 ROUTE_RESPONSE_LAW = "response_law"
 ROUTE_NONE = "none"
+
+# Whether the kinetic constants a network draft states for a member class sit at the reference condition of its
+# response laws (``assembly["network"]["networks"][...]["members"][...]["reference_condition"]``; network drafts that
+# carry response laws only, ASSEMBLE-003).
+REFERENCE_AT = "at_reference"
+REFERENCE_NOT_AT = "not_at_reference"
+REFERENCE_UNDETERMINED = "undetermined"
+REFERENCE_NO_CONSTANTS = "no_kinetic_constants"
+REFERENCE_NO_LAW = "no_law"
+NETWORK_REFERENCE_STATUSES: Mapping[str, str] = MappingProxyType(
+    {
+        REFERENCE_AT: "every kinetic constant the draft states for the member sits at the reference condition of each "
+        "of its laws: equal to the law's reference parameter, within the reference_tolerance of that parameter's "
+        "row, or declared with kinetics_at_reference = yes there (recorded, not checked)",
+        REFERENCE_NOT_AT: "a kinetic constant the draft states for the member is not at a law's reference condition, "
+        "or sits at a condition whose temperature or pH is unknown; the law carries the member's kinetics to no other "
+        "condition, and load_user_dataset refuses the rows until they are at the reference condition, a "
+        "reference_tolerance covers the difference or kinetics_at_reference = yes declares them reference values",
+        REFERENCE_UNDETERMINED: "a condition's temperature or pH, or the law's reference parameter row, is still a "
+        "REVIEW field or not a number with readable units, so the reference condition is checked when the reviewed "
+        "tables are loaded",
+        REFERENCE_NO_CONSTANTS: "the draft states no kinetic constant for the member (a gap), so the law rescales "
+        "nothing yet; constants added for it must be stated at the law's reference condition",
+        REFERENCE_NO_LAW: "no response law is bound to the member; its kinetics hold at the condition of their rows, "
+        "and FungMod does not reuse them at another condition",
+    }
+)
 
 RESPONSE_COLUMNS = (
     "strain_id",
@@ -315,6 +358,24 @@ _NETWORK_LIMITATIONS = (
     "Response laws, the pH-ionization form, cultures and time courses are not combined with an enzyme network in "
     "this version; the network's kinetics apply at the condition of their rows.",
 )
+# A network draft that carries response laws (ASSEMBLE-003) replaces the last network limitation by these.
+_NETWORK_LAW_LIMITATIONS = (
+    "Response laws in an enzyme network draft: each responses.csv law scales only the rate of the member class and "
+    "pool it names, from the law's reference condition, at every condition (Km, ki, concentrations and yields are not "
+    "rescaled). A member without a law, or whose kinetics are not at its law's reference condition, keeps the "
+    "condition of its rows: a requested condition its rows do not state is a gap for it, and the network is blocked "
+    "there. A requested condition is an EnvironmentGrid condition only when the laws carry every member there.",
+    "The pH-ionization form, cultures and time courses are not combined with an enzyme network in this version.",
+)
+# The loader's own refusal of responses.csv in an enzyme_network dataset, while it has one (USERDATA-010). A network
+# draft with laws then says, in the loader's words, that load_user_dataset refuses it. A loader that binds laws to
+# network processes has no such refusal, and the statement is left out.
+_LOADER_NETWORK_LAW_REFUSAL = next(
+    (message for table, _attribute, message in _NETWORK_TABLE_REFUSALS if table == "responses.csv"), ""
+)
+# The constants a response law requires at its reference condition: the loader's kinetic constants and, in an enzyme
+# network, the competitive inhibition constant of the process (a constant of the rate at that condition, like Km).
+_LAW_REFERENCE_QUANTITIES = _KINETIC_CONSTANT_QUANTITIES | {INHIBITION_CONSTANT_QUANTITY}
 #: Where ``fetch_kinetics`` reads, and with ``refresh`` stores, its query snapshots unless ``cache_dir`` names another.
 DEFAULT_KINETICS_CACHE_DIR = DEFAULT_SNAPSHOT_DIR
 #: The kinetics database ``fetch_kinetics`` queries, by EC number and substrate name.
@@ -555,13 +616,18 @@ def assemble_user_tables(
     status; ``assembly["network"]`` reports pools, links, members, classes that
     act on no pool, and whether each requested condition can run (all members
     with kinetics and the entry's initial concentration). ``user_data`` may then
-    be a network dataset itself (its ``ki`` rows are kept). Refused with the
-    reason: ``responses`` (laws are not bound to network processes), a cycle of
-    products, a product that equals the registry substrate of a pool with
-    another ``substrate_id``, a product that is a solid substrate, a class
-    acting on two pools of one network, an entry no class acts on, colliding
-    state names, and disagreeing initial concentrations of an entry in the
-    user's rows.
+    be a network dataset itself (its ``ki`` rows are kept). ``responses`` and the
+    ``responses.csv`` rows of ``user_data`` bind to the member class and pool
+    they name (``substrate`` names a requested substrate or a pool it releases);
+    a law on a class that is no member, or on a pool its class does not act on,
+    is refused. A law carries a member's kinetics to another requested condition
+    only from the law's reference condition, and ``assembly["network"]`` reports
+    per member whether its drafted kinetic constants sit there
+    (``reference_condition``). Refused with the reason: a cycle of products, a
+    product that equals the registry substrate of a pool with another
+    ``substrate_id``, a product that is a solid substrate, a class acting on two
+    pools of one network, an entry no class acts on, colliding state names, and
+    disagreeing initial concentrations of an entry in the user's rows.
 
     ``fetch_kinetics=True`` (FETCH-002) looks up SABIO-RK kinetics for every
     class of the repertoire that acts on a requested substrate (with
@@ -1067,6 +1133,22 @@ class _LookupQuery:
     query: str
 
 
+@dataclass(frozen=True)
+class _LawReference:
+    """One response law bound to an enzyme class and substrate (a network pool) and its reference parameter's row."""
+
+    law: str
+    reads: str
+    parameter: str
+    row: Mapping[str, str] | None
+
+    @property
+    def text(self) -> str:
+        if self.row is None:
+            return f"{self.parameter}, which responses.csv does not give"
+        return f"{self.parameter} {_law_value_text(self.row['value'], self.row['units'])}"
+
+
 @dataclass
 class _Case:
     target: _Target
@@ -1563,30 +1645,41 @@ class _Assembler:
         )
         return pool
 
-    def _refuse_network_laws(self, responses: Sequence[Mapping[str, Any]] | None) -> None:
-        """Response laws are not combined with an enzyme network (USERDATA-010)."""
+    def _check_network_law(self, label: str, class_key: str, target: _Target) -> None:
+        """A law in a network draft binds to a member class on the pool it acts on (ASSEMBLE-003).
 
-        if responses is not None:
-            raise UserTablesAssemblyError(
-                "responses binds temperature or pH laws per enzyme class and substrate of a single-class case; "
-                "responses.csv is not combined with enzyme_network in this version, so a network draft cannot carry "
-                "them. Assemble without network to use the laws."
-            )
-        if self.user is None:
+        ``target`` is a pool of the draft's networks (a requested substrate or a
+        pool it releases). A class acting on no pool of the networks that hold
+        it is no member, and a member names only the pool it acts on; both are
+        refused with the reason. A pool whose categories are REVIEW fields is
+        decided when the reviewed tables load, as in a single-class draft.
+        """
+
+        item = self.classes[class_key]
+        if not target.determined or item.acts_on(target):
             return
-        pools = {target.substrate_id for target in self.targets if target.user_row is not None}
-        lines = [
-            line
-            for line, row in self.user.table("responses.csv")
-            if row.get("strain_id") == self.user_strain_id and row.get("substrate_id") in pools
-        ]
-        if lines:
+        held: list[_Target] = []
+        for network in self.networks:
+            if not any(pool is target for pool in network.pools):
+                continue
+            for pool in network.pools:
+                if not any(pool is other for other in held):
+                    held.append(pool)
+        pools = [pool.substrate_id for pool in held]
+        acting = [pool.substrate_id for pool in held if pool.determined and item.acts_on(pool)]
+        if acting:
             raise UserTablesAssemblyError(
-                f"User dataset {self.user.dataset.dataset_id!r} binds response laws to {self.strain_id!r} on "
-                f"substrates of this network (responses.csv {_rows_label(lines)}); responses.csv is not combined with "
-                "enzyme_network in this version, so a network draft would drop them. Assemble without network to keep "
-                "the laws."
+                f"{label} binds a law to {class_key!r} on {target.substrate_id!r}, but that class does not act on that "
+                f"pool ({_not_acting_reason(item, target)}); in the enzyme network it is the member on "
+                f"{', '.join(acting)}. A response law scales the rate of one member's process, on the pool it acts on; "
+                "name that pool."
             )
+        raise UserTablesAssemblyError(
+            f"{label} binds a law to {class_key!r} on {target.substrate_id!r}, but {class_key!r} is no member of the "
+            f"enzyme network that holds {target.substrate_id!r}: it acts on none of its pools ({', '.join(pools)}; on "
+            f"{target.substrate_id}: {_not_acting_reason(item, target)}). A response law scales the rate of a member's "
+            "process, so there is no process to bind it to."
+        )
 
     # -- the enzyme repertoire ----------------------------------------------
 
@@ -2532,11 +2625,15 @@ class _Assembler:
     # -- response laws -------------------------------------------------------
 
     def collect_laws(self, responses: Sequence[Mapping[str, Any]] | None) -> None:
-        if self.network:
-            self._refuse_network_laws(responses)
-            return
+        """The response-law rows of the draft: the user dataset's for the fungus, then the ``responses`` argument.
+
+        In a network draft (ASSEMBLE-003) the substrate of a row may be any pool
+        of the draft's networks, and a law on a class that is no member, or on a
+        pool its class does not act on, is refused with the reason.
+        """
+
         if self.user is not None:
-            for _line, row in self.user.table("responses.csv"):
+            for line, row in self.user.table("responses.csv"):
                 if row.get("strain_id") != self.user_strain_id:
                     continue
                 target = next(
@@ -2550,6 +2647,14 @@ class _Assembler:
                 if target is None:
                     continue
                 key = (self._class_key(row["enzyme_class"]), target.substrate_id)
+                if self.network:
+                    label = f"User dataset {self.user.dataset.dataset_id!r} responses.csv row {line}"
+                    if key[0] not in self.classes:
+                        raise UserTablesAssemblyError(
+                            f"{label} binds a law to enzyme class {key[0]!r}, which has no evidence in "
+                            f"{self.strain_name}, so it is no member of the enzyme network."
+                        )
+                    self._check_network_law(label, key[0], target)
                 self.laws.setdefault(key, []).append(dict(row))
                 self.law_origin[key] = f"user dataset {self.user.dataset.dataset_id} responses.csv"
         if responses is None:
@@ -2576,14 +2681,23 @@ class _Assembler:
             if class_key not in self.classes:
                 raise UserTablesAssemblyError(
                     f"responses[{index}] binds a law to enzyme class {class_key!r}, which has no evidence in "
-                    f"{self.strain_name}."
+                    f"{self.strain_name}." + (" It is no member of the enzyme network." if self.network else "")
                 )
             target = self._target_named(str(item["substrate"]))
+            if target is None and self.network:
+                pools = ", ".join(pool.substrate_id for pool in self.targets)
+                raise UserTablesAssemblyError(
+                    f"responses[{index}]['substrate'] {item['substrate']!r} is no pool of the enzyme network: neither a "
+                    f"requested substrate nor a pool one releases through a stated product (pools: {pools}). A response "
+                    "law scales the rate of a member's process on its pool."
+                )
             if target is None:
                 raise UserTablesAssemblyError(
                     f"responses[{index}]['substrate'] {item['substrate']!r} is not a requested substrate."
                 )
-            if target.determined and not self.classes[class_key].acts_on(target):
+            if self.network:
+                self._check_network_law(f"responses[{index}]", class_key, target)
+            elif target.determined and not self.classes[class_key].acts_on(target):
                 raise UserTablesAssemblyError(
                     f"responses[{index}] binds a law to {class_key!r} on {target.substrate_id!r}, but that class does "
                     "not act on that substrate."
@@ -2627,6 +2741,19 @@ class _Assembler:
     def _law_conditions(self, class_key: str, target: _Target) -> set[str]:
         return {RESPONSE_LAWS[row["law"]].condition for row in self.laws.get((class_key, target.substrate_id), [])}
 
+    def _law_references(self, class_key: str, substrate_id: str) -> list[_LawReference]:
+        """The laws bound to an enzyme class and substrate, in ``RESPONSE_LAWS`` order, with their reference rows."""
+
+        rows = self.laws.get((class_key, substrate_id), [])
+        references: list[_LawReference] = []
+        for name, law in RESPONSE_LAWS.items():
+            mine = [row for row in rows if row["law"] == name]
+            if not mine:
+                continue
+            row = next((row for row in mine if row["parameter"] == law.reference_parameter), None)
+            references.append(_LawReference(law=name, reads=law.condition, parameter=law.reference_parameter, row=row))
+        return references
+
     # -- cases ---------------------------------------------------------------
 
     def build(self) -> AssembledTablesDraft:
@@ -2638,6 +2765,8 @@ class _Assembler:
             self._exclude_network_forms(cases)
         self._apply_rate_forms(cases)
         self._apply_law_reference(cases)
+        if self.network and self.laws:
+            self._apply_network_law_reference(cases)
         grid = self._apply_condition_rows(cases)
         included = self._included(cases)
         slots = self._condition_slots(cases, included, grid)
@@ -2943,6 +3072,38 @@ class _Assembler:
                     f"but the draft states them at {where}",
                     keep_measured=True,
                 )
+
+    def _apply_network_law_reference(self, cases: Sequence[_Case]) -> None:
+        """A member's law carries its kinetics to another condition only from the law's reference condition.
+
+        Network drafts with response laws only (ASSEMBLE-003). Every law of a
+        member scales its rate at every condition, so the kinetic constants a
+        law-carried case reuses must sit at the reference condition of each law
+        of that member: equal to the reference parameter, within the
+        ``reference_tolerance`` of its row, or declared with
+        ``kinetics_at_reference = yes`` (the loader's rule). Otherwise the case is
+        a gap whose measurement requests name the measured condition, as a
+        single-class case without a covering law is.
+        """
+
+        for case in cases:
+            if case.route != ROUTE_RESPONSE_LAW:
+                continue
+            assert case.chosen is not None
+            measured = case.chosen.measured
+            for reference in self._law_references(case.enzyme_class.key, case.target.substrate_id):
+                at_reference, why = _reference_check(reference, measured)
+                if at_reference is True:
+                    continue
+                self._downgrade(
+                    case,
+                    f"{reference.law} of {case.enzyme_class.key} on {case.target.substrate_id} rescales the rate from "
+                    f"its reference condition ({reference.text}), and the kinetics it would carry to "
+                    f"{case.requested.text} are stated at {measured.condition_id} ({measured.text}): {why}; FungMod "
+                    "carries kinetics through a law only from the law's reference condition",
+                    keep_measured=True,
+                )
+                break
 
     def _apply_condition_rows(self, cases: Sequence[_Case]) -> dict[int, bool]:
         """Decide for each requested condition whether it is a conditions.csv row or an EnvironmentGrid condition.
@@ -3487,6 +3648,9 @@ class _Assembler:
 
         An entry's initial concentration belongs to the network, not to one
         class, so it is written once, on the first class acting on the entry.
+        A requested EnvironmentGrid condition (response laws carry the kinetics
+        there) reuses the values of the draft's one conditions.csv row, so the
+        design value is written on that row when it is not itself requested.
         """
 
         value = self.design_values.get("substrate_initial_concentration")
@@ -3498,6 +3662,8 @@ class _Assembler:
             if row["quantity"] == "substrate_initial_concentration"
         }
         requested = [slot for slot in slots if slot["requested"] is not None]
+        if len(requested) < len(self.requested) and len(slots) == 1 and slots[0]["requested"] is None:
+            requested.append(slots[0])
         output: list[dict[str, str]] = []
         for network in self.networks:
             entry = network.entry
@@ -3702,7 +3868,19 @@ class _Assembler:
             for item in report["substrates"]
         ]
         output["network"] = self._network_report(cases, compatibility, slots, tables)
-        output["limitations"] = [*report["limitations"], *_NETWORK_LIMITATIONS]
+        if not self.laws:
+            output["limitations"] = [*report["limitations"], *_NETWORK_LIMITATIONS]
+            return output
+        laws = [*_NETWORK_LIMITATIONS[:-1], *_NETWORK_LAW_LIMITATIONS]
+        if _LOADER_NETWORK_LAW_REFUSAL:
+            laws.append(
+                "load_user_dataset of this version refuses responses.csv in an enzyme_network dataset (its message: "
+                f'"{_LOADER_NETWORK_LAW_REFUSAL}"), so check-data refuses this draft while it holds the laws. Its '
+                "responses.csv rows already name the member class and pool each law scales; to run the laws now, "
+                "assemble without network with each pool a law names as a requested substrate, which binds each law "
+                "to its single-class case."
+            )
+        output["limitations"] = [*report["limitations"], *laws]
         return output
 
     def _network_report(
@@ -3715,14 +3893,28 @@ class _Assembler:
         rows = {row["substrate_id"]: row for row in tables["substrates.csv"]}
         by_pool = {entry["substrate_id"]: entry for entry in compatibility}
         slot_ids = {slot["requested"].index: slot["condition_id"] for slot in slots if slot["requested"] is not None}
-        conditions = [slot_ids[requested.index] for requested in self.requested]
+        # A requested condition without a conditions.csv row is an EnvironmentGrid condition, which exists only when
+        # response laws carry kinetics there; it is reported under its requested ID, as in the cases.
+        conditions = [slot_ids.get(requested.index, requested.condition_id) for requested in self.requested]
         initials: dict[tuple[str, str], str] = {}
         for row in tables["kinetics.csv"]:
             if row["quantity"] == "substrate_initial_concentration":
                 key = (row["substrate_id"], row["condition_id"])
                 if initials.get(key) != "stated":
                     initials[key] = "review field" if row["value"].startswith(REVIEW_MARKER) else "stated"
+        # An EnvironmentGrid condition reuses the values of the draft's one conditions.csv row (a law carries kinetics
+        # only while the draft's rows are its measured condition), the entry's initial concentration included.
+        grid_from = str(slots[0]["condition_id"]) if len(slots) == 1 else None
+        grid_ids = [requested.condition_id for requested in self.requested if requested.index not in slot_ids]
+        for condition_id in grid_ids:
+            for network in self.networks:
+                stated = initials.get((network.entry.substrate_id, grid_from or ""))
+                if stated is not None:
+                    initials[(network.entry.substrate_id, condition_id)] = stated
         self.network_initials = set(initials)
+        conditions_by_id = {
+            row["condition_id"]: _measured(row["condition_id"], row, user_row=False) for row in tables["conditions.csv"]
+        }
         networks: list[dict[str, Any]] = []
         for network in self.networks:
             pools = [pool.substrate_id for pool in network.pools]
@@ -3756,19 +3948,20 @@ class _Assembler:
                 for acting in by_pool[pool.substrate_id]["acting"]:
                     class_key = acting["enzyme_class"]
                     statuses = {
-                        slot_ids[case.requested.index]: case.status
+                        slot_ids.get(case.requested.index, case.requested.condition_id): case.status
                         for case in cases
                         if case.enzyme_class.key == class_key and case.target is pool
                     }
-                    members.append(
-                        {
-                            "enzyme_class": class_key,
-                            "name": self.classes[class_key].name,
-                            "pool": pool.substrate_id,
-                            "pool_role": "entry" if pool is network.entry else "intermediate",
-                            "kinetics_status": statuses,
-                        }
-                    )
+                    member: dict[str, Any] = {
+                        "enzyme_class": class_key,
+                        "name": self.classes[class_key].name,
+                        "pool": pool.substrate_id,
+                        "pool_role": "entry" if pool is network.entry else "intermediate",
+                        "kinetics_status": statuses,
+                    }
+                    if self.laws:
+                        member.update(self._member_laws(class_key, pool.substrate_id, tables, conditions_by_id))
+                    members.append(member)
             undetermined = [pool.substrate_id for pool in network.pools if not pool.determined]
             member_keys = {item["enzyme_class"] for item in members}
             not_members = []
@@ -3801,14 +3994,18 @@ class _Assembler:
                     status = NETWORK_BLOCKED
                 else:
                     status = NETWORK_COMPLETE
-                verdicts.append(
-                    {
-                        "condition": condition_id,
-                        "status": status,
-                        "initial_concentration": initial,
-                        "blocked_by": blocked_by,
-                    }
-                )
+                verdict: dict[str, Any] = {
+                    "condition": condition_id,
+                    "status": status,
+                    "initial_concentration": initial,
+                    "blocked_by": blocked_by,
+                }
+                if self.laws:
+                    # Where the network runs at this condition: a conditions.csv row, or an EnvironmentGrid condition
+                    # whose kinetics the laws carry from the draft's one conditions.csv row.
+                    verdict["in_conditions_csv"] = condition_id not in grid_ids
+                    verdict["carried_from"] = grid_from if condition_id in grid_ids else None
+                verdicts.append(verdict)
             networks.append(
                 {
                     "entry_substrate": network.entry.substrate_id,
@@ -3821,12 +4018,79 @@ class _Assembler:
                     "conditions": verdicts,
                 }
             )
-        return {
+        report: dict[str, Any] = {
             "manifest_field": NETWORK_MANIFEST_FIELD,
             "entry_substrates": [network.entry.substrate_id for network in self.networks],
             "networks": networks,
             "status_meaning": dict(NETWORK_CONDITION_STATUSES),
         }
+        if self.laws:
+            report["reference_condition_meaning"] = dict(NETWORK_REFERENCE_STATUSES)
+            # The loader's own refusal of responses.csv in an enzyme_network dataset, while it has one; None once the
+            # loader binds laws to network processes.
+            report["loader_refusal"] = _LOADER_NETWORK_LAW_REFUSAL or None
+        return report
+
+    def _member_laws(
+        self,
+        class_key: str,
+        substrate_id: str,
+        tables: Mapping[str, Sequence[Mapping[str, str]]],
+        conditions: Mapping[str, _Measured],
+    ) -> dict[str, Any]:
+        """A network member's response laws and whether its drafted kinetic constants sit at their reference.
+
+        Every kinetics.csv row of the member whose quantity a law rescales
+        (``_LAW_REFERENCE_QUANTITIES``) is checked against the reference
+        condition of each law, by the loader's rule (``_reference_check``).
+        """
+
+        references = self._law_references(class_key, substrate_id)
+        if not references:
+            return {"reference_condition": REFERENCE_NO_LAW, "response_laws": []}
+        stated_at = list(
+            dict.fromkeys(
+                row["condition_id"]
+                for row in tables["kinetics.csv"]
+                if row["enzyme_class"] == class_key
+                and row["substrate_id"] == substrate_id
+                and row["quantity"] in _LAW_REFERENCE_QUANTITIES
+            )
+        )
+        outcomes: list[bool | None] = []
+        laws = []
+        for reference in references:
+            checks = []
+            for condition_id in stated_at:
+                measured = conditions[condition_id]
+                at_reference, why = _reference_check(reference, measured)
+                outcomes.append(at_reference)
+                checks.append(
+                    {
+                        "condition": condition_id,
+                        "condition_text": measured.text,
+                        "at_reference": at_reference,
+                        "reason": why,
+                    }
+                )
+            laws.append(
+                {
+                    "law": reference.law,
+                    "reads": reference.reads,
+                    "reference": reference.text,
+                    "origin": self.law_origin[(class_key, substrate_id)],
+                    "kinetics": checks,
+                }
+            )
+        if not stated_at:
+            status = REFERENCE_NO_CONSTANTS
+        elif any(outcome is False for outcome in outcomes):
+            status = REFERENCE_NOT_AT
+        elif any(outcome is None for outcome in outcomes):
+            status = REFERENCE_UNDETERMINED
+        else:
+            status = REFERENCE_AT
+        return {"reference_condition": status, "response_laws": laws}
 
     def _manifest(self) -> dict[str, Any]:
         parts = []
@@ -4475,11 +4739,19 @@ class _Assembler:
             if not item["members"]:
                 lines.append("| - | - | " + " | ".join("-" for _ in item["conditions"]) + " |")
             lines.append("")
+            if "loader_refusal" in network:
+                lines.extend(self._network_laws_markdown(item))
             for entry in item["conditions"]:
                 blocked = f": {_md_text('; '.join(entry['blocked_by']))}" if entry["blocked_by"] else ""
+                grid = (
+                    f"; an EnvironmentGrid condition, not a conditions.csv row: the laws carry the kinetics of "
+                    f"{entry['carried_from']}"
+                    if entry.get("in_conditions_csv") is False
+                    else ""
+                )
                 lines.append(
                     f"- {entry['condition']}: {entry['status']} (initial concentration of `{item['entry_substrate']}`: "
-                    f"{entry['initial_concentration']}){blocked}."
+                    f"{entry['initial_concentration']}{grid}){blocked}."
                 )
             if item["not_members"]:
                 lines.extend(["", "Classes of the fungus that act on no pool of this network (not members):", ""])
@@ -4487,6 +4759,20 @@ class _Assembler:
                     reasons = "; ".join(member["reasons"]) or "the pools are under review"
                     lines.append(f"- {member['enzyme_class']}: {_md_text(reasons)}.")
             lines.append("")
+        return lines
+
+    def _network_laws_markdown(self, item: Mapping[str, Any]) -> list[str]:
+        """review.md: the response laws of a network's members and whether their kinetics sit at the reference."""
+
+        lines = [
+            "Response laws (responses.csv): each law scales only its member's rate, from the law's reference "
+            "condition, at every condition; whether the kinetic constants the draft states for the member sit at "
+            "that reference condition (`reference_condition`):",
+            "",
+        ]
+        for member in item["members"]:
+            lines.append(f"- {_md_text(_member_laws_text(member))}.")
+        lines.append("")
         return lines
 
     def _request_text(self, case: Mapping[str, Any]) -> str:
@@ -4532,6 +4818,25 @@ class _Assembler:
 
 def _with_review(draft: AssembledTablesDraft, review: str) -> AssembledTablesDraft:
     return replace(draft, review=review)
+
+
+def _member_laws_text(member: Mapping[str, Any]) -> str:
+    """One network member's response laws and whether its drafted kinetic constants sit at their reference condition."""
+
+    who = f"{member['enzyme_class']} on {member['pool']}"
+    laws = member["response_laws"]
+    if not laws:
+        return f"{who}: no response law ({member['reference_condition']}); its kinetics hold at the condition of their rows"
+    names = " and ".join(f"{law['law']} ({law['reference']})" for law in laws)
+    origins = ", ".join(dict.fromkeys(str(law["origin"]) for law in laws))
+    reasons: dict[str, list[str]] = {}
+    for law in laws:
+        for check in law["kinetics"]:
+            reasons.setdefault(f"{check['condition']} ({check['condition_text']})", []).append(str(check["reason"]))
+    detail = "; ".join(f"{where}: {' and '.join(texts)}" for where, texts in reasons.items())
+    return f"{who}: {names}, from {origins}; {member['reference_condition']}" + (
+        f", kinetics at {detail}" if detail else ": the draft states no kinetic constant for it"
+    )
 
 
 def _count_text(item: Mapping[str, Any]) -> str:
@@ -4626,6 +4931,73 @@ def _differing(measured: _Measured, requested: _Requested) -> set[str]:
 def _same_condition(kelvin_a: float, ph_a: float, kelvin_b: float, ph_b: float) -> bool:
     return math.isclose(kelvin_a, kelvin_b, rel_tol=_FLOAT_EQUALITY, abs_tol=_FLOAT_EQUALITY) and math.isclose(
         ph_a, ph_b, rel_tol=_FLOAT_EQUALITY, abs_tol=_FLOAT_EQUALITY
+    )
+
+
+def _law_value_text(value: str, units: str) -> str:
+    """A response-law value with its units; a pH, in dimensionless units, as the bare number."""
+
+    return value if units == "dimensionless" else f"{value} {units}".strip()
+
+
+def _reference_check(reference: _LawReference, measured: _Measured) -> tuple[bool | None, str]:
+    """Whether kinetics stated at ``measured`` sit at the reference condition of a law, and why.
+
+    The loader's rule (``_validate_reference_condition`` of the user-data
+    loader): the condition's temperature or pH, in the units of the reference
+    parameter's row, equals the reference value, or differs by at most that
+    row's ``reference_tolerance``; ``kinetics_at_reference = yes`` there
+    declares the kinetics reference values (recorded, not checked), and an
+    unknown temperature or pH cannot carry kinetic constants for a law that
+    reads it. ``None``: not decidable yet (a REVIEW field, or a reference row
+    that is not a number with readable units, which the loader reports).
+    """
+
+    row = reference.row
+    if row is None:
+        return None, f"responses.csv gives no {reference.parameter} row for {reference.law}, its reference condition"
+    if row.get("kinetics_at_reference", "").strip().lower() == "yes":
+        return True, (
+            f"kinetics_at_reference = yes on the {reference.parameter} row declares them reference values (recorded, "
+            "not checked)"
+        )
+    temperature = reference.reads == "temperature"
+    if (measured.temperature if temperature else measured.ph) == "unknown":
+        return False, (
+            f"the {reference.reads} of {measured.condition_id} is unknown, and kinetic constants scaled by a law on "
+            f"the {reference.reads} must be stated at a known one"
+        )
+    current = measured.kelvin if temperature else measured.ph_value
+    if current is None:
+        return None, f"the {reference.reads} of {measured.condition_id} is still a REVIEW field"
+    units = row.get("units", "")
+    value = _finite_text(row.get("value", ""))
+    tolerance_text = row.get("reference_tolerance", "")
+    tolerance = _finite_text(tolerance_text)
+    unreadable = (
+        f"the {reference.parameter} row ({_law_value_text(row.get('value', ''), units)}"
+        + (f", reference_tolerance {tolerance_text}" if tolerance_text else "")
+        + ") is not a number with readable units yet; load_user_dataset reports it"
+    )
+    if value is None or not _parses(units) or (tolerance_text and (tolerance is None or tolerance < 0.0)):
+        return None, unreadable
+    base_units = RESPONSE_LAWS[reference.law].parameter(reference.parameter).reference_units
+    try:
+        stated = float(Q_(current, base_units).to(units).magnitude)
+    except Exception:  # a unit of another dimension; the unit registry raises several exception types
+        return None, unreadable
+    difference = abs(stated - value)
+    stated_text = f"{_number_cell(_rounded(stated))} {units}" if temperature else f"pH {_number_cell(_rounded(stated))}"
+    target_text = f"{reference.parameter} {_law_value_text(_number_cell(value), units)}"
+    if difference == 0.0:
+        return True, f"{stated_text} equals {target_text}"
+    tolerance_units = _law_value_text(tolerance_text, units)
+    if tolerance is not None and difference <= tolerance:
+        return True, f"{stated_text} is within the reference_tolerance {tolerance_units} of {target_text}"
+    clause = "no reference_tolerance is given" if tolerance is None else f"its reference_tolerance is {tolerance_units}"
+    return False, (
+        f"{stated_text} differs from {target_text} by {_law_value_text(_number_cell(_rounded(difference)), units)}; "
+        f"{clause}"
     )
 
 

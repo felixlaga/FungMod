@@ -6,6 +6,32 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Response laws carried into enzyme-network drafts (ASSEMBLE-003):
+  `assemble_user_tables(network=True, responses=...)` and `fungmod assemble
+  --network --responses FILE`, and the `responses.csv` rows of `user_data`,
+  write each temperature or pH law to the draft's `responses.csv` against the
+  network member (strain, enzyme class and pool) it names; `substrate` may be
+  a requested substrate or a pool it releases. The single-class checks apply,
+  plus two refusals with the reason: a class that is no member of the network
+  and a pool its class does not act on. A law carries a member's kinetics to
+  another requested condition (an `EnvironmentGrid` condition, as in
+  single-class drafts) only when they sit at the law's reference condition by
+  the loader's rule (equal, within `reference_tolerance`, or declared with
+  `kinetics_at_reference = yes`); otherwise the member is a gap there with the
+  reason. Each member in `assembly["network"]` reports `response_laws` and
+  `reference_condition` (`at_reference`, `not_at_reference`, `undetermined`,
+  `no_kinetic_constants`, `no_law`; `reference_condition_meaning`), each
+  condition `in_conditions_csv` and `carried_from`, and an `EnvironmentGrid`
+  condition reuses (and `design` writes) the entry's initial concentration on
+  the draft's one `conditions.csv` row; `review.md` and the command line show
+  the laws per member. No law is derived from SABIO-RK entries measured at
+  several conditions. The loader of this version refuses `responses.csv` in an
+  `enzyme_network` dataset; the draft says so in the loader's words
+  (`assembly["network"]["loader_refusal"]`, a limitation, a command-line line),
+  so `check-data` refuses such a draft until the loader binds laws to network
+  processes. Tests: `tests/test_assemble_network_responses.py` (the load of a
+  drafted network with laws is a strict expected failure until then).
+
 - Kinetics of the enzyme classes a user dataset defines, looked up by their
   own EC numbers (FETCH-003). `user_tables_from_sabiork(user_enzyme_classes=...)`
   resolves an entry's EC number to a user-defined class (rows of an
@@ -889,6 +915,13 @@ All notable public releases of FungMod are documented here.
   remain explicit; no validated organism model or registry promotion is claimed.
 
 ### Changed
+
+- ASSEMBLE-003, behaviour: `assemble_user_tables(network=True)` (`fungmod
+  assemble --network`) no longer refuses `responses` or the `responses.csv`
+  rows of `user_data` on a pool; it writes them against their members (see
+  Added). Drafts without that combination are byte-identical, and so is every
+  single-class draft with laws. Text: `fungmod assemble --help` describes the
+  laws of a network draft. No numerical behaviour changes.
 
 - FETCH-003, behaviour: a class of `user_data` with a complete EC number is
   now looked up by `fetch_kinetics` (FETCH-002 listed it as not queried), and

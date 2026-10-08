@@ -213,6 +213,11 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "990003",
     "990030",
     "990040",
+    # ASSEMBLE-003 network drafts with response laws: the dataset id, the illustrative notes and the test-only stated
+    # law of tests/test_assemble_network_responses.py come from the request and the tables, never from code.
+    "chain_laws",
+    "nw-2",
+    "test-only stated law",
 )
 
 

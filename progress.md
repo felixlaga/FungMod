@@ -26,6 +26,193 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## ASSEMBLE-003 Response Laws Carried Into Enzyme-Network Drafts
+
+Status: `complete` for the stated scope (2026-10-08); the drafted laws load only
+with a loader that binds laws to network processes (NETWORK-003, open pull
+request #125), which this base does not have. Drafts should carry the
+conditions-dependence the user or the sources give. `fungmod assemble
+--responses FILE` drafted response-law rows for single-class cases, but
+`--network` refused `--responses` and the `responses.csv` rows of a
+`--user-data` dataset outright. Now a network draft writes each law against the
+network member it names, carries a member's kinetics to another requested
+condition only from the law's reference condition, and reports per member
+whether its drafted kinetic constants sit there; no new numerics, and no law
+is ever derived from data.
+
+Design decisions:
+
+- **Bound to a member.** The `responses` argument and the user dataset's
+  `responses.csv` rows for the fungus are written to the draft's
+  `responses.csv` against the strain, member class and pool they name
+  (`substrate`: a requested substrate or a pool it releases, found as in the
+  single-class draft). The single-class validation applies unchanged (the
+  columns, a law `responses.csv` binds, a class with evidence in the fungus, a
+  law the dataset already binds), plus `_check_network_law`: a class acting on
+  none of the pools of the networks that hold the named pool is "no member"
+  and a member naming a pool it does not act on is refused, each with the
+  reason (the categorical rule's reason and the pool the member does act on);
+  a substrate that is no pool is refused with the pools listed. A pool whose
+  categories are `REVIEW:` fields is decided when the reviewed tables load, as
+  in single-class drafts.
+- **The single-class route, per member.** Law-carried cases use the existing
+  machinery unchanged: a requested condition differing from the measured one
+  is reached only when the member's laws cover every difference, the pair's
+  kinetics sit at one condition, and the draft's `conditions.csv` rows are
+  that condition; it is then an `EnvironmentGrid` condition (NETWORK-003's law
+  records have no environment selector, so grid conditions reach them). A
+  member without a law keeps the condition of its rows, so its gap needs the
+  condition as a `conditions.csv` row and the other members' laws cannot carry
+  their kinetics there (the existing `_requested_rows` rule): the network is
+  blocked there, all or nothing.
+- **Reference condition.** `_apply_network_law_reference` (network drafts
+  with laws only) turns a law-carried case into a gap, with the existing
+  `_downgrade` wording ("...; the case is left as a gap", measured kinetics
+  kept and named by the measurement requests), unless the reused kinetics sit
+  at the reference condition of every law of the member, by the loader's rule
+  (`_reference_check`, mirroring `_validate_reference_condition`: the
+  condition's temperature or pH in the reference row's units equal to the
+  reference value, within that row's `reference_tolerance`, or declared with
+  `kinetics_at_reference = yes`; an unknown temperature or pH is not at the
+  reference; a `REVIEW:` field or an unreadable row is undecided). Single-class
+  drafts keep their behaviour (byte identity); the loader checks them at load.
+- **Report.** Only when a network draft holds laws: each member gets
+  `response_laws` (law, condition it reads, reference parameter and value,
+  origin, and per drafted condition with kinetic constants, including `ki`,
+  whether they sit at the reference and why) and `reference_condition`
+  (`REFERENCE_AT`, `REFERENCE_NOT_AT`, `REFERENCE_UNDETERMINED`,
+  `REFERENCE_NO_CONSTANTS`, `REFERENCE_NO_LAW`; `NETWORK_REFERENCE_STATUSES` as
+  `reference_condition_meaning`); each condition verdict gets
+  `in_conditions_csv` and `carried_from`; grid conditions are reported under
+  their requested IDs (`_network_report` assumed every requested condition was
+  a row) and reuse the entry's initial concentration of the draft's one
+  `conditions.csv` row, where `design` now writes it when that row is not
+  requested. `review.md` lists the laws per member; the command line prints
+  them under the member table and marks grid conditions. The last network
+  limitation is replaced by two law sentences.
+- **This loader.** `_LOADER_NETWORK_LAW_REFUSAL` is read from the loader's own
+  `_NETWORK_TABLE_REFUSALS`: while the loader refuses `responses.csv` in an
+  `enzyme_network` dataset, a network draft with laws says so in the loader's
+  words (`assembly["network"]["loader_refusal"]`, a limitation, a `check-data:`
+  line of `fungmod assemble`) with the route that runs the laws now (assemble
+  without `network`, each pool a law names requested). Once NETWORK-003 removes
+  that refusal the statement disappears without a code change.
+- **No law from data.** SABIO-RK entries at several conditions stay listed
+  exactly as before ("kinetics are stated only at other conditions ..., which
+  FungMod does not reuse here without a response law", or, with a stated law,
+  a `conflict` "several measured kinetics could be carried here by the
+  response law ..., and FungMod does not choose the reference").
+
+Changed:
+
+- `api/user_data_assembly.py`: `_check_network_law` replaces
+  `_refuse_network_laws`; `collect_laws` (network checks, docstring);
+  `_law_references`, `_apply_network_law_reference`, `_member_laws`,
+  `_network_laws_markdown`; `_network_report` (grid conditions, member and
+  verdict keys, `reference_condition_meaning`, `loader_refusal`),
+  `_network_design_initials` (the grid row), `_with_network_report`
+  (limitations), `_network_markdown`; `_LawReference`, `_reference_check`,
+  `_law_value_text`, `_member_laws_text`; constants `REFERENCE_*`,
+  `NETWORK_REFERENCE_STATUSES`, `_NETWORK_LAW_LIMITATIONS`,
+  `_LOADER_NETWORK_LAW_REFUSAL`, `_LAW_REFERENCE_QUANTITIES`; docstrings.
+- `cli.py` (assemble only): `_print_network_laws`, grid conditions and the
+  loader line in `_print_assembly_network`; the `--network` epilog paragraph,
+  `--responses` help and module docstring. cli.py still names no database.
+- Docs: `docs/user-data.md` (new "Response laws in a network draft" with rules
+  and real output; the drafting rules, `responses` input, refusals and limits);
+  `docs/cli.md` (network section with the output, options table);
+  `docs/capabilities.md`; `README.md` (capability row); `CHANGELOG.md` (Added;
+  Changed).
+- Not changed: `api/user_data.py` (the loader and its refusal), the core, any
+  process law, registry record, fixture, preflight rule or run output.
+
+Tests (`tests/test_assemble_network_responses.py`, 15 test functions, 29
+cases; `urlopen`, the SABIO-RK fetch module and `socket.connect` patched to
+fail): six drafts without the new combination byte-identical to 524df39
+(single-class drafts with laws from the argument, a temperature law with a
+pH-6 row, the plain chain with the laws on and off the reference, a network
+of three conditions, the registry chain at two conditions) and the stdout of a
+single-class `assemble --responses` (POSIX only); the plain `network_chain`
+copy with a cardinal temperature and a cardinal pH law on `depolymerase_like`
+and an Arrhenius law on `oligomer_hydrolase_like` (NETWORK-003's illustrative
+values): the rows against strain, class and pool (the intermediate pool too),
+user kinetics unchanged, 40 degC an `EnvironmentGrid` condition carried from
+`c30_ph5`, both members `at_reference` with their checks, verdicts, the
+limitation sentences (the loader's in its words while it refuses), review.md;
+the load of the reviewed draft with each law on its process, a strict `xfail`
+("loader binds network laws only with NETWORK-003 (#125)", `raises=UserDataError`);
+while the loader refuses, `check-data` exits 2 with exactly its message;
+reference conditions (off by 5 degC, a tolerance of 4 and of 5 degC,
+`kinetics_at_reference = yes`, a kelvin reference): the reasons, the gap with
+the existing wording, the other member downgraded, the network blocked at
+40 degC; a member without a law keeping its rows' condition (`no_law`); the
+design loading written on the row a grid condition reuses, and blocked
+without it; the `oxidase_case` dataset's laws carried into a one-member
+network; refusals (no member, no evidence, wrong pool, no pool, a law
+`responses.csv` does not bind, missing columns, a law the dataset already
+binds); Reaction 618 entries at several conditions never becoming a law, with
+and without a stated law; the command line (`assemble --network --responses`:
+the file, the printed laws, grid line and run commands; a refusal exits 2 and
+writes nothing; help). `tests/test_assemble_network.py`: the two assertions
+that `responses` and a dataset's `responses.csv` are refused in a network now
+assert that an empty argument changes nothing, the dataset's rows are kept
+and a law on the wrong pool is refused; the command-line refusal test uses a
+substrate no class acts on. `tests/test_guardrails_no_hardcoding.py`: the new
+test tokens.
+
+Checked against NETWORK-003 (#125) outside the repository: in a scratch copy
+of this tree with #125's `api/user_data.py` and `cli.py` changes applied, the
+strict `xfail` flips (XPASS), the loader-refusal test skips, every other test
+passes, the reviewed draft loads with `check-data` listing each law on its
+process, and `fungmod run` gives `active_response_model` at `c30_ph5`
+(50 % of the entry degraded at 64.77 minutes, the fixture's value) and at the
+grid condition 40 degC, pH 5 (112.4 minutes).
+
+Commands and results (worktree on `claude/assemble-response-laws`, based on
+`524df39`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on the assembly, the CLI and the two
+  network assembly test modules: 0 errors.
+- `mkdocs build --strict`: built, no warnings; the anchor
+  `response-laws-in-a-network-draft` exists.
+- `tests/test_assemble_network_responses.py`: 28 passed, 1 xfailed.
+- Targeted run (both network assembly modules, assembly, both lookup modules,
+  fetch by name, CLI, CLI workflow, guardrails, documentation sync, hygiene,
+  instruction hierarchy, roadmap, shared progress, release configuration,
+  canonical API, network loader, import, partial runs, environment grids):
+  460 passed, 1 xfailed in 2 min 23 s.
+- Full suite (`pytest -n 2 --dist loadfile`, background): 2871 passed, 1 xfailed
+  in 23 min.
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13).
+
+Scientific impact: none on any simulated value of this version. A network
+draft now carries the temperature and pH laws a user states, each scaling only
+its member's rate from the law's reference condition, and a requested
+condition is reached through laws only when every member's law carries its
+kinetics there; nothing is fitted, and kinetics measured at several conditions
+never become a law.
+
+Compatibility: additive API and report keys, present only in network drafts
+with laws; behaviour: `responses` (and a dataset's `responses.csv`) are no
+longer refused with `network=True`. Every other draft, single-class drafts with
+laws included, is byte-identical (pinned digests here, the 56c8df4, 8a35ae5 and
+e97e8e6 pins still pass).
+
+Remaining ambiguities: the drafted laws load only once NETWORK-003 (#125) is
+merged, at which point the strict `xfail` must be removed (the refusal
+statement then disappears by itself; the no-law network limitation "Response
+laws, the pH-ionization form, cultures and time courses are not combined ..."
+and the loader-side docs sentences then need #125's wording); single-class
+drafts still do not report the reference condition while drafting (the loader
+refuses off-reference kinetics at load); the origin of `--responses` rows is
+reported as "the responses argument", as in single-class drafts; a law on a
+pool whose categories are `REVIEW:` fields is accepted and decided at load.
+
+Next task: once NETWORK-003 (#125) is merged, remove the strict `xfail` and
+align the no-law network limitation and docs with its wording; then report the
+reference condition of a law in single-class drafts too (a deliberate text
+change to pinned drafts, re-pinned).
+
 ## FETCH-003 Kinetics Of A Lab's Own Enzyme Classes Looked Up By Their EC Numbers
 
 Status: `complete` for the stated scope (2026-10-08); not verified against a
