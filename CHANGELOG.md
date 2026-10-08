@@ -1102,6 +1102,12 @@ All notable public releases of FungMod are documented here.
 
 ### Changed
 
+- The JOSS paper draft (`paper/joss/paper.md`, PAPER-004) describes the
+  current software: looked-up kinetics, network response laws, cultures with
+  several consuming enzymes, enzyme inactivation, `--json` summaries,
+  quick-look figures, the walkthrough and the spatial module's analytic
+  Jacobians. The author statements are still to be completed.
+
 - The implicit methods of the spatial mycelium core take the analytic
   Jacobian by default (SPATIAL-003): BDF and Radau as a sparse matrix (before,
   the coloured finite differences), LSODA in band storage of the cell-major

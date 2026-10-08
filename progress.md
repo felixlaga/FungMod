@@ -26,6 +26,38 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PAPER-004 The JOSS Paper Brought Up To The Current Software
+
+Date: 2026-10-08
+
+Status: done; the author statements are still outstanding. `paper/joss/paper.md`
+now describes the capabilities added since PAPER-003's last update, each
+checked against the code that carries it:
+- the kinetics looked up in SABIO-RK by the EC numbers of a strain's classes,
+  the laboratory's own classes included (FETCH-002, FETCH-003);
+- temperature and pH laws per class of an enzyme network (NETWORK-003);
+- a culture whose several secreted enzymes consume the substrate in parallel
+  (CULTURE-002);
+- first-order enzyme inactivation, optionally temperature-dependent
+  (USERDATA-011);
+- the machine-readable summaries of the command line (CLI-003);
+- the quick-look figures of every state and process (PLOTS-001);
+- the walkthrough and the live-source check script (DOCS-WALK-001);
+- the analytic sparse Jacobians of the spatial module (SPATIAL-003).
+
+The test count reads "more than 3,100" (3192 passed on the combined branch).
+Older sentences were shortened to stay inside the journal's length limit:
+1,743 words without references, against 1,750.
+
+Changed: `paper/joss/paper.md`, `CHANGELOG.md`, this entry.
+
+Tests: `tests/test_joss_paper.py` (unchanged) passes. It checks the sections,
+the citations, the length and that no research results are reported.
+
+Not changed: any code, model, parameter, registry record or bibliography
+entry. Scientific impact: none. Open for the author: the research-impact
+evidence and the AI-usage statement, both still marked in the draft.
+
 ## SPATIAL-003 Analytic Sparse Jacobian For The Spatial Mycelium Core
 
 Status: `complete` for the stated scope (2026-10-08). The performance step
