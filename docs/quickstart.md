@@ -99,6 +99,8 @@ all files in the bundle.
   `fit`.
 - Run the same workflow on your own measurements with
   [user-supplied data](user-data.md).
+- Go from a fungus name to its enzymes, their kinetics and a simulation,
+  step by step: [from a fungus name to a simulation](walkthrough.md).
 - Run the [zero-to-report notebook](notebooks.md#zero-to-a-complete-report).
 - Learn how [virtual-experiment modes](concepts/virtual-experiments.md) differ.
 - Use the [output reference](concepts/outputs.md) for downstream analysis.

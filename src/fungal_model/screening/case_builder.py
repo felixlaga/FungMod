@@ -39,6 +39,36 @@ SURFACE_CATALYSIS_PARAMETER_ROLES = (
     "adsorption_constant",
     "accessible_surface_area",
 )
+SURFACE_CATALYSIS_TEMPLATE_MODES = ("toy", "exploratory", "scientific")
+SURFACE_CATALYSIS_REQUIRED_PROCESS_STATE_METADATA = (
+    "config_name",
+    "config_mode",
+    "config_maturity",
+    "accessible_site_pool",
+    "product_map_name",
+)
+_SURFACE_CONFIG_PROVENANCE_REQUIRED = ("source", "measurement_method", "confidence_level", "validity_range", "notes")
+# Written by the assembler, the registry wrapper and the screens; a template cannot state them.
+_SURFACE_CONFIG_PROVENANCE_RESERVED = frozenset(
+    {
+        "registry_id",
+        "fungus_id",
+        "substrate_id",
+        "environment_id",
+        "process_compatibility_id",
+        "case_template_id",
+        "parameter_record_ids",
+        "parameter_value_sources",
+        "environment_response",
+        "screen_mode",
+        "sample_directory",
+        "run_label",
+        "scientific_mode_note",
+    }
+)
+_SURFACE_SUBSTRATE_ENTITY_REQUIRED = ("notes", "product_notes")
+_SURFACE_SUBSTRATE_ENTITY_OPTIONAL = ("completeness", "default_degradation_model", "water_activity_dependence")
+_SURFACE_PARAMETER_ENTRIES_REQUIRED = ("measurement_method", "validity_range")
 HOMOGENEOUS_MM_PARAMETER_ROLES = (
     "km",
     "kcat",
@@ -1150,19 +1180,12 @@ def _template_config_name(
     )
 
 
-def _template_config_mode(case_template: CaseTemplateRecord, *, fallback: str) -> str:
-    return str(case_template.process_state_metadata.get("config_mode", fallback))
-
-
-def _template_config_maturity(case_template: CaseTemplateRecord, *, fallback: str) -> str:
-    return str(case_template.process_state_metadata.get("config_maturity", fallback))
-
-
-def _template_geometry_data(case_template: CaseTemplateRecord, *, fallback: dict[str, Any]) -> dict[str, Any]:
-    geometry = case_template.process_state_metadata.get("geometry")
-    if isinstance(geometry, Mapping):
-        return deepcopy(dict(geometry))
-    return fallback
+def _roles_to_resolve(
+    *,
+    compatibility: ProcessCompatibilityRecord,
+    required_roles: tuple[str, ...],
+) -> tuple[str, ...]:
+    return tuple(dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys())))
 
 
 def _surface_catalysis_config_data(
@@ -1177,16 +1200,56 @@ def _surface_catalysis_config_data(
     parameter_records: Mapping[str, ParameterRecord],
     output_directory: str | None,
 ) -> dict[str, Any]:
-    bio001 = _is_bio001_surface_case(compatibility)
+    """Assemble one surface-catalysis case from its template and registry records.
+
+    The law is ``r = k_s * theta(E) * A`` with ``theta = K_ads E / (1 + K_ads E)``:
+    it reads the free-catalyst state, the adsorption constant, the surface rate
+    constant and the accessible area *parameter*, and it reads no geometry. The
+    template therefore states its geometry explicitly: a well-mixed geometry
+    mapping, kept as context metadata, or ``geometry: null`` for a model that
+    claims no vessel; a template that states neither is refused.
+
+    Every label and text comes from the template (``config_name``,
+    ``config_mode``, ``config_maturity``, ``accessible_site_pool``,
+    ``product_map_name``, ``config_provenance``, ``substrate_entity``,
+    ``enzyme_entity``, ``parameter_entries`` and its ``limitations``); the
+    structural fields come from the substrate, enzyme-class and compatibility
+    records. The bond class is the template's ``bond_type`` or, when the
+    template names none, the one bond class the substrate carries, the enzyme
+    class targets and the compatibility record requires; several are refused,
+    never chosen. A ``scientific`` template is assembled only from exact records
+    that the scientific selection rules accept. Nothing is defaulted.
+    """
+
+    metadata = case_template.process_state_metadata
+    mode = _surface_config_mode(case_template)
+    if mode == "scientific":
+        _surface_require_scientific_records(case_template, parameter_records=parameter_records)
+    physical_state = _surface_physical_state(substrate)
+    geometry = _surface_geometry(case_template)
+    limitations = _surface_limitations(case_template)
+    bond_type = _surface_bond_type(
+        registry=registry,
+        compatibility=compatibility,
+        case_template=case_template,
+        substrate=substrate,
+    )
+    declared_provenance = _surface_config_provenance(case_template)
+    substrate_entity = _surface_text_block(
+        case_template,
+        "substrate_entity",
+        required=_SURFACE_SUBSTRATE_ENTITY_REQUIRED,
+        optional=_SURFACE_SUBSTRATE_ENTITY_OPTIONAL,
+    )
+    enzyme_entity = _surface_enzyme_entity(case_template)
+    parameter_entries = _surface_text_block(
+        case_template,
+        "parameter_entries",
+        required=_SURFACE_PARAMETER_ENTRIES_REQUIRED,
+    )
     substrate_state = _template_state(case_template, "substrate")
     product_state = _template_state(case_template, "product")
     catalyst_state = _template_state(case_template, "catalyst")
-    product_map_id = _product_map_id(case_template)
-    primary_bond = str(case_template.process_state_metadata.get("bond_type") or substrate.bond_classes[0])
-    accessible_site_pool = str(
-        case_template.process_state_metadata.get("accessible_site_pool")
-        or "configured accessible site pool"
-    )
     provenance = _surface_catalysis_provenance(
         registry=registry,
         compatibility=compatibility,
@@ -1195,7 +1258,7 @@ def _surface_catalysis_config_data(
         substrate_id=substrate_id,
         environment_id=environment_id,
         parameter_records=parameter_records,
-        bio001=bio001,
+        declared=declared_provenance,
     )
     modifiers = _template_process_modifiers(
         case_template=case_template,
@@ -1208,63 +1271,48 @@ def _surface_catalysis_config_data(
         environment_id=environment_id,
         modifiers=modifiers,
     )
-    entities: dict[str, Any] = {
-        "geometry": {
-            "id": "geometry",
-            "loader": "well_mixed",
-            "data": _template_geometry_data(
-                case_template,
-                fallback=_bio001_geometry_data() if bio001 else _toy_geometry_data(),
-            ),
-        },
-        "substrates": [
-            {
-                "id": substrate_id,
-                "loader": "generic_solid",
-                "data": _surface_substrate_data(
-                    substrate=substrate,
-                    enzyme_class=compatibility.enzyme_class,
-                    provenance=provenance,
-                    bio001=bio001,
-                ),
-            }
-        ],
-        "enzymes": [
-            {
-                "id": compatibility.enzyme_class,
-                "data": _surface_enzyme_data(
-                    compatibility=compatibility,
-                    substrate=substrate,
-                    provenance=provenance,
-                    bio001=bio001,
-                ),
-            }
-        ],
-        "product_maps": [
-            _product_map_entity(
-                case_template=case_template,
+    entities: dict[str, Any] = {}
+    if geometry is not None:
+        entities["geometry"] = {"id": "geometry", "loader": "well_mixed", "data": geometry}
+    entities["substrates"] = [
+        {
+            "id": substrate_id,
+            "loader": "generic_solid",
+            "data": _surface_substrate_data(
+                substrate=substrate,
+                physical_state=physical_state,
+                enzyme_class=compatibility.enzyme_class,
                 provenance=provenance,
-                name=(
-                    "BIO-001 cellulose soluble product release map"
-                    if bio001
-                    else "toy registry one-to-one product release map"
-                ),
-                maturity="exploratory" if bio001 else "framework_benchmark",
-            )
-        ],
-    }
+                declared=substrate_entity,
+            ),
+        }
+    ]
+    entities["enzymes"] = [
+        {
+            "id": compatibility.enzyme_class,
+            "data": _surface_enzyme_data(
+                compatibility=compatibility,
+                substrate=substrate,
+                provenance=provenance,
+                declared=enzyme_entity,
+            ),
+        }
+    ]
+    entities["product_maps"] = [
+        _product_map_entity(
+            case_template=case_template,
+            provenance=provenance,
+            name=str(metadata["product_map_name"]),
+            maturity=str(metadata["config_maturity"]),
+        )
+    ]
     if environment_entity is not None:
         entities["environment"] = environment_entity
     return {
         "kind": "model_config",
-        "name": _template_config_name(
-            case_template=case_template,
-            fungus_id=fungus_id,
-            substrate_id=substrate_id,
-            fallback=_surface_config_name(fungus_id=fungus_id, substrate_id=substrate_id, bio001=bio001),
-        ),
-        "mode": _template_config_mode(case_template, fallback="exploratory" if bio001 else "toy"),
-        "maturity": _template_config_maturity(case_template, fallback="exploratory" if bio001 else "framework_benchmark"),
+        "name": _surface_config_name(case_template, fungus_id=fungus_id, substrate_id=substrate_id),
+        "mode": mode,
+        "maturity": str(metadata["config_maturity"]),
         "provenance": provenance,
         "case_template": _case_template_config(case_template),
         "entities": entities,
@@ -1272,11 +1320,7 @@ def _surface_catalysis_config_data(
             {
                 "id": "registry_case_parameters",
                 "parameters": [
-                    (
-                        _exploratory_surface_parameter_config(record, role=role)
-                        if bio001
-                        else _parameter_config(record, role=role)
-                    )
+                    _surface_parameter_config(record, role=role, entries=parameter_entries)
                     for role, record in parameter_records.items()
                 ],
             }
@@ -1289,30 +1333,18 @@ def _surface_catalysis_config_data(
                     "substrate": substrate_state,
                     "catalyst": catalyst_state,
                     "product": product_state,
-                    "bond_type": primary_bond,
-                    "accessible_site_pool": accessible_site_pool,
+                    "bond_type": bond_type,
+                    "accessible_site_pool": str(metadata["accessible_site_pool"]),
                 },
                 "parameters": {
                     role: record.parameter_symbol
                     for role, record in parameter_records.items()
                     if role in SURFACE_CATALYSIS_PARAMETER_ROLES
                 },
-                "product_map": product_map_id,
+                "product_map": _product_map_id(case_template),
                 "modifiers": modifiers,
                 "output_state_roles": dict(case_template.output_state_roles),
-                "assumptions": _process_assumptions(
-                    case_template,
-                    (
-                        "Enzyme-mediated insoluble cellulose surface degradation pilot.",
-                        "Accessible surface area is constant within each sample; surface renewal and morphology are not modeled.",
-                        "Soluble product release is represented by a mass-equivalent product class.",
-                    )
-                    if bio001
-                    else (
-                        "Toy registry case builder only.",
-                        "Uses the existing generic surface-catalysis factory without adding biology.",
-                    ),
-                ),
+                "assumptions": limitations,
             }
         ],
         "initial_state": _initial_state_from_template(
@@ -1344,22 +1376,233 @@ def _surface_catalysis_config_data(
     }
 
 
-def _roles_to_resolve(
+def _surface_template_label(case_template: CaseTemplateRecord) -> str:
+    return f"Surface-catalysis case template {case_template.case_template_id!r}"
+
+
+def _surface_config_mode(case_template: CaseTemplateRecord) -> str:
+    mode = case_template.process_state_metadata.get("config_mode")
+    if mode not in SURFACE_CATALYSIS_TEMPLATE_MODES:
+        raise RegistryCaseBuildError(
+            f"{_surface_template_label(case_template)} config_mode {mode!r} must be one of "
+            f"{', '.join(SURFACE_CATALYSIS_TEMPLATE_MODES)}."
+        )
+    return str(mode)
+
+
+def _surface_require_scientific_records(
+    case_template: CaseTemplateRecord,
     *,
+    parameter_records: Mapping[str, ParameterRecord],
+) -> None:
+    """Refuse a scientific template bound to any record the scientific rules would not select."""
+
+    problems: list[str] = []
+    for role, record in parameter_records.items():
+        blocker = parameter_record_mode_eligibility_blocker(record, mode="scientific")
+        if blocker is not None:
+            problems.append(f"{role} ({record.record_id}): {blocker}")
+        elif not record.value.is_exact:
+            problems.append(f"{role} ({record.record_id}): ValueSpec kind {record.value.kind!r} is not exact.")
+    if problems:
+        raise RegistryCaseBuildError(
+            f"{_surface_template_label(case_template)} declares config_mode 'scientific', but not every bound "
+            f"record is exact and scientific-grade: {' '.join(problems)}"
+        )
+
+
+def _surface_physical_state(substrate: SubstrateRecord) -> str:
+    physical_state = _configured_physical_state(substrate.physical_state)
+    if physical_state in {"dissolved", "unknown"}:
+        raise RegistryCaseBuildError(
+            f"Substrate record {substrate.record_id!r} declares physical_state {substrate.physical_state!r}; "
+            "surface catalysis acts on a substrate the record declares solid."
+        )
+    return physical_state
+
+
+def _surface_geometry(case_template: CaseTemplateRecord) -> dict[str, Any] | None:
+    """The template's declared geometry, or ``None`` for an explicit ``geometry: null``.
+
+    The surface law reads no geometry, so none is assumed for a template that
+    states none.
+    """
+
+    metadata = case_template.process_state_metadata
+    label = _surface_template_label(case_template)
+    if "geometry" not in metadata:
+        raise RegistryCaseBuildError(
+            f"{label} declares no geometry. The surface-catalysis law reads no geometry (its area is the "
+            "accessible_surface_area parameter), and FungMod assumes none: declare 'geometry: null' for a model "
+            "that claims no vessel, or the well-mixed geometry mapping the case states as context."
+        )
+    geometry = metadata["geometry"]
+    if geometry is None:
+        return None
+    if not isinstance(geometry, Mapping) or not geometry:
+        raise RegistryCaseBuildError(f"{label} geometry must be a well-mixed geometry mapping or null.")
+    if geometry.get("geometry_type") != "well_mixed":
+        raise RegistryCaseBuildError(
+            f"{label} geometry_type {geometry.get('geometry_type')!r} is not 'well_mixed'; the surface-catalysis "
+            "law is well mixed."
+        )
+    return deepcopy(dict(geometry))
+
+
+def _surface_limitations(case_template: CaseTemplateRecord) -> list[str]:
+    if not case_template.limitations:
+        raise RegistryCaseBuildError(
+            f"{_surface_template_label(case_template)} states no limitations; the surface-catalysis process "
+            "assumptions are the template's limitations and are never supplied by the assembler."
+        )
+    return list(case_template.limitations)
+
+
+def _surface_bond_type(
+    *,
+    registry: FungModRegistry,
     compatibility: ProcessCompatibilityRecord,
-    required_roles: tuple[str, ...],
-) -> tuple[str, ...]:
-    return tuple(dict.fromkeys((*required_roles, *compatibility.parameter_roles.keys())))
+    case_template: CaseTemplateRecord,
+    substrate: SubstrateRecord,
+) -> str:
+    """The template's ``bond_type``, or the single bond class shared by the substrate and the enzyme class.
+
+    A shared bond class is one the substrate record carries, the enzyme class
+    targets and the compatibility record requires. A declared ``bond_type``
+    must be one of them.
+    """
+
+    label = _surface_template_label(case_template)
+    try:
+        enzyme_class = registry.get_enzyme_class(compatibility.enzyme_class)
+    except RegistryLookupError as exc:
+        raise RegistryCaseBuildError(
+            f"Process compatibility record {compatibility.record_id!r} names enzyme class "
+            f"{compatibility.enzyme_class!r}, which the registry does not hold."
+        ) from exc
+    shared = tuple(
+        bond
+        for bond in dict.fromkeys(substrate.bond_classes)
+        if bond in enzyme_class.target_bond_classes and bond in compatibility.required_bond_classes
+    )
+    declared = case_template.process_state_metadata.get("bond_type")
+    if declared is not None:
+        if not _canonical_template_text(declared):
+            raise RegistryCaseBuildError(f"{label} bond_type must be canonical nonblank text.")
+        if declared not in shared:
+            raise RegistryCaseBuildError(
+                f"{label} bond_type {declared!r} is not a bond class shared by substrate {substrate.record_id!r} "
+                f"and enzyme class {enzyme_class.record_id!r} (shared: {list(shared)})."
+            )
+        return str(declared)
+    if len(shared) == 1:
+        return shared[0]
+    if not shared:
+        raise RegistryCaseBuildError(
+            f"{label} names no bond_type, and substrate {substrate.record_id!r} and enzyme class "
+            f"{enzyme_class.record_id!r} share no bond class."
+        )
+    raise RegistryCaseBuildError(
+        f"{label} names no bond_type, and substrate {substrate.record_id!r} and enzyme class "
+        f"{enzyme_class.record_id!r} share {len(shared)} bond classes ({', '.join(shared)}); the bond class is "
+        "never chosen: declare bond_type in the template."
+    )
 
 
-def _is_bio001_surface_case(compatibility: ProcessCompatibilityRecord) -> bool:
-    return compatibility.provenance.get("bio_milestone") == "BIO-001"
+def _surface_text_block(
+    case_template: CaseTemplateRecord,
+    key: str,
+    *,
+    required: tuple[str, ...],
+    optional: tuple[str, ...] = (),
+) -> dict[str, str]:
+    """A template mapping of canonical texts with exactly the required and optional keys, in declared order."""
+
+    label = _surface_template_label(case_template)
+    block = case_template.process_state_metadata.get(key)
+    if not isinstance(block, Mapping):
+        raise RegistryCaseBuildError(
+            f"{label} requires a {key!r} mapping with {', '.join(required)}."
+        )
+    unknown = sorted(str(name) for name in block if name not in (*required, *optional))
+    if unknown:
+        raise RegistryCaseBuildError(f"{label} {key} has unsupported field(s): {', '.join(unknown)}.")
+    missing = [name for name in required if not _canonical_template_text(block.get(name))]
+    invalid = [name for name in optional if name in block and not _canonical_template_text(block[name])]
+    if missing or invalid:
+        raise RegistryCaseBuildError(
+            f"{label} {key} requires canonical nonblank text for: {', '.join((*missing, *invalid))}."
+        )
+    return {str(name): str(value) for name, value in block.items()}
 
 
-def _surface_config_name(*, fungus_id: str, substrate_id: str, bio001: bool) -> str:
-    if bio001:
-        return f"BIO-001 cellulose surface virtual experiment {fungus_id} on {substrate_id}"
-    return f"toy registry case {fungus_id} on {substrate_id}"
+def _surface_config_provenance(case_template: CaseTemplateRecord) -> dict[str, str]:
+    """The template's ``config_provenance`` texts, in declared order.
+
+    Beyond the required fields a template may state further provenance texts
+    (for example a milestone label); it may not state the case-identity and
+    record fields the assembler and the screens write.
+    """
+
+    label = _surface_template_label(case_template)
+    block = case_template.process_state_metadata.get("config_provenance")
+    if not isinstance(block, Mapping):
+        raise RegistryCaseBuildError(
+            f"{label} requires a 'config_provenance' mapping with "
+            f"{', '.join(_SURFACE_CONFIG_PROVENANCE_REQUIRED)}."
+        )
+    reserved = sorted(str(name) for name in block if name in _SURFACE_CONFIG_PROVENANCE_RESERVED)
+    if reserved:
+        raise RegistryCaseBuildError(
+            f"{label} config_provenance may not state assembler-written field(s): {', '.join(reserved)}."
+        )
+    missing = [name for name in _SURFACE_CONFIG_PROVENANCE_REQUIRED if name not in block]
+    invalid = [str(name) for name, value in block.items() if not _canonical_template_text(value)]
+    if missing or invalid:
+        raise RegistryCaseBuildError(
+            f"{label} config_provenance requires canonical nonblank text for: {', '.join((*missing, *invalid))}."
+        )
+    return {str(name): str(value) for name, value in block.items()}
+
+
+def _surface_enzyme_entity(case_template: CaseTemplateRecord) -> dict[str, Any]:
+    label = _surface_template_label(case_template)
+    block = case_template.process_state_metadata.get("enzyme_entity")
+    if not isinstance(block, Mapping):
+        raise RegistryCaseBuildError(f"{label} requires an 'enzyme_entity' mapping with name, validity_labels, notes.")
+    unknown = sorted(str(name) for name in block if name not in ("name", "validity_labels", "notes"))
+    if unknown:
+        raise RegistryCaseBuildError(f"{label} enzyme_entity has unsupported field(s): {', '.join(unknown)}.")
+    missing = [name for name in ("name", "notes") if not _canonical_template_text(block.get(name))]
+    if missing:
+        raise RegistryCaseBuildError(
+            f"{label} enzyme_entity requires canonical nonblank text for: {', '.join(missing)}."
+        )
+    labels = block.get("validity_labels")
+    if (
+        isinstance(labels, (str, bytes))
+        or not isinstance(labels, Sequence)
+        or not labels
+        or not all(_canonical_template_text(item) for item in labels)
+    ):
+        raise RegistryCaseBuildError(
+            f"{label} enzyme_entity validity_labels must be a nonempty list of canonical nonblank texts."
+        )
+    return {"name": str(block["name"]), "validity_labels": [str(item) for item in labels], "notes": str(block["notes"])}
+
+
+def _surface_config_name(case_template: CaseTemplateRecord, *, fungus_id: str, substrate_id: str) -> str:
+    try:
+        return str(case_template.process_state_metadata["config_name"]).format(
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            case_template_id=case_template.case_template_id,
+        )
+    except (KeyError, IndexError, ValueError) as exc:
+        raise RegistryCaseBuildError(
+            f"{_surface_template_label(case_template)} config_name may use only the fields {{fungus_id}}, "
+            f"{{substrate_id}} and {{case_template_id}}: {exc}"
+        ) from exc
 
 
 def _surface_catalysis_provenance(
@@ -1371,70 +1614,47 @@ def _surface_catalysis_provenance(
     substrate_id: str,
     environment_id: str,
     parameter_records: Mapping[str, ParameterRecord],
-    bio001: bool,
+    declared: Mapping[str, str],
 ) -> dict[str, Any]:
-    if not bio001:
-        return {
-            "source": "FungMod R3 toy registry case builder.",
-            "measurement_method": "software registry-to-config assembly test",
-            "confidence_level": "testing",
-            "notes": (
-                "Toy/development plug-and-play assembly fixture only; not "
-                "empirical evidence and not a biological model."
-            ),
-            "validity_range": "R3 framework tests only",
-            "units": "not_applicable",
+    """The template's declared provenance (notes last), the case identity and the bound records."""
+
+    provenance: dict[str, Any] = {name: value for name, value in declared.items() if name != "notes"}
+    provenance.update(
+        {
             "registry_id": registry.registry_id,
             "fungus_id": fungus_id,
             "substrate_id": substrate_id,
             "environment_id": environment_id,
             "process_compatibility_id": compatibility.record_id,
             "case_template_id": case_template.case_template_id,
+            "parameter_record_ids": {
+                role: record.record_id
+                for role, record in parameter_records.items()
+            },
+            "parameter_value_sources": {
+                role: record.value.source
+                for role, record in parameter_records.items()
+            },
+            "notes": declared["notes"],
         }
-    return {
-        "source": "FungMod BIO-001 controlled virtual-experiment scaffold.",
-        "measurement_method": "registry assembly from user-supplied exploratory ValueSpec samples",
-        "confidence_level": "exploratory_assumption",
-        "validity_range": "BIO-001 cellulose surface-degradation pilot only",
-        "units": "not_applicable",
-        "bio_milestone": "BIO-001",
-        "registry_id": registry.registry_id,
-        "fungus_id": fungus_id,
-        "substrate_id": substrate_id,
-        "environment_id": environment_id,
-        "process_compatibility_id": compatibility.record_id,
-        "case_template_id": case_template.case_template_id,
-        "parameter_record_ids": {
-            role: record.record_id
-            for role, record in parameter_records.items()
-        },
-        "parameter_value_sources": {
-            role: record.value.source
-            for role, record in parameter_records.items()
-        },
-        "notes": (
-            "Exploratory enzyme-mediated insoluble cellulose surface-degradation "
-            "pilot. It is not a whole-fungus model and does not include secretion, "
-            "uptake, biomass growth, oxygen limitation, or full lignocellulose structure."
-        ),
-    }
+    )
+    return provenance
 
 
 def _surface_substrate_data(
     *,
     substrate: SubstrateRecord,
+    physical_state: str,
     enzyme_class: str,
     provenance: Mapping[str, Any],
-    bio001: bool,
+    declared: Mapping[str, str],
 ) -> dict[str, Any]:
-    if not bio001:
-        return _generic_substrate_data(substrate=substrate, enzyme_class=enzyme_class)
-    return {
+    data: dict[str, Any] = {
         "kind": "substrate",
         "name": substrate.name,
         "substrate_type": "generic_solid",
         "chemical_class": substrate.substrate_class,
-        "physical_state": _configured_physical_state(substrate.physical_state),
+        "physical_state": physical_state,
         "bond_types": list(substrate.bond_classes),
         "accessible_bonds": list(substrate.bond_classes),
         "required_enzyme_classes": [enzyme_class],
@@ -1442,20 +1662,20 @@ def _surface_substrate_data(
             {
                 "name": product,
                 "source": provenance["source"],
-                "notes": "BIO-001 soluble cellulose hydrolysis-product class; not a full stoichiometric speciation model.",
+                "notes": declared["product_notes"],
             }
             for product in substrate.products
         ],
-        "completeness": "partial",
-        "default_degradation_model": "heterogeneous_surface",
-        "water_activity_dependence": "unknown",
-        "provenance": {
-            "source": provenance["source"],
-            "confidence_level": provenance["confidence_level"],
-            "notes": "Generic insoluble cellulose-like film metadata for BIO-001 surface degradation.",
-        },
-        "parameters": [],
     }
+    # Optional substrate descriptors are written only when the template states them.
+    data.update({name: declared[name] for name in _SURFACE_SUBSTRATE_ENTITY_OPTIONAL if name in declared})
+    data["provenance"] = {
+        "source": provenance["source"],
+        "confidence_level": provenance["confidence_level"],
+        "notes": declared["notes"],
+    }
+    data["parameters"] = []
+    return data
 
 
 def _surface_enzyme_data(
@@ -1463,26 +1683,21 @@ def _surface_enzyme_data(
     compatibility: ProcessCompatibilityRecord,
     substrate: SubstrateRecord,
     provenance: Mapping[str, Any],
-    bio001: bool,
+    declared: Mapping[str, Any],
 ) -> dict[str, Any]:
-    if not bio001:
-        return _toy_enzyme_data(compatibility=compatibility, substrate=substrate)
     return {
         "kind": "enzyme",
-        "name": "Generic cellulase-like enzyme source",
+        "name": declared["name"],
         "enzyme_class": compatibility.enzyme_class,
         "target_bond_types": list(compatibility.required_bond_classes),
         "target_substrate_classes": [substrate.substrate_class],
         "target_substrate_names": [substrate.name],
-        "validity_labels": ["exploratory_metadata", "surface_catalysis", "enzyme_mediated_cellulose_degradation"],
+        "validity_labels": list(declared["validity_labels"]),
         "provenance": {
             "source": provenance["source"],
             "measurement_method": provenance["measurement_method"],
             "confidence_level": provenance["confidence_level"],
-            "notes": (
-                "Generic cellulase-like enzyme metadata for BIO-001. This does "
-                "not model secretion, uptake, biomass growth, or enzyme inactivation."
-            ),
+            "notes": declared["notes"],
             "validity_range": provenance["validity_range"],
             "units": "not_applicable",
         },
@@ -1492,22 +1707,29 @@ def _surface_enzyme_data(
     }
 
 
-def _bio001_geometry_data() -> dict[str, Any]:
+def _surface_parameter_config(
+    record: ParameterRecord,
+    *,
+    role: str,
+    entries: Mapping[str, str],
+) -> dict[str, Any]:
+    confidence_level = record.value.confidence_level or record.provenance.get("confidence_level")
+    if not _canonical_template_text(confidence_level):
+        raise RegistryCaseBuildError(
+            f"Parameter record {record.record_id!r} (role {role!r}) states no confidence level on its value or "
+            "provenance."
+        )
     return {
-        "kind": "geometry",
-        "name": "BIO-001 well-mixed enzyme assay context",
-        "geometry_type": "well_mixed",
-        "provenance": {
-            "source": "FungMod BIO-001 controlled virtual-experiment scaffold.",
-            "measurement_method": "user-specified virtual-experiment context",
-            "confidence_level": "exploratory_assumption",
-            "notes": "Geometry context for an enzyme-mediated surface-degradation pilot; no spatial gradients are modeled.",
-            "validity_range": "BIO-001 cellulose surface-degradation pilot only",
-            "units": "not_applicable",
-        },
-        "volume": {"value": 100.0, "units": "milliliter"},
-        "surface_area": {"value": 0.5, "units": "meter ** 2"},
-        "parameters": [],
+        "name": record.name,
+        "symbol": record.parameter_symbol,
+        "value": _record_exact_value(record, role=role),
+        "units": _record_units(record, role=role),
+        "uncertainty": 0.0,
+        "source": record.value.source or _record_source(record),
+        "confidence_level": str(confidence_level),
+        "notes": f"{record.notes} Registry case role: {role}.",
+        "measurement_method": entries["measurement_method"],
+        "validity_range": entries["validity_range"],
     }
 
 
@@ -1794,78 +2016,6 @@ def _homogeneous_enzyme_data(
     }
 
 
-def _toy_geometry_data() -> dict[str, Any]:
-    return {
-        "kind": "geometry",
-        "name": "toy registry well-mixed 100 mL",
-        "geometry_type": "well_mixed",
-        "provenance": {
-            "source": "FungMod R3 toy registry case builder.",
-            "measurement_method": "defined benchmark metadata",
-            "confidence_level": "testing",
-            "notes": "Inline toy geometry for registry-to-config workflow tests.",
-            "validity_range": "R3 framework tests only",
-            "units": "not_applicable",
-        },
-        "volume": {"value": 100.0, "units": "milliliter"},
-        "surface_area": {"value": 0.1, "units": "meter ** 2"},
-        "parameters": [],
-    }
-
-
-def _generic_substrate_data(*, substrate: SubstrateRecord, enzyme_class: str) -> dict[str, Any]:
-    return {
-        "kind": "substrate",
-        "name": substrate.name,
-        "substrate_type": "generic_solid",
-        "chemical_class": substrate.substrate_class,
-        "physical_state": _configured_physical_state(substrate.physical_state),
-        "bond_types": list(substrate.bond_classes),
-        "accessible_bonds": list(substrate.bond_classes),
-        "required_enzyme_classes": [enzyme_class],
-        "degradation_products": [
-            {
-                "name": product,
-                "notes": "Toy registry product placeholder; not empirical.",
-            }
-            for product in substrate.products
-        ],
-        "provenance": {
-            "source": "FungMod R3 toy registry case builder.",
-            "confidence_level": "testing",
-            "notes": "Inline generic substrate generated from toy registry metadata.",
-        },
-        "parameters": [],
-    }
-
-
-def _toy_enzyme_data(
-    *,
-    compatibility: ProcessCompatibilityRecord,
-    substrate: SubstrateRecord,
-) -> dict[str, Any]:
-    return {
-        "kind": "enzyme",
-        "name": f"Toy registry catalyst for {compatibility.enzyme_class}",
-        "enzyme_class": compatibility.enzyme_class,
-        "target_bond_types": list(compatibility.required_bond_classes),
-        "target_substrate_classes": [substrate.substrate_class],
-        "target_substrate_names": [],
-        "validity_labels": ["toy", "registry_case_builder"],
-        "provenance": {
-            "source": "FungMod R3 toy registry case builder.",
-            "measurement_method": "defined benchmark metadata",
-            "confidence_level": "testing",
-            "notes": "Inline toy enzyme metadata for process compatibility only.",
-            "validity_range": "R3 framework tests only",
-            "units": "not_applicable",
-        },
-        "catalytic_parameters": [],
-        "adsorption_parameters": [],
-        "parameters": [],
-    }
-
-
 def _configured_physical_state(registry_physical_state: str) -> str:
     if registry_physical_state in {"mixed_solid", "solid_polymer", "solid_biomass", "dissolved", "unknown"}:
         return registry_physical_state
@@ -1875,40 +2025,6 @@ def _configured_physical_state(registry_physical_state: str) -> str:
         "Registry substrate physical_state "
         f"{registry_physical_state!r} cannot be represented by the generic config loader."
     )
-
-
-def _parameter_config(record: ParameterRecord, *, role: str) -> dict[str, Any]:
-    assert record.value.value is not None
-    return {
-        "name": record.name,
-        "symbol": record.parameter_symbol,
-        "value": record.value.value,
-        "units": record.value.units or "dimensionless",
-        "uncertainty": 0.0,
-        "source": record.value.source or record.provenance.get("source"),
-        "confidence_level": record.value.confidence_level
-        or record.provenance.get("confidence_level", "testing"),
-        "notes": f"{record.notes} Registry case role: {role}. Toy/development only.",
-        "measurement_method": "registry exact ValueSpec",
-        "validity_range": "R3 toy registry case only",
-    }
-
-
-def _exploratory_surface_parameter_config(record: ParameterRecord, *, role: str) -> dict[str, Any]:
-    value = _record_exact_value(record, role=role)
-    return {
-        "name": record.name,
-        "symbol": record.parameter_symbol,
-        "value": value,
-        "units": _record_units(record, role=role),
-        "uncertainty": 0.0,
-        "source": record.value.source or _record_source(record),
-        "confidence_level": record.value.confidence_level
-        or record.provenance.get("confidence_level", "exploratory_assumption"),
-        "notes": f"{record.notes} Registry case role: {role}.",
-        "measurement_method": "sampled from user-supplied exploratory registry ValueSpec",
-        "validity_range": "BIO-001 cellulose surface-degradation pilot only",
-    }
 
 
 def _scientific_parameter_config(record: ParameterRecord, *, role: str) -> dict[str, Any]:
@@ -2238,11 +2354,12 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
         required_parameter_roles=SURFACE_CATALYSIS_PARAMETER_ROLES,
         required_state_roles=("substrate", "product", "catalyst"),
         deterministic_mode="toy",
-        additional_supported_modes=(),
-        required_process_state_metadata=(),
-        enforce_template_mode_match=False,
+        additional_supported_modes=("scientific",),
+        required_process_state_metadata=SURFACE_CATALYSIS_REQUIRED_PROCESS_STATE_METADATA,
+        enforce_template_mode_match=True,
         unsupported_mode_message=(
-            "Surface-catalysis registry assembly currently only emits toy model configs."
+            "Surface-catalysis registry assembly supports mode='toy' or mode='scientific', matching the "
+            "template's config_mode; exploratory templates are sampled through the exploratory screen."
         ),
         config_data_builder=_surface_catalysis_config_data,
     ),
@@ -2363,6 +2480,9 @@ __all__ = [
     "RegistryCaseConfigMode",
     "RegistryProcessAssembler",
     "RegistryRoleSet",
+    "SURFACE_CATALYSIS_PARAMETER_ROLES",
+    "SURFACE_CATALYSIS_REQUIRED_PROCESS_STATE_METADATA",
+    "SURFACE_CATALYSIS_TEMPLATE_MODES",
     "build_registry_process_config_data",
     "build_model_config_from_registry_case",
     "get_registry_process_assembler",

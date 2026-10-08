@@ -1,0 +1,6 @@
+Entry	Entry Name	Protein names	Gene Names	Organism	Organism (ID)	EC number	CAZy	Reviewed
+X9B2P001	SYB201_XFIX2	Synthetic protein B2-01 (format fixture)	synb201	Synthetic fixture mould B2 (strain FIX-2)	9000000002	3.2.1.21		unreviewed
+X9B2P002	SYB202_XFIX2	Synthetic protein B2-02 (format fixture)	synb202	Synthetic fixture mould B2 (strain FIX-2)	9000000002	3.2.1.8	GH11;	reviewed
+X9B2P003	SYB203_XFIX2	Synthetic protein B2-03 (format fixture)	synb203	Synthetic fixture mould B2 (strain FIX-2)	9000000002	3.2.1.14	CBM18;GH18;	unreviewed
+X9B2P004	SYB204_XFIX2	Synthetic protein B2-04 (format fixture)	synb204	Synthetic fixture mould B2 (strain FIX-2)	9000000002		AA9;	unreviewed
+X9B2P005	SYB205_XFIX2	Synthetic protein B2-05 (format fixture)	synb205	Synthetic fixture mould B2 (strain FIX-2)	9000000002	3.1.1.1		unreviewed

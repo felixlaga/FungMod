@@ -1,0 +1,32 @@
+{
+  "candidate_rows": 1,
+  "fetched_by": "fungal_model.sources.uniprot.search_proteomes_by_name(refresh=True)",
+  "field_names_note": "The proteomes search URL, the query fields organism_name and proteome_type, the return-field names and their TSV column headers follow UniProt's REST documentation; they were not checked against a live response when FungMod's client was written. The response was parsed before it was stored.",
+  "fields": [
+    "upid",
+    "organism",
+    "organism_id",
+    "protein_count"
+  ],
+  "file": "proteomes.tsv",
+  "format": "tsv",
+  "http_status": 200,
+  "kind": "fungmod_uniprot_proteome_search_snapshot",
+  "name_key": "synthetic fixture mould b2",
+  "next_page": false,
+  "organism_name": "Synthetic fixture mould B2",
+  "page_size": 500,
+  "proteome_type": "reference proteome (proteome_type:1)",
+  "query": "organism_name:\"Synthetic fixture mould B2\" AND proteome_type:1",
+  "query_key": "organism_name_synthetic_fixture_mould_b2_32e605c891b0",
+  "retrieved_at": "2026-10-08T11:37:25.872090Z",
+  "schema_version": "1",
+  "sha256": "80ee05efa1f2c1b6101f8862b50f6e414c3a02f3b87c27f1e088f7619401bdb5",
+  "size_bytes": 114,
+  "source": "UniProt REST API proteomes search endpoint",
+  "total_results": null,
+  "truncated": false,
+  "uniprot_release": "fixture_release",
+  "uniprot_release_date": "06-October-2026",
+  "url": "https://rest.uniprot.org/proteomes/search?query=organism_name:%22Synthetic%20fixture%20mould%20B2%22%20AND%20proteome_type:1&fields=upid,organism,organism_id,protein_count&format=tsv&size=500"
+}

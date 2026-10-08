@@ -55,6 +55,28 @@ records:
       public_path: false
       bond_type: toy_beta_1_4_glycosidic
       accessible_site_pool: configured accessible site pool
+      product_map_name: toy registry one-to-one product release map
+      config_provenance:
+        source: FungMod R3 toy registry case builder.
+        measurement_method: software registry-to-config assembly test
+        confidence_level: testing
+        validity_range: R3 framework tests only
+        units: not_applicable
+        notes: >-
+          Toy/development plug-and-play assembly fixture only; not empirical
+          evidence and not a biological model.
+      substrate_entity:
+        notes: Inline generic substrate generated from toy registry metadata.
+        product_notes: Toy registry product placeholder; not empirical.
+      enzyme_entity:
+        name: Toy registry catalyst for toy_cellulase
+        validity_labels:
+          - toy
+          - registry_case_builder
+        notes: Inline toy enzyme metadata for process compatibility only.
+      parameter_entries:
+        measurement_method: registry exact ValueSpec
+        validity_range: R3 toy registry case only
       geometry:
         kind: geometry
         name: toy registry well-mixed 100 mL
@@ -138,6 +160,39 @@ records:
       public_path: true
       bond_type: beta_1_4_glycosidic
       accessible_site_pool: cellulose accessible beta-1,4-glycosidic surface
+      product_map_name: BIO-001 cellulose soluble product release map
+      config_provenance:
+        source: FungMod BIO-001 controlled virtual-experiment scaffold.
+        measurement_method: registry assembly from user-supplied exploratory ValueSpec samples
+        confidence_level: exploratory_assumption
+        validity_range: BIO-001 cellulose surface-degradation pilot only
+        units: not_applicable
+        bio_milestone: BIO-001
+        notes: >-
+          Exploratory enzyme-mediated insoluble cellulose surface-degradation
+          pilot. It is not a whole-fungus model and does not include secretion,
+          uptake, biomass growth, oxygen limitation, or full lignocellulose
+          structure.
+      substrate_entity:
+        notes: Generic insoluble cellulose-like film metadata for BIO-001 surface degradation.
+        product_notes: >-
+          BIO-001 soluble cellulose hydrolysis-product class; not a full
+          stoichiometric speciation model.
+        completeness: partial
+        default_degradation_model: heterogeneous_surface
+        water_activity_dependence: unknown
+      enzyme_entity:
+        name: Generic cellulase-like enzyme source
+        validity_labels:
+          - exploratory_metadata
+          - surface_catalysis
+          - enzyme_mediated_cellulose_degradation
+        notes: >-
+          Generic cellulase-like enzyme metadata for BIO-001. This does not
+          model secretion, uptake, biomass growth, or enzyme inactivation.
+      parameter_entries:
+        measurement_method: sampled from user-supplied exploratory registry ValueSpec
+        validity_range: BIO-001 cellulose surface-degradation pilot only
       geometry:
         kind: geometry
         name: BIO-001 well-mixed enzyme assay context

@@ -150,7 +150,9 @@ def test_registry_process_assemblers_advertise_supported_roles() -> None:
         "accessible_surface_area",
     )
     assert surface.deterministic_mode == "toy"
-    assert surface.supported_request_modes == ("toy",)
+    # SURFACE-001: toy or scientific, as the template's config_mode states; exploratory templates are sampled.
+    assert surface.supported_request_modes == ("toy", "scientific")
+    assert surface.enforce_template_mode_match
     assert homogeneous is not None
     assert homogeneous.required_parameter_roles == (
         "km",

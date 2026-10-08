@@ -106,6 +106,9 @@ def test_new_surface_catalysis_template_assembles_without_record_id_specific_bra
         "bond_type": "toy_beta_1_4_glycosidic",
         "accessible_site_pool": "pre-bio template accessible pool",
     }
+    assert data["entities"]["enzymes"][0]["data"]["name"] == "PRE-BIO template catalyst fixture"
+    assert data["entities"]["product_maps"][0]["data"]["name"] == "PRE-BIO template product map fixture"
+    assert data["provenance"]["validity_range"] == "PRE-BIO-001 template-assembly tests only"
 
 
 def test_toy_case_template_is_marked_outside_public_path() -> None:
@@ -190,6 +193,28 @@ def _insert_surface_template_fixture(registry_dir: Path) -> None:
                 "public_path": False,
                 "bond_type": "toy_beta_1_4_glycosidic",
                 "accessible_site_pool": "pre-bio template accessible pool",
+                # SURFACE-001: every label and text of the assembled case comes from the template.
+                "product_map_name": "PRE-BIO template product map fixture",
+                "config_provenance": {
+                    "source": "PRE-BIO-001 test fixture",
+                    "measurement_method": "software registry-to-config assembly test",
+                    "confidence_level": "testing",
+                    "validity_range": "PRE-BIO-001 template-assembly tests only",
+                    "notes": "Template-driven surface-catalysis assembly fixture; not a biological model.",
+                },
+                "substrate_entity": {
+                    "notes": "Template fixture substrate metadata.",
+                    "product_notes": "Template fixture product placeholder; not empirical.",
+                },
+                "enzyme_entity": {
+                    "name": "PRE-BIO template catalyst fixture",
+                    "validity_labels": ["toy", "registry_case_builder"],
+                    "notes": "Template fixture enzyme metadata.",
+                },
+                "parameter_entries": {
+                    "measurement_method": "registry exact ValueSpec",
+                    "validity_range": "PRE-BIO-001 template-assembly tests only",
+                },
                 "geometry": {
                     "kind": "geometry",
                     "name": "PRE-BIO template geometry fixture",

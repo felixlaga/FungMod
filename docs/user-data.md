@@ -480,20 +480,24 @@ for item in draft.assembly["kinetics_lookup"]["not_queried"]:
   on a pool of a network), one query per complete EC number of the class's
   registry record: its EC number and the EC numbers among its aliases that the
   registry resolves to that class (the shipped `cellobiohydrolase` record
-  states 3.2.1.91 and, as an alias, 3.2.1.176, so both are queried). The query
-  is restricted to the substrate's name,
+  states 3.2.1.91 and, as an alias, 3.2.1.176, so both are queried). A class
+  your user dataset defines in [`enzyme_classes.csv`](#enzyme_classescsv-optional)
+  is queried by the `ec_number` of its row (FETCH-003), and the SABIO-RK
+  conversion resolves the answer's entries to that class by the same exact
+  match. The query is restricted to the substrate's name,
   `ECNumber:"<EC number>" AND Substrate:"<substrate name>"`, with the name of
   the registry record (otherwise of the user dataset's row or of the
   request), which is also the name an entry is matched on afterwards. No
   query names an enzyme, an organism or a class name, and none is broader
   than an EC number and a substrate name.
 - **Not queried**, each listed in the report with the reason: a class whose
-  record states no complete EC number (SABIO-RK is queried by EC number only,
-  never by a name); a class of the user dataset's `enzyme_classes.csv`
-  (`user_tables_from_sabiork` resolves an entry's EC number against the
-  registry, so no entry could become kinetics of a user-defined class: enter
-  its kinetics in the dataset); an EC number the registry resolves to another
-  class or ambiguously; a substrate whose categories are `REVIEW:` fields
+  record or `enzyme_classes.csv` row states no complete EC number (SABIO-RK is
+  queried by EC number only, never by a name; a partial `3.1.1.-` is not
+  queried); an EC number the registry resolves to another class or
+  ambiguously; an EC number two classes share, a registry class and a
+  user-defined class or two user-defined classes of the dataset (whether or
+  not the fungus has both), because the conversion would not choose between
+  them, so both are listed; a substrate whose categories are `REVIEW:` fields
   (which classes act on it is decided only when the reviewed tables load); a
   substrate name with a double quote, a backslash or a control character
   (FungMod does not guess an escaping). A request whose fungus has no
@@ -535,7 +539,9 @@ for item in draft.assembly["kinetics_lookup"]["not_queried"]:
 - **The report.** `draft.assembly["kinetics_lookup"]` holds the database and
   endpoint, the query form, every query (class, EC number, substrate, query,
   snapshot directory relative to `cache_dir`, URLs, retrieval time, HTTP
-  status, entries, the SHA-256 of each raw page and of the combined export),
+  status, entries, the SHA-256 of each raw page and of the combined export;
+  for a user-defined class also `class_defined_in`, the `enzyme_classes.csv`
+  row that defines it and its EC number),
   the entries converted with the cases they feed, every other entry with its
   use (`listed`, `not used`, `not convertible`, `not selected`) and reason
   and, for an entry that cannot be converted, each parameter's reason
@@ -555,7 +561,9 @@ tests serve **synthetic test responses written by hand** in the export format
 (`tests/fixtures/sabiork_kinetics_queries/`, not SABIO-RK data). An answer
 that is not the export envelope, or whose entries do not add up to its
 `total_count`, is refused and nothing is stored, so a change on SABIO-RK's
-side stops the lookup rather than misleading it.
+side stops the lookup rather than misleading it. On a machine with internet
+access, `scripts/verify_live_sources.py` checks the live answer to such a query
+against these expectations ([verifying the live lookups](walkthrough.md#verifying-the-live-lookups)).
 
 With those synthetic responses (`tests/test_fetch_kinetics.py`), a strain
 declared to be the synthetic organism K1 with `beta_glucosidase` asserted
@@ -575,14 +583,41 @@ queried; and a registry enzyme network in which beta-glucosidase gets its
 kinetics on the intermediate pool while cellobiohydrolase's two queries come
 back empty, so the network stays blocked by that gap.
 
+Classes a lab defines itself (FETCH-003, `tests/test_fetch_kinetics_user_classes.py`,
+with the user dataset `tests/fixtures/user_data/lab_classes_case/`): strain K6,
+whose `scientific_name` is the synthetic organism K6, has two classes the
+registry does not have, `lab_ester_hydrolase` (`ec_number` 3.1.1.1) on
+`pnp_butyrate` ("4-Nitrophenyl butyrate") and `lab_phosphomonoesterase`
+(3.1.3.2) on `pnp_phosphate`. Asked for `pnp_butyrate` at 25 degC, pH 7, at
+30 degC, pH 7 and at 37 degC, pH 7.5, the draft makes one query,
+`ECNumber:"3.1.1.1" AND Substrate:"4-Nitrophenyl butyrate"` (the second class
+does not act on that substrate), and its four entries give: the lab's own
+`kinetics.csv` rows at 25 degC, which come first (K6's entry there is listed
+as weaker evidence); K6's entry at 30 degC as `literature_same_organism`; K7's
+entry at 37 degC as a `transferred_estimate`; a mutant not convertible. The
+reviewed draft runs the 30 degC case in scientific mode and the 37 degC case
+in exploratory mode only. The materially different case, `pnp_phosphate` at
+40 degC, pH 5, is a Vmax-form transfer in micromolar units (Vmax
+`85 µM*min^(-1)`, Km `210 µM`). An EC number two classes share is refused on both
+sides: a second row of `enzyme_classes.csv` with 3.1.1.1 stops the query and
+lists the entries of an export as not convertible, and a lab class given
+3.2.1.21 stops both its own query and that of the registry's
+`beta_glucosidase`, whose Reaction 618 entries are then listed too.
+
 Limits of the lookup:
 
 - SABIO-RK only, one query per EC number and substrate name. Entries filed
   under another name of the substrate (an alias, a synonym, another
   spelling) are not found; give an export you downloaded as
   `kinetics_sources` for those.
-- Classes of a user dataset are not looked up, because the SABIO-RK
-  conversion resolves EC numbers against the registry only.
+- A class your user dataset defines is looked up only by the `ec_number` of
+  its `enzyme_classes.csv` row, exactly; a class without one, with a partial
+  one, or sharing it with another class (registry or user-defined) gets no
+  SABIO-RK kinetics: enter them in `kinetics.csv`, or give the class an EC
+  number of its own.
+- Entries converted for a substrate of your user dataset are matched to it by
+  the substrate's name; its `substrates.csv` row (product and yield included)
+  is kept unchanged, whatever the SABIO-RK reaction names as products.
 - SABIO-RK's entries are whatever organisms it holds: only the fungus's
   species gives literature, everything else is a transfer (an estimate) for
   exploratory mode.
@@ -682,6 +717,16 @@ carboxylesterase,carboxylesterase,3.1.1.1,carboxylic_ester,aryl_ester,Lab notebo
 Use it only for classes the registry does not have; an ID or name that the
 registry already uses is refused. Bond and substrate classes are lowercase
 snake_case.
+
+`ec_number` is optional, and it is how SABIO-RK kinetics reach your class: the
+SABIO-RK conversion resolves an entry's EC number to your class when both are
+the same complete EC number (four numeric parts), and
+[`fetch_kinetics`](#fetching-kinetics) queries SABIO-RK by it. A partial EC
+number such as `3.1.1.-` matches nothing and is not queried, and an EC number
+that another class also has (a registry class, or a second row of this file)
+is listed with both classes, never resolved: FungMod does not choose between
+them, and never by a name. Give each class its own EC number, or leave the
+cell empty, when you want SABIO-RK kinetics for it.
 
 ### `substrates.csv`
 
@@ -1393,7 +1438,9 @@ the environment the client was written in could not reach rest.uniprot.org;
 the tests serve synthetic responses in that format
 (`tests/fixtures/uniprot_proteome_search/`). A response without these
 columns is refused and nothing is stored, so a change on UniProt's side stops
-the route rather than misleading it.
+the route rather than misleading it. On a machine with internet access,
+`scripts/verify_live_sources.py` checks the live search and export against
+these expectations ([verifying the live lookups](walkthrough.md#verifying-the-live-lookups)).
 
 Limits of the name route:
 
@@ -2716,6 +2763,13 @@ Drafting never fetches anything. To have the entries looked up for one
 fungus's enzyme classes by EC number and substrate name instead, assemble
 with `fetch_kinetics=True` ([fetching kinetics](#fetching-kinetics)).
 
+An entry's EC number names its enzyme class. It resolves to a registry class
+and, when you pass `user_enzyme_classes` (the rows of an
+[`enzyme_classes.csv`](#enzyme_classescsv-optional), as mappings of column to
+cell), to a class you define yourself whose `ec_number` is the same complete
+EC number. `assemble_user_tables` passes the classes of its `user_data` this
+way, so SABIO-RK entries can become kinetics of your own classes.
+
 ```python
 import fungmod as fm
 
@@ -2784,7 +2838,7 @@ Every application of these rules is recorded in `review.md`.
 | SABIO-RK | User tables | Rule |
 | --- | --- | --- |
 | Organism and expression host (`expressed_in`) | `strains.csv` | One strain per organism and host, ID `<organism>_in_<host>` (or the ID given in `strain_id_for_organism`), name `SABIO-RK enzyme source: <organism>, expressed in <host>`. Mutant enzymes are listed, not converted: an engineered variant is not an enzyme of the organism. |
-| EC number | `enzymes.csv` | Resolved against the registry's enzyme classes, where EC numbers are aliases. An unresolved EC number is listed and the entry not converted; with `propose_enzyme_classes=True` an `enzyme_classes.csv` row is drafted whose bond and substrate classes are `REVIEW:` fields, never inferred. |
+| EC number | `enzymes.csv` | Resolved against the registry's enzyme classes, where EC numbers are aliases, and against the `ec_number` of the user-defined classes you pass as `user_enzyme_classes` (rows of an `enzyme_classes.csv`; an exact match of complete EC numbers, whose row is then copied unchanged into the draft). An EC number two classes share (two registry classes, two user-defined classes, or one of each) is listed with both classes and the entry not converted; nothing is decided by the enzyme name. An unresolved EC number is listed and the entry not converted; with `propose_enzyme_classes=True` an `enzyme_classes.csv` row is drafted whose bond and substrate classes are `REVIEW:` fields, never inferred. |
 | Substrate named by the Km and concentration parameters (or the reaction's only substrate) | `substrates.csv` | Resolved against the registry by name or alias and referenced; otherwise a row with `REVIEW:` substrate class, physical state and bond classes. The product and its mol/mol yield (product coefficient divided by substrate coefficient) come from the reaction when it names one product; otherwise `REVIEW:`. |
 | Temperature, pH, buffer | `conditions.csv` | One condition per distinct temperature and pH (IDs such as `c30_ph5`), the buffer in `notes`. A missing value is `unknown`; a range is a `REVIEW:` field. `°C` becomes `degC` and `K` `kelvin`. |
 | Km | `km` | |

@@ -224,6 +224,705 @@ by default (about 0.5 s per 62-hour radial solve on this container), after
 the plan's owner confirms that the default Jacobian change needs no
 amendment.
 
+## FETCH-003 Kinetics Of A Lab's Own Enzyme Classes Looked Up By Their EC Numbers
+
+Status: `complete` for the stated scope (2026-10-08); not verified against a
+live SABIO-RK response. FETCH-002 looked up kinetics only for registry
+classes: a class a user dataset defines in `enzyme_classes.csv` was listed as
+"not queried", because the SABIO-RK conversion (`user_tables_from_sabiork`)
+resolved an entry's EC number against the registry only, so no entry could
+become its kinetics, from a lookup or from an export the user downloaded. A
+lab's own enzyme classes therefore never got literature or transfer kinetics.
+Now the conversion also resolves an EC number to a user-defined class of the
+dataset being assembled, by the same exact rule, and `fetch_kinetics` queries
+those classes by their own EC number, under the FETCH-002 snapshot, status and
+reporting rules, with no new numerics.
+
+Design decisions (design note kept outside the repository):
+
+- **Where the user's classes come from.** `assemble_user_tables` passes the
+  user-defined classes of the dataset being assembled to the conversion: every
+  row of `user_data`'s `enzyme_classes.csv` and every class the draft writes
+  to its own `enzyme_classes.csv` (today rows of that same file;
+  `_Assembler._user_defined_classes`). The conversion takes them as
+  `user_tables_from_sabiork(user_enzyme_classes=...)`: rows of an
+  `enzyme_classes.csv` as mappings (`class_id` required and not a registry
+  class; unknown columns, duplicates and a registry class ID refused). Without
+  them nothing changes.
+- **The rule, as for registry classes.** An entry's EC number resolves to a
+  user-defined class only when both are complete EC numbers (four numeric
+  parts, `complete_ec_number`) and equal (`_classes_with_ec_number`), and only
+  when no registry class and no other user-defined class has it: two
+  user-defined classes with one EC number (whether or not the fungus has
+  both), or an EC number that resolves to a registry class and is a user
+  class's `ec_number`, is refused and listed with both classes ("FungMod does
+  not choose between classes that share an EC number, and never by the enzyme
+  name"). A partial EC number (`3.1.1.-`) matches nothing. Nothing is matched
+  by a name; with `propose_enzyme_classes=True` an entry whose name names a
+  user class but whose EC number differs is refused (as for registry names),
+  and a proposed `class_id` never takes a user class's ID. The registry/user
+  compatibility check before converting uses the user class's own bond and
+  substrate classes. A class entries resolve to has its row copied unchanged
+  into the conversion's `enzyme_classes.csv`, so a standalone draft loads.
+- **The lookup.** A user-defined class acting on a requested substrate (or a
+  network pool) is queried by the complete `ec_number` of its row and the
+  substrate's name, `ECNumber:"<EC number>" AND Substrate:"<substrate name>"`,
+  exactly when the conversion would resolve the answer's entries to it: a
+  class without a complete EC number is listed ("SABIO-RK is queried by
+  complete EC number only, never by a class or enzyme name"), and an EC number
+  a registry class or another user-defined class shares is listed on both
+  sides, so neither is queried by it. A registry class with several EC numbers
+  of which some cannot be queried now gets a `not_queried` item for those
+  beside the queries of the others (FETCH-002 dropped them silently; no
+  shipped record is affected). Snapshots, refusals, statuses (own species
+  literature, transfer estimates, conflicts, gaps, no reuse across conditions)
+  and the offline rerun are FETCH-002's, unchanged.
+- **Report.** A query of a user-defined class carries `class_defined_in`
+  (`enzyme_classes.csv row N of user dataset D`); the command line prints it
+  after the class ("(user-defined, ...)"), `review.md` marks the class in the
+  lookup table and, only when such a class was queried, says "each enzyme
+  class of the fungus (a registry record's EC numbers, or the ec_number of a
+  user-defined class in enzyme_classes.csv)". The conversion's decision
+  "EC x (name) resolves to user-defined enzyme class `c` (its enzyme_classes.csv
+  ec_number x, an exact match; ...)" reaches the assembled draft's decisions.
+- **Honest decisions for the user's substrates.** On a substrate of the user
+  dataset the assembled draft keeps the user's `substrates.csv` row, but it
+  used to repeat the conversion's decisions about the row the conversion
+  would draft ("substrates.csv row ... is drafted with ... REVIEW fields",
+  "Product of ...: left for review"). These are now left out for such a
+  substrate and replaced by "SABIO-RK entries on '<name>' are matched to
+  substrate `<id>` of user dataset D by its name (or through registry
+  substrate `<id>`); its substrates.csv row, with its product and yield, is
+  kept unchanged." (Pre-existing for registry classes on a user substrate;
+  common now that lab classes act on lab substrates.)
+
+Changed:
+
+- `api/user_data_sources.py`: `user_tables_from_sabiork(user_enzyme_classes=())`;
+  `_validated_user_classes`, `_classes_with_ec_number`; `_DraftBuilder(user_classes=)`,
+  `_DraftBuilder._user_class`; `_enzyme_class`, `_unresolved_class`,
+  `_incompatible`, `_class_rows` and the review's enzyme-class rule
+  (`_USER_CLASS_RULE`, used only when user classes are given); `_ClassChoice.user_row`;
+  module docstring.
+- `api/user_data_assembly.py`: `_Assembler._user_defined_classes`,
+  `_class_defined_in`; `_lookup_ec_numbers` (user classes, shared EC numbers,
+  partly queried classes) and `lookup_kinetics`; `collect_entries` and
+  `_unconverted_parameters` pass the user classes; `_included` (decisions for
+  the user's substrates); `_lookup_report` (`class_defined_in`),
+  `_lookup_markdown`; `_LOOKUP_LIMITATIONS[1]`; docstrings.
+- `cli.py`: `FETCH_KINETICS_HELP`, the `--fetch-kinetics` epilog paragraph and
+  the module docstring; `_print_kinetics_lookup` prints `class_defined_in`.
+  cli.py still names no database and no class.
+- `sources/sabiork/`: not changed (the query form and snapshots are generic).
+- Fixtures: `tests/fixtures/user_data/lab_classes_case/` (README; strain K6 of
+  the synthetic organism K6 with two lab-defined classes, `lab_ester_hydrolase`
+  EC 3.1.1.1 on `pnp_butyrate` and `lab_phosphomonoesterase` EC 3.1.3.2 on
+  `pnp_phosphate`, the lab's own estimate rows at 25 degC, pH 7; illustrative
+  values only) and two synthetic SABIO-RK responses in
+  `tests/fixtures/sabiork_kinetics_queries/` (EC 3.1.1.1: four entries,
+  own species at 30 degC, another organism at 37 degC, a mutant, own species
+  at 25 degC; EC 3.1.3.2: Vmax-form entries in micromolar units at 40 degC and
+  25 degC), with the README's tables.
+- Docs: `docs/user-data.md` ("Fetching kinetics": what is queried, not
+  queried, the report, the synthetic FETCH-003 example, limits;
+  `enzyme_classes.csv`: what `ec_number` does; "Starting from SABIO-RK":
+  `user_enzyme_classes` and the EC-number mapping row); `docs/cli.md`
+  (the lookup section, a sample of the user-defined line); `README.md`
+  (assembly and command-line paragraphs, capability row);
+  `docs/capabilities.md`; `CHANGELOG.md` (Added; Changed).
+
+Tests (`tests/test_fetch_kinetics_user_classes.py`, 14 test functions, 25
+cases; `urlopen` and `socket.connect` patched to fail, synthetic responses
+served by FETCH-002's `_FakeSabio`): a lab class gets same-species literature
+at 30 degC (Km 0.35 mM, kcat 45 1/s, sd kept), a transferred estimate at 37 degC
+and keeps the lab's own rows at 25 degC (the same species's entry there
+listed as weaker evidence), one query only, `class_defined_in`, the lab's
+`enzyme_classes.csv` and `substrates.csv` rows unchanged, no decision about a
+drafted substrate row, an offline rerun byte-identical, and the reviewed draft
+`modelable` in scientific mode at 30 degC and `underparameterized` at 37 degC;
+the materially different case (EC 3.1.3.2 on `pnp_phosphate`, a Vmax-form
+transfer in `µM*min^(-1)` and `µM`, each class queried on its own substrate
+only, the ester class a gap at 40 degC, exploratory `modelable` and scientific
+`underparameterized`), and the same responses as downloaded exports giving the
+same kinetics rows; two user classes with one EC number (no query; the
+export's entries refused naming both); a lab class with a registry class's EC
+number (neither queried; Reaction 618's EntryID 35622 refused naming both);
+cellobiohydrolase keeping 3.2.1.91 when a lab class has 3.2.1.176 (a partial
+`not_queried` item); a lab class in an enzyme network queried on its
+intermediate pool; a partial EC number neither queried nor matched; the
+esterase fixture's class now queried; the conversion alone (the user's row
+copied, the old message without user classes, never by name, seven argument
+refusals); four drafts byte-identical to e97e8e6 (pinned digests: the
+esterase user dataset assembled, Reaction 618 drafted with and without
+`propose_enzyme_classes`, the maltose response drafted); three FETCH-002
+lookups of registry classes (fixed fetch clock) byte-identical to e97e8e6 once
+the one changed limitation sentence is put back; the command line
+(`assemble --user-data ... --fetch-kinetics --fetch`, an offline rerun byte
+for byte, `check-data`, a scientific `run` at 30 degC, exit 0).
+`tests/test_fetch_kinetics.py`: the two tests that expected the esterase
+fixture's class to be listed now use the network chain fixture (classes
+without an EC number). `tests/test_guardrails_no_hardcoding.py`: the new
+fixture tokens.
+
+Commands and results (worktree on `claude/user-class-kinetics-lookup`, based
+on `e97e8e6`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on the conversion, the assembly, the
+  CLI and the three changed test modules: 0 errors.
+- `mkdocs build --strict`: built, no warnings.
+- `tests/test_fetch_kinetics_user_classes.py`: 25 passed;
+  `tests/test_fetch_kinetics.py`: 30 passed.
+- Targeted run (both lookup modules, assembly, network assembly, SABIO-RK
+  sources, adapter, parser, discovery, fetch script, provider API, user-data
+  import, genome, UniProt, network, CLI, CLI workflow, guardrails,
+  documentation sync, hygiene, roadmap, release configuration, canonical
+  API): 579 passed in 3 min 23 s.
+- Full suite (`pytest -n 2 --dist loadfile`, background): 2842 passed in 68 min
+  (run before an unused dataclass field was removed; the lookup and conversion
+  modules, 75 tests, were re-run after it and passed).
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13); live
+  SABIO-RK (unreachable from the environment).
+
+Not verified live: everything FETCH-002 lists (the query form, the
+`ECNumber` and `Substrate` fields, SABIO-RK's compound-name matching and its
+answer to a query without matches), now also for EC numbers of classes a lab
+defines; the synthetic responses use the compound names the lab's
+`substrates.csv` gives, and SABIO-RK may file the same compound under another
+name.
+
+Not changed: `sources/sabiork/` (query form, snapshots, fetch), `api/user_data.py`
+(the loader), the core, any process law, rate form, registry record,
+preflight rule or output schema of a run; drafts in which no user-defined
+class takes part in a conversion (pinned digests; the FETCH-002 pins at
+8a35ae5 still pass); `--kinetics-source` exports for registry classes, unless a
+user-defined class of the dataset shares their EC number.
+
+Scientific impact: none on any simulated value. A lab's own class can now
+receive SABIO-RK kinetics, as literature only for its own species and
+otherwise as an estimate, exactly as a registry class does; an EC number two
+classes share is never resolved, so no entry is attributed to a class by
+guess.
+
+Compatibility: additive API (`user_enzyme_classes`, `class_defined_in` on
+queries of user-defined classes). Behaviour: a user class with a complete EC
+number is now queried (FETCH-002 listed it); an entry whose EC number a
+registry class and a user-defined class of the dataset share is no longer
+converted for the registry class. Text: the lookup limitation of every
+`fetch_kinetics` draft; the "does not resolve" reason when the dataset defines
+classes; the decisions on a user substrate; `--help`.
+
+Remaining ambiguities: substrate aliases and synonyms are still not queried; a
+partial EC number of a user class is never matched (a lab that knows only
+`3.1.1.-` gets no SABIO-RK kinetics); `fungmod draft-kinetics` has no option
+to pass a dataset's classes (the API's `user_enzyme_classes` does); asserting
+a class by EC number (`enzyme_classes=["3.1.1.1"]`) still resolves against
+the registry only; what SABIO-RK answers for these EC numbers is unknown until
+checked live.
+
+Next task: verify the query form against live SABIO-RK from a networked
+environment and freeze a real snapshot (for a registry class and for a lab
+class with its own EC number); then decide whether substrate aliases should
+be queried.
+
+## SURFACE-001 Template-Driven Surface-Catalysis Registry Assembler
+
+Status: `complete` for the stated scope (2026-10-08). The generic
+surface-catalysis registry assembler (`screening/case_builder.py`) only
+emitted toy configs and carried the defects the USERDATA-008 design note
+listed: a `bio_milestone == "BIO-001"` branch writing cellulose-specific
+names, assumptions, provenance, validity ranges and substrate and enzyme
+notes from code; `_bio001_geometry_data()` / `_toy_geometry_data()`
+injecting 100 mL with 0.5 m^2 or 0.1 m^2 and code-written provenance when a
+template declared no geometry; `primary_bond = ... or
+substrate.bond_classes[0]`; label, mode, maturity and name fallbacks; and
+`deterministic_mode="toy"` with no other mode. It is now template-driven,
+the first step towards Langmuir adsorption-limited degradation of solid
+substrates from sourced data. No new numerics; no simulated value changes.
+
+Verified against the code first (e97e8e6): both shipped surface templates
+already declared geometry, bond type, site pool, name, mode and maturity, so
+the geometry and label fallbacks were reachable only by other templates; the
+two branches wrote the rest from code.
+
+Design decisions:
+
+- **Required template metadata** (as for Michaelis-Menten via
+  `required_process_state_metadata`): `config_name`, `config_mode` (`toy`,
+  `exploratory`, `scientific`), `config_maturity`, `accessible_site_pool`,
+  `product_map_name` (`SURFACE_CATALYSIS_REQUIRED_PROCESS_STATE_METADATA`).
+- **Moved text.** New template blocks hold what the branches wrote:
+  `config_provenance` (`source`, `measurement_method`, `confidence_level`,
+  `validity_range`, `notes`, plus further provenance texts such as BIO-001's
+  `units` and `bio_milestone`; assembler-written keys refused),
+  `substrate_entity` (`notes`, `product_notes`, optional `completeness`,
+  `default_degradation_model`, `water_activity_dependence`),
+  `enzyme_entity` (`name`, `validity_labels`, `notes`) and
+  `parameter_entries` (`measurement_method`, `validity_range`). The process
+  assumptions are the template's `limitations` (none: refused); the product
+  map's maturity is `config_maturity`. The config provenance is the declared
+  block (notes last) plus the case identity and the bound records' ids and
+  sources. Structural fields come from the substrate, enzyme-class and
+  compatibility records. A parameter entry's confidence level must be stated
+  on the record (the `"exploratory_assumption"` / `"testing"` fallbacks and
+  the `"dimensionless"` unit fallback are gone).
+- **Geometry.** The law (`r = k_s * theta(E) * A`) reads no geometry: its
+  area is the `accessible_surface_area` parameter. A template states a
+  well-mixed geometry mapping (kept as context metadata) or `geometry: null`
+  (no geometry entity, as the culture assembler accepts); a template that
+  states neither, an empty or non-mapping geometry, or a non-well-mixed one is
+  refused.
+- **Bond class.** The template's `bond_type` (which must be shared), or the
+  single bond class the substrate carries, the enzyme class targets and the
+  compatibility record requires; several or none are refused, never chosen.
+- **Modes.** Deterministic assembly accepts `toy` and `scientific`, each only
+  for a template of that `config_mode` (`enforce_template_mode_match`);
+  exploratory templates are sampled by the exploratory screen. A `scientific`
+  template is assembled only when every bound record is exact and passes the
+  scientific eligibility rules (refused at assembly otherwise, on every path).
+  Toy templates stay toy. A substrate declared dissolved or of unknown
+  physical state is refused for surface catalysis.
+
+Changed:
+
+- `screening/case_builder.py`: `_surface_catalysis_config_data` rewritten;
+  new `_surface_*` helpers (mode, scientific records, physical state,
+  geometry, limitations, bond type, text blocks, config provenance, enzyme
+  entity, config name, provenance, substrate and enzyme data, parameter
+  entries); constants `SURFACE_CATALYSIS_TEMPLATE_MODES`,
+  `SURFACE_CATALYSIS_REQUIRED_PROCESS_STATE_METADATA` (exported with
+  `SURFACE_CATALYSIS_PARAMETER_ROLES`); assembler entry
+  (`additional_supported_modes=("scientific",)`, required metadata,
+  `enforce_template_mode_match=True`, new message). Removed
+  `_is_bio001_surface_case`, `_surface_config_name`'s BIO-001/toy branches,
+  `_bio001_geometry_data`, `_toy_geometry_data`, `_generic_substrate_data`,
+  `_toy_enzyme_data`, `_parameter_config`,
+  `_exploratory_surface_parameter_config`, `_template_config_mode`,
+  `_template_config_maturity`, `_template_geometry_data`.
+- `data_registry/case_templates/case_templates.yml`: the BIO-001 and toy
+  surface templates gain `product_map_name`, `config_provenance`,
+  `substrate_entity`, `enzyme_entity` and `parameter_entries` holding the
+  text the branches wrote, verbatim.
+- Docs: `docs/concepts/virtual-experiments.md` "Surface-catalysis cases"
+  (law, template contract, geometry, bond class, modes, BIO-001 geometry as
+  context metadata); `docs/capabilities.md` surface row; `README.md`
+  capability bullet; `ARCHITECTURE_DEBT.md` `FD-011` (registered and
+  narrowed: the surface part resolved, the chain wrapper's code-written
+  CASE-001/BIO-002 notes and enzyme-named chain roles remain, contained);
+  `CHANGELOG.md` (Changed).
+
+Parity (digests are sha256 of `yaml.safe_dump(config, sort_keys=False)`,
+computed at e97e8e6 with an exported tree and again on this branch; capture
+script and both JSON dumps kept outside the repository):
+
+- Every shipped registry case in every screen mode (exploratory at the lower
+  bound and at seed 1234, scientific exact) and every deterministic build
+  (toy, scientific): 64 configs, 62 byte-identical, including BIO-001
+  (`cb118564...`, seed 1234 `28484633...`), the BIO-002 chain (deterministic
+  toy `53d6ade9...`, exploratory `84883c4d...`), the *T. harzianum* culture
+  and every Michaelis-Menten case; the same 26 refusals with the same
+  messages; `tests/test_user_data_network_cross_basis.py`'s pinned registry
+  and fixture digests pass unchanged.
+- The toy surface case (the shipped registry with the toy compatibility
+  bound to the exact toy records, as `tests/test_registry_case_builder.py`
+  builds it), deterministic toy (`f212fc15...` -> `7ce1c007...`) and
+  exploratory (`ded97952...` -> `ffc84a9d...`), differs only in fields the
+  removed toy branch wrote: (1) provenance gains `parameter_record_ids` and
+  `parameter_value_sources` and lists `notes` last; (2) each degradation
+  product carries the provenance `source`; (3) the enzyme's
+  `target_substrate_names` names the case substrate (was empty); (4) the
+  enzyme provenance `measurement_method` is the config's ("software
+  registry-to-config assembly test", was "defined benchmark metadata"); (5)
+  parameter notes drop the appended "Toy/development only." (the toy
+  records' notes say so). Undoing exactly these five gives the e97e8e6
+  digests (tested). Values, states, units, geometry, product map and
+  assumptions are identical.
+- Simulations: the nine surface and chain runs of the capture (BIO-001 at
+  both samples, BIO-002 deterministic and sampled, toy deterministic and
+  sampled) have byte-identical trajectories, extents and process rates.
+
+Tests (`tests/test_surface_catalysis_assembly.py`, 23 functions, 41 cases):
+BIO-001 and BIO-002 digests equal e97e8e6; the toy digests pinned and the
+five differences undone to the e97e8e6 digests; the toy run against the
+analytic `k_s * theta * A * t`; the moved text present in the templates and
+in the config; the assembler's modes. Refusals: missing geometry (message
+says the law reads no geometry), explicit `geometry: null` assembling
+without a geometry entity, malformed and non-well-mixed geometry, each
+required metadata field (including `config_mode`, on the deterministic and
+screen paths), an unknown `config_mode`, each template block and field, a
+reserved provenance key, a `config_name` field outside the three allowed, no
+limitations, a declared bond type not shared, an ambiguous and an absent
+shared bond class, a dissolved substrate, a scientific request on the toy
+template with scientific-grade records (template mode), a toy request on a
+scientific template, an exploratory record bound to a scientific template.
+Materially different, test-only, non-cellulose template (a polyamide-like
+film with amide and ester bonds and a hydrolase targeting only the amide
+bond; substrate in millimole of repeat units, enzyme in g/L, `K_ads` in L/g,
+`k_s` in mmol/m^2/h, area in cm^2, hours, a 0.5 release yield,
+`geometry: null`, no `bond_type`): three exploratory samples through
+`simulate_screen` with the derived bond class, no geometry entity and final
+states equal to `k_s * theta * A * t` and its yield; a linear trajectory
+(the zero-order limitation) and a scientific run through the configured
+workflow and `VirtualExperiment`. Also
+`tests/test_guardrails_no_hardcoding.py` (the surface functions of
+`case_builder.py`, found with `ast`, name no organism, substrate, milestone,
+toy, fixture, geometry or first-bond token; the removed names stay out of
+the module; it fails on e97e8e6), `tests/test_registry_case_builder.py` (the
+assembler's modes) and `tests/test_pre_bio001_stoichiometry_and_assembly.py`
+(its template fixture declares the new blocks; moved fields asserted).
+
+Commands and results (worktree on `claude/surface-assembler-cleanup`, based
+on `e97e8e6`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright` on `case_builder.py` and the four changed or new test files:
+  0 errors.
+- `mkdocs build --strict`: built, no warnings; anchor
+  `surface-catalysis-cases` exists.
+- `tests/test_surface_catalysis_assembly.py`: 41 passed.
+- Targeted run (surface, chain, case builder, templates, config-driven
+  assembly, ensembles, modelability, parameter resolution, virtual
+  experiment, BIO-001 notebook, compiled models, guardrails, documentation
+  sync, hygiene, instruction hierarchy, roadmap, quality config, user-data v2
+  and the cross-basis digests): 570 passed.
+- Full suite (`pytest -n 2 --dist loadfile`, background, the code as
+  committed in d8925c4): 2859 passed in 1 h 10 min; no xdist-only failure.
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13).
+
+Not changed: `processes/surface.py`, the process factory (its own label and
+rate-unit defaults for configs written by hand), the law, the solver, the
+`extracellular_enzyme_chain` assembler and its registry wrapper, every other
+assembler, every parameter, substrate, enzyme-class and compatibility
+record, the user-data route (still refuses surface inputs), output schemas.
+
+Scientific impact: none on any simulated value. The surface assembler no
+longer writes cellulose text into non-cellulose cases or invents a vessel
+and an area, a multi-bond substrate is no longer silently assigned its first
+bond class, and a template with exact scientific-grade records can now run
+in scientific mode (exact-input gate, not validation).
+
+Compatibility: custom surface-catalysis templates must add the required
+metadata and the four blocks and state `geometry`; templates that relied on
+the fallbacks are refused with the missing field named. Deterministic
+`mode="scientific"` requests on a surface case now reach the template-mode
+and record checks instead of the old "only emits toy" refusal. The toy
+surface case's metadata changed as listed.
+
+Remaining ambiguities and debt: the BIO-001 template still declares a
+100 mL / 0.5 m^2 well-mixed geometry as context metadata (kept for parity;
+the law does not read it, and `geometry: null` would change only the
+config); the process factory still defaults `rate_units` to
+`<substrate units> / second` and labels for configs that omit them (the
+assembler always writes the labels); the chain wrapper's CASE-001 notes and
+enzyme-named chain roles (`FD-011`).
+
+Risk: low to medium-low. Shipped configs and simulations are unchanged and
+pinned; the new refusals affect only surface templates without the new
+metadata.
+
+Recommended next task: expose the surface law to user data (the design
+note's USERDATA-009/010 increment): accept a sourced adsorption constant
+`K_ads`, surface rate constant `k_s` and accessible area `A` for one solid
+substrate in the amount convention, generate a surface-catalysis template
+with these blocks, `geometry: null` and the law's limitations (zero order in
+the substrate until depletion, constant area, no enzyme depletion by
+binding), with the mode set by the weakest input. Enzyme partitioning with a
+binding capacity (`E_T = E_F + E_B`) remains new numerics and stays out of
+that step.
+
+## PLOTS-001 Quick-Look Figures Of Every State And Process Of A Network Or Culture
+
+Status: `complete` for the stated scope (2026-10-08). For the owner's goal
+("fungus X on substrate Y in conditions Z ... the code calculates all the
+stuff"), a network or a culture computed every pool, enzyme, biomass and
+ledger trajectory and every process rate (`time_series_long.csv`), but the
+quick-look figures showed only the run-level substrate, product, degraded
+fraction and degradation rate: a network's intermediate pools and per-process
+rates, and a culture's biomass, enzyme pools and ledgers, were invisible
+without opening the tables. Separately, a run whose cases were in different
+units drew them on one axis labelled with the first row's units (a registry
+grid of the BIO-001 surface case in kilogram and the CASE-001 enzyme chain in
+millimolar drew the chain's 3 mM as 3 kilogram).
+
+Design decisions:
+
+- Which cases: a case whose `time_series_long.csv` holds the rates
+  (`process_rate.<id>`, source `simulation_process_rate`) of more than one
+  process. This is a property of the tables, not of a mechanism name: enzyme
+  networks of two or more classes, cultures (user and registry) and the
+  registry's extracellular enzyme chain qualify; every single-class case (one
+  process, surface catalysis and pH ionization included) does not and keeps its
+  five figures. No branch on a process type, organism, substrate or enzyme. A
+  one-class network has one process and keeps the run-level figures.
+- Two figures per such case, `<case_id>_state_trajectories.png` and
+  `<case_id>_process_rates.png`, after the run-level figures in case-id order:
+  a deterministic list, returned by `write_quicklook_plots` and recorded in
+  `quicklook_paths`, the manifest and the report.
+- One panel per (state, units) and per (process, units), never two units on
+  one axis (panels, not twin axes). States: the substrate (a network's entry
+  pool), the intermediates by number, the final product, then every other
+  state in table order (enzymes; biomass, pools and ledgers of a culture).
+  Labels `value (<units>)`, `rate (<units>)`, `time (<time units>)`; titles
+  `<state> (<state_role>)` and the process id.
+- Uncertainty: with more than one sample, the p05-p95 band and p50 of
+  `trajectory_quantiles.csv`, as `trajectory_quantile_bands.png` already does,
+  with that table's caveat (a summary of simulated samples, not validation or
+  a confidence interval) in the footnote; with one sample, the sample; a run
+  directory without quantile rows gets one line per sample, and says so.
+- Thresholds as already defined (10, 50 and 90 % of (S0 - S) / S0 of the
+  case's `substrate` state, so a network's entry pool), read, never
+  recomputed: a vertical line at the p50 of `summary_metrics.csv`, shaded
+  p05-p95 when the samples differ, and the number of samples of
+  `threshold_times.csv` that reached it; a threshold no sample reached is
+  listed as not reached; a time in other units than the axis is listed, not
+  drawn.
+- Process names from the existing tables: a network process's rows in
+  `mechanism_summary.csv` (its `process_enzyme_classes` class in
+  `provenance.enzyme_class`, its pool in `state_variables`) and the
+  `rate_modifier` rows that name it in `configured_by` (the competitive
+  inhibitor). Processes without such rows (cultures, the chain) are named by
+  their id. Rates are never converted: the culture fixtures record their loss
+  rates per second and their synthesis rates per hour, and are drawn so.
+- Run-level figures: one panel per (units, time units) only when more than one
+  occurs; a run in one units text takes the previous code path unchanged.
+- Not a new output: no table, column, allowed value or schema version changes
+  (`2.2.1`); the report needed no change (it lists the recorded paths).
+
+Changed: `src/fungal_model/api/quicklook.py` (the case figures:
+`_write_case_figures`, `_case_panels`, `_threshold_markers`,
+`_process_descriptions`, `_plot_panel_figure`, `_draw_panel`; the run-level
+`_plot_rows_by_units`; docstrings); `docs/concepts/outputs.md` ("Quick-look
+figures": the five run-level figures, the units rule, the two case figures and
+what each panel draws); `CHANGELOG.md` (Added, Fixed).
+
+Tests: new `tests/test_quicklook_case_figures.py` (14 test functions, 21
+cases). Figures are checked through what matplotlib is asked to draw (titles,
+axis labels, legend entries, lines, bands, captured at `savefig`), never
+pixels. The four network fixtures and `culture_estimates`: the figure list in
+order (result, manifest `quicklook_paths` and `files`); one state panel per
+simulated state, each `value (<units>)` with that state's one units text;
+entry substrate, intermediates and product first; one process panel per
+`process_rate.<id>` with its own rate units; the band of two samples or the
+single sample's line; context in the title. Each network process panel names
+its class, pool and modifiers as `mechanism_summary.csv` gives them. The
+cross-basis solid chain: g/L solid, mmol/L dimer and product, mg/L and mM
+enzymes, g/L/h and mmol/L/h rates, the competitive inhibitor named, the
+threshold times equal to `summary_metrics.csv`. The dissolved chain: three
+threshold lines on the substrate panel only. The culture: substrate, biomass,
+pool and both ledgers, and rates per hour and per second as recorded. The
+report lists both figures; replotting is byte-identical. Single class
+(`esterase_case`): exactly the five figures with their pinned titles and axis
+labels, and byte-identical when replotted. A registry grid of the surface
+case (kilogram) and the chain (millimolar): two panels in
+`substrate_remaining_vs_time.png`, case figures for the chain only, its
+processes named by id. Artificial tables: one process gives no case figures
+and two do; a units mix gives separate panels and one units text one axis;
+threshold labels for reached by all, by one of two, by none, and in other
+units.
+
+Byte identity (matplotlib 3.11.2, Agg): the 65 run-level PNGs of 13 runs
+written by base `e97e8e6` (single class: the esterase, solid and oxidase
+fixtures, registry reaction 618, BIO-001 surface; several processes: the four
+network fixtures, both culture fixtures, the CASE-001 chain and the
+*T. harzianum* registry culture) are byte-identical when re-plotted by this
+code from the same tables.
+
+Commands and results (worktree on `claude/network-culture-plots`, based on
+`e97e8e6`, Python 3.11 venv, `PYTHONPATH=src`, `MPLBACKEND=Agg`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on `api/quicklook.py` and the new test:
+  0 errors.
+- `mkdocs build --strict`: built, no warnings.
+- `tests/test_quicklook_case_figures.py`: 21 passed.
+- Targeted run (virtual-experiment API, organism registry case, CLI, API-003
+  report, roadmap status, guardrails, environment grid, partial runs): 133
+  passed.
+- Full suite (`pytest -n 2 --dist loadfile`, background, the code as
+  committed in `e5211d4`): 2838 passed in 70 min; no failures, so no serial
+  rerun was needed.
+- `pyright --pythonpath <venv python>` on the whole project (the CI step): 0
+  errors.
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13).
+
+Not changed: any table, column, value or schema version; the report renderer;
+simulation, process laws, solver, registry, user-data loading and assembly;
+the run-level figures of every run in one units text.
+
+Scientific impact: none on any simulated value. A network's intermediate
+pools and each class's rate, and a culture's biomass, enzyme pools, ledgers
+and process rates are now visible, each in its own units, with the threshold
+times and the ensemble band as the tables give them; a run in mixed units is
+no longer drawn against one mislabelled axis.
+
+Compatibility: additive files in `figures/` (and in `quicklook_paths`, the
+manifest and the report list) for cases with several processes; the
+run-level figures of a run in several units change from one axis to one panel
+per units text.
+
+Remaining ambiguities: the rule (several processes) also draws the registry
+chain and culture, and not a one-class network; states after the product
+follow the table's (model) order rather than a role grouping; a grid writes
+two more PNGs per such case (`--no-plots` skips them); the band's p50 is
+pointwise, not a sampled trajectory, as in `trajectory_quantile_bands.png`; a
+culture's `product_release_vs_time.png` stays empty, as before, because a
+culture has no `product_formed`.
+
+Risk: low. Plotting only, from existing tables; the single-units path of the
+run-level figures is the previous code, checked byte for byte.
+
+Next task: culture observables (biomass and pool time courses) in the
+time-course comparison, so the new panels can be compared with a user's own
+measurements; then the net rate of every pool (bundles record `state_rates.csv`
+for every state, the tables only the mapped substrate and product).
+
+## EXAMPLE-001 A Worked Example On Stored Literature Data
+
+Status: `complete` for the stated scope (2026-10-08). Documentation and tests
+only; no change to `src/` or to any registry record, so no scientific or
+numerical behaviour changed.
+
+The walkthrough (DOCS-WALK-001) shows the route on synthetic fixtures. This
+entry adds the worked example whose numbers come from real records already in
+the registry.
+
+- Survey. `fungmod list` names five registry fungi. Two carry published
+  kinetics or physiology for a fungus, and `fungmod run` runs both from
+  stored records with no network:
+  - `trichoderma_harzianum_p49p11` on `cellulose_celufloc_200` at the three
+    Gelain 2020 loadings, in scientific mode;
+  - `phanerochaete_chrysosporium_k3` on `cellobiose` at the five Tsukada 2008
+    pH environments, in exploratory mode only, because the assay loadings
+    are `exploratory_prior` records.
+
+  The Reaction 618 pilot (`sabiork_beta_glucosidase_source`, entry 35622) is
+  a rice enzyme. `toy_fungus_alpha` and `generic_cellulase_source` are
+  fixtures. Nothing blocked the route, so no code changed.
+- `docs/real-example.md` ("A worked example on stored literature data", in
+  the nav after the walkthrough) shows for each case:
+  - what the source measured, and what is fitted or assumed;
+  - the command and its real output;
+  - how to read it: substrate loss, product release (none for the culture,
+    with the closure ledger explained), rates (for BGL1A the maximum
+    depletion rate is the time-zero rate at the assumed loadings), threshold
+    times, why there is no uncertainty band, and the environment-effect
+    status;
+  - a provenance table: value, units and maturity, plus the posterior class,
+    the 95 % credible interval and whether the value lies inside it for the
+    nine fitted constants, or the SABIO-RK parameter and the deposited SD for
+    BGL1A;
+  - the important limitation rows, the suggested experiments with the
+    page's own follow-ups (labelled as such), and what the page does not
+    show.
+
+  The culture case also has a stdlib snippet that sets the run's cellulose,
+  biomass and filter-paper activity beside the deposited duplicate means
+  (`data/benchmarks/gelain_2020_v2/observations.json`). It is labelled
+  in-sample, names three visible misfits, and cites the joint comparison's
+  holdout errors (the hydrolysis candidate failed its screen) as the only
+  out-of-sample test. Values that round to zero print as `0.00` (format
+  `z`), and the CLI's near-zero final cellulose is shown as `...`, because
+  its sign is solver noise and differs between platforms.
+- `tests/test_real_example_doc.py` (24 tests, about 30 s) checks:
+  - each marked command, rerun in a temporary directory, and the snippet
+    (with the observations path made absolute): every shown output line;
+  - each table against the run's `provenance_table.csv`,
+    `limitations_table.csv`, `suggested_experiments.csv`,
+    `summary_metrics.csv` and `threshold_times.csv`;
+  - each table against the registry records (value at four significant
+    digits, units, maturity, posterior fields, fit artifact path and
+    SHA-256) and the archived SABIO-RK export (value, deposited SD, raw
+    SHA-256);
+  - that the survey lists every registry fungus, and that each row's "Runs
+    in" claim matches the preflight exit codes in both modes;
+  - that only the loading differs between the three cultures, the maturity
+    labels by record type, the holdout errors quoted from the joint
+    comparison page, the time grids, and the nav position and links.
+
+  `tests/test_walkthrough_doc.py` now exposes `marked_blocks(doc, prefix)`,
+  `assert_lines_shown(...)` and `offline()` for reuse; its own checks are
+  unchanged.
+- Links: `README.md`, `docs/index.md` and `docs/walkthrough.md` (one each);
+  one sentence in `paper/joss/paper.md`; `CHANGELOG.md`.
+
+Not shown, and said so on the page: any validation against independent data
+(none is bundled), any prediction outside the stored scope, the published
+Gelain equations, a fungus degrading anything in the BGL1A case, and
+uncertainty bands (both cases are exact).
+
+## DOCS-WALK-001 Walkthrough From A Fungus Name To A Simulation, And A Live-Source Check
+
+Status: `complete` for the stated scope (2026-10-08). Documentation, fixtures,
+tests and one repository script; no change to `src/`, so no scientific or
+numerical behaviour changed. The live UniProt and SABIO-RK formats remain
+unverified: the script that checks them needs internet access, which the
+environment of this task did not have.
+
+- `docs/walkthrough.md` ("From a fungus name to a simulation", in the nav
+  after "Command line"): the owner's route "fungus X on substrate Y in
+  conditions Z" from a shell, in seven steps: `fungmod assemble
+  --fetch-proteome --fetch-kinetics --network` (each option and the `--fetch`
+  opt-in explained), the draft report read from the top (proteome choice,
+  repertoire, acting classes, network, kinetics lookup, per-case kinetics
+  status with a table of the five statuses, `REVIEW:` fields, next commands),
+  resolving a `conflict` with `--entry-id` (a scientific decision; the page
+  says its choice is arbitrary because the entries are synthetic), filling
+  the `REVIEW:` fields (the drafted row and the reviewed row shown),
+  `check-data` (refused, then loaded with its gaps and measurement requests),
+  `run --runnable-only` (exit code 4; without the flag exit code 3; scientific
+  mode refused for transferred estimates), reading the outputs (time series,
+  metrics and rates, threshold times, what the percentiles mean, a provenance
+  extract, limitations, measurement requests, the manifest) and replacing the
+  estimates with your own measurements (a row template with placeholders).
+  A warning box says the organism, proteome, entries and organisms are
+  synthetic test fixtures, not biology, and that a real run needs network
+  access.
+- Every output on the page is real: the worked example runs offline against
+  `tests/fixtures/walkthrough/` (README), FungMod's own snapshots of the
+  existing synthetic fixtures (`search_fixture_mould_b2.tsv`,
+  `proteome_UP999990002_uniprotkb.tsv`, `ecnumber_3_2_1_21_cellobiose.json`),
+  made once by running the assemble command with `--fetch` while the tests'
+  fakes served those fixtures (a throwaway script outside the repository);
+  `.gitattributes` marks the directory `-text` (FungMod checks its SHA-256).
+- `tests/test_walkthrough_doc.py` (13 tests) reads the page's marked blocks
+  (`<!-- walkthrough-<kind>: <key> -->`), reruns every marked command as shown
+  in a temporary directory (only the snapshot directories become absolute
+  paths), applies the page's edits, and checks that every line of every
+  marked output occurs in the real output in order (`...` is any text), the
+  provenance table against `provenance_table.csv`, the drafted row against
+  the draft, the claims about scientific mode and about your own values
+  (filled with test values that are not measurements: no gap, both
+  conditions run, scientific mode runs), the snapshots against the source
+  fixtures byte for byte, and the script's sample report.
+- `scripts/verify_live_sources.py`: one request to each of UniProt's proteome
+  search, UniProtKB's export and SABIO-RK's kinetic-law export, through
+  `search_proteomes_by_name`, `choose_proteome`, `fetch_proteome_snapshot`
+  and `fetch_kinlaw_query_snapshot` (refresh), then `parse_reaction_records`
+  and `user_tables_from_sabiork` on the answer; `urllib.request.urlopen` is
+  wrapped while FungMod's UniProt functions run, and the SABIO-RK request uses
+  the documented `transport`, so the report shows the response FungMod
+  parsed. Per endpoint: URL, HTTP status, `X-UniProt-Release`,
+  `X-UniProt-Release-Date`, `X-Total-Results`, `Link`, SABIO-RK's
+  `meta.total_count`/`meta.total_pages`, columns or fields found against
+  those expected, entries, parser outcome, EC numbers, organisms, parameters
+  and substrate names of the entries, and the conversion. Mismatch (exit
+  code 1): a non-200 answer other than a server error, a missing column or
+  envelope field, a parser refusal, a missing or inconsistent
+  `X-Total-Results`, entries of another EC number, no entry naming the
+  substrate; not checked (exit code 3): no network, a server error, a name
+  without exactly one proteome (`--proteome` chooses), a query without
+  entries. Defaults *Trichoderma reesei* and EC 3.2.1.21 on "Cellobiose",
+  printed as probes only. Writes snapshots and `verification_report.json`
+  only to a new temporary directory or an empty `--output-dir` outside the
+  repository (refused inside it). `tests/test_verify_live_sources.py` (24
+  tests) runs it offline with patched `urlopen` on the synthetic fixtures:
+  the passing path, each mismatch, the not-checked paths, usage errors, and
+  that nothing is written inside the repository.
+- Links: `README.md`, `docs/index.md`, `docs/quickstart.md` (one each);
+  `docs/user-data.md` "From a fungus name" and "Fetching kinetics" each point
+  to the script in one sentence.
+
+Not verified: the live services (the script is for the owner to run); the
+walkthrough's numbers come from synthetic fixtures and a design enzyme
+concentration and say nothing about any fungus.
+
 ## FETCH-002 Kinetics Of The Fungus's Enzyme Classes Looked Up By EC Number
 
 Status: `complete` for the stated scope (2026-10-08); not verified against a

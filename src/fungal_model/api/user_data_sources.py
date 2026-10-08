@@ -21,9 +21,14 @@ Mapping rules (each application is recorded in ``review.md``):
 - one strain per SABIO-RK organism and expression host, or the strain ID the
   caller maps the organism to; mutant enzymes are not entered as an organism's
   kinetics;
-- the EC number is resolved against the registry's enzyme classes; an
-  unresolved EC number is listed, and an ``enzyme_classes.csv`` row with
-  ``REVIEW:`` bond and substrate classes is proposed only on request;
+- the EC number is resolved against the registry's enzyme classes and, when
+  the caller gives them (``user_enzyme_classes``), against the ``ec_number``
+  of user-defined classes of ``enzyme_classes.csv`` by exact match of complete
+  EC numbers (FETCH-003); an EC number that resolves to two classes (two
+  registry classes, two user-defined classes, or one of each) is listed, never
+  decided by the enzyme name; an unresolved EC number is listed, and an
+  ``enzyme_classes.csv`` row with ``REVIEW:`` bond and substrate classes is
+  proposed only on request;
 - the substrate the law describes (named by its Km or concentration
   parameters) is resolved against the registry by name or alias, otherwise it
   becomes a user substrate row with ``REVIEW:`` categorical fields; the product
@@ -78,6 +83,7 @@ from fungal_model.sources.sabiork import (
     SabioRKSourceSnapshot,
     stable_sabiork_token,
 )
+from fungal_model.sources.sabiork.query_snapshots import complete_ec_number
 
 # SABIO-RK unit spellings and the unit-registry spelling written for each. The
 # table is consulted only when the unit registry does not parse the SABIO-RK
@@ -364,6 +370,7 @@ def user_tables_from_sabiork(
     propose_enzyme_classes: bool = False,
     registry: str | Path | FungModRegistry | None = None,
     cache_dir: str | Path = "data/source_snapshots/sabiork",
+    user_enzyme_classes: Sequence[Mapping[str, str]] = (),
 ) -> UserTablesDraft:
     """Draft user-dataset tables from SABIO-RK kinetic-law entries for review.
 
@@ -387,6 +394,17 @@ def user_tables_from_sabiork(
     converted. ``registry`` resolves enzyme classes and substrates (the
     packaged registry by default).
 
+    ``user_enzyme_classes`` (FETCH-003) are user-defined enzyme classes an
+    entry's EC number may also resolve to: rows of a user dataset's
+    ``enzyme_classes.csv`` (mappings of its columns to cells; ``class_id`` is
+    required and must not name a registry class). An entry's EC number
+    resolves to such a class only when both are complete EC numbers and equal,
+    and only when no registry class and no other user-defined class has it;
+    an EC number shared that way is listed with the reason, and a class is
+    never chosen by the enzyme name. A class that entries resolve to has its
+    row copied unchanged into the draft's ``enzyme_classes.csv``. Without
+    ``user_enzyme_classes`` nothing changes.
+
     Returns a ``UserTablesDraft``; ``draft.write(directory)`` writes the
     tables, ``user_dataset.yml`` and ``review.md``. ``load_user_dataset``
     refuses the directory until every ``REVIEW:`` field is filled.
@@ -398,17 +416,20 @@ def user_tables_from_sabiork(
             "requires."
         )
     base = _base_registry(registry)
+    resolver = RegistryResolver(base)
+    user_classes = _validated_user_classes(user_enzyme_classes, resolver)
     design_rows = _validated_design(design)
     organism_map = _validated_organism_map(strain_id_for_organism)
     loaded = _load_entries(source, cache_dir=cache_dir)
     selected = _select_entries(loaded.entries, entry_ids)
     builder = _DraftBuilder(
         dataset_id=dataset_id,
-        resolver=RegistryResolver(base),
+        resolver=resolver,
         registry=base,
         organism_map=organism_map,
         design=design_rows,
         propose_enzyme_classes=propose_enzyme_classes,
+        user_classes=user_classes,
     )
     builder.not_selected = tuple(entry for entry in loaded.entries if entry not in selected)
     builder.duplicates = loaded.duplicates
@@ -598,6 +619,66 @@ def _validated_organism_map(mapping: Mapping[str, str] | None) -> dict[str, str]
     return output
 
 
+def _validated_user_classes(
+    rows: Sequence[Mapping[str, str]] | None, resolver: RegistryResolver
+) -> dict[str, dict[str, str]]:
+    """User-defined enzyme classes by class_id, as enzyme_classes.csv cells (FETCH-003)."""
+
+    if rows is None:
+        return {}
+    if isinstance(rows, (str, Mapping)):
+        raise UserTablesSourceError(
+            "user_enzyme_classes must be a sequence of enzyme_classes.csv rows (mappings of column to cell), not one "
+            "row or a string."
+        )
+    output: dict[str, dict[str, str]] = {}
+    for index, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise UserTablesSourceError(
+                f"user_enzyme_classes[{index}] must be an enzyme_classes.csv row (a mapping of column to cell)."
+            )
+        unknown = sorted(str(key) for key in row if key not in ENZYME_CLASS_COLUMNS)
+        if unknown:
+            raise UserTablesSourceError(
+                f"user_enzyme_classes[{index}] has key(s) {', '.join(unknown)}, which are not enzyme_classes.csv "
+                f"columns ({', '.join(ENZYME_CLASS_COLUMNS)})."
+            )
+        cells = {column: _text(row.get(column)).strip() for column in ENZYME_CLASS_COLUMNS}
+        class_id = cells["class_id"]
+        if not _IDENTIFIER.fullmatch(class_id):
+            raise UserTablesSourceError(
+                f"user_enzyme_classes[{index}] needs a class_id of letters and digits joined by single underscores, "
+                f"as enzyme_classes.csv requires; got {class_id!r}."
+            )
+        if class_id in output:
+            raise UserTablesSourceError(f"user_enzyme_classes[{index}] repeats class_id {class_id!r}.")
+        if _resolves(resolver.resolve_enzyme_class, class_id):
+            raise UserTablesSourceError(
+                f"user_enzyme_classes[{index}] class_id {class_id!r} names a registry enzyme class; a user-defined "
+                "class needs an identifier the registry does not use, as load_user_dataset requires."
+            )
+        output[class_id] = cells
+    return output
+
+
+def _classes_with_ec_number(ec_number: str, user_classes: Mapping[str, Mapping[str, str]]) -> list[str]:
+    """The class_ids of user-defined classes whose ``ec_number`` is the complete EC number ``ec_number``.
+
+    An exact match of complete EC numbers (four numeric parts, an ``EC`` prefix
+    ignored): a partial EC number such as ``3.2.1.-`` matches nothing, on
+    either side, and nothing is matched by a name.
+    """
+
+    number = complete_ec_number(ec_number)
+    if number is None:
+        return []
+    return [
+        class_id
+        for class_id, row in user_classes.items()
+        if complete_ec_number(_text(row.get("ec_number"))) == number
+    ]
+
+
 @dataclass(frozen=True)
 class _DesignValue:
     quantity: str
@@ -755,6 +836,7 @@ class _DraftBuilder:
         organism_map: Mapping[str, str],
         design: Mapping[str, _DesignValue],
         propose_enzyme_classes: bool,
+        user_classes: Mapping[str, Mapping[str, str]] | None = None,
     ) -> None:
         self.dataset_id = dataset_id
         self.resolver = resolver
@@ -762,6 +844,8 @@ class _DraftBuilder:
         self.organism_map = organism_map
         self.design = design
         self.propose_enzyme_classes = propose_enzyme_classes
+        # User-defined classes an EC number may resolve to, by class_id (FETCH-003); empty unless given.
+        self.user_classes: Mapping[str, Mapping[str, str]] = dict(user_classes or {})
         self.not_selected: tuple[_Entry, ...] = ()
         self.duplicates: tuple[str, ...] = ()
         self.decisions: dict[str, list[str]] = {
@@ -1100,19 +1184,32 @@ class _DraftBuilder:
         if cached is not None:
             return cached
         label = f"EC {ec}{f' ({name})' if name else ''}"
+        users = _classes_with_ec_number(ec, self.user_classes)
         try:
             resolved = self.resolver.resolve_enzyme_class(ec)
         except AmbiguousResolutionError as exc:
-            choice = _ClassChoice("", f"{label} is ambiguous in the registry: {exc}", "")
+            reason = f"{label} is ambiguous in the registry: {exc}"
+            if users:
+                reason += f"; it is also the ec_number of {_user_class_text(users)}"
+            choice = _ClassChoice("", reason, "")
         except ResolutionError:
-            choice = self._unresolved_class(ec, name, label)
+            choice = self._user_class(label, users) if users else self._unresolved_class(ec, name, label)
         else:
-            choice = _ClassChoice(
-                resolved.record_id,
-                "",
-                f"{label} resolves to registry enzyme class `{resolved.record_id}` (matched {resolved.matched_field} "
-                f"{resolved.matched_value!r}).",
-            )
+            if users:
+                choice = _ClassChoice(
+                    "",
+                    f"{label} resolves both to registry enzyme class {resolved.record_id!r} and to "
+                    f"{_user_class_text(users)}; FungMod does not choose between classes that share an EC number, "
+                    "and never by the enzyme name",
+                    "",
+                )
+            else:
+                choice = _ClassChoice(
+                    resolved.record_id,
+                    "",
+                    f"{label} resolves to registry enzyme class `{resolved.record_id}` (matched "
+                    f"{resolved.matched_field} {resolved.matched_value!r}).",
+                )
         self._class_cache[ec] = choice
         if choice.decision:
             self._note("Enzyme classes", choice.decision)
@@ -1120,11 +1217,36 @@ class _DraftBuilder:
             self._note("Enzyme classes", f"{choice.reason}.")
         return choice
 
-    def _unresolved_class(self, ec: str, name: str, label: str) -> _ClassChoice:
-        if not self.propose_enzyme_classes:
+    def _user_class(self, label: str, users: Sequence[str]) -> _ClassChoice:
+        """The user-defined class an EC number the registry does not resolve names, or why none is taken."""
+
+        if len(users) > 1:
             return _ClassChoice(
                 "",
-                f"{label} does not resolve to a registry enzyme class; no class is invented (pass "
+                f"{label} is the ec_number of {_user_class_text(users)}; FungMod does not choose between classes that "
+                "share an EC number, and never by the enzyme name",
+                "",
+            )
+        (class_id,) = users
+        row = self.user_classes[class_id]
+        return _ClassChoice(
+            class_id,
+            "",
+            f"{label} resolves to user-defined enzyme class `{class_id}` (its enzyme_classes.csv ec_number "
+            f"{row['ec_number']}, an exact match; no registry class and no other user-defined class has that EC "
+            "number). Its enzyme_classes.csv row is the user's, unchanged.",
+        )
+
+    def _unresolved_class(self, ec: str, name: str, label: str) -> _ClassChoice:
+        if not self.propose_enzyme_classes:
+            target = (
+                "a registry enzyme class or to the ec_number of a user-defined class"
+                if self.user_classes
+                else "a registry enzyme class"
+            )
+            return _ClassChoice(
+                "",
+                f"{label} does not resolve to {target}; no class is invented (pass "
                 "propose_enzyme_classes=True to draft an enzyme_classes.csv row with REVIEW bond and substrate classes)",
                 "",
             )
@@ -1140,9 +1262,26 @@ class _DraftBuilder:
                     f"{clash.record_id!r}; the EC number and the name disagree, so no class is proposed",
                     "",
                 )
+            named = [
+                class_id
+                for class_id, row in self.user_classes.items()
+                if _norm_text(name) in {_norm_text(class_id), _norm_text(_text(row.get("name")))}
+            ]
+            if named:
+                return _ClassChoice(
+                    "",
+                    f"{label} does not resolve, but the name {name!r} names user-defined enzyme class {named[0]!r}, "
+                    f"whose ec_number is {_text(self.user_classes[named[0]].get('ec_number')) or 'not given'}; the EC "
+                    "number and the name disagree, so no class is proposed",
+                    "",
+                )
         base = stable_sabiork_token(name) if name else f"ec_{stable_sabiork_token(ec)}"
         class_id = base
-        if class_id in self._proposed_classes or _resolves(self.resolver.resolve_enzyme_class, class_id):
+        if (
+            class_id in self._proposed_classes
+            or class_id in self.user_classes
+            or _resolves(self.resolver.resolve_enzyme_class, class_id)
+        ):
             class_id = f"{base}_ec_{stable_sabiork_token(ec)}"
         row = {
             "class_id": class_id,
@@ -1208,15 +1347,24 @@ class _DraftBuilder:
     def _incompatible(self, class_id: str, substrate_id: str) -> str:
         if not class_id or not substrate_id:
             return ""
-        enzyme_class = self.registry.get_enzyme_class(class_id)
+        user_row = self.user_classes.get(class_id)
+        if user_row is not None:
+            kind = "user-defined enzyme class"
+            targets = _semicolon_cells(_text(user_row.get("target_bond_classes")))
+            compatible = _semicolon_cells(_text(user_row.get("compatible_substrate_classes")))
+        else:
+            enzyme_class = self.registry.get_enzyme_class(class_id)
+            kind = "registry enzyme class"
+            targets = tuple(enzyme_class.target_bond_classes)
+            compatible = tuple(enzyme_class.compatible_substrate_classes)
         substrate = self.registry.get_substrate(substrate_id)
-        shared = set(enzyme_class.target_bond_classes) & set(substrate.bond_classes)
-        if substrate.substrate_class in enzyme_class.compatible_substrate_classes and shared:
+        shared = set(targets) & set(substrate.bond_classes)
+        if substrate.substrate_class in compatible and shared:
             return ""
         return (
-            f"registry enzyme class {class_id!r} cannot act on registry substrate {substrate_id!r} (substrate class "
+            f"{kind} {class_id!r} cannot act on registry substrate {substrate_id!r} (substrate class "
             f"{substrate.substrate_class!r}, bond classes {list(substrate.bond_classes)}; the class acts on "
-            f"{list(enzyme_class.compatible_substrate_classes)} and cleaves {list(enzyme_class.target_bond_classes)})"
+            f"{list(compatible)} and cleaves {list(targets)})"
         )
 
     # -- strains, conflicts, rate forms ------------------------------------
@@ -1477,6 +1625,11 @@ class _DraftBuilder:
             if not group:
                 continue
             rows.append({**row, "source": "; ".join(_unique(_source_text(plan.entry.record) for plan in group))})
+        # A user-defined class that entries resolve to keeps the user's own row, so the draft loads on its own.
+        used = {plan.class_id for plan in plans}
+        for class_id, row in self.user_classes.items():
+            if class_id in used:
+                rows.append({column: _text(row.get(column)) for column in ENZYME_CLASS_COLUMNS})
         return rows
 
     def _substrate_rows(self, plans: Sequence[_Plan]) -> list[dict[str, str]]:
@@ -1703,7 +1856,8 @@ class _DraftBuilder:
         else:
             lines.append("None.")
         lines.extend(["", "## Mapping decisions", ""])
-        lines.extend(f"- {_md_text(rule)}" for rule in _RULES)
+        rules = _RULES if not self.user_classes else (_RULES[0], _USER_CLASS_RULE, *_RULES[2:])
+        lines.extend(f"- {_md_text(rule)}" for rule in rules)
         for section, items in self.decisions.items():
             if not items:
                 continue
@@ -1837,6 +1991,14 @@ _RULES = (
     "range -> ph_min and ph_max, or REVIEW fields); a law with pKa parameters in any other form is listed. One "
     "enzyme class uses the pH-ionization form on all of its substrates or on none, so where entries of the kcat "
     "or Vmax form share the class, the pH-ionization entries are listed.",
+)
+# The enzyme-class rule of _RULES when user-defined classes are given (FETCH-003); without them _RULES is unchanged.
+_USER_CLASS_RULE = (
+    "Enzyme class: the EC number is resolved against the registry's enzyme classes (EC numbers are aliases there) "
+    "and against the ec_number of the user-defined classes given (user_enzyme_classes; an exact match of complete EC "
+    "numbers). An EC number that resolves to two classes (two registry classes, two user-defined classes, or one of "
+    "each) is listed, never decided by the enzyme name. An unresolved EC number is listed; an enzyme_classes.csv row "
+    "is proposed only with propose_enzyme_classes=True, and its bond and substrate classes are REVIEW fields."
 )
 
 
@@ -2338,6 +2500,21 @@ def _text(value: Any) -> str:
 
 def _unique(values: Iterable[str]) -> list[str]:
     return list(dict.fromkeys(value for value in values if value))
+
+
+def _user_class_text(class_ids: Sequence[str]) -> str:
+    """How a reason names user-defined classes that share an EC number."""
+
+    plural = "es" if len(class_ids) > 1 else ""
+    return f"user-defined enzyme class{plural} {', '.join(repr(item) for item in class_ids)} of enzyme_classes.csv"
+
+
+def _norm_text(text: str) -> str:
+    return " ".join(text.casefold().split())
+
+
+def _semicolon_cells(text: str) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(item.strip() for item in text.split(";") if item.strip()))
 
 
 def _unique_items(values: Iterable[tuple[str, str, str]]) -> list[tuple[str, str, str]]:

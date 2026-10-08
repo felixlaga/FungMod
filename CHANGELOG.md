@@ -24,6 +24,95 @@ All notable public releases of FungMod are documented here.
   7.9e-11 of the largest entry, with no dependency outside the declared
   stencil (`tests/test_mycelium_jacobian.py`, `docs/spatial-mycelium.md`).
 
+- Kinetics of the enzyme classes a user dataset defines, looked up by their
+  own EC numbers (FETCH-003). `user_tables_from_sabiork(user_enzyme_classes=...)`
+  resolves an entry's EC number to a user-defined class (rows of an
+  `enzyme_classes.csv`) when both are the same complete EC number, and copies
+  that class's row unchanged into the draft; `assemble_user_tables` passes the
+  classes of its `user_data` (every row of the dataset's `enzyme_classes.csv`,
+  which includes every class the draft writes), so SABIO-RK entries, from
+  `kinetics_sources` or looked up, can become kinetics of a lab's own class
+  under the existing per-case rules (own species literature, other organisms
+  transferred estimates, conflicts, gaps). With `fetch_kinetics=True`
+  (`fungmod assemble --fetch-kinetics`) such a class is queried by the
+  `ec_number` of its row and the substrate's name, with the FETCH-002
+  snapshots, statuses and report; its query in
+  `assembly["kinetics_lookup"]` carries `class_defined_in` (the row and the
+  dataset), and the command line and `review.md` say "user-defined". An EC
+  number two classes share, two user-defined classes or a registry and a
+  user-defined class, is listed with both classes and the reason and never
+  chosen (by the conversion and by the lookup, on both sides), a partial EC
+  number matches nothing, and nothing is matched by a name. Tests:
+  `tests/test_fetch_kinetics_user_classes.py` with the user dataset
+  `tests/fixtures/user_data/lab_classes_case/` and two synthetic SABIO-RK
+  responses (not SABIO-RK data); not verified against live SABIO-RK.
+
+- Quick-look figures of what a network or a culture computes (PLOTS-001):
+  each case whose time series hold the rates of more than one process (an
+  enzyme network of two or more classes, a culture, the registry's enzyme
+  chain) gets `figures/<case_id>_state_trajectories.png`, one panel per
+  simulated state in its own units (the entry substrate, the intermediate pools
+  and the final product first; for a culture also the biomass, each enzyme pool
+  and both closure ledgers), the substrate panel marked with the 10, 50 and
+  90 % degradation times of `threshold_times.csv` at their p50 from
+  `summary_metrics.csv`, and `figures/<case_id>_process_rates.png`, one panel
+  per `process_rate.<id>` series in its own rate units, a network process
+  named with its enzyme class, pool and rate modifiers from
+  `mechanism_summary.csv`. With several samples each panel shows the p05-p95
+  band and p50 of `trajectory_quantiles.csv`. The figures are drawn from the
+  existing tables only; no output table, column or value changes (schema
+  `2.2.1`), and cases with one process keep the five run-level figures
+  unchanged (byte-identical under the same matplotlib).
+
+- A worked example on stored literature data (EXAMPLE-001):
+  `docs/real-example.md` runs, offline and from the registry's stored records
+  alone, the two cases whose numbers come from published sources.
+  *T. harzianum* P49P11 on Celufloc 200 cellulose at 10, 20 and 30 g/L
+  (Gelain 2020; `fungmod run --mode scientific`) is read for substrate loss,
+  rates, threshold times, the missing product pool and the absent
+  uncertainty band. A short snippet sets its time courses beside the
+  deposited duplicate means they were fitted to, labelled as in-sample
+  agreement, with the joint comparison's holdout errors cited as the only
+  out-of-sample test. The *P. chrysosporium* BGL1A pH law (SABIO-RK entry
+  38522, Tsukada 2008; `fungmod run --mode exploratory` over pH 4 to 8) is
+  shown with a per-pH table of degradation, glucose release, initial rate
+  and threshold times, and the scientific-mode preflight that names the two
+  assumed assay loadings. Each case has a provenance table (value, units,
+  maturity, posterior class and credible interval, or SABIO-RK parameter and
+  deposited standard deviation), its important limitations, its follow-up
+  measurements and what the page does not show. A survey table lists every
+  registry fungus, what its source measured and the modes it runs in.
+  `tests/test_real_example_doc.py` reruns every command and the snippet,
+  checks every output line shown, checks each table against the run's
+  tables, the registry records and the archived SABIO-RK export, and checks
+  each survey row's modes with the preflight. `tests/test_walkthrough_doc.py`
+  now exposes its block parser and line matcher for reuse. The page is in
+  the nav after the walkthrough and linked from `README.md`, `docs/index.md`
+  and `docs/walkthrough.md`. No scientific or numerical behaviour changed.
+
+- A walkthrough from a fungus name to a simulation (DOCS-WALK-001):
+  `docs/walkthrough.md` runs `fungmod assemble --fetch-proteome
+  --fetch-kinetics --network`, resolves the draft's conflict with
+  `--entry-id`, fills its `REVIEW:` fields, then `fungmod check-data` and
+  `fungmod run --runnable-only` (exit codes 0, 3 and 4), reads the metrics,
+  rates, threshold times, provenance, limitations and measurement requests,
+  and shows how your own measurements replace the transferred estimates.
+  Every output shown is real output on frozen snapshots of the existing
+  synthetic UniProt and SABIO-RK test responses
+  (`tests/fixtures/walkthrough/`, said on the page to be synthetic, not
+  biology); `tests/test_walkthrough_doc.py` reruns every command shown and
+  checks every line shown, so the page cannot drift. New
+  `scripts/verify_live_sources.py` checks, once, on a machine with internet
+  access, the live UniProt proteome search, UniProtKB export and SABIO-RK
+  EC-number query through FungMod's own query builders, parsers and snapshot
+  checks, and reports per endpoint the URL, HTTP status, the headers FungMod
+  relies on, the columns or fields found against those expected, the entries
+  and every mismatch (exit code 1 on a mismatch, 3 when an endpoint could not
+  be checked); it writes only to a new temporary directory or an
+  `--output-dir` outside the repository. Its tests run it offline with
+  patched `urlopen`. No scientific or numerical behaviour changed; the live
+  formats remain unverified until the script is run against the services.
+
 - Kinetics of the fungus's enzyme classes looked up in SABIO-RK by EC number
   (FETCH-002): `assemble_user_tables(fetch_kinetics=True)` and `fungmod
   assemble --fetch-kinetics` query SABIO-RK's kinetic-law export once per
@@ -908,6 +997,48 @@ All notable public releases of FungMod are documented here.
   `jacobian_kernels` and the solver metadata `jacobian_bandwidths` and
   `jacobian_entries_outside_band`.
 
+- FETCH-003, behaviour: a class of `user_data` with a complete EC number is
+  now looked up by `fetch_kinetics` (FETCH-002 listed it as not queried), and
+  a SABIO-RK entry whose EC number a user-defined class shares with a registry
+  class is no longer converted for the registry class; it is listed with both
+  classes. Text: the lookup limitation of `fetch_kinetics` drafts says which
+  classes are looked up (the only change to drafts of registry classes, which
+  are otherwise byte-identical); a registry class with several EC numbers of
+  which some are not queried is now listed for those, beside the queries of
+  the others (FETCH-002 dropped them silently); the "does not resolve" reason
+  names user-defined classes when the dataset has any; for a substrate of the
+  user dataset, the assembled draft no longer repeats the conversion's
+  decisions about a `substrates.csv` row it does not write and says instead
+  that the user's row is kept; `fungmod assemble --help` describes the lookup
+  of user-defined classes. No numerical behaviour changes.
+
+- The surface-catalysis registry assembler is template-driven (SURFACE-001).
+  It no longer branches on the BIO-001 milestone or writes cellulose or toy
+  text from code: `config_name`, `config_mode`, `config_maturity`,
+  `accessible_site_pool` and `product_map_name` are required template
+  metadata, the config provenance, substrate and enzyme entity text and the
+  parameter entries' method and validity come from the new template blocks
+  `config_provenance`, `substrate_entity`, `enzyme_entity` and
+  `parameter_entries`, and the process assumptions are the template's
+  limitations. The silent geometry fallbacks (100 mL with 0.5 m^2 or 0.1 m^2
+  and code-written provenance) are removed: a template states a well-mixed
+  geometry or `geometry: null` (the surface law reads no geometry) or is
+  refused. The bond class is the template's `bond_type` or the single class
+  the substrate carries, the enzyme class targets and the compatibility record
+  requires; ambiguity is refused instead of taking the substrate's first bond
+  class. Deterministic assembly accepts `mode='scientific'` as well as `toy`,
+  each only for a template of that `config_mode` (a scientific template only
+  with exact scientific-grade records; exploratory templates are sampled by
+  the exploratory screen); a substrate declared dissolved or of unknown
+  physical state is refused. The BIO-001 text moved verbatim into its
+  template, so the BIO-001 and BIO-002 configs hash as before (pinned
+  digests); the toy surface case's configs differ only in metadata the toy
+  branch wrote (provenance names the bound records and lists `notes` last,
+  product entries carry the provenance source, the enzyme names its target
+  substrate and the config's measurement method, parameter notes drop the
+  appended "Toy/development only."). No simulated value changes. Custom
+  surface templates must add the new required metadata and blocks.
+
 - Text only (FETCH-002): `fungmod assemble --help` describes `--fetch` as the
   opt-in for the UniProt proteome and the kinetics lookup, and `--cache-dir`
   as where kinetics snapshots are read and stored; `--fetch` without a
@@ -1023,6 +1154,14 @@ All notable public releases of FungMod are documented here.
   translocation were missing. It now uses the declared stencil and a
   colouring valid on periodic axes of any length, and is vectorised (33 ms
   instead of 70 ms per Jacobian on a 40 x 40 colony).
+
+- The run-level quick-look figures (`substrate_remaining_vs_time.png`,
+  `product_release_vs_time.png`, `degradation_fraction_vs_time.png`,
+  `degradation_rate_vs_time.png`) drew the cases of a run on one axis labelled
+  with the first row's units, even when cases were in different units (g/L and
+  mM) or time units (hours and minutes). Each units text now gets its own panel
+  with its units on both axes; a run in one units text draws exactly as before
+  (PLOTS-001).
 
 - A dimensionless parameter bound to a product-map coefficient in scaled units
   was read as its raw number: a `culture.csv` `biomass_yield` of `0.5 mg/g`
