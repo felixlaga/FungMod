@@ -22,8 +22,9 @@ repertoire of ``assemble`` can be a UniProt proteome (``--proteome UP...``, or
 by ``fungal_model.sources.uniprot``); its frozen snapshots are read from disk,
 and the network is reached only with ``assemble --fetch``, the one network
 opt-in of the command line. ``assemble --fetch-kinetics`` looks up the
-kinetics of the repertoire's classes in the API's kinetic-law database by EC
-number and substrate name (``assemble_user_tables(fetch_kinetics=True)``),
+kinetics of the repertoire's classes (registry classes and classes the user
+dataset defines) in the API's kinetic-law database by EC number and substrate
+name (``assemble_user_tables(fetch_kinetics=True)``),
 through frozen query snapshots under ``--cache-dir`` that only ``--fetch``
 refreshes. ``assemble --network`` drafts an enzyme network
 (``enzyme_network``: every class of the repertoire acting on a pool the
@@ -150,9 +151,10 @@ FETCH_HELP = (
 FETCH_KINETICS_HELP = (
     "look up the kinetics of every class of the repertoire that acts on a requested substrate (with --network, on a "
     "pool) in the API's kinetic-law database (assemble_user_tables(fetch_kinetics=True)): one query per EC number of "
-    "the class's registry record and the substrate's name, never a name guess; the entries join the kinetics "
-    "sources under the same per-case rules. Classes without an EC number and classes of --user-data are listed and "
-    "not queried. The frozen query snapshots under --cache-dir are read; the database is queried only with --fetch"
+    "the class's registry record, or of its enzyme_classes.csv row for a class --user-data defines, and the "
+    "substrate's name, never a name guess; the entries join the kinetics sources under the same per-case rules. "
+    "Classes without a complete EC number, and an EC number two classes share, are listed and not queried. The "
+    "frozen query snapshots under --cache-dir are read; the database is queried only with --fetch"
 )
 IN_SAMPLE_HELP = (
     "Agreement with, and values fitted to, your own time courses are in-sample: they are not validation, and "
@@ -218,11 +220,12 @@ the enzyme repertoire from a UniProt proteome (instead of --annotation):
 
 kinetics looked up by EC number (--fetch-kinetics):
   For every class of the repertoire that acts on a requested substrate (with --network, on a pool), the API's
-  kinetic-law database is queried once per EC number of the class's registry record and the substrate's name,
-  and the entries join the kinetics sources: the fungus's own species is literature, another organism a transfer
-  (estimates), several candidates a conflict (choose with --entry-id), nothing at the condition a gap; kinetics
-  are never reused at another condition. Classes without an EC number and classes of --user-data are listed and
-  not queried. Each answer is a frozen, digest-checked snapshot under --cache-dir: without --fetch only those are
+  kinetic-law database is queried once per EC number of the class's registry record (or of its enzyme_classes.csv
+  row, for a class --user-data defines) and the substrate's name, and the entries join the kinetics sources: the
+  fungus's own species is literature, another organism a transfer (estimates), several candidates a conflict
+  (choose with --entry-id), nothing at the condition a gap; kinetics are never reused at another condition.
+  Classes without a complete EC number, and an EC number two classes share (registry or user-defined), are listed
+  and not queried. Each answer is a frozen, digest-checked snapshot under --cache-dir: without --fetch only those are
   read and a missing one is refused with the command that fetches it; an HTTP error, or an unusable or truncated
   answer, stores nothing; a stored snapshot is never replaced by a new answer (remove it first).
 
@@ -2014,7 +2017,9 @@ def _print_kinetics_lookup(lookup: Mapping[str, Any], *, kinetics_dir: Path | No
             print(f"  network: not used; frozen snapshots under {kinetics_dir} (--fetch queries the database)")
     for item in lookup["queries"]:
         counts = ", ".join(f"{number} {use}" for use, number in item["counts"].items()) or "no entry"
-        print(f"  {item['enzyme_class']} on {item['substrate_id']}, EC {item['ec_number']}: {item['query']}")
+        # A user-defined class (FETCH-003) says where it and its EC number are defined.
+        defined = f" (user-defined, {item['class_defined_in']})" if "class_defined_in" in item else ""
+        print(f"  {item['enzyme_class']}{defined} on {item['substrate_id']}, EC {item['ec_number']}: {item['query']}")
         print(
             f"    snapshot {item['snapshot']} (retrieved {item['retrieved_at']}, HTTP {item['http_status']}, raw SHA-256 "
             f"{', '.join(item['raw_sha256'])}): {item['entries']} entries; {counts}"

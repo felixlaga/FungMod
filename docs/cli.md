@@ -837,14 +837,17 @@ enzyme classes in SABIO-RK instead of reading an export you downloaded
 [fetching kinetics](user-data.md#fetching-kinetics)). For every class of the
 repertoire that acts on a requested substrate (with `--network`, on a pool),
 one query per EC number of the class's registry record (its EC number and the
-EC numbers among its aliases) and the substrate's name,
+EC numbers among its aliases), or of the `enzyme_classes.csv` row of a class
+`--user-data` defines, and the substrate's name,
 `ECNumber:"<EC number>" AND Substrate:"<substrate name>"`; never a name of the
 enzyme and never broader. The entries join `--kinetics-source` and follow the
 same per-case rules: the fungus's species (`--scientific-name`,
 `--same-species`) is literature, another organism a transfer (estimates), two
 candidates at one condition a conflict (choose with `--entry-id`), nothing at
-a condition a gap. Classes without an EC number and classes of `--user-data`
-are listed and not queried.
+a condition a gap. Classes without a complete EC number, and an EC number two
+classes share (a registry class and a class of `--user-data`, or two classes of
+`--user-data`), are listed and not queried: the conversion would not choose
+between them.
 
 ```bash
 fungmod assemble --fungus "Strain K1" --scientific-name "Genus species" \
@@ -894,6 +897,37 @@ Cases: 2 (enzyme class x substrate x condition)
   2  Strain K1  beta_glucosidase  cellobiose  c40_ph5    gap                       none            SABIO-RK EntryID 9900001
   ...
 ```
+
+A class your `--user-data` defines in `enzyme_classes.csv` (FETCH-003) is
+queried by its own `ec_number`, and its line says where it is defined. With
+the user dataset `tests/fixtures/user_data/lab_classes_case/` and the same kind
+of synthetic responses (`tests/test_fetch_kinetics_user_classes.py`; not
+SABIO-RK data, not verified live):
+
+```bash
+fungmod assemble --fungus strain_k6 --user-data lab_classes_case \
+  --substrate pnp_butyrate --temperature-c 30 --ph 7 \
+  --design substrate_initial_concentration=1 mM --design enzyme_concentration=0.05 uM \
+  --fetch-kinetics --fetch --dataset-id lab_lookup --output lab_lookup
+```
+
+```text
+Kinetics looked up by EC number (--fetch-kinetics; SABIO-RK https://sabio.h-its.org/export-api/sabio/kinlaw-entry/json, one query per EC number of a class and substrate name: ECNumber:"<EC number>" AND Substrate:"<substrate name>")
+  network: --fetch given; each query below was sent to the database and its answer is frozen under data/source_snapshots/sabiork
+  lab_ester_hydrolase (user-defined, enzyme_classes.csv row 2 of user dataset lab_classes_demo) on pnp_butyrate, EC 3.1.1.1: ECNumber:"3.1.1.1" AND Substrate:"4-Nitrophenyl butyrate"
+    snapshot ecnumber_3.1.1.1_and_substrate_4-nitrophenyl_butyrate-ca52b23f89da/... (retrieved ..., HTTP 200, raw SHA-256 f9bec60d...): 4 entries; 1 converted, 2 not used, 1 not convertible
+    converted 9900021 (Synthetic kinetics organism K6) -> lab_ester_hydrolase on pnp_butyrate at c30_ph7 (literature_same_organism)
+    not used 9900022 (Synthetic kinetics organism K7): stated at 37 degC, pH 7.5, which is not a requested condition, and no case needs it as its measured condition
+    not convertible 9900023 (Synthetic kinetics organism K7): mutant enzyme (synthetic variant V2): an engineered variant, not an enzyme of Synthetic kinetics organism K7, so it is not entered as the organism's kinetics
+    not used 9900024 (Synthetic kinetics organism K6): stated at 25 degC, pH 7, which is not a requested condition, and no case needs it as its measured condition
+```
+
+The reviewed draft then passes `check-data` and runs the 30 degC case with
+`--mode scientific` (K6 is the strain's own species, so the entry is
+literature). Where two classes share the EC number, the line becomes
+`not queried: <class> on <substrate>: EC <number> is also the ec_number of
+user-defined enzyme class <other> (enzyme_classes.csv), so its SABIO-RK entries
+would not become kinetics of <class>; nothing was queried`.
 
 Without `--fetch` and without a snapshot, the command is refused (exit code 2)
 with every missing query and the command that fetches them:

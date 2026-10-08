@@ -224,6 +224,206 @@ by default (about 0.5 s per 62-hour radial solve on this container), after
 the plan's owner confirms that the default Jacobian change needs no
 amendment.
 
+## FETCH-003 Kinetics Of A Lab's Own Enzyme Classes Looked Up By Their EC Numbers
+
+Status: `complete` for the stated scope (2026-10-08); not verified against a
+live SABIO-RK response. FETCH-002 looked up kinetics only for registry
+classes: a class a user dataset defines in `enzyme_classes.csv` was listed as
+"not queried", because the SABIO-RK conversion (`user_tables_from_sabiork`)
+resolved an entry's EC number against the registry only, so no entry could
+become its kinetics, from a lookup or from an export the user downloaded. A
+lab's own enzyme classes therefore never got literature or transfer kinetics.
+Now the conversion also resolves an EC number to a user-defined class of the
+dataset being assembled, by the same exact rule, and `fetch_kinetics` queries
+those classes by their own EC number, under the FETCH-002 snapshot, status and
+reporting rules, with no new numerics.
+
+Design decisions (design note kept outside the repository):
+
+- **Where the user's classes come from.** `assemble_user_tables` passes the
+  user-defined classes of the dataset being assembled to the conversion: every
+  row of `user_data`'s `enzyme_classes.csv` and every class the draft writes
+  to its own `enzyme_classes.csv` (today rows of that same file;
+  `_Assembler._user_defined_classes`). The conversion takes them as
+  `user_tables_from_sabiork(user_enzyme_classes=...)`: rows of an
+  `enzyme_classes.csv` as mappings (`class_id` required and not a registry
+  class; unknown columns, duplicates and a registry class ID refused). Without
+  them nothing changes.
+- **The rule, as for registry classes.** An entry's EC number resolves to a
+  user-defined class only when both are complete EC numbers (four numeric
+  parts, `complete_ec_number`) and equal (`_classes_with_ec_number`), and only
+  when no registry class and no other user-defined class has it: two
+  user-defined classes with one EC number (whether or not the fungus has
+  both), or an EC number that resolves to a registry class and is a user
+  class's `ec_number`, is refused and listed with both classes ("FungMod does
+  not choose between classes that share an EC number, and never by the enzyme
+  name"). A partial EC number (`3.1.1.-`) matches nothing. Nothing is matched
+  by a name; with `propose_enzyme_classes=True` an entry whose name names a
+  user class but whose EC number differs is refused (as for registry names),
+  and a proposed `class_id` never takes a user class's ID. The registry/user
+  compatibility check before converting uses the user class's own bond and
+  substrate classes. A class entries resolve to has its row copied unchanged
+  into the conversion's `enzyme_classes.csv`, so a standalone draft loads.
+- **The lookup.** A user-defined class acting on a requested substrate (or a
+  network pool) is queried by the complete `ec_number` of its row and the
+  substrate's name, `ECNumber:"<EC number>" AND Substrate:"<substrate name>"`,
+  exactly when the conversion would resolve the answer's entries to it: a
+  class without a complete EC number is listed ("SABIO-RK is queried by
+  complete EC number only, never by a class or enzyme name"), and an EC number
+  a registry class or another user-defined class shares is listed on both
+  sides, so neither is queried by it. A registry class with several EC numbers
+  of which some cannot be queried now gets a `not_queried` item for those
+  beside the queries of the others (FETCH-002 dropped them silently; no
+  shipped record is affected). Snapshots, refusals, statuses (own species
+  literature, transfer estimates, conflicts, gaps, no reuse across conditions)
+  and the offline rerun are FETCH-002's, unchanged.
+- **Report.** A query of a user-defined class carries `class_defined_in`
+  (`enzyme_classes.csv row N of user dataset D`); the command line prints it
+  after the class ("(user-defined, ...)"), `review.md` marks the class in the
+  lookup table and, only when such a class was queried, says "each enzyme
+  class of the fungus (a registry record's EC numbers, or the ec_number of a
+  user-defined class in enzyme_classes.csv)". The conversion's decision
+  "EC x (name) resolves to user-defined enzyme class `c` (its enzyme_classes.csv
+  ec_number x, an exact match; ...)" reaches the assembled draft's decisions.
+- **Honest decisions for the user's substrates.** On a substrate of the user
+  dataset the assembled draft keeps the user's `substrates.csv` row, but it
+  used to repeat the conversion's decisions about the row the conversion
+  would draft ("substrates.csv row ... is drafted with ... REVIEW fields",
+  "Product of ...: left for review"). These are now left out for such a
+  substrate and replaced by "SABIO-RK entries on '<name>' are matched to
+  substrate `<id>` of user dataset D by its name (or through registry
+  substrate `<id>`); its substrates.csv row, with its product and yield, is
+  kept unchanged." (Pre-existing for registry classes on a user substrate;
+  common now that lab classes act on lab substrates.)
+
+Changed:
+
+- `api/user_data_sources.py`: `user_tables_from_sabiork(user_enzyme_classes=())`;
+  `_validated_user_classes`, `_classes_with_ec_number`; `_DraftBuilder(user_classes=)`,
+  `_DraftBuilder._user_class`; `_enzyme_class`, `_unresolved_class`,
+  `_incompatible`, `_class_rows` and the review's enzyme-class rule
+  (`_USER_CLASS_RULE`, used only when user classes are given); `_ClassChoice.user_row`;
+  module docstring.
+- `api/user_data_assembly.py`: `_Assembler._user_defined_classes`,
+  `_class_defined_in`; `_lookup_ec_numbers` (user classes, shared EC numbers,
+  partly queried classes) and `lookup_kinetics`; `collect_entries` and
+  `_unconverted_parameters` pass the user classes; `_included` (decisions for
+  the user's substrates); `_lookup_report` (`class_defined_in`),
+  `_lookup_markdown`; `_LOOKUP_LIMITATIONS[1]`; docstrings.
+- `cli.py`: `FETCH_KINETICS_HELP`, the `--fetch-kinetics` epilog paragraph and
+  the module docstring; `_print_kinetics_lookup` prints `class_defined_in`.
+  cli.py still names no database and no class.
+- `sources/sabiork/`: not changed (the query form and snapshots are generic).
+- Fixtures: `tests/fixtures/user_data/lab_classes_case/` (README; strain K6 of
+  the synthetic organism K6 with two lab-defined classes, `lab_ester_hydrolase`
+  EC 3.1.1.1 on `pnp_butyrate` and `lab_phosphomonoesterase` EC 3.1.3.2 on
+  `pnp_phosphate`, the lab's own estimate rows at 25 degC, pH 7; illustrative
+  values only) and two synthetic SABIO-RK responses in
+  `tests/fixtures/sabiork_kinetics_queries/` (EC 3.1.1.1: four entries,
+  own species at 30 degC, another organism at 37 degC, a mutant, own species
+  at 25 degC; EC 3.1.3.2: Vmax-form entries in micromolar units at 40 degC and
+  25 degC), with the README's tables.
+- Docs: `docs/user-data.md` ("Fetching kinetics": what is queried, not
+  queried, the report, the synthetic FETCH-003 example, limits;
+  `enzyme_classes.csv`: what `ec_number` does; "Starting from SABIO-RK":
+  `user_enzyme_classes` and the EC-number mapping row); `docs/cli.md`
+  (the lookup section, a sample of the user-defined line); `README.md`
+  (assembly and command-line paragraphs, capability row);
+  `docs/capabilities.md`; `CHANGELOG.md` (Added; Changed).
+
+Tests (`tests/test_fetch_kinetics_user_classes.py`, 14 test functions, 25
+cases; `urlopen` and `socket.connect` patched to fail, synthetic responses
+served by FETCH-002's `_FakeSabio`): a lab class gets same-species literature
+at 30 degC (Km 0.35 mM, kcat 45 1/s, sd kept), a transferred estimate at 37 degC
+and keeps the lab's own rows at 25 degC (the same species's entry there
+listed as weaker evidence), one query only, `class_defined_in`, the lab's
+`enzyme_classes.csv` and `substrates.csv` rows unchanged, no decision about a
+drafted substrate row, an offline rerun byte-identical, and the reviewed draft
+`modelable` in scientific mode at 30 degC and `underparameterized` at 37 degC;
+the materially different case (EC 3.1.3.2 on `pnp_phosphate`, a Vmax-form
+transfer in `µM*min^(-1)` and `µM`, each class queried on its own substrate
+only, the ester class a gap at 40 degC, exploratory `modelable` and scientific
+`underparameterized`), and the same responses as downloaded exports giving the
+same kinetics rows; two user classes with one EC number (no query; the
+export's entries refused naming both); a lab class with a registry class's EC
+number (neither queried; Reaction 618's EntryID 35622 refused naming both);
+cellobiohydrolase keeping 3.2.1.91 when a lab class has 3.2.1.176 (a partial
+`not_queried` item); a lab class in an enzyme network queried on its
+intermediate pool; a partial EC number neither queried nor matched; the
+esterase fixture's class now queried; the conversion alone (the user's row
+copied, the old message without user classes, never by name, seven argument
+refusals); four drafts byte-identical to e97e8e6 (pinned digests: the
+esterase user dataset assembled, Reaction 618 drafted with and without
+`propose_enzyme_classes`, the maltose response drafted); three FETCH-002
+lookups of registry classes (fixed fetch clock) byte-identical to e97e8e6 once
+the one changed limitation sentence is put back; the command line
+(`assemble --user-data ... --fetch-kinetics --fetch`, an offline rerun byte
+for byte, `check-data`, a scientific `run` at 30 degC, exit 0).
+`tests/test_fetch_kinetics.py`: the two tests that expected the esterase
+fixture's class to be listed now use the network chain fixture (classes
+without an EC number). `tests/test_guardrails_no_hardcoding.py`: the new
+fixture tokens.
+
+Commands and results (worktree on `claude/user-class-kinetics-lookup`, based
+on `e97e8e6`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on the conversion, the assembly, the
+  CLI and the three changed test modules: 0 errors.
+- `mkdocs build --strict`: built, no warnings.
+- `tests/test_fetch_kinetics_user_classes.py`: 25 passed;
+  `tests/test_fetch_kinetics.py`: 30 passed.
+- Targeted run (both lookup modules, assembly, network assembly, SABIO-RK
+  sources, adapter, parser, discovery, fetch script, provider API, user-data
+  import, genome, UniProt, network, CLI, CLI workflow, guardrails,
+  documentation sync, hygiene, roadmap, release configuration, canonical
+  API): 579 passed in 3 min 23 s.
+- Full suite (`pytest -n 2 --dist loadfile`, background): 2842 passed in 68 min
+  (run before an unused dataclass field was removed; the lookup and conversion
+  modules, 75 tests, were re-run after it and passed).
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13); live
+  SABIO-RK (unreachable from the environment).
+
+Not verified live: everything FETCH-002 lists (the query form, the
+`ECNumber` and `Substrate` fields, SABIO-RK's compound-name matching and its
+answer to a query without matches), now also for EC numbers of classes a lab
+defines; the synthetic responses use the compound names the lab's
+`substrates.csv` gives, and SABIO-RK may file the same compound under another
+name.
+
+Not changed: `sources/sabiork/` (query form, snapshots, fetch), `api/user_data.py`
+(the loader), the core, any process law, rate form, registry record,
+preflight rule or output schema of a run; drafts in which no user-defined
+class takes part in a conversion (pinned digests; the FETCH-002 pins at
+8a35ae5 still pass); `--kinetics-source` exports for registry classes, unless a
+user-defined class of the dataset shares their EC number.
+
+Scientific impact: none on any simulated value. A lab's own class can now
+receive SABIO-RK kinetics, as literature only for its own species and
+otherwise as an estimate, exactly as a registry class does; an EC number two
+classes share is never resolved, so no entry is attributed to a class by
+guess.
+
+Compatibility: additive API (`user_enzyme_classes`, `class_defined_in` on
+queries of user-defined classes). Behaviour: a user class with a complete EC
+number is now queried (FETCH-002 listed it); an entry whose EC number a
+registry class and a user-defined class of the dataset share is no longer
+converted for the registry class. Text: the lookup limitation of every
+`fetch_kinetics` draft; the "does not resolve" reason when the dataset defines
+classes; the decisions on a user substrate; `--help`.
+
+Remaining ambiguities: substrate aliases and synonyms are still not queried; a
+partial EC number of a user class is never matched (a lab that knows only
+`3.1.1.-` gets no SABIO-RK kinetics); `fungmod draft-kinetics` has no option
+to pass a dataset's classes (the API's `user_enzyme_classes` does); asserting
+a class by EC number (`enzyme_classes=["3.1.1.1"]`) still resolves against
+the registry only; what SABIO-RK answers for these EC numbers is unknown until
+checked live.
+
+Next task: verify the query form against live SABIO-RK from a networked
+environment and freeze a real snapshot (for a registry class and for a lab
+class with its own EC number); then decide whether substrate aliases should
+be queried.
+
 ## FETCH-002 Kinetics Of The Fungus's Enzyme Classes Looked Up By EC Number
 
 Status: `complete` for the stated scope (2026-10-08); not verified against a

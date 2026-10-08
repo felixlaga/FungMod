@@ -65,13 +65,21 @@ changes.
 With ``fetch_kinetics=True`` (FETCH-002) the SABIO-RK entries need not be
 supplied: for every class of the repertoire that acts on a requested substrate
 (or, in a network draft, on a pool) the draft looks up SABIO-RK by the class's
-EC numbers from its registry record and the substrate's name,
+EC numbers (from its registry record, or, for a class the user dataset defines,
+the ``ec_number`` of its ``enzyme_classes.csv`` row) and the substrate's name,
 ``ECNumber:"<EC number>" AND Substrate:"<substrate name>"``, through frozen,
 digest-checked query snapshots (``fungal_model.sources.sabiork.query_snapshots``);
 SABIO-RK itself is queried only with ``refresh=True``. The answers join the
-kinetics sources and follow the rules above unchanged; classes without an EC
-number or defined in a user dataset are listed and not queried. Without
-``fetch_kinetics`` nothing changes.
+kinetics sources and follow the rules above unchanged; classes without a
+complete EC number, and EC numbers two classes share, are listed and not
+queried. Without ``fetch_kinetics`` nothing changes.
+
+The SABIO-RK conversion resolves an entry's EC number against the registry and
+against the user-defined classes of the dataset being assembled (FETCH-003):
+the rows of the user dataset's ``enzyme_classes.csv``, which include every
+class the draft writes to its own ``enzyme_classes.csv``. Only an exact match
+of complete EC numbers counts; an EC number shared by two classes (registry or
+user-defined) is listed with the reason, and nothing is matched by a name.
 """
 
 from __future__ import annotations
@@ -116,6 +124,7 @@ from fungal_model.api.user_data_sources import (
     SUBSTRATE_COLUMNS,
     UserTablesDraft,
     UserTablesSourceError,
+    _classes_with_ec_number,
     _csv_text,
     _DraftBuilder,
     _id_number,
@@ -275,6 +284,9 @@ _TIME_GRID_KEYS = frozenset({"duration", "units", "points"})
 _FLOAT_EQUALITY = 1e-12
 # What became of a SABIO-RK entry (``assembly["entries"][...]["use"]``), in report order.
 _ENTRY_USES = ("converted", "listed", "not used", "not convertible", "not selected")
+# How the conversion's decisions about the substrates.csv row it drafts begin (its "Substrates and products"
+# section); on a substrate of the user dataset the assembly keeps the user's row instead.
+_CONVERSION_SUBSTRATE_DECISIONS = ("Substrate ", "Product of ")
 
 _LIMITATIONS = (
     "One fungus per call; its enzyme repertoire comes only from its genome annotation or proteome export, the "
@@ -313,10 +325,11 @@ _LOOKUP_LIMITATIONS = (
     "user dataset directory, SABIO-RK entries from a RegistryProposal, a frozen snapshot or an export JSON, and the "
     "SABIO-RK kinetic-law exports looked up by EC number (fetch_kinetics), read from frozen, digest-checked query "
     "snapshots. SABIO-RK is queried only with refresh=True; nothing else is fetched while assembling.",
-    "Kinetics looked up by EC number: one SABIO-RK query per complete EC number of a registry enzyme class of the "
-    f"fungus (its EC number and the EC numbers among its aliases that resolve to it) and substrate name, "
-    f"{KINLAW_QUERY_FORM}. Entries filed under another name of the substrate are not found, and classes without an "
-    "EC number or defined in a user dataset are not looked up (each is listed with the reason).",
+    "Kinetics looked up by EC number: one SABIO-RK query per complete EC number of an enzyme class of the fungus (a "
+    "registry class's EC number and the EC numbers among its aliases that resolve to it, or the ec_number of a "
+    f"user-defined class in enzyme_classes.csv) and substrate name, {KINLAW_QUERY_FORM}. Entries filed under another "
+    "name of the substrate are not found; classes without a complete EC number, and an EC number shared by two "
+    "classes (registry or user-defined), are not looked up (each is listed with the reason).",
     "The query form, the ECNumber and Substrate fields and SABIO-RK's answer to a query without matches were not "
     "checked against a live response when the lookup was written. An answer that is not the kinetic-law export "
     "envelope, or whose entry count differs from its total_count, is refused and nothing is stored.",
@@ -520,8 +533,12 @@ def assemble_user_tables(
 
     ``kinetics_sources`` are SABIO-RK sources exactly as
     ``user_tables_from_sabiork`` accepts them; ``entry_ids`` selects entries
-    across them. ``user_data`` is an existing user dataset directory (or a
-    loaded ``UserDataset``) that holds the fungus; its rows for the fungus
+    across them. An entry's EC number resolves to a registry class or to a
+    user-defined class of ``user_data`` (``user_enzyme_classes`` of the
+    conversion: an exact match of complete EC numbers, and an EC number two
+    classes share is listed, never chosen). ``user_data`` is an existing
+    user dataset directory (or a loaded ``UserDataset``) that holds the
+    fungus; its rows for the fungus
     and the requested substrates are kept unchanged. ``responses`` are
     response-law rows (the columns of ``responses.csv`` with ``substrate`` in
     place of ``strain_id`` and ``substrate_id``) for the fungus. ``design``
@@ -550,12 +567,15 @@ def assemble_user_tables(
     class of the repertoire that acts on a requested substrate (with
     ``network=True``, on a pool of a network): one query per complete EC
     number of the class's registry record (its EC number and the EC numbers
-    among its aliases that the registry resolves to it) and substrate name,
+    among its aliases that the registry resolves to it) or, for a class the
+    user dataset defines (FETCH-003), of its ``enzyme_classes.csv`` row's
+    ``ec_number``, and substrate name,
     ``ECNumber:"<EC number>" AND Substrate:"<substrate name>"`` (the name of the
     registry record, else of the user dataset's row or the request), never a
-    name guess and never broader. Classes without an EC number, classes of the
-    user dataset (SABIO-RK entries become kinetics of registry classes only)
-    and substrates whose categories are ``REVIEW:`` fields are listed and not
+    name guess and never broader. Classes without a complete EC number, an EC
+    number shared by two classes (two user-defined classes, or a registry and
+    a user-defined class: the conversion would not choose between them) and
+    substrates whose categories are ``REVIEW:`` fields are listed and not
     queried. Each answer is a frozen, digest-checked snapshot under
     ``cache_dir`` (``fungal_model.sources.sabiork.query_snapshots``); without
     ``refresh`` only those snapshots are read and a missing one is refused
@@ -1630,6 +1650,33 @@ class _Assembler:
             return {}
         return {row["class_id"]: row for _line, row in self.user.table("enzyme_classes.csv")}
 
+    def _user_defined_classes(self) -> dict[str, dict[str, str]]:
+        """The user-defined enzyme classes of the dataset being assembled, by class_id (FETCH-003).
+
+        Every row of the user dataset's ``enzyme_classes.csv`` and every class
+        the draft writes to its own ``enzyme_classes.csv`` (today rows of that
+        same file), as the cells of its columns. A SABIO-RK entry's EC number
+        resolves to one of these exactly as to a registry class.
+        """
+
+        rows = {class_id: dict(row) for class_id, row in self._user_class_rows().items()}
+        for item in self.classes.values():
+            if item.user_class_row is not None:
+                rows.setdefault(item.key, dict(item.user_class_row))
+        return {
+            class_id: {column: row.get(column, "") for column in ENZYME_CLASS_COLUMNS} for class_id, row in rows.items()
+        }
+
+    def _class_defined_in(self, key: str) -> str:
+        """Where a user-defined class is defined, for the lookup report; empty for a registry class."""
+
+        item = self.classes.get(key)
+        if item is None or item.origin != "user" or self.user is None:
+            return ""
+        lines = [line for line, row in self.user.table("enzyme_classes.csv") if row.get("class_id") == key]
+        where = f" row {lines[0]}" if lines else ""
+        return f"enzyme_classes.csv{where} of user dataset {self.user.dataset.dataset_id}"
+
     def _class_key(self, text: str) -> str:
         """Resolve a class reference the way the loader does: a user class_id, else a registry class."""
 
@@ -2105,6 +2152,7 @@ class _Assembler:
             for item in self.classes.values():
                 if not item.acts_on(target):
                     continue
+                # ``reason`` names the EC numbers not queried; with ``numbers`` the others still are.
                 numbers, reason = self._lookup_ec_numbers(item)
                 planned: list[_LookupQuery] = []
                 for ec in numbers:
@@ -2115,6 +2163,7 @@ class _Assembler:
                             f"the substrate {target.substrate_id} cannot be named in a SABIO-RK query: {exc} Nothing "
                             "was queried"
                         )
+                        planned = []
                         break
                     planned.append(_LookupQuery(class_key=item.key, ec_number=ec, target=target, query=query))
                 if reason:
@@ -2126,7 +2175,6 @@ class _Assembler:
                             "reason": reason,
                         }
                     )
-                    continue
                 self.lookup_queries.extend(planned)
         queries = list(dict.fromkeys(item.query for item in self.lookup_queries))
         if not refresh:
@@ -2161,35 +2209,71 @@ class _Assembler:
         return [self.lookup_snapshots[query] for query in queries]
 
     def _lookup_ec_numbers(self, item: _Class) -> tuple[tuple[str, ...], str]:
-        """The complete EC numbers to query for a class, or why it is not queried."""
+        """The complete EC numbers to query for a class, and why any other is not queried.
 
+        A registry class is queried by its record's EC number and the EC
+        numbers among its aliases that resolve to it; a user-defined class
+        (FETCH-003) by the complete ``ec_number`` of its ``enzyme_classes.csv``
+        row. An EC number is queried only when the conversion would resolve its
+        entries to this class: not when it resolves to another registry class
+        or ambiguously, and not when another class, registry or user-defined,
+        has it too. The reason is empty when every EC number is queried; with
+        no EC number left it says that nothing was queried.
+        """
+
+        user_classes = self._user_defined_classes()
         if item.origin == "user":
-            ec = str((item.user_class_row or {}).get("ec_number", "")).strip()
-            stated = f"EC {ec}" if ec else "no EC number"
-            return (), (
-                f"{item.key} is an enzyme class of the user dataset (enzyme_classes.csv, {stated}); SABIO-RK entries "
-                "become kinetics only of the registry enzyme class their EC number resolves to, so no entry could "
-                f"become kinetics of {item.key}; nothing was queried"
-            )
-        record = self.base.get_enzyme_class(item.key)
+            stated = str((item.user_class_row or {}).get("ec_number", "")).strip()
+            ec = complete_ec_number(stated)
+            if ec is None:
+                what = f"EC {stated}, not a complete EC number" if stated else "no EC number"
+                return (), (
+                    f"{item.key} is an enzyme class of the user dataset (enzyme_classes.csv, {what}); SABIO-RK is "
+                    "queried by complete EC number only, never by a class or enzyme name; nothing was queried"
+                )
+            candidates: list[str] = [ec]
+        else:
+            record = self.base.get_enzyme_class(item.key)
+            candidates = []
+            for text in (record.ec_number or "", *record.aliases):
+                ec = complete_ec_number(text)
+                if ec is not None and ec not in candidates:
+                    candidates.append(ec)
         numbers: list[str] = []
         elsewhere: list[str] = []
-        for text in (record.ec_number or "", *record.aliases):
-            ec = complete_ec_number(text)
-            if ec is None or ec in numbers:
-                continue
+        for ec in candidates:
             try:
                 resolved = self.resolver.resolve_enzyme_class(ec).record_id
             except AmbiguousResolutionError:
                 elsewhere.append(f"EC {ec} is ambiguous in the registry")
                 continue
             except ResolutionError:
+                resolved = ""
+            if item.origin == "user" and resolved:
+                elsewhere.append(f"EC {ec} of {item.key} also resolves to registry enzyme class {resolved}")
+                continue
+            if item.origin != "user" and not resolved:
                 elsewhere.append(f"EC {ec} does not resolve to an enzyme class")
                 continue
-            if resolved != item.key:
+            if item.origin != "user" and resolved != item.key:
                 elsewhere.append(f"EC {ec} resolves to registry enzyme class {resolved}")
                 continue
+            others = [key for key in _classes_with_ec_number(ec, user_classes) if key != item.key]
+            if others:
+                plural = "es" if len(others) > 1 else ""
+                elsewhere.append(
+                    f"EC {ec} is also the ec_number of user-defined enzyme class{plural} {', '.join(others)} "
+                    "(enzyme_classes.csv)"
+                )
+                continue
             numbers.append(ec)
+        if numbers and elsewhere:
+            those = "that EC number" if len(elsewhere) == 1 else "those EC numbers"
+            return tuple(numbers), (
+                f"{'; '.join(elsewhere)}, so SABIO-RK entries with {those} would not become kinetics of {item.key} "
+                f"and {those} {'was' if len(elsewhere) == 1 else 'were'} not queried; EC {', '.join(numbers)} "
+                f"{'was' if len(numbers) == 1 else 'were'} queried"
+            )
         if numbers:
             return tuple(numbers), ""
         if elsewhere:
@@ -2296,6 +2380,7 @@ class _Assembler:
             )
         self.species.extend(mapped)
         species = {_norm(name) for name in self.species}
+        user_classes = tuple(self._user_defined_classes().values())
         for label, source, entry in selected:
             raw_enzyme = entry.raw.get("enzyme_description")
             host = str(raw_enzyme.get("expressed_in") or "").strip() if isinstance(raw_enzyme, Mapping) else ""
@@ -2320,6 +2405,7 @@ class _Assembler:
                     design=self.design,
                     registry=self.base,
                     cache_dir=self.cache_dir,
+                    user_enzyme_classes=user_classes,
                 )
             except UserTablesSourceError as exc:
                 info.use = "not convertible"
@@ -2344,6 +2430,7 @@ class _Assembler:
             organism_map={},
             design=self.design_values,
             propose_enzyme_classes=False,
+            user_classes=self._user_defined_classes(),
         )
         return [dict(item) for item in builder._plan(entry).skipped]
 
@@ -2980,8 +3067,26 @@ class _Assembler:
                 )
         for candidate in ordered:
             if candidate.entry is not None and candidate.entry.draft is not None:
-                # The conversion's own decisions, except its strain and condition IDs, which the assembly replaces.
-                self.decisions.extend(text for text in candidate.entry.draft.decisions if not text.startswith("`"))
+                # The conversion's own decisions, except its strain and condition IDs, which the assembly replaces,
+                # and, on a substrate of the user dataset, the substrates.csv row it would draft: the assembly keeps
+                # the user's row (with its product and yield) unchanged and says so instead.
+                user_row = candidate.target.user_row is not None
+                self.decisions.extend(
+                    text
+                    for text in candidate.entry.draft.decisions
+                    if not text.startswith("`") and not (user_row and text.startswith(_CONVERSION_SUBSTRATE_DECISIONS))
+                )
+                if user_row and self.user is not None:
+                    how = (
+                        f"through registry substrate `{candidate.target.registry_id}`"
+                        if candidate.target.registry_id
+                        else "by its name"
+                    )
+                    self.decisions.append(
+                        f"SABIO-RK entries on {candidate.entry.substrate_text!r} are matched to substrate "
+                        f"`{candidate.target.substrate_id}` of user dataset {self.user.dataset.dataset_id} {how}; "
+                        "its substrates.csv row, with its product and yield, is kept unchanged."
+                    )
         return ordered
 
     # -- conditions ----------------------------------------------------------
@@ -3960,9 +4065,12 @@ class _Assembler:
                     converted.append(described)
                 else:
                     others.append({**described, "use": info.use, "reason": info.reason or info.use})
+            # A user-defined class's query says where the class and its EC number are defined (FETCH-003).
+            defined_in = self._class_defined_in(item.class_key)
             queries.append(
                 {
                     "enzyme_class": item.class_key,
+                    **({"class_defined_in": defined_in} if defined_in else {}),
                     "ec_number": item.ec_number,
                     "substrate_id": item.target.substrate_id,
                     "substrate": item.target.name,
@@ -4280,8 +4388,13 @@ class _Assembler:
             "## Kinetics looked up by EC number",
             "",
             f"`fetch_kinetics` queried {lookup['database']} ({lookup['endpoint']}) once per complete EC number of each "
-            "registry enzyme class of the fungus and substrate it acts on, "
-            f"`{lookup['query_form']}`. Each answer is a frozen, digest-checked snapshot; its entries were examined "
+            + (
+                "enzyme class of the fungus (a registry record's EC numbers, or the ec_number of a user-defined class "
+                "in enzyme_classes.csv) and substrate it acts on, "
+                if any("class_defined_in" in item for item in lookup["queries"])
+                else "registry enzyme class of the fungus and substrate it acts on, "
+            )
+            + f"`{lookup['query_form']}`. Each answer is a frozen, digest-checked snapshot; its entries were examined "
             "with the other kinetics sources, by the same rules.",
             "",
         ]
@@ -4306,8 +4419,10 @@ class _Assembler:
                     for entry in item["converted"]
                 )
                 others = "; ".join(f"{entry['entry_id']} {entry['use']}: {entry['reason']}" for entry in item["not_converted"])
+                defined = f" (user-defined, {item['class_defined_in']})" if "class_defined_in" in item else ""
                 lines.append(
-                    f"| {item['enzyme_class']} | {item['ec_number']} | {item['substrate_id']} | `{_md(item['query'])}` | "
+                    f"| {item['enzyme_class']}{defined} | {item['ec_number']} | {item['substrate_id']} | "
+                    f"`{_md(item['query'])}` | "
                     f"`{item['snapshot']}` (export sha256 `{item['export_sha256']}`) | {item['retrieved_at']} "
                     f"(HTTP {item['http_status']}) | {item['entries']} | {_md(converted) or '-'} | {_md(others) or '-'} |"
                 )

@@ -1,0 +1,3 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+lab_ester_hydrolase,Lab ester hydrolase,3.1.1.1,carboxylic_ester,aryl_ester,"FungMod FETCH-003 fixture; a class the lab defines itself, not a registry record"
+lab_phosphomonoesterase,Lab phosphomonoesterase,3.1.3.2,phosphoric_monoester,aryl_phosphate,"FungMod FETCH-003 fixture; a class the lab defines itself, not a registry record"

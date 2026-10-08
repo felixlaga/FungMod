@@ -1,0 +1,13 @@
+dataset_id: lab_classes_demo
+contributor: FungMod maintainers
+date: 2026-10-08
+source: FungMod FETCH-003 fixture; illustrative values, not measurements
+notes: >-
+  Two enzyme classes a lab defines itself in enzyme_classes.csv, each with an
+  EC number, so that the kinetics lookup by EC number can reach them
+  (tests/test_fetch_kinetics_user_classes.py). Every kinetic value is an
+  illustrative estimate; nothing here is a measurement.
+simulation:
+  duration: 60
+  units: minute
+  points: 61

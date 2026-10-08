@@ -191,6 +191,28 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "strain k1",
     "k1_draft",
     "maltose_hydrolase_without_ec",
+    # FETCH-003 lab-defined classes and their synthetic SABIO-RK responses: the dataset, strain, classes, substrates,
+    # products, compounds, variant and entry and reaction ids of tests/test_fetch_kinetics_user_classes.py come from
+    # enzyme_classes.csv, the tables, the responses and the request, never from code.
+    "lab_classes",
+    "strain_k6",
+    "lab strain k6",
+    "lab_ester_hydrolase",
+    "phosphomonoesterase",
+    "phosphatase",
+    "pnp_butyrate",
+    "pnp_phosphate",
+    "nitrophenol",
+    "butanoate",
+    "orthophosphate",
+    "lab_lookup",
+    "lab_vmax",
+    "lab_exo_cleaver",
+    "synthetic variant v2",
+    "990002",
+    "990003",
+    "990030",
+    "990040",
 )
 
 
