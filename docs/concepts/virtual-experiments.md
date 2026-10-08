@@ -91,6 +91,52 @@ when every condition that varies across the screen is covered by a law or by
 condition-specific records. Otherwise the values remain metadata and ranking
 is guarded. See [environment response laws](../environment-response.md).
 
+## Surface-catalysis cases
+
+A registry case whose compatibility record selects `surface_catalysis` runs
+the generic equilibrium-coverage law
+
+```text
+r = k_s * theta(E) * A,    theta = K_ads * E / (1 + K_ads * E)
+```
+
+with the free enzyme `E` as a state, the adsorption constant `K_ads`, the
+surface rate constant `k_s` and the accessible area `A` as parameter records,
+and the rate set to zero once the substrate is exhausted. The law is zero
+order in the substrate until then (the area is a constant parameter, not a
+function of conversion), and binding does not deplete the free enzyme.
+
+The assembler is template-driven (SURFACE-001). The case template states:
+
+- `config_name`, `config_mode` (`toy`, `exploratory` or `scientific`),
+  `config_maturity`, `accessible_site_pool` and `product_map_name` (required;
+  a template without one is refused);
+- `config_provenance` (`source`, `measurement_method`, `confidence_level`,
+  `validity_range`, `notes`, and optionally further provenance texts),
+  `substrate_entity` (`notes`, `product_notes`, optional `completeness`,
+  `default_degradation_model`, `water_activity_dependence`), `enzyme_entity`
+  (`name`, `validity_labels`, `notes`) and `parameter_entries`
+  (`measurement_method`, `validity_range`); the process assumptions are the
+  template's `limitations`;
+- `geometry`: a well-mixed geometry mapping, or `geometry: null` for a model
+  that claims no vessel. The surface law reads no geometry (its area is the
+  `accessible_surface_area` parameter), so FungMod assumes none and refuses a
+  template that states neither;
+- `bond_type`, optional: without it the bond class is the one class the
+  substrate record carries, the enzyme class targets and the compatibility
+  record requires; several are refused, never chosen.
+
+Structural fields (substrate name, class, physical state, bond and product
+classes; enzyme class) come from the registry records; a substrate the record
+declares dissolved or of unknown physical state is refused. A `toy` or
+`scientific` template is built deterministically only in its own mode; a
+`scientific` template only from exact records the scientific selection rules
+accept; an `exploratory` template is sampled by `simulate(mode="exploratory")`.
+The shipped BIO-001 cellulose pilot is an exploratory template whose
+cellulose-specific text lives in its registry record; the well-mixed geometry
+it declares (100 mL, 0.5 m^2) is context metadata, and its surface area is not
+the accessible area the law uses.
+
 ## Failure is part of the API
 
 Unsupported mechanisms, missing parameters, incompatible units, maturity
