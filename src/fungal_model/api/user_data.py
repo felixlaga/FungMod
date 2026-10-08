@@ -3318,7 +3318,9 @@ def _parse_culture(
                 units = None
         values = _kinetic_values(row, quantity=None, file=file, line=line, context=context)
         if values is not None and quantity is not None:
-            values = _culture_value_bounds(values, quantity=quantity, file=file, line=line, context=context)
+            values = _culture_value_bounds(
+                values, quantity=quantity, units=units, file=file, line=line, context=context
+            )
         evidence_type = _required_text(row, "evidence_type", file=file, line=line, context=context)
         if evidence_type == FITTED_EVIDENCE_TYPE:
             context.add(
@@ -3469,15 +3471,22 @@ def _culture_value_bounds(
     values: tuple[float | None, float | None, float | None],
     *,
     quantity: str,
+    units: str | None,
     file: str,
     line: int,
     context: _Context,
 ) -> tuple[float | None, float | None, float | None] | None:
-    """Refuse a zero half-saturation constant or yield, and a biomass yield above one."""
+    """Refuse a zero half-saturation constant or yield, and a biomass yield above one.
+
+    The biomass yield is judged as a plain fraction: 400 mg/g is 0.4 g/g, so its
+    bound is checked after converting the stated units with pint.
+    """
 
     value, lower, upper = values
     smallest = value if value is not None else lower
     largest = value if value is not None else upper
+    if quantity == "biomass_yield" and units is not None and largest is not None:
+        largest = float(Q_(largest, units).to("dimensionless").magnitude)
     column = "value" if value is not None else "lower"
     if quantity in _CULTURE_POSITIVE_QUANTITIES and smallest is not None and smallest <= 0.0:
         context.add(file, line, column, f"{quantity} must be positive.")

@@ -16,6 +16,7 @@ def test_dev_quality_tools_are_declared() -> None:
     assert any(dependency.startswith("ruff") for dependency in dev_dependencies)
     assert any(dependency.startswith("pyright") for dependency in dev_dependencies)
     assert any(dependency.startswith("pytest-cov") for dependency in dev_dependencies)
+    assert any(dependency.startswith("pytest-xdist") for dependency in dev_dependencies)
 
 
 def test_quality_tool_configs_exist() -> None:
@@ -59,6 +60,19 @@ def test_ci_runs_lint_typecheck_and_coverage() -> None:
     assert "python -m pyright" in commands
     assert "python -m pytest --cov=fungal_model" in commands
     assert "--cov-report=xml" in commands
+
+
+def test_ci_runs_test_files_in_parallel_and_takes_runner_labels_from_variables() -> None:
+    workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+    tests = workflow["jobs"]["tests"]
+    (run,) = [step["run"] for step in tests["steps"] if step.get("name") == "Run tests with coverage"]
+    assert "-n auto --dist loadfile" in run
+    # Job names are the required status checks: they must not depend on the runner labels.
+    assert tests["name"] == "tests (${{ matrix.os }}, py${{ matrix.python-version }})"
+    assert tests["strategy"]["matrix"]["os"] == ["ubuntu-latest", "macos-latest", "windows-latest"]
+    for variable in ("FUNGMOD_RUNNER_UBUNTU", "FUNGMOD_RUNNER_MACOS", "FUNGMOD_RUNNER_WINDOWS"):
+        assert f"vars.{variable}" in tests["runs-on"]
+    assert "matrix.os" in tests["runs-on"], "without variables, each job runs on its matrix runner"
 
 
 def test_branch_protection_policy_documents_quality_gates() -> None:

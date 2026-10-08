@@ -868,6 +868,14 @@ All notable public releases of FungMod are documented here.
   `jacobian_kernels` and the solver metadata `jacobian_bandwidths` and
   `jacobian_entries_outside_band`.
 
+- CI runs the test files in parallel on every core of each runner
+  (`pytest -n auto --dist loadfile`, pytest-xdist in the `dev` extra), and the
+  runner labels can be overridden with the repository variables
+  `FUNGMOD_RUNNER_UBUNTU`, `FUNGMOD_RUNNER_MACOS` and `FUNGMOD_RUNNER_WINDOWS`
+  (for example hosted runners from another provider); without them every job
+  runs on the GitHub-hosted runner it used before, and job names, which are the
+  required status checks, do not change (CI-001).
+
 - Text only (ASSEMBLE-002): the refusal of a network dataset as `user_data` of
   `assemble_user_tables` now names `network=True` (`fungmod assemble
   --network`), which accepts it. No numerical behaviour changes.
@@ -969,6 +977,14 @@ All notable public releases of FungMod are documented here.
   translocation were missing. It now uses the declared stencil and a
   colouring valid on periodic axes of any length, and is vectorised (33 ms
   instead of 70 ms per Jacobian on a 40 x 40 colony).
+
+- A dimensionless parameter bound to a product-map coefficient in scaled units
+  was read as its raw number: a `culture.csv` `biomass_yield` of `0.5 mg/g`
+  acted as 0.5 g/g, a thousand times too large, and `350 mg/g` or `35 percent`
+  were refused as above 1 g/g. The composition builder now converts such a
+  record to a plain fraction with pint, and the culture bound is judged in
+  g/g. Records in `g/g` or `dimensionless`, every registry case and every
+  fixture are unchanged (their configs hash as before).
 
 - `final_metrics.csv` named a product stated in micromolar
   `final_product_amount` (and would have called an amount per mass such as

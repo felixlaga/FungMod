@@ -224,6 +224,55 @@ by default (about 0.5 s per 62-hour radial solve on this container), after
 the plan's owner confirms that the default Jacobian change needs no
 amendment.
 
+## CI-001 Parallel Tests In CI And Runner Labels From Repository Variables
+
+Status: `complete` (2026-10-08). Each CI test job ran the whole suite serially
+for 30 to 60 minutes. The `tests` job now runs
+`python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml -n auto --dist loadfile`:
+pytest-xdist (added to the `dev` extra) spreads test files over every core of
+the runner, keeping each file's tests on one worker so module-level fixtures
+are shared as before. Runner labels can be overridden with the repository
+variables `FUNGMOD_RUNNER_UBUNTU`, `FUNGMOD_RUNNER_MACOS` and
+`FUNGMOD_RUNNER_WINDOWS` (lint, documentation and notebooks use the Ubuntu
+variable; the package job stays on `ubuntu-latest`); without them every job
+runs where it ran before. Job names, which are the required status checks, are
+unchanged. `tests/test_quality_config.py` pins the parallel command, the
+variables and the job names. No source, test behaviour or scientific output
+changes. Verification: CI on this change runs the suite in parallel on all
+nine operating-system and Python combinations.
+
+## FIX-UNITS-001 A Dimensionless Coefficient In Scaled Units Is A Plain Fraction
+
+Status: `complete` (2026-10-08). Reported by the NETWORK-002 work: the
+composition builder (`screening/culture_physiology.py`, which builds the
+culture and enzyme-network templates) read a product-map coefficient bound to
+a dimensionless parameter record as the record's raw number. A user's
+`culture.csv` `biomass_yield` of `0.5 mg/g` passed the unit check
+(dimensionless) and the bound (0.5 is at most 1) and then acted as 0.5 g/g,
+a thousand times too large; `350 mg/g` and `35 percent` were refused as above
+1 g/g. Other parameters were not affected: they keep their units in the
+parameter set and are converted by pint.
+
+- `_coefficients` converts a bound record whose units are dimensionless but
+  scaled (`mg/g`, `percent`) to a plain fraction with pint before the bound
+  check, the complement and the coefficient; dimensional records
+  (NETWORK-002 yields) keep their units as before.
+- `_culture_value_bounds` judges the biomass yield's upper bound in g/g.
+- Unchanged: records in `g/g` or `dimensionless` (a factor of one), every
+  registry case and every user fixture; the existing pinned config digests of
+  the shipped culture case and the earlier fixtures pass.
+
+Tests (`tests/test_user_data_culture.py`): `350 mg/g` and `35 percent` give the
+same trajectories as `0.35 g/g` (rtol 1e-9); `0.5 mg/g` equals `0.0005 g/g`
+and differs from `0.5 g/g` (fails without the fix); `1200 mg/g` is refused as
+above 1 g/g. Commands: ruff clean; `tests/test_user_data_culture.py` 68
+passed; the cross-basis, network, guardrail, organism-case, registry
+case-builder, solid, v2 and culture suites 467 passed.
+
+Scientific behaviour impact: corrects user cultures stated in scaled
+dimensionless units; nothing else changes. Risk: low. Next: the unit-bearing
+release for single-class solid cases (NETWORK-003).
+
 ## NETWORK-002 Enzyme-Network Links Across Amount Bases Through A Stated Yield
 
 Status: `complete` for the stated scope (2026-10-08). USERDATA-010 refused a
