@@ -51,9 +51,11 @@ modifiers:
 ```
 
 Single-process templates list modifiers under
-`process_state_metadata.process_modifiers`; `culture_physiology` templates list
-them per process template. A process law is bound by using its `process_type`
-in the template and mapping its parameter roles. In both cases assembly
+`process_state_metadata.process_modifiers`; `culture_physiology` and
+`enzyme_network` templates list them per process template, so a law scales the
+rate of the process it is listed under and of no other. A process law is bound
+by using its `process_type` in the template and mapping its parameter roles. In
+both cases assembly
 requires an exact registry environment condition for every condition a law
 reads, generates an inline environment entity carrying exactly those
 conditions, and refuses to run otherwise. Nothing is inferred from the
@@ -63,7 +65,12 @@ those parameters.
 User datasets bind `temperature_cardinal_rosso`, `ph_cardinal_rosso` and
 `temperature_arrhenius_reference` through the same mechanism from an optional
 `responses.csv`, with the kinetic constants required at the law's reference
-condition. They bind the `ph_ionization_michaelis_menten` process law through
+condition: to the single process of a single-class case, or, in a dataset with
+an `enzyme_network` block, to the network process of the row's enzyme class and
+pool, where the process's competitive inhibition constant is also required at
+the reference condition and a process without a law keeps its rows' constants
+([response laws in a network](user-data.md#response-laws-in-a-network)).
+They bind the `ph_ionization_michaelis_menten` process law through
 the pH-ionization rate form of `kinetics.csv` (limiting constants, four pK
 values and the fitted pH range), with the condition pH required inside that
 range and no pH modifier on top; see [user-supplied data](user-data.md).

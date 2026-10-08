@@ -1,0 +1,2 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+solid_g5,,Cellulose-like solid G5,glucan_like_solid,solid_polymer,glycosidic_like_bond,dry_mass,solubilized_mass_g5,1,g/g,"Illustrative test note CG-5 p. 1; the product row is required by substrates.csv and is not used by the culture form (no product identity is claimed)"

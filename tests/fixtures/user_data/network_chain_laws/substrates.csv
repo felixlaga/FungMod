@@ -1,0 +1,3 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
+polymer_p1,,Soluble polymer-like substrate P1,soluble_polymer_like,dissolved,inner_glycosidic_like,oligomer_o1,4,mol/mol,Illustrative test note NW-1 p. 2 (four oligomer-like units per polymer-like molecule; an assumed stoichiometry)
+oligomer_o1,,Oligomer-like pool O1,oligomer_like,dissolved,inner_glycosidic_like,monomer_m1,2,mol/mol,Illustrative test note NW-1 p. 2 (two monomer-like units per oligomer-like molecule; an assumed stoichiometry)

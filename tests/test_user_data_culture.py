@@ -999,7 +999,7 @@ def test_time_courses_and_response_laws_of_a_culture_are_refused(tmp_path: Path)
         ), issues
 
 
-def test_pools_must_be_one_consuming_pool_and_declared_classes(tmp_path: Path) -> None:
+def test_pools_must_be_consuming_pools_and_declared_classes(tmp_path: Path) -> None:
     # No pool acting on the substrate: only the beta-glucosidase pool and culture-level rows.
     only_bg = _culture(drop=tuple((quantity, CLASS) for quantity in CULTURE_QUANTITIES))
     issues = _issues(tmp_path / "none", {CULTURE_TABLE: only_bg})
@@ -1007,20 +1007,29 @@ def test_pools_must_be_one_consuming_pool_and_declared_classes(tmp_path: Path) -
         issues, CULTURE_TABLE, 2, "enzyme_class", "names no enzyme pool whose class acts on the substrate"
     ), issues
 
-    # Two pools acting on the substrate.
+    # Two pools acting on the substrate consume it in parallel (CULTURE-002, tests/test_user_data_culture_pools.py):
+    # the second pool's roles without rows are explicit gaps, and the shared consumption roles become per pool.
     enzymes = (REENTRY / "enzymes.csv").read_text(encoding="utf-8") + (
         f"{STRAIN},cellobiohydrolase,cellobiohydrolase activity (test),Test note TN-9\n"
     )
     two = _culture(add=[_culture_row("enzyme_loss_rate", "0.01", "1/h", pool="cellobiohydrolase")])
-    issues = _issues(tmp_path / "two", {"enzymes.csv": enzymes, CULTURE_TABLE: two})
-    assert _has_issue(issues, CULTURE_TABLE, 41, "enzyme_class", "names 2 enzyme pools that act on the substrate"), (
-        issues
+    dataset = _load(tmp_path / "two", {"enzymes.csv": enzymes, CULTURE_TABLE: two})
+    assert dataset.cultures[0]["consuming_pools"] == [CLASS, "cellobiohydrolase"]
+    gap = _record(
+        dataset, f"{DATASET}__{STRAIN}__{SUBSTRATE}__load_10__culture__hydrolysis_capacity__cellobiohydrolase__gap"
     )
+    assert gap["maturity"] == USER_DATASET_MATURITY_GAP
+    assert _record(dataset, f"{DATASET}__{STRAIN}__{SUBSTRATE}__load_10__culture__hydrolysis_capacity__{CLASS}")[
+        "value"
+    ]["kind"] == "exact"
 
     # A second class acting on the substrate, declared but not a pool: the case would have two models.
     issues = _issues(tmp_path / "declared", {"enzymes.csv": enzymes})
     assert _has_issue(
         issues, "enzymes.csv", 4, "enzyme_class", "does not choose between a culture and an enzyme-assay"
+    ), issues
+    assert _has_issue(
+        issues, "enzymes.csv", 4, "enzyme_class", "To make 'cellobiohydrolase' a consuming pool of the culture"
     ), issues
 
     # A strain that declares the consuming class runs the culture and must declare every pool.

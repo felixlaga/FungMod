@@ -1,0 +1,4 @@
+strain_id,enzyme_class,evidence,source
+strain_g5,endo_cutter_g5_like,assumed secreted activity (illustrative),Illustrative test note CG-5 p. 1
+strain_g5,exo_cutter_g5_like,assumed secreted activity (illustrative),Illustrative test note CG-5 p. 1
+strain_g5,dimer_hydrolase_g5_like,assumed secreted activity (illustrative),Illustrative test note CG-5 p. 1

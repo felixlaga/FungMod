@@ -181,6 +181,30 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "cello_oligosaccharide",
     "cleaver_t1",
     "entry_e1",
+    # NETWORK-003 response laws in networks: the fixture and the test-only class of tests/test_user_data_network_responses.py
+    # come from the tables.
+    "network_chain_laws",
+    "other_cutter",
+    # CULTURE-002 cultures with several consuming pools: strains, pools, solids and conditions come from culture.csv and
+    # its tables.
+    "culture_parallel_pools",
+    "culture_shared_pools",
+    "strain_g5",
+    "strain_g6",
+    "strain_k6",
+    "strain_k7",
+    "solid_g5",
+    "solid_k6",
+    "film_g5",
+    "endo_cutter_g5",
+    "exo_cutter_g5",
+    "third_cutter_g5",
+    "endo_cleaver_k",
+    "exo_cleaver_k",
+    "second_cutter_x",
+    "c28_ph5",
+    "c30_ph6",
+
     # FETCH-002 synthetic SABIO-RK responses: organisms, compounds, variants, entry ids and the strain of
     # tests/test_fetch_kinetics.py come from the responses and the request, never from code.
     "synthetic kinetics organism",
@@ -214,6 +238,11 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "990003",
     "990030",
     "990040",
+    # ASSEMBLE-003 network drafts with response laws: the dataset id, the illustrative notes and the test-only stated
+    # law of tests/test_assemble_network_responses.py come from the request and the tables, never from code.
+    "chain_laws",
+    "nw-2",
+    "test-only stated law",
 )
 
 

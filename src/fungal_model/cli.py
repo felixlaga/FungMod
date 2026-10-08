@@ -28,7 +28,8 @@ name (``assemble_user_tables(fetch_kinetics=True)``),
 through frozen query snapshots under ``--cache-dir`` that only ``--fetch``
 refreshes. ``assemble --network`` drafts an enzyme network
 (``enzyme_network``: every class of the repertoire acting on a pool the
-requested substrates release acts together) instead of single-class cases.
+requested substrates release acts together) instead of single-class cases;
+with ``--responses`` each law is written against the network member it names.
 
 The command line only parses arguments and prints what the API returns; every
 scientific decision (name resolution, modelability, the simulation rule of each
@@ -235,7 +236,12 @@ several enzymes acting together (--network):
   product, or the request) that equal a substrate_id or a registry substrate id, never a name, and every class of
   the repertoire acting on a pool is a member with its own kinetics status. A network runs at a condition only
   when every member has kinetics there (all or nothing); a member without kinetics is a gap, never left out.
-  Response laws (--responses) are refused; --user-data may then be a network dataset.
+  --responses (and the responses.csv rows of --user-data) bind each temperature or pH law to the member class and
+  pool it names (substrate: a requested substrate or a pool it releases); a law on a class that is no member, or on
+  a pool its class does not act on, is refused. A law carries a member's kinetics to another requested condition
+  (an EnvironmentGrid condition) only from the law's reference condition, and only when the laws carry every member
+  there; the report says per member whether its kinetics sit at that reference condition. --user-data may then be
+  a network dataset.
 
 examples:
   fungmod assemble --fungus "Strain G1" --substrate NAME --temperature-c 30 --temperature-c 40 --ph 5 \\
@@ -612,7 +618,8 @@ def _add_assemble_parser(commands: Any) -> None:
         metavar="FILE",
         help=(
             "CSV of temperature or pH response-law rows for the fungus: the columns of responses.csv with "
-            "substrate in place of strain_id and substrate_id"
+            "substrate in place of strain_id and substrate_id (with --network, a requested substrate or a pool it "
+            "releases)"
         ),
     )
     assay = assemble.add_argument_group("the virtual assay")
@@ -2073,15 +2080,44 @@ def _print_assembly_network(network: Mapping[str, Any]) -> None:
                 f"  members on {', '.join(item['undetermined_pools'])} are decided when the reviewed tables are loaded "
                 "(substrate class or bond classes under review)"
             )
+        if "reference_condition_meaning" in network:
+            _print_network_laws(item["members"])
         for entry in item["conditions"]:
             blocked = f": {'; '.join(entry['blocked_by'])}" if entry["blocked_by"] else ""
+            grid = (
+                f"; an EnvironmentGrid condition, not a conditions.csv row: the laws carry the kinetics of "
+                f"{entry['carried_from']}"
+                if entry.get("in_conditions_csv") is False
+                else ""
+            )
             print(
                 f"  {entry['condition']}: {entry['status']} (initial concentration of {item['entry_substrate']}: "
-                f"{entry['initial_concentration']}){blocked}"
+                f"{entry['initial_concentration']}{grid}){blocked}"
             )
         for member in item["not_members"]:
             reasons = "; ".join(member["reasons"]) or "the pools are under review"
             print(f"  not a member (acts on no pool of this network): {member['enzyme_class']}: {reasons}")
+
+
+def _print_network_laws(members: Sequence[Mapping[str, Any]]) -> None:
+    """The response laws of a network draft's members and whether their kinetics sit at the laws' reference."""
+
+    print("  response laws (responses.csv; each scales its member's rate from the law's reference condition):")
+    for member in members:
+        who = f"{member['enzyme_class']} on {member['pool']}"
+        laws = member["response_laws"]
+        if not laws:
+            print(
+                f"    {who}: no response law ({member['reference_condition']}); kinetics hold at their rows' condition"
+            )
+            continue
+        names = ", ".join(f"{law['law']} ({law['reference']})" for law in laws)
+        origins = ", ".join(dict.fromkeys(str(law["origin"]) for law in laws))
+        checks = (
+            "; ".join(f"{check['condition']}: {check['reason']}" for law in laws for check in law["kinetics"])
+            or "no kinetic constant in the draft"
+        )
+        print(f"    {who}: {names} from {origins}; {member['reference_condition']}: {checks}")
 
 
 def _print_draft(draft: UserTablesDraft, *, provider: str, source: str) -> None:
@@ -2369,17 +2405,25 @@ def _print_cultures(dataset: UserDataset) -> None:
         f"Cultures (culture.csv; the strain grows on the substrate and secretes its enzyme pools, "
         f"culture_physiology): {len(dataset.cultures)}"
     )
+    # Several pools may consume the substrate in parallel (CULTURE-002); one keeps the earlier column title.
+    several = any(len(item.get("consuming_pools", ())) > 1 for item in dataset.cultures)
     rows = [
         (
             str(item["strain_id"]),
             str(item["substrate_id"]),
-            str(item["enzyme_class"]),
+            ", ".join(str(pool) for pool in item.get("consuming_pools", (item["enzyme_class"],))),
             ", ".join(str(pool) for pool in item["enzyme_pools"]),
             _rows_text(item["rows"]) if item["rows"] else "none (every role a gap)",
         )
         for item in dataset.cultures
     ]
-    headers = ("strain", "substrate", "consuming pool", "enzyme pools", "culture.csv rows")
+    headers = (
+        "strain",
+        "substrate",
+        "consuming pools" if several else "consuming pool",
+        "enzyme pools",
+        "culture.csv rows",
+    )
     for line in _table(headers, rows):
         print(f"  {line}")
 
@@ -2391,12 +2435,15 @@ def _print_enzyme_networks(dataset: UserDataset) -> None:
         f"Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, "
         f"enzyme_network): {len(dataset.enzyme_networks)}"
     )
+    # The response-law column appears only when a responses.csv law is bound to a process (NETWORK-003).
+    laws = any(process.get("response_laws") for item in dataset.enzyme_networks for process in item["processes"])
     rows = [
         (
             str(process["enzyme_class"]),
             str(process["pool"]),
             str(process["rate_form"]),
             str(process["inhibitor"] or "none"),
+            *((", ".join(process["response_laws"]) or "none",) if laws else ()),
         )
         for item in dataset.enzyme_networks
         for process in item["processes"]
@@ -2410,7 +2457,7 @@ def _print_enzyme_networks(dataset: UserDataset) -> None:
             for link in item["links"]
         )
         print(f"  from {item['entry_substrate']}: {links}; strains {', '.join(item['strains'])}")
-    headers = ("enzyme class", "pool", "rate form", "competitive inhibitor")
+    headers = ("enzyme class", "pool", "rate form", "competitive inhibitor", *(("response laws",) if laws else ()))
     for line in _table(headers, rows):
         print(f"  {line}")
 

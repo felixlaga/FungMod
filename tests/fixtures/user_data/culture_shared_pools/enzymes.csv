@@ -1,0 +1,5 @@
+strain_id,enzyme_class,evidence,source
+strain_k6,endo_cleaver_k_like,assumed secreted activity (illustrative),Illustrative test note CK-6 p. 1
+strain_k6,exo_cleaver_k_like,assumed secreted activity (illustrative),Illustrative test note CK-6 p. 1
+strain_k7,exo_cleaver_k_like,assumed secreted activity (illustrative),Illustrative test note CK-7 p. 1
+strain_k7,endo_cleaver_k_like,assumed secreted activity (illustrative),Illustrative test note CK-7 p. 1

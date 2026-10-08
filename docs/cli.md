@@ -455,7 +455,7 @@ The options map one to one onto the arguments of `assemble_user_tables`:
 | `--entry-id ID`, `--same-species ORGANISM` (repeatable) | `entry_ids`, `same_species` |
 | `--fetch-kinetics` (with `--fetch` to query) | `fetch_kinetics=True` (with `refresh=True`): SABIO-RK kinetics of the repertoire's classes by EC number and substrate name; see [kinetics looked up by EC number](#kinetics-looked-up-by-ec-number-fetch-kinetics) |
 | `--user-data DIR` | `user_data` |
-| `--responses FILE` | `responses`: a CSV with the columns of `responses.csv`, `substrate` in place of `strain_id` and `substrate_id` |
+| `--responses FILE` | `responses`: a CSV with the columns of `responses.csv`, `substrate` in place of `strain_id` and `substrate_id` (with `--network`, a requested substrate or a pool it releases) |
 | `--design QUANTITY=VALUE UNITS` or `QUANTITY=LOWER:UPPER UNITS` (repeatable) | `design` (`substrate_initial_concentration`, `enzyme_concentration`, `enzyme_loading`) |
 | `--network` | `network=True`: an enzyme network instead of single-class cases (see [several enzymes acting together](#several-enzymes-acting-together-network)) |
 | `--time-grid DURATION UNITS POINTS` | `time_grid` |
@@ -509,12 +509,13 @@ Enzyme classes resolved from them: 5
 ```
 
 `check-data` also prints a dataset's cultures (one row per strain and
-culture substrate, with the consuming pool, every enzyme pool and the
+culture substrate, with the consuming pool or pools, every enzyme pool and the
 `culture.csv` rows; see
 [fungal culture](user-data.md#fungal-culture-growth-and-secretion)), its
 enzyme networks (each entry's chain of pools with the yields and strains, a
 unit-bearing yield with its evidence type, for example `(3.0838 mmol/g, estimate)`, and
-one row per process with its class, pool, rate form and competitive inhibitor;
+one row per process with its class, pool, rate form and competitive inhibitor,
+plus its response laws when `responses.csv` binds any;
 see [several enzymes acting together](user-data.md#several-enzymes-acting-together)), its time
 courses (one row per series, with its points, time range, units and how many
 observations carry an `sd`) and, for a fitted dataset, the fitted values with
@@ -708,10 +709,37 @@ Enzyme network (--network; user_dataset.yml enzyme_network, entry substrates cel
 ```
 
 and its printed `fungmod run` command has no `--runnable-only`, because
-nothing is blocked. `--responses` and a `--user-data` dataset whose
-`responses.csv` binds laws to a pool are refused (exit code 2), and so is
-everything else a network cannot run; `--user-data` may itself be a network
-dataset with `--network` (its `ki` rows are kept) and is refused without it.
+nothing is blocked. Everything a network cannot run is refused (exit code 2);
+`--user-data` may itself be a network dataset with `--network` (its `ki` rows
+are kept) and is refused without it.
+
+With `--responses FILE` (and the `responses.csv` rows of `--user-data`) each
+temperature or pH law is written to the draft's `responses.csv` against the
+member class and pool it names (`substrate`: a requested substrate or a pool
+it releases); a law on a class that is no member, or on a pool its class does
+not act on, is refused (exit code 2). A law carries its member's kinetics to
+another requested condition, an `EnvironmentGrid` condition, only from the
+law's reference condition, and the network block says per member whether its
+kinetics sit there ([response laws in a network draft](user-data.md#response-laws-in-a-network-draft)).
+With `my_chain` and the illustrative laws of `chain_laws.csv` shown there,
+`fungmod assemble --fungus strain_n1 --user-data my_chain --substrate
+polymer_p1 --temperature-c 30 --temperature-c 40 --ph 5 --network --responses
+chain_laws.csv --dataset-id chain_laws_draft --output chain_laws_draft`
+prints, in its network block:
+
+```text
+  response laws (responses.csv; each scales its member's rate from the law's reference condition):
+    depolymerase_like on polymer_p1: temperature_cardinal_rosso (optimum_temperature 30 degC), ph_cardinal_rosso (optimum_ph 5) from the responses argument; at_reference: c30_ph5: 30 degC equals optimum_temperature 30 degC; c30_ph5: pH 5 equals optimum_ph 5
+    oligomer_hydrolase_like on oligomer_o1: temperature_arrhenius_reference (reference_temperature 30 degC) from the responses argument; at_reference: c30_ph5: 30 degC equals reference_temperature 30 degC
+  c30_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated)
+  c40_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated; an EnvironmentGrid condition, not a conditions.csv row: the laws carry the kinetics of c30_ph5)
+```
+
+and its next steps run `--condition c30_ph5` and the grid `--temperature-c 40
+--ph 5`. Once its reviewer is filled in, `check-data` lists the network with a
+`response laws` column (each law on its process), and the grid run reports
+`environment effect: active_response_model` and 50 % of the entry degraded in
+112.4 minutes at 40 degC, against 64.77 minutes at `c30_ph5`.
 
 ## From a fungus name: its UniProt reference proteome
 
