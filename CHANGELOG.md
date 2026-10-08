@@ -884,6 +884,14 @@ All notable public releases of FungMod are documented here.
   (NETWORK-003); its laws bind per network process (see Added). Assembled
   network drafts still carry no response law.
 
+- CI runs the test files in parallel on every core of each runner
+  (`pytest -n auto --dist loadfile`, pytest-xdist in the `dev` extra), and the
+  runner labels can be overridden with the repository variables
+  `FUNGMOD_RUNNER_UBUNTU`, `FUNGMOD_RUNNER_MACOS` and `FUNGMOD_RUNNER_WINDOWS`
+  (for example hosted runners from another provider); without them every job
+  runs on the GitHub-hosted runner it used before, and job names, which are the
+  required status checks, do not change (CI-001).
+
 - Text only (ASSEMBLE-002): the refusal of a network dataset as `user_data` of
   `assemble_user_tables` now names `network=True` (`fungmod assemble
   --network`), which accepts it. No numerical behaviour changes.

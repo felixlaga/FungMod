@@ -11,9 +11,13 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Runner labels come from repository variables when they are set (Settings > Secrets and
+# variables > Actions > Variables), for example FUNGMOD_RUNNER_UBUNTU=depot-ubuntu-24.04-4;
+# without them every job runs on the GitHub-hosted runner named by its matrix entry. Job
+# names never change, so required status checks keep matching.
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.FUNGMOD_RUNNER_UBUNTU || 'ubuntu-latest' }}
 
     steps:
       - name: Check out repository
@@ -37,7 +41,13 @@ jobs:
 
   tests:
     name: tests (${{ matrix.os }}, py${{ matrix.python-version }})
-    runs-on: ${{ matrix.os }}
+    runs-on: >-
+      ${{
+        (matrix.os == 'ubuntu-latest' && vars.FUNGMOD_RUNNER_UBUNTU) ||
+        (matrix.os == 'macos-latest' && vars.FUNGMOD_RUNNER_MACOS) ||
+        (matrix.os == 'windows-latest' && vars.FUNGMOD_RUNNER_WINDOWS) ||
+        matrix.os
+      }}
     strategy:
       fail-fast: false
       matrix:
@@ -65,8 +75,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,standards,copasi]"
 
+      # Test files run in parallel on every core of the runner (pytest-xdist); a file's
+      # tests stay on one worker (--dist loadfile), so module-level fixtures are shared as before.
       - name: Run tests with coverage
-        run: python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml
+        run: python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml -n auto --dist loadfile
 
       - name: Upload coverage to artifact
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
@@ -76,7 +88,7 @@ jobs:
           path: coverage.xml
 
   documentation:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.FUNGMOD_RUNNER_UBUNTU || 'ubuntu-latest' }}
 
     steps:
       - name: Check out repository
@@ -96,7 +108,7 @@ jobs:
         run: python -m mkdocs build --strict
 
   release-notebooks:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.FUNGMOD_RUNNER_UBUNTU || 'ubuntu-latest' }}
 
     steps:
       - name: Check out repository
