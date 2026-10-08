@@ -759,6 +759,24 @@ def test_lookups_of_registry_classes_change_only_the_lookup_limitation(
     assert hashlib.sha256(text.replace(new, old).encode("utf-8")).hexdigest() == LOOKUP_DIGESTS_E97E8E6[name]
 
 
+def test_a_stored_lookup_has_the_same_bytes_on_every_platform(
+    sabio: _FakeSabio, monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The derived export and the fetch metadata are written with LF line endings on every platform, so the
+    export SHA-256 a draft quotes (and the digests pinned above) do not depend on where the lookup ran."""
+
+    _fixed_clock(monkeypatch)
+    sabio.serve(QUERY_A, BODY_A)
+    root = tmp_path_factory.mktemp("lf")
+    draft = _k1(root, refresh=True)
+    written = sorted(root.rglob("combined_export.json")) + sorted(root.rglob("fetch_metadata.json"))
+    assert len(written) >= 2
+    for path in written:
+        assert b"\r\n" not in path.read_bytes(), path
+    (query,) = [item for item in draft.assembly["kinetics_lookup"]["queries"] if item["query"] == QUERY_A]
+    assert query["export_sha256"] == hashlib.sha256(next(root.rglob("combined_export.json")).read_bytes()).hexdigest()
+
+
 # ---------------------------------------------------------------------------
 # fungmod assemble --user-data ... --fetch-kinetics --fetch, check-data, run
 

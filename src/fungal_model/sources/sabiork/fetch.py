@@ -339,7 +339,9 @@ def _write_error_metadata(
 
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # LF on every platform: the snapshot's recorded SHA-256 values (and the drafts that quote them) must not
+    # depend on whether the export was written on Windows.
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
 
 
 def _required_meta_int(payload: Mapping[str, Any], key: str) -> int:
