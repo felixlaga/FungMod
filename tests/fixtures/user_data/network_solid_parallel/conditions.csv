@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c37_ph6,37,degC,6.0,Illustrative assay condition for the parallel cross-basis enzyme-network fixture

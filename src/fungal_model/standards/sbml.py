@@ -275,6 +275,13 @@ def _reaction_spec(
         return reactants, products, tuple(process.catalysts), " * ".join(factors)
 
     if isinstance(process, HomogeneousMichaelisMentenProcess):
+        if process.product_coefficient_units:
+            # SBML stoichiometries are pure numbers; a unit-bearing coefficient would be frozen as one.
+            raise SbmlExportError(
+                f"Process {process.name!r} forms {', '.join(sorted(process.product_coefficient_units))} with a "
+                "unit-bearing product coefficient (an amount of product per amount of substrate on another basis), "
+                "which an SBML stoichiometry cannot carry; the exporter does not write it as a pure number."
+            )
         reactants = {process.substrate_state: 1.0}
         products = {species: float(coeff) for species, coeff in process.product_coefficients.items()}
         substrate_id = sid.of(process.substrate_state)

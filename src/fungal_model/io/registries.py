@@ -243,6 +243,9 @@ def load_stoichiometric_product_map(data: Mapping[str, Any]) -> ProductReleaseMa
     raw_bindings = data.get("coefficient_bindings", {}) or {}
     if not isinstance(raw_bindings, Mapping):
         raise ValueError("product map coefficient_bindings must be a mapping of state to binding.")
+    raw_units = data.get("coefficient_units", {}) or {}
+    if not isinstance(raw_units, Mapping):
+        raise ValueError("product map coefficient_units must be a mapping of product state to unit text.")
     return ProductReleaseMap(
         reactants={str(name): float(value) for name, value in data["reactants"].items()},
         products={str(name): float(value) for name, value in data["products"].items()},
@@ -254,6 +257,7 @@ def load_stoichiometric_product_map(data: Mapping[str, Any]) -> ProductReleaseMa
             str(state): CoefficientBinding.from_dict(_mapping(binding, field_name=f"coefficient_bindings.{state}"))
             for state, binding in raw_bindings.items()
         },
+        coefficient_units={str(state): str(units) for state, units in raw_units.items()},
     )
 
 

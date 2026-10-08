@@ -77,8 +77,16 @@ next only where a substrate's ``substrates.csv`` product equals another
 ``substrate_id``, with the stated yield. Intermediate pools and the final product
 start at zero. A ``ki`` row naming an ``inhibitor`` (a pool released downstream
 of its own) binds the existing provenance-bound competitive-inhibition modifier
-to that process; without one the process has no inhibition term. Cycles,
-ambiguous products, links between dissolved and dry-mass pools, a class on two
+to that process; without one the process has no inhibition term. A solid pool
+(dry mass per volume) releases a dissolved pool (amount per volume), or a molar
+final product, only through a unit-bearing yield the user states in
+``yield_basis`` (an amount of product per dry mass, for example ``mmol/g``)
+with its own ``yield_evidence_type``: it becomes a parameter record that sets
+the mode like any other input and binds the release coefficient, the pools
+after it are reported in the entry's units times the yield's units, and the
+closure is computed through it. FungMod never derives such a yield from a molar
+mass. Cycles, ambiguous products, links across bases without a unit-bearing
+yield (and every link from a dissolved pool to a solid one), a class on two
 pools of one network and strains with different member classes are refused;
 classes act additively and independently, with no synergy or competition for
 sites. Every class of a network dataset runs in its networks only, so the
@@ -298,6 +306,15 @@ AMOUNT_BASIS_DRY_MASS = "dry_mass"
 # The amount basis each physical state requires in substrates.csv (blank: amounts per volume).
 _AMOUNT_BASIS = MappingProxyType({PHYSICAL_STATE_DISSOLVED: "", PHYSICAL_STATE_SOLID_POLYMER: AMOUNT_BASIS_DRY_MASS})
 _SOLID_YIELD_BASIS = "g/g"
+# A unit-bearing yield (enzyme networks only): an amount of a dissolved product per dry mass of the solid that
+# releases it, stated by the user in yield_basis (for example mmol/g) with its own evidence type and method. Its
+# dimension is checked with pint against this reference; FungMod never derives it from a molar mass.
+_UNIT_BEARING_YIELD_REFERENCE_UNITS = "mol / gram"
+YIELD_EVIDENCE_COLUMN = "yield_evidence_type"
+YIELD_METHOD_COLUMN = "yield_method"
+YIELD_EVIDENCE_TYPES = ("measured", "literature", "estimate")
+# The kinetics-free parameter role of a unit-bearing yield in a network template: product_yield__<pool>.
+NETWORK_YIELD_QUANTITY = "product_yield"
 # Physical states of the registry vocabulary that describe composite materials (several polymer fractions).
 _COMPOSITE_PHYSICAL_STATES = frozenset({"mixed_solid", "solid_biomass"})
 # The template role of the exponent n of the conversion-dependent reactivity factor (S / S0)^n.
@@ -610,7 +627,16 @@ _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ),
     "substrates.csv": (
         ("substrate_id", "product", "product_yield", "yield_basis", "source"),
-        ("registry_substrate", "name", "substrate_class", "physical_state", "bond_classes", "amount_basis"),
+        (
+            "registry_substrate",
+            "name",
+            "substrate_class",
+            "physical_state",
+            "bond_classes",
+            "amount_basis",
+            YIELD_EVIDENCE_COLUMN,
+            YIELD_METHOD_COLUMN,
+        ),
     ),
     "conditions.csv": (("condition_id", "temperature", "temperature_units", "ph"), ("notes",)),
     "kinetics.csv": (
@@ -1390,6 +1416,11 @@ class _Substrate:
     source: str
     physical_state: str = PHYSICAL_STATE_DISSOLVED
     amount_basis: str = ""
+    # A unit-bearing yield (an amount of product per dry mass, as written in yield_basis) with its evidence type
+    # and method; blank for the pure-number yield of the row's physical state (g/g or mol/mol).
+    yield_units: str = ""
+    yield_evidence_type: str = ""
+    yield_method: str = ""
 
     @property
     def is_solid(self) -> bool:
@@ -1397,7 +1428,7 @@ class _Substrate:
 
     @property
     def yield_basis(self) -> str:
-        return _YIELD_BASIS_BY_STATE[self.physical_state]
+        return self.yield_units or _YIELD_BASIS_BY_STATE[self.physical_state]
 
 
 @dataclass(frozen=True)
@@ -1580,10 +1611,23 @@ class _Network:
     strains: tuple[str, ...]
     entry_rows: Mapping[tuple[str, str], _Kinetics]
 
+    # The pools whose release into the next pool (or the final product) uses a unit-bearing yield: at most one,
+    # a solid pool releasing an amount per volume (set from the substrates when the network is built).
+    unit_bearing_yield_pools: tuple[str, ...] = ()
+
     def downstream(self, pool: str) -> tuple[str, ...]:
         """The pools released after ``pool``, the final product last."""
 
         return (*self.pools[self.pools.index(pool) + 1 :], self.product)
+
+    def converted(self, pool: str) -> bool:
+        """Whether ``pool`` (a pool of the network or its final product) lies after a unit-bearing yield."""
+
+        if not self.unit_bearing_yield_pools:
+            return False
+        conversion = self.pools.index(self.unit_bearing_yield_pools[0])
+        position = len(self.pools) if pool == self.product else self.pools.index(pool)
+        return position > conversion
 
 
 @dataclass
@@ -2656,6 +2700,9 @@ def _parse_substrates(table: _Table, resolver: RegistryResolver, context: _Conte
         # The bases follow the physical state: the parsed one, else the one the row states.
         state = parsed[4] if parsed is not None else row.get("physical_state", "")
         bases_ok = _substrate_bases_ok(row, state, file=file, line=line, context=context)
+        yield_units = _unit_bearing_yield_units(row, state)
+        if not _yield_evidence_ok(row, unit_bearing=bool(yield_units), file=file, line=line, context=context):
+            bases_ok = False
         if (
             substrate_id is None
             or product is None
@@ -2691,8 +2738,69 @@ def _parse_substrates(table: _Table, resolver: RegistryResolver, context: _Conte
             source=source,
             physical_state=physical_state,
             amount_basis=_AMOUNT_BASIS[physical_state],
+            yield_units=yield_units,
+            yield_evidence_type=row.get(YIELD_EVIDENCE_COLUMN, "") if yield_units else "",
+            yield_method=row.get(YIELD_METHOD_COLUMN, "") if yield_units else "",
         )
     return substrates
+
+
+def _unit_bearing_yield_units(row: Mapping[str, str], state: str) -> str:
+    """The yield_basis of a solid row when it is an amount of product per dry mass (a unit-bearing yield), else blank."""
+
+    basis = row.get("yield_basis", "")
+    if state != PHYSICAL_STATE_SOLID_POLYMER or not basis or basis == _SOLID_YIELD_BASIS:
+        return ""
+    if _unit_dimension_error(basis, _UNIT_BEARING_YIELD_REFERENCE_UNITS) is not None:
+        return ""
+    return basis
+
+
+def _yield_evidence_ok(row: Mapping[str, str], *, unit_bearing: bool, file: str, line: int, context: _Context) -> bool:
+    """A unit-bearing yield states its evidence type (and a method for measured or literature values); no other row.
+
+    The pure-number yields (g/g, mol/mol) stay template constants that do not
+    set the mode, as before, so their rows leave both columns blank.
+    """
+
+    evidence = row.get(YIELD_EVIDENCE_COLUMN, "")
+    method = row.get(YIELD_METHOD_COLUMN, "")
+    if not unit_bearing and row.get("yield_basis", "") not in _YIELD_BASIS_BY_STATE.values():
+        # The yield_basis itself is refused (with the reason) by the basis check; its evidence is not judged.
+        return True
+    if not unit_bearing:
+        filled = [column for column, value in ((YIELD_EVIDENCE_COLUMN, evidence), (YIELD_METHOD_COLUMN, method)) if value]
+        for column in filled:
+            context.add(
+                file,
+                line,
+                column,
+                f"{column} applies to a unit-bearing yield only (an amount of product per dry mass of a solid, for "
+                "example mmol/g, on an enzyme-network link). A g/g or mol/mol yield is a template constant that does "
+                "not set the mode in this version; leave the column blank.",
+            )
+        return not filled
+    if evidence not in YIELD_EVIDENCE_TYPES:
+        stated = "is blank" if not evidence else f"is {evidence!r}"
+        context.add(
+            file,
+            line,
+            YIELD_EVIDENCE_COLUMN,
+            f"{YIELD_EVIDENCE_COLUMN} {stated}, but the unit-bearing yield {row.get('product_yield', '')} "
+            f"{row.get('yield_basis', '')} is a stated input like a kinetic value: give one of "
+            f"{', '.join(YIELD_EVIDENCE_TYPES)} (an estimate keeps every case that uses it exploratory).",
+        )
+        return False
+    if evidence in _EVIDENCE_REQUIRES_METHOD and not method:
+        context.add(
+            file,
+            line,
+            YIELD_METHOD_COLUMN,
+            f"A {evidence} unit-bearing yield needs {YIELD_METHOD_COLUMN}: how it was measured or obtained (for "
+            "example the molar masses you used to compute it); FungMod never computes it for you.",
+        )
+        return False
+    return True
 
 
 def _substrate_bases_ok(row: Mapping[str, str], state: str, *, file: str, line: int, context: _Context) -> bool:
@@ -2740,14 +2848,16 @@ def _substrate_bases_ok(row: Mapping[str, str], state: str, *, file: str, line: 
             )
             ok = False
         return ok
-    if basis != _SOLID_YIELD_BASIS:
+    if basis != _SOLID_YIELD_BASIS and not _unit_bearing_yield_units(row, state):
         context.add(
             file,
             line,
             "yield_basis",
             f"yield_basis must be {_SOLID_YIELD_BASIS!r} for a {state} substrate: grams of product per gram of dry "
             "substrate consumed. A molar yield on a solid polymer would need the molar mass of a repeat unit, which "
-            "FungMod does not assume; the yield is always explicit and never inferred.",
+            "FungMod does not assume; the yield is always explicit and never inferred. In an enzyme network, a solid "
+            "may instead state an amount of product per dry mass (for example mmol/g) to release a dissolved pool; "
+            f"{basis!r} is not such an amount per mass.",
         )
         ok = False
     expected = _AMOUNT_BASIS[state]
@@ -8201,9 +8311,13 @@ def _validate_networks(parsed: _Parsed, context: _Context) -> None:
     substrates.csv product that equals another substrate_id. The members of a
     network are the dataset's declared classes that act on one of its pools by
     the categorical rule; each runs one Michaelis-Menten process on its pool in
-    its pair's rate form. Refused: tables not combined with networks yet,
-    unknown entries, cycles, ambiguous products, links across amount bases, a
-    class on two pools of one network, strains with different member classes, the
+    its pair's rate form. A link from a solid pool to a dissolved pool (or a
+    molar final product) needs the solid's unit-bearing yield. Refused: tables
+    not combined with networks yet, unknown entries, cycles, ambiguous products,
+    links across amount bases without a unit-bearing yield (and from a
+    dissolved pool to a solid one), a unit-bearing yield on a same-basis link or
+    outside a network, a class on two pools of one network, strains with
+    different member classes, the
     pH-ionization form, initial amounts, doses and reactivity exponents on
     intermediate pools, disagreeing initial concentrations of an entry, unused
     substrates, colliding state names, and ki rows that name no downstream pool,
@@ -8213,6 +8327,17 @@ def _validate_networks(parsed: _Parsed, context: _Context) -> None:
     if parsed.network_entries is None:
         return
     if not parsed.network_entries:
+        for substrate in parsed.substrates.values():
+            if substrate.yield_units:
+                context.add(
+                    "substrates.csv",
+                    substrate.row,
+                    "yield_basis",
+                    f"yield_basis {substrate.yield_units!r} is a unit-bearing yield (an amount of product per dry mass), "
+                    "which links a solid pool to a dissolved pool of an enzyme network; this version supports it in "
+                    f"network datasets only (declare {NETWORK_MANIFEST_FIELD} with {NETWORK_ENTRY_FIELD} in "
+                    f"user_dataset.yml). A single-class case on a solid states its product in g/g.",
+                )
         for row in parsed.kinetics:
             if row.quantity == INHIBITION_CONSTANT_QUANTITY:
                 context.add(
@@ -8331,18 +8456,42 @@ def _network_link(parsed: _Parsed, substrate: _Substrate, context: _Context) -> 
             )
             return False, None
     if product not in parsed.substrates:
+        # The final product: a unit-bearing yield releases it as an amount per volume, a g/g yield as a dry mass.
         return True, None
     target = parsed.substrates[product]
-    if target.is_solid != substrate.is_solid:
+    if not substrate.is_solid and target.is_solid:
         context.add(
             "substrates.csv",
             substrate.row,
             "product",
             f"Substrate {substrate.substrate_id!r} ({_basis_text(substrate)}) releases {product!r}, a "
-            f"{_basis_text(target)} substrate. The Michaelis-Menten law writes its product in the units of its "
-            "substrate, so linking a dry-mass pool with an amount-per-volume pool would need the molar mass of the "
-            "product as a dimensional yield, which FungMod does not apply. Keep the linked pools on one basis, or "
-            "give the product another name so that it stays the network's final product.",
+            f"{_basis_text(target)} substrate. An enzyme network links a dissolved pool only to dissolved pools: "
+            "forming a solid from a dissolved pool is not supported in this version. Give the product another name "
+            "so that it stays the network's final product.",
+        )
+        return False, None
+    if substrate.is_solid and not target.is_solid and not substrate.yield_units:
+        context.add(
+            "substrates.csv",
+            substrate.row,
+            "yield_basis",
+            f"Substrate {substrate.substrate_id!r} ({_basis_text(substrate)}) releases {product!r}, a "
+            f"{_basis_text(target)} substrate, with a {substrate.yield_basis} yield. Linking a dry-mass pool to an "
+            "amount-per-volume pool needs a unit-bearing yield that converts the dry mass consumed into the amount "
+            "released: state it in yield_basis as an amount of product per dry mass (for example mmol/g, which you "
+            f"may compute from molar masses and say so) with {YIELD_EVIDENCE_COLUMN} and, for a measured or "
+            f"literature value, {YIELD_METHOD_COLUMN}. FungMod never derives it from a molar mass.",
+        )
+        return False, None
+    if substrate.yield_units and target.is_solid:
+        context.add(
+            "substrates.csv",
+            substrate.row,
+            "yield_basis",
+            f"Substrate {substrate.substrate_id!r} releases {product!r}, another solid pool on a dry-mass basis, but "
+            f"states a unit-bearing yield ({substrate.yield_units}). A link between pools on one basis takes the "
+            f"pure-number yield of that basis ({_SOLID_YIELD_BASIS}); a unit-bearing yield converts a dry mass into "
+            "the amount of a dissolved pool only.",
         )
         return False, None
     return True, product
@@ -8350,7 +8499,7 @@ def _network_link(parsed: _Parsed, substrate: _Substrate, context: _Context) -> 
 
 def _basis_text(substrate: _Substrate) -> str:
     if substrate.is_solid:
-        return f"{substrate.physical_state}, dry mass per volume, yield g/g"
+        return f"{substrate.physical_state}, dry mass per volume, yield {substrate.yield_basis}"
     return f"{substrate.physical_state}, amount per volume, yield {_YIELD_BASIS}"
 
 
@@ -8496,6 +8645,7 @@ def _network_members(
         classes=members,
         strains=tuple(strains),
         entry_rows=MappingProxyType(entry_rows),
+        unit_bearing_yield_pools=tuple(pool for pool in pools if parsed.substrates[pool].yield_units),
     )
 
 
@@ -8624,6 +8774,9 @@ def _network_roles(network: _Network) -> tuple[tuple[str, str, str, str], ...]:
     """(template role, kinetics quantity, enzyme class, pool) of every parameter role of a network, in record order."""
 
     roles: list[tuple[str, str, str, str]] = [(_NETWORK_INITIAL_ROLE, "substrate_initial_concentration", "", network.entry)]
+    roles.extend(
+        (_network_yield_role(pool), NETWORK_YIELD_QUANTITY, "", pool) for pool in network.unit_bearing_yield_pools
+    )
     for process in network.processes:
         key, pool = process.class_key, process.pool
         roles.append((f"km__{key}__{pool}", "km", key, pool))
@@ -8637,6 +8790,12 @@ def _network_roles(network: _Network) -> tuple[tuple[str, str, str, str], ...]:
         if process.inhibitor:
             roles.append((f"ki__{key}__{pool}", INHIBITION_CONSTANT_QUANTITY, key, pool))
     return tuple(roles)
+
+
+def _network_yield_role(pool: str) -> str:
+    """The template role of the unit-bearing yield with which ``pool`` releases the next pool."""
+
+    return f"{NETWORK_YIELD_QUANTITY}__{pool}"
 
 
 def _network_symbol(namespace: _Namespace, network: _Network, role: str) -> str:
@@ -8689,6 +8848,26 @@ def _generate_network_records(
             for condition in parsed.conditions.values():
                 entry_row = network.entry_rows.get((strain_id, condition.condition_id))
                 for role, quantity, class_key, pool in _network_roles(network):
+                    if quantity == NETWORK_YIELD_QUANTITY:
+                        mapping = _network_yield_mapping(
+                            parsed,
+                            namespace=namespace,
+                            network=network,
+                            pool=pool,
+                            role=role,
+                            strain=strain,
+                            condition=condition,
+                        )
+                        record = _emit(
+                            generated,
+                            context,
+                            "parameter_records",
+                            mapping,
+                            origin=("substrates.csv", parsed.substrates[pool].row, "yield_basis"),
+                        )
+                        if isinstance(record, ParameterRecord):
+                            network_records.append(record)
+                        continue
                     if not class_key:
                         # The entry's initial concentration: one pool, stated on the rows of its classes.
                         class_key = entry_row.class_key if entry_row is not None else network.processes[0].class_key
@@ -8757,6 +8936,87 @@ def _generate_network_records(
                     _network_compatibility_mapping(network, class_key, parsed=parsed, namespace=namespace),
                     origin=origin,
                 )
+
+
+def _network_yield_mapping(
+    parsed: _Parsed,
+    *,
+    namespace: _Namespace,
+    network: _Network,
+    pool: str,
+    role: str,
+    strain: _Strain,
+    condition: _Condition,
+) -> dict[str, Any]:
+    """The parameter record of a unit-bearing yield: the substrates.csv value, units, evidence, method and source.
+
+    The record binds the release coefficient of the pool, so its evidence type
+    sets the template's mode like any other input (an estimate keeps it
+    exploratory). It is one stated value: FungMod neither derived it from a
+    molar mass or a registry product map nor checks it against one. One record
+    per strain and condition, selected per case like every network record.
+    """
+
+    substrate = parsed.substrates[pool]
+    entry = parsed.substrates[network.entry]
+    released = _network_pool_name(parsed, network, network.downstream(pool)[0])
+    evidence = substrate.yield_evidence_type
+    confidence = _confidence(evidence)
+    statement = (
+        f"{_number_text(float(substrate.product_yield))} {substrate.yield_units} of {released} released per dry mass "
+        f"of {substrate.name} consumed"
+    )
+    provenance: dict[str, Any] = {
+        "source": substrate.source,
+        "confidence_level": confidence,
+        "measurement_method": substrate.yield_method or "user estimate without a stated method",
+        "validity_range": (
+            f"The conversion stated in substrates.csv row {substrate.row} of user dataset {namespace.dataset_id} "
+            f"({statement}); FungMod did not derive it from a molar mass or a registry product map."
+        ),
+        USER_DATASET_PROVENANCE_KEY: namespace.provenance(
+            "substrates.csv",
+            substrate.row,
+            source=substrate.source,
+            method=substrate.yield_method or None,
+            evidence_type=evidence,
+            condition_id=condition.condition_id,
+            enzyme_network={"entry_substrate": network.entry, "role": role, "enzyme_class": None, "pool": pool},
+        ),
+    }
+    if evidence == "estimate":
+        provenance["exploratory_prior"] = True
+    record_id = namespace.id("network", network.entry, strain.strain_id, condition.condition_id, role)
+    return {
+        "record_id": record_id,
+        "name": (
+            f"Yield of {released} from {substrate.name} in the enzyme network from {entry.name} for {strain.name} at "
+            f"{condition.condition_id} ({namespace.dataset_id})"
+        ),
+        "maturity": _EVIDENCE_MATURITY[evidence],
+        "provenance": provenance,
+        "notes": (
+            f"User-stated unit-bearing yield from dataset {namespace.dataset_id} (substrates.csv row {substrate.row}, "
+            f"yield_basis {substrate.yield_units}): {statement}; evidence type {evidence}. It converts the dry mass "
+            "consumed into the amount released and is never derived by FungMod."
+        ),
+        "parameter_symbol": _network_symbol(namespace, network, role),
+        "process_type": USER_DATASET_NETWORK_PROCESS_TYPE,
+        "enzyme_class": None,
+        "substrate_class": entry.substrate_class,
+        "fungus_id": namespace.id(strain.strain_id),
+        "substrate_id": entry.registry_id or namespace.id(entry.substrate_id),
+        "environment_id": namespace.id(condition.condition_id),
+        "value": {
+            "kind": "exact",
+            "units": substrate.yield_units,
+            "source": substrate.source,
+            "confidence_level": confidence,
+            "notes": f"substrates.csv row {substrate.row} of user dataset {namespace.dataset_id}: {statement}.",
+            "value": float(substrate.product_yield),
+        },
+        "allowed_use": _allowed_use(evidence, exact=True),
+    }
 
 
 def _network_initial_gap(
@@ -8847,6 +9107,26 @@ _NETWORK_LIMITATIONS = (
 )
 
 
+_NETWORK_CONVERSION_VALIDITY_NOTE = (
+    "Upstream of the unit-bearing yield the closure weights carry its units, so the conservation check sums every "
+    "pool in the final product's units through the stated yield (a dry mass per volume times an amount per dry mass "
+    "is an amount per volume); pint checked that the yield converts the solid's units into the released pool's."
+)
+
+
+def _network_conversion_limitation(parsed: _Parsed, network: _Network, pool: str) -> str:
+    substrate = parsed.substrates[pool]
+    released = _network_pool_name(parsed, network, network.downstream(pool)[0])
+    return (
+        f"Basis change from {substrate.name} (dry mass per volume) to {released} (amount per volume) through the "
+        f"user-stated yield of {_number_text(float(substrate.product_yield))} {substrate.yield_units} (substrates.csv row "
+        f"{substrate.row}, evidence type {substrate.yield_evidence_type}, a parameter record of this template). FungMod "
+        "did not derive it from a molar mass, a degree of polymerisation or a registry product map and does not check "
+        f"it against one; {released} and every pool after it are reported in the entry's initial-concentration units "
+        "times the yield's units, simplified by pint."
+    )
+
+
 def _network_inhibition_limitation(parsed: _Parsed, network: _Network, process: _NetworkProcess) -> str:
     info = parsed.classes[process.class_key]
     pool = parsed.substrates[process.pool].name
@@ -8864,15 +9144,33 @@ def _network_inhibition_limitation(parsed: _Parsed, network: _Network, process: 
     )
 
 
-def _network_weights(parsed: _Parsed, network: _Network) -> dict[str, float]:
-    """Closure weights from the yields: the final product weighs 1, each pool its yield times the next pool's."""
+def _network_weights(parsed: _Parsed, network: _Network) -> dict[str, Any]:
+    """Closure weights from the yields: the final product weighs 1, each pool its yield times the next pool's.
 
-    weights = {"product": 1.0}
+    Upstream of a unit-bearing yield a weight carries that yield's units
+    (``{value, units}``): the weighted dry mass of a solid pool is then an
+    amount per volume, so the ledger is summed in the final product's units
+    through the stated yield. Without one every weight is a pure number, as
+    before.
+    """
+
+    weights: dict[str, Any] = {"product": 1.0}
     weight = 1.0
+    units = ""
     for pool in reversed(network.pools):
-        weight = float(parsed.substrates[pool].product_yield) * weight
-        weights[_network_pool_role(network.pools, pool)] = weight
+        substrate = parsed.substrates[pool]
+        weight = float(substrate.product_yield) * weight
+        units = substrate.yield_units or units
+        weights[_network_pool_role(network.pools, pool)] = {"value": weight, "units": units} if units else weight
     return weights
+
+
+def _network_units_mapping(network: _Network, pool: str) -> dict[str, Any]:
+    """Where a pool's (or the final product's) units come from: the entry's, times the yield's after a basis change."""
+
+    if network.converted(pool):
+        return {"units_from_roles": [_NETWORK_INITIAL_ROLE, _network_yield_role(network.unit_bearing_yield_pools[0])]}
+    return {"units_from_role": _NETWORK_INITIAL_ROLE}
 
 
 def _network_template_mapping(
@@ -8896,9 +9194,9 @@ def _network_template_mapping(
     for pool in network.pools[1:]:
         initial_state_mapping[_network_pool_role(network.pools, pool)] = {
             "value": 0.0,
-            "units_from_role": _NETWORK_INITIAL_ROLE,
+            **_network_units_mapping(network, pool),
         }
-    initial_state_mapping["product"] = {"value": 0.0, "units_from_role": _NETWORK_INITIAL_ROLE}
+    initial_state_mapping["product"] = {"value": 0.0, **_network_units_mapping(network, network.product)}
     for process in network.processes:
         if process.form in _ENZYME_FORMS:
             role = f"enzyme_initial_concentration__{process.class_key}"
@@ -8909,17 +9207,29 @@ def _network_template_mapping(
         next_role = _network_next_role(network, pool)
         released = _network_pool_name(parsed, network, network.downstream(pool)[0])
         unit = "g" if substrate.is_solid else "mol"
+        if substrate.yield_units:
+            # The coefficient is the yield's parameter record, with its units: it converts the dry mass consumed.
+            coefficient: Any = {"parameter_role": _network_yield_role(pool)}
+            notes = (
+                f"User-stated unit-bearing yield {_number_text(float(substrate.product_yield))} {substrate.yield_units} "
+                f"({substrate.product} per dry mass of {substrate.substrate_id} consumed; substrates.csv row "
+                f"{substrate.row}, evidence type {substrate.yield_evidence_type}), bound as parameter role "
+                f"{_network_yield_role(pool)}; FungMod derived it from no molar mass."
+            )
+        else:
+            coefficient = float(substrate.product_yield)
+            notes = (
+                f"User-stated yield {_number_text(float(substrate.product_yield))} {unit} {substrate.product} per "
+                f"{unit} {substrate.substrate_id} consumed (substrates.csv row {substrate.row})."
+            )
         product_maps.append(
             {
                 "id": namespace.id("network", network.entry, pool, "release_map"),
                 "name": f"{substrate.name} to {released} in the enzyme network from {entry.name} ({namespace.dataset_id})",
                 "product_map_type": "stoichiometric",
                 "reactants": {_network_pool_role(network.pools, pool): 1.0},
-                "products": {next_role: float(substrate.product_yield)},
-                "notes": (
-                    f"User-stated yield {_number_text(float(substrate.product_yield))} {unit} {substrate.product} per "
-                    f"{unit} {substrate.substrate_id} consumed (substrates.csv row {substrate.row})."
-                ),
+                "products": {next_role: coefficient},
+                "notes": notes,
             }
         )
     process_templates = []
@@ -8968,17 +9278,24 @@ def _network_template_mapping(
             "assumptions": [
                 f"{info.name} consumes {pool.name} by its own homogeneous Michaelis-Menten law ({_FORM_LABEL[process.form]}"
                 " form), independently of every other class of the network; processes on one pool add their rates.",
-                f"Consumed {pool.name} is released as {released} with the user-stated yield of substrates.csv.",
+                f"Consumed {pool.name} is released as {released} with the user-stated yield of substrates.csv"
+                + (
+                    f" ({_number_text(float(pool.product_yield))} {pool.yield_units}, which converts the dry mass consumed "
+                    "into the amount released)."
+                    if pool.yield_units
+                    else "."
+                ),
             ],
         }
         if modifiers:
             spec["modifiers"] = modifiers
         process_templates.append(spec)
-    loader = "generic_solid" if entry.is_solid else "generic_dissolved"
     substrate_entities = []
     for pool in network.pools:
         substrate = parsed.substrates[pool]
         record_id = substrate.registry_id or namespace.id(pool)
+        # Each pool is loaded on its own basis (the entry's, unless a unit-bearing yield changed it).
+        loader = "generic_solid" if substrate.is_solid else "generic_dissolved"
         substrate_entities.append(
             {
                 "id": record_id,
@@ -9066,6 +9383,12 @@ def _network_template_mapping(
             }
     chain = " -> ".join((*network.pools, network.product))
     basis = "dry mass per volume (yields g/g)" if entry.is_solid else f"amount per volume (yields {_YIELD_BASIS})"
+    if network.unit_bearing_yield_pools:
+        converting = parsed.substrates[network.unit_bearing_yield_pools[0]]
+        basis = (
+            f"dry mass per volume up to {converting.substrate_id}, then amount per volume through its stated yield of "
+            f"{_number_text(float(converting.product_yield))} {converting.yield_units}"
+        )
     vmax_processes = [process for process in network.processes if process.form == RATE_FORM_VMAX]
     limitations = [
         (
@@ -9084,6 +9407,7 @@ def _network_template_mapping(
         )
     if entry.is_solid:
         limitations.extend(_solid_limitations(any(process.reactive for process in network.processes)))
+    limitations.extend(_network_conversion_limitation(parsed, network, pool) for pool in network.unit_bearing_yield_pools)
     rows = sorted(
         {
             row.row
@@ -9123,7 +9447,16 @@ def _network_template_mapping(
             "substrate_state_role": _network_pool_role(network.pools, last.substrate_id),
             "product_state_role": "product",
             "stoichiometric_yield": float(last.product_yield),
-            "notes": "The last release step of the network; the yield of every step is in stoichiometric_yields.",
+            "notes": "The last release step of the network; the yield of every step is in stoichiometric_yields."
+            + (
+                " A unit-bearing yield ("
+                + ", ".join(
+                    f"{pool}: {parsed.substrates[pool].yield_units}" for pool in network.unit_bearing_yield_pools
+                )
+                + ") appears there as its number; its units and record are in process_state_metadata.product_maps."
+                if network.unit_bearing_yield_pools
+                else ""
+            ),
         },
         "stoichiometric_yields": {
             _network_next_role(network, pool): float(parsed.substrates[pool].product_yield) for pool in network.pools
@@ -9164,6 +9497,7 @@ def _network_template_mapping(
             "The closure weights are the user-stated yields multiplied along the chain (the final product weighs 1), "
             "so the conservation check tests the integration, not the yields.",
             *([_SOLID_VALIDITY_NOTE] if entry.is_solid else []),
+            *([_NETWORK_CONVERSION_VALIDITY_NOTE] if network.unit_bearing_yield_pools else []),
         ],
         "notes": (
             f"Enzyme-network template generated from user dataset {namespace.dataset_id} for the network that starts "
@@ -9229,6 +9563,8 @@ def _network_report(parsed: _Parsed, *, dataset_id: str) -> tuple[Mapping[str, A
                             "yield": float(parsed.substrates[pool].product_yield),
                             "yield_basis": parsed.substrates[pool].yield_basis,
                             "substrates_row": parsed.substrates[pool].row,
+                            # The evidence type of a unit-bearing yield (a parameter record); None for g/g and mol/mol.
+                            "yield_evidence_type": parsed.substrates[pool].yield_evidence_type or None,
                         }
                         for pool in network.pools
                     ],

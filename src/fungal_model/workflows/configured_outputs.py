@@ -19,6 +19,7 @@ import numpy as np
 from pint.errors import DimensionalityError, PintError
 
 from fungal_model.core.units import Q_, Quantity, is_quantity
+from fungal_model.core.validators import conserved_weight
 from fungal_model.io.model_config import (
     ConfigReference,
     EntropyProductionRateTimeseriesConfig,
@@ -160,11 +161,11 @@ def _clear_stale_entropy_artifacts(destination: Path) -> None:
         (destination / filename).unlink(missing_ok=True)
 
 
-def _mass_balance_weights(config: ModelConfig) -> Mapping[str, float] | None:
+def _mass_balance_weights(config: ModelConfig) -> Mapping[str, float | Quantity] | None:
     for validator in config.validators:
         if validator.validator_type == "mass_balance" and "conserved_weights" in validator.settings:
             return {
-                str(name): float(value)
+                str(name): conserved_weight(value)
                 for name, value in validator.settings["conserved_weights"].items()
             }
     return None
@@ -1180,7 +1181,7 @@ def _weighted_conserved_total(
     for state_name, raw_weight in conserved_weights.items():
         if state_name not in result.states:
             raise KeyError(f"Conserved weight provided for unknown state {state_name!r}.")
-        weight = raw_weight if is_quantity(raw_weight) else float(raw_weight)
+        weight = conserved_weight(raw_weight)
         term = result.states[state_name] * weight
         total = term if total is None else cast(Quantity, total + term.to(total.units))
     if total is None:

@@ -876,11 +876,31 @@ def _case_template_initial_state_issues(
             )
         has_units = bool(str(spec.get("units", "")).strip())
         has_units_from_role = bool(str(spec.get("units_from_role", "")).strip())
-        if has_units == has_units_from_role:
+        units_from_roles = spec.get("units_from_roles")
+        has_units_from_roles = units_from_roles is not None
+        if sum((has_units, has_units_from_role, has_units_from_roles)) != 1:
             issues.append(
                 {
                     "field": f"initial_state_mapping.{role_text}",
-                    "message": "Initial-state mapping must define exactly one of units or units_from_role.",
+                    "message": (
+                        "Initial-state mapping must define exactly one of units, units_from_role or units_from_roles."
+                        if has_units_from_roles
+                        else "Initial-state mapping must define exactly one of units or units_from_role."
+                    ),
+                }
+            )
+        if has_units_from_roles and (
+            not isinstance(units_from_roles, (list, tuple))
+            or len(units_from_roles) < 2
+            or any(not isinstance(item, str) or not item.strip() for item in units_from_roles)
+        ):
+            issues.append(
+                {
+                    "field": f"initial_state_mapping.{role_text}.units_from_roles",
+                    "message": (
+                        "units_from_roles must list at least two parameter roles whose record units multiply to "
+                        "the state's units."
+                    ),
                 }
             )
     return issues

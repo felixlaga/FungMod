@@ -1,0 +1,19 @@
+dataset_id: network_solid_parallel
+contributor: FungMod maintainers
+date: 2026-10-08
+source: >-
+  Illustrative estimates for a user-defined strain with two user-defined enzyme classes that
+  act in parallel on a suspended chitin-like solid and release a dissolved dimer-like product;
+  no measurement, literature value or registry record stands behind them
+notes: >-
+  Second non-specific cross-basis enzyme-network case of the user-data route (NETWORK-002):
+  two classes in parallel on one solid pool (kcat form with a protein-mass enzyme, and Vmax
+  form), releasing the network's final product as an amount per volume through a stated
+  unit-bearing yield in umol/g (an estimate). Every value is an estimate, so the case runs in
+  exploratory mode only and scientific mode refuses it.
+simulation:
+  duration: 480
+  units: hour
+  points: 161
+enzyme_network:
+  entry_substrates: [solid_k4]

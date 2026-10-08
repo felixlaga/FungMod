@@ -1,0 +1,3 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+solid_cutter_like,Solid cutter-like class S3,,glycosidic_like_bond,glucan_like_solid,Illustrative user-defined class for the cross-basis enzyme-network fixture (no record of this class exists)
+dimer_hydrolase_like,Dimer hydrolase-like class S3,,glycosidic_like_bond,dimer_like,Illustrative user-defined class for the cross-basis enzyme-network fixture (no record of this class exists)

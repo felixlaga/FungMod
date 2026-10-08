@@ -368,7 +368,7 @@ _CASE_TEMPLATE_FIELDS = _COMMON_RECORD_FIELDS | {
     "validity_notes",
 }
 
-_INITIAL_STATE_MAPPING_FIELDS = {"parameter_role", "value", "units", "units_from_role", "notes"}
+_INITIAL_STATE_MAPPING_FIELDS = {"parameter_role", "value", "units", "units_from_role", "units_from_roles", "notes"}
 _PRODUCT_MAP_FIELDS = {
     "id",
     "product_map_type",

@@ -31,6 +31,19 @@ ending in ``_state_role`` and parameter roles by other keys ending in ``_role``.
 A process template may name the ``enzyme_class`` it stands for; that name is
 output metadata only (``process_enzyme_classes`` of the assembled case-template
 config, written only when a template names one) and no process law reads it.
+
+A product-map coefficient bound to a parameter record (``parameter_role``)
+whose units are not dimensionless carries those units: it converts an amount of
+the reactant into an amount of the product stated on another basis (for
+example ``mmol/g``), and the coefficient times the reactant's units must have
+the product state's dimension. A closure weight may then carry units as a
+``{value, units}`` mapping, so that every weighted state is summed in one
+ledger dimension through the stated conversion; the conservation check of each
+product map runs in pint whenever a weight or coefficient carries units. An
+initial state may take its units from ``units_from_roles``: the product of the
+units of those roles' records, simplified by pint (for example a dry mass per
+volume times an amount per dry mass gives an amount per volume). Nothing is
+converted by a molar mass or any constant the template does not state.
 """
 
 from __future__ import annotations
@@ -40,6 +53,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from typing import Any
 
+from fungal_model.core.units import Q_
 from fungal_model.modifiers.reactivity import SUBSTRATE_REACTIVITY_MODIFIER_TYPE
 from fungal_model.processes import ProcessLibrary
 from fungal_model.registry.records import (
@@ -61,6 +75,7 @@ from fungal_model.screening.case_builder import (
     _template_parameter_record,
     _template_state,
     _template_time_config,
+    _template_units_from_roles,
 )
 from fungal_model.screening.template_environment_modifiers import (
     ENVIRONMENT_MODIFIER_TYPES,
@@ -297,6 +312,8 @@ def _state_units(
                 _template_parameter_record(parameter_records, str(units_from_role)),
                 role=str(units_from_role),
             )
+        elif spec.get("units_from_roles") is not None:
+            units[state_name] = _template_units_from_roles(spec["units_from_roles"], parameter_records=parameter_records)
         else:
             units[state_name] = str(spec["units"])
     return units
@@ -345,6 +362,12 @@ def _product_map_specs(
             raise RegistryCaseBuildError(
                 f"Case template {template.case_template_id!r} product map {map_id!r} needs reactants and products."
             )
+        if reactants["units"]:
+            raise RegistryCaseBuildError(
+                f"Case template {template.case_template_id!r} product map {map_id!r} binds a reactant coefficient to "
+                f"a record with units ({', '.join(sorted(reactants['units']))}); reactant coefficients are pure "
+                "numbers, and a conversion between bases belongs to a product coefficient."
+            )
         specs[map_id] = {
             "id": map_id,
             "name": str(raw.get("name", map_id)),
@@ -354,6 +377,7 @@ def _product_map_specs(
             "parameter_roles": tuple((*reactants["roles"], *products["roles"])),
             "coefficient_provenance": {**reactants["provenance"], **products["provenance"]},
             "coefficient_bindings": dict(products["bindings"]),
+            "coefficient_units": dict(products["units"]),
         }
     return specs
 
@@ -374,6 +398,7 @@ def _coefficients(
     roles: list[str] = []
     provenance: dict[str, str] = {}
     bindings: dict[str, dict[str, Any]] = {}
+    units: dict[str, str] = {}
     for role, raw_coefficient in value.items():
         state_name = _template_state(template, str(role))
         if isinstance(raw_coefficient, Mapping):
@@ -387,6 +412,16 @@ def _coefficients(
             parameter_role = str(raw_coefficient[field])
             record = _template_parameter_record(parameter_records, parameter_role)
             numeric = _record_exact_value(record, role=parameter_role)
+            record_units = _dimensional_record_units(record, role=parameter_role)
+            if record_units is not None:
+                if field == "complement_of_parameter_role":
+                    raise RegistryCaseBuildError(
+                        f"Case template {template.case_template_id!r} product map {map_id!r} {side}.{role} takes the "
+                        f"complement of role {parameter_role!r}, whose record has units {record_units!r}; a complement "
+                        "needs a dimensionless fraction."
+                    )
+                # A dimensional record keeps its units: the coefficient converts between two bases.
+                units[state_name] = record_units
             if field == "complement_of_parameter_role":
                 if not 0.0 <= numeric <= 1.0:
                     raise RegistryCaseBuildError(
@@ -418,7 +453,20 @@ def _coefficients(
                 f"non-negative coefficient; got {numeric!r}."
             )
         coefficients[state_name] = numeric
-    return {"coefficients": coefficients, "roles": roles, "provenance": provenance, "bindings": bindings}
+    return {"coefficients": coefficients, "roles": roles, "provenance": provenance, "bindings": bindings, "units": units}
+
+
+def _dimensional_record_units(record: ParameterRecord, *, role: str) -> str | None:
+    """The record's units when they are not dimensionless; None for a pure-number record (as before)."""
+
+    if record.value.units is None:
+        return None
+    text = str(record.value.units)
+    try:
+        dimensionless = bool(Q_(1.0, text).dimensionless)
+    except Exception as exc:  # pint raises several unrelated exception types for bad strings
+        raise RegistryCaseBuildError(f"Role {role!r} record units {text!r} cannot be parsed: {exc}") from exc
+    return None if dimensionless else text
 
 
 def _process_template_specs(
@@ -520,6 +568,18 @@ def _conservation_spec(
         raise RegistryCaseBuildError(
             f"Case template {template.case_template_id!r} conservation {validator_id!r} requires state_weights."
         )
+    unit_bearing = any(isinstance(weight, Mapping) for weight in raw_weights.values()) or any(
+        spec.get("coefficient_units") for spec in product_maps.values()
+    )
+    if unit_bearing:
+        return _unit_bearing_conservation_spec(
+            template,
+            validator_id=validator_id,
+            closed_system=bool(raw["closed_system"]),
+            raw_weights=raw_weights,
+            state_units=state_units,
+            product_maps=product_maps,
+        )
     state_weights: dict[str, float] = {}
     weight_units: set[str] = set()
     for role, weight in raw_weights.items():
@@ -559,6 +619,108 @@ def _conservation_spec(
     return {"id": validator_id, "closed_system": bool(raw["closed_system"]), "state_weights": state_weights}
 
 
+def _unit_bearing_conservation_spec(
+    template: CaseTemplateRecord,
+    *,
+    validator_id: str,
+    closed_system: bool,
+    raw_weights: Mapping[str, Any],
+    state_units: Mapping[str, str],
+    product_maps: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    """The closure ledger when a weight or a product coefficient carries units, checked in pint.
+
+    Each weighted term (state units times weight) must have the ledger's
+    dimension, the first term's. Each product map consumes its reactants per
+    unit extent in the reactants' common units; each product forms its
+    coefficient (with its units, when it carries any) times that extent, which
+    must have the product state's dimension; and the weighted reactant and
+    product totals must agree. Pure-number weights stay floats and
+    unit-bearing ones become ``{value, units}`` mappings in the config.
+    """
+
+    state_weights: dict[str, Any] = {}
+    quantities: dict[str, Any] = {}
+    ledger: Any = None
+    for role, weight in raw_weights.items():
+        state_name = _template_state(template, str(role))
+        try:
+            if isinstance(weight, Mapping):
+                if set(weight) != {"value", "units"}:
+                    raise ValueError("a unit-bearing weight gives exactly value and units")
+                numeric = float(weight["value"])
+                units = str(weight["units"])
+                quantity = Q_(numeric, units)
+            else:
+                numeric = float(weight)
+                units = ""
+                quantity = Q_(numeric, "dimensionless")
+        except Exception as exc:  # pint and float raise several unrelated exception types
+            raise RegistryCaseBuildError(
+                f"Conservation {validator_id!r} weight for role {role!r} must be a number or a mapping of value and "
+                f"units ({exc})."
+            ) from exc
+        if not math.isfinite(numeric) or numeric <= 0.0:
+            raise RegistryCaseBuildError(
+                f"Conservation {validator_id!r} weight for role {role!r} must be positive and finite."
+            )
+        term = Q_(1.0, state_units[state_name]) * quantity
+        if ledger is None:
+            ledger = term
+        elif not term.is_compatible_with(ledger):
+            raise RegistryCaseBuildError(
+                f"Conservation {validator_id!r} weight for role {role!r} gives a term in {term.units!s}, which is not "
+                f"the ledger's dimension ({ledger.units!s}); a closure ledger sums one dimension."
+            )
+        state_weights[state_name] = {"value": numeric, "units": units} if units else numeric
+        quantities[state_name] = quantity
+    for map_id, spec in product_maps.items():
+        touched = set(spec["reactants"]) | set(spec["products"])
+        missing = sorted(touched.difference(quantities))
+        if missing:
+            raise RegistryCaseBuildError(
+                f"Conservation {validator_id!r} lacks weights for product map {map_id!r} state(s): "
+                f"{', '.join(missing)}."
+            )
+        reactant_units = {state_units[name] for name in spec["reactants"]}
+        if len(reactant_units) != 1:
+            raise RegistryCaseBuildError(
+                f"Product map {map_id!r} consumes reactants in different units {sorted(reactant_units)}; a "
+                "unit-bearing conservation check measures the extent in one reactant unit."
+            )
+        extent = Q_(1.0, next(iter(reactant_units)))
+        # The ledger change per unit extent: reactants consumed, then products formed, in the ledger's units.
+        reactant_total: Any = None
+        for name, coefficient in spec["reactants"].items():
+            term = coefficient * quantities[name] * extent
+            reactant_total = term if reactant_total is None else reactant_total + term.to(reactant_total.units)
+        product_total: Any = Q_(0.0, reactant_total.units)
+        for name, coefficient in spec["products"].items():
+            units = spec.get("coefficient_units", {}).get(name)
+            formed = (Q_(coefficient, units) if units else Q_(coefficient, "dimensionless")) * extent
+            if not formed.is_compatible_with(Q_(1.0, state_units[name])):
+                raise RegistryCaseBuildError(
+                    f"Product map {map_id!r} forms {name!r} as {formed.units!s} per unit extent, which is not the "
+                    f"product state's dimension ({state_units[name]}); the coefficient must convert the reactant's "
+                    "amount into the product's."
+                )
+            term = formed.to(state_units[name]) * quantities[name]
+            if not term.is_compatible_with(reactant_total):
+                raise RegistryCaseBuildError(
+                    f"Conservation {validator_id!r} weighs product {name!r} of map {map_id!r} in {term.units!s}, "
+                    f"not in the ledger's dimension ({reactant_total.units!s})."
+                )
+            product_total = product_total + term.to(reactant_total.units)
+        if not math.isclose(
+            float(reactant_total.magnitude), float(product_total.magnitude), rel_tol=1e-9, abs_tol=1e-12
+        ):
+            raise RegistryCaseBuildError(
+                f"Conservation {validator_id!r} is inconsistent for product map {map_id!r}: "
+                f"reactants={reactant_total}, products={product_total}."
+            )
+    return {"id": validator_id, "closed_system": closed_system, "state_weights": state_weights}
+
+
 def _require_every_role_used(
     template: CaseTemplateRecord,
     *,
@@ -577,6 +739,9 @@ def _require_every_role_used(
             value = initial.get(field)
             if isinstance(value, str) and value:
                 referenced.add(value)
+        roles = initial.get("units_from_roles")
+        if isinstance(roles, Sequence) and not isinstance(roles, (str, bytes)):
+            referenced.update(str(role) for role in roles if str(role))
     unresolved = sorted(referenced.difference(parameter_records))
     if unresolved:
         raise RegistryCaseBuildError(
@@ -885,6 +1050,8 @@ def _entities(
                     "coefficient_bindings": {
                         state: dict(binding) for state, binding in spec["coefficient_bindings"].items()
                     },
+                    # Written only when a coefficient carries units, so pure-number maps assemble as before.
+                    **({"coefficient_units": dict(spec["coefficient_units"])} if spec["coefficient_units"] else {}),
                 },
             }
             for spec in product_maps.values()

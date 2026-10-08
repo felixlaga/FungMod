@@ -258,12 +258,20 @@ class HomogeneousMichaelisMentenFactory:
             if isinstance(product_map_id, str) and product_map_id in context.product_maps
             else None
         )
+        # A unit-bearing coefficient forms its product in that product's own state units (resolved here, once).
+        product_coefficient_units = (
+            dict(context.product_maps[product_map_id].coefficient_units)
+            if isinstance(product_map_id, str) and product_map_id in context.product_maps
+            else {}
+        )
         process = HomogeneousMichaelisMentenProcess(
             name=process_config.id,
             substrate_state=substrate_state,
             product_state=None if states.get("product") is None else str(states["product"]),
             product_coefficients=product_coefficients,
             product_coefficient_bindings=product_coefficient_bindings,
+            product_coefficient_units=product_coefficient_units,
+            product_state_units={state: context.state_units[state] for state in product_coefficient_units},
             substrate_units=context.state_units[substrate_state],
             enzyme_state=enzyme_state,
             enzyme_units=None if enzyme_state is None else context.state_units[enzyme_state],
@@ -317,6 +325,7 @@ class PHIonizationMichaelisMentenFactory:
                     for state in sorted(context.product_maps[product_map_id].species)
                     if state not in context.state_units
                 )
+                incompatible.extend(_unit_bearing_map_incompatibility(context.product_maps[product_map_id]))
         return _decision(self, missing_fields=missing, incompatible_entities=incompatible)
 
     def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
@@ -530,6 +539,7 @@ class SubstrateTransglycosylationFactory:
                 incompatible.append("product_map.reactants")
             if not product_map.products:
                 incompatible.append("product_map.products")
+            incompatible.extend(_unit_bearing_map_incompatibility(product_map))
         return _decision(self, missing_fields=missing, incompatible_entities=incompatible)
 
     def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
@@ -584,11 +594,14 @@ class SurfaceCatalysisFactory:
             if state is not None and state not in context.state_units
         )
         product_map_id = getattr(process_config, "product_map", None)
+        incompatible: list[str] = []
         if isinstance(product_map_id, str) and product_map_id not in context.product_maps:
             missing += (f"product_maps.{product_map_id}",)
         elif product_map_id is None:
             missing += ("product_map",)
-        return _decision(self, missing_fields=missing)
+        elif isinstance(product_map_id, str):
+            incompatible.extend(_unit_bearing_map_incompatibility(context.product_maps[product_map_id]))
+        return _decision(self, missing_fields=missing, incompatible_entities=incompatible)
 
     def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
         _require_buildable(self.can_build(context, process_config))
@@ -828,6 +841,12 @@ def default_foundation_factories() -> tuple[ProcessFactory, ...]:
         DilutionExchangeFactory(),
         GasTransferFactory(),
     )
+
+
+def _unit_bearing_map_incompatibility(product_map: ProductReleaseMap) -> tuple[str, ...]:
+    """A product map whose coefficients carry units, for a process that forms products as pure-number multiples."""
+
+    return ("product_map.coefficient_units",) if product_map.coefficient_units else ()
 
 
 def _decision(
