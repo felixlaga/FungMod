@@ -1,0 +1,37 @@
+{
+  "artifact_layout_version": "1.0",
+  "base_url": "https://sabio.h-its.org/export-api/sabio",
+  "derived_export": {
+    "artifact_role": "derived_combined_export",
+    "path": "derived/combined_export.json",
+    "sha256": "5bba8bd81d8aa8fadfc587bfd1ca8c0dc9b91196272896718d9c9c2d4156987c",
+    "source_page_count": 1
+  },
+  "endpoint": "/kinlaw-entry/json",
+  "fetched_at": "2026-10-08T11:37:26.081315Z",
+  "http_status": 200,
+  "immutable_snapshot_bundle": true,
+  "page": 1,
+  "pageSize": 1000,
+  "query": "ECNumber:\"3.2.1.21\" AND Substrate:\"Cellobiose\"",
+  "query_key": "ecnumber_3.2.1.21_and_substrate_cellobiose-5a9fabef44f3",
+  "raw_pages": [
+    {
+      "artifact_role": "raw_http_response",
+      "http_status": 200,
+      "page": 1,
+      "path": "raw/page_0001.json",
+      "sha256": "846c8df52cbaef44b8d7deac3e4bec30d1cb74998199b1f007db1864db942ba2",
+      "size_bytes": 40581,
+      "source_url": "https://sabio.h-its.org/export-api/sabio/kinlaw-entry/json?q=ECNumber%3A%223.2.1.21%22+AND+Substrate%3A%22Cellobiose%22&page=1&pageSize=1000"
+    }
+  ],
+  "requests_made": 1,
+  "snapshot_id": "20261008T113726078755Z-d68ba850915349b5b7c16eec90867694",
+  "source_urls": [
+    "https://sabio.h-its.org/export-api/sabio/kinlaw-entry/json?q=ECNumber%3A%223.2.1.21%22+AND+Substrate%3A%22Cellobiose%22&page=1&pageSize=1000"
+  ],
+  "total_count": 7,
+  "total_pages": 1,
+  "warnings": []
+}

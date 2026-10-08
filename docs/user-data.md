@@ -561,7 +561,9 @@ tests serve **synthetic test responses written by hand** in the export format
 (`tests/fixtures/sabiork_kinetics_queries/`, not SABIO-RK data). An answer
 that is not the export envelope, or whose entries do not add up to its
 `total_count`, is refused and nothing is stored, so a change on SABIO-RK's
-side stops the lookup rather than misleading it.
+side stops the lookup rather than misleading it. On a machine with internet
+access, `scripts/verify_live_sources.py` checks the live answer to such a query
+against these expectations ([verifying the live lookups](walkthrough.md#verifying-the-live-lookups)).
 
 With those synthetic responses (`tests/test_fetch_kinetics.py`), a strain
 declared to be the synthetic organism K1 with `beta_glucosidase` asserted
@@ -1436,7 +1438,9 @@ the environment the client was written in could not reach rest.uniprot.org;
 the tests serve synthetic responses in that format
 (`tests/fixtures/uniprot_proteome_search/`). A response without these
 columns is refused and nothing is stored, so a change on UniProt's side stops
-the route rather than misleading it.
+the route rather than misleading it. On a machine with internet access,
+`scripts/verify_live_sources.py` checks the live search and export against
+these expectations ([verifying the live lookups](walkthrough.md#verifying-the-live-lookups)).
 
 Limits of the name route:
 

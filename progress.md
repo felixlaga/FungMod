@@ -773,6 +773,156 @@ time-course comparison, so the new panels can be compared with a user's own
 measurements; then the net rate of every pool (bundles record `state_rates.csv`
 for every state, the tables only the mapped substrate and product).
 
+## EXAMPLE-001 A Worked Example On Stored Literature Data
+
+Status: `complete` for the stated scope (2026-10-08). Documentation and tests
+only; no change to `src/` or to any registry record, so no scientific or
+numerical behaviour changed.
+
+The walkthrough (DOCS-WALK-001) shows the route on synthetic fixtures. This
+entry adds the worked example whose numbers come from real records already in
+the registry.
+
+- Survey. `fungmod list` names five registry fungi. Two carry published
+  kinetics or physiology for a fungus, and `fungmod run` runs both from
+  stored records with no network:
+  - `trichoderma_harzianum_p49p11` on `cellulose_celufloc_200` at the three
+    Gelain 2020 loadings, in scientific mode;
+  - `phanerochaete_chrysosporium_k3` on `cellobiose` at the five Tsukada 2008
+    pH environments, in exploratory mode only, because the assay loadings
+    are `exploratory_prior` records.
+
+  The Reaction 618 pilot (`sabiork_beta_glucosidase_source`, entry 35622) is
+  a rice enzyme. `toy_fungus_alpha` and `generic_cellulase_source` are
+  fixtures. Nothing blocked the route, so no code changed.
+- `docs/real-example.md` ("A worked example on stored literature data", in
+  the nav after the walkthrough) shows for each case:
+  - what the source measured, and what is fitted or assumed;
+  - the command and its real output;
+  - how to read it: substrate loss, product release (none for the culture,
+    with the closure ledger explained), rates (for BGL1A the maximum
+    depletion rate is the time-zero rate at the assumed loadings), threshold
+    times, why there is no uncertainty band, and the environment-effect
+    status;
+  - a provenance table: value, units and maturity, plus the posterior class,
+    the 95 % credible interval and whether the value lies inside it for the
+    nine fitted constants, or the SABIO-RK parameter and the deposited SD for
+    BGL1A;
+  - the important limitation rows, the suggested experiments with the
+    page's own follow-ups (labelled as such), and what the page does not
+    show.
+
+  The culture case also has a stdlib snippet that sets the run's cellulose,
+  biomass and filter-paper activity beside the deposited duplicate means
+  (`data/benchmarks/gelain_2020_v2/observations.json`). It is labelled
+  in-sample, names three visible misfits, and cites the joint comparison's
+  holdout errors (the hydrolysis candidate failed its screen) as the only
+  out-of-sample test. Values that round to zero print as `0.00` (format
+  `z`), and the CLI's near-zero final cellulose is shown as `...`, because
+  its sign is solver noise and differs between platforms.
+- `tests/test_real_example_doc.py` (24 tests, about 30 s) checks:
+  - each marked command, rerun in a temporary directory, and the snippet
+    (with the observations path made absolute): every shown output line;
+  - each table against the run's `provenance_table.csv`,
+    `limitations_table.csv`, `suggested_experiments.csv`,
+    `summary_metrics.csv` and `threshold_times.csv`;
+  - each table against the registry records (value at four significant
+    digits, units, maturity, posterior fields, fit artifact path and
+    SHA-256) and the archived SABIO-RK export (value, deposited SD, raw
+    SHA-256);
+  - that the survey lists every registry fungus, and that each row's "Runs
+    in" claim matches the preflight exit codes in both modes;
+  - that only the loading differs between the three cultures, the maturity
+    labels by record type, the holdout errors quoted from the joint
+    comparison page, the time grids, and the nav position and links.
+
+  `tests/test_walkthrough_doc.py` now exposes `marked_blocks(doc, prefix)`,
+  `assert_lines_shown(...)` and `offline()` for reuse; its own checks are
+  unchanged.
+- Links: `README.md`, `docs/index.md` and `docs/walkthrough.md` (one each);
+  one sentence in `paper/joss/paper.md`; `CHANGELOG.md`.
+
+Not shown, and said so on the page: any validation against independent data
+(none is bundled), any prediction outside the stored scope, the published
+Gelain equations, a fungus degrading anything in the BGL1A case, and
+uncertainty bands (both cases are exact).
+
+## DOCS-WALK-001 Walkthrough From A Fungus Name To A Simulation, And A Live-Source Check
+
+Status: `complete` for the stated scope (2026-10-08). Documentation, fixtures,
+tests and one repository script; no change to `src/`, so no scientific or
+numerical behaviour changed. The live UniProt and SABIO-RK formats remain
+unverified: the script that checks them needs internet access, which the
+environment of this task did not have.
+
+- `docs/walkthrough.md` ("From a fungus name to a simulation", in the nav
+  after "Command line"): the owner's route "fungus X on substrate Y in
+  conditions Z" from a shell, in seven steps: `fungmod assemble
+  --fetch-proteome --fetch-kinetics --network` (each option and the `--fetch`
+  opt-in explained), the draft report read from the top (proteome choice,
+  repertoire, acting classes, network, kinetics lookup, per-case kinetics
+  status with a table of the five statuses, `REVIEW:` fields, next commands),
+  resolving a `conflict` with `--entry-id` (a scientific decision; the page
+  says its choice is arbitrary because the entries are synthetic), filling
+  the `REVIEW:` fields (the drafted row and the reviewed row shown),
+  `check-data` (refused, then loaded with its gaps and measurement requests),
+  `run --runnable-only` (exit code 4; without the flag exit code 3; scientific
+  mode refused for transferred estimates), reading the outputs (time series,
+  metrics and rates, threshold times, what the percentiles mean, a provenance
+  extract, limitations, measurement requests, the manifest) and replacing the
+  estimates with your own measurements (a row template with placeholders).
+  A warning box says the organism, proteome, entries and organisms are
+  synthetic test fixtures, not biology, and that a real run needs network
+  access.
+- Every output on the page is real: the worked example runs offline against
+  `tests/fixtures/walkthrough/` (README), FungMod's own snapshots of the
+  existing synthetic fixtures (`search_fixture_mould_b2.tsv`,
+  `proteome_UP999990002_uniprotkb.tsv`, `ecnumber_3_2_1_21_cellobiose.json`),
+  made once by running the assemble command with `--fetch` while the tests'
+  fakes served those fixtures (a throwaway script outside the repository);
+  `.gitattributes` marks the directory `-text` (FungMod checks its SHA-256).
+- `tests/test_walkthrough_doc.py` (13 tests) reads the page's marked blocks
+  (`<!-- walkthrough-<kind>: <key> -->`), reruns every marked command as shown
+  in a temporary directory (only the snapshot directories become absolute
+  paths), applies the page's edits, and checks that every line of every
+  marked output occurs in the real output in order (`...` is any text), the
+  provenance table against `provenance_table.csv`, the drafted row against
+  the draft, the claims about scientific mode and about your own values
+  (filled with test values that are not measurements: no gap, both
+  conditions run, scientific mode runs), the snapshots against the source
+  fixtures byte for byte, and the script's sample report.
+- `scripts/verify_live_sources.py`: one request to each of UniProt's proteome
+  search, UniProtKB's export and SABIO-RK's kinetic-law export, through
+  `search_proteomes_by_name`, `choose_proteome`, `fetch_proteome_snapshot`
+  and `fetch_kinlaw_query_snapshot` (refresh), then `parse_reaction_records`
+  and `user_tables_from_sabiork` on the answer; `urllib.request.urlopen` is
+  wrapped while FungMod's UniProt functions run, and the SABIO-RK request uses
+  the documented `transport`, so the report shows the response FungMod
+  parsed. Per endpoint: URL, HTTP status, `X-UniProt-Release`,
+  `X-UniProt-Release-Date`, `X-Total-Results`, `Link`, SABIO-RK's
+  `meta.total_count`/`meta.total_pages`, columns or fields found against
+  those expected, entries, parser outcome, EC numbers, organisms, parameters
+  and substrate names of the entries, and the conversion. Mismatch (exit
+  code 1): a non-200 answer other than a server error, a missing column or
+  envelope field, a parser refusal, a missing or inconsistent
+  `X-Total-Results`, entries of another EC number, no entry naming the
+  substrate; not checked (exit code 3): no network, a server error, a name
+  without exactly one proteome (`--proteome` chooses), a query without
+  entries. Defaults *Trichoderma reesei* and EC 3.2.1.21 on "Cellobiose",
+  printed as probes only. Writes snapshots and `verification_report.json`
+  only to a new temporary directory or an empty `--output-dir` outside the
+  repository (refused inside it). `tests/test_verify_live_sources.py` (24
+  tests) runs it offline with patched `urlopen` on the synthetic fixtures:
+  the passing path, each mismatch, the not-checked paths, usage errors, and
+  that nothing is written inside the repository.
+- Links: `README.md`, `docs/index.md`, `docs/quickstart.md` (one each);
+  `docs/user-data.md` "From a fungus name" and "Fetching kinetics" each point
+  to the script in one sentence.
+
+Not verified: the live services (the script is for the owner to run); the
+walkthrough's numbers come from synthetic fixtures and a design enzyme
+concentration and say nothing about any fungus.
+
 ## FETCH-002 Kinetics Of The Fungus's Enzyme Classes Looked Up By EC Number
 
 Status: `complete` for the stated scope (2026-10-08); not verified against a

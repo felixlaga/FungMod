@@ -38,7 +38,11 @@ same; see the [command line](cli.md).
 With your own measurements, describe them in a folder of small CSV tables
 (strains, their enzyme classes, substrates, conditions and kinetics) and pass
 `user_data="that/folder"` to `virtual_experiment`; see
-[user-supplied data](user-data.md).
+[user-supplied data](user-data.md). To go from a fungus name to its enzymes,
+their kinetics and a simulation from a shell, follow
+[from a fungus name to a simulation](walkthrough.md). For the same kinds of
+output on the registry's literature-backed cases, with every number traced to
+its source, see [a worked example on stored literature data](real-example.md).
 
 ## What you get
 

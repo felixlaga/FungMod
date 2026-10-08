@@ -12,3 +12,5 @@ tests/fixtures/user_data/** -text
 tests/fixtures/uniprot_proteome_search/** -text
 # FETCH-002 synthetic SABIO-RK responses: tests compare stored raw pages with these exact bytes.
 tests/fixtures/sabiork_kinetics_queries/** -text
+# DOCS-WALK-001 frozen snapshots of those synthetic responses: FungMod verifies their SHA-256 on every read.
+tests/fixtures/walkthrough/** -text

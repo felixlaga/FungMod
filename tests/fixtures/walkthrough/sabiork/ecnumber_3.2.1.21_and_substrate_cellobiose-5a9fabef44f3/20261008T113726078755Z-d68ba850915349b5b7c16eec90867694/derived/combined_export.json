@@ -1,0 +1,1472 @@
+{
+  "data": [
+    {
+      "enzyme_description": {
+        "ec_number": "3.2.1.21",
+        "enzyme_name": "beta-glucosidase",
+        "expressed_in": null,
+        "go_term": null,
+        "is_recombinant": false,
+        "mutant_spec": null,
+        "proteins": [],
+        "wildtype": "Wildtype"
+      },
+      "experimental_conditions": {
+        "buffer": "Synthetic test buffer",
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "envvar_ph": {
+          "end_value": null,
+          "start_value": 5
+        },
+        "envvar_temperature": {
+          "end_value": null,
+          "start_value": 30,
+          "unit": "\u00b0C"
+        },
+        "envvars_other": []
+      },
+      "external_links": {
+        "compound": []
+      },
+      "general": {
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "date_inserted": null,
+        "date_updated": null,
+        "experiment_type": "InVitro",
+        "mechanism": null,
+        "organism": {
+          "id": null,
+          "name": "Synthetic kinetics organism K1",
+          "ncbi_taxonomy_id": null,
+          "ncbi_taxonomy_lineage": []
+        },
+        "publication_id": null,
+        "strain": {
+          "id": null,
+          "name": null
+        },
+        "tissue": {
+          "id": null,
+          "name": null
+        }
+      },
+      "id": 9900001,
+      "kineticlaw": {
+        "formula": "E*kcat*S/(Km+S)",
+        "formula_subst": null,
+        "kinlaw_type": {
+          "id": 23,
+          "name": "Michaelis-Menten",
+          "sbo_term": "SBO:0000029"
+        },
+        "parameter": [
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "kcat",
+            "parameter_type": {
+              "id": 7,
+              "name": "kcat",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": null,
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": 1,
+            "start_value": 12,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "s^(-1)"
+            }
+          },
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "Km",
+            "parameter_type": {
+              "id": 8,
+              "name": "Km",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": "1 | Cellobiose | Substrate",
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": 0.2,
+            "start_value": 2.5,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "mM"
+            }
+          },
+          {
+            "comment": "-",
+            "end_value": 20,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "S",
+            "parameter_type": {
+              "id": 9,
+              "name": "concentration",
+              "sbo_term": null
+            },
+            "role": "Variable",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": "1 | Cellobiose | Substrate",
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 0.5,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "mM"
+            }
+          }
+        ],
+        "reversible": "Irreversible",
+        "variables": []
+      },
+      "publication": {
+        "author": "FungMod test fixture",
+        "data_identifier": null,
+        "journal": null,
+        "pages": null,
+        "publication_id": null,
+        "pubmed_id": null,
+        "title": "Synthetic test response for the FungMod kinetics lookup tests; not a publication",
+        "volume": null,
+        "year": null
+      },
+      "reaction": {
+        "equation": "H2O + Cellobiose = 2 beta-D-Glucose",
+        "equation_normalized": null,
+        "id": 9900100,
+        "is_transport": false,
+        "pathways": [],
+        "species": [
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Enzyme"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Catalyst",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "H2O"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Cellobiose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "beta-D-Glucose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Product",
+            "stoch_value": "2"
+          }
+        ]
+      },
+      "schema": "draft.v1.schema.json"
+    },
+    {
+      "enzyme_description": {
+        "ec_number": "3.2.1.21",
+        "enzyme_name": "beta-glucosidase",
+        "expressed_in": null,
+        "go_term": null,
+        "is_recombinant": false,
+        "mutant_spec": null,
+        "proteins": [],
+        "wildtype": "Wildtype"
+      },
+      "experimental_conditions": {
+        "buffer": "Synthetic test buffer",
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "envvar_ph": {
+          "end_value": null,
+          "start_value": 5
+        },
+        "envvar_temperature": {
+          "end_value": null,
+          "start_value": 30,
+          "unit": "\u00b0C"
+        },
+        "envvars_other": []
+      },
+      "external_links": {
+        "compound": []
+      },
+      "general": {
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "date_inserted": null,
+        "date_updated": null,
+        "experiment_type": "InVitro",
+        "mechanism": null,
+        "organism": {
+          "id": null,
+          "name": "Synthetic kinetics organism K2",
+          "ncbi_taxonomy_id": null,
+          "ncbi_taxonomy_lineage": []
+        },
+        "publication_id": null,
+        "strain": {
+          "id": null,
+          "name": null
+        },
+        "tissue": {
+          "id": null,
+          "name": null
+        }
+      },
+      "id": 9900002,
+      "kineticlaw": {
+        "formula": "E*kcat*S/(Km+S)",
+        "formula_subst": null,
+        "kinlaw_type": {
+          "id": 23,
+          "name": "Michaelis-Menten",
+          "sbo_term": "SBO:0000029"
+        },
+        "parameter": [
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "kcat",
+            "parameter_type": {
+              "id": 7,
+              "name": "kcat",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": null,
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": 2,
+            "start_value": 30,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "s^(-1)"
+            }
+          },
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "Km",
+            "parameter_type": {
+              "id": 8,
+              "name": "Km",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": "1 | Cellobiose | Substrate",
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": 0.1,
+            "start_value": 1.1,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "mM"
+            }
+          }
+        ],
+        "reversible": "Irreversible",
+        "variables": []
+      },
+      "publication": {
+        "author": "FungMod test fixture",
+        "data_identifier": null,
+        "journal": null,
+        "pages": null,
+        "publication_id": null,
+        "pubmed_id": null,
+        "title": "Synthetic test response for the FungMod kinetics lookup tests; not a publication",
+        "volume": null,
+        "year": null
+      },
+      "reaction": {
+        "equation": "H2O + Cellobiose = 2 beta-D-Glucose",
+        "equation_normalized": null,
+        "id": 9900100,
+        "is_transport": false,
+        "pathways": [],
+        "species": [
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Enzyme"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Catalyst",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "H2O"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Cellobiose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "beta-D-Glucose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Product",
+            "stoch_value": "2"
+          }
+        ]
+      },
+      "schema": "draft.v1.schema.json"
+    },
+    {
+      "enzyme_description": {
+        "ec_number": "3.2.1.21",
+        "enzyme_name": "beta-glucosidase",
+        "expressed_in": null,
+        "go_term": null,
+        "is_recombinant": false,
+        "mutant_spec": null,
+        "proteins": [],
+        "wildtype": "Wildtype"
+      },
+      "experimental_conditions": {
+        "buffer": "Synthetic test buffer",
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "envvar_ph": {
+          "end_value": null,
+          "start_value": 6
+        },
+        "envvar_temperature": {
+          "end_value": null,
+          "start_value": 45,
+          "unit": "\u00b0C"
+        },
+        "envvars_other": []
+      },
+      "external_links": {
+        "compound": []
+      },
+      "general": {
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "date_inserted": null,
+        "date_updated": null,
+        "experiment_type": "InVitro",
+        "mechanism": null,
+        "organism": {
+          "id": null,
+          "name": "Synthetic kinetics organism K3",
+          "ncbi_taxonomy_id": null,
+          "ncbi_taxonomy_lineage": []
+        },
+        "publication_id": null,
+        "strain": {
+          "id": null,
+          "name": null
+        },
+        "tissue": {
+          "id": null,
+          "name": null
+        }
+      },
+      "id": 9900003,
+      "kineticlaw": {
+        "formula": "E*kcat*S/(Km+S)",
+        "formula_subst": null,
+        "kinlaw_type": {
+          "id": 23,
+          "name": "Michaelis-Menten",
+          "sbo_term": "SBO:0000029"
+        },
+        "parameter": [
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "kcat",
+            "parameter_type": {
+              "id": 7,
+              "name": "kcat",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": null,
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 50,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "s^(-1)"
+            }
+          },
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "Km",
+            "parameter_type": {
+              "id": 8,
+              "name": "Km",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": "1 | Cellobiose | Substrate",
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 0.9,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "mM"
+            }
+          }
+        ],
+        "reversible": "Irreversible",
+        "variables": []
+      },
+      "publication": {
+        "author": "FungMod test fixture",
+        "data_identifier": null,
+        "journal": null,
+        "pages": null,
+        "publication_id": null,
+        "pubmed_id": null,
+        "title": "Synthetic test response for the FungMod kinetics lookup tests; not a publication",
+        "volume": null,
+        "year": null
+      },
+      "reaction": {
+        "equation": "H2O + Cellobiose = 2 beta-D-Glucose",
+        "equation_normalized": null,
+        "id": 9900100,
+        "is_transport": false,
+        "pathways": [],
+        "species": [
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Enzyme"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Catalyst",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "H2O"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Cellobiose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "beta-D-Glucose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Product",
+            "stoch_value": "2"
+          }
+        ]
+      },
+      "schema": "draft.v1.schema.json"
+    },
+    {
+      "enzyme_description": {
+        "ec_number": "3.2.1.21",
+        "enzyme_name": "beta-glucosidase",
+        "expressed_in": null,
+        "go_term": null,
+        "is_recombinant": false,
+        "mutant_spec": "synthetic variant V1",
+        "proteins": [],
+        "wildtype": "Mutant"
+      },
+      "experimental_conditions": {
+        "buffer": "Synthetic test buffer",
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "envvar_ph": {
+          "end_value": null,
+          "start_value": 5
+        },
+        "envvar_temperature": {
+          "end_value": null,
+          "start_value": 30,
+          "unit": "\u00b0C"
+        },
+        "envvars_other": []
+      },
+      "external_links": {
+        "compound": []
+      },
+      "general": {
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "date_inserted": null,
+        "date_updated": null,
+        "experiment_type": "InVitro",
+        "mechanism": null,
+        "organism": {
+          "id": null,
+          "name": "Synthetic kinetics organism K2",
+          "ncbi_taxonomy_id": null,
+          "ncbi_taxonomy_lineage": []
+        },
+        "publication_id": null,
+        "strain": {
+          "id": null,
+          "name": null
+        },
+        "tissue": {
+          "id": null,
+          "name": null
+        }
+      },
+      "id": 9900004,
+      "kineticlaw": {
+        "formula": "E*kcat*S/(Km+S)",
+        "formula_subst": null,
+        "kinlaw_type": {
+          "id": 23,
+          "name": "Michaelis-Menten",
+          "sbo_term": "SBO:0000029"
+        },
+        "parameter": [
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "kcat",
+            "parameter_type": {
+              "id": 7,
+              "name": "kcat",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": null,
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 3,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "s^(-1)"
+            }
+          },
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "Km",
+            "parameter_type": {
+              "id": 8,
+              "name": "Km",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": "1 | Cellobiose | Substrate",
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 4.0,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "mM"
+            }
+          }
+        ],
+        "reversible": "Irreversible",
+        "variables": []
+      },
+      "publication": {
+        "author": "FungMod test fixture",
+        "data_identifier": null,
+        "journal": null,
+        "pages": null,
+        "publication_id": null,
+        "pubmed_id": null,
+        "title": "Synthetic test response for the FungMod kinetics lookup tests; not a publication",
+        "volume": null,
+        "year": null
+      },
+      "reaction": {
+        "equation": "H2O + Cellobiose = 2 beta-D-Glucose",
+        "equation_normalized": null,
+        "id": 9900100,
+        "is_transport": false,
+        "pathways": [],
+        "species": [
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Enzyme"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Catalyst",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "H2O"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Cellobiose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "beta-D-Glucose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Product",
+            "stoch_value": "2"
+          }
+        ]
+      },
+      "schema": "draft.v1.schema.json"
+    },
+    {
+      "enzyme_description": {
+        "ec_number": "3.2.1.21",
+        "enzyme_name": "beta-glucosidase",
+        "expressed_in": null,
+        "go_term": null,
+        "is_recombinant": false,
+        "mutant_spec": null,
+        "proteins": [],
+        "wildtype": "Wildtype"
+      },
+      "experimental_conditions": {
+        "buffer": "Synthetic test buffer",
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "envvar_ph": {
+          "end_value": null,
+          "start_value": 5
+        },
+        "envvar_temperature": {
+          "end_value": null,
+          "start_value": 30,
+          "unit": "\u00b0C"
+        },
+        "envvars_other": []
+      },
+      "external_links": {
+        "compound": []
+      },
+      "general": {
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "date_inserted": null,
+        "date_updated": null,
+        "experiment_type": "InVitro",
+        "mechanism": null,
+        "organism": {
+          "id": null,
+          "name": "Synthetic kinetics organism K3",
+          "ncbi_taxonomy_id": null,
+          "ncbi_taxonomy_lineage": []
+        },
+        "publication_id": null,
+        "strain": {
+          "id": null,
+          "name": null
+        },
+        "tissue": {
+          "id": null,
+          "name": null
+        }
+      },
+      "id": 9900005,
+      "kineticlaw": {
+        "formula": "E*kcat*S/(Km+S)",
+        "formula_subst": null,
+        "kinlaw_type": {
+          "id": 23,
+          "name": "Michaelis-Menten",
+          "sbo_term": "SBO:0000029"
+        },
+        "parameter": [
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "kcat",
+            "parameter_type": {
+              "id": 7,
+              "name": "kcat",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": null,
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 7,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "arbitrary units"
+            }
+          },
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "Km",
+            "parameter_type": {
+              "id": 8,
+              "name": "Km",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": "1 | Cellobiose | Substrate",
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 1.0,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "arbitrary units"
+            }
+          }
+        ],
+        "reversible": "Irreversible",
+        "variables": []
+      },
+      "publication": {
+        "author": "FungMod test fixture",
+        "data_identifier": null,
+        "journal": null,
+        "pages": null,
+        "publication_id": null,
+        "pubmed_id": null,
+        "title": "Synthetic test response for the FungMod kinetics lookup tests; not a publication",
+        "volume": null,
+        "year": null
+      },
+      "reaction": {
+        "equation": "H2O + Cellobiose = 2 beta-D-Glucose",
+        "equation_normalized": null,
+        "id": 9900100,
+        "is_transport": false,
+        "pathways": [],
+        "species": [
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Enzyme"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Catalyst",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "H2O"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Cellobiose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "beta-D-Glucose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Product",
+            "stoch_value": "2"
+          }
+        ]
+      },
+      "schema": "draft.v1.schema.json"
+    },
+    {
+      "enzyme_description": {
+        "ec_number": "3.2.1.21",
+        "enzyme_name": "beta-glucosidase",
+        "expressed_in": null,
+        "go_term": null,
+        "is_recombinant": false,
+        "mutant_spec": null,
+        "proteins": [],
+        "wildtype": "Wildtype"
+      },
+      "experimental_conditions": {
+        "buffer": "Synthetic test buffer",
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "envvar_ph": {
+          "end_value": null,
+          "start_value": 5
+        },
+        "envvar_temperature": {
+          "end_value": null,
+          "start_value": 30,
+          "unit": "\u00b0C"
+        },
+        "envvars_other": []
+      },
+      "external_links": {
+        "compound": []
+      },
+      "general": {
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "date_inserted": null,
+        "date_updated": null,
+        "experiment_type": "InVitro",
+        "mechanism": null,
+        "organism": {
+          "id": null,
+          "name": "Synthetic kinetics organism K3",
+          "ncbi_taxonomy_id": null,
+          "ncbi_taxonomy_lineage": []
+        },
+        "publication_id": null,
+        "strain": {
+          "id": null,
+          "name": null
+        },
+        "tissue": {
+          "id": null,
+          "name": null
+        }
+      },
+      "id": 9900006,
+      "kineticlaw": {
+        "formula": "E*kcat*S/(Km+S)",
+        "formula_subst": null,
+        "kinlaw_type": {
+          "id": 23,
+          "name": "Michaelis-Menten",
+          "sbo_term": "SBO:0000029"
+        },
+        "parameter": [
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "kcat",
+            "parameter_type": {
+              "id": 7,
+              "name": "kcat",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": null,
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 9,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "s^(-1)"
+            }
+          },
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "Km",
+            "parameter_type": {
+              "id": 8,
+              "name": "Km",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": "1 | Synthetic acceptor A9 | Substrate",
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 6.0,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "mM"
+            }
+          }
+        ],
+        "reversible": "Irreversible",
+        "variables": []
+      },
+      "publication": {
+        "author": "FungMod test fixture",
+        "data_identifier": null,
+        "journal": null,
+        "pages": null,
+        "publication_id": null,
+        "pubmed_id": null,
+        "title": "Synthetic test response for the FungMod kinetics lookup tests; not a publication",
+        "volume": null,
+        "year": null
+      },
+      "reaction": {
+        "equation": "Cellobiose + Synthetic acceptor A9 = beta-D-Glucose + Synthetic product P9",
+        "equation_normalized": null,
+        "id": 9900100,
+        "is_transport": false,
+        "pathways": [],
+        "species": [
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Enzyme"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Catalyst",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Cellobiose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Synthetic acceptor A9"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "beta-D-Glucose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Product",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Synthetic product P9"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Product",
+            "stoch_value": "1"
+          }
+        ]
+      },
+      "schema": "draft.v1.schema.json"
+    },
+    {
+      "enzyme_description": {
+        "ec_number": "3.2.1.21",
+        "enzyme_name": "beta-glucosidase",
+        "expressed_in": null,
+        "go_term": null,
+        "is_recombinant": false,
+        "mutant_spec": null,
+        "proteins": [],
+        "wildtype": "Wildtype"
+      },
+      "experimental_conditions": {
+        "buffer": "Synthetic test buffer",
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "envvar_ph": {
+          "end_value": null,
+          "start_value": 5
+        },
+        "envvar_temperature": {
+          "end_value": null,
+          "start_value": 30,
+          "unit": "\u00b0C"
+        },
+        "envvars_other": []
+      },
+      "external_links": {
+        "compound": []
+      },
+      "general": {
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "date_inserted": null,
+        "date_updated": null,
+        "experiment_type": "InVitro",
+        "mechanism": null,
+        "organism": {
+          "id": null,
+          "name": "Synthetic kinetics organism K2",
+          "ncbi_taxonomy_id": null,
+          "ncbi_taxonomy_lineage": []
+        },
+        "publication_id": null,
+        "strain": {
+          "id": null,
+          "name": null
+        },
+        "tissue": {
+          "id": null,
+          "name": null
+        }
+      },
+      "id": 9900007,
+      "kineticlaw": {
+        "formula": "E*kcat*S/(Km+S)",
+        "formula_subst": null,
+        "kinlaw_type": {
+          "id": 23,
+          "name": "Michaelis-Menten",
+          "sbo_term": "SBO:0000029"
+        },
+        "parameter": [
+          {
+            "comment": "-",
+            "end_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "kcat_Km",
+            "parameter_type": {
+              "id": 15,
+              "name": "kcat/Km",
+              "sbo_term": null
+            },
+            "role": "Constant",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": "1 | Cellobiose | Substrate",
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 11,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "mM^(-1)*s^(-1)"
+            }
+          },
+          {
+            "comment": "-",
+            "end_value": 5,
+            "n_end_value": null,
+            "n_standard_deviation": null,
+            "n_start_value": null,
+            "name": "S",
+            "parameter_type": {
+              "id": 9,
+              "name": "concentration",
+              "sbo_term": null
+            },
+            "role": "Variable",
+            "species": {
+              "ref_status_actual": null,
+              "species_key": "1 | Cellobiose | Substrate",
+              "species_ref_type": "Species"
+            },
+            "standard_deviation": null,
+            "start_value": 0.2,
+            "unit": {
+              "id": null,
+              "n_name": null,
+              "name": "mM"
+            }
+          }
+        ],
+        "reversible": "Irreversible",
+        "variables": []
+      },
+      "publication": {
+        "author": "FungMod test fixture",
+        "data_identifier": null,
+        "journal": null,
+        "pages": null,
+        "publication_id": null,
+        "pubmed_id": null,
+        "title": "Synthetic test response for the FungMod kinetics lookup tests; not a publication",
+        "volume": null,
+        "year": null
+      },
+      "reaction": {
+        "equation": "H2O + Cellobiose = 2 beta-D-Glucose",
+        "equation_normalized": null,
+        "id": 9900100,
+        "is_transport": false,
+        "pathways": [],
+        "species": [
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Enzyme"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Catalyst",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "H2O"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "Cellobiose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Substrate",
+            "stoch_value": "1"
+          },
+          {
+            "comment": "-",
+            "compound": {
+              "id": null,
+              "name": "beta-D-Glucose"
+            },
+            "location": {
+              "go_term": null,
+              "id": null,
+              "name": null
+            },
+            "protein_complex_ids": null,
+            "protein_complex_names": null,
+            "role": "Product",
+            "stoch_value": "2"
+          }
+        ]
+      },
+      "schema": "draft.v1.schema.json"
+    }
+  ],
+  "meta": {
+    "combined_from_pages": false,
+    "page": 1,
+    "page_size": 1000,
+    "pages_fetched": [
+      "https://sabio.h-its.org/export-api/sabio/kinlaw-entry/json?q=ECNumber%3A%223.2.1.21%22+AND+Substrate%3A%22Cellobiose%22&page=1&pageSize=1000"
+    ],
+    "raw_pages_preserved": true,
+    "source_page_count": 1,
+    "total_count": 7,
+    "total_pages": 1
+  }
+}
