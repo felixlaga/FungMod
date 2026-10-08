@@ -26,6 +26,13 @@ import numpy as np
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.errors import InvalidMechanismError
 from fungal_model.mycelium.fields import FieldKernelContext, FieldSpec, RateFieldKernel, TendencyKernel
+from fungal_model.mycelium.jacobian import (
+    FieldJacobianKernel,
+    StencilBlock,
+    diffusion_stencil,
+    transport_blocks,
+    upwind_drift_stencil,
+)
 from fungal_model.mycelium.operators import (
     diffusive_tendency,
     divergence,
@@ -122,6 +129,12 @@ class FieldDiffusion(FieldProcess):
 
         return tendency
 
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel:
+        row, _ = context.field_slot(self.field, self.field_units)
+        diffusivity = _non_negative(context.parameter(self.diffusivity_symbol, f"meter ** 2 / ({context.time_units})"), name=self.diffusivity_symbol)
+        values = diffusion_stencil(context.grid, diffusivity).values()
+        return FieldJacobianKernel(blocks=transport_blocks(row, row, context.grid.ndim), values=lambda time, fields: values)
+
 
 # ---------------------------------------------------------------------------
 # Tips and hyphae
@@ -193,7 +206,9 @@ class TipExtension(FieldProcess):
             rate_units=_per_time(self.hypha_units, "hour"),
         )
 
-    def _creation_kernel(self, context: FieldKernelContext) -> RateFieldKernel:
+    def _creation_constants(self, context: FieldKernelContext) -> tuple[int, float, int | None, float]:
+        """Tip row, ``speed`` times the length conversion, and the substrate row and half-saturation (or ``None``, 0)."""
+
         tip_row, _ = context.field_slot(self.tip_field, self.tip_units)
         hypha_row, _ = context.field_slot(self.hypha_field, self.hypha_units)
         del hypha_row
@@ -201,9 +216,15 @@ class TipExtension(FieldProcess):
         to_hyphae = context.factor(f"meter * ({context.stored_units(self.tip_field)})", context.stored_units(self.hypha_field), name=self.name)
         gain = speed * to_hyphae
         if self.substrate_field is None or self.substrate_units is None or self.half_saturation_symbol is None:
-            return lambda time, fields: gain * fields[tip_row]
+            return tip_row, gain, None, 0.0
         substrate_row, _ = context.field_slot(self.substrate_field, self.substrate_units)
         half = _positive(context.parameter(self.half_saturation_symbol, context.stored_units(self.substrate_field)), name=self.half_saturation_symbol)
+        return tip_row, gain, substrate_row, half
+
+    def _creation_kernel(self, context: FieldKernelContext) -> RateFieldKernel:
+        tip_row, gain, substrate_row, half = self._creation_constants(context)
+        if substrate_row is None:
+            return lambda time, fields: gain * fields[tip_row]
 
         def creation(time: float, fields: np.ndarray) -> np.ndarray:
             del time
@@ -241,6 +262,35 @@ class TipExtension(FieldProcess):
             return out
 
         return tendency_with_cost
+
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel:
+        """``d(v n s/(K+s))/dn = v s/(K+s)`` and ``d/ds = v n K/(K+s)^2`` into hyphae, times ``-cost`` into the cost field."""
+
+        tip_row, gain, substrate_row, half = self._creation_constants(context)
+        hypha_row, _ = context.field_slot(self.hypha_field, self.hypha_units)
+        if substrate_row is None:
+            return FieldJacobianKernel(blocks=(StencilBlock(hypha_row, tip_row),), values=lambda time, fields: (gain,))
+        blocks = [StencilBlock(hypha_row, tip_row), StencilBlock(hypha_row, substrate_row)]
+        cost = 0.0
+        if self.cost_field is not None and self.cost_units is not None and self.cost_symbol is not None:
+            cost_row, _ = context.field_slot(self.cost_field, self.cost_units)
+            cost = _non_negative(
+                context.parameter(self.cost_symbol, f"({context.stored_units(self.cost_field)}) / ({context.stored_units(self.hypha_field)})"),
+                name=self.cost_symbol,
+            )
+            blocks += [StencilBlock(cost_row, tip_row), StencilBlock(cost_row, substrate_row)]
+        charged = len(blocks) == 4
+
+        def values(time: float, fields: np.ndarray) -> list[np.ndarray]:
+            del time
+            substrate = fields[substrate_row]
+            by_tips = gain * substrate / (half + substrate)
+            by_substrate = gain * fields[tip_row] * half / (half + substrate) ** 2
+            if not charged:
+                return [by_tips, by_substrate]
+            return [by_tips, by_substrate, -cost * by_tips, -cost * by_substrate]
+
+        return FieldJacobianKernel(blocks=tuple(blocks), values=values)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -325,6 +375,30 @@ class TipMotion(FieldProcess):
 
         return tendency
 
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel:
+        """Diffusion coefficients (constant) plus the upwind drift's derivatives in the tips and the drift field."""
+
+        grid = context.grid
+        tip_row, _ = context.field_slot(self.tip_field, self.tip_units)
+        diffusivity = 0.0 if self.diffusivity_symbol is None else _non_negative(context.parameter(self.diffusivity_symbol, f"meter ** 2 / ({context.time_units})"), name=self.diffusivity_symbol)
+        diffusion = diffusion_stencil(grid, diffusivity)
+        diffusion_values = diffusion.values()
+        blocks = transport_blocks(tip_row, tip_row, grid.ndim)
+        if self.drift_field is None or self.drift_units is None or self.mobility_symbol is None:
+            return FieldJacobianKernel(blocks=blocks, values=lambda time, fields: diffusion_values)
+        drift_row, _ = context.field_slot(self.drift_field, self.drift_units)
+        mobility = self.drift_direction * _non_negative(
+            context.parameter(self.mobility_symbol, f"meter ** 2 / ({context.time_units}) / ({context.stored_units(self.drift_field)})"),
+            name=self.mobility_symbol,
+        )
+
+        def values(time: float, fields: np.ndarray) -> list[np.ndarray]:
+            del time
+            carried, potential = upwind_drift_stencil(grid, fields[tip_row], fields[drift_row], mobility)
+            return (diffusion + carried).values() + potential.values()
+
+        return FieldJacobianKernel(blocks=blocks + transport_blocks(tip_row, drift_row, grid.ndim), values=values)
+
 
 @dataclass(frozen=True, kw_only=True)
 class LateralBranching(FieldProcess):
@@ -394,6 +468,28 @@ class LateralBranching(FieldProcess):
 
         return tendency
 
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel:
+        """``d(b rho s)/drho = b s`` and ``d/ds = b rho`` (``b`` alone without a substrate field)."""
+
+        tip_row, _ = context.field_slot(self.tip_field, self.tip_units)
+        hypha_row, _ = context.field_slot(self.hypha_field, self.hypha_units)
+        tip_units = context.stored_units(self.tip_field)
+        hypha_units = context.stored_units(self.hypha_field)
+        to_rate = context.factor(_per_time(tip_units, context.time_units), self.rate_units, name=self.name)
+        to_stored = context.factor(self.rate_units, _per_time(tip_units, context.time_units), name=self.name)
+        if self.substrate_field is None or self.substrate_units is None:
+            rate = _non_negative(context.parameter(self.rate_symbol, f"({tip_units}) / ({hypha_units}) / ({context.time_units})"), name=self.rate_symbol)
+            coefficient = to_stored * to_rate * rate
+            return FieldJacobianKernel(blocks=(StencilBlock(tip_row, hypha_row),), values=lambda time, fields: (coefficient,))
+        substrate_row, _ = context.field_slot(self.substrate_field, self.substrate_units)
+        substrate_units = context.stored_units(self.substrate_field)
+        rate = _non_negative(context.parameter(self.rate_symbol, f"({tip_units}) / ({hypha_units}) / ({substrate_units}) / ({context.time_units})"), name=self.rate_symbol)
+        coefficient = to_stored * to_rate * rate
+        return FieldJacobianKernel(
+            blocks=(StencilBlock(tip_row, hypha_row), StencilBlock(tip_row, substrate_row)),
+            values=lambda time, fields: (coefficient * fields[substrate_row], coefficient * fields[hypha_row]),
+        )
+
 
 @dataclass(frozen=True, kw_only=True)
 class DichotomousBranching(FieldProcess):
@@ -440,6 +536,11 @@ class DichotomousBranching(FieldProcess):
             return out
 
         return tendency
+
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel:
+        tip_row, _ = context.field_slot(self.tip_field, self.tip_units)
+        rate = _non_negative(context.parameter(self.rate_symbol, f"1 / ({context.time_units})"), name=self.rate_symbol)
+        return FieldJacobianKernel(blocks=(StencilBlock(tip_row, tip_row),), values=lambda time, fields: (rate,))
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -492,6 +593,17 @@ class Anastomosis(FieldProcess):
             return out
 
         return tendency
+
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel:
+        """``d(-a n rho)/dn = -a rho`` and ``d/drho = -a n``."""
+
+        tip_row, _ = context.field_slot(self.tip_field, self.tip_units)
+        hypha_row, _ = context.field_slot(self.hypha_field, self.hypha_units)
+        rate = _non_negative(context.parameter(self.rate_symbol, f"1 / ({context.stored_units(self.hypha_field)}) / ({context.time_units})"), name=self.rate_symbol)
+        return FieldJacobianKernel(
+            blocks=(StencilBlock(tip_row, tip_row), StencilBlock(tip_row, hypha_row)),
+            values=lambda time, fields: (-rate * fields[hypha_row], -rate * fields[tip_row]),
+        )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -558,6 +670,18 @@ class FirstOrderLoss(FieldProcess):
             return out
 
         return tendency_with_product
+
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel:
+        row, _ = context.field_slot(self.field, self.field_units)
+        rate = _non_negative(context.parameter(self.rate_symbol, f"1 / ({context.time_units})"), name=self.rate_symbol)
+        if self.product_field is None or self.product_units is None:
+            return FieldJacobianKernel(blocks=(StencilBlock(row, row),), values=lambda time, fields: (-rate,))
+        product_row, _ = context.field_slot(self.product_field, self.product_units)
+        to_product = context.factor(context.stored_units(self.field), context.stored_units(self.product_field), name=self.name)
+        return FieldJacobianKernel(
+            blocks=(StencilBlock(row, row), StencilBlock(product_row, row)),
+            values=lambda time, fields: (-rate, to_product * rate),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -645,6 +769,45 @@ class LocalUptake(FieldProcess):
             return out
 
         return tendency
+
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel:
+        """The uptake flux differentiated in the hyphal density and the external substrate, with opposite signs in the two fields."""
+
+        external_row, _ = context.field_slot(self.external_field, self.external_units)
+        internal_row, _ = context.field_slot(self.internal_field, self.internal_units)
+        hypha_row, _ = context.field_slot(self.hypha_field, self.hypha_units)
+        external_units = context.stored_units(self.external_field)
+        hypha_units = context.stored_units(self.hypha_field)
+        to_rate = context.factor(_per_time(external_units, context.time_units), self.rate_units, name=self.name)
+        to_external = context.factor(self.rate_units, _per_time(external_units, context.time_units), name=self.name)
+        to_internal = context.factor(self.rate_units, _per_time(context.stored_units(self.internal_field), context.time_units), name=self.name)
+        blocks = (
+            StencilBlock(external_row, hypha_row),
+            StencilBlock(external_row, external_row),
+            StencilBlock(internal_row, hypha_row),
+            StencilBlock(internal_row, external_row),
+        )
+        if self.half_saturation_symbol is None:
+            rate = to_rate * _non_negative(context.parameter(self.rate_symbol, f"1 / ({hypha_units}) / ({context.time_units})"), name=self.rate_symbol)
+
+            def linear(time: float, fields: np.ndarray) -> list[np.ndarray]:
+                del time
+                by_hyphae = rate * fields[external_row]
+                by_external = rate * fields[hypha_row]
+                return [-to_external * by_hyphae, -to_external * by_external, to_internal * by_hyphae, to_internal * by_external]
+
+            return FieldJacobianKernel(blocks=blocks, values=linear)
+        maximum = to_rate * _non_negative(context.parameter(self.rate_symbol, f"({external_units}) / ({hypha_units}) / ({context.time_units})"), name=self.rate_symbol)
+        half = _positive(context.parameter(self.half_saturation_symbol, external_units), name=self.half_saturation_symbol)
+
+        def saturating(time: float, fields: np.ndarray) -> list[np.ndarray]:
+            del time
+            external = fields[external_row]
+            by_hyphae = maximum * external / (half + external)
+            by_external = maximum * fields[hypha_row] * half / (half + external) ** 2
+            return [-to_external * by_hyphae, -to_external * by_external, to_internal * by_hyphae, to_internal * by_external]
+
+        return FieldJacobianKernel(blocks=blocks, values=saturating)
 
 
 ACTIVE_TRANSLOCATION_AGGREGATION = (
@@ -735,6 +898,30 @@ class Translocation(FieldProcess):
             return out
 
         return tendency
+
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel:
+        """Diffusion coefficients (constant) plus the active upwind flux's derivatives in the substrate and the tips."""
+
+        grid = context.grid
+        internal_row, _ = context.field_slot(self.internal_field, self.internal_units)
+        diffusivity = _non_negative(context.parameter(self.diffusivity_symbol, f"meter ** 2 / ({context.time_units})"), name=self.diffusivity_symbol)
+        diffusion = diffusion_stencil(grid, diffusivity)
+        diffusion_values = diffusion.values()
+        blocks = transport_blocks(internal_row, internal_row, grid.ndim)
+        if self.tip_field is None or self.tip_units is None or self.active_diffusivity_symbol is None:
+            return FieldJacobianKernel(blocks=blocks, values=lambda time, fields: diffusion_values)
+        tip_row, _ = context.field_slot(self.tip_field, self.tip_units)
+        active = _non_negative(
+            context.parameter(self.active_diffusivity_symbol, f"meter ** 2 / ({context.time_units}) / ({context.stored_units(self.tip_field)})"),
+            name=self.active_diffusivity_symbol,
+        )
+
+        def values(time: float, fields: np.ndarray) -> list[np.ndarray]:
+            del time
+            carried, tips = upwind_drift_stencil(grid, fields[internal_row], fields[tip_row], active)
+            return (diffusion + carried).values() + tips.values()
+
+        return FieldJacobianKernel(blocks=blocks + transport_blocks(internal_row, tip_row, grid.ndim), values=values)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -837,6 +1024,42 @@ class LocalSecretion(FieldProcess):
             return out
 
         return tendency_with_cost
+
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel:
+        """``d(k rho s/(K+s))/drho = k s/(K+s)`` and ``d/ds = k rho K/(K+s)^2`` into the product, times ``-cost`` into the cost field."""
+
+        hypha_row, _ = context.field_slot(self.hypha_field, self.hypha_units)
+        product_row, _ = context.field_slot(self.product_field, self.product_units)
+        product_units = context.stored_units(self.product_field)
+        rate = _non_negative(context.parameter(self.rate_symbol, f"({product_units}) / ({context.stored_units(self.hypha_field)}) / ({context.time_units})"), name=self.rate_symbol)
+        to_rate = context.factor(_per_time(product_units, context.time_units), self.rate_units, name=self.name)
+        to_product = context.factor(self.rate_units, _per_time(product_units, context.time_units), name=self.name)
+        coefficient = to_product * to_rate * rate
+        if self.substrate_field is None or self.substrate_units is None or self.half_saturation_symbol is None:
+            return FieldJacobianKernel(blocks=(StencilBlock(product_row, hypha_row),), values=lambda time, fields: (coefficient,))
+        substrate_row, _ = context.field_slot(self.substrate_field, self.substrate_units)
+        half = _positive(context.parameter(self.half_saturation_symbol, context.stored_units(self.substrate_field)), name=self.half_saturation_symbol)
+        blocks = [StencilBlock(product_row, hypha_row), StencilBlock(product_row, substrate_row)]
+        cost = 0.0
+        if self.cost_field is not None and self.cost_units is not None and self.cost_symbol is not None:
+            cost_row, _ = context.field_slot(self.cost_field, self.cost_units)
+            cost = _non_negative(
+                context.parameter(self.cost_symbol, f"({context.stored_units(self.cost_field)}) / ({product_units})"),
+                name=self.cost_symbol,
+            )
+            blocks += [StencilBlock(cost_row, hypha_row), StencilBlock(cost_row, substrate_row)]
+        charged = len(blocks) == 4
+
+        def values(time: float, fields: np.ndarray) -> list[np.ndarray]:
+            del time
+            substrate = fields[substrate_row]
+            by_hyphae = coefficient * substrate / (half + substrate)
+            by_substrate = coefficient * fields[hypha_row] * half / (half + substrate) ** 2
+            if not charged:
+                return [by_hyphae, by_substrate]
+            return [by_hyphae, by_substrate, -cost * by_hyphae, -cost * by_substrate]
+
+        return FieldJacobianKernel(blocks=tuple(blocks), values=values)
 
 
 def continuum_process_types() -> dict[str, type[FieldProcess]]:

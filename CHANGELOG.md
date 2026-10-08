@@ -6,6 +6,24 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Analytic sparse Jacobian for the spatial mycelium core (SPATIAL-003):
+  every shipped field process offers `compile_jacobian`, the blocks of the
+  nearest-neighbour stencil it couples (`StencilBlock`) and a kernel for
+  their coefficients (`FieldJacobianKernel`): the local laws in closed form,
+  diffusion and the first-order upwind drift as the exact derivatives of the
+  finite-volume operators with the geometry's face weights, on cartesian
+  grids of one to three axes and the axisymmetric grid, under no-flux and
+  periodic boundaries. `CompiledMyceliumModel.analytic_jacobian` scatters
+  them into a CSC matrix on the declared stencil (built once, no dense
+  intermediate) scaled by the derivative of `max(field, 0)`;
+  `analytic_jacobian_banded` gives LSODA the band storage of the cell-major
+  state; `simulate(..., jacobian="analytic" | "finite_difference")` makes the
+  choice explicit and the core now honours
+  `SolverSettings(jacobian="compiled")`. Verified against centred
+  differences of the right-hand side on eight grid and boundary kinds to
+  7.9e-11 of the largest entry, with no dependency outside the declared
+  stencil (`tests/test_mycelium_jacobian.py`, `docs/spatial-mycelium.md`).
+
 - Enzyme-network links across amount bases through a stated, unit-bearing
   yield (NETWORK-002): in a network dataset a solid pool (dry mass per volume)
   may release a dissolved pool (amount per volume), or a molar final product,
@@ -827,6 +845,29 @@ All notable public releases of FungMod are documented here.
 
 ### Changed
 
+- The implicit methods of the spatial mycelium core take the analytic
+  Jacobian by default (SPATIAL-003): BDF and Radau as a sparse matrix (before,
+  the coloured finite differences), LSODA in band storage of the cell-major
+  state (before, its own banded or dense differences), leaving out and
+  counting only the couplings across the wrap of a periodic first axis, which
+  no band holds. `jacobian="finite_difference"` selects the previous paths
+  (LSODA's unchanged) and is used by default when a process offers no
+  analytic kernel. Results agree with the previous defaults within the
+  documented 2e-4 (at most 3.5e-5 relative in the stored integrals and
+  observables, 1.7e-9 of scale in the profiles) except the Edelstein front's
+  80-hour tip integral under BDF, which the previous default had 7.2e-4 off
+  and which now meets the converged value to 4.7e-7. Measured on a loaded
+  container: BDF 5 to 11 times faster (the 40 x 40 colony over 24 hours from
+  6.8 s to 0.9 s; the colony comparison plan's 160 x 160 cartesian reference
+  in 231 s against 4.1 hours recorded), LSODA 1.6 to 1.8 times, Radau 3 times
+  on the radial plan model and 15 percent slower on the 40 x 40 colony.
+  `jacobian_structure` records `analytic_sparse_on_the_nearest_neighbour_stencil`
+  or `analytic_banded_cell_major`, `JACOBIAN_STRUCTURE` now names the former
+  (the finite-difference label is `FINITE_DIFFERENCE_JACOBIAN_STRUCTURE`),
+  `jacobian_sparsity()` returns the declared stencil, `summary()` gains
+  `jacobian_kernels` and the solver metadata `jacobian_bandwidths` and
+  `jacobian_entries_outside_band`.
+
 - Text only (ASSEMBLE-002): the refusal of a network dataset as `user_data` of
   `assemble_user_tables` now names `network=True` (`fungmod assemble
   --network`), which accepts it. No numerical behaviour changes.
@@ -917,6 +958,17 @@ All notable public releases of FungMod are documented here.
   reuses compiled kernels for unconstrained processes.
 
 ### Fixed
+
+- The coloured finite-difference Jacobian of the spatial mycelium core
+  (SPATIAL-003) was inexact in three ways: its pattern held wrap entries on
+  no-flux axes, which the colouring filled with a real neighbour's coupling
+  whenever the axis length was not a multiple of three
+  (`J[0, 799] = J[0, 1]` on the 800-cell front); on a periodic axis of such a
+  length two columns of one row shared a colour and their entries were mixed;
+  and the cross-field neighbour couplings of a drift and of active
+  translocation were missing. It now uses the declared stencil and a
+  colouring valid on periodic axes of any length, and is vectorised (33 ms
+  instead of 70 ms per Jacobian on a 40 x 40 colony).
 
 - `final_metrics.csv` named a product stated in micromolar
   `final_product_amount` (and would have called an amount per mass such as

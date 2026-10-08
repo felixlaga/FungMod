@@ -99,11 +99,13 @@ result.results_summary()                            # maturity, assumptions, lim
 `MyceliumModel.compile()` refuses a process whose fields the model lacks or
 whose units are incompatible, a missing or unknown parameter, and a
 negative rate or non-positive half-saturation, before any kernel runs.
-`SolverSettings` is the shared one: implicit methods other than LSODA get
-the nearest-neighbour sparsity pattern; explicit methods work for mildly
-stiff colonies. The `benchmarks` module holds two artificial models whose
-parameters are round framework-benchmark numbers with `testing`
-confidence, refused by scientific mode.
+`SolverSettings` is the shared one: the implicit methods take the model's
+analytic Jacobian (BDF and Radau as a sparse matrix, LSODA in band storage)
+and explicit methods work for mildly stiff colonies (see
+[Jacobians](#jacobians)).
+The `benchmarks` module holds two artificial models whose parameters are
+round framework-benchmark numbers with `testing` confidence, refused by
+scientific mode.
 
 ## Verification
 
@@ -121,7 +123,8 @@ confidence, refused by scientific mode.
 - the artificial two-dimensional colony conserves substrate across uptake,
   extension cost and translocation to 1e-7 relative, expands monotonically
   and stays symmetric to 1e-10 under transposition and reflection;
-- LSODA, BDF with the sparse pattern and RK45 agree to 2e-4 relative;
+- LSODA, BDF with the analytic sparse Jacobian and RK45 agree to 2e-4
+  relative;
 - the same physics declared in millimetres and in centimetres gives the
   same trajectory to 1e-8, and the per-cell hyphal growth matches the
   closed form `v n_0 (e^{alpha t} - 1) / alpha`;
@@ -139,23 +142,183 @@ confidence, refused by scientific mode.
   (`tests/test_mycelium_colony.py`);
 - the colony observables reproduce their closed forms, agree between the
   two geometries for a uniform density, and follow the outermost detected
-  cell (`tests/test_colony_observation.py`).
+  cell (`tests/test_colony_observation.py`);
+- the analytic Jacobian equals centred differences of the right-hand side on
+  every grid geometry and boundary kind, has no dependency outside its
+  declared stencil, gives the trajectories of the finite-difference paths and
+  reproduces the previous default results (`tests/test_mycelium_jacobian.py`;
+  numbers under [Jacobians](#jacobians)).
 
-Two Jacobian paths exist (SPATIAL-002). On a one-axis grid LSODA integrates
-the state in cell-major order with a banded Jacobian of half-bandwidth
-`2 F - 1` for `F` fields, so a Jacobian costs a few right-hand sides instead
-of one per state: the radial colony comparison model (283 cells, four
-fields, 62 hours) went from about 220 s to 4 s with the same trajectory.
-The implicit methods (BDF, Radau) receive a sparse finite-difference
-Jacobian on the nearest-neighbour pattern, built with one right-hand side
-per colour (`3 ** ndim * F` colours, cells coloured by index modulo three
-per axis) and a fixed step `sqrt(eps) * max(|y|, 1)`: scipy's own adaptive
-estimator overflowed on these clipped fields and failed the integration,
-and the fixed rule does not. Measured on the development container (one
-core): the 40 x 40 artificial colony over 24 hours takes about 19 s with
-LSODA (dense backend Jacobian) and 39 s with BDF on the sparse pattern. A
-compiled analytic sparse Jacobian remains the next performance step for
-two- and three-dimensional grids.
+## Jacobians
+
+The implicit methods need the Jacobian `d rhs / d state`. Every shipped
+process offers it analytically (SPATIAL-003): `FieldProcess.compile_jacobian`
+returns a `FieldJacobianKernel`, the blocks of the stencil the process
+couples (`StencilBlock`: which field row depends on which field, in the same
+cell or one step along an axis) and a kernel for their coefficients,
+evaluated at `max(field, 0)` like the right-hand side. The local laws are
+differentiated in closed form (for a saturating extension `v s / (K + s)`
+with respect to the tips and `v n K / (K + s)^2` with respect to the
+substrate, the cost row the same times `-c`; uptake, secretion, branching,
+anastomosis and losses likewise). The transport terms differentiate the
+finite-volume operators themselves: diffusion has the constant coefficients
+`w D / dx` of the geometry's face weights (`1 / dx` on a cartesian grid,
+`r_face / (r_centre dr)` on the radial one, nothing on a no-flux outer face,
+the wrapped neighbour on a periodic one); an upwind drift `v q_up` with
+`v = mobility grad(g)` contributes `max(v, 0)` and `min(v, 0)` with respect
+to the carried field and `mobility q_up / dx` with respect to the steering
+field, with the upwind side held fixed (where a face velocity is exactly
+zero this is the derivative of the side the kernel uses). The model maps the
+union of every process's blocks once onto a compressed-sparse-column
+pattern; `CompiledMyceliumModel.analytic_jacobian` only scatters the
+coefficient arrays into its data vector and multiplies each column by the
+derivative of the projection (zero for a negative state, the right
+derivative at zero). No dense matrix is formed. A process that offers no
+kernel (a third-party one) is assumed nearest-neighbour like the rest and
+puts every pair of its fields on the pattern; such a model falls back to
+finite differences, which `summary()["jacobian_kernels"]` and the run's
+`jacobian_structure` record.
+
+The declared stencil is the nearest-neighbour pattern plus the cross-field
+neighbour couplings of a drift (tips steered by the hyphae) and of active
+translocation (internal substrate steered by the tips), which the pattern
+before SPATIAL-003 left out. The coloured finite-difference Jacobian uses the
+same stencil since SPATIAL-003, and its colouring (`stencil_colours`) gives
+the cells after the last whole triple of a periodic axis colours of their
+own. Before, three defects made it inexact: the pattern held wrap entries on
+no-flux axes, and where an axis length was not a multiple of three the
+colouring put that wrap column in the colour of a real neighbour, so the
+entry copied a real coupling (`J[0, 799] = J[0, 1] = 16` per hour on the
+800-cell front); on a periodic axis of such a length two columns of one row
+shared a colour and their entries were mixed; and the cross-field neighbour
+couplings were missing. A Jacobian only steers Newton's iteration, but these
+slowed it (the front took 398 Jacobians and 1488 factorisations for 80 hours)
+and on the front left the 80-hour tip integral 7.2e-4 relative from the
+converged value at `rtol` 1e-8, while the front position was right.
+
+Which Jacobian each method gets is recorded in
+`solver_metadata["jacobian_structure"]`; `simulate(..., jacobian=...)` makes
+the choice explicit:
+
+| Method | Default | `jacobian="analytic"` or `SolverSettings(jacobian="compiled")` | `jacobian="finite_difference"` |
+| --- | --- | --- | --- |
+| BDF, Radau | analytic sparse (`analytic_sparse_on_the_nearest_neighbour_stencil`) | the same; refused when a process offers no kernel | coloured finite differences on the declared stencil (`coloured_finite_difference_on_the_nearest_neighbour_pattern`) |
+| LSODA | analytic, in band storage of the cell-major state (`analytic_banded_cell_major`); dense (`analytic_dense`) where the band would hold more, on grids of two cells along the first axis | the same; refused when a process offers no kernel | LSODA's own differences, unchanged: banded in cell-major order with half-bandwidth `2 F - 1` for `F` fields on a one-axis grid (`one_axis_banded_cell_major`), dense otherwise (`backend_default`) |
+| RK45, RK23, DOP853 | none | ignored | ignored |
+
+A model with a process that offers no kernel gets the last column by
+default; `SolverSettings(jacobian="compiled")` with
+`jacobian="finite_difference"` is refused as a contradiction. LSODA accepts
+only dense or banded matrices. Its band holds every coupling between cells at
+most one slice of the first axis apart: half-bandwidths at most `F` times
+the cells of a slice plus `F - 1` (`jacobian_bandwidths` in the metadata;
+`[2, 2]` on the two-field front, `[162, 161]` on the 40 x 40 colony). The
+couplings across the wrap of a periodic first axis lie outside any band; they
+are left out and counted (`jacobian_entries_outside_band`), and LSODA's own
+banded differences cannot represent them either, so on such a grid the
+matrix LSODA factorises is exact but for those entries. Keeping them made the
+matrix dense: 394 s instead of 0.45 s for 40 hours of an 800-cell periodic
+line. On a one-axis grid LSODA's own banded differences, kept as the
+finite-difference path, cost a few right-hand sides per Jacobian instead of
+one per state: the radial colony comparison model (283 cells, four fields,
+62 hours) went from about 220 s to 4 s with the same trajectory (SPATIAL-002).
+
+Verification (`tests/test_mycelium_jacobian.py`), before any default
+changed:
+
+- on a model with every shipped process type in every declared option
+  (saturating and linear forms, costs, products, drift up and down, a field
+  steering itself, fields in two unit systems) on eight grids (one axis
+  no-flux, periodic of seven and of two cells; two axes no-flux and periodic
+  by no-flux; three axes periodic of 3 x 4 x 5 cells and mixed; the radial
+  grid) at random states with some negative values, the analytic matrix
+  equals centred differences of the right-hand side to 7.9e-11 of its
+  largest entry at worst (entries above 1e-6 of the largest to 5.9e-8
+  relative; the tests require 1e-8 and 1e-6), and so does the artificial
+  colony at a simulated state;
+- no dependency lies outside the declared stencil: perturbing a state
+  outside a row's stencil leaves the row bit for bit unchanged, and the
+  matrix is stored on exactly that pattern;
+- negative states give zero columns and a state at zero the right
+  derivative; the band storage holds the same matrix in cell-major order
+  except the counted wrap of a periodic first axis;
+- the corrected coloured differences agree with the analytic matrix to the
+  `sqrt(eps)` accuracy of forward differences, including on periodic axes of
+  four, five and seven cells, and put nothing across a no-flux wall;
+- on the 16 x 16 colony and the 60-cell radial colony, BDF on the analytic
+  and on the finite-difference path, LSODA on the analytic band and Radau
+  agree with LSODA's own differences to 2e-4 relative (`atol` 1e-7); on a
+  periodic line LSODA's band without the wrap, BDF on both paths and Radau
+  agree with DOP853;
+- the new defaults reproduce the defaults before SPATIAL-003 (stored
+  values). BDF: the colony's integrals to 8.2e-10 relative and its diagonal
+  profiles to 1.7e-9 of their scale, the radial colony's integrals to 3.1e-8,
+  the colony comparison plan's check solve (450 radial cells, 62 hours, the
+  artificial stage 0 check values) to 5.5e-9 in the tip count with an
+  identical area, and the front's position to 2.7e-7 and hyphae to 3.5e-5;
+  its tip integral, which the old default had 7.2e-4 off at 80 hours, now
+  agrees with DOP853 at `rtol` 1e-11 to 4.7e-7. LSODA: the front to 6e-15
+  and the plan's primary solve to 9.8e-9 in the tip count with an identical
+  area. Every analytic front-speed, conservation and symmetry test above
+  passes unchanged.
+
+Measured on the development container, which other jobs shared throughout
+(load average 8 to 25 on four cores), so absolute times are noisy and only
+ratios within one session mean much; medians of three interleaved runs, at
+the tolerances of the tests (`rtol` 1e-6 for the colony, the plan's 1e-6 for
+LSODA and 1e-7 for BDF and Radau on the radial model, 1e-8 for the front);
+"before" is main before SPATIAL-003 (LSODA's own differences, whose code is
+unchanged, timed beside "now"), "differences" the corrected finite-difference
+path, and the two Radau colony runs alternated in one process:
+
+| Problem | LSODA before | LSODA now | BDF before | BDF now | BDF differences | Radau now | Radau differences |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 40 x 40 colony, 4 fields, 24 h | 48 s | 28 s | 6.8 s | 0.88 s | 0.85 s | 37 s | 32 s |
+| radial plan model, 450 cells, 62 h | 0.89 s | 0.51 s | 4.4 s | 0.81 s | 2.8 s | 29 s | 86 s |
+| Edelstein front, 800 cells, 80 h | 0.63 s | 0.39 s | 7.1 s | 0.62 s | 0.50 s | 41 s | 43 s |
+
+One Jacobian of the 40 x 40 colony costs 1.9 ms analytic against 33 ms by
+coloured differences (70 ms before their vectorisation; one right-hand side
+is 0.8 ms), and of a 160 x 160 colony 21 ms against 278 ms (660 ms before).
+The colony comparison plan's stage 0 cartesian reference (160 x 160 cells of
+0.25 mm, 102 400 states, hours 1 to 12, BDF at `rtol` 1e-7, the artificial
+check values) took 231 s with the analytic default (969 right-hand sides, 3
+Jacobians, 75 factorisations) against the 4.1 hours and 18 074 right-hand
+sides recorded for it, and its window observables equal the recorded ones to
+1.9e-8 in tip count and exactly in area; this was a timing and regression
+check, not a new stage 0 record. The earlier figures on this page (19 s for LSODA and 39 s for BDF on the 40 x
+40 colony) were taken on a quieter container, BDF then with scipy's own
+sparse differences.
+
+The analytic Jacobian is the default of every implicit method because it is
+verified and faster where the Jacobian matters. BDF is 5 to 11 times faster
+than the default it replaces, as fast as the corrected differences where
+Newton needs one Jacobian per run (alternating the two in one process on the
+front gave medians of 0.55 s analytic and 0.69 s by differences) and 3.5
+times faster on the radial plan model, where it needs many (5 Jacobians
+against 134). LSODA is 1.6 to 1.8 times faster than with its own differences
+on the colony, the radial plan model and the front, and 1.35 times on the
+periodic line (0.45 s against 0.61 s). Radau is 3 times faster on the radial
+plan model (12 Jacobians against 251) and as fast on the front, but 15
+percent slower on the 40 x 40 colony, the one measured case where the
+analytic matrix lost: both paths there take two Jacobians and the same
+number of factorisations, and Radau's time is SuperLU's complex
+factorisation (one took 13.5 s with the analytic matrix and 12.1 s with the
+differences at a 12-hour state, with 3 percent less fill, against 0.06 s for
+the real one), a cost of the factorisation's sensitivity to the values, not
+of the Jacobian. Radau keeps the analytic default for its exactness and its
+gain on the stiff plan model; `jacobian="finite_difference"` is the choice
+for such a case, and BDF is 35 to 65 times faster than Radau on all three
+problems.
+
+The change moves the frozen colony comparison plan's solvers (LSODA its
+primary, BDF its check solver and cartesian reference) by at most 2e-8
+relative in the observables at the stage 0 check values, far inside the
+plan's thresholds (0.005 between solvers, 0.02 between grids); the stage 0
+record was not re-run and remains the record of its run, and
+`jacobian="finite_difference"` keeps LSODA's earlier path unchanged. On two-
+and three-dimensional grids BDF with the sparse matrix is the fast choice:
+LSODA's band there spans a whole slice of cells.
 
 ## What it is not
 
