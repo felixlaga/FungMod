@@ -58,8 +58,10 @@ from fungal_model.processes.factories import (
     HomogeneousMichaelisMentenFactory,
     PHIonizationMichaelisMentenFactory,
     ProcessBuildContext,
+    SubstrateTransglycosylationFactory,
     SurfaceCatalysisFactory,
 )
+from fungal_model.processes.transglycosylation import TRANSGLYCOSYLATION_MATURITY
 from fungal_model.registry import load_registry
 from fungal_model.registry.loaders import load_registry_record_mapping
 from fungal_model.registry.records import PARAMETER_ALLOWED_USE_EXPLORATORY, CaseTemplateRecord
@@ -587,6 +589,25 @@ def test_a_product_map_with_coefficient_units_is_explicit_and_refused_where_coef
         modifiers=(),
     )
     decision = PHIonizationMichaelisMentenFactory().can_build(context, ionization)
+    assert "product_map.coefficient_units" in decision.incompatible_entities
+    transglycosylation = SimpleNamespace(
+        id="artificial transglycosylation",
+        states={"substrate": "X", "enzyme": "E"},
+        parameters={
+            name: name
+            for name in (
+                "hydrolysis_km",
+                "transglycosylation_km",
+                "hydrolysis_kcat",
+                "transglycosylation_kcat",
+                "rate_units",
+            )
+        },
+        product_map="release",
+        modifiers=(),
+        raw={"branch": "hydrolysis", "primary_source": "artificial", "maturity": TRANSGLYCOSYLATION_MATURITY},
+    )
+    decision = SubstrateTransglycosylationFactory().can_build(context, transglycosylation)
     assert "product_map.coefficient_units" in decision.incompatible_entities
     homogeneous = SimpleNamespace(
         id="artificial homogeneous",

@@ -59,8 +59,9 @@ Design decisions (design note kept outside the repository):
   product_state_units=)`, which declares such a product in its own units,
   refuses a coefficient whose units times the substrate's are not the
   product's dimension, and returns `Q_(c, units) x rate` from `contributions`.
-  The surface-catalysis, pH-ionization and transglycosylation processes (and
-  their factories) and the SBML exporter refuse a unit-bearing coefficient;
+  The surface-catalysis and transglycosylation processes, the factories of
+  those and of the pH-ionization process, and the SBML exporter refuse a
+  unit-bearing coefficient;
   `ProductReleaseMap.signed_coefficient` and `validate_weight_conservation`
   refuse one instead of reading its magnitude.
 - The yield is a parameter record per strain and condition (role

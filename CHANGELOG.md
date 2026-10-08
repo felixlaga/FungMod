@@ -27,9 +27,9 @@ All notable public releases of FungMod are documented here.
   converts them once at build time), unit-bearing `parameter_role`
   coefficients and closure weights in the composition builder, initial-state
   `units_from_roles` on case templates, and `conserved_weight` in the
-  validators; the surface-catalysis, pH-ionization and transglycosylation
-  processes and the SBML exporter refuse a unit-bearing coefficient instead of
-  reading it as a pure number. Refused with file, row and column: a
+  validators; the surface-catalysis and transglycosylation processes, the
+  factories of those and of the pH-ionization process, and the SBML exporter
+  refuse a unit-bearing coefficient instead of reading it as a pure number. Refused with file, row and column: a
   dry-mass-to-amount link without such a yield, a unit-bearing yield on a link
   between two solids, of the wrong dimension, on a dissolved row or outside a
   network, a dissolved pool releasing a solid one, and missing or misplaced
