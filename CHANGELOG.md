@@ -49,6 +49,34 @@ All notable public releases of FungMod are documented here.
   network draft now says which laws scale which member (with laws) or that no
   law is bound (without). Tests: `tests/test_assemble_network_responses.py`.
 
+- Machine-readable `--json` summaries of `fungmod run`, `assemble`,
+  `check-data` and `fit` (CLI-003). `--json PATH` writes one JSON document to
+  a new file; the path is refused before the command runs (exit code 2) when
+  it exists, its directory is missing or it lies inside `--output`.
+  `--json -` writes the document alone to standard output and the usual text
+  to standard error. The document (`kind` `fungmod_command_summary`,
+  `schema_version` `1.0.0`) states the command, its arguments, the FungMod
+  version, the exit code and its meaning (`fungal_model.cli.EXIT_CODE_MEANINGS`,
+  the list `--help` prints), the error, and a result per command. For `run`:
+  every requested case with its preflight, its status (`ran`, `blocked`,
+  `refused`, `failed`) and reason, its final metrics and threshold times
+  (median, 5th and 95th percentiles, mean, minimum and maximum of
+  `summary_metrics.csv`, with units), the measurement requests, the bundle's
+  paths, the limitation counts by severity, and the time-course comparison.
+  For `assemble`: the UniProt proteome and its snapshots, the classes found
+  and acting, every case's kinetics status with a count of each of the five
+  statuses, the kinetics lookup, the enzyme network, the `REVIEW:` fields, the
+  written files and the next commands. For `check-data`: pass or fail, every
+  issue with file, line and column, and the gaps with their measurement
+  requests. For `fit`: the fitted values with units, intervals and verdicts,
+  the RMSE per series and the fitted dataset. Units are strings beside their
+  values. Every `null` has its reason in the `null_reasons` object beside it.
+  No NaN or infinity is written. The text and the exit codes do not change.
+  The summary is built by the new module `fungal_model.cli_summary` from what
+  the command computed and wrote; no scientific or numerical behavior changes.
+  Tests: `tests/test_cli_json.py`; documented in `docs/cli.md`
+  ("Machine-readable summaries: --json").
+
 - Kinetics of the enzyme classes a user dataset defines, looked up by their
   own EC numbers (FETCH-003). `user_tables_from_sabiork(user_enzyme_classes=...)`
   resolves an entry's EC number to a user-defined class (rows of an

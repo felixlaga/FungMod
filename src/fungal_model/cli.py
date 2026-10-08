@@ -41,6 +41,12 @@ directory have no defaults, a condition grid needs both temperature and pH
 values, and an option that is not given leaves the API's own default (stated
 in the help) in place.
 
+``run``, ``assemble``, ``check-data`` and ``fit`` also take ``--json PATH``:
+one machine-readable JSON summary of what the command computed, printed and
+wrote (``fungal_model.cli_summary``), written to a new file, or to standard
+output with ``--json -``, in which case the printed text goes to standard
+error. The printed text and the exit code do not change.
+
 Exit codes: 0 success; 1 the simulation failed after a passing preflight;
 2 usage or input error (including invalid user data, a refused draft and a
 refused fit); 3 the preflight blocks a requested case in the requested mode and
@@ -51,6 +57,7 @@ cases were simulated and the blocked ones are listed as not simulated.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import json
 import math
@@ -59,11 +66,11 @@ import shlex
 import subprocess
 import sys
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
-from fungal_model import __version__
+from fungal_model import __version__, cli_summary
 from fungal_model.api.environment_grid import EnvironmentGrid, environment_grid
 from fungal_model.api.result_tables import CASE_STATUS_NOT_SIMULATED, preflight_policy
 from fungal_model.api.user_data import (
@@ -120,6 +127,22 @@ EXIT_SIMULATION_FAILED = 1
 EXIT_USAGE = 2
 EXIT_NOT_RUNNABLE = 3
 EXIT_PARTIAL = 4
+EXIT_CODE_MEANINGS: Mapping[int, str] = {
+    EXIT_OK: "success",
+    EXIT_SIMULATION_FAILED: "the simulation failed after a passing preflight",
+    EXIT_USAGE: "usage or input error (unknown names, invalid user data, a refused draft or fit, missing arguments)",
+    EXIT_NOT_RUNNABLE: "the preflight blocks a requested case in the requested mode; nothing is simulated",
+    EXIT_PARTIAL: "partial run (run --runnable-only): the runnable cases were simulated, the blocked ones are listed",
+}
+"""The meaning of each exit code, as ``--help`` lists it and as ``--json`` summaries state it."""
+
+JSON_STDOUT = "-"
+JSON_HELP = (
+    "also write one machine-readable JSON summary of this command (its result, exit code and meaning, FungMod "
+    "version and summary schema_version) to PATH, a new file{where} (nothing is overwritten), or to standard "
+    "output with '-', which then prints the usual text to standard error; the text and the exit code do not "
+    "change (see docs/cli.md)"
+)
 
 RUNNABLE_ONLY_HELP = (
     "simulate the runnable cases when the preflight blocks others (VirtualExperiment.simulate(blocked=\"report\")): "
@@ -168,16 +191,13 @@ _DESCRIPTION = (
     "workflow assembles a reviewable dataset for a fungus, substrates and conditions, checks it, runs it, "
     "compares it with your time courses and fits kinetic constants to them."
 )
+_EXIT_CODE_LINES = "\n".join(f"  {code}  {meaning}" for code, meaning in EXIT_CODE_MEANINGS.items())
 _EPILOG = f"""modes (--mode is required; it decides what may be simulated):
   {EXPLORATORY_MODE_HELP}
   {SCIENTIFIC_MODE_HELP}
 
 exit codes:
-  0  success
-  1  the simulation failed after a passing preflight
-  2  usage or input error (unknown names, invalid user data, a refused draft or fit, missing arguments)
-  3  the preflight blocks a requested case in the requested mode; nothing is simulated
-  4  partial run (run --runnable-only): the runnable cases were simulated, the blocked ones are listed
+{_EXIT_CODE_LINES}
 
 examples:
   fungmod list --aliases
@@ -326,13 +346,87 @@ def main(argv: Sequence[str] | None = None) -> int:
         "draft-kinetics": _draft_kinetics,
         "fit": _fit,
     }
+    target = cast("str | None", getattr(args, "json", None))
+    # The --json summary's result object; the handlers record into it what they computed.
+    args.summary = None if target is None else cli_summary.new_result(args.command)
+    summary_stream = sys.stdout
+    if target is not None:
+        try:
+            _check_json_target(target, args)
+        except _UsageError as exc:
+            return _usage_error(args.command, exc)
+    failure: _UsageError | None = None
+    # With --json -, standard output carries the summary alone and the printed text goes to standard error.
+    with contextlib.redirect_stdout(sys.stderr) if target == JSON_STDOUT else contextlib.nullcontext():
+        try:
+            code = handlers[args.command](args)
+        except _UsageError as exc:
+            failure = exc
+            code = _usage_error(args.command, exc)
+    if target is not None:
+        code = _write_summary(args, target, code=code, failure=failure, stream=summary_stream)
+    return code
+
+
+def _usage_error(command: str, exc: _UsageError) -> int:
+    print(f"fungmod {command}: error: {exc}", file=sys.stderr)
+    for line in exc.details:
+        print(f"  {line}", file=sys.stderr)
+    return EXIT_USAGE
+
+
+def _check_json_target(target: str, args: argparse.Namespace) -> None:
+    """Refuse a --json PATH before the command runs: inside --output, existing, or in a missing directory."""
+
+    if target == JSON_STDOUT:
+        return
+    path = Path(target)
+    output = cast("Path | None", getattr(args, "output", None))
+    if output is not None and path.resolve().is_relative_to(output.resolve()):
+        raise _UsageError(
+            f"--json {path} is inside --output {output}, which holds only the files the command writes; write the "
+            f"summary elsewhere, or to standard output with --json {JSON_STDOUT}."
+        )
+    if path.exists() or path.is_symlink():
+        raise _UsageError(f"--json {path} exists; choose a new file, nothing is overwritten.")
+    if not path.parent.is_dir():
+        raise _UsageError(f"--json {path}: the directory {path.parent} does not exist; FungMod creates none for it.")
+
+
+def _write_summary(
+    args: argparse.Namespace, target: str, *, code: int, failure: _UsageError | None, stream: Any
+) -> int:
+    """Write the --json summary of a finished command; the command's exit code, or 2 if the file cannot be written."""
+
+    summary = cli_summary.document(
+        command=args.command,
+        arguments=args.command_line,
+        version=__version__,
+        exit_code=code,
+        exit_meaning=EXIT_CODE_MEANINGS[code],
+        error=None if failure is None else cli_summary.error(str(failure), failure.details),
+        result=args.summary,
+    )
+    text = cli_summary.render(summary)
+    if target == JSON_STDOUT:
+        stream.write(text)
+        stream.flush()
+        return code
     try:
-        return handlers[args.command](args)
-    except _UsageError as exc:
-        print(f"fungmod {args.command}: error: {exc}", file=sys.stderr)
-        for line in exc.details:
-            print(f"  {line}", file=sys.stderr)
+        with Path(target).open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+    except OSError as exc:
+        print(f"fungmod {args.command}: error: cannot write the --json summary to {target}: {exc}", file=sys.stderr)
         return EXIT_USAGE
+    return code
+
+
+def _record(args: argparse.Namespace, build: Callable[[], Mapping[str, Any]]) -> None:
+    """Add sections to the --json summary; ``build`` runs only when --json is given."""
+
+    summary = getattr(args, "summary", None)
+    if summary is not None:
+        summary.update(build())
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -399,6 +493,7 @@ def build_parser() -> argparse.ArgumentParser:
             f"and band coverage per series. {IN_SAMPLE_HELP}"
         ),
     )
+    _add_json_argument(run)
 
     preflight = commands.add_parser(
         "preflight",
@@ -428,6 +523,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     check.add_argument("directory", type=Path, metavar="DIR", help="user dataset directory")
     _add_registry_argument(check)
+    _add_json_argument(check, output=False)
 
     listing = commands.add_parser(
         "list",
@@ -649,6 +745,7 @@ def _add_assemble_parser(commands: Any) -> None:
         help="new or empty directory for the draft (tables, user_dataset.yml, review.md, annotation copy)",
     )
     _add_registry_argument(output)
+    _add_json_argument(output)
 
 
 def _add_draft_kinetics_parser(commands: Any) -> None:
@@ -804,6 +901,7 @@ def _add_fit_parser(commands: Any) -> None:
         help="new or empty directory for the fitted dataset (a copy of the input with fitted rows and fit_report.json)",
     )
     _add_registry_argument(fit)
+    _add_json_argument(fit)
 
 
 def _add_design_argument(container: Any) -> None:
@@ -889,6 +987,11 @@ def _selection_parser() -> argparse.ArgumentParser:
     return selection
 
 
+def _add_json_argument(container: Any, *, output: bool = True) -> None:
+    where = " outside --output" if output else ""
+    container.add_argument("--json", metavar="PATH", help=JSON_HELP.format(where=where))
+
+
 def _add_registry_argument(container: Any) -> None:
     container.add_argument(
         "--registry",
@@ -925,8 +1028,24 @@ def _run(args: argparse.Namespace) -> int:
             "--compare-timecourses compares with the time courses of a user dataset; give --user-data DIR."
         )
     output = cast(Path, args.output)
+    _record(
+        args,
+        lambda: {
+            "request": cli_summary.run_request(
+                mode=mode,
+                samples=args.samples,
+                seed=args.seed,
+                runnable_only=args.runnable_only,
+                html_report=args.report,
+                figures=not args.no_plots,
+                compare_timecourses=args.compare_timecourses,
+                output=output,
+            )
+        },
+    )
     _require_new_output(output)
     study = _build_experiment(args)
+    _record(args, lambda: {"experiment": cli_summary.experiment(study)})
     if args.compare_timecourses:
         dataset = cast(UserDataset, study.user_dataset)
         if not dataset.timecourses:
@@ -938,9 +1057,11 @@ def _run(args: argparse.Namespace) -> int:
     reports = study.preflight(mode=mode)
     blocked = _print_preflight(reports, mode=mode)
     partial = bool(blocked) and args.runnable_only and len(blocked) < len(reports)
+    _record(args, lambda: {"measurement_requests": cli_summary.measurement_requests(blocked)})
     if blocked:
         _print_blocked(blocked, total=len(reports), mode=mode, command="run", runnable_only=args.runnable_only)
         if not partial:
+            _record(args, lambda: _refused_run(reports, blocked, mode=mode, runnable_only=args.runnable_only))
             return EXIT_NOT_RUNNABLE
     try:
         result = study.simulate(
@@ -954,8 +1075,25 @@ def _run(args: argparse.Namespace) -> int:
         report_path = result.write_report(include_html=args.report, include_index=args.report)
     except (RegistryScreenSimulationError, VirtualExperimentError) as exc:
         print(f"fungmod run: simulation failed: {exc}", file=sys.stderr)
+        failed = f"the simulation failed after a passing preflight: {exc}"
+        _record(
+            args,
+            lambda: {
+                "cases": cli_summary.run_cases(reports, failed=failed),
+                "simulation": cli_summary.Unknown(failed),
+                "timecourse_comparison": cli_summary.Unknown("the simulation failed, so nothing was compared"),
+            },
+        )
         return EXIT_SIMULATION_FAILED
     _print_run_summary(result, report_path=report_path, html=args.report)
+    _record(
+        args,
+        lambda: {
+            "cases": cli_summary.run_cases(reports, result=result),
+            "simulation": cli_summary.simulation(result, report_path=report_path, html_report=args.report),
+            "timecourse_comparison": cli_summary.Unknown("--compare-timecourses was not given"),
+        },
+    )
     if args.compare_timecourses:
         try:
             comparison = result.compare_with_timecourses()
@@ -965,8 +1103,19 @@ def _run(args: argparse.Namespace) -> int:
                 f"The simulation bundle in {result.output_directory} is complete; the time-course comparison was "
                 "refused."
             )
-            raise _user_data_error(exc) from exc
+            error = _user_data_error(exc)
+            refused = f"the comparison was refused ({error.args[0]}); the simulation bundle is complete"
+            _record(args, lambda: {"timecourse_comparison": cli_summary.Unknown(refused)})
+            raise error from exc
         _print_comparison(comparison)
+        _record(
+            args,
+            lambda: {
+                # Again: the manifest now lists timecourse_comparison.csv.
+                "simulation": cli_summary.simulation(result, report_path=report_path, html_report=args.report),
+                "timecourse_comparison": cli_summary.timecourse_comparison(comparison),
+            },
+        )
     if result.partial_run:
         blocked_ids = ", ".join(case["case_id"] for case in result.blocked_cases())
         print()
@@ -976,6 +1125,25 @@ def _run(args: argparse.Namespace) -> int:
         )
         return EXIT_PARTIAL
     return EXIT_OK
+
+
+def _refused_run(
+    reports: Sequence[ModelabilityReport], blocked: Sequence[ModelabilityReport], *, mode: str, runnable_only: bool
+) -> dict[str, Any]:
+    """The --json sections of a run that simulated nothing because the preflight blocks a requested case."""
+
+    stated = f"the preflight blocks {len(blocked)} of {len(reports)} requested case(s) in {mode} mode"
+    if runnable_only:
+        stated += "; --runnable-only has nothing to simulate: no requested case is runnable"
+    refused = (
+        f"not simulated: {stated} and --runnable-only was not given; FungMod simulates only when every requested "
+        "case passes the preflight"
+    )
+    return {
+        "cases": cli_summary.run_cases(reports, refused=refused),
+        "simulation": cli_summary.Unknown(f"nothing was simulated: {stated}"),
+        "timecourse_comparison": cli_summary.Unknown("nothing was simulated, so nothing was compared"),
+    }
 
 
 def _preflight(args: argparse.Namespace) -> int:
@@ -1002,11 +1170,15 @@ def _preflight(args: argparse.Namespace) -> int:
 
 
 def _check_data(args: argparse.Namespace) -> int:
+    _record(args, lambda: {"directory": str(args.directory)})
     registry_path = _registry_path(args)
     registry = _load_registry(registry_path)
+    _record(args, lambda: {"base_registry": cli_summary.registry_identity(registry_path, registry.registry_id)})
     try:
         dataset = load_user_dataset(args.directory, registry=registry)
     except UserDataError as exc:
+        issues = exc.issues
+        _record(args, lambda: cli_summary.check_data_refused(issues))
         error = _user_data_error(exc)
         if REVIEW_MARKER in error.args[0]:
             error = _UsageError(
@@ -1042,6 +1214,7 @@ def _check_data(args: argparse.Namespace) -> int:
     _print_enzyme_inactivation(dataset)
     _print_timecourses(dataset)
     _print_fit_block(dataset)
+    _record(args, lambda: cli_summary.check_data_loaded(dataset))
     return EXIT_OK
 
 
@@ -1090,9 +1263,25 @@ def _assemble(args: argparse.Namespace) -> int:
         )
     conditions = _assembly_conditions(args)
     output = cast(Path, args.output)
+    _record(
+        args,
+        lambda: {
+            "request": {
+                "dataset_id": args.dataset_id,
+                "output_directory": str(output),
+                "fungus": fungi[0],
+                "substrates": list(args.substrate),
+                "conditions": conditions,
+                "network": bool(args.network),
+                "fetch": bool(args.fetch),
+                "fetch_kinetics": bool(args.fetch_kinetics),
+            }
+        },
+    )
     _require_new_output(output, _DATASET_OUTPUT_REASON)
     registry_path = _registry_path(args)
-    proteome, selection = _assembly_proteome(args, fungi[0])
+    proteome, resolution = _assembly_proteome(args, fungi[0])
+    selection = None if resolution is None else resolution.statement
     optional = {
         "scientific_name": args.scientific_name,
         "same_species": args.same_species,
@@ -1153,15 +1342,36 @@ def _assemble(args: argparse.Namespace) -> int:
         raise _UsageError(str(exc)) from exc
     except (ValueError, KeyError, OSError) as exc:
         raise _UsageError(_exception_text(exc)) from exc
-    _print_assembly(draft, kinetics_dir=kinetics_dir, fetched=bool(args.fetch_kinetics and args.fetch))
+    fetched = bool(args.fetch_kinetics and args.fetch)
+    _print_assembly(draft, kinetics_dir=kinetics_dir, fetched=fetched)
     _print_written(written, output)
     _print_review_fields(draft.review_fields)
-    _print_assembly_next_steps(draft, output)
+    steps = _print_assembly_next_steps(draft, output)
+    proteome_snapshots = [
+        *([] if resolution is None else [str(resolution.search.directory)]),
+        *([] if proteome is None else [str(proteome.directory)]),
+    ]
+    _record(
+        args,
+        lambda: {
+            "draft": cli_summary.assembly(
+                draft,
+                written=written,
+                output=output,
+                kinetics_dir=kinetics_dir,
+                fetched=fetched,
+                proteome_snapshots=proteome_snapshots,
+                next_steps=steps,
+            )
+        },
+    )
     return EXIT_OK
 
 
-def _assembly_proteome(args: argparse.Namespace, fungus: str) -> tuple[UniprotSnapshot | None, str | None]:
-    """The UniProt proteome snapshot of ``--proteome`` or ``--fetch-proteome`` and how it was chosen.
+def _assembly_proteome(
+    args: argparse.Namespace, fungus: str
+) -> tuple[UniprotSnapshot | None, ProteomeNameResolution | None]:
+    """The UniProt proteome snapshot of ``--proteome`` or ``--fetch-proteome`` and, when found by name, how it was chosen.
 
     The network is reached only with ``--fetch`` (``refresh`` of the sources
     module); otherwise the frozen snapshots are read and a missing one is
@@ -1184,6 +1394,15 @@ def _assembly_proteome(args: argparse.Namespace, fungus: str) -> tuple[UniprotSn
             )
         if problems:
             raise _UsageError(f"{'; '.join(problems)}; nothing else is fetched.")
+        _record(
+            args,
+            lambda: {
+                "proteome": cli_summary.Unknown(
+                    "neither --proteome nor --fetch-proteome was given: the enzyme repertoire comes from the other "
+                    "sources (annotation, asserted classes, user data, registry record)"
+                )
+            },
+        )
         return None, None
     route = "--fetch-proteome" if by_name else "--proteome"
     annotated = [
@@ -1235,7 +1454,20 @@ def _assembly_proteome(args: argparse.Namespace, fungus: str) -> tuple[UniprotSn
     except UniprotFetchError as exc:
         raise _UsageError(str(exc)) from exc
     _print_proteome(snapshot, resolution, snapshot_dir=snapshot_dir, fetched=refresh, name_from=name_from)
-    return snapshot, None if resolution is None else resolution.statement
+    _record(
+        args,
+        lambda: {
+            "proteome": cli_summary.proteome(
+                snapshot,
+                resolution,
+                proteome_id=proteome_id,
+                snapshot_dir=snapshot_dir,
+                fetched=refresh,
+                name_from=name_from,
+            )
+        },
+    )
+    return snapshot, resolution
 
 
 def _proteome_choice_error(exc: ProteomeChoiceError, args: argparse.Namespace, name_from: str) -> _UsageError:
@@ -1325,6 +1557,14 @@ def _fit(args: argparse.Namespace) -> int:
         "max_nfev": args.max_nfev,
     }
     registry_path = _registry_path(args)
+    _record(
+        args,
+        lambda: {
+            "request": cli_summary.fit_request(
+                directory=args.directory, case=args.case, bounds=bounds, initial=initial, output=output
+            )
+        },
+    )
     print(f"Fitting {', '.join(bounds)} of {strain_id} / {enzyme_class} / {substrate_id} in {args.directory}")
     try:
         fit = fit_user_dataset(
@@ -1337,6 +1577,7 @@ def _fit(args: argparse.Namespace) -> int:
         )
     except UserDataError as exc:
         error = _user_data_error(exc)
+        found = exc.report if isinstance(exc, UserDataFitError) else None
         if isinstance(exc, UserDataFitError) and exc.report is not None and exc.report.get("quantities"):
             print()
             print("The fit was refused; nothing was written. What the fit found:")
@@ -1346,13 +1587,26 @@ def _fit(args: argparse.Namespace) -> int:
                     error.args[0],
                     [*error.details, "On the command line, --allow-unidentified writes it labelled as not identified."],
                 )
+        nothing = cli_summary.Unknown("the fit was refused; nothing was written")
+        _record(args, lambda: {"fit": cli_summary.fit_report(found), "fitted_dataset": nothing, "next_steps": nothing})
         raise error from exc
     _print_fit(fit)
+    _record(args, lambda: {"fit": cli_summary.fit_report(fit.report)})
     try:
         fitted = fit.write(output, registry=registry_path)
     except UserDataError as exc:
-        raise _user_data_error(exc) from exc
-    _print_fitted_dataset(fitted, fit, output)
+        error = _user_data_error(exc)
+        refused = cli_summary.Unknown(f"the fitted dataset was refused when written: {error.args[0]}")
+        _record(args, lambda: {"fitted_dataset": refused, "next_steps": refused})
+        raise error from exc
+    steps = _print_fitted_dataset(fitted, fit, output)
+    _record(
+        args,
+        lambda: {
+            "fitted_dataset": cli_summary.fitted_dataset(fitted, report_path=output / "fit_report.json"),
+            "next_steps": steps,
+        },
+    )
     return EXIT_OK
 
 
@@ -1526,6 +1780,8 @@ def _build_experiment(args: argparse.Namespace) -> VirtualExperiment:
 
 
 _RUN_OUTPUT_REASON = "so that the manifest lists only the files of this run"
+# The options a printed next `fungmod run` command continues with; N, S and RUN_DIR are the user's choice.
+_RUN_COMPLETION = "--mode exploratory --samples N --seed S --output RUN_DIR"
 # Proteome-search candidates printed; the rest are counted and stay in the frozen search snapshot.
 _CANDIDATE_ROWS = 25
 _DATASET_OUTPUT_REASON = "so that the directory holds only this dataset's files; nothing is overwritten"
@@ -1546,9 +1802,7 @@ def _user_data_error(exc: UserDataError) -> _UsageError:
 
 
 def _issue_line(issue: Mapping[str, Any]) -> str:
-    row = "-" if issue["row"] is None else str(issue["row"])
-    column = issue["column"] if issue["column"] else "-"
-    return f"{issue['file']}:{row}:{column}: {issue['message']}"
+    return f"{cli_summary.issue_location(issue)}: {issue['message']}"
 
 
 def _exception_text(exc: BaseException) -> str:
@@ -2172,7 +2426,9 @@ def _print_review_fields(fields: Sequence[Mapping[str, Any]]) -> None:
         print(f"  {field['file']}:{row}:{field['column'] or '-'}: {field['note']}")
 
 
-def _print_assembly_next_steps(draft: AssembledTablesDraft, output: Path) -> None:
+def _print_assembly_next_steps(draft: AssembledTablesDraft, output: Path) -> dict[str, Any]:
+    """Print the next steps of an assembled draft; return them for the --json summary."""
+
     report = draft.assembly
     directory = shell_quote(str(output))
     selection = [
@@ -2189,23 +2445,20 @@ def _print_assembly_next_steps(draft: AssembledTablesDraft, output: Path) -> Non
     ]
     listed = [item for item in report["requested_conditions"] if item["in_conditions_csv"]]
     grid = [item for item in report["requested_conditions"] if not item["in_conditions_csv"]]
-    commands = []
-    notes = []
+    commands: list[tuple[str, list[str]]] = []
     if listed:
         conditions = [part for item in listed for part in ("--condition", shell_quote(item["condition_id"]))]
-        command, note = _assembly_run_command(report, selection, conditions, [item["condition_id"] for item in listed])
-        commands.append(command)
-        notes.extend(note)
+        commands.append(
+            _assembly_run_command(report, selection, conditions, [item["condition_id"] for item in listed])
+        )
     for item in grid:
         values = item["environment_grid"]
         grid_parts = [
             *(part for value in values["temperature_C"] for part in ("--temperature-c", _value_text(value))),
             *(part for value in values["ph"] for part in ("--ph", _value_text(value))),
         ]
-        command, note = _assembly_run_command(report, selection, grid_parts, [item["condition_id"]])
-        commands.append(command)
-        notes.extend(note)
-    _print_next_steps(draft, output, commands, notes)
+        commands.append(_assembly_run_command(report, selection, grid_parts, [item["condition_id"]]))
+    return _print_next_steps(draft, output, commands)
 
 
 def _assembly_run_command(
@@ -2265,13 +2518,16 @@ def _network_run_command(
 def _print_draft_next_steps(draft: UserTablesDraft, output: Path) -> None:
     directory = shell_quote(str(output))
     command = f"fungmod run --user-data {directory} --fungus STRAIN --substrate SUBSTRATE --condition CONDITION_ID"
-    _print_next_steps(draft, output, [command])
+    _print_next_steps(draft, output, [(command, [])])
 
 
 def _print_next_steps(
-    draft: UserTablesDraft, output: Path, commands: Sequence[str], notes: Sequence[str] = ()
-) -> None:
+    draft: UserTablesDraft, output: Path, commands: Sequence[tuple[str, Sequence[str]]]
+) -> dict[str, Any]:
+    """Print the next steps of a draft (each run command with its notes); return them for the --json summary."""
+
     directory = shell_quote(str(output))
+    check = f"fungmod check-data {directory}"
     step = 1
     print()
     print("Next:")
@@ -2279,15 +2535,24 @@ def _print_next_steps(
         print(f"  {step}. Fill the {len(draft.review_fields)} {REVIEW_MARKER} field(s) above; {output / 'review.md'} "
               "explains every decision.")
         step += 1
-    print(f"  {step}. fungmod check-data {directory}")
+    print(f"  {step}. {check}")
     step += 1
     print(f"  {step}. Run it (exploratory mode samples ranges and estimates; scientific mode takes exact measured, "
           "literature or design values only):")
-    for command in commands:
+    for command, _ in commands:
         print(f"     {command} \\")
-        print("       --mode exploratory --samples N --seed S --output RUN_DIR")
-    for note in notes:
-        print(f"     {note}")
+        print(f"       {_RUN_COMPLETION}")
+    for _, notes in commands:
+        for note in notes:
+            print(f"     {note}")
+    return {
+        "review_fields_to_fill": len(draft.review_fields),
+        "review_file": str(output / "review.md"),
+        "commands": [
+            cli_summary.next_command(check),
+            *(cli_summary.next_command(command, _RUN_COMPLETION, notes) for command, notes in commands),
+        ],
+    }
 
 
 def _print_fit(fit: UserDatasetFit) -> None:
@@ -2337,22 +2602,32 @@ def _print_fit_quantities(report: Mapping[str, Any]) -> None:
         print(f"  {item['quantity']}: {item['identifiability_method']}; {item['reason']}")
 
 
-def _print_fitted_dataset(fitted: UserDataset, fit: UserDatasetFit, output: Path) -> None:
+def _print_fitted_dataset(fitted: UserDataset, fit: UserDatasetFit, output: Path) -> dict[str, Any]:
+    """Print the fitted dataset and the next commands; return the next steps for the --json summary."""
+
     case = fit.report["case"]
     directory = shell_quote(str(output))
     conditions = " ".join(f"--condition {shell_quote(condition)}" for condition in fit.report["conditions"])
+    check = f"fungmod check-data {directory}"
+    run = (
+        f"fungmod run --user-data {directory} --fungus {shell_quote(case['strain_id'])} "
+        f"--substrate {shell_quote(case['substrate_id'])} {conditions}"
+    )
+    completion = f"{_RUN_COMPLETION} --compare-timecourses"
+    note = "fitted values run in exploratory mode only; scientific mode refuses them"
     print()
     print(f"Fitted dataset: {fitted.dataset_id} (digest {fitted.digest})")
     print(f"Directory: {fitted.source_directory}")
     print(f"Fit report: {output / 'fit_report.json'}")
     print()
-    print("Next (fitted values run in exploratory mode only; scientific mode refuses them):")
-    print(f"  fungmod check-data {directory}")
-    print(
-        f"  fungmod run --user-data {directory} --fungus {shell_quote(case['strain_id'])} "
-        f"--substrate {shell_quote(case['substrate_id'])} {conditions} \\"
-    )
-    print("    --mode exploratory --samples N --seed S --output RUN_DIR --compare-timecourses")
+    print(f"Next ({note}):")
+    print(f"  {check}")
+    print(f"  {run} \\")
+    print(f"    {completion}")
+    return {
+        "note": note,
+        "commands": [cli_summary.next_command(check), cli_summary.next_command(run, completion)],
+    }
 
 
 def _print_genome_resolution(dataset: UserDataset) -> None:

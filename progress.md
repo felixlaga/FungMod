@@ -434,6 +434,171 @@ Next task: report the reference condition of a law in single-class drafts too
 back in the pins); then let a drafted network with laws be compared and
 fitted once time courses are combined with networks.
 
+## CLI-003 Machine-Readable --json Summaries Of The Command Line
+
+Status: `complete` for the stated scope (2026-10-08). CLI-001, CLI-002 and
+RUN-001 recommended a machine-readable `--json` summary so that scripts and
+pipelines can use `fungmod` results without parsing prose. `run`,
+`assemble`, `check-data` and `fit` now take `--json PATH` (`-` for standard
+output) and write one JSON document of what the command computed, printed
+and wrote. The printed text and the exit codes do not change (checked byte
+for byte on 14 commands, help included, against the base commit).
+
+Design decisions:
+
+- **Where the summary goes.** `--json PATH` writes a new file; the text stays
+  on standard output. `--json -` writes the summary alone to standard output
+  and the text the command prints to standard error (the handler runs under
+  `contextlib.redirect_stdout(sys.stderr)`), so standard output is one JSON
+  document. The path is refused before the command runs (exit code 2, no
+  summary) when it exists (nothing is overwritten), when its directory does
+  not exist (none is created), or when it lies inside `--output` (the output
+  directory holds only the files the command writes; the run manifest would
+  not list it). The summary is written for every exit code once the
+  arguments parse, errors included; an argparse error writes none. A summary
+  file that cannot be written exits with 2.
+- **What it holds.** Only what the command already computed: the API's
+  objects (`ModelabilityReport`, `DegradationScreenResult` and its tables,
+  `TimecourseComparison`, `AssembledTablesDraft.assembly`, `UserDataset`, the
+  fit report) and the files of the output directory (`output_manifest.json`,
+  `case_summary.csv`, `final_metrics.csv`, `threshold_times.csv`,
+  `summary_metrics.csv`, `limitations_table.csv`). No unit is converted, no
+  statistic is computed that the tables do not hold (a count of rows is the
+  only arithmetic), and no value is chosen for an unknown.
+- **Unknowns.** Every `null` has its reason in the `null_reasons` object of
+  the object holding it (`cli_summary.Unknown`); `finalize` refuses a bare
+  `None`, a non-finite number and any non-JSON value, and a non-finite table
+  value becomes `null` with the value quoted. Sections a stopped command did
+  not reach are `null` with "not reached: ...". Values that do not apply (no
+  seed in scientific mode, no error) follow the same rule, so a consumer
+  meets one rule for every null.
+- **Case statuses of `run`.** `ran`, `blocked` (the preflight blocks the case;
+  the reason is `case_summary.csv`'s `not_simulated_reason`, or the blocking
+  reason and next action when nothing was written), `refused` (runnable, but
+  another case is blocked and `--runnable-only` was not given: exit 3), and
+  `failed` (runnable, but the simulation failed after a passing preflight:
+  exit 1). The fourth status is added to the three requested because a failed
+  simulation is neither blocked nor refused.
+- **One table of exit-code meanings.** `EXIT_CODE_MEANINGS` in `cli.py` now
+  builds the exit-code lines of `--help` (unchanged text) and the summaries'
+  `exit_meaning`.
+- **No `compare` subcommand exists.** The time-course comparison is part of
+  the `run` summary (`timecourse_comparison`), refused comparisons included.
+  `preflight`, `list` and `draft-kinetics` have no `--json`.
+- **Where the code lives.** `fungal_model/cli_summary.py` builds the
+  summaries; `cli.py` records them as each step finishes (`_record`, run
+  only with `--json`) and writes them. The next-step printers of `assemble`
+  and `fit` now return their commands for the summary and print the same
+  text. The new module is added to the guardrail scans of `cli.py`
+  (no shortcut wording, no organism, substrate, enzyme or database token, no
+  low-level solver) and names no database and opens no connection.
+
+Changed:
+
+- `src/fungal_model/cli.py`: `--json` on `run`, `check-data`, `assemble` and
+  `fit` (`JSON_HELP`, `_add_json_argument`); `main` (summary, target check,
+  stdout redirect, writing: `_check_json_target`, `_write_summary`,
+  `_usage_error`, `_record`); `EXIT_CODE_MEANINGS`, `JSON_STDOUT`,
+  `_RUN_COMPLETION`; the four handlers record their sections
+  (`_refused_run`); `_assembly_proteome` returns the name resolution;
+  `_print_assembly_next_steps`, `_print_next_steps` and
+  `_print_fitted_dataset` return the next steps; `_issue_line` uses
+  `cli_summary.issue_location`; module docstring.
+- `src/fungal_model/cli_summary.py` (new): `SUMMARY_SCHEMA_VERSION`
+  (`"1.0.0"`), `Unknown`, `finalize`, `render`, `document`, `new_result`,
+  `RESULT_SECTIONS`, `RUN_CASE_STATUSES` and the builders per command.
+- Docs: `docs/cli.md` ("Machine-readable summaries: --json": options, the
+  document, the three rules, the field reference per command, real output of
+  `check-data` on the esterase fixture and excerpts of the Reaction 618
+  partial run; the introduction, the arguments list and the exit codes);
+  `README.md` (command-line paragraph and capability row); `CHANGELOG.md`.
+
+Tests (`tests/test_cli_json.py`, 19 test functions, 24 cases; the network
+refused, synthetic UniProt and kinetic-law responses served by the fakes of
+`tests/test_fetch_by_name.py` and `tests/test_fetch_kinetics.py`): the
+schema version is pinned and only the four commands take `--json`; a null
+needs a reason and NaN and infinity are refused; a partial Reaction 618 run
+gives the same text and exit code (4) with and without `--json`, its ran and
+blocked cases with reasons equal to `case_summary.csv` and the text, medians
+and 5th and 95th percentiles equal to `summary_metrics.csv` and printed to
+four significant figures, threshold times not reached as nulls with the
+printed reason, the bundle's paths, limitation counts by severity and
+measurement requests as written and printed; a refused run (refused and
+blocked cases, exit 3, nothing written), `--runnable-only` with nothing
+runnable, and a failed simulation (exit 1; `simulate` patched to raise);
+`--json -` gives pure JSON on standard output and the text on standard
+error; text and exit code unchanged with `--json` for six commands (exit 0
+and 2 of `check-data`, usage errors of `run`, `fit` and `assemble`, exit 3 of
+`run`); a usage error leaves every section not reached; refused `--json`
+paths (existing, inside `--output`, missing directory) before the command
+runs; `check-data` with a gap and its measurement request, and an invalid
+dataset with file, line and column of each issue (a file-level issue with a
+null line and column); `assemble` of the dbCAN fixture against
+`assemble_user_tables` and the text (classes, acting classes, each case's
+kinetics status, the counts of the five statuses, the eight `REVIEW:` fields,
+the written files, the next commands), a proteome found by name (candidates,
+chosen, snapshots) and by identifier offline, a proteome without a release
+header (null release with the reason), the kinetics lookup (query, counts,
+snapshot paths), and an enzyme network (members, statuses per condition);
+`fit` against `fit_report.json` and the text, the fitted dataset's
+`check-data` summary, a fit refused before it ran and an unidentified fit;
+`run --compare-timecourses` against `timecourse_comparison.csv`, and a
+refused comparison after a complete bundle (exit 2). Parametrize ids are
+short. `tests/test_guardrails_no_shortcuts.py`,
+`tests/test_guardrails_no_hardcoding.py` and
+`tests/test_guardrails_native_execution.py` scan the new module too.
+
+Commands and results (worktree on `claude/cli-json-summary`, based on
+`524df39`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests`: all checks passed.
+- `pyright` on `cli.py`, `cli_summary.py` and `tests/test_cli_json.py`: 0
+  errors (`cli.py` also 0 at the base commit).
+- `mkdocs build --strict -q`: built, no warnings.
+- Byte comparison of 14 commands (help texts, `run` exit 0, 2, 3 and 4 and
+  scientific, `check-data`, `assemble`, `fit`, `run --compare-timecourses`)
+  before and after the change: identical stdout, stderr and exit codes; the
+  help of the four commands differs only by the `--json PATH` option.
+- `tests/test_cli_json.py`: 24 passed. With `tests/test_cli.py`,
+  `tests/test_cli_user_data_workflow.py`, `tests/test_user_data*.py`, the four
+  guardrail modules, `tests/test_assemble_network.py`,
+  `tests/test_fetch_by_name.py`, `tests/test_fetch_kinetics.py` and
+  `tests/test_fetch_kinetics_user_classes.py`: 793 passed in 5 min 6 s.
+- Full suite (`pytest -q -n 2 --dist loadfile -p no:cacheprovider`,
+  background): 2867 passed in 41 min 10 s (run before two assertions on the
+  run case statuses were added to `tests/test_cli_json.py` and two docs
+  sentences reworded; that module was re-run after them and passed).
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13).
+
+Not changed: the text and exit codes of every command, the API, the output
+bundle and its schema (still `2.2.1`), any table, report, preflight rule,
+process law or numerical result; `preflight`, `list` and `draft-kinetics`.
+
+Scientific impact: none. The summary repeats computed values and their
+units; it adds no value and fills no unknown.
+
+Compatibility: additive. New option `--json` on four subcommands, new module
+`fungal_model.cli_summary`, new public names `EXIT_CODE_MEANINGS` and
+`JSON_STDOUT` in `fungal_model.cli` (not in `__all__`). Help texts gain the
+option. Private helpers changed signature (`_assembly_proteome`,
+`_print_next_steps`).
+
+Remaining ambiguities and limitations: the summary is written at the end of
+the command, so a crash (an unexpected exception, not a refusal) writes none;
+`simulation.file_count` counts the manifest's files instead of listing them
+(the per-sample bundles make the list long); paths are as printed, so a
+relative `--output` stays relative; `preflight` has no summary; the format is
+version 1.0.0 and has no JSON Schema file yet; `fit` reports the objective's
+definition but not its value (its units depend on the error model).
+
+Risk: low. The default path is unchanged (byte-compared); the summary only
+reads results, and its contract (null reasons, finite numbers, schema
+version) is enforced when it is written and checked in tests.
+
+Recommended next task: `cases=` on `VirtualExperiment.simulate` for
+re-running chosen cases of a request with their original seeds (RUN-001's
+second recommendation), then a JSON Schema file for the summary format and a
+`preflight --json`.
+
 ## FETCH-003 Kinetics Of A Lab's Own Enzyme Classes Looked Up By Their EC Numbers
 
 Status: `complete` for the stated scope (2026-10-08); not verified against a
