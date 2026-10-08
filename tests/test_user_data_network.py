@@ -45,6 +45,7 @@ from fungal_model.api.user_data import (
     USER_DATASET_MATURITY_GAP,
     USER_DATASET_NETWORK_PROCESS_TYPE,
 )
+from fungal_model.api.result_tables import _final_product_metric_name, _is_concentration_units
 from fungal_model.api.user_data_assembly import UserTablesAssemblyError, assemble_user_tables
 from fungal_model.cli import EXIT_OK, EXIT_PARTIAL, EXIT_USAGE, main
 from fungal_model.registry import load_registry
@@ -1086,3 +1087,39 @@ def test_run_reports_a_blocked_network_case(capsys: pytest.CaptureFixture[str], 
     )
     assert code == EXIT_PARTIAL, err
     assert "not simulated" in out
+
+
+# ---------------------------------------------------------------------------
+# Output labels
+
+
+def test_a_micromolar_product_is_named_a_concentration(parallel_run: Any) -> None:
+    """Schema 2.2.1: a product per volume is a concentration whatever its prefix; text matching called uM an amount."""
+
+    metrics = {row["metric"]: row for row in parallel_run.final_metrics()}
+    assert metrics["final_product_concentration"]["units"] == "micromolar"
+    assert metrics["final_product_concentration"]["status"] == "computed"
+    assert "final_product_amount" not in metrics
+
+
+@pytest.mark.parametrize(
+    ("units", "concentration"),
+    [
+        ("millimolar", True),
+        ("micromolar", True),
+        ("nanomolar", True),
+        ("millimole / liter", True),
+        ("gram / liter", True),
+        ("filter_paper_unit / liter", True),
+        ("kilogram", False),
+        ("mole", False),
+        ("millimole / gram", False),
+        ("not_applicable", False),
+        ("", False),
+    ],
+)
+def test_concentration_units_are_judged_by_dimension(units: str, concentration: bool) -> None:
+    assert _is_concentration_units(units) is concentration
+    assert _final_product_metric_name(units) == (
+        "final_product_concentration" if concentration else "final_product_amount"
+    )

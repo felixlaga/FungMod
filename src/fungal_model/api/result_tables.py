@@ -3147,13 +3147,23 @@ def _final_product_metric_name(product_units: str) -> str:
 
 
 def _is_concentration_units(units: str) -> bool:
-    text = units.strip().lower()
-    if text in {"mm", "millimolar", "molar", "mol / l", "mol/l", "mole / liter", "mole/liter"}:
-        return True
-    volume_tokens = ("liter", "litre", "l", "meter ** 3", "metre ** 3")
-    if "/" not in text:
+    """Whether a product state's units are a concentration: anything per volume, judged by pint's dimensionality.
+
+    An amount, mass or activity per volume (``millimolar``, ``micromolar``,
+    ``millimole / liter``, ``gram / liter``, ``FPU / liter``) is a
+    concentration; an amount alone (``kilogram``, ``mole``) is not. Text pint
+    cannot parse is not called a concentration. (Matching unit names as text
+    called ``micromolar`` an amount.)
+    """
+
+    text = units.strip()
+    if not text:
         return False
-    return any(token in text for token in volume_tokens)
+    try:
+        dimensionality = Q_(1.0, text).dimensionality
+    except Exception:  # pint raises several unrelated exception types for bad strings
+        return False
+    return dimensionality.get("[length]", 0) == -3
 
 
 def _initial_state_value(

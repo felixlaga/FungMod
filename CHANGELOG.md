@@ -876,6 +876,16 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- `final_metrics.csv` named a product stated in micromolar
+  `final_product_amount` (and would have called an amount per mass such as
+  `millimole / gram` a concentration): the label was chosen by matching unit
+  names as text. It is now chosen by pint's dimensionality: anything per volume
+  is `final_product_concentration`, anything else `final_product_amount`.
+  Output schema `2.2.1` (was `2.2.0`): no table, column or allowed value
+  changed, but bundles of earlier versions carry `final_product_amount` for
+  micromolar products (the esterase, oxidase and parallel-network fixtures,
+  for example), so do not pool the two names across versions; every other
+  label and every value is unchanged (NETWORK-002).
 - The homogeneous and pH-ionization Michaelis-Menten assembler labelled every
   substrate entity dissolved (`generic_dissolved` loader, `physical_state`
   `dissolved`, `homogeneous_dissolved` degradation model) whatever the

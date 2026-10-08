@@ -916,9 +916,11 @@ configured conservation diagnostics copied from existing per-sample
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
-In output schema `2.0.0` (current: `2.2.0`; `2.1.0` added the on-request
+In output schema `2.0.0` (current: `2.2.1`; `2.1.0` added the on-request
 `timecourse_comparison.csv`, `2.2.0` the `case_status` and
-`not_simulated_reason` columns of `case_summary.csv` for partial runs), `time_series_long.csv` reports `degradation_rate`
+`not_simulated_reason` columns of `case_summary.csv` for partial runs, and
+`2.2.1` names a product in any per-volume unit, micromolar included,
+`final_product_concentration`), `time_series_long.csv` reports `degradation_rate`
 as -d[substrate]/dt and `product_release_rate` as +d[product]/dt of the case's
 mapped substrate and product states (source `simulation_state_rate`), each in
 that state's units per time unit. They are read from the per-sample

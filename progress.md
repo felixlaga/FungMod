@@ -159,10 +159,21 @@ after: identical. `tests/test_user_data_network.py`: the cross-basis refusal
 test now expects the new message and adds the dissolved-to-solid refusal.
 Guardrails: the fixtures' tokens join the user-data token list.
 
+Also fixed (separate commit): `result_tables._is_concentration_units` matched
+unit names as text, so a product in `micromolar` was reported as
+`final_product_amount` (confirmed on the esterase, oxidase and
+`network_parallel` fixtures) and `millimole / gram` would have passed as a
+concentration. It now uses pint's dimensionality (per volume is a
+concentration). Output schema `2.2.1` (patch: no table, column or allowed value
+changed; the metric name of micromolar products differs from `2.2.0` bundles);
+tests `test_a_micromolar_product_is_named_a_concentration` and
+`test_concentration_units_are_judged_by_dimension` in
+`tests/test_user_data_network.py`; the three schema-version pins updated.
+
 Not changed: no process law, rate form, modifier, solver, kernel, fit,
 comparison or preflight rule; pure-number coefficients and weights take the
-code paths they took before; no registry record or case template; output
-schema unchanged by this entry.
+code paths they took before; no registry record or case template; apart from
+the micromolar label, every output of every existing case is unchanged.
 
 Scientific impact: a user's solid substrate can feed a dissolved pool whose
 classes have molar kinetics, so a solid-degrading class and a disaccharide- or

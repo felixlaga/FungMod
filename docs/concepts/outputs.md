@@ -11,7 +11,7 @@ should be recoverable from an exported artifact.
 | `case_summary.csv` | One row per requested case: sample counts, and `case_status` (`simulated`, or `not_simulated` with the reason in a [partial run](#partial-runs)). |
 | `modelability_items.csv` | Known, uncertain, missing, or unsupported inputs. |
 | `time_series_long.csv` | Long-form state and derived trajectories. |
-| `final_metrics.csv` | Final substrate/product metrics and maximum rates, each in its own state's units. `final_product_yield` (product formed per initial substrate) is the plain ratio, `dimensionless`, when product and substrate share units; across a [basis change](../user-data.md#a-solid-releasing-a-dissolved-pool) it is the pint quotient with its units (for example `millimole / gram`), never labelled dimensionless. |
+| `final_metrics.csv` | Final substrate/product metrics and maximum rates, each in its own state's units. The final product is `final_product_concentration` when its units are anything per volume (judged by pint's dimensionality since schema `2.2.1`; `2.2.0` and earlier bundles named a micromolar product `final_product_amount`) and `final_product_amount` otherwise (a mass or an amount). `final_product_yield` (product formed per initial substrate) is the plain ratio, `dimensionless`, when product and substrate share units; across a [basis change](../user-data.md#a-solid-releasing-a-dissolved-pool) it is the pint quotient with its units (for example `millimole / gram`), never labelled dimensionless. |
 | `threshold_times.csv` | Times to configured degradation fractions. |
 | `sampled_parameters.csv` | Every sampled value with source and allowed-use metadata. |
 | `uncertainty_summary.csv` | Summaries over sampled inputs and output metrics. |
