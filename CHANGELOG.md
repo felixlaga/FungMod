@@ -6,6 +6,23 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Quick-look figures of what a network or a culture computes (PLOTS-001):
+  each case whose time series hold the rates of more than one process (an
+  enzyme network of two or more classes, a culture, the registry's enzyme
+  chain) gets `figures/<case_id>_state_trajectories.png`, one panel per
+  simulated state in its own units (the entry substrate, the intermediate pools
+  and the final product first; for a culture also the biomass, each enzyme pool
+  and both closure ledgers), the substrate panel marked with the 10, 50 and
+  90 % degradation times of `threshold_times.csv` at their p50 from
+  `summary_metrics.csv`, and `figures/<case_id>_process_rates.png`, one panel
+  per `process_rate.<id>` series in its own rate units, a network process
+  named with its enzyme class, pool and rate modifiers from
+  `mechanism_summary.csv`. With several samples each panel shows the p05-p95
+  band and p50 of `trajectory_quantiles.csv`. The figures are drawn from the
+  existing tables only; no output table, column or value changes (schema
+  `2.2.1`), and cases with one process keep the five run-level figures
+  unchanged (byte-identical under the same matplotlib).
+
 - Kinetics of the fungus's enzyme classes looked up in SABIO-RK by EC number
   (FETCH-002): `assemble_user_tables(fetch_kinetics=True)` and `fungmod
   assemble --fetch-kinetics` query SABIO-RK's kinetic-law export once per
@@ -963,6 +980,14 @@ All notable public releases of FungMod are documented here.
   reuses compiled kernels for unconstrained processes.
 
 ### Fixed
+
+- The run-level quick-look figures (`substrate_remaining_vs_time.png`,
+  `product_release_vs_time.png`, `degradation_fraction_vs_time.png`,
+  `degradation_rate_vs_time.png`) drew the cases of a run on one axis labelled
+  with the first row's units, even when cases were in different units (g/L and
+  mM) or time units (hours and minutes). Each units text now gets its own panel
+  with its units on both axes; a run in one units text draws exactly as before
+  (PLOTS-001).
 
 - A dimensionless parameter bound to a product-map coefficient in scaled units
   was read as its raw number: a `culture.csv` `biomass_yield` of `0.5 mg/g`
