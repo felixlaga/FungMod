@@ -390,6 +390,9 @@ def test_a_paginated_answer_is_combined_and_an_incomplete_one_stores_nothing(sab
         (b"\xff\xfe not text", 200, "not a usable kinetic-law export"),
         (BODY_A, 203, "HTTP 203, not 200"),
     ],
+    # Short ids: the default id would embed the whole response body, and pytest exports the test id in an
+    # environment variable, which Windows limits to 32767 characters.
+    ids=["http_500", "unreachable", "html_body", "empty_envelope", "not_utf8", "http_203"],
 )
 def test_http_errors_and_unusable_answers_store_nothing(
     sabio: _FakeSabio, tmp_path: Path, body: bytes | BaseException, status: int, message: str
