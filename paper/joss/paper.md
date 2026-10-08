@@ -40,7 +40,8 @@ unknown and the measurements that would supply them. The model is assembled
 from records (organisms, enzyme classes, substrates, environments and
 parameters) rather than from code written for one organism, so the same
 workflow runs on the shipped records and on a laboratory's own tables, whose
-enzyme repertoire can come from a genome annotation or a proteome and whose
+enzyme repertoire can come from a genome annotation or a proteome looked up by
+the organism's name, whose enzymes can act alone or together, and whose
 kinetics can come from the laboratory's measurements or from a public kinetic
 database. The assembled models can be calibrated to measured time courses and
 exported to the community standards SBML, SED-ML, COMBINE and PEtab.
@@ -100,10 +101,11 @@ estimation problem in COPASI and compares it with FungMod.
 kinds (exact, range, distribution, unknown, not applicable), a unit, a source
 and a maturity label, and declares which uses it allows. A preflight matches
 the requested source, substrate and environment, selects a case template and
-assembles the process laws through one of five assemblers (surface
+assembles the process laws through one of six assemblers (surface
 catalysis, homogeneous Michaelis-Menten, pH-ionised Michaelis-Menten, culture
-physiology and an extracellular enzyme chain). Nothing is inferred from an
-organism's name. The trade-off is coverage: a fungus without records yields a
+physiology, an extracellular enzyme chain, and an enzyme network that
+composes one Michaelis-Menten process per enzyme class). A name is used only
+to look up records or a proteome; no property is inferred from it. The trade-off is coverage: a fungus without records yields a
 list of missing parameters and suggested measurements, not a guess.
 
 **Modes.** An exploratory mode accepts labelled exploratory priors; a
@@ -128,24 +130,37 @@ enzymes, substrates, conditions and kinetics without editing the registry:
 kcat with an enzyme concentration, Vmax (stated, or derived from a specific
 activity and an enzyme loading, or from a saturating assay activity), or a
 diprotic pH-ionisation law, with optional temperature and pH response laws.
-The loader checks every row, reports each problem by file, row and column,
+A suspended solid substrate runs as an apparent law on a dry-mass basis, with
+enzyme doses per gram of substrate and an optional conversion-dependent
+reactivity term [@kadam2004]. A culture table binds the shipped culture model
+to the laboratory's own fungus, which then grows on the substrate and
+secretes its enzymes. An enzyme network runs every class of a strain
+together: rates add on shared pools, a product feeds the next class only
+where the data state that link, and a measured inhibition constant slows a
+class through competitive product inhibition. All three reuse the existing
+process laws. The loader checks every row, reports each problem by file, row and column,
 and turns each missing value into an explicit unknown with a measurement
 request. Measured time courses can be compared with a simulation, and Km with
 kcat or Vmax can be fitted to them; fitted values carry their fit report and
 stay exploratory.
 
 **From a name to a draft.** A strain's enzyme classes can come from a dbCAN
-annotation of its genome or from a UniProt proteome export, resolved through
-a curated CAZy family map and the registry's EC numbers; neither ever
-supplies a rate. SABIO-RK kinetic-law entries, fetched only on request into
+annotation of its genome [@zheng2023] or from a UniProt proteome
+[@uniprot2023], which FungMod can find from the organism's name when the user
+explicitly allows network access: an ambiguous name is refused with its
+candidates listed, and every response is frozen as a digest-checked snapshot
+so that later runs are offline and identical. Both routes resolve through a
+curated CAZy family map and the registry's EC numbers; neither ever supplies
+a rate. SABIO-RK kinetic-law entries, fetched only on request into
 digested snapshots, are converted into user tables whose open decisions are
 marked for review. One call assembles a reviewable dataset for a fungus, its
 substrates and its conditions from these sources and reports, per case,
 whether the kinetics are the laboratory's, published for the same species,
 transferred from another organism (and then only an estimate), conflicting or
 missing; kinetics are never reused at another condition without a stated
-response law. A command-line interface runs, checks and lists virtual
-experiments.
+response law. A command-line interface assembles, checks, runs, compares
+and fits these datasets, and simulates the runnable cases of a request while
+reporting the blocked ones with their measurement requests.
 
 **Spatial mycelium.** An exploratory module simulates hyphal and tip
 densities with tip extension, branching, anastomosis, uptake and
@@ -158,7 +173,7 @@ and is not yet connected to the registry.
 # Research impact statement
 
 FungMod 0.1.1 is released on PyPI under the MIT licence, with documentation
-at https://fungmod.readthedocs.io/. More than 2,000 automated tests run on Linux,
+at https://fungmod.readthedocs.io/. More than 2,600 automated tests run on Linux,
 macOS and Windows for Python 3.11 to 3.13. The repository includes four
 reproducible case studies on the published *Trichoderma harzianum* P49P11
 cellulose cultures [@gelain2020] (holdout benchmarks, posterior sampling,
@@ -166,8 +181,9 @@ preregistered model comparison and cross-solver reproduction in COPASI), each
 with a frozen plan, a runner script and checksummed results, and one command
 regenerates every table and figure from those results. The registry is
 deliberately small: one calibrated whole organism, two enzyme-level cases
-sourced from SABIO-RK (one with a pH response), and labelled development
-records.
+sourced from SABIO-RK (one with a pH response), categorical records of
+further enzyme classes and polysaccharides without kinetic values, and
+labelled development records.
 [Author: add any realised use, such as groups or projects using FungMod,
 talks, teaching or citations. If there is none yet, keep this paragraph as
 the evidence of near-term significance and do not claim more.]
