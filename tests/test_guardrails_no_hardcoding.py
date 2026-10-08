@@ -160,6 +160,17 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "cello_oligosaccharide",
     "cleaver_t1",
     "entry_e1",
+    # FETCH-002 synthetic SABIO-RK responses: organisms, compounds, variants, entry ids and the strain of
+    # tests/test_fetch_kinetics.py come from the responses and the request, never from code.
+    "synthetic kinetics organism",
+    "synthetic acceptor",
+    "synthetic product p9",
+    "synthetic variant v1",
+    "990000",
+    "990001",
+    "strain k1",
+    "k1_draft",
+    "maltose_hydrolase_without_ec",
 )
 
 
@@ -246,6 +257,24 @@ def test_uniprot_route_modules_have_no_organism_substrate_or_enzyme_specific_tok
             "x9b2p",
         ):
             assert forbidden not in module, (relative, forbidden)
+
+
+def test_kinetics_lookup_module_has_no_organism_substrate_enzyme_or_ec_number_tokens() -> None:
+    """FETCH-002: the SABIO-RK query snapshots name SABIO-RK's query syntax, never a class, substrate or EC number."""
+
+    module = (ROOT / "src" / "fungal_model" / "sources" / "sabiork" / "query_snapshots.py").read_text(
+        encoding="utf-8"
+    ).lower()
+    for forbidden in (
+        *USER_DATA_FORBIDDEN_TOKENS,
+        "chitinase",
+        "aspergillus",
+        "3.2.1.",
+        "3.1.1.",
+        "1.10.3.",
+        "reaction_618",
+    ):
+        assert forbidden not in module, forbidden
 
 
 POLYSACCHARIDE_CLASS_TOKENS = (

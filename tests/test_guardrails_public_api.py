@@ -194,6 +194,40 @@ def test_uniprot_route_api_is_exported_and_not_a_placeholder() -> None:
             assert "todo" not in source, name
 
 
+def test_kinetics_lookup_api_is_exported_and_not_a_placeholder() -> None:
+    """FETCH-002: the SABIO-RK query snapshots of the kinetics lookup; complete functions, not top-level names."""
+
+    import fungal_model.api.user_data_assembly as assembly
+    import fungal_model.sources.sabiork.query_snapshots as query_snapshots
+
+    for module, names in (
+        (
+            query_snapshots,
+            (
+                "complete_ec_number",
+                "ec_number_query",
+                "fetch_kinlaw_query_snapshot",
+                "fetch_kinlaw_query_snapshots",
+                "kinlaw_query_directory",
+                "kinlaw_query_snapshot_exists",
+                "load_kinlaw_query_snapshot",
+            ),
+        ),
+        (assembly, ("assemble_user_tables",)),
+    ):
+        for name in names:
+            assert name in module.__all__, name
+            source = inspect.getsource(getattr(module, name)).lower()
+            assert "notimplementederror" not in source, name
+            assert "placeholder" not in source, name
+            assert "todo" not in source, name
+    for name in ("fetch_kinlaw_query_snapshot", "ec_number_query", "load_kinlaw_query_snapshot"):
+        assert not hasattr(fungal_model, name), name
+    for name in ("KineticsLookupError", "MissingKineticsSnapshotError", "KineticsSnapshotConflictError"):
+        assert name in assembly.__all__, name
+        assert issubclass(getattr(assembly, name), assembly.UserTablesAssemblyError), name
+
+
 def test_culture_route_names_are_exported_and_not_placeholders() -> None:
     """USERDATA-009: culture.csv is read by load_user_dataset; its vocabulary is exported from the user-data module."""
 

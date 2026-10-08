@@ -1,0 +1,414 @@
+{
+  "meta": {
+    "page": 1,
+    "page_size": 1000,
+    "total_count": 2,
+    "total_pages": 1
+  },
+  "data": [
+    {
+      "schema": "draft.v1.schema.json",
+      "id": 9900011,
+      "general": {
+        "organism": {
+          "id": null,
+          "name": "Synthetic kinetics organism K4",
+          "ncbi_taxonomy_id": null,
+          "ncbi_taxonomy_lineage": []
+        },
+        "tissue": {
+          "id": null,
+          "name": null
+        },
+        "strain": {
+          "id": null,
+          "name": null
+        },
+        "experiment_type": "InVitro",
+        "mechanism": null,
+        "publication_id": null,
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "date_inserted": null,
+        "date_updated": null
+      },
+      "reaction": {
+        "equation": "H2O + Maltose = 2 D-Glucose",
+        "equation_normalized": null,
+        "is_transport": false,
+        "id": 9900200,
+        "species": [
+          {
+            "stoch_value": "1",
+            "compound": {
+              "id": null,
+              "name": "Enzyme"
+            },
+            "role": "Catalyst",
+            "location": {
+              "id": null,
+              "name": null,
+              "go_term": null
+            },
+            "protein_complex_names": null,
+            "protein_complex_ids": null,
+            "comment": "-"
+          },
+          {
+            "stoch_value": "1",
+            "compound": {
+              "id": null,
+              "name": "H2O"
+            },
+            "role": "Substrate",
+            "location": {
+              "id": null,
+              "name": null,
+              "go_term": null
+            },
+            "protein_complex_names": null,
+            "protein_complex_ids": null,
+            "comment": "-"
+          },
+          {
+            "stoch_value": "1",
+            "compound": {
+              "id": null,
+              "name": "Maltose"
+            },
+            "role": "Substrate",
+            "location": {
+              "id": null,
+              "name": null,
+              "go_term": null
+            },
+            "protein_complex_names": null,
+            "protein_complex_ids": null,
+            "comment": "-"
+          },
+          {
+            "stoch_value": "2",
+            "compound": {
+              "id": null,
+              "name": "D-Glucose"
+            },
+            "role": "Product",
+            "location": {
+              "id": null,
+              "name": null,
+              "go_term": null
+            },
+            "protein_complex_names": null,
+            "protein_complex_ids": null,
+            "comment": "-"
+          }
+        ],
+        "pathways": []
+      },
+      "kineticlaw": {
+        "kinlaw_type": {
+          "id": 23,
+          "name": "Michaelis-Menten",
+          "sbo_term": "SBO:0000029"
+        },
+        "reversible": "Irreversible",
+        "formula": "Vmax*S/(Km+S)",
+        "formula_subst": null,
+        "variables": [],
+        "parameter": [
+          {
+            "name": "Vmax",
+            "role": "Constant",
+            "parameter_type": {
+              "id": 10,
+              "name": "Vmax",
+              "sbo_term": null
+            },
+            "species": {
+              "species_ref_type": "Species",
+              "species_key": null,
+              "ref_status_actual": null
+            },
+            "start_value": 0.8,
+            "end_value": null,
+            "standard_deviation": 0.05,
+            "unit": {
+              "id": null,
+              "name": "mM*min^(-1)",
+              "n_name": null
+            },
+            "comment": "-",
+            "n_start_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null
+          },
+          {
+            "name": "Km",
+            "role": "Constant",
+            "parameter_type": {
+              "id": 8,
+              "name": "Km",
+              "sbo_term": null
+            },
+            "species": {
+              "species_ref_type": "Species",
+              "species_key": "1 | Maltose | Substrate",
+              "ref_status_actual": null
+            },
+            "start_value": 3.2,
+            "end_value": null,
+            "standard_deviation": 0.3,
+            "unit": {
+              "id": null,
+              "name": "mM",
+              "n_name": null
+            },
+            "comment": "-",
+            "n_start_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null
+          }
+        ]
+      },
+      "enzyme_description": {
+        "ec_number": "3.2.1.3",
+        "wildtype": "Wildtype",
+        "enzyme_name": "glucan 1,4-alpha-glucosidase",
+        "mutant_spec": null,
+        "is_recombinant": false,
+        "expressed_in": null,
+        "proteins": [],
+        "go_term": null
+      },
+      "experimental_conditions": {
+        "buffer": "Synthetic test buffer",
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "envvar_ph": {
+          "start_value": 4.5,
+          "end_value": null
+        },
+        "envvar_temperature": {
+          "start_value": 40,
+          "end_value": null,
+          "unit": "°C"
+        },
+        "envvars_other": []
+      },
+      "publication": {
+        "publication_id": null,
+        "pubmed_id": null,
+        "title": "Synthetic test response for the FungMod kinetics lookup tests; not a publication",
+        "author": "FungMod test fixture",
+        "journal": null,
+        "volume": null,
+        "pages": null,
+        "year": null,
+        "data_identifier": null
+      },
+      "external_links": {
+        "compound": []
+      }
+    },
+    {
+      "schema": "draft.v1.schema.json",
+      "id": 9900012,
+      "general": {
+        "organism": {
+          "id": null,
+          "name": "Synthetic kinetics organism K5",
+          "ncbi_taxonomy_id": null,
+          "ncbi_taxonomy_lineage": []
+        },
+        "tissue": {
+          "id": null,
+          "name": null
+        },
+        "strain": {
+          "id": null,
+          "name": null
+        },
+        "experiment_type": "InVitro",
+        "mechanism": null,
+        "publication_id": null,
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "date_inserted": null,
+        "date_updated": null
+      },
+      "reaction": {
+        "equation": "H2O + Maltose = 2 D-Glucose",
+        "equation_normalized": null,
+        "is_transport": false,
+        "id": 9900200,
+        "species": [
+          {
+            "stoch_value": "1",
+            "compound": {
+              "id": null,
+              "name": "Enzyme"
+            },
+            "role": "Catalyst",
+            "location": {
+              "id": null,
+              "name": null,
+              "go_term": null
+            },
+            "protein_complex_names": null,
+            "protein_complex_ids": null,
+            "comment": "-"
+          },
+          {
+            "stoch_value": "1",
+            "compound": {
+              "id": null,
+              "name": "H2O"
+            },
+            "role": "Substrate",
+            "location": {
+              "id": null,
+              "name": null,
+              "go_term": null
+            },
+            "protein_complex_names": null,
+            "protein_complex_ids": null,
+            "comment": "-"
+          },
+          {
+            "stoch_value": "1",
+            "compound": {
+              "id": null,
+              "name": "Maltose"
+            },
+            "role": "Substrate",
+            "location": {
+              "id": null,
+              "name": null,
+              "go_term": null
+            },
+            "protein_complex_names": null,
+            "protein_complex_ids": null,
+            "comment": "-"
+          },
+          {
+            "stoch_value": "2",
+            "compound": {
+              "id": null,
+              "name": "D-Glucose"
+            },
+            "role": "Product",
+            "location": {
+              "id": null,
+              "name": null,
+              "go_term": null
+            },
+            "protein_complex_names": null,
+            "protein_complex_ids": null,
+            "comment": "-"
+          }
+        ],
+        "pathways": []
+      },
+      "kineticlaw": {
+        "kinlaw_type": {
+          "id": 23,
+          "name": "Michaelis-Menten",
+          "sbo_term": "SBO:0000029"
+        },
+        "reversible": "Irreversible",
+        "formula": "Vmax*S/(Km+S)",
+        "formula_subst": null,
+        "variables": [],
+        "parameter": [
+          {
+            "name": "Vmax",
+            "role": "Constant",
+            "parameter_type": {
+              "id": 10,
+              "name": "Vmax",
+              "sbo_term": null
+            },
+            "species": {
+              "species_ref_type": "Species",
+              "species_key": null,
+              "ref_status_actual": null
+            },
+            "start_value": 1.6,
+            "end_value": null,
+            "standard_deviation": null,
+            "unit": {
+              "id": null,
+              "name": "mM*min^(-1)",
+              "n_name": null
+            },
+            "comment": "-",
+            "n_start_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null
+          },
+          {
+            "name": "Km",
+            "role": "Constant",
+            "parameter_type": {
+              "id": 8,
+              "name": "Km",
+              "sbo_term": null
+            },
+            "species": {
+              "species_ref_type": "Species",
+              "species_key": "1 | Maltose | Substrate",
+              "ref_status_actual": null
+            },
+            "start_value": 1.9,
+            "end_value": null,
+            "standard_deviation": null,
+            "unit": {
+              "id": null,
+              "name": "mM",
+              "n_name": null
+            },
+            "comment": "-",
+            "n_start_value": null,
+            "n_end_value": null,
+            "n_standard_deviation": null
+          }
+        ]
+      },
+      "enzyme_description": {
+        "ec_number": "3.2.1.3",
+        "wildtype": "Wildtype",
+        "enzyme_name": "glucan 1,4-alpha-glucosidase",
+        "mutant_spec": null,
+        "is_recombinant": false,
+        "expressed_in": null,
+        "proteins": [],
+        "go_term": null
+      },
+      "experimental_conditions": {
+        "buffer": "Synthetic test buffer",
+        "comment": "Synthetic test response written for FungMod's FETCH-002 tests; not SABIO-RK data.",
+        "envvar_ph": {
+          "start_value": 7,
+          "end_value": null
+        },
+        "envvar_temperature": {
+          "start_value": 25,
+          "end_value": null,
+          "unit": "°C"
+        },
+        "envvars_other": []
+      },
+      "publication": {
+        "publication_id": null,
+        "pubmed_id": null,
+        "title": "Synthetic test response for the FungMod kinetics lookup tests; not a publication",
+        "author": "FungMod test fixture",
+        "journal": null,
+        "volume": null,
+        "pages": null,
+        "year": null,
+        "data_identifier": null
+      },
+      "external_links": {
+        "compound": []
+      }
+    }
+  ]
+}

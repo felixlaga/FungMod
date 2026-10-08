@@ -21,7 +21,11 @@ repertoire of ``assemble`` can be a UniProt proteome (``--proteome UP...``, or
 ``--fetch-proteome`` for the reference proteome found under the fungus's name
 by ``fungal_model.sources.uniprot``); its frozen snapshots are read from disk,
 and the network is reached only with ``assemble --fetch``, the one network
-opt-in of the command line. ``assemble --network`` drafts an enzyme network
+opt-in of the command line. ``assemble --fetch-kinetics`` looks up the
+kinetics of the repertoire's classes in the API's kinetic-law database by EC
+number and substrate name (``assemble_user_tables(fetch_kinetics=True)``),
+through frozen query snapshots under ``--cache-dir`` that only ``--fetch``
+refreshes. ``assemble --network`` drafts an enzyme network
 (``enzyme_network``: every class of the repertoire acting on a pool the
 requested substrates release acts together) instead of single-class cases.
 
@@ -69,10 +73,14 @@ from fungal_model.api.user_data import (
     load_user_dataset,
 )
 from fungal_model.api.user_data_assembly import (
+    DEFAULT_KINETICS_CACHE_DIR,
     NETWORK_BLOCKED,
     STATUS_CONFLICT,
     STATUS_GAP,
     AssembledTablesDraft,
+    KineticsLookupError,
+    KineticsSnapshotConflictError,
+    MissingKineticsSnapshotError,
     assemble_user_tables,
 )
 from fungal_model.api.user_data_fit import TimecourseComparison, UserDataFitError, UserDatasetFit, fit_user_dataset
@@ -133,10 +141,18 @@ NO_FETCH_HELP = (
     "command line: sources are local files, a user dataset, or frozen snapshots already on disk."
 )
 FETCH_HELP = (
-    "the network opt-in: query UniProt for --proteome or --fetch-proteome and freeze each response (SHA-256, URL, "
-    "query, retrieval time, release header) under --snapshot-dir; an existing snapshot whose bytes differ from the "
-    "new response is kept and the command refused. Without --fetch only frozen snapshots are read, and a missing "
+    "the network opt-in: query UniProt for --proteome or --fetch-proteome, and the kinetic-law database for "
+    "--fetch-kinetics, and freeze each response (SHA-256, URL, query, retrieval time, HTTP status; UniProt's release "
+    "header) under --snapshot-dir (UniProt) or --cache-dir (kinetics); an existing snapshot whose bytes differ from "
+    "the new response is kept and the command refused. Without --fetch only frozen snapshots are read, and a missing "
     "one is refused with the command that fetches it."
+)
+FETCH_KINETICS_HELP = (
+    "look up the kinetics of every class of the repertoire that acts on a requested substrate (with --network, on a "
+    "pool) in the API's kinetic-law database (assemble_user_tables(fetch_kinetics=True)): one query per EC number of "
+    "the class's registry record and the substrate's name, never a name guess; the entries join the kinetics "
+    "sources under the same per-case rules. Classes without an EC number and classes of --user-data are listed and "
+    "not queried. The frozen query snapshots under --cache-dir are read; the database is queried only with --fetch"
 )
 IN_SAMPLE_HELP = (
     "Agreement with, and values fitted to, your own time courses are in-sample: they are not validation, and "
@@ -200,6 +216,16 @@ the enzyme repertoire from a UniProt proteome (instead of --annotation):
   CAZy cross-references give the classes; no kinetic value comes from a proteome. --fetch is the only route to
   the network; without it the frozen snapshots under --snapshot-dir are read.
 
+kinetics looked up by EC number (--fetch-kinetics):
+  For every class of the repertoire that acts on a requested substrate (with --network, on a pool), the API's
+  kinetic-law database is queried once per EC number of the class's registry record and the substrate's name,
+  and the entries join the kinetics sources: the fungus's own species is literature, another organism a transfer
+  (estimates), several candidates a conflict (choose with --entry-id), nothing at the condition a gap; kinetics
+  are never reused at another condition. Classes without an EC number and classes of --user-data are listed and
+  not queried. Each answer is a frozen, digest-checked snapshot under --cache-dir: without --fetch only those are
+  read and a missing one is refused with the command that fetches it; an HTTP error, or an unusable or truncated
+  answer, stores nothing; a stored snapshot is never replaced by a new answer (remove it first).
+
 several enzymes acting together (--network):
   The draft declares enzyme_network with the requested substrates as entry substrates: the pools each releases
   are followed through stated products only (the user dataset's substrates.csv, a registry record's single
@@ -216,6 +242,9 @@ examples:
       --dataset-id strain_g1_draft --output strain_g1_draft
   fungmod assemble --fungus "Strain G2" --scientific-name "Genus species" --fetch-proteome --fetch \\
       --substrate NAME --temperature-c 30 --ph 5 --dataset-id strain_g2_draft --output strain_g2_draft
+  fungmod assemble --fungus "Strain G3" --scientific-name "Genus species" --enzyme-class CLASS \\
+      --substrate NAME --temperature-c 30 --ph 5 --fetch-kinetics --fetch \\
+      --dataset-id strain_g3_draft --output strain_g3_draft
   fungmod assemble --fungus STRAIN --user-data my_dataset --substrate SUBSTRATE_ID --temperature-c 30 --ph 5 \\
       --network --dataset-id strain_network_draft --output strain_network_draft
 """
@@ -557,11 +586,16 @@ def _add_assemble_parser(commands: Any) -> None:
         metavar="ORGANISM",
         help="an organism name of the kinetics sources that you declare to be the fungus's own species (repeatable)",
     )
+    kinetics.add_argument("--fetch-kinetics", action="store_true", help=FETCH_KINETICS_HELP)
     kinetics.add_argument(
         "--cache-dir",
         type=Path,
         metavar="DIR",
-        help="directory of frozen snapshots searched for a reaction id (default: the API's snapshot directory)",
+        help=(
+            "directory of the frozen kinetics snapshots: searched for a reaction id of --kinetics-source, and where "
+            "--fetch-kinetics reads its query snapshots (with --fetch, stores them) "
+            f"(default: {DEFAULT_KINETICS_CACHE_DIR}, the API's default, relative to the current directory)"
+        ),
     )
     kinetics.add_argument(
         "--user-data",
@@ -1065,7 +1099,10 @@ def _assemble(args: argparse.Namespace) -> int:
         "entry_ids": args.entry_ids,
         "cache_dir": args.cache_dir,
         "network": True if args.network else None,
+        "fetch_kinetics": True if args.fetch_kinetics else None,
+        "refresh": True if args.fetch_kinetics and args.fetch else None,
     }
+    kinetics_dir = cast("Path | None", args.cache_dir) or Path(DEFAULT_KINETICS_CACHE_DIR)
     try:
         draft = assemble_user_tables(
             dataset_id=args.dataset_id,
@@ -1078,9 +1115,34 @@ def _assemble(args: argparse.Namespace) -> int:
         written = draft.write(output)
     except UserDataError as exc:
         raise _user_data_error(exc) from exc
+    except MissingKineticsSnapshotError as exc:
+        raise _UsageError(
+            f"no frozen snapshot of {len(exc.missing)} kinetics quer{'y' if len(exc.missing) == 1 else 'ies'} of "
+            f"--fetch-kinetics in {kinetics_dir}; the command line reaches the kinetics database only with --fetch.",
+            [
+                *(
+                    f"  {item['enzyme_class']} on {item['substrate_id']}, EC {item['ec_number']}: {item['query']} "
+                    f"(would be stored in {item['directory']})"
+                    for item in exc.missing
+                ),
+                f"To query the kinetics database and freeze the answer(s) under {kinetics_dir}, run the same command "
+                "with --fetch:",
+                f"  {_command_with(args, '--fetch')}",
+            ],
+        ) from exc
+    except KineticsSnapshotConflictError as exc:
+        raise _UsageError(
+            str(exc),
+            [
+                f"The frozen snapshot is kept. To store the database's new answer instead, remove {exc.directory} (or "
+                "choose another --cache-dir) and run the command again with --fetch.",
+            ],
+        ) from exc
+    except KineticsLookupError as exc:
+        raise _UsageError(str(exc)) from exc
     except (ValueError, KeyError, OSError) as exc:
         raise _UsageError(_exception_text(exc)) from exc
-    _print_assembly(draft)
+    _print_assembly(draft, kinetics_dir=kinetics_dir, fetched=bool(args.fetch_kinetics and args.fetch))
     _print_written(written, output)
     _print_review_fields(draft.review_fields)
     _print_assembly_next_steps(draft, output)
@@ -1098,12 +1160,19 @@ def _assembly_proteome(args: argparse.Namespace, fungus: str) -> tuple[UniprotSn
     proteome_id = cast("str | None", args.proteome)
     by_name = bool(args.fetch_proteome)
     if proteome_id is None and not by_name:
-        given = [flag for flag, value in (("--fetch", args.fetch), ("--snapshot-dir", args.snapshot_dir)) if value]
-        if given:
-            raise _UsageError(
-                f"{' and '.join(given)} {'apply' if len(given) > 1 else 'applies'} to the UniProt proteome of "
-                "--proteome or --fetch-proteome; nothing else is fetched."
+        problems = []
+        if args.fetch and not args.fetch_kinetics:
+            problems.append(
+                "--fetch applies to the UniProt proteome of --proteome or --fetch-proteome and to the kinetics lookup "
+                "of --fetch-kinetics"
             )
+        if args.snapshot_dir is not None:
+            problems.append(
+                "--snapshot-dir applies to the UniProt proteome of --proteome or --fetch-proteome (kinetics snapshots "
+                "are under --cache-dir)"
+            )
+        if problems:
+            raise _UsageError(f"{'; '.join(problems)}; nothing else is fetched.")
         return None, None
     route = "--fetch-proteome" if by_name else "--proteome"
     annotated = [
@@ -1812,7 +1881,7 @@ def _candidate_table(candidates: Sequence[ProteomeCandidate], *, chosen: str | N
     return _table(("#", "proteome", "organism", "taxonomy", "type", "proteins", ""), rows)
 
 
-def _print_assembly(draft: AssembledTablesDraft) -> None:
+def _print_assembly(draft: AssembledTablesDraft, *, kinetics_dir: Path | None = None, fetched: bool = False) -> None:
     report = draft.assembly
     fungus = report["fungus"]
     registry_fungus = f", registry fungus {fungus['registry_fungus_id']}" if fungus["registry_fungus_id"] else ""
@@ -1879,6 +1948,8 @@ def _print_assembly(draft: AssembledTablesDraft) -> None:
             print(f"  undetermined: {item['undetermined']}")
     if "network" in report:
         _print_assembly_network(report["network"])
+    if "kinetics_lookup" in report:
+        _print_kinetics_lookup(report["kinetics_lookup"], kinetics_dir=kinetics_dir, fetched=fetched)
 
     cases = report["cases"]
     print()
@@ -1923,6 +1994,46 @@ def _print_assembly(draft: AssembledTablesDraft) -> None:
     print("Limitations of this draft:")
     for text in report["limitations"]:
         print(f"  - {text}")
+
+
+def _print_kinetics_lookup(lookup: Mapping[str, Any], *, kinetics_dir: Path | None, fetched: bool) -> None:
+    print()
+    print(
+        f"Kinetics looked up by EC number (--fetch-kinetics; {lookup['database']} {lookup['endpoint']}, one query per "
+        f"EC number of a class and substrate name: {lookup['query_form']})"
+    )
+    if not lookup["queries"]:
+        print("  no query was made")
+    elif kinetics_dir is not None:
+        if fetched:
+            print(
+                f"  network: --fetch given; each query below was sent to the database and its answer is frozen under "
+                f"{kinetics_dir}"
+            )
+        else:
+            print(f"  network: not used; frozen snapshots under {kinetics_dir} (--fetch queries the database)")
+    for item in lookup["queries"]:
+        counts = ", ".join(f"{number} {use}" for use, number in item["counts"].items()) or "no entry"
+        print(f"  {item['enzyme_class']} on {item['substrate_id']}, EC {item['ec_number']}: {item['query']}")
+        print(
+            f"    snapshot {item['snapshot']} (retrieved {item['retrieved_at']}, HTTP {item['http_status']}, raw SHA-256 "
+            f"{', '.join(item['raw_sha256'])}): {item['entries']} entries; {counts}"
+        )
+        for entry in item["converted"]:
+            cases = ", ".join(
+                f"{case['enzyme_class']} on {case['substrate_id']} at {case['condition']} ({case['kinetics_status']})"
+                for case in entry["cases"]
+            )
+            print(f"    converted {entry['entry_id']} ({entry['organism']}) -> {cases or 'no requested case'}")
+        for entry in item["not_converted"]:
+            print(f"    {entry['use']} {entry['entry_id']} ({entry['organism'] or 'no organism'}): {entry['reason']}")
+            if entry["use"] == "not convertible":
+                for parameter in entry["parameters_not_converted"]:
+                    amount = " ".join(part for part in (parameter["value"], parameter["units"]) if part)
+                    print(f"      parameter {parameter['parameter']} ({amount or 'no value'}): {parameter['reason']}")
+    for item in lookup["not_queried"]:
+        who = f"{item['enzyme_class']} on " if item["enzyme_class"] else ""
+        print(f"  not queried: {who}{item['substrate_id']}: {item['reason']}")
 
 
 def _print_assembly_network(network: Mapping[str, Any]) -> None:

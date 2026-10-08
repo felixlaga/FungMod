@@ -137,7 +137,11 @@ comes from the UniProt reference proteome found under the fungus's name
 (`--network`) the draft is one [enzyme network](#several-enzymes-acting-together)
 in which every class of the fungus acting on the requested substrate, or on a
 pool it releases, acts together
-([drafting an enzyme network](#drafting-an-enzyme-network)).
+([drafting an enzyme network](#drafting-an-enzyme-network)). With
+`fetch_kinetics=True` (`--fetch-kinetics`) you need not supply the SABIO-RK
+entries: they are looked up by the EC numbers of the fungus's own classes and
+the substrate's name, through frozen snapshots that only `refresh=True`
+(`--fetch`) fetches ([fetching kinetics](#fetching-kinetics)).
 When a case of the draft is a `gap` or a `conflict`, the printed `fungmod
 run` command carries `--runnable-only` and a line says why: once loaded, that
 case's kinetic constants are explicit gaps, so the preflight blocks it, and
@@ -198,7 +202,10 @@ mode both cases are refused, because the transferred values are estimates.
   `UserDataset`; it is loaded and checked first) and `kinetics_sources`
   (SABIO-RK, as `user_tables_from_sabiork` accepts them); `entry_ids` selects
   entries across them, and `same_species` lists SABIO-RK organism names you
-  declare to be the fungus's own species.
+  declare to be the fungus's own species. `fetch_kinetics=True` adds the
+  SABIO-RK entries looked up by EC number for the repertoire's classes, read
+  from frozen snapshots under `cache_dir` (`refresh=True` fetches them;
+  [fetching kinetics](#fetching-kinetics)).
 - `responses`: response-law rows for the fungus, with the columns of
   `responses.csv` and `substrate` in place of `strain_id` and `substrate_id`.
 - `design` and `time_grid`: the virtual assay's amounts
@@ -272,17 +279,21 @@ cases of a registry fungus.
   are `REVIEW:` fields unless you give them. A case without kinetics receives
   your design substrate concentration (and your enzyme concentration when its
   pair already uses the kcat form), so its gaps are only the kinetic constants.
-- **Offline and deterministic.** Nothing is fetched while assembling, and the
-  same inputs give byte-identical files.
+- **Offline and deterministic.** Nothing is fetched while assembling unless
+  `fetch_kinetics` and `refresh=True` ask SABIO-RK for the repertoire's
+  kinetics ([fetching kinetics](#fetching-kinetics)), and the same inputs and
+  snapshots give byte-identical files.
 
 ### Limits
 
 - One fungus per call.
 - Offline sources only: a dbCAN `overview.txt` file or a UniProtKB export (a
   file or a frozen UniProt proteome snapshot), a user dataset and SABIO-RK
-  entries from a proposal, a frozen snapshot or an export; no other kinetics
-  database. The proteome snapshot is fetched beforehand, only on request
-  (`fungmod assemble --fetch`, or `refresh=True` in Python).
+  entries from a proposal, a frozen snapshot, an export or the frozen query
+  snapshots of `fetch_kinetics`; no other kinetics database. The proteome
+  snapshot is fetched beforehand, only on request (`fungmod assemble --fetch`,
+  or `refresh=True` in Python), and the kinetics snapshots only with
+  `fetch_kinetics` and `refresh=True` (`--fetch-kinetics --fetch`).
 - Transferred kinetics are estimates; scientific mode needs your own, or
   same-species literature, values.
 - No rate, concentration, expression or secretion is taken from a genome.
@@ -425,6 +436,153 @@ xylanase and chitinase classes are listed as not members, and the network
 runs), the parallel network fixture as `user_data` with its `ki` row, and a
 registry fungus whose same-species literature network is `modelable` in
 scientific mode.
+
+### Fetching kinetics
+
+`assemble_user_tables(fetch_kinetics=True)` (`fungmod assemble
+--fetch-kinetics`) looks up SABIO-RK kinetics for the fungus's own enzyme
+classes, so that you need not download an export or know a reaction id: the
+repertoire comes from the fungus's evidence (an annotation, a proteome, the
+classes you assert, a registry record, a user dataset; a
+[name](#from-a-fungus-name) can select a proteome), and its kinetics come from
+SABIO-RK by EC number.
+
+```python
+import fungmod as fm
+
+draft = fm.assemble_user_tables(
+    dataset_id="k1_draft",
+    fungus="Strain K1",
+    scientific_name="Genus species",       # SABIO-RK entries of this organism are the fungus's own literature
+    substrates=["cellobiose"],
+    conditions=[
+        {"temperature": 30, "temperature_units": "degC", "ph": 5},
+        {"temperature": 40, "temperature_units": "degC", "ph": 5},
+    ],
+    enzyme_classes=["beta_glucosidase"],    # or annotation, proteome, a registry fungus, user_data
+    fetch_kinetics=True,
+    refresh=True,                           # the network opt-in; without it only frozen snapshots are read
+)
+for query in draft.assembly["kinetics_lookup"]["queries"]:
+    print(query["enzyme_class"], query["query"], query["entries"], query["counts"])
+for item in draft.assembly["kinetics_lookup"]["not_queried"]:
+    print(item["enzyme_class"], item["substrate_id"], item["reason"])
+```
+
+- **What is queried.** For every class of the repertoire that acts on a
+  requested substrate by the [categorical rule](#rules) (with `network=True`,
+  on a pool of a network), one query per complete EC number of the class's
+  registry record: its EC number and the EC numbers among its aliases that the
+  registry resolves to that class (the shipped `cellobiohydrolase` record
+  states 3.2.1.91 and, as an alias, 3.2.1.176, so both are queried). The query
+  is restricted to the substrate's name,
+  `ECNumber:"<EC number>" AND Substrate:"<substrate name>"`, with the name of
+  the registry record (otherwise of the user dataset's row or of the
+  request), which is also the name an entry is matched on afterwards. No
+  query names an enzyme, an organism or a class name, and none is broader
+  than an EC number and a substrate name.
+- **Not queried**, each listed in the report with the reason: a class whose
+  record states no complete EC number (SABIO-RK is queried by EC number only,
+  never by a name); a class of the user dataset's `enzyme_classes.csv`
+  (`user_tables_from_sabiork` resolves an entry's EC number against the
+  registry, so no entry could become kinetics of a user-defined class: enter
+  its kinetics in the dataset); an EC number the registry resolves to another
+  class or ambiguously; a substrate whose categories are `REVIEW:` fields
+  (which classes act on it is decided only when the reviewed tables load); a
+  substrate name with a double quote, a backslash or a control character
+  (FungMod does not guess an escaping). A request whose fungus has no
+  repertoire at all is refused, as without `fetch_kinetics`.
+- **Snapshots.** Each answer is frozen under `cache_dir` (default
+  `data/source_snapshots/sabiork`, relative to the current directory; the
+  directory `--cache-dir` names) in the layout of the existing SABIO-RK fetch
+  (`fungal_model.sources.sabiork.fetch.fetch_and_save_export`):
+  `<query key>/<snapshot id>/raw/page_0001.json` (the response bytes, one file
+  per page), `derived/combined_export.json` and `fetch_metadata.json` (the
+  query, the URLs, the retrieval time, the HTTP status, `total_count`, and the
+  SHA-256 and size of every raw page and of the combined export). Without
+  `refresh` only these snapshots are read and verified: the missing ones are
+  refused together (`MissingKineticsSnapshotError`; the command line prints
+  the command with `--fetch`), and a snapshot whose bytes changed after it was
+  stored, or two snapshots of one query, are refused and kept
+  (`KineticsSnapshotConflictError` names the directory to remove).
+- **Fetching** (`refresh=True`, `--fetch`). The queries are sent one after
+  another, at least a second apart, every page of a paginated answer is
+  fetched, and each answer is verified in a temporary directory before it is
+  stored. An HTTP error, a body that is not the export envelope, a page that
+  fails, or an answer whose entries do not add up to its `total_count` (a
+  truncated or incompletely paginated answer) stores nothing; the answers
+  stored before such an error stay frozen. An answer whose bytes equal a
+  stored snapshot leaves it unchanged; one whose bytes differ is refused and
+  the stored snapshot kept (remove its directory to store the new answer). Run
+  without `--fetch`, the same command reads the snapshots and writes the same
+  draft, byte for byte.
+- **The same rules as any SABIO-RK source.** The entries join
+  `kinetics_sources` and every [kinetics status](#kinetics-status-of-a-case)
+  rule applies unchanged: an entry of the fungus's species (its
+  `scientific_name`, or an organism you list in `same_species`) is
+  `literature_same_organism`, another organism's is a `transferred_estimate`,
+  several candidates at one condition are a `conflict` (choose with
+  `entry_ids`, which selects across local and looked-up entries alike), and a
+  condition no entry states is a `gap`; kinetics are never reused at another
+  temperature or pH without a response law. An EntryID found in two sources
+  with different content is refused.
+- **The report.** `draft.assembly["kinetics_lookup"]` holds the database and
+  endpoint, the query form, every query (class, EC number, substrate, query,
+  snapshot directory relative to `cache_dir`, URLs, retrieval time, HTTP
+  status, entries, the SHA-256 of each raw page and of the combined export),
+  the entries converted with the cases they feed, every other entry with its
+  use (`listed`, `not used`, `not convertible`, `not selected`) and reason
+  and, for an entry that cannot be converted, each parameter's reason
+  (no value, units not parsed, a quantity that is not a user-data quantity),
+  and the classes not queried. `review.md` adds a "Kinetics looked up by EC
+  number" section, and the `source` of `user_dataset.yml` names each query and
+  its snapshot. The draft never records whether a run reached the network.
+
+**Not verified live.** The export URL and envelope are the ones the existing
+SABIO-RK client uses (`https://sabio.h-its.org/export-api/sabio/kinlaw-entry/json?q=...&page=1&pageSize=1000`).
+The query form, the `ECNumber` and `Substrate` fields and their quoting, how
+SABIO-RK matches a compound name (letter case, synonyms), and what it returns
+for a query without matches (assumed: the envelope with `total_count` 0 and
+no entries) were not checked against a live response, because the
+environment the lookup was written in could not reach sabio.h-its.org. The
+tests serve **synthetic test responses written by hand** in the export format
+(`tests/fixtures/sabiork_kinetics_queries/`, not SABIO-RK data). An answer
+that is not the export envelope, or whose entries do not add up to its
+`total_count`, is refused and nothing is stored, so a change on SABIO-RK's
+side stops the lookup rather than misleading it.
+
+With those synthetic responses (`tests/test_fetch_kinetics.py`), a strain
+declared to be the synthetic organism K1 with `beta_glucosidase` asserted
+gets one query, `ECNumber:"3.2.1.21" AND Substrate:"Cellobiose"`, whose seven
+entries become: one converted (K1's entry at 30 degC, pH 5:
+`literature_same_organism` there, and the 40 degC case a gap whose
+measurement requests name 30 degC), one listed (another organism's entry at
+30 degC, weaker evidence), two not used (a condition not requested, a law of
+another substrate), and three not convertible (a mutant, units that do not
+parse, kcat/Km only). Without the declared species the two 30 degC entries are
+a `conflict`; with `entry_ids` one of them is a `transferred_estimate`. The
+materially different cases: glucoamylase (EC 3.2.1.3) on a described maltose
+substrate (a test-only widening of the class, as in the assembly tests), whose
+entry is a Vmax-form transfer that loads and is `modelable` in exploratory mode
+only, beside a test-only class without an EC number that is listed and not
+queried; and a registry enzyme network in which beta-glucosidase gets its
+kinetics on the intermediate pool while cellobiohydrolase's two queries come
+back empty, so the network stays blocked by that gap.
+
+Limits of the lookup:
+
+- SABIO-RK only, one query per EC number and substrate name. Entries filed
+  under another name of the substrate (an alias, a synonym, another
+  spelling) are not found; give an export you downloaded as
+  `kinetics_sources` for those.
+- Classes of a user dataset are not looked up, because the SABIO-RK
+  conversion resolves EC numbers against the registry only.
+- SABIO-RK's entries are whatever organisms it holds: only the fungus's
+  species gives literature, everything else is a transfer (an estimate) for
+  exploratory mode.
+- No response law, Ki or other quantity outside the [mapping
+  rules](#mapping-rules) comes from SABIO-RK; the conversion is exactly that of
+  [starting from SABIO-RK](#starting-from-sabio-rk).
 
 ## Directory layout
 
@@ -2399,7 +2557,9 @@ then checks them like any other dataset. The entries can come from:
 - a reaction ID string such as `"618"`, read from the local snapshot folders
   through the same adapter.
 
-Drafting never fetches anything.
+Drafting never fetches anything. To have the entries looked up for one
+fungus's enzyme classes by EC number and substrate name instead, assemble
+with `fetch_kinetics=True` ([fetching kinetics](#fetching-kinetics)).
 
 ```python
 import fungmod as fm
@@ -2636,7 +2796,9 @@ Limits of the SABIO-RK route:
 - Tables drafted from SABIO-RK are drafts: nothing is imported without a
   person filling the `REVIEW:` fields, and only the conversions listed in
   [starting from SABIO-RK](#starting-from-sabio-rk) are made.
-- An assembled draft covers one fungus per call, reads offline sources only,
+- An assembled draft covers one fungus per call, reads offline sources only
+  (SABIO-RK is queried for the repertoire's kinetics only with
+  `fetch_kinetics` and `refresh=True`, see [fetching kinetics](#fetching-kinetics)),
   writes kinetics of another organism's enzyme as estimates, and reaches a
   condition other than the measured one only through a response law at an
   `EnvironmentGrid` condition (see

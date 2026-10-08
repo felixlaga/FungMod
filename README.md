@@ -87,6 +87,12 @@ the fungus acting on the substrate, or on a pool it releases through a stated
 product, acts together, and a class without kinetics is a gap that blocks the
 network rather than a class left out
 ([drafting an enzyme network](docs/user-data.md#drafting-an-enzyme-network)).
+With `fetch_kinetics=True` the SABIO-RK entries need not be supplied: each
+class of the fungus is looked up by the EC numbers of its registry record and
+the substrate's name, the answers are frozen as digest-checked snapshots
+(fetched only with `refresh=True`), and the same per-case rules apply
+([fetching kinetics](docs/user-data.md#fetching-kinetics); opt-in, not verified
+against live SABIO-RK).
 
 ### Command line
 
@@ -116,8 +122,10 @@ other steps ([command line](docs/cli.md)).
 For fungus X on substrate Y at conditions Z from your own sources, the whole
 user-data workflow runs from the shell too: `fungmod assemble` gathers the
 fungus's annotation, the enzyme classes you assert, a user dataset and
-SABIO-RK entries (an export file or a frozen snapshot; nothing is fetched)
-into one draft and prints every case's kinetics status, sources and reason
+SABIO-RK entries (an export file or a frozen snapshot, or, with
+`--fetch-kinetics`, looked up by the EC numbers of the fungus's classes; nothing
+is fetched without `--fetch`) into one draft and prints every case's kinetics
+status, sources and reason
 and the `REVIEW:` fields to fill; then `check-data`, `run` (with
 `--compare-timecourses` to compare with your time courses) and `fit` (Km with
 kcat or Vmax, with identifiability verdicts; in-sample, exploratory only):
@@ -146,7 +154,14 @@ Without an annotation file, `--fetch-proteome --fetch` in place of
 found under the fungus's name (`--scientific-name`, else `--fungus`); `--fetch`
 is the command line's only network access, and the responses are frozen so
 that the same command reruns offline
-([from a fungus name](docs/user-data.md#from-a-fungus-name)).
+([from a fungus name](docs/user-data.md#from-a-fungus-name)). In place of
+`--kinetics-source`, `--fetch-kinetics --fetch` queries SABIO-RK once per EC
+number of each class acting on a substrate, `ECNumber:"<EC number>" AND
+Substrate:"<substrate name>"`, freezes each answer under `--cache-dir`, and
+prints per query the entries converted (and the cases they feed) and why the
+others were not; classes without an EC number are listed, not queried. The
+query form was not verified against a live SABIO-RK response
+([kinetics looked up by EC number](docs/cli.md#kinetics-looked-up-by-ec-number-fetch-kinetics)).
 
 `fungmod draft-kinetics SOURCE --provider sabiork` drafts tables from
 SABIO-RK entries alone ([user-data workflow](docs/cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
@@ -164,8 +179,8 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
-| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) on dissolved substrates, or kcat or Vmax as an apparent Michaelis-Menten law on one suspended solid polymer in dry mass per volume (the enzyme as protein mass, assay activity or a dose per gram of substrate, with an optional conversion-dependent reactivity exponent), plus optional temperature and pH response laws, or a fungal culture in `culture.csv` (your strain growing on a solid substrate and secreting its enzyme pools, through the registry's existing culture model: consumption by one pool, an explicit biomass yield, induced synthesis and loss of each pool), or, with `enzyme_network` in the manifest, all of a strain's classes acting together (independent Michaelis-Menten processes whose rates add on shared pools, a pool released by one class degraded by the next where a substrate's stated product is another substrate of the dataset, optional competitive product inhibition through a `ki` row; no synergy or competition for sites), overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status, as single-class cases or, with `network=True`, as one enzyme network of every class acting on the substrates and the pools they release ([user-supplied data](docs/user-data.md)) |
-| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts (`--runnable-only`: the runnable cases of a request with gaps, exit code 4); the user-data workflow `assemble` (fungus X on substrate Y at conditions Z from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's status and the `REVIEW:` fields; `--network` drafts every class of the fungus acting together as one enzyme network), `draft-kinetics`, `check-data`, `run --compare-timecourses` and `fit`, with nothing fetched unless you opt in: `assemble --fetch-proteome --fetch` finds the fungus's UniProt reference proteome by name (an exact name or a sole candidate is taken, anything else is refused with the candidates listed), freezes the responses as digest-checked snapshots and takes its enzyme classes, never a rate, through UniProt REST endpoints used as documented but not verified live ([command line](docs/cli.md#from-a-fungus-name-its-uniprot-reference-proteome)) |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) on dissolved substrates, or kcat or Vmax as an apparent Michaelis-Menten law on one suspended solid polymer in dry mass per volume (the enzyme as protein mass, assay activity or a dose per gram of substrate, with an optional conversion-dependent reactivity exponent), plus optional temperature and pH response laws, or a fungal culture in `culture.csv` (your strain growing on a solid substrate and secreting its enzyme pools, through the registry's existing culture model: consumption by one pool, an explicit biomass yield, induced synthesis and loss of each pool), or, with `enzyme_network` in the manifest, all of a strain's classes acting together (independent Michaelis-Menten processes whose rates add on shared pools, a pool released by one class degraded by the next where a substrate's stated product is another substrate of the dataset, optional competitive product inhibition through a `ki` row; no synergy or competition for sites), overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK (entries you give, or, with `fetch_kinetics=True`, looked up by the EC numbers of the fungus's classes and the substrate's name through digest-checked snapshots, opt-in and not verified live), with every case's source and status, as single-class cases or, with `network=True`, as one enzyme network of every class acting on the substrates and the pools they release ([user-supplied data](docs/user-data.md)) |
+| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts (`--runnable-only`: the runnable cases of a request with gaps, exit code 4); the user-data workflow `assemble` (fungus X on substrate Y at conditions Z from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's status and the `REVIEW:` fields; `--network` drafts every class of the fungus acting together as one enzyme network), `draft-kinetics`, `check-data`, `run --compare-timecourses` and `fit`, with nothing fetched unless you opt in: `assemble --fetch-proteome --fetch` finds the fungus's UniProt reference proteome by name (an exact name or a sole candidate is taken, anything else is refused with the candidates listed), freezes the responses as digest-checked snapshots and takes its enzyme classes, never a rate, through UniProt REST endpoints used as documented but not verified live ([command line](docs/cli.md#from-a-fungus-name-its-uniprot-reference-proteome)); `assemble --fetch-kinetics --fetch` queries SABIO-RK by the EC numbers of the fungus's classes and the substrate's name, freezes each answer (refusing HTTP errors, unusable and truncated answers, and changed snapshots), and reports per query which entries became which case and why the rest did not; the query form was not verified against a live SABIO-RK response ([command line](docs/cli.md#kinetics-looked-up-by-ec-number-fetch-kinetics)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |

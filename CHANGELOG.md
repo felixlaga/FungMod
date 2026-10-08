@@ -6,6 +6,46 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Kinetics of the fungus's enzyme classes looked up in SABIO-RK by EC number
+  (FETCH-002): `assemble_user_tables(fetch_kinetics=True)` and `fungmod
+  assemble --fetch-kinetics` query SABIO-RK's kinetic-law export once per
+  complete EC number of each registry class of the repertoire that acts on a
+  requested substrate (with `network=True`, on a pool), its EC number and the
+  EC-number aliases the registry resolves to it, restricted to the
+  substrate's name: `ECNumber:"<EC number>" AND Substrate:"<substrate name>"`
+  (the existing discovery query builder; never a name guess, never broader).
+  Each answer is frozen in the existing SABIO-RK snapshot layout of
+  `fetch_and_save_export` (raw pages, combined export, `fetch_metadata.json`
+  with query, URLs, retrieval time, HTTP status, `total_count` and SHA-256)
+  and verified on every read (`fungal_model.sources.sabiork.query_snapshots`).
+  SABIO-RK is reached only with `refresh=True` (`--fetch`, the command line's
+  one network opt-in); without it only the snapshots are read, every missing
+  one is refused together with the command that fetches it, and the same
+  command gives the same draft byte for byte. An HTTP error, an answer that is
+  not the export envelope, and an answer whose entries do not add up to its
+  `total_count` (truncated or incompletely paginated; every page is fetched)
+  store nothing; a changed snapshot, two snapshots of one query, and a new
+  answer whose bytes differ from the stored one are refused and the snapshot
+  kept, with the directory to remove. The looked-up entries join the kinetics
+  sources and follow the existing per-case rules (own species literature,
+  other organisms transferred estimates, conflicts, gaps, no reuse across
+  conditions without a law; `entry_ids` and `same_species` across local and
+  looked-up entries). Classes without an EC number, classes of a user dataset
+  (the SABIO-RK conversion resolves EC numbers against the registry only),
+  substrates whose categories are `REVIEW:` fields and unquotable names are
+  listed and not queried. The report gains `assembly["kinetics_lookup"]`
+  (every query with its snapshot, the entries converted and the cases they
+  feed, every other entry with its use, reason and unconverted parameters,
+  and what was not queried); `review.md` a "Kinetics looked up by EC number"
+  section; the command line prints the same per query. New exceptions
+  `KineticsLookupError`, `MissingKineticsSnapshotError` and
+  `KineticsSnapshotConflictError` (subclasses of `UserTablesAssemblyError`).
+  The query form, its fields and SABIO-RK's answer to a query without matches
+  were not verified against a live response; the tests serve synthetic
+  responses (`tests/fixtures/sabiork_kinetics_queries/`). Without
+  `fetch_kinetics` drafts are byte-identical to the previous version (pinned
+  digests).
+
 - An enzyme network drafted for a fungus, substrates and conditions
   (ASSEMBLE-002): `assemble_user_tables(network=True)` and `fungmod assemble
   --network` draft the USERDATA-010 `enzyme_network` block with the requested
@@ -786,6 +826,12 @@ All notable public releases of FungMod are documented here.
   remain explicit; no validated organism model or registry promotion is claimed.
 
 ### Changed
+
+- Text only (FETCH-002): `fungmod assemble --help` describes `--fetch` as the
+  opt-in for the UniProt proteome and the kinetics lookup, and `--cache-dir`
+  as where kinetics snapshots are read and stored; `--fetch` without a
+  proteome option and without `--fetch-kinetics` is still refused, with a
+  message that names both. No numerical behaviour changes.
 
 - Text only (ASSEMBLE-002): the refusal of a network dataset as `user_data` of
   `assemble_user_tables` now names `network=True` (`fungmod assemble

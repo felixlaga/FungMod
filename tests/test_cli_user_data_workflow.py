@@ -994,7 +994,8 @@ def test_help_names_the_workflow_and_its_boundaries() -> None:
 def test_the_command_line_names_no_kinetics_database_and_opens_no_connection_itself() -> None:
     """The kinetics providers come from the API's table; the one network route is assemble --fetch (FETCH-001).
 
-    cli.py opens no connection: it passes ``refresh`` to ``fungal_model.sources.uniprot`` only from ``--fetch``.
+    cli.py opens no connection: it passes ``refresh`` to ``fungal_model.sources.uniprot`` only from ``--fetch``,
+    and to ``assemble_user_tables`` only from ``--fetch`` together with ``--fetch-kinetics`` (FETCH-002).
     """
 
     source = (ROOT / "src" / "fungal_model" / "cli.py").read_text(encoding="utf-8")
@@ -1004,6 +1005,8 @@ def test_the_command_line_names_no_kinetics_database_and_opens_no_connection_its
         assert forbidden not in source, forbidden
     assert source.count("refresh=") == 2 and source.count("refresh=refresh") == 2
     assert source.count("refresh = bool(args.fetch)") == 1
+    assert source.count('"refresh"') == 1
+    assert source.count('"refresh": True if args.fetch_kinetics and args.fetch else None') == 1
 
 
 
