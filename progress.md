@@ -379,6 +379,23 @@ environment and freeze a real snapshot (replacing nothing silently); then let
 the conversion resolve EC numbers through a user dataset's `enzyme_classes.csv`
 so user-defined classes can receive looked-up kinetics.
 
+## CI-001 Parallel Tests In CI And Runner Labels From Repository Variables
+
+Status: `complete` (2026-10-08). Each CI test job ran the whole suite serially
+for 30 to 60 minutes. The `tests` job now runs
+`python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml -n auto --dist loadfile`:
+pytest-xdist (added to the `dev` extra) spreads test files over every core of
+the runner, keeping each file's tests on one worker so module-level fixtures
+are shared as before. Runner labels can be overridden with the repository
+variables `FUNGMOD_RUNNER_UBUNTU`, `FUNGMOD_RUNNER_MACOS` and
+`FUNGMOD_RUNNER_WINDOWS` (lint, documentation and notebooks use the Ubuntu
+variable; the package job stays on `ubuntu-latest`); without them every job
+runs where it ran before. Job names, which are the required status checks, are
+unchanged. `tests/test_quality_config.py` pins the parallel command, the
+variables and the job names. No source, test behaviour or scientific output
+changes. Verification: CI on this change runs the suite in parallel on all
+nine operating-system and Python combinations.
+
 ## FIX-UNITS-001 A Dimensionless Coefficient In Scaled Units Is A Plain Fraction
 
 Status: `complete` (2026-10-08). Reported by the NETWORK-002 work: the
