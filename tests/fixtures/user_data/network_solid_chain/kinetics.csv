@@ -1,0 +1,9 @@
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,inhibitor
+strain_s3,solid_cutter_like,solid_c3,c45_ph5,km,8,,,g/L,estimate,illustrative apparent half-saturation estimate,Illustrative test note XB-1 p. 3,
+strain_s3,solid_cutter_like,solid_c3,c45_ph5,kcat,0.02,,,g/(mg*h),estimate,illustrative estimate,Illustrative test note XB-1 p. 3,
+strain_s3,solid_cutter_like,solid_c3,c45_ph5,enzyme_concentration,20,,,mg/L,estimate,illustrative estimate,Illustrative test note XB-1 p. 3,
+strain_s3,solid_cutter_like,solid_c3,c45_ph5,substrate_initial_concentration,10,,,g/L,estimate,illustrative estimate,Illustrative test note XB-1 p. 3,
+strain_s3,dimer_hydrolase_like,dimer_d3,c45_ph5,km,1.2,,,mM,estimate,illustrative estimate,Illustrative test note XB-1 p. 4,
+strain_s3,dimer_hydrolase_like,dimer_d3,c45_ph5,kcat,50,,,1/s,estimate,illustrative estimate,Illustrative test note XB-1 p. 4,
+strain_s3,dimer_hydrolase_like,dimer_d3,c45_ph5,enzyme_concentration,0.00002,,,mM,estimate,illustrative estimate,Illustrative test note XB-1 p. 4,
+strain_s3,dimer_hydrolase_like,dimer_d3,c45_ph5,ki,3,,,mM,estimate,illustrative estimate,Illustrative test note XB-1 p. 5,monomer_m3

@@ -46,7 +46,7 @@ proteome resolution, cultures, time courses and fitted values, or every issue as
 `assemble_user_tables`, `user_tables_from_sabiork`, `compare_with_timecourses`
 and `fit_user_dataset` (see [the user-data workflow from a shell](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
 
-Eleven complete examples live in the test fixtures:
+Thirteen complete examples live in the test fixtures:
 `tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on a
 user-defined aryl ester, `kcat` form, estimates only),
 `tests/fixtures/user_data/literature_reentry/` (the published SABIO-RK Reaction
@@ -81,7 +81,13 @@ solid with one protein-mass enzyme pool (estimates only).
 degrading a soluble polymer-like substrate through an oligomer-like pool to a
 monomer-like product, and two user-defined classes in parallel on one ester-like
 substrate (kcat and Vmax forms) with competitive product inhibition of one of
-them (estimates only).
+them (estimates only). `tests/fixtures/user_data/network_solid_chain/` and
+`tests/fixtures/user_data/network_solid_parallel/` are networks that
+[change basis](#a-solid-releasing-a-dissolved-pool): a cellulose-like solid in
+g/L releasing a dissolved disaccharide-like pool in mmol/L that a second class
+converts to a monomer-like product, and two classes in parallel on a chitin-like
+solid releasing a dimer-like product in umol/L, each through a unit-bearing
+yield the user states (estimates only).
 
 To start from public kinetics instead of typing them in, draft the tables from
 SABIO-RK entries and review them; see
@@ -681,7 +687,8 @@ snake_case.
 
 Columns: `substrate_id`\*, `registry_substrate`, `name`, `substrate_class`,
 `physical_state`, `bond_classes`, `amount_basis`, `product`\*,
-`product_yield`\*, `yield_basis`\*, `source`\*.
+`product_yield`\*, `yield_basis`\*, `source`\*, `yield_evidence_type`,
+`yield_method`.
 
 ```text
 substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
@@ -702,9 +709,16 @@ cellobiose,cellobiose,,,,,beta_D_glucose,2,mol/mol,Reaction equation of the sour
 - A `solid_polymer` substrate is one suspended polymer stated on a dry-mass
   basis: `amount_basis` must be `dry_mass` and `yield_basis` must be `g/g`
   (grams of product per gram of dry substrate consumed). See
-  [solid substrates](#solid-substrates).
-- The product yield is always explicit; it is never inferred, and no basis is
-  converted to another.
+  [solid substrates](#solid-substrates). In an
+  [enzyme network](#a-solid-releasing-a-dissolved-pool) a solid that releases a
+  dissolved pool (or a molar final product) states instead a unit-bearing
+  yield: `yield_basis` an amount of product per dry mass (for example
+  `mmol/g`), with `yield_evidence_type` (`measured`, `literature` or
+  `estimate`) and, for a measured or literature value, `yield_method`. Both
+  columns stay blank on every other row.
+- The product yield is always explicit; it is never inferred, and FungMod
+  converts no basis to another itself: the only conversion between a dry mass
+  and an amount is a unit-bearing yield you state.
 
 ### `conditions.csv`
 
@@ -1617,7 +1631,9 @@ Each refusal names its file, row and column:
 - Molar units on any substrate-side row, on `vmax` and on the enzyme.
 - `physical_state` `mixed_solid` or `solid_biomass` (composite substrates,
   which would need a composition model) and `unknown`; a `yield_basis` other
-  than `g/g`; an `amount_basis` other than `dry_mass`.
+  than `g/g` (except, in an enzyme network, an amount of product per dry mass:
+  see [a solid releasing a dissolved pool](#a-solid-releasing-a-dissolved-pool));
+  an `amount_basis` other than `dry_mass`.
 - Adsorption, binding-capacity and surface inputs: the `kinetics.csv`
   quantities `adsorption_constant`, `adsorption_dissociation_constant`,
   `binding_capacity`, `accessible_surface_area`, `specific_surface_area` and
@@ -1652,7 +1668,10 @@ validation.
 - The constants are apparent and preparation- and loading-specific; FungMod
   does not extrapolate them to other loadings and does not warn when you do.
 - No conversion between dry mass, monomer equivalents and moles; the product
-  is a pool in grams with your stated g/g yield.
+  is a pool in grams with your stated g/g yield. The one exception is an
+  enzyme network, where a unit-bearing yield you state (for example `mmol/g`)
+  releases a dissolved pool or a molar final product
+  ([a solid releasing a dissolved pool](#a-solid-releasing-a-dissolved-pool)).
 - No time courses, comparison or fitting on solid substrates; the assembly
   and SABIO-RK drafting routes draft dissolved substrates only.
 - The assembled substrate entity carries the substrate's own physical state
@@ -1710,7 +1729,7 @@ checks.
 | --- | --- | --- | --- | --- |
 | `substrate_initial_concentration` | blank | `initial_substrate` | dry mass per volume | `g/L` |
 | `initial_biomass` | blank | `initial_biomass` | biomass dry mass per volume, written exactly like the initial substrate's units | `g/L` |
-| `biomass_yield` | blank | `biomass_yield` | dimensionless, above 0 and at most 1 | `g/g` |
+| `biomass_yield` | blank | `biomass_yield` | dimensionless, above 0 and at most 1 g/g; `mg/g` or `percent` are converted with pint (350 mg/g is 0.35 g/g) | `g/g` |
 | `biomass_loss_rate` | blank | `biomass_loss_rate` | 1/time | `1/h` |
 | `induction_half_saturation` | blank | `induction_half_saturation` | dry mass per volume, above 0 | `g/L` |
 | `hydrolysis_capacity` | the consuming pool | `hydrolysis_capacity` | substrate dry mass per time per pool amount | `g/FPU/h`, `g/mg/h` |
@@ -1930,7 +1949,11 @@ enzyme_network:
 ```
 
 Without the block nothing changes: the records of every dataset without it are
-byte-identical to those of the previous version. To have the block, the pools,
+byte-identical to those of the previous version. `y` is a pure number on a
+link between pools of one basis; on the one link from a solid to a dissolved
+pool it is a [unit-bearing yield](#a-solid-releasing-a-dissolved-pool) you
+state, converted by pint once when the model is compiled.
+To have the block, the pools,
 the links and every class's kinetics rows drafted for a fungus from its
 annotation, proteome, asserted classes, registry record, a user dataset and
 SABIO-RK, use `assemble_user_tables(network=True)` (`fungmod assemble
@@ -1948,9 +1971,10 @@ SABIO-RK, use `assemble_user_tables(network=True)` (`fungmod assemble
   polymer -> oligomer -> monomer) and any number of classes may act in parallel
   on each pool.
 - The entry starts at its `substrate_initial_concentration`; every
-  intermediate pool and the final product start at zero. Every pool is reported
-  in the units of the entry's initial concentration, and pint converts each Km,
-  Vmax and Ki.
+  intermediate pool and the final product start at zero. Every pool on the
+  entry's basis is reported in the units of the entry's initial concentration;
+  after a [basis change](#a-solid-releasing-a-dissolved-pool), in those units
+  times the yield's units. Pint converts each Km, Vmax and Ki.
 - The members of a network are the declared classes (from `enzymes.csv` or a
   genome annotation) that act on one of its pools by the categorical rule.
   Each runs one process on its pool in its pair's rate form: the kcat form
@@ -2068,6 +2092,127 @@ the substrate decays as `S0 exp(-(Vmax_A / Km_A + Vmax_B / Km_B) t)`
 (`tests/test_user_data_network.py`). A network of one class equals the
 single-class case of the same rows.
 
+### A solid releasing a dissolved pool
+
+A solid pool is a dry mass per volume and a dissolved pool an amount per
+volume, so a link between them changes basis. The Michaelis-Menten process
+writes a pure-number yield in its substrate's units, and a conversion between
+grams of a solid and moles of what it releases needs a yield with units. That
+yield is yours to state: FungMod never computes it from a molar mass, a degree
+of polymerisation or a registry product map, and does not check it against
+one. Typical case: a cellobiohydrolase-like class on a cellulose-like solid in
+g/L releasing a disaccharide in mM, which a second class with kinetics in mM
+(for example drafted from SABIO-RK) converts further.
+
+On the solid's `substrates.csv` row, `yield_basis` is then an amount of product
+per dry mass, checked with pint (any amount per mass: `mmol/g`, `umol/mg`,
+`mol/kg`), and two more columns describe the value like a kinetics row:
+
+| Column | Content |
+| --- | --- |
+| `product_yield` | The number, for example `3.0838`. |
+| `yield_basis` | Its units: amount of the released product per dry mass of the solid consumed, for example `mmol/g`. |
+| `yield_evidence_type` | `measured`, `literature` or `estimate` (required; the yield sets the mode like any other input). |
+| `yield_method` | How it was obtained, required for `measured` and `literature`; for example the molar masses you used. |
+| `source` | The row's source, which is the yield's source. |
+
+The rules:
+
+- A link from a solid pool to a dissolved pool needs a unit-bearing yield; a
+  `g/g` yield there is refused on `yield_basis` with this explanation. A solid
+  pool may also release the network's final product with a unit-bearing yield,
+  which makes that product an amount per volume.
+- A link between two solid pools takes `g/g` (a unit-bearing yield there is
+  refused as ambiguous), between two dissolved pools `mol/mol`, and a dissolved
+  pool never releases a solid one (refused on `product`). A chain therefore
+  changes basis at most once, from dry mass to amount.
+- A unit-bearing yield of the wrong dimension (for example `mmol/L` or
+  `g/mmol` on a solid) is refused on `yield_basis`, as is any unit-bearing yield
+  outside an `enzyme_network` dataset (a single-class case on a solid keeps its
+  `g/g` product).
+- The yield becomes a parameter record per strain and condition, role
+  `product_yield__<pool>`, with your value, units, evidence type, method and
+  source; the release coefficient of the solid's process is bound to it. Its
+  evidence decides the mode like every other record: with measured kinetics, a
+  `literature` yield allows scientific mode and an `estimate` keeps the network
+  exploratory.
+- Pools after the basis change, and the final product, are reported in the
+  entry's initial-concentration units times the yield's units, simplified by
+  pint: g/L x mmol/g = `millimole / liter`, g/L x umol/g = `micromole / liter`.
+- The solid's process still runs in dry mass per volume per time; its released
+  amount per time is the rate times the yield, converted by pint once when the
+  model is compiled.
+- The closure ledger weighs every pool through the yields, so its terms are all
+  amounts per volume: for the example below `2 x 3.0838 mmol/g x S + 2 D + M`,
+  in mmol/L. `conservation_diagnostics.csv` lists the solid's weight with its
+  units (`{"units": "mmol/g", "value": 6.1676}`).
+- `final_product_yield` is product formed per initial solid and keeps its units
+  (`millimole / gram`); it is dimensionless only when product and substrate
+  share a basis.
+
+`tests/fixtures/user_data/network_solid_chain/` (every value an illustrative
+estimate; the yield computed by the user as 1000 / 324.28 mmol/g from an
+assumed repeat-unit molar mass of 162.14 g/mol, two units per released
+molecule):
+
+```text
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source,yield_evidence_type,yield_method
+solid_c3,,Cellulose-like solid C3,glucan_like_solid,solid_polymer,glycosidic_like_bond,dry_mass,dimer_d3,3.0838,mmol/g,<source>,estimate,computed by the user as 1000 / 324.28 mmol/g ...
+dimer_d3,,Disaccharide-like pool D3,dimer_like,dissolved,glycosidic_like_bond,,monomer_m3,2,mol/mol,<source>,,
+```
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,inhibitor
+strain_s3,solid_cutter_like,solid_c3,c45_ph5,km,8,,,g/L,estimate,...
+strain_s3,solid_cutter_like,solid_c3,c45_ph5,kcat,0.02,,,g/(mg*h),estimate,...
+strain_s3,solid_cutter_like,solid_c3,c45_ph5,enzyme_concentration,20,,,mg/L,estimate,...
+strain_s3,solid_cutter_like,solid_c3,c45_ph5,substrate_initial_concentration,10,,,g/L,estimate,...
+strain_s3,dimer_hydrolase_like,dimer_d3,c45_ph5,km,1.2,,,mM,estimate,...
+strain_s3,dimer_hydrolase_like,dimer_d3,c45_ph5,kcat,50,,,1/s,estimate,...
+strain_s3,dimer_hydrolase_like,dimer_d3,c45_ph5,enzyme_concentration,0.00002,,,mM,estimate,...
+strain_s3,dimer_hydrolase_like,dimer_d3,c45_ph5,ki,3,,,mM,estimate,...,monomer_m3
+```
+
+```text
+$ fungmod check-data tests/fixtures/user_data/network_solid_chain
+...
+  from solid_c3: solid_c3 -> dimer_d3 (3.0838 mmol/g, estimate), dimer_d3 -> monomer_m3 (2 mol/mol); strains strain_s3
+  enzyme class          pool      rate form  competitive inhibitor
+  solid_cutter_like     solid_c3  kcat       none
+  dimer_hydrolase_like  dimer_d3  kcat       monomer_m3
+
+$ fungmod run --user-data tests/fixtures/user_data/network_solid_chain --fungus strain_s3 \
+    --substrate solid_c3 --environment c45_ph5 --mode exploratory --samples 8 --seed 1 --output solid_network_run
+...
+    final_substrate_remaining          0.2775 [0.2775, 0.2775] gram / liter (n=8)
+    final_substrate_degraded_fraction  0.9723 [0.9723, 0.9723] dimensionless (n=8)
+    final_product_concentration        59.14 [59.14, 59.14] millimole / liter (n=8)
+    final_product_formed               59.14 [59.14, 59.14] millimole / liter (n=8)
+    final_product_yield                5.914 [5.914, 5.914] millimole / gram (n=8)
+    maximum_product_release_rate       1.158 [1.158, 1.158] millimole / hour / liter (n=8)
+    maximum_substrate_depletion_rate   0.2222 [0.2222, 0.2222] gram / hour / liter (n=8)
+  Threshold times (median [5th, 95th percentile] over samples):
+    time_to_10_percent_substrate_degradation  4.609 [4.609, 4.609] hour (n=8)
+    time_to_50_percent_substrate_degradation  26.37 [26.37, 26.37] hour (n=8)
+    time_to_90_percent_substrate_degradation  68.56 [68.56, 68.56] hour (n=8)
+```
+
+The solid is reported in g/L and its process rate in g/L/h; the
+disaccharide-like pool and the monomer-like product in mmol/L. The pool peaks
+at 1.85 mmol/L near 36 hours, as the competitive inhibition by the accumulating
+product (Ki 3 mM) slows the second class, and the ledger stays at 61.676 mmol/L
+(2 x 3.0838 mmol/g x 10 g/L) in every run. Its tests check that the
+disaccharide forms initially at the solid's rate times the yield (the compiled
+stoichiometric column holds 3.0838 mmol/L per g/L), that each process rate is
+its own law, and the closure at every output time
+(`tests/test_user_data_network_cross_basis.py`).
+`tests/fixtures/user_data/network_solid_parallel/` is the materially different
+case: two classes in parallel on a chitin-like solid (kcat form with a
+protein-mass enzyme, Vmax form in g/L/h) releasing the final product with a
+yield of 2460.6 umol/g, so the product is in umol/L, it equals
+`2460.6 umol/g x (S0 - S)` at every output time, and with the initial solid far
+below both Km the solid decays as `S0 exp(-(Vmax_A / Km_A + Vmax_B / Km_B) t)`.
+
 ### What a network generates
 
 | Record | Identifier |
@@ -2077,8 +2222,9 @@ single-class case of the same rows.
 | Parameter record per strain, condition and role | `<dataset_id>__network__<entry>__<strain>__<condition>__<role>` (`__gap` for a gap) |
 | Parameter symbol per role | `<dataset_id>__network__<entry>__<role>` |
 
-The roles are `substrate_initial_concentration` (the entry's), and per process
-`km__<class>__<pool>`, `kcat__<class>__<pool>` with
+The roles are `substrate_initial_concentration` (the entry's), then
+`product_yield__<pool>` for a [unit-bearing yield](#a-solid-releasing-a-dissolved-pool),
+and per process `km__<class>__<pool>`, `kcat__<class>__<pool>` with
 `enzyme_initial_concentration__<class>` or `vmax__<class>__<pool>`, plus
 `ki__<class>__<pool>` and `reactivity_exponent__<class>__<pool>` when bound.
 Each record keeps the value, evidence, maturity and provenance of its row (or
@@ -2112,10 +2258,13 @@ Each refusal names its file, row and column:
 - A product that equals the `registry_substrate` of a row with another
   `substrate_id` (ambiguous: write the `substrate_id` to link, or another name
   to end the network), and a cycle of products.
-- A link between pools on different bases, dissolved (amount per volume,
-  `mol/mol`) and solid (dry mass per volume, `g/g`): the Michaelis-Menten law
-  writes its product in the units of its substrate, and a conversion would need
-  a molar mass as a dimensional yield, which FungMod does not apply.
+- A link from a solid pool (dry mass per volume) to a dissolved pool (amount
+  per volume) without a unit-bearing yield, on `yield_basis`; a unit-bearing
+  yield on a link between two solid pools, a dissolved pool releasing a solid
+  one (on `product`), a unit-bearing yield of the wrong dimension or outside a
+  network, and `yield_evidence_type` or `yield_method` missing where required
+  or given on a `g/g` or `mol/mol` row
+  ([a solid releasing a dissolved pool](#a-solid-releasing-a-dissolved-pool)).
 - A class that acts on two pools of one network: one enzyme on two substrates
   competes for its active site, which independent processes do not represent.
 - Strains of one dataset that declare different classes of a network (one
@@ -2141,8 +2290,9 @@ Each refusal names its file, row and column:
 Modelled: several enzyme classes of one strain acting on a chain of
 well-mixed pools, each by its own Michaelis-Menten law at its stated
 concentration, classes on one pool in parallel with additive rates, each pool
-released into the next with the stated yield, and optional competitive
-inhibition of a process by one downstream pool.
+released into the next with the stated yield (from a solid to a dissolved pool
+through a unit-bearing yield you state), and optional competitive inhibition of
+a process by one downstream pool.
 
 Not modelled, and the template and outputs say so:
 
@@ -2154,12 +2304,17 @@ Not modelled, and the template and outputs say so:
   non-competitive, uncompetitive or mixed inhibition, no inhibition by several
   products of one process, no substrate inhibition, no competing substrates of
   one enzyme, no transglycosylation.
-- Chains only (each substrate has one product), on one amount basis; no
-  branching products, no dry-mass-to-molar conversion.
+- Chains only (each substrate has one product); no branching products. A
+  chain changes basis at most once, from a solid to a dissolved pool or a molar
+  final product, and only through a yield you state with its evidence; no
+  dissolved pool releases a solid one, and FungMod derives no conversion from a
+  molar mass.
 - No response laws, time courses, comparison, fitting or cultures in a
   network yet; the values hold at the condition of their rows. Networks are
   drafted for a fungus by `assemble_user_tables(network=True)`
-  ([drafting an enzyme network](#drafting-an-enzyme-network)).
+  ([drafting an enzyme network](#drafting-an-enzyme-network)); drafts follow
+  dissolved pools only, so a link from a solid to a dissolved pool, with its
+  yield, is written in `substrates.csv` by hand.
 - An enzyme-kinetics model at stated enzyme concentrations, not a fungus
   growing and secreting; the strain's class list decides which classes act.
 
@@ -2749,7 +2904,8 @@ Limits of the SABIO-RK route:
   another environment, assembly refuses it.
 - No unit conversion between molar and mass concentrations or rates; the
   product yield must be mol/mol on a dissolved substrate and g/g on a solid
-  one. An assay activity is accepted only on the case substrate at saturation
+  one, except a unit-bearing yield you state (an amount per dry mass) on an
+  enzyme-network link from a solid. An assay activity is accepted only on the case substrate at saturation
   (and never on a solid substrate); activities are never converted between
   substrates.
 - Response laws are limited to the cardinal temperature, cardinal pH and
@@ -2764,7 +2920,8 @@ Limits of the SABIO-RK route:
 - Several enzyme classes act together only in an enzyme network
   ([several enzymes acting together](#several-enzymes-acting-together)):
   independent Michaelis-Menten processes whose rates add on shared pools, a
-  chain of pools linked by explicit products on one amount basis, and
+  chain of pools linked by explicit products with at most one basis change
+  (from a solid, through a stated unit-bearing yield), and
   optionally one competitive inhibitor per process; no synergy, competition for
   sites, competing substrates of one enzyme, other inhibition forms, response
   laws, time courses or cultures in a network. Growth and secretion only through

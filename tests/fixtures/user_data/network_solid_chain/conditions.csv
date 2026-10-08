@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c45_ph5,45,degC,5.0,Illustrative assay condition for the cross-basis enzyme-network fixture

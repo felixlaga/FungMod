@@ -509,7 +509,7 @@ def test_tables_refuse_to_report_a_runnable_or_simulated_case_as_blocked(tmp_pat
 def test_case_summary_schema_documents_the_partial_run_columns() -> None:
     columns = {column["name"]: column for column in OUTPUT_TABLE_SCHEMAS["case_summary"]["columns"]}
 
-    assert OUTPUT_SCHEMA_VERSION == "2.2.0"
+    assert OUTPUT_SCHEMA_VERSION == "2.2.1"
     assert columns["case_status"]["allowed_values"] == f"{CASE_STATUS_SIMULATED}; {CASE_STATUS_NOT_SIMULATED}"
     assert columns["case_status"]["required"] is True
     assert columns["not_simulated_reason"]["required"] is False

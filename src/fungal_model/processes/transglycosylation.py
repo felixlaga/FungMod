@@ -88,6 +88,11 @@ class SubstrateTransglycosylationProcess(Process):
             )
         if not product_release_map.products:
             raise InvalidMechanismError("Substrate transglycosylation product maps require explicit products.")
+        if product_release_map.coefficient_units:
+            raise InvalidMechanismError(
+                "Substrate transglycosylation product maps take pure-number coefficients; this map's coefficients "
+                f"carry units ({product_release_map.coefficient_units})."
+            )
 
         state_specs = tuple(
             StateVariableSpec(species, substrate_units, role="reactant" if species == substrate_state else "product")

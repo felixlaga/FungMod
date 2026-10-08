@@ -1,0 +1,18 @@
+dataset_id: network_solid_chain
+contributor: FungMod maintainers
+date: 2026-10-08
+source: >-
+  Illustrative estimates for a user-defined strain whose two user-defined enzyme classes
+  degrade a suspended cellulose-like solid through a dissolved disaccharide-like pool to a
+  monomer-like product; no measurement, literature value or registry record stands behind them
+notes: >-
+  Non-specific cross-basis enzyme-network case of the user-data route (NETWORK-002): the solid
+  is stated as a dry mass per volume, the disaccharide-like pool as an amount per volume, and
+  the link between them uses a stated unit-bearing yield in mmol/g (an estimate). Every value
+  is an estimate, so the case runs in exploratory mode only and scientific mode refuses it.
+simulation:
+  duration: 96
+  units: hour
+  points: 97
+enzyme_network:
+  entry_substrates: [solid_c3]

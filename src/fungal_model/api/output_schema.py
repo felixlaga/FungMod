@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-OUTPUT_SCHEMA_VERSION = "2.2.0"
+OUTPUT_SCHEMA_VERSION = "2.2.1"
 OUTPUT_SCHEMA_NAME = "fungmod_virtual_experiment_outputs"
 
 

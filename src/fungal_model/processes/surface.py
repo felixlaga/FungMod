@@ -304,6 +304,15 @@ class ProductReleaseMap:
     ``coefficient_bindings`` names the parameter each product coefficient was
     derived from, when it was derived from one. It is descriptive: the numeric
     ``products`` entries drive every simulation.
+
+    ``coefficient_units`` gives the units of a product coefficient that carries
+    units: the amount of that product formed per amount of reactant consumed
+    when the two are stated on different bases (for example ``mmol/g``, moles
+    of a dissolved product per gram of a dry solid). A product without an entry
+    has a pure-number coefficient, as before. Only a process that converts its
+    contributions with these units may consume such a map; the numeric helpers
+    of this class refuse a unit-bearing coefficient instead of reading its
+    magnitude as a pure number.
     """
 
     reactants: Mapping[str, float]
@@ -313,6 +322,7 @@ class ProductReleaseMap:
     maturity: str | None = None
     source: str | None = None
     coefficient_bindings: Mapping[str, CoefficientBinding] = field(default_factory=dict)
+    coefficient_units: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         unknown = sorted(set(self.coefficient_bindings) - set(self.products))
@@ -321,6 +331,34 @@ class ProductReleaseMap:
                 "Coefficient bindings must name product states of the map; unknown: " + ", ".join(unknown) + "."
             )
         object.__setattr__(self, "coefficient_bindings", dict(self.coefficient_bindings))
+        units = {str(state): str(value) for state, value in self.coefficient_units.items()}
+        unknown_units = sorted(set(units) - set(self.products))
+        if unknown_units:
+            raise ValueError(
+                "Coefficient units must name product states of the map; unknown: " + ", ".join(unknown_units) + "."
+            )
+        for state, text in units.items():
+            if not text.strip():
+                raise ValueError(f"Coefficient units of product {state!r} must be explicit unit text.")
+            try:
+                quantity = Q_(1.0, text)
+            except Exception as exc:  # pint raises several unrelated exception types for bad strings
+                raise ValueError(f"Coefficient units {text!r} of product {state!r} cannot be parsed: {exc}") from exc
+            if quantity.dimensionless:
+                raise ValueError(
+                    f"Coefficient units {text!r} of product {state!r} are dimensionless; a pure-number coefficient "
+                    "takes no coefficient_units entry."
+                )
+        object.__setattr__(self, "coefficient_units", units)
+
+    def _require_pure_numbers(self, species: Any, purpose: str) -> None:
+        carried = sorted(set(self.coefficient_units).intersection(species))
+        if carried:
+            units = ", ".join(self.coefficient_units[name] for name in carried)
+            raise ValueError(
+                f"Product coefficient(s) of {', '.join(carried)} carry units ({units}); {purpose} needs pure-number "
+                "coefficients and would misread them."
+            )
 
     @classmethod
     def one_to_one(
@@ -347,15 +385,17 @@ class ProductReleaseMap:
         return set(self.reactants) | set(self.products)
 
     def signed_coefficient(self, species: str) -> float:
+        self._require_pure_numbers((species,), "A signed pure-number coefficient")
         return float(self.products.get(species, 0.0) - self.reactants.get(species, 0.0))
 
     def validate_weight_conservation(self, weights: Mapping[str, float]) -> bool:
+        self._require_pure_numbers(self.products, "The numeric weight-conservation check")
         reactant_total = sum(float(coef) * float(weights[name]) for name, coef in self.reactants.items())
         product_total = sum(float(coef) * float(weights[name]) for name, coef in self.products.items())
         return bool(np.isclose(reactant_total, product_total))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "name": self.name,
             "reactants": dict(self.reactants),
             "products": dict(self.products),
@@ -363,6 +403,10 @@ class ProductReleaseMap:
             "maturity": self.maturity,
             "source": self.source,
         }
+        if self.coefficient_units:
+            # Written only when a coefficient carries units, so maps of pure numbers serialise as before.
+            data["coefficient_units"] = dict(self.coefficient_units)
+        return data
 
 
 @dataclass(frozen=True, init=False)
@@ -397,6 +441,11 @@ class SurfaceCatalysisProcess(Process):
         source: str = "Generic surface catalysis process.",
         notes: str = "",
     ) -> None:
+        if product_release_map.coefficient_units:
+            raise ValueError(
+                f"Surface catalysis process {name!r} cannot use a product map whose coefficients carry units "
+                f"({product_release_map.coefficient_units}): its contributions use pure-number coefficients."
+            )
         units_by_state = dict(state_units or {})
         units_by_state.setdefault(substrate_state, substrate_units)
         units_by_state.setdefault(enzyme_state, enzyme_units)
