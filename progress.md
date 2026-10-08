@@ -26,6 +26,151 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PLOTS-001 Quick-Look Figures Of Every State And Process Of A Network Or Culture
+
+Status: `complete` for the stated scope (2026-10-08). For the owner's goal
+("fungus X on substrate Y in conditions Z ... the code calculates all the
+stuff"), a network or a culture computed every pool, enzyme, biomass and
+ledger trajectory and every process rate (`time_series_long.csv`), but the
+quick-look figures showed only the run-level substrate, product, degraded
+fraction and degradation rate: a network's intermediate pools and per-process
+rates, and a culture's biomass, enzyme pools and ledgers, were invisible
+without opening the tables. Separately, a run whose cases were in different
+units drew them on one axis labelled with the first row's units (a registry
+grid of the BIO-001 surface case in kilogram and the CASE-001 enzyme chain in
+millimolar drew the chain's 3 mM as 3 kilogram).
+
+Design decisions:
+
+- Which cases: a case whose `time_series_long.csv` holds the rates
+  (`process_rate.<id>`, source `simulation_process_rate`) of more than one
+  process. This is a property of the tables, not of a mechanism name: enzyme
+  networks of two or more classes, cultures (user and registry) and the
+  registry's extracellular enzyme chain qualify; every single-class case (one
+  process, surface catalysis and pH ionization included) does not and keeps its
+  five figures. No branch on a process type, organism, substrate or enzyme. A
+  one-class network has one process and keeps the run-level figures.
+- Two figures per such case, `<case_id>_state_trajectories.png` and
+  `<case_id>_process_rates.png`, after the run-level figures in case-id order:
+  a deterministic list, returned by `write_quicklook_plots` and recorded in
+  `quicklook_paths`, the manifest and the report.
+- One panel per (state, units) and per (process, units), never two units on
+  one axis (panels, not twin axes). States: the substrate (a network's entry
+  pool), the intermediates by number, the final product, then every other
+  state in table order (enzymes; biomass, pools and ledgers of a culture).
+  Labels `value (<units>)`, `rate (<units>)`, `time (<time units>)`; titles
+  `<state> (<state_role>)` and the process id.
+- Uncertainty: with more than one sample, the p05-p95 band and p50 of
+  `trajectory_quantiles.csv`, as `trajectory_quantile_bands.png` already does,
+  with that table's caveat (a summary of simulated samples, not validation or
+  a confidence interval) in the footnote; with one sample, the sample; a run
+  directory without quantile rows gets one line per sample, and says so.
+- Thresholds as already defined (10, 50 and 90 % of (S0 - S) / S0 of the
+  case's `substrate` state, so a network's entry pool), read, never
+  recomputed: a vertical line at the p50 of `summary_metrics.csv`, shaded
+  p05-p95 when the samples differ, and the number of samples of
+  `threshold_times.csv` that reached it; a threshold no sample reached is
+  listed as not reached; a time in other units than the axis is listed, not
+  drawn.
+- Process names from the existing tables: a network process's rows in
+  `mechanism_summary.csv` (its `process_enzyme_classes` class in
+  `provenance.enzyme_class`, its pool in `state_variables`) and the
+  `rate_modifier` rows that name it in `configured_by` (the competitive
+  inhibitor). Processes without such rows (cultures, the chain) are named by
+  their id. Rates are never converted: the culture fixtures record their loss
+  rates per second and their synthesis rates per hour, and are drawn so.
+- Run-level figures: one panel per (units, time units) only when more than one
+  occurs; a run in one units text takes the previous code path unchanged.
+- Not a new output: no table, column, allowed value or schema version changes
+  (`2.2.1`); the report needed no change (it lists the recorded paths).
+
+Changed: `src/fungal_model/api/quicklook.py` (the case figures:
+`_write_case_figures`, `_case_panels`, `_threshold_markers`,
+`_process_descriptions`, `_plot_panel_figure`, `_draw_panel`; the run-level
+`_plot_rows_by_units`; docstrings); `docs/concepts/outputs.md` ("Quick-look
+figures": the five run-level figures, the units rule, the two case figures and
+what each panel draws); `CHANGELOG.md` (Added, Fixed).
+
+Tests: new `tests/test_quicklook_case_figures.py` (14 test functions, 21
+cases). Figures are checked through what matplotlib is asked to draw (titles,
+axis labels, legend entries, lines, bands, captured at `savefig`), never
+pixels. The four network fixtures and `culture_estimates`: the figure list in
+order (result, manifest `quicklook_paths` and `files`); one state panel per
+simulated state, each `value (<units>)` with that state's one units text;
+entry substrate, intermediates and product first; one process panel per
+`process_rate.<id>` with its own rate units; the band of two samples or the
+single sample's line; context in the title. Each network process panel names
+its class, pool and modifiers as `mechanism_summary.csv` gives them. The
+cross-basis solid chain: g/L solid, mmol/L dimer and product, mg/L and mM
+enzymes, g/L/h and mmol/L/h rates, the competitive inhibitor named, the
+threshold times equal to `summary_metrics.csv`. The dissolved chain: three
+threshold lines on the substrate panel only. The culture: substrate, biomass,
+pool and both ledgers, and rates per hour and per second as recorded. The
+report lists both figures; replotting is byte-identical. Single class
+(`esterase_case`): exactly the five figures with their pinned titles and axis
+labels, and byte-identical when replotted. A registry grid of the surface
+case (kilogram) and the chain (millimolar): two panels in
+`substrate_remaining_vs_time.png`, case figures for the chain only, its
+processes named by id. Artificial tables: one process gives no case figures
+and two do; a units mix gives separate panels and one units text one axis;
+threshold labels for reached by all, by one of two, by none, and in other
+units.
+
+Byte identity (matplotlib 3.11.2, Agg): the 65 run-level PNGs of 13 runs
+written by base `e97e8e6` (single class: the esterase, solid and oxidase
+fixtures, registry reaction 618, BIO-001 surface; several processes: the four
+network fixtures, both culture fixtures, the CASE-001 chain and the
+*T. harzianum* registry culture) are byte-identical when re-plotted by this
+code from the same tables.
+
+Commands and results (worktree on `claude/network-culture-plots`, based on
+`e97e8e6`, Python 3.11 venv, `PYTHONPATH=src`, `MPLBACKEND=Agg`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on `api/quicklook.py` and the new test:
+  0 errors.
+- `mkdocs build --strict`: built, no warnings.
+- `tests/test_quicklook_case_figures.py`: 21 passed.
+- Targeted run (virtual-experiment API, organism registry case, CLI, API-003
+  report, roadmap status, guardrails, environment grid, partial runs): 133
+  passed.
+- Full suite (`pytest -n 2 --dist loadfile`, background, the code as
+  committed in `e5211d4`): 2838 passed in 70 min; no failures, so no serial
+  rerun was needed.
+- `pyright --pythonpath <venv python>` on the whole project (the CI step): 0
+  errors.
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13).
+
+Not changed: any table, column, value or schema version; the report renderer;
+simulation, process laws, solver, registry, user-data loading and assembly;
+the run-level figures of every run in one units text.
+
+Scientific impact: none on any simulated value. A network's intermediate
+pools and each class's rate, and a culture's biomass, enzyme pools, ledgers
+and process rates are now visible, each in its own units, with the threshold
+times and the ensemble band as the tables give them; a run in mixed units is
+no longer drawn against one mislabelled axis.
+
+Compatibility: additive files in `figures/` (and in `quicklook_paths`, the
+manifest and the report list) for cases with several processes; the
+run-level figures of a run in several units change from one axis to one panel
+per units text.
+
+Remaining ambiguities: the rule (several processes) also draws the registry
+chain and culture, and not a one-class network; states after the product
+follow the table's (model) order rather than a role grouping; a grid writes
+two more PNGs per such case (`--no-plots` skips them); the band's p50 is
+pointwise, not a sampled trajectory, as in `trajectory_quantile_bands.png`; a
+culture's `product_release_vs_time.png` stays empty, as before, because a
+culture has no `product_formed`.
+
+Risk: low. Plotting only, from existing tables; the single-units path of the
+run-level figures is the previous code, checked byte for byte.
+
+Next task: culture observables (biomass and pool time courses) in the
+time-course comparison, so the new panels can be compared with a user's own
+measurements; then the net rate of every pool (bundles record `state_rates.csv`
+for every state, the tables only the mapped substrate and product).
+
 ## FETCH-002 Kinetics Of The Fungus's Enzyme Classes Looked Up By EC Number
 
 Status: `complete` for the stated scope (2026-10-08); not verified against a

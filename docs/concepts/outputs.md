@@ -144,9 +144,9 @@ Every run writes five run-level figures to `figures/`, overlaying its cases:
 
 When the rows of one of the first four figures come in more than one units
 text, value or time (cases of a grid in g/L and in mM, or in hours and in
-minutes), each units text gets its own panel with its units on both axes;
-before, they shared one axis labelled with the first units. A run in one units
-text draws exactly as before.
+minutes), each units text gets its own panel with its units on both axes
+(earlier versions drew them on one axis labelled with the first units). A run
+in one units text draws exactly as before.
 
 ### Networks, cultures and chains
 
@@ -159,11 +159,12 @@ after the run-level figures in case-id order:
 | File | Panels |
 | --- | --- |
 | `<case_id>_state_trajectories.png` | One panel per simulated state (`source` `simulation_state`): the substrate (for a network, the entry pool), the intermediate pools in their order and the final product, then every other state as the table lists it (the enzymes; for a culture the biomass, each enzyme pool and both closure ledgers). Each panel is in its state's own units, `value (<units>)`. The substrate panel marks the times to 10, 50 and 90 % substrate degradation of `threshold_times.csv` (the same thresholds as for every case: (S0 - S) / S0 of the case's substrate state) at their p50 from `summary_metrics.csv`, shaded p05-p95 when the samples differ, with the number of samples that reached each; a threshold no sample reached is listed as not reached. |
-| `<case_id>_process_rates.png` | One panel per `process_rate.<process_id>` series of `time_series_long.csv`: each process law as the solver evaluated it at the returned times, in its own rate units, `rate (<units>)`, never converted (a culture's loss rates are recorded per second and its synthesis rates per hour). For a network, each panel names the process's enzyme class and pool and its rate modifiers (a competitive inhibitor), read from the per-process rows of `mechanism_summary.csv` (the template's `process_enzyme_classes`). |
+| `<case_id>_process_rates.png` | One panel per `process_rate.<process_id>` series of `time_series_long.csv`: each process law as the solver evaluated it at the returned times, in its own rate units, `rate (<units>)`, never converted (the culture fixtures, for example, record their loss rates per second and their synthesis rates per hour, and are drawn so). For a network, each panel names the process's enzyme class and pool and its rate modifiers (a competitive inhibitor), read from the per-process rows of `mechanism_summary.csv` (the template's `process_enzyme_classes`). |
 
 With more than one sample, each panel shows the p05-p95 band and the p50 of
 `trajectory_quantiles.csv` (a summary of the simulated samples, not validation
 or a confidence interval); with one sample, the sample itself. No two units
 share a value axis, so a solid in g/L and its released pool in mmol/L, or an
 assay-unit pool and the biomass, are never drawn against one scale. A case
-with one process (every single-class case) gets the run-level figures only.
+with one process (one enzyme class acting through one process law) gets the
+run-level figures only.
