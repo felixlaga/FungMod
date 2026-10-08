@@ -367,6 +367,11 @@ each implementation:
 - software-test benchmark configs that are explicitly non-scientific;
 - a registry-backed exploratory virtual-experiment API for Reaction 618 and
   the controlled BIO-001 surface-degradation pilot;
+- a template-driven surface-catalysis registry assembler (SURFACE-001): every
+  label, text and the geometry come from the case template (a template without
+  geometry or with an ambiguous bond class is refused; the Langmuir surface law
+  reads no geometry), and a case runs in its template's `toy`, `exploratory` or
+  `scientific` mode, scientific only with exact scientific-grade records;
 - schema-versioned virtual-experiment output tables with provenance,
   mechanism-summary, limitations, missing-parameter, suggested-experiment, and
   range-use fields;

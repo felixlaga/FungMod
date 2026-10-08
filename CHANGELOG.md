@@ -867,6 +867,33 @@ All notable public releases of FungMod are documented here.
 
 ### Changed
 
+- The surface-catalysis registry assembler is template-driven (SURFACE-001).
+  It no longer branches on the BIO-001 milestone or writes cellulose or toy
+  text from code: `config_name`, `config_mode`, `config_maturity`,
+  `accessible_site_pool` and `product_map_name` are required template
+  metadata, the config provenance, substrate and enzyme entity text and the
+  parameter entries' method and validity come from the new template blocks
+  `config_provenance`, `substrate_entity`, `enzyme_entity` and
+  `parameter_entries`, and the process assumptions are the template's
+  limitations. The silent geometry fallbacks (100 mL with 0.5 m^2 or 0.1 m^2
+  and code-written provenance) are removed: a template states a well-mixed
+  geometry or `geometry: null` (the surface law reads no geometry) or is
+  refused. The bond class is the template's `bond_type` or the single class
+  the substrate carries, the enzyme class targets and the compatibility record
+  requires; ambiguity is refused instead of taking the substrate's first bond
+  class. Deterministic assembly accepts `mode='scientific'` as well as `toy`,
+  each only for a template of that `config_mode` (a scientific template only
+  with exact scientific-grade records; exploratory templates are sampled by
+  the exploratory screen); a substrate declared dissolved or of unknown
+  physical state is refused. The BIO-001 text moved verbatim into its
+  template, so the BIO-001 and BIO-002 configs hash as before (pinned
+  digests); the toy surface case's configs differ only in metadata the toy
+  branch wrote (provenance names the bound records and lists `notes` last,
+  product entries carry the provenance source, the enzyme names its target
+  substrate and the config's measurement method, parameter notes drop the
+  appended "Toy/development only."). No simulated value changes. Custom
+  surface templates must add the new required metadata and blocks.
+
 - Text only (FETCH-002): `fungmod assemble --help` describes `--fetch` as the
   opt-in for the UniProt proteome and the kinetics lookup, and `--cache-dir`
   as where kinetics snapshots are read and stored; `--fetch` without a

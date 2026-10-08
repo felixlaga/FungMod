@@ -26,6 +26,208 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## SURFACE-001 Template-Driven Surface-Catalysis Registry Assembler
+
+Status: `complete` for the stated scope (2026-10-08). The generic
+surface-catalysis registry assembler (`screening/case_builder.py`) only
+emitted toy configs and carried the defects the USERDATA-008 design note
+listed: a `bio_milestone == "BIO-001"` branch writing cellulose-specific
+names, assumptions, provenance, validity ranges and substrate and enzyme
+notes from code; `_bio001_geometry_data()` / `_toy_geometry_data()`
+injecting 100 mL with 0.5 m^2 or 0.1 m^2 and code-written provenance when a
+template declared no geometry; `primary_bond = ... or
+substrate.bond_classes[0]`; label, mode, maturity and name fallbacks; and
+`deterministic_mode="toy"` with no other mode. It is now template-driven,
+the first step towards Langmuir adsorption-limited degradation of solid
+substrates from sourced data. No new numerics; no simulated value changes.
+
+Verified against the code first (e97e8e6): both shipped surface templates
+already declared geometry, bond type, site pool, name, mode and maturity, so
+the geometry and label fallbacks were reachable only by other templates; the
+two branches wrote the rest from code.
+
+Design decisions:
+
+- **Required template metadata** (as for Michaelis-Menten via
+  `required_process_state_metadata`): `config_name`, `config_mode` (`toy`,
+  `exploratory`, `scientific`), `config_maturity`, `accessible_site_pool`,
+  `product_map_name` (`SURFACE_CATALYSIS_REQUIRED_PROCESS_STATE_METADATA`).
+- **Moved text.** New template blocks hold what the branches wrote:
+  `config_provenance` (`source`, `measurement_method`, `confidence_level`,
+  `validity_range`, `notes`, plus further provenance texts such as BIO-001's
+  `units` and `bio_milestone`; assembler-written keys refused),
+  `substrate_entity` (`notes`, `product_notes`, optional `completeness`,
+  `default_degradation_model`, `water_activity_dependence`),
+  `enzyme_entity` (`name`, `validity_labels`, `notes`) and
+  `parameter_entries` (`measurement_method`, `validity_range`). The process
+  assumptions are the template's `limitations` (none: refused); the product
+  map's maturity is `config_maturity`. The config provenance is the declared
+  block (notes last) plus the case identity and the bound records' ids and
+  sources. Structural fields come from the substrate, enzyme-class and
+  compatibility records. A parameter entry's confidence level must be stated
+  on the record (the `"exploratory_assumption"` / `"testing"` fallbacks and
+  the `"dimensionless"` unit fallback are gone).
+- **Geometry.** The law (`r = k_s * theta(E) * A`) reads no geometry: its
+  area is the `accessible_surface_area` parameter. A template states a
+  well-mixed geometry mapping (kept as context metadata) or `geometry: null`
+  (no geometry entity, as the culture assembler accepts); a template that
+  states neither, an empty or non-mapping geometry, or a non-well-mixed one is
+  refused.
+- **Bond class.** The template's `bond_type` (which must be shared), or the
+  single bond class the substrate carries, the enzyme class targets and the
+  compatibility record requires; several or none are refused, never chosen.
+- **Modes.** Deterministic assembly accepts `toy` and `scientific`, each only
+  for a template of that `config_mode` (`enforce_template_mode_match`);
+  exploratory templates are sampled by the exploratory screen. A `scientific`
+  template is assembled only when every bound record is exact and passes the
+  scientific eligibility rules (refused at assembly otherwise, on every path).
+  Toy templates stay toy. A substrate declared dissolved or of unknown
+  physical state is refused for surface catalysis.
+
+Changed:
+
+- `screening/case_builder.py`: `_surface_catalysis_config_data` rewritten;
+  new `_surface_*` helpers (mode, scientific records, physical state,
+  geometry, limitations, bond type, text blocks, config provenance, enzyme
+  entity, config name, provenance, substrate and enzyme data, parameter
+  entries); constants `SURFACE_CATALYSIS_TEMPLATE_MODES`,
+  `SURFACE_CATALYSIS_REQUIRED_PROCESS_STATE_METADATA` (exported with
+  `SURFACE_CATALYSIS_PARAMETER_ROLES`); assembler entry
+  (`additional_supported_modes=("scientific",)`, required metadata,
+  `enforce_template_mode_match=True`, new message). Removed
+  `_is_bio001_surface_case`, `_surface_config_name`'s BIO-001/toy branches,
+  `_bio001_geometry_data`, `_toy_geometry_data`, `_generic_substrate_data`,
+  `_toy_enzyme_data`, `_parameter_config`,
+  `_exploratory_surface_parameter_config`, `_template_config_mode`,
+  `_template_config_maturity`, `_template_geometry_data`.
+- `data_registry/case_templates/case_templates.yml`: the BIO-001 and toy
+  surface templates gain `product_map_name`, `config_provenance`,
+  `substrate_entity`, `enzyme_entity` and `parameter_entries` holding the
+  text the branches wrote, verbatim.
+- Docs: `docs/concepts/virtual-experiments.md` "Surface-catalysis cases"
+  (law, template contract, geometry, bond class, modes, BIO-001 geometry as
+  context metadata); `docs/capabilities.md` surface row; `README.md`
+  capability bullet; `ARCHITECTURE_DEBT.md` `FD-011` (registered and
+  narrowed: the surface part resolved, the chain wrapper's code-written
+  CASE-001/BIO-002 notes and enzyme-named chain roles remain, contained);
+  `CHANGELOG.md` (Changed).
+
+Parity (digests are sha256 of `yaml.safe_dump(config, sort_keys=False)`,
+computed at e97e8e6 with an exported tree and again on this branch; capture
+script and both JSON dumps kept outside the repository):
+
+- Every shipped registry case in every screen mode (exploratory at the lower
+  bound and at seed 1234, scientific exact) and every deterministic build
+  (toy, scientific): 64 configs, 62 byte-identical, including BIO-001
+  (`cb118564...`, seed 1234 `28484633...`), the BIO-002 chain (deterministic
+  toy `53d6ade9...`, exploratory `84883c4d...`), the *T. harzianum* culture
+  and every Michaelis-Menten case; the same 26 refusals with the same
+  messages; `tests/test_user_data_network_cross_basis.py`'s pinned registry
+  and fixture digests pass unchanged.
+- The toy surface case (the shipped registry with the toy compatibility
+  bound to the exact toy records, as `tests/test_registry_case_builder.py`
+  builds it), deterministic toy (`f212fc15...` -> `7ce1c007...`) and
+  exploratory (`ded97952...` -> `ffc84a9d...`), differs only in fields the
+  removed toy branch wrote: (1) provenance gains `parameter_record_ids` and
+  `parameter_value_sources` and lists `notes` last; (2) each degradation
+  product carries the provenance `source`; (3) the enzyme's
+  `target_substrate_names` names the case substrate (was empty); (4) the
+  enzyme provenance `measurement_method` is the config's ("software
+  registry-to-config assembly test", was "defined benchmark metadata"); (5)
+  parameter notes drop the appended "Toy/development only." (the toy
+  records' notes say so). Undoing exactly these five gives the e97e8e6
+  digests (tested). Values, states, units, geometry, product map and
+  assumptions are identical.
+- Simulations: the nine surface and chain runs of the capture (BIO-001 at
+  both samples, BIO-002 deterministic and sampled, toy deterministic and
+  sampled) have byte-identical trajectories, extents and process rates.
+
+Tests (`tests/test_surface_catalysis_assembly.py`, 23 functions, 41 cases):
+BIO-001 and BIO-002 digests equal e97e8e6; the toy digests pinned and the
+five differences undone to the e97e8e6 digests; the toy run against the
+analytic `k_s * theta * A * t`; the moved text present in the templates and
+in the config; the assembler's modes. Refusals: missing geometry (message
+says the law reads no geometry), explicit `geometry: null` assembling
+without a geometry entity, malformed and non-well-mixed geometry, each
+required metadata field (including `config_mode`, on the deterministic and
+screen paths), an unknown `config_mode`, each template block and field, a
+reserved provenance key, a `config_name` field outside the three allowed, no
+limitations, a declared bond type not shared, an ambiguous and an absent
+shared bond class, a dissolved substrate, a scientific request on the toy
+template with scientific-grade records (template mode), a toy request on a
+scientific template, an exploratory record bound to a scientific template.
+Materially different, test-only, non-cellulose template (a polyamide-like
+film with amide and ester bonds and a hydrolase targeting only the amide
+bond; substrate in millimole of repeat units, enzyme in g/L, `K_ads` in L/g,
+`k_s` in mmol/m^2/h, area in cm^2, hours, a 0.5 release yield,
+`geometry: null`, no `bond_type`): three exploratory samples through
+`simulate_screen` with the derived bond class, no geometry entity and final
+states equal to `k_s * theta * A * t` and its yield; a linear trajectory
+(the zero-order limitation) and a scientific run through the configured
+workflow and `VirtualExperiment`. Also
+`tests/test_guardrails_no_hardcoding.py` (the surface functions of
+`case_builder.py`, found with `ast`, name no organism, substrate, milestone,
+toy, fixture, geometry or first-bond token; the removed names stay out of
+the module; it fails on e97e8e6), `tests/test_registry_case_builder.py` (the
+assembler's modes) and `tests/test_pre_bio001_stoichiometry_and_assembly.py`
+(its template fixture declares the new blocks; moved fields asserted).
+
+Commands and results (worktree on `claude/surface-assembler-cleanup`, based
+on `e97e8e6`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright` on `case_builder.py` and the four changed or new test files:
+  0 errors.
+- `mkdocs build --strict`: built, no warnings; anchor
+  `surface-catalysis-cases` exists.
+- `tests/test_surface_catalysis_assembly.py`: 41 passed.
+- Targeted run (surface, chain, case builder, templates, config-driven
+  assembly, ensembles, modelability, parameter resolution, virtual
+  experiment, BIO-001 notebook, compiled models, guardrails, documentation
+  sync, hygiene, instruction hierarchy, roadmap, quality config, user-data v2
+  and the cross-basis digests): 570 passed.
+- Full suite: see the commit report (`-n 2 --dist loadfile`, background).
+
+Not changed: `processes/surface.py`, the process factory (its own label and
+rate-unit defaults for configs written by hand), the law, the solver, the
+`extracellular_enzyme_chain` assembler and its registry wrapper, every other
+assembler, every parameter, substrate, enzyme-class and compatibility
+record, the user-data route (still refuses surface inputs), output schemas.
+
+Scientific impact: none on any simulated value. The surface assembler no
+longer writes cellulose text into non-cellulose cases or invents a vessel
+and an area, a multi-bond substrate is no longer silently assigned its first
+bond class, and a template with exact scientific-grade records can now run
+in scientific mode (exact-input gate, not validation).
+
+Compatibility: custom surface-catalysis templates must add the required
+metadata and the four blocks and state `geometry`; templates that relied on
+the fallbacks are refused with the missing field named. Deterministic
+`mode="scientific"` requests on a surface case now reach the template-mode
+and record checks instead of the old "only emits toy" refusal. The toy
+surface case's metadata changed as listed.
+
+Remaining ambiguities and debt: the BIO-001 template still declares a
+100 mL / 0.5 m^2 well-mixed geometry as context metadata (kept for parity;
+the law does not read it, and `geometry: null` would change only the
+config); the process factory still defaults `rate_units` to
+`<substrate units> / second` and labels for configs that omit them (the
+assembler always writes the labels); the chain wrapper's CASE-001 notes and
+enzyme-named chain roles (`FD-011`).
+
+Risk: low to medium-low. Shipped configs and simulations are unchanged and
+pinned; the new refusals affect only surface templates without the new
+metadata.
+
+Recommended next task: expose the surface law to user data (the design
+note's USERDATA-009/010 increment): accept a sourced adsorption constant
+`K_ads`, surface rate constant `k_s` and accessible area `A` for one solid
+substrate in the amount convention, generate a surface-catalysis template
+with these blocks, `geometry: null` and the law's limitations (zero order in
+the substrate until depletion, constant area, no enzyme depletion by
+binding), with the mode set by the weakest input. Enzyme partitioning with a
+binding capacity (`E_T = E_F + E_B`) remains new numerics and stays out of
+that step.
+
 ## FETCH-002 Kinetics Of The Fungus's Enzyme Classes Looked Up By EC Number
 
 Status: `complete` for the stated scope (2026-10-08); not verified against a

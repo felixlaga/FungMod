@@ -7,7 +7,8 @@ ID, status, reason, risk, exit condition, removal milestone, and tests
 protecting the boundary. New foundation work should remove entries from this
 file, not normalize them.
 
-Current state: two active contained entries, `FD-009` and `FD-010`. `FD-008` was resolved by shared
+Current state: three active contained entries, `FD-009`, `FD-010` and `FD-011` (registered and
+narrowed on 2026-10-08 by SURFACE-001, which resolved its surface-catalysis part). `FD-008` was resolved by shared
 package integration on 2026-09-28. `FD-007` was
 resolved on 2026-08-01 by deterministic build-time staging from the canonical
 resource roots. `FD-005` was resolved in PR-41 by enabling Pyright optional-member-access
@@ -16,6 +17,70 @@ process-to-`Reaction` adapter debt was resolved in Phase 1 Task 4; retained
 `Reaction`, `SimulationEngine`, and `ReactionDiffusionEngine1D` APIs are
 intentional explicit low-level APIs, not native configured workflow
 dependencies.
+
+## FD-011 Case-specific text and fallbacks in generic registry assemblers
+
+Status: active, contained since 2026-10-08 (SURFACE-001; registered and narrowed in the same change)
+
+Reason: the generic registry assemblers in `screening/case_builder.py` must
+read every case-specific label, text and value from the registry records and
+the case template. Two did not. The surface-catalysis assembler branched on
+the compatibility record's `bio_milestone == "BIO-001"` and wrote
+cellulose-specific prose (names, assumptions, provenance, validity ranges,
+substrate and enzyme notes) or toy prose from code, injected a 100 mL /
+0.5 m^2 (BIO-001) or 100 mL / 0.1 m^2 (toy) geometry with code-written
+provenance when a template declared none, took `substrate.bond_classes[0]`
+when a template named no bond class, defaulted the config mode, maturity
+and name, and assembled toy configs only. The `extracellular_enzyme_chain`
+registry wrapper (`_extracellular_enzyme_chain_config_data`) still writes the
+CASE-001/BIO-002 "cellulose-equivalent" provenance notes from code, and the
+chain's role contract (`EXTRACELLULAR_ENZYME_CHAIN_PARAMETER_ROLES`) names
+`cellulase_initial_concentration` and `beta_glucosidase_initial_concentration`.
+
+Resolved part (SURFACE-001, 2026-10-08): the surface-catalysis assembler is
+template-driven. `config_name`, `config_mode`, `config_maturity`,
+`accessible_site_pool` and `product_map_name` are required template metadata
+(`SURFACE_CATALYSIS_REQUIRED_PROCESS_STATE_METADATA`); the config provenance,
+substrate and enzyme entity text and the parameter entries' method and
+validity come from the template blocks `config_provenance`,
+`substrate_entity`, `enzyme_entity` and `parameter_entries`; the process
+assumptions are the template's limitations. A template states its geometry
+(a well-mixed mapping, or `geometry: null`: the surface law reads no
+geometry) or is refused. The bond class is the template's `bond_type` or the
+single class the substrate carries, the enzyme class targets and the
+compatibility record requires; ambiguity is refused. Toy and scientific
+templates are requested deterministically by their own `config_mode`;
+scientific only with exact, scientific-eligible records; exploratory templates
+are sampled by the exploratory screen. The BIO-001 text moved into its
+template verbatim: BIO-001 and BIO-002 configs hash as at e97e8e6; the toy
+case differs only in the fields the removed toy branch wrote, listed and
+undone field by field in `tests/test_surface_catalysis_assembly.py`. No
+simulated value changed.
+
+Risk (remaining part): the chain wrapper's code-written notes describe every
+chain case as cellulose-equivalent, which would mislabel a materially
+different chain template reaching registry assembly.
+
+Containment: only the shipped BIO-002 chain template reaches the wrapper; the
+user-data route refuses chains; the chain's configs are pinned (digests in
+`tests/test_surface_catalysis_assembly.py` and
+`tests/test_user_data_network_cross_basis.py`); the surface assembler's
+functions are scanned for organism, substrate, milestone and toy tokens.
+
+Exit condition: the chain wrapper reads its provenance notes from the chain
+template (byte-identical for BIO-002) and the chain role contract names
+roles by function (surface catalyst, homogeneous catalyst) rather than by
+enzyme, with the guardrail extended to the whole module.
+
+Removal milestone: the first task that exposes `extracellular_enzyme_chain`
+to a template other than BIO-002 (for example user-data chains), before that
+template is assembled.
+
+Tests protecting it:
+`tests/test_guardrails_no_hardcoding.py::test_surface_catalysis_assembler_has_no_organism_substrate_or_toy_specific_tokens`,
+`tests/test_guardrails_no_hardcoding.py::test_registry_case_builder_has_no_reaction_specific_onboarding_tokens`,
+`tests/test_surface_catalysis_assembly.py` (parity digests, refusals, the
+test-only non-cellulose template in exploratory and scientific mode).
 
 ## FD-010 Per-candidate config rebuild in calibration and no parameter sensitivities
 

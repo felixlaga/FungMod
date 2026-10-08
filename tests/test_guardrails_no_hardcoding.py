@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -340,3 +341,59 @@ def _python_files(paths: tuple[str, ...]) -> tuple[Path, ...]:
         elif path.is_dir():
             files.extend(sorted(item for item in path.rglob("*.py") if "__pycache__" not in item.parts))
     return tuple(files)
+
+
+# SURFACE-001: the test-only non-cellulose surface fixture of tests/test_surface_catalysis_assembly.py.
+SURFACE_FIXTURE_TOKENS = (
+    "polyamide",
+    "fixture_surface_source",
+    "fixture_amide_bond",
+    "fixture_ester_bond",
+    "released_dimer",
+)
+
+
+def test_surface_catalysis_assembler_has_no_organism_substrate_or_toy_specific_tokens() -> None:
+    """SURFACE-001: the surface-catalysis registry assembler reads every label, text and geometry from its template.
+
+    The surface functions of case_builder.py (every top-level function whose name contains ``surface``) name no
+    organism, substrate, enzyme, milestone or toy text, choose no bond class and inject no geometry; the removed
+    BIO-001 and toy branches stay removed from the whole module.
+    """
+
+    source = (ROOT / "src" / "fungal_model" / "screening" / "case_builder.py").read_text(encoding="utf-8")
+    functions = [
+        node for node in ast.parse(source).body if isinstance(node, ast.FunctionDef) and "surface" in node.name
+    ]
+    assert {"_surface_catalysis_config_data", "_surface_bond_type", "_surface_geometry"} <= {
+        node.name for node in functions
+    }
+    surface_source = "\n".join(ast.get_source_segment(source, node) or "" for node in functions).lower()
+    for forbidden in (
+        *USER_DATA_FORBIDDEN_TOKENS,
+        *SURFACE_FIXTURE_TOKENS,
+        "bio001",
+        "bio-001",
+        "bio_milestone",
+        "toy",
+        "r3 ",
+        "glycosidic",
+        "film",
+        "pilot",
+        "milliliter",
+        "bond_classes[0]",
+    ):
+        assert forbidden not in surface_source, forbidden
+    module = source.lower()
+    for removed in (
+        "_is_bio001_surface_case",
+        "_bio001_geometry_data",
+        "_toy_geometry_data",
+        "_toy_enzyme_data",
+        "bio-001",
+        "bio_milestone",
+        "toy registry",
+        "toy/development",
+        "bond_classes[0]",
+    ):
+        assert removed not in module, removed
