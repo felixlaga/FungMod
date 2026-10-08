@@ -26,6 +26,189 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## ASSEMBLE-002 An Enzyme Network Drafted For Fungus, Substrate And Conditions
+
+Status: `complete` for the stated scope (2026-10-08). For the owner's goal ("i
+want fungi X on substrate Y in conditions Z, and then it automatically fetches
+... the different enzymes and stuff in the fungi, and then the code calculates
+all the stuff"), `fungmod assemble` drafted single-class cases: once loaded,
+the preflight picks one class per strain, substrate and condition. Since
+USERDATA-010 a dataset can opt into an enzyme network in which every class of
+the strain acts together, but nothing drafted one: the user wrote the manifest
+block, the product links and every class's kinetics rows by hand. Now
+`assemble_user_tables(network=True)` and `fungmod assemble --network` draft it
+from the same sources (annotation, UniProt proteome file, snapshot or name,
+asserted classes, registry record, user dataset, SABIO-RK), opt-in, with no
+new numerics and no change to the loader or the core.
+
+Design decisions (design note kept outside the repository):
+
+- **Entries.** Every requested substrate is an entry substrate (one network
+  each, the manifest's `entry_substrates`); an intermediate that is also
+  requested starts a network of its own, which the loader allows.
+- **Pools from stated products only.** From each entry the draft follows the
+  product its `substrates.csv` row will state: the request's `product`, the
+  user dataset's row, or a registry record's product when it lists exactly
+  one. A product links to a pool only when it EQUALS a `substrate_id` of the
+  user dataset or a registry substrate ID (the draft's `substrate_id` of a
+  registry substrate), the loader's rule; that pool joins the draft as an
+  intermediate (`network_role`, `released_by`). Names and aliases are never
+  matched: a product naming a registry substrate by name stays the final
+  product and a decision says so. After drafting, the written
+  `substrates.csv` must link exactly the followed pools (a converted SABIO-RK
+  product that would change a chain is refused with the remedy).
+- **Members.** Every class of the repertoire that acts on a pool by the
+  categorical rule is a member, with the existing per-case status (own,
+  same-species literature, transfer as an estimate, conflict, gap) per pool
+  and requested condition. A member without kinetics is a gap (no row; the
+  loader makes its gaps and measurement requests), never a dropped class;
+  classes acting on no pool are listed per network as not members with each
+  pool's reason.
+- **The loader's rules while drafting.** Intermediate (non-entry) pools take
+  no initial concentration: such SABIO-RK rows are listed as not converted,
+  such user rows as unused. An entry has one initial concentration per
+  condition: user rows win and must agree (else refused); a disagreeing
+  source value is listed; source values disagreeing with each other become one
+  `REVIEW:` row naming each; `design` is written once per entry and condition
+  where nothing states it (on the first class acting on the entry). The
+  pH-ionization form is excluded (case `gap` with the reason). Refused with
+  the reason: `responses` and `responses.csv` rows of `user_data` on a pool,
+  cycles, ambiguous products, a product that is a solid substrate (drafts are
+  dissolved only; worded without relying on the loader's cross-basis refusal,
+  which another task may relax), a class on two pools of one network, an entry
+  no class acts on, colliding state names, disagreeing user initial
+  concentrations. One strain per draft, so "one network per entry shared by
+  strains" holds by construction.
+- **A network dataset as `user_data`** is accepted with `network=True`: its
+  rows are kept unchanged (including `ki` and `inhibitor`), and the network is
+  re-derived from the request by the same rules. Without `network` the
+  refusal stays (its message now names `network=True`), because a
+  single-class draft would drop the network.
+- **Verdict per condition** (`all_members_have_kinetics`, `blocked` with what
+  blocks it, `undetermined` when a pool's categories are `REVIEW:` fields);
+  the printed `run` command names the entry substrates and carries
+  `--runnable-only` when a network case of it is blocked.
+
+Changed:
+
+- `api/user_data_assembly.py`: `assemble_user_tables(network=False)`;
+  `discover_network_pools`, `_stated_product`, `_pool_for_product`,
+  `_refuse_solid_pool`, `_add_pool`, `_refuse_network_laws`,
+  `_check_network_members`, `_exclude_network_forms`, `_network_kinetics`,
+  `_network_design_initials`, `_network_dropped`,
+  `_consolidated_entry_initials`, `_check_written_links`,
+  `_with_network_report`, `_network_report`, `_network_markdown`;
+  `_design_rows_for_gaps(skip_initial=...)`; `_Target.network_role` and
+  `released_by`; `_NetworkDraft`; constants `NETWORK_COMPLETE`,
+  `NETWORK_BLOCKED`, `NETWORK_UNDETERMINED`, `NETWORK_CONDITION_STATUSES`,
+  `NETWORK_KINETICS_COLUMNS`; `_table_columns` (a network draft's
+  `kinetics.csv` adds `inhibitor`); the manifest's `enzyme_network` block and
+  a notes sentence; `assembly["network"]` (entries, per network pools, links
+  with `stated_by` and source, final product, members with status per
+  condition, not members, undetermined pools, verdicts) and `network_role` on
+  substrates; four network limitations; a `review.md` "Enzyme network"
+  section; gap requests say whether the pool is the entry or an intermediate.
+  Every network step runs only when `network=True`; the single-class path is
+  the same code as before.
+- `cli.py`: `assemble --network`; the network block printed after the
+  compatibility lines; intermediate pools printed as pools; next steps name
+  entry substrates only, with a network-specific `--runnable-only` note; help
+  epilog paragraph and example; module docstring.
+- Tests: new `tests/test_assemble_network.py` (19 test functions, 25 cases);
+  `tests/test_guardrails_no_hardcoding.py` (test-only tokens of the new
+  tests). No fixture added: the tests derive their inputs from existing
+  fixtures in temporary directories, plus one test-only in-memory registry
+  (a dissolved oligomer record whose single registry product is the shipped
+  `cellobiose` record, and `cellobiohydrolase` widened in memory to its
+  class; both labelled test-only in their provenance, as the ASSEMBLE-001
+  glucoamylase widening).
+- Docs: `docs/user-data.md` "Drafting an enzyme network" (rules, Python, worked
+  example with real output) and cross-links from the assembly section, the
+  network section, its refusals and limits; `docs/cli.md` "Several enzymes
+  acting together: --network" (real output of the chain example, `check-data`
+  and the partial run; the proteome-by-name block from the synthetic UniProt
+  responses, labelled), command and options tables, arguments; `README.md`
+  (assembly paragraph, command-line paragraph, two capability rows);
+  `docs/capabilities.md`; `CHANGELOG.md` (Added; Changed: text only).
+
+Tests (`tests/test_assemble_network.py`, network blocked through `urlopen`,
+the SABIO-RK fetch module and `socket.connect`): seven drafts without
+`network` (dbCAN + transfer, two conditions with a gap, conflict, registry
+fungus with literature and design, oxidase law to an `EnvironmentGrid`
+condition, user dataset winning over literature, UniProt export file) are
+byte-identical to 56c8df4 (SHA-256 over files, annotation digests and
+`to_dict()`), and so is the stdout of the `docs/cli.md` assemble example
+(POSIX only: Windows quotes printed commands for `cmd`); a user chain (the
+`network_chain` fixture without its block, dissolved user substrates linked
+by `substrates.csv` products) drafts the block, keeps the rows, reports pools,
+links, members and verdicts, and loads as the same network as the fixture;
+from the command line it prints the network block and a `run` command with
+`--runnable-only` (40 degC blocked), `check-data` lists the network, `run
+--runnable-only` over 30 and 40 degC exits 4 and `run` at 30 degC exits 0;
+two requested substrates make two networks; a registry chain (hand-written
+dbCAN annotation, the test-only record whose registry product is `cellobiose`,
+SABIO-RK 35622 as a transfer) adds `cellobiose` as an intermediate, keeps
+the member without kinetics as a gap that blocks the network, lists three
+annotation classes as not members, drops the intermediate's initial
+concentration (listed) and writes the entry's design loading once; the loaded
+draft's preflight is underparameterized with the cellobiohydrolase request;
+a product named by name is no link; a registry fungus's literature network is
+`modelable` in scientific mode; a pool under review leaves the network
+`undetermined`; a UniProt reference proteome found by name from the
+FETCH-001 synthetic responses (`--scientific-name ... --fetch-proteome --fetch
+--network`) lists chitinase and xylanase as not members, prints no
+`--runnable-only`, and runs (exit 0); the `network_parallel` dataset as `user_data` keeps its `ki` row and
+loads as the same network, and is refused without `network`; the user's entry
+loading wins over a SABIO-RK assay range (listed); disagreeing source
+loadings become one `REVIEW:` row (assembler-level test, because no two
+SABIO-RK classes on one substrate exist in the snapshots); the pH-ionization
+form is a gap; refusals (cycle, ambiguous product, class on two pools,
+colliding state name, solid product, `responses`, a dataset's
+`responses.csv`, an entry no class acts on, disagreeing user loadings,
+non-boolean `network`); the CLI refusal exits 2 and writes nothing; help.
+
+Commands and results (worktree on `claude/assemble-network`, based on
+`56c8df4`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on `api/user_data_assembly.py`,
+  `cli.py`, `tests/test_assemble_network.py` and the guardrail test: 0 errors.
+- `mkdocs build --strict`: built, no warnings; the anchors
+  `drafting-an-enzyme-network` and `several-enzymes-acting-together-network`
+  exist.
+- `tests/test_assemble_network.py`: 25 passed.
+- Targeted run (new tests, assembly, fetch by name, network, UniProt, genome,
+  partial runs, CLI, CLI workflow, guardrails, documentation sync, hygiene,
+  instruction hierarchy, roadmap, release configuration): 413 passed in 3 min
+  35 s.
+- Full suite (`pytest`, background, the committed code): 2713 passed in 29 min.
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13); the pinned
+  CLI stdout digest is skipped on Windows, whose printed commands are quoted
+  for `cmd`.
+
+Not changed: `api/user_data.py` (loader, network rules, refusals), the core,
+any process law, rate form, registry record, fixture, preflight rule or
+output schema of a run; drafts without `network` (pinned digests).
+
+Scientific impact: none on any simulated value. A drafted network loads to
+the same records as a hand-written one (the chain draft reproduces the
+fixture's metrics, 50 % of the entry degraded at 64.77 minutes); the
+assembly only arranges existing sources, never links pools by name, never
+upgrades a transfer, and never leaves a class out of a network.
+
+Compatibility: additive (a keyword argument, a CLI flag, report keys and a
+`kinetics.csv` column only in network drafts); one refusal message text
+changed.
+
+Remaining ambiguities: each requested substrate is an entry (no way to
+request a pool as intermediate-only besides not requesting it); a
+SABIO-RK product never extends a chain (a changed chain is refused instead);
+the design enzyme concentration applies to every kcat-form member, as in
+single-class drafts.
+
+Next task: bind `responses.csv` laws per network process (then drafts can
+carry them); let the assembly follow cross-basis links once the loader
+accepts a dimensional product coefficient (solid entry to dissolved pools).
+
 ## PAPER-003 A Software-Only Paper Draft For JOSS
 
 Date: 2026-10-06

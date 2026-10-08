@@ -6,6 +6,38 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- An enzyme network drafted for a fungus, substrates and conditions
+  (ASSEMBLE-002): `assemble_user_tables(network=True)` and `fungmod assemble
+  --network` draft the USERDATA-010 `enzyme_network` block with the requested
+  substrates as entry substrates, follow the pools each releases only through
+  stated products (the request's `product`, the user dataset's `substrates.csv`
+  row, or a registry record's single product) that equal a `substrate_id` of
+  the user dataset or a registry substrate ID (never a name; such a pool is
+  added as an intermediate), and make every class of the repertoire
+  (annotation, proteome export, asserted classes, registry record, user
+  dataset) that acts on a pool a member, with the existing per-case kinetics
+  status (own, same-species literature, cross-organism transfer as an
+  estimate, conflict, gap). A member without kinetics is a gap with the
+  existing measurement requests, never a dropped class. The loader's network
+  rules are applied while drafting: intermediate pools take no initial
+  concentration (such rows are listed), an entry has one per condition (the
+  user's rows win; disagreeing source values become one `REVIEW:` field;
+  `design` is written once per entry and condition), the pH-ionization form is
+  a gap with the reason, and refused with the reason are `responses`, a
+  dataset's `responses.csv` rows on a pool, cycles, ambiguous products,
+  products that are solid substrates, a class on two pools of one network, an
+  entry no class acts on, colliding state names and disagreeing user initial
+  concentrations. The report gains `assembly["network"]` (pools, links, final
+  product, members and their status per condition, classes acting on no pool,
+  and per condition `all_members_have_kinetics`, `blocked` with what blocks
+  it, or `undetermined`) and `network_role` on substrates; `review.md` an
+  "Enzyme network" section; a network draft's `kinetics.csv` the `inhibitor`
+  column; `fungmod assemble --network` prints the network block and a `run`
+  command with `--runnable-only` when a network case is blocked. A network
+  dataset is accepted as `user_data` with `network=True` (its `ki` rows kept).
+  Without `network` drafts are byte-identical to the previous version (pinned
+  digests).
+
 - A software-only paper draft for the Journal of Open Source Software,
   `paper/joss/paper.md` with its bibliography (PAPER-003): no research
   results, the journal's 2026 sections, author statements still to be
@@ -760,6 +792,10 @@ All notable public releases of FungMod are documented here.
   remain explicit; no validated organism model or registry promotion is claimed.
 
 ### Changed
+
+- Text only (ASSEMBLE-002): the refusal of a network dataset as `user_data` of
+  `assemble_user_tables` now names `network=True` (`fungmod assemble
+  --network`), which accepts it. No numerical behaviour changes.
 
 - Text only (FETCH-001): `UniprotSnapshot.genomes_row` (and so
   `write_snapshot_to_user_dataset`) prefixes its `source` with the export's

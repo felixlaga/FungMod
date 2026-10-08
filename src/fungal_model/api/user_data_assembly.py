@@ -44,6 +44,22 @@ Rules:
   stoichiometry does not settle, a new substrate's categories, the source of
   an annotation) are ``REVIEW:`` fields unless given.
 - Nothing is fetched, and the same inputs give byte-identical files.
+
+With ``network=True`` (ASSEMBLE-002) the draft is one enzyme network per
+requested substrate (``enzyme_network`` in ``user_dataset.yml``, the
+USERDATA-010 route) instead of single-class cases: each requested substrate is
+an entry substrate, and the pools it releases are followed only through
+stated products (the request's ``product``, the user dataset's
+``substrates.csv`` row, or a registry record's single product) that equal a
+``substrate_id`` of the user dataset or a registry substrate ID, never a name.
+Every class of the repertoire that acts on a pool is a member, with the same
+per-case kinetics status; a member without kinetics is a gap, never dropped.
+The loader's network rules are applied while drafting: intermediate pools
+take no initial concentration, an entry has one, and what a network cannot run
+(response laws, the pH-ionization form, cycles, ambiguous products, solid
+pools, a class on two pools of one network, an entry no class acts on) is
+refused or reported as a gap with the reason. Without ``network`` nothing
+changes.
 """
 
 from __future__ import annotations
@@ -63,6 +79,10 @@ from fungal_model.api.user_data import (
     _UNIPROT_PROTEOME_ID,
     CULTURE_TABLE,
     GENOME_TABLE,
+    INHIBITOR_COLUMN,
+    NETWORK_ENTRY_FIELD,
+    NETWORK_MANIFEST_FIELD,
+    PH_IONIZATION_QUANTITIES,
     RESPONSE_LAWS,
     REVIEW_MARKER,
     UNIPROT_SOURCE_TYPE,
@@ -113,6 +133,21 @@ STATUS_CONFLICT = "conflict"
 STATUS_GAP = "gap"
 ASSEMBLY_STATUSES = (STATUS_USER_DATA, STATUS_LITERATURE, STATUS_TRANSFERRED, STATUS_CONFLICT, STATUS_GAP)
 
+# Whether an enzyme network of a network draft can run at a requested condition (all or nothing).
+NETWORK_COMPLETE = "all_members_have_kinetics"
+NETWORK_BLOCKED = "blocked"
+NETWORK_UNDETERMINED = "undetermined"
+NETWORK_CONDITION_STATUSES: Mapping[str, str] = MappingProxyType(
+    {
+        NETWORK_COMPLETE: "every member class has kinetics from a source and the entry's initial concentration is "
+        "stated or a REVIEW field; check-data lists any role still missing once the tables are reviewed",
+        NETWORK_BLOCKED: "a member class has no kinetics (gap or conflict) or the entry's initial concentration is "
+        "missing; load_user_dataset records the gaps and the preflight blocks the network (all or nothing)",
+        NETWORK_UNDETERMINED: "a pool's substrate class or bond classes are REVIEW fields, so its member classes are "
+        "decided only when the reviewed tables are loaded",
+    }
+)
+
 # How a case reaches its requested condition.
 ROUTE_SAME_CONDITION = "same_condition"
 ROUTE_RESPONSE_LAW = "response_law"
@@ -134,6 +169,8 @@ RESPONSE_COLUMNS = (
 )
 GENOME_COLUMNS = ("strain_id", "annotation_file", "annotation_tool", "source", "min_tools_agreeing")
 ASSEMBLED_KINETICS_COLUMNS = (*KINETICS_COLUMNS, "replicates", "activity_substrate", "activity_saturating")
+# A network draft's kinetics.csv also has the inhibitor column of ki rows (USERDATA-010).
+NETWORK_KINETICS_COLUMNS = (*ASSEMBLED_KINETICS_COLUMNS, INHIBITOR_COLUMN)
 _TABLE_COLUMNS: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
         "strains.csv": STRAIN_COLUMNS,
@@ -226,6 +263,18 @@ _LIMITATIONS = (
     "through a temperature or pH law in responses.csv, as an EnvironmentGrid condition.",
     "Homogeneous Michaelis-Menten kinetics on dissolved substrates only, as in every user dataset.",
 )
+_NETWORK_LIMITATIONS = (
+    "Enzyme network draft: the member classes act together as independent Michaelis-Menten processes whose rates "
+    "add on shared pools; no synergy, no competition for substrate binding or adsorption sites, and no inhibition "
+    "unless a ki row states a competitive inhibitor.",
+    "Pools are linked only where a stated product (the request, the user dataset's substrates.csv or a registry "
+    "record's single product) equals a substrate_id; products are never matched by name, so a pool the data does "
+    "not link is not part of the network.",
+    "A network runs only when every member class has kinetics at the condition (all or nothing): a member without "
+    "kinetics is a gap that blocks the network there, never a class left out.",
+    "Response laws, the pH-ionization form, cultures and time courses are not combined with an enzyme network in "
+    "this version; the network's kinetics apply at the condition of their rows.",
+)
 
 
 class UserTablesAssemblyError(UserTablesSourceError):
@@ -245,7 +294,11 @@ class AssembledTablesDraft(UserTablesDraft):
     (fungus, enzyme class, substrate, requested condition) the class evidence,
     the kinetics status (``user_data``, ``literature_same_organism``,
     ``transferred_estimate``, ``conflict`` or ``gap``), how the condition is
-    reached, the source ids and the reason.
+    reached, the source ids and the reason. A network draft
+    (``assemble_user_tables(network=True)``) declares ``enzyme_network`` in its
+    manifest, its ``kinetics.csv`` has the ``inhibitor`` column, and
+    ``assembly["network"]`` reports its pools, links, member classes and
+    per-condition status.
     """
 
     responses: tuple[Mapping[str, str], ...] = ()
@@ -273,7 +326,7 @@ class AssembledTablesDraft(UserTablesDraft):
 
         texts = {USER_DATASET_MANIFEST: _manifest_text(self.manifest)}
         for name, rows in self.tables().items():
-            texts[name] = _csv_text(_TABLE_COLUMNS[name], rows)
+            texts[name] = _csv_text(_table_columns(name, self.manifest), rows)
         texts[_REVIEW_MD] = self.review
         return texts
 
@@ -346,6 +399,7 @@ def assemble_user_tables(
     entry_ids: Sequence[str] | None = None,
     registry: str | Path | FungModRegistry | None = None,
     cache_dir: str | Path = "data/source_snapshots/sabiork",
+    network: bool = False,
 ) -> AssembledTablesDraft:
     """Assemble one reviewable user dataset for a fungus on substrates at stated conditions.
 
@@ -399,6 +453,23 @@ def assemble_user_tables(
     ``enzyme_loading`` as in ``user_tables_from_sabiork``; ``time_grid`` takes
     ``duration``, ``units`` and ``points``.
 
+    ``network=True`` drafts an enzyme network (``enzyme_network`` in
+    ``user_dataset.yml``) instead of single-class cases: every requested
+    substrate is an entry substrate, the pools it releases are followed through
+    stated products that equal a ``substrate_id`` of ``user_data`` or a
+    registry substrate ID (added to the draft), and every class of the
+    repertoire acting on a pool is a member with its own per-case kinetics
+    status; ``assembly["network"]`` reports pools, links, members, classes that
+    act on no pool, and whether each requested condition can run (all members
+    with kinetics and the entry's initial concentration). ``user_data`` may then
+    be a network dataset itself (its ``ki`` rows are kept). Refused with the
+    reason: ``responses`` (laws are not bound to network processes), a cycle of
+    products, a product that equals the registry substrate of a pool with
+    another ``substrate_id``, a product that is a solid substrate, a class
+    acting on two pools of one network, an entry no class acts on, colliding
+    state names, and disagreeing initial concentrations of an entry in the
+    user's rows.
+
     Returns an ``AssembledTablesDraft``; ``draft.write(directory)`` writes the
     tables, the annotation file, ``user_dataset.yml`` and ``review.md``, and
     ``draft.assembly`` is the per-case report. ``load_user_dataset`` refuses
@@ -412,19 +483,24 @@ def assemble_user_tables(
             "dataset_id must be lowercase snake_case (letters, digits, single underscores), as user_dataset.yml "
             "requires."
         )
+    if not isinstance(network, bool):
+        raise UserTablesAssemblyError("network must be True or False.")
     base = _base_registry(registry)
     try:
         design_values = _validated_design(design)
     except UserTablesSourceError as exc:
         raise UserTablesAssemblyError(str(exc)) from exc
     assembler = _Assembler(dataset_id=dataset_id, base=base, design=design, cache_dir=cache_dir)
+    assembler.network = network
     assembler.design_values = dict(design_values)
     assembler.design_quantities = tuple(design_values)
     assembler.simulation = _validated_time_grid(time_grid)
     assembler.requested = _validated_conditions(conditions)
-    assembler.user = _user_source(user_data, base)
+    assembler.user = _user_source(user_data, base, network=network)
     assembler.resolve_fungus(fungus, scientific_name=scientific_name)
     assembler.resolve_substrates(_substrate_specs(substrates))
+    if network:
+        assembler.discover_network_pools()
     assembler.collect_classes(
         annotation=annotation,
         annotation_tool=annotation_tool,
@@ -617,7 +693,9 @@ class _UserSource:
         return self.rows.get(name, [])
 
 
-def _user_source(user_data: str | Path | UserDataset | None, base: FungModRegistry) -> _UserSource | None:
+def _user_source(
+    user_data: str | Path | UserDataset | None, base: FungModRegistry, *, network: bool = False
+) -> _UserSource | None:
     if user_data is None:
         return None
     if isinstance(user_data, UserDataset):
@@ -631,12 +709,13 @@ def _user_source(user_data: str | Path | UserDataset | None, base: FungModRegist
     else:
         directory = Path(user_data)
         dataset = load_user_dataset(directory, registry=base)
-    if dataset.enzyme_networks:
-        # A network is a modelling choice of the dataset's manifest; drafts are single-class tables and would drop it.
+    if dataset.enzyme_networks and not network:
+        # A network is a modelling choice of the dataset's manifest; single-class drafts would drop it.
         raise UserTablesAssemblyError(
             f"User dataset {dataset.dataset_id!r} declares enzyme networks (enzyme_network in user_dataset.yml, from "
             f"{', '.join(str(item['entry_substrate']) for item in dataset.enzyme_networks)}); assembled drafts are "
-            "single-class tables and do not carry a network. Load that dataset with load_user_dataset directly."
+            "single-class tables unless network=True (fungmod assemble --network) drafts a network, so this draft "
+            "would drop it. Pass network=True, or load that dataset with load_user_dataset directly."
         )
     rows = {name: _read_rows(directory / name) for name in _TABLE_COLUMNS}
     return _UserSource(dataset=dataset, directory=directory, manifest=dict(dataset.manifest), rows=rows)
@@ -749,10 +828,23 @@ class _Target:
     spec: Mapping[str, Any]
     user_row: dict[str, str] | None = None
     record: SubstrateRecord | None = None
+    # Network drafts only: "entry" for a requested substrate, "intermediate" for a pool a stated product adds.
+    network_role: str = ""
+    released_by: str = ""
 
     @property
     def determined(self) -> bool:
         return self.substrate_class is not None and self.bond_classes is not None
+
+
+@dataclass
+class _NetworkDraft:
+    """The pools one requested substrate releases through stated products, in chain order."""
+
+    entry: _Target
+    pools: list[_Target]
+    # (substrate_id, product, where the product is stated) of every pool, in chain order.
+    products: list[tuple[str, str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -895,6 +987,11 @@ class _Assembler:
         self.law_origin: dict[tuple[str, str], str] = {}
         self.decisions: list[str] = []
         self.not_converted_parameters: list[dict[str, str]] = []
+        # enzyme networks (network=True only)
+        self.network = False
+        self.networks: list[_NetworkDraft] = []
+        # (substrate_id, condition_id) whose initial concentration a kinetics.csv row states (value or REVIEW field)
+        self.network_initials: set[tuple[str, str]] = set()
 
     # -- the fungus ----------------------------------------------------------
 
@@ -1168,6 +1265,178 @@ class _Assembler:
             resolved_as="new",
             spec=dict(spec),
         )
+
+    # -- enzyme network pools (network=True) ---------------------------------
+
+    def discover_network_pools(self) -> None:
+        """Follow each requested substrate's stated products to the pools of its enzyme network.
+
+        Each requested substrate is an entry substrate. A product links to a
+        pool only when it equals the substrate_id of a requested substrate, of
+        a user-dataset ``substrates.csv`` row, or a registry substrate ID (the
+        draft's substrate_id of a registry substrate), which is the loader's
+        rule; such a pool joins the draft as an intermediate. Names and aliases
+        are never matched, and a product that is no pool is the network's final
+        product.
+        """
+
+        for target in self.targets:
+            target.network_role = "entry"
+        for entry in list(self.targets):
+            pools = [entry]
+            products: list[tuple[str, str, str]] = []
+            while True:
+                current = pools[-1]
+                stated = self._stated_product(current)
+                if stated is None:
+                    break
+                product, origin = stated
+                products.append((current.substrate_id, product, origin))
+                pool = self._pool_for_product(current, product, origin)
+                if pool is None:
+                    break
+                if pool in pools:
+                    chain = " -> ".join((*(item.substrate_id for item in pools), pool.substrate_id))
+                    raise UserTablesAssemblyError(
+                        f"The stated products form a cycle in the enzyme network that starts from "
+                        f"{entry.substrate_id!r} ({chain}; the product of {current.substrate_id!r} is stated by "
+                        f"{origin}). A network's pools are released one into the next and FungMod does not break a "
+                        "cycle; state another product for one of these substrates."
+                    )
+                pools.append(pool)
+            self.networks.append(_NetworkDraft(entry=entry, pools=pools, products=products))
+
+    def _stated_product(self, target: _Target) -> tuple[str, str] | None:
+        """The product a substrate's row will state, and where it is stated; None when no source states one."""
+
+        if target.user_row is not None:
+            assert self.user is not None
+            product = target.user_row.get("product", "")
+            origin = f"user dataset {self.user.dataset.dataset_id} substrates.csv (substrate {target.substrate_id})"
+        elif "product" in target.spec:
+            product = _cell(target.spec["product"])
+            origin = f"the request (substrates[{target.index}]['product'])"
+        elif target.record is not None and len(target.record.products) == 1:
+            product = target.record.products[0]
+            origin = f"registry substrate record {target.record.record_id}"
+        else:
+            return None
+        if not product or product.startswith(REVIEW_MARKER):
+            return None
+        return product, origin
+
+    def _pool_for_product(self, current: _Target, product: str, origin: str) -> _Target | None:
+        """The pool a stated product releases (an existing target or a new intermediate); None: a final product."""
+
+        where = f"The product {product!r} of {current.substrate_id!r} (stated by {origin})"
+        ambiguous = [
+            item.substrate_id for item in self.targets if item.registry_id == product and item.substrate_id != product
+        ]
+        if self.user is not None:
+            for _line, row in self.user.table("substrates.csv"):
+                reference = row.get("registry_substrate", "")
+                if (
+                    reference
+                    and row.get("substrate_id") != product
+                    and self.resolver.resolve_substrate(reference).record_id == product
+                ):
+                    ambiguous.append(row["substrate_id"])
+        if ambiguous:
+            other = sorted(set(ambiguous))[0]
+            raise UserTablesAssemblyError(
+                f"{where} is the registry substrate of {other!r} but not its substrate_id. An enzyme network links a "
+                "product to a pool only when it equals a substrate_id, and FungMod does not guess which was meant: "
+                f"state the product as {other!r} to release that pool, or give it another name to keep it the "
+                "network's final product."
+            )
+        existing = next((item for item in self.targets if item.substrate_id == product), None)
+        if existing is not None:
+            return existing
+        if self.user is not None:
+            row = next(
+                (row for _line, row in self.user.table("substrates.csv") if row.get("substrate_id") == product), None
+            )
+            if row is not None:
+                reference = row.get("registry_substrate", "")
+                state = (
+                    self.base.get_substrate(self.resolver.resolve_substrate(reference).record_id).physical_state
+                    if reference
+                    else row.get("physical_state", "")
+                )
+                self._refuse_solid_pool(where, f"substrate {product!r} of the user dataset", state)
+                pool = self._user_target(len(self.targets), product, dict(row))
+                return self._add_pool(pool, current, origin)
+        if product in self.base.substrates:
+            record = self.base.get_substrate(product)
+            self._refuse_solid_pool(where, f"registry substrate {product!r}", record.physical_state)
+            pool = _Target(
+                index=len(self.targets),
+                input=product,
+                substrate_id=record.record_id,
+                registry_id=record.record_id,
+                name=record.name,
+                substrate_class=record.substrate_class,
+                bond_classes=tuple(record.bond_classes),
+                resolved_as="registry",
+                spec={"substrate": product},
+                record=record,
+            )
+            return self._add_pool(pool, current, origin)
+        try:
+            named = self.resolver.resolve_substrate(product).record_id
+        except ResolutionError:
+            named = ""
+        if named:
+            self.decisions.append(
+                f"{where} names registry substrate `{named}` by its name or alias, not by its ID; an enzyme network "
+                f"links a product to a pool only when it equals a substrate_id, so {product!r} stays the final product "
+                f"of the network. State `{named}` as the product to release that pool."
+            )
+        return None
+
+    def _refuse_solid_pool(self, where: str, what: str, state: str) -> None:
+        if state != "dissolved":
+            raise UserTablesAssemblyError(
+                f"{where} is {what} with physical state {state!r}. Assembled drafts cover dissolved substrates "
+                "only, so the enzyme network cannot hold it as a pool; state another product (in the request, or in "
+                "the user dataset's substrates.csv) to keep it the network's final product, or load a dataset that "
+                "holds it with load_user_dataset directly."
+            )
+
+    def _add_pool(self, pool: _Target, current: _Target, origin: str) -> _Target:
+        pool.network_role = "intermediate"
+        pool.released_by = current.substrate_id
+        self.targets.append(pool)
+        self.decisions.append(
+            f"Enzyme network: {current.substrate_id} releases `{pool.substrate_id}` ({pool.name}), stated by {origin}; "
+            f"`{pool.substrate_id}` is added to the draft as an intermediate pool, which starts at zero."
+        )
+        return pool
+
+    def _refuse_network_laws(self, responses: Sequence[Mapping[str, Any]] | None) -> None:
+        """Response laws are not combined with an enzyme network (USERDATA-010)."""
+
+        if responses is not None:
+            raise UserTablesAssemblyError(
+                "responses binds temperature or pH laws per enzyme class and substrate of a single-class case; "
+                "responses.csv is not combined with enzyme_network in this version, so a network draft cannot carry "
+                "them. Assemble without network to use the laws."
+            )
+        if self.user is None:
+            return
+        pools = {target.substrate_id for target in self.targets if target.user_row is not None}
+        lines = [
+            line
+            for line, row in self.user.table("responses.csv")
+            if row.get("strain_id") == self.user_strain_id and row.get("substrate_id") in pools
+        ]
+        if lines:
+            raise UserTablesAssemblyError(
+                f"User dataset {self.user.dataset.dataset_id!r} binds response laws to {self.strain_id!r} on "
+                f"substrates of this network (responses.csv {_rows_label(lines)}); responses.csv is not combined with "
+                "enzyme_network in this version, so a network draft would drop them. Assemble without network to keep "
+                "the laws."
+            )
 
     # -- the enzyme repertoire ----------------------------------------------
 
@@ -1873,6 +2142,9 @@ class _Assembler:
     # -- response laws -------------------------------------------------------
 
     def collect_laws(self, responses: Sequence[Mapping[str, Any]] | None) -> None:
+        if self.network:
+            self._refuse_network_laws(responses)
+            return
         if self.user is not None:
             for _line, row in self.user.table("responses.csv"):
                 if row.get("strain_id") != self.user_strain_id:
@@ -1969,16 +2241,24 @@ class _Assembler:
 
     def build(self) -> AssembledTablesDraft:
         compatibility = self._compatibility()
+        if self.network:
+            self._check_network_members(compatibility)
         cases = self._cases(compatibility)
+        if self.network:
+            self._exclude_network_forms(cases)
         self._apply_rate_forms(cases)
         self._apply_law_reference(cases)
         grid = self._apply_condition_rows(cases)
         included = self._included(cases)
         slots = self._condition_slots(cases, included, grid)
         tables = self._tables(cases, included, slots)
+        if self.network:
+            self._check_written_links(tables, included)
         manifest = self._manifest()
         review_fields = _review_fields(manifest, tables)
         report = self._report(cases, compatibility, slots, grid, included)
+        if self.network:
+            report = self._with_network_report(report, cases, compatibility, slots, tables)
         converted = tuple(
             dict.fromkeys(candidate.entry.entry_id for candidate in included if candidate.entry is not None)
         )
@@ -2525,12 +2805,15 @@ class _Assembler:
         enzymes = [dict(item.row) for item in self.classes.values() if item.row is not None]
         user_classes = [dict(item.user_class_row) for item in self.classes.values() if item.user_class_row is not None]
         kinetics: list[dict[str, str]] = []
-        for candidate in included:
-            if candidate.level == 0:
-                kinetics.extend(dict(row) for row in candidate.rows)
-                continue
-            kinetics.extend(self._entry_rows(candidate, self._slot_for(slots, candidate.measured)["condition_id"]))
-        kinetics.extend(self._design_rows_for_gaps(cases, included, slots))
+        if self.network:
+            kinetics = self._network_kinetics(cases, included, slots)
+        else:
+            for candidate in included:
+                if candidate.level == 0:
+                    kinetics.extend(dict(row) for row in candidate.rows)
+                    continue
+                kinetics.extend(self._entry_rows(candidate, self._slot_for(slots, candidate.measured)["condition_id"]))
+            kinetics.extend(self._design_rows_for_gaps(cases, included, slots))
         substrates = [self._substrate_row(target, included) for target in self.targets]
         responses: list[dict[str, str]] = []
         for target in self.targets:
@@ -2552,12 +2835,16 @@ class _Assembler:
         cases: Sequence[_Case],
         included: Sequence[_Candidate],
         slots: Sequence[Mapping[str, Any]],
+        skip_initial: bool = False,
     ) -> list[dict[str, str]]:
         """The stated design amounts for cases without kinetics, so their gaps are only the kinetic constants.
 
         The initial substrate concentration is written for every such case; the
         enzyme concentration only when the pair's rate form is already the kcat
         form, since writing it would otherwise choose the form for the user.
+        A network draft (``skip_initial``) writes the initial concentration per
+        entry and condition instead (``_network_design_initials``), and never for
+        an intermediate pool, which starts at zero.
         """
 
         forms: dict[tuple[str, str], str] = {}
@@ -2570,12 +2857,15 @@ class _Assembler:
             if case.status not in {STATUS_GAP, STATUS_CONFLICT} or case.requested.index not in slot_ids:
                 continue
             key = (case.enzyme_class.key, case.target.substrate_id)
+            condition_id = slot_ids[case.requested.index]
             written = []
             for quantity in ("substrate_initial_concentration", "enzyme_concentration"):
                 value = self.design_values.get(quantity)
                 if value is None or (quantity == "enzyme_concentration" and forms.get(key) != _KCAT_FORM):
                     continue
-                rows.append(value.row((self.strain_id, key[0], key[1], slot_ids[case.requested.index])))
+                if skip_initial and quantity == "substrate_initial_concentration":
+                    continue
+                rows.append(value.row((self.strain_id, key[0], key[1], condition_id)))
                 written.append(quantity)
             if written:
                 case.design_written = tuple(written)
@@ -2702,6 +2992,432 @@ class _Assembler:
             )
         return row
 
+    # -- enzyme network rules (network=True) ---------------------------------
+
+    def _check_network_members(self, compatibility: Sequence[Mapping[str, Any]]) -> None:
+        """An entry needs a class acting on it, and a class acts on one pool of a network (the loader's rules)."""
+
+        acting = {entry["substrate_id"]: [item["enzyme_class"] for item in entry["acting"]] for entry in compatibility}
+        for network in self.networks:
+            entry = network.entry
+            if entry.determined and not acting[entry.substrate_id]:
+                raise UserTablesAssemblyError(
+                    f"No enzyme class of {self.strain_name} acts on {entry.name} ({entry.substrate_id}), so the "
+                    "enzyme network that starts from it would have no process, which load_user_dataset refuses. "
+                    "Remove it from the substrates, or give the class that acts on it with its evidence."
+                )
+            for item in self.classes.values():
+                on = [pool.substrate_id for pool in network.pools if item.key in acting[pool.substrate_id]]
+                if len(on) > 1:
+                    raise UserTablesAssemblyError(
+                        f"Enzyme class {item.key!r} of {self.strain_name} acts on {len(on)} pools of the enzyme "
+                        f"network that starts from {entry.substrate_id!r} ({', '.join(on)}). One enzyme acting on two "
+                        "substrates of one system competes for its active site, which independent Michaelis-Menten "
+                        "processes do not represent, and FungMod binds no competing-substrate law; load_user_dataset "
+                        "refuses it. Assemble the pools in separate drafts, or without network."
+                    )
+
+    def _exclude_network_forms(self, cases: Sequence[_Case]) -> None:
+        """Kinetics in the pH-ionization form cannot run in a network: their cases become gaps with the reason."""
+
+        for case in cases:
+            for candidate in self._case_candidates(case):
+                if candidate.excluded or not any(row["quantity"] in PH_IONIZATION_QUANTITIES for row in candidate.rows):
+                    continue
+                candidate.excluded = (
+                    f"{candidate.label} states the pH-ionization rate form, which an enzyme network does not bind in "
+                    "this version (its processes are homogeneous Michaelis-Menten laws in the kcat or Vmax form)"
+                )
+                if candidate.entry is not None:
+                    candidate.entry.use = "not used"
+                    candidate.entry.reason = candidate.excluded
+                elif candidate.excluded not in self.unused_user_rows:
+                    self.unused_user_rows.append(candidate.excluded)
+        for case in cases:
+            for candidate in self._case_candidates(case):
+                if candidate.excluded:
+                    self._downgrade(case, candidate.excluded, keep_measured=False)
+
+    def _network_kinetics(
+        self,
+        cases: Sequence[_Case],
+        included: Sequence[_Candidate],
+        slots: Sequence[Mapping[str, Any]],
+    ) -> list[dict[str, str]]:
+        """kinetics.csv of a network draft: the included rows with the loader's initial-concentration rules applied."""
+
+        entries = {network.entry.substrate_id for network in self.networks}
+        names = {target.substrate_id: target.name for target in self.targets}
+        items: list[tuple[dict[str, str], _Candidate]] = []
+        for candidate in included:
+            if candidate.level == 0:
+                rows = [dict(row) for row in candidate.rows]
+            else:
+                rows = self._entry_rows(candidate, self._slot_for(slots, candidate.measured)["condition_id"])
+            for row in rows:
+                if row["quantity"] == "substrate_initial_concentration" and row["substrate_id"] not in entries:
+                    self._network_dropped(
+                        candidate,
+                        row,
+                        f"{names[row['substrate_id']]} is an intermediate pool of the enzyme network: it is released "
+                        "by the network and starts at zero, so it takes no initial concentration (request it as a "
+                        "substrate to start a network of its own from it)",
+                    )
+                    continue
+                items.append((row, candidate))
+        rows = self._consolidated_entry_initials(items, names)
+        rows.extend(self._design_rows_for_gaps(cases, included, slots, skip_initial=True))
+        rows.extend(self._network_design_initials(cases, slots, rows))
+        return rows
+
+    def _network_design_initials(
+        self, cases: Sequence[_Case], slots: Sequence[Mapping[str, Any]], rows: Sequence[Mapping[str, str]]
+    ) -> list[dict[str, str]]:
+        """The design initial concentration of each entry at each requested condition where no row states one.
+
+        An entry's initial concentration belongs to the network, not to one
+        class, so it is written once, on the first class acting on the entry.
+        """
+
+        value = self.design_values.get("substrate_initial_concentration")
+        if value is None:
+            return []
+        stated = {
+            (row["substrate_id"], row["condition_id"])
+            for row in rows
+            if row["quantity"] == "substrate_initial_concentration"
+        }
+        requested = [slot for slot in slots if slot["requested"] is not None]
+        output: list[dict[str, str]] = []
+        for network in self.networks:
+            entry = network.entry
+            acting = [item for item in self.classes.values() if entry.determined and item.acts_on(entry)]
+            if not acting:
+                continue
+            for slot in requested:
+                key = (entry.substrate_id, str(slot["condition_id"]))
+                if key in stated:
+                    continue
+                stated.add(key)
+                output.append(value.row((self.strain_id, acting[0].key, entry.substrate_id, key[1])))
+                for case in cases:
+                    if case.enzyme_class is acting[0] and case.target is entry and case.requested is slot["requested"]:
+                        case.design_written = (*case.design_written, "substrate_initial_concentration")
+        return output
+
+    def _network_dropped(self, candidate: _Candidate, row: Mapping[str, str], reason: str) -> None:
+        amount = _row_amount_text(row)
+        if candidate.level == 0:
+            self.unused_user_rows.append(
+                f"{candidate.label}: {row['quantity']} of {row['substrate_id']} at {row['condition_id']} ({amount}) "
+                f"is not used: {reason}"
+            )
+            return
+        assert candidate.entry is not None
+        self.not_converted_parameters.append(
+            {
+                "entry_id": candidate.entry.entry_id,
+                "parameter": f"{row['quantity']} ({amount})",
+                "parameter_type": "concentration",
+                "value": row["value"] or f"{row['lower']} to {row['upper']}",
+                "units": row["units"],
+                "reason": reason,
+            }
+        )
+
+    def _consolidated_entry_initials(
+        self, items: Sequence[tuple[dict[str, str], _Candidate]], names: Mapping[str, str]
+    ) -> list[dict[str, str]]:
+        """One initial concentration per entry and condition: the user's rows win; disagreeing sources are reviewed.
+
+        The classes of a network act on one entry pool, whose initial
+        concentration is one value (the loader refuses rows that disagree).
+        Rows of the user dataset are kept and must agree among themselves;
+        source rows (SABIO-RK assay concentrations) that disagree with them are
+        listed as not converted; source rows that disagree with each other are
+        replaced by one ``REVIEW:`` row naming every stated value.
+        """
+
+        groups: dict[tuple[str, str], list[int]] = {}
+        for index, (row, _candidate) in enumerate(items):
+            if row["quantity"] == "substrate_initial_concentration":
+                groups.setdefault((row["substrate_id"], row["condition_id"]), []).append(index)
+        dropped: set[int] = set()
+        replaced: dict[int, dict[str, str]] = {}
+        for (substrate_id, condition_id), indices in groups.items():
+            if len({_amount_key(items[index][0]) for index in indices}) <= 1:
+                continue
+            stated = "; ".join(
+                f"{_row_amount_text(row)} from {candidate.label} for {row['enzyme_class']}"
+                for row, candidate in (items[index] for index in indices)
+            )
+            user = [index for index in indices if items[index][1].level == 0]
+            if user:
+                if len({_amount_key(items[index][0]) for index in user}) > 1:
+                    raise UserTablesAssemblyError(
+                        f"The user dataset states different initial concentrations of {substrate_id!r} at condition "
+                        f"{condition_id!r} on the rows of its classes ({stated}). The classes of an enzyme network act "
+                        "on one entry pool, whose initial concentration is one value, and FungMod does not choose "
+                        "between them; state it identically on every class's row of the dataset, or assemble without "
+                        "network."
+                    )
+                kept = _amount_key(items[user[0]][0])
+                for index in indices:
+                    row, candidate = items[index]
+                    if candidate.level != 0 and _amount_key(row) != kept:
+                        dropped.add(index)
+                        self._network_dropped(
+                            candidate,
+                            row,
+                            f"the entry pool {substrate_id} of the enzyme network has one initial concentration at "
+                            f"{condition_id}, which the user dataset states ({_row_amount_text(items[user[0]][0])}); "
+                            "this source's value is not used",
+                        )
+                continue
+            first = items[indices[0]][0]
+            for index in indices:
+                dropped.add(index)
+                self._network_dropped(
+                    items[index][1],
+                    items[index][0],
+                    f"the sources state different initial concentrations of the entry pool {substrate_id} at "
+                    f"{condition_id}, which has one; replaced by one REVIEW field of kinetics.csv",
+                )
+            replaced[indices[0]] = {
+                "strain_id": first["strain_id"],
+                "enzyme_class": first["enzyme_class"],
+                "substrate_id": substrate_id,
+                "condition_id": condition_id,
+                "quantity": "substrate_initial_concentration",
+                "value": f"{REVIEW_MARKER} initial concentration of {names[substrate_id]} in the enzyme network at "
+                f"{condition_id}, one value for the pool (the sources state {stated}); or pass "
+                "design={'substrate_initial_concentration': ...}",
+                "lower": "",
+                "upper": "",
+                "units": f"{REVIEW_MARKER} an amount-per-volume unit such as mM",
+                "evidence_type": _DESIGN,
+                "method": _DESIGN_METHOD,
+                "source": f"{REVIEW_MARKER} where the initial concentration of the virtual experiment comes from",
+                "sd": "",
+            }
+        output: list[dict[str, str]] = []
+        for index, (row, _candidate) in enumerate(items):
+            if index in replaced:
+                output.append(replaced[index])
+            elif index not in dropped:
+                output.append(row)
+        return output
+
+    def _check_written_links(
+        self, tables: Mapping[str, Sequence[Mapping[str, str]]], included: Sequence[_Candidate]
+    ) -> None:
+        """The written substrates.csv must link exactly the discovered pools, with distinct state names."""
+
+        rows = {row["substrate_id"]: row for row in tables["substrates.csv"]}
+        registry_of = {
+            row["registry_substrate"]: row["substrate_id"] for row in rows.values() if row["registry_substrate"]
+        }
+        kcat_classes = {
+            candidate.class_key for candidate in included if candidate.form == _KCAT_FORM and not candidate.excluded
+        }
+        for network in self.networks:
+            expected = [pool.substrate_id for pool in network.pools]
+            chain = [network.entry.substrate_id]
+            product = rows[chain[-1]]["product"]
+            while product in rows and product not in chain:
+                chain.append(product)
+                product = rows[chain[-1]]["product"]
+            if chain != expected or product in chain:
+                common = next(
+                    (index for index, (a, b) in enumerate(zip(chain, expected, strict=False)) if a != b),
+                    min(len(chain), len(expected)),
+                )
+                stated = rows[chain[common - 1]]
+                raise UserTablesAssemblyError(
+                    "The drafted substrates.csv links the enzyme network that starts from "
+                    f"{network.entry.substrate_id!r} as {' -> '.join((*chain, product))}, while the stated products "
+                    f"link {' -> '.join(expected)}: the "
+                    f"product of {stated['substrate_id']!r} comes from {stated['source'] or 'a converted source'}. "
+                    "FungMod does not choose between them; state the product of that substrate in the request "
+                    "(substrates=[{'substrate': ..., 'product': ...}])."
+                )
+            for pool in chain:
+                released = rows[pool]["product"]
+                other = registry_of.get(released)
+                if other is not None and other != released:
+                    raise UserTablesAssemblyError(
+                        f"The product {released!r} of {pool!r} in the enzyme network that starts from "
+                        f"{network.entry.substrate_id!r} is the registry substrate of {other!r} but not its "
+                        "substrate_id, an ambiguity load_user_dataset refuses. State the product as "
+                        f"{other!r} to release that pool, or give it another name."
+                    )
+            names: dict[str, str] = {}
+            states = [
+                (f"pool {pool.substrate_id}", f"{pool.registry_id or pool.substrate_id}_concentration")
+                for pool in network.pools
+            ]
+            if not product.startswith(REVIEW_MARKER):
+                states.append(("the final product", f"{product}_concentration"))
+            for pool in network.pools:
+                for item in self.classes.values():
+                    if item.key in kcat_classes and pool.determined and item.acts_on(pool):
+                        states.append((f"the enzyme of {item.key}", f"{item.key}_concentration"))
+            for role, state in states:
+                if state in names and names[state] != role:
+                    raise UserTablesAssemblyError(
+                        f"The enzyme network that starts from {network.entry.substrate_id!r} would give the state "
+                        f"{state!r} to both {names[state]} and {role}, which load_user_dataset refuses; rename a "
+                        "substrate, product or enzyme class."
+                    )
+                names[state] = role
+
+    def _with_network_report(
+        self,
+        report: Mapping[str, Any],
+        cases: Sequence[_Case],
+        compatibility: Sequence[Mapping[str, Any]],
+        slots: Sequence[Mapping[str, Any]],
+        tables: Mapping[str, Sequence[Mapping[str, str]]],
+    ) -> dict[str, Any]:
+        """The report of a network draft: substrates with their network role, the network section, more limitations."""
+
+        output = dict(report)
+        roles = {target.substrate_id: target for target in self.targets}
+        output["substrates"] = [
+            {
+                **item,
+                "network_role": roles[item["substrate_id"]].network_role,
+                "released_by": roles[item["substrate_id"]].released_by or None,
+            }
+            for item in report["substrates"]
+        ]
+        output["network"] = self._network_report(cases, compatibility, slots, tables)
+        output["limitations"] = [*report["limitations"], *_NETWORK_LIMITATIONS]
+        return output
+
+    def _network_report(
+        self,
+        cases: Sequence[_Case],
+        compatibility: Sequence[Mapping[str, Any]],
+        slots: Sequence[Mapping[str, Any]],
+        tables: Mapping[str, Sequence[Mapping[str, str]]],
+    ) -> dict[str, Any]:
+        rows = {row["substrate_id"]: row for row in tables["substrates.csv"]}
+        by_pool = {entry["substrate_id"]: entry for entry in compatibility}
+        slot_ids = {slot["requested"].index: slot["condition_id"] for slot in slots if slot["requested"] is not None}
+        conditions = [slot_ids[requested.index] for requested in self.requested]
+        initials: dict[tuple[str, str], str] = {}
+        for row in tables["kinetics.csv"]:
+            if row["quantity"] == "substrate_initial_concentration":
+                key = (row["substrate_id"], row["condition_id"])
+                if initials.get(key) != "stated":
+                    initials[key] = "review field" if row["value"].startswith(REVIEW_MARKER) else "stated"
+        self.network_initials = set(initials)
+        networks: list[dict[str, Any]] = []
+        for network in self.networks:
+            pools = [pool.substrate_id for pool in network.pools]
+            # Where each product was stated when the pools were followed; a product a converted kinetics source
+            # gave instead (or a REVIEW field) has none, and its substrates.csv source cell says where it comes from.
+            stated_by = {
+                substrate_id: origin
+                for substrate_id, product, origin in network.products
+                if rows[substrate_id]["product"] == product
+            }
+            links = []
+            for pool in pools:
+                row = rows[pool]
+                product = row["product"]
+                links.append(
+                    {
+                        "substrate_id": pool,
+                        "product": None if product.startswith(REVIEW_MARKER) else product,
+                        "product_yield": (
+                            None if row["product_yield"].startswith(REVIEW_MARKER) else row["product_yield"]
+                        ),
+                        "yield_basis": row["yield_basis"],
+                        "releases_pool": product in pools,
+                        "stated_by": stated_by.get(pool),
+                        "source": None if row["source"].startswith(REVIEW_MARKER) else row["source"],
+                    }
+                )
+            final = links[-1]["product"]
+            members: list[dict[str, Any]] = []
+            for pool in network.pools:
+                for acting in by_pool[pool.substrate_id]["acting"]:
+                    class_key = acting["enzyme_class"]
+                    statuses = {
+                        slot_ids[case.requested.index]: case.status
+                        for case in cases
+                        if case.enzyme_class.key == class_key and case.target is pool
+                    }
+                    members.append(
+                        {
+                            "enzyme_class": class_key,
+                            "name": self.classes[class_key].name,
+                            "pool": pool.substrate_id,
+                            "pool_role": "entry" if pool is network.entry else "intermediate",
+                            "kinetics_status": statuses,
+                        }
+                    )
+            undetermined = [pool.substrate_id for pool in network.pools if not pool.determined]
+            member_keys = {item["enzyme_class"] for item in members}
+            not_members = []
+            for item in self.classes.values():
+                if item.key in member_keys:
+                    continue
+                reasons = [
+                    f"{entry['substrate_id']}: {reason['reason']}"
+                    for entry in (by_pool[pool] for pool in pools)
+                    for reason in entry["not_acting"]
+                    if reason["enzyme_class"] == item.key
+                ]
+                not_members.append({"enzyme_class": item.key, "name": item.name, "reasons": reasons})
+            verdicts = []
+            for condition_id in conditions:
+                blocked_by = [
+                    f"{item['enzyme_class']} on {item['pool']} ({item['kinetics_status'][condition_id]})"
+                    for item in members
+                    if item["kinetics_status"].get(condition_id) in {STATUS_GAP, STATUS_CONFLICT}
+                ]
+                initial = initials.get((network.entry.substrate_id, condition_id), "missing")
+                if initial == "missing":
+                    blocked_by.append(
+                        f"the initial concentration of {network.entry.substrate_id} (no source states it; give "
+                        "design={'substrate_initial_concentration': ...} or a kinetics.csv row)"
+                    )
+                if undetermined:
+                    status = NETWORK_UNDETERMINED
+                elif blocked_by:
+                    status = NETWORK_BLOCKED
+                else:
+                    status = NETWORK_COMPLETE
+                verdicts.append(
+                    {
+                        "condition": condition_id,
+                        "status": status,
+                        "initial_concentration": initial,
+                        "blocked_by": blocked_by,
+                    }
+                )
+            networks.append(
+                {
+                    "entry_substrate": network.entry.substrate_id,
+                    "pools": pools,
+                    "links": links,
+                    "final_product": final,
+                    "members": members,
+                    "not_members": not_members,
+                    "undetermined_pools": undetermined,
+                    "conditions": verdicts,
+                }
+            )
+        return {
+            "manifest_field": NETWORK_MANIFEST_FIELD,
+            "entry_substrates": [network.entry.substrate_id for network in self.networks],
+            "networks": networks,
+            "status_meaning": dict(NETWORK_CONDITION_STATUSES),
+        }
+
     def _manifest(self) -> dict[str, Any]:
         parts = []
         if self.user is not None:
@@ -2718,7 +3434,7 @@ class _Assembler:
             parts.append(f"SABIO-RK {source['description']}: {snapshots}")
         if self.fungus_record is not None:
             parts.append(f"FungMod registry fungus record {self.fungus_record.record_id}")
-        substrates = ", ".join(target.name for target in self.targets)
+        substrates = ", ".join(target.name for target in self.targets if target.network_role != "intermediate")
         conditions = "; ".join(requested.text for requested in self.requested)
         simulation: dict[str, Any]
         if self.simulation is not None:
@@ -2734,7 +3450,7 @@ class _Assembler:
                 "units": f"{REVIEW_MARKER} time unit of the duration, such as minute or hour",
                 "points": f"{REVIEW_MARKER} number of output time points, an integer of at least 2",
             }
-        return {
+        manifest: dict[str, Any] = {
             "dataset_id": self.dataset_id,
             "contributor": f"{REVIEW_MARKER} name of the person who reviewed these tables",
             "source": (
@@ -2748,6 +3464,16 @@ class _Assembler:
             ),
             "simulation": simulation,
         }
+        if self.network:
+            manifest["notes"] += (
+                " enzyme_network makes every case an enzyme network: the member classes act together on the pools "
+                "that the stated products link (assemble_user_tables(network=True)); review.md lists the pools, links "
+                "and members."
+            )
+            manifest[NETWORK_MANIFEST_FIELD] = {
+                NETWORK_ENTRY_FIELD: [network.entry.substrate_id for network in self.networks]
+            }
+        return manifest
 
     def _annotation_label(self) -> str:
         """How the manifest and review.md name the annotation: a UniProt export or a dbCAN annotation."""
@@ -2939,8 +3665,9 @@ class _Assembler:
 
     def _review_markdown(self, draft: AssembledTablesDraft, report: Mapping[str, Any]) -> str:
         fungus = report["fungus"]
+        requested = [target for target in self.targets if target.network_role != "intermediate"]
         lines = [
-            f"# Review: {self.strain_name} on {', '.join(t.name for t in self.targets)} ({self.dataset_id})",
+            f"# Review: {self.strain_name} on {', '.join(t.name for t in requested)} ({self.dataset_id})",
             "",
             "Assembled by `assemble_user_tables` for one fungus, the requested substrates and the requested "
             "conditions. This is a draft: `load_user_dataset` refuses the directory until every field that begins "
@@ -2957,7 +3684,10 @@ class _Assembler:
             ),
             "- Substrates: "
             + "; ".join(
-                f"{_md(t.input)} -> `{t.substrate_id}` ({t.resolved_as.replace('_', ' ')})" for t in self.targets
+                f"{_md(t.input)} -> `{t.substrate_id}` ({t.resolved_as.replace('_', ' ')}"
+                + (f"; network pool released by `{t.released_by}`" if t.network_role == "intermediate" else "")
+                + ")"
+                for t in self.targets
             ),
             "- Conditions: "
             + "; ".join(
@@ -3047,6 +3777,8 @@ class _Assembler:
                     f"- Acts on it without evidence in the fungus: {item['enzyme_class']}: {_md(item['reason'])}.{unused}"
                 )
             lines.append("")
+        if self.network:
+            lines.extend(self._network_markdown(report["network"]))
         lines.extend(
             [
                 "## Cases",
@@ -3155,9 +3887,63 @@ class _Assembler:
             lines.extend(["", "## Decisions", ""])
             lines.extend(f"- {_md_text(item)}" for item in draft.decisions)
         lines.extend(["", "## Limitations", ""])
-        lines.extend(f"- {_md_text(item)}" for item in _LIMITATIONS)
+        lines.extend(f"- {_md_text(item)}" for item in report["limitations"])
         lines.append("")
         return "\n".join(lines)
+
+    def _network_markdown(self, network: Mapping[str, Any]) -> list[str]:
+        lines = [
+            "## Enzyme network",
+            "",
+            f"`user_dataset.yml` declares `{NETWORK_MANIFEST_FIELD}` with `{NETWORK_ENTRY_FIELD}` "
+            f"{', '.join(f'`{entry}`' for entry in network['entry_substrates'])}: every member class runs its own "
+            "Michaelis-Menten process on its pool, classes on one pool add their rates, and a pool released by one "
+            "class is the substrate of the next where substrates.csv states that product as another substrate_id "
+            "(never matched by name). Intermediate pools and the final product start at zero. A network runs at a "
+            "condition only when every member has kinetics there (all or nothing); a member without kinetics is a "
+            "gap, never left out.",
+            "",
+        ]
+        for item in network["networks"]:
+            lines.extend([f"### From `{item['entry_substrate']}`", ""])
+            links = []
+            for link in item["links"]:
+                product = f"`{link['product']}`" if link["product"] else "a product still under review"
+                amount = (
+                    f"{link['product_yield']} {link['yield_basis']}" if link["product_yield"] else "yield under review"
+                )
+                final = "" if link["releases_pool"] else ", final product"
+                links.append(f"`{link['substrate_id']}` -> {product} ({amount}{final})")
+            lines.append(f"- Pools and links: {'; '.join(links)}.")
+            if item["undetermined_pools"]:
+                lines.append(
+                    f"- Members on {', '.join(item['undetermined_pools'])} are decided when the reviewed tables are "
+                    "loaded (substrate class or bond classes under review)."
+                )
+            headers = " | ".join(str(entry["condition"]) for entry in item["conditions"])
+            lines.extend(["", f"| Member class | Pool | {headers} |"])
+            lines.append("| --- | --- | " + " | ".join("---" for _ in item["conditions"]) + " |")
+            for member in item["members"]:
+                statuses = " | ".join(
+                    member["kinetics_status"].get(entry["condition"], "-") for entry in item["conditions"]
+                )
+                lines.append(f"| {member['enzyme_class']} | {member['pool']} ({member['pool_role']}) | {statuses} |")
+            if not item["members"]:
+                lines.append("| - | - | " + " | ".join("-" for _ in item["conditions"]) + " |")
+            lines.append("")
+            for entry in item["conditions"]:
+                blocked = f": {_md_text('; '.join(entry['blocked_by']))}" if entry["blocked_by"] else ""
+                lines.append(
+                    f"- {entry['condition']}: {entry['status']} (initial concentration of `{item['entry_substrate']}`: "
+                    f"{entry['initial_concentration']}){blocked}."
+                )
+            if item["not_members"]:
+                lines.extend(["", "Classes of the fungus that act on no pool of this network (not members):", ""])
+                for member in item["not_members"]:
+                    reasons = "; ".join(member["reasons"]) or "the pools are under review"
+                    lines.append(f"- {member['enzyme_class']}: {_md_text(reasons)}.")
+            lines.append("")
+        return lines
 
     def _request_text(self, case: Mapping[str, Any]) -> str:
         design = case["design_rows"]
@@ -3166,7 +3952,11 @@ class _Assembler:
             if "enzyme_concentration" in design
             else "km and kcat with the enzyme concentration, or Vmax (or a specific activity and enzyme loading)"
         )
-        if "substrate_initial_concentration" not in design:
+        pool_role = self._pool_role(case["substrate_id"])
+        if "substrate_initial_concentration" not in design and (
+            not self.network
+            or (pool_role == "entry" and (case["substrate_id"], case["condition"]) not in self.network_initials)
+        ):
             roles += ", and state the initial substrate concentration"
         measured = case["measured_condition"]
         text = (
@@ -3174,6 +3964,12 @@ class _Assembler:
             f"{case['kinetics_status']}: measure {roles} of {case['enzyme_class_name']} from {self.strain_name} on "
             f"{case['substrate']} at {case['condition_text']}"
         )
+        if self.network:
+            pool = "the entry pool" if pool_role == "entry" else "an intermediate pool, starting at zero,"
+            text += (
+                f" ({case['substrate_id']} is {pool} of an enzyme network, which runs at this condition only when "
+                "every member class has kinetics)"
+            )
         if measured is not None:
             text += (
                 f"; kinetics are stated only at {measured['condition_id']} ({measured['condition']}), which FungMod "
@@ -3181,6 +3977,9 @@ class _Assembler:
                 "EnvironmentGrid condition)"
             )
         return _md(f"{text}. Why: {case['reason']}.")
+
+    def _pool_role(self, substrate_id: str) -> str:
+        return next((target.network_role for target in self.targets if target.substrate_id == substrate_id), "")
 
 
 # ---------------------------------------------------------------------------
@@ -3219,6 +4018,29 @@ def _rows_form(rows: Sequence[Mapping[str, str]]) -> str:
     if quantities & _VMAX_FORM_QUANTITIES:
         return _VMAX_FORM
     return ""
+
+
+def _table_columns(name: str, manifest: Mapping[str, Any]) -> tuple[str, ...]:
+    """The columns of a drafted table; a network draft's kinetics.csv adds the ``inhibitor`` column of ki rows."""
+
+    if name == "kinetics.csv" and NETWORK_MANIFEST_FIELD in manifest:
+        return NETWORK_KINETICS_COLUMNS
+    return _TABLE_COLUMNS[name]
+
+
+def _amount_key(row: Mapping[str, str]) -> tuple[float | str, ...]:
+    """A kinetics row's amount as the loader compares it: value, lower and upper as numbers, and the units."""
+
+    def number_or_text(text: str) -> float | str:
+        number = _finite_text(text)
+        return text if number is None else number
+
+    return (number_or_text(row["value"]), number_or_text(row["lower"]), number_or_text(row["upper"]), row["units"])
+
+
+def _row_amount_text(row: Mapping[str, str]) -> str:
+    amount = row["value"] or f"{row['lower']} to {row['upper']}"
+    return f"{amount} {row['units']}".strip()
 
 
 def _rows_label(lines: Sequence[int]) -> str:
@@ -3266,7 +4088,7 @@ def _review_fields(
     walk(manifest, "")
     for name, rows in tables.items():
         for index, row in enumerate(rows):
-            for column in _TABLE_COLUMNS[name]:
+            for column in _table_columns(name, manifest):
                 cell = row.get(column, "")
                 if cell.startswith(REVIEW_MARKER):
                     fields.append({"file": name, "row": index + 2, "column": column, "note": cell})
