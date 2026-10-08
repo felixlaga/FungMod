@@ -3,7 +3,9 @@
 A :class:`FieldProcess` is the spatial counterpart of
 :class:`fungal_model.processes.base.Process`: it names the fields it reads and
 changes, the parameters it needs, its assumptions, validity and failure modes,
-and it compiles once into numpy kernels that act on whole field arrays. No
+and it compiles once into numpy kernels that act on whole field arrays (and,
+optionally, into the analytic derivative of its tendency on the
+nearest-neighbour stencil, :meth:`FieldProcess.compile_jacobian`). No
 kernel performs a unit conversion at run time; every factor is resolved in
 :meth:`FieldProcess.compile_tendency` from a :class:`FieldKernelContext`.
 """
@@ -16,6 +18,7 @@ from typing import Any
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.errors import InvalidMechanismError
 from fungal_model.mycelium.fields import FieldKernelContext, FieldSpec, RateFieldKernel, TendencyKernel
+from fungal_model.mycelium.jacobian import FieldJacobianKernel
 from fungal_model.processes.base import ParameterRequirement, ValidityDomain
 
 KERNEL_VECTORISED = "vectorised_numpy"
@@ -74,6 +77,16 @@ class FieldProcess:
 
     def compile_rate(self, context: FieldKernelContext) -> RateFieldKernel | None:
         """Kernel returning the per-cell rate the process reports in ``rate_units``, or ``None``."""
+
+        del context
+        return None
+
+    def compile_jacobian(self, context: FieldKernelContext) -> FieldJacobianKernel | None:
+        """The analytic derivative of the tendency on the nearest-neighbour stencil, or ``None``.
+
+        A process that returns ``None`` has no analytic Jacobian; a model that
+        contains one cannot use the analytic Jacobian and says so.
+        """
 
         del context
         return None

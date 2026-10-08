@@ -4,7 +4,8 @@ Fields on a uniform one-, two- or three-dimensional grid (cartesian, or one
 radial axis for a colony with circular symmetry); generic processes
 for tip extension, tip motion, branching, anastomosis, first-order losses,
 local uptake, translocation along hyphae and local secretion; one compile
-step that resolves every unit; integration on plain numpy arrays. The
+step that resolves every unit; integration on plain numpy arrays, with the
+analytic sparse Jacobian of every process for the implicit methods. The
 processes are exploratory until parameterised from a registry record and
 checked against colony-expansion data; see ``docs/spatial-mycelium.md``.
 """
@@ -24,6 +25,7 @@ from .hyphae import (
     Translocation,
     continuum_process_types,
 )
+from .jacobian import FieldJacobianKernel, StencilBlock
 from .model import CompiledMyceliumModel, MyceliumModel, MyceliumResult, total_amount
 from .observation import (
     circle_length_in_square,
@@ -39,6 +41,7 @@ __all__ = [
     "CompiledMyceliumModel",
     "DichotomousBranching",
     "FieldDiffusion",
+    "FieldJacobianKernel",
     "FieldKernelContext",
     "FieldProcess",
     "FieldSpec",
@@ -49,6 +52,7 @@ __all__ = [
     "MyceliumModel",
     "MyceliumResult",
     "SpatialGrid",
+    "StencilBlock",
     "TipExtension",
     "TipMotion",
     "Translocation",

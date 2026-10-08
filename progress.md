@@ -26,6 +26,204 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## SPATIAL-003 Analytic Sparse Jacobian For The Spatial Mycelium Core
+
+Status: `complete` for the stated scope (2026-10-08). The performance step
+SPATIAL-001 and SPATIAL-002 named: every shipped field process now
+differentiates its own tendency, the model assembles the Jacobian as a sparse
+matrix on the declared nearest-neighbour stencil, and every implicit method
+takes it by default. Verified before any default changed. Numerical only: no
+process law, parameter, unit or biological claim changed, and no organism case
+was started.
+
+What exists:
+
+- `fungal_model.mycelium.jacobian` (new): `StencilBlock` (a field row's
+  dependence on a field in the same cell or one step along an axis),
+  `FieldJacobianKernel` (a process's blocks and the kernel of their
+  coefficient arrays), the exact derivatives of the finite-volume operators
+  (`diffusion_stencil`: constant coefficients `w D / dx` with the geometry's
+  face weights, no-flux outer faces excluded, periodic faces wrapped;
+  `upwind_drift_stencil`: `max(v, 0)` and `min(v, 0)` with respect to the
+  carried field and `mobility q_up / dx` with respect to the steering field,
+  upwind side held fixed), `StencilAssembler` (the CSC pattern of the union of
+  declared blocks, built once; per evaluation only a scatter of coefficient
+  arrays and the column scaling by the derivative of `max(field, 0)`, the
+  right derivative at zero; no dense intermediate) and `stencil_colours`.
+- `FieldProcess.compile_jacobian` (default `None`) and an analytic kernel on
+  all ten shipped processes in every declared option: tip extension
+  (constant or saturating speed, with its cost), tip motion (diffusion,
+  drift up or down a field, including a field steering itself), lateral and
+  dichotomous branching, anastomosis, first-order loss (with a product), local
+  uptake (linear or saturating), translocation (diffusive and active), local
+  secretion (linear or saturating, with its cost) and field diffusion; on
+  cartesian grids of one to three axes and the axisymmetric grid, no-flux and
+  periodic boundaries.
+- `CompiledMyceliumModel`: `analytic_jacobian` (CSC), `analytic_jacobian_banded`
+  (LSODA's band storage of the cell-major state; half-bandwidths at most `F`
+  times the cells of a slice of the first axis plus `F - 1`; the couplings
+  across the wrap of a periodic first axis lie outside any band and are left
+  out and counted), `analytic_band_widths`, `analytic_entries_outside_band`,
+  `analytic_jacobian_sparsity`, `has_analytic_jacobian`,
+  `processes_without_analytic_jacobian`, `jacobian_structure_for(settings,
+  jacobian)`; `simulate(..., jacobian="analytic" | "finite_difference" |
+  None)`; `SolverSettings(jacobian="compiled")` is honoured as `"analytic"`.
+  A process without a kernel puts every pair of its fields on the stencil and
+  makes the model fall back to finite differences, recorded in
+  `summary()["jacobian_kernels"]` and the run's `jacobian_structure`.
+- Defaults: BDF and Radau take the analytic sparse matrix
+  (`analytic_sparse_on_the_nearest_neighbour_stencil`, before the coloured
+  finite differences); LSODA takes the analytic band
+  (`analytic_banded_cell_major`, before its own differences, banded on one axis
+  and dense otherwise), dense (`analytic_dense`) only where the band would hold
+  more than a dense matrix (two cells along the first axis).
+  `jacobian="finite_difference"` gives BDF and Radau the coloured differences
+  and leaves LSODA's earlier path unchanged. `JACOBIAN_STRUCTURE` now names the
+  analytic sparse structure (`FINITE_DIFFERENCE_JACOBIAN_STRUCTURE` the
+  coloured one); new metadata `jacobian_bandwidths` and
+  `jacobian_entries_outside_band`.
+- Found and fixed in the coloured finite-difference Jacobian: (1) its pattern
+  held wrap entries on no-flux axes, which the colouring filled with a real
+  neighbour's coupling whenever the axis length was not a multiple of three
+  (`J[0, 799] = J[0, 1] = 16` per hour on the 800-cell front; 16 and 40 cells
+  per axis in the colony tests were affected too); (2) on a periodic axis of
+  such a length two columns of one row shared a colour and their entries were
+  mixed; (3) the cross-field neighbour couplings of a drift and of active
+  translocation were missing. It now uses the declared stencil and
+  `stencil_colours`, and is vectorised (33 ms instead of 70 ms per Jacobian
+  on a 40 x 40 colony). The defects only steered Newton, but they slowed it
+  (front: 398 Jacobians and 1488 factorisations over 80 hours) and left the
+  front's 80-hour tip integral 7.2e-4 relative from the converged value at
+  `rtol` 1e-8 while its position was right.
+
+Verification (`tests/test_mycelium_jacobian.py`, 52 tests), before any
+default changed:
+
+- a model with every process type and option on eight grids (one axis no-flux,
+  periodic of seven and two cells; two axes no-flux and periodic by no-flux;
+  three axes periodic of 3 x 4 x 5 and mixed; radial) at random states with
+  negative values: analytic against centred differences of the right-hand
+  side, worst 7.9e-11 of the largest entry over 24 states (entries above 1e-6
+  of the largest: 5.9e-8 relative); the tests require 1e-8 and 1e-6; the
+  artificial colony at a simulated state and the front likewise;
+- pattern: perturbing a state outside a row's stencil leaves the row bit for
+  bit unchanged on every grid, and the matrix is stored on exactly the
+  declared pattern, which the finite-difference path shares;
+- projection: zero columns for negative states, the right derivative at zero;
+  band storage equals the CSC matrix in cell-major order except the counted
+  wrap;
+- the corrected coloured differences agree with the analytic matrix to
+  `sqrt(eps)` accuracy (periodic axes of four, five and seven cells included)
+  and put nothing across a no-flux wall; the colouring separates every stencil
+  on axes of 2 to 9 cells, no-flux and periodic;
+- solutions: on the 16 x 16 and the 60-cell radial colony BDF (both paths),
+  LSODA (analytic band) and Radau agree with LSODA's own differences to the
+  documented 2e-4 (`atol` 1e-7); on a periodic line LSODA without the wrap,
+  BDF (both paths) and Radau agree with DOP853;
+- regression against stored values of the defaults before SPATIAL-003: BDF
+  colony integrals 8.2e-10, profiles 1.7e-9 of scale, radial colony 3.1e-8,
+  the colony comparison plan's check solve (450 radial cells, 62 h, artificial
+  stage 0 check values) 5.5e-9 in tip count with identical area, front
+  position 2.7e-7 and hyphae 3.5e-5; the front's tip integral (7.2e-4 off
+  before) now agrees with DOP853 at `rtol` 1e-11 to 4.7e-7 (asserted to
+  1e-5). LSODA: front 6e-15, the plan's primary solve 9.8e-9 in tip count
+  with identical area. Every existing analytic front-speed, conservation and
+  symmetry test passes unchanged (`tests/test_mycelium_colony.py`,
+  `tests/test_mycelium_core.py`, `tests/test_colony_observation.py`,
+  `tests/test_colony_comparison_stage0.py`).
+
+Measured on the development container while other jobs shared it (load
+average 8 to 25 on four cores; absolute times are noisy, ratios within one
+session are the meaningful numbers), medians of three interleaved runs
+("LSODA before" is LSODA's own differences, unchanged code, timed beside
+"now"; the two Radau colony runs alternated in one process):
+
+| Problem | LSODA before | LSODA now | BDF before | BDF now | BDF differences | Radau now | Radau differences |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 40 x 40 colony, 4 fields, 24 h | 48 s | 28 s | 6.8 s | 0.88 s | 0.85 s | 37 s | 32 s |
+| radial plan model, 450 cells, 62 h | 0.89 s | 0.51 s | 4.4 s | 0.81 s | 2.8 s | 29 s | 86 s |
+| Edelstein front, 800 cells, 80 h | 0.63 s | 0.39 s | 7.1 s | 0.62 s | 0.50 s | 41 s | 43 s |
+
+One Jacobian: 1.9 ms analytic against 33 ms by coloured differences at 40 x
+40 cells (one right-hand side 0.8 ms), 21 ms against 278 ms at 160 x 160. An
+800-cell periodic line over 40 hours: LSODA 0.45 s now against 0.61 s, and
+394 s when the wrap was kept in a dense matrix (hence the band without it).
+The plan's stage 0 cartesian reference (160 x 160 cells, 102 400 states,
+hours 1 to 12, BDF at `rtol` 1e-7, artificial check values) took 231 s with
+the analytic default (969 right-hand sides, 3 Jacobians) against the 4.1
+hours and 18 074 right-hand sides recorded for it; its window observables
+equal the recorded ones to 1.9e-8 in tip count and exactly in area (a timing
+and regression check, not a new record).
+
+Why every implicit method defaults to it: verified, and faster where the
+Jacobian matters. BDF is 5 to 11 times faster than its previous default and
+3.5 times faster than the corrected differences where Newton needs many
+Jacobians (equal where it needs one); LSODA is 1.6 to 1.8 times faster than
+its own differences (1.35 on the periodic line). Radau is 3 times faster on
+the radial plan model and equal on the front, but 15 percent slower on the
+40 x 40 colony, the one measured loss: same Jacobian and factorisation
+counts, and its time is SuperLU's complex factorisation (13.5 s against
+12.1 s for one at a 12-hour state, with 3 percent less fill), sensitive to
+the values rather than to the Jacobian path; it keeps the analytic default
+for exactness and its gain on the stiff plan model, and BDF is 35 to 65
+times faster than Radau on all three problems. The change moves the frozen
+colony comparison plan's solvers by at most 2e-8 relative in the observables
+at the stage 0 check values, far inside the plan's thresholds (0.005 solver,
+0.02 grid); the stage 0 record was not re-run and stays the record of its own
+run.
+
+Not changed: every process law, parameter, unit and tendency kernel (the
+right-hand side is untouched), the observation operators, the colony
+comparison plan, its recorded stage 0, `SolverSettings` and the well-mixed
+compiled core, the 1D and N-D reaction-diffusion engines.
+
+Tests: `tests/test_mycelium_jacobian.py` (new). No existing test was edited.
+
+Commands run (venv, Python 3.11, numpy 2.4.6, scipy 1.17.1): `ruff check src
+tests scripts/run_*.py` (passed); `pyright` on the whole project (0 errors);
+`mkdocs build --strict` (passed); `pytest tests/test_mycelium_jacobian.py`
+(52 passed) with `tests/test_mycelium_core.py`, `tests/test_mycelium_colony.py`,
+`tests/test_colony_observation.py` and `tests/test_colony_comparison_stage0.py`
+(all passed, unchanged); the full suite with `pytest -n 2 --dist loadfile`
+(2833 passed in 16 min, no skips). The timings came from scratch scripts outside the
+repository, run against this tree and against main extracted at 4c75b51.
+
+Scientific impact: none on any claim; numerical results of BDF, Radau and
+LSODA runs of the spatial core move within solver tolerance (the front's tip
+integral moves closer to the converged value). Backward compatibility:
+additive API; `JACOBIAN_STRUCTURE`'s value, the recorded `jacobian_structure`
+of default implicit runs and `jacobian_sparsity()` (now the declared stencil,
+without the old wrap entries on no-flux axes and with the cross-field
+neighbour couplings) changed; `simulate` gains the keyword `jacobian`. Risk:
+low for results (verified, within tolerance); medium for memory with LSODA on
+large two- and three-dimensional grids, whose band spans a slice of cells
+(still far below the dense matrix it replaces).
+
+Remaining ambiguities: `SolverSettings.jacobian`'s docstring in
+`core/numerics.py` still says only the compiled process core honours
+`compiled`, and `ARCHITECTURE_DEBT.md` (FD-009) still lists a sparse compiled
+Jacobian as a next step; both are outside this change's files. Where a face
+velocity is exactly zero or a state exactly zero the derivative is one-sided
+(the kernel's side, the right derivative). Radau's complex factorisations
+dominate its cost on these problems whichever Jacobian it takes.
+
+Remaining work: the organism case. A registry-parameterised mycelium for a
+named fungus needs (1) the data, ingested as DATA-003 (De Ligne et al. 2019,
+hourly colony area and tip counts of *C. puteana* and *R. solani* under
+sixteen conditions); (2) organism parameter records with provenance (Boswell
+et al. 2003 for *R. solani* is the candidate source; none is known for *C.
+puteana*), entered through the registry, not guessed; (3) the frozen plan,
+which exists (COLONY-001, amendment 3, stage 0 recorded): stage A fits per
+species on the declared calibration conditions, the held-out conditions
+scored by the plan's error models and decision rules, the grid guard on every
+scored solution. Nothing of that was started here.
+
+Recommended next task: stage A of COLONY-001 for one species under the
+frozen plan, with the analytic LSODA band as the primary solver it now uses
+by default (about 0.5 s per 62-hour radial solve on this container), after
+the plan's owner confirms that the default Jacobian change needs no
+amendment.
+
 ## FETCH-002 Kinetics Of The Fungus's Enzyme Classes Looked Up By EC Number
 
 Status: `complete` for the stated scope (2026-10-08); not verified against a

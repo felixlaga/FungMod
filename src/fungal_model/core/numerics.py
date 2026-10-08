@@ -51,7 +51,9 @@ class SolverSettings:
     #: (scipy differentiates the right-hand side) or ``compiled`` (the compiled
     #: model assembles it from per-process gradient kernels, analytic where a
     #: process offers one and central finite differences otherwise). Explicit
-    #: methods ignore it. Only the compiled process core honours ``compiled``.
+    #: methods ignore it. The compiled process core and the spatial mycelium
+    #: core (``fungal_model.mycelium``, analytic sparse Jacobian) honour
+    #: ``compiled``.
     jacobian: str = JACOBIAN_FINITE_DIFFERENCE_BY_BACKEND
 
     def __post_init__(self) -> None:
