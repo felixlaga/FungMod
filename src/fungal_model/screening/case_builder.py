@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
+from fungal_model.core.units import Q_
 from fungal_model.io.model_config import ModelConfig
 from fungal_model.modifiers.reactivity import SUBSTRATE_REACTIVITY_MODIFIER_TYPE
 from fungal_model.registry.records import (
@@ -813,7 +814,31 @@ def _template_initial_units(
     if units_from_role is not None:
         role = str(units_from_role)
         return _record_units(_template_parameter_record(parameter_records, role), role=role)
+    if spec.get("units_from_roles") is not None:
+        return _template_units_from_roles(spec["units_from_roles"], parameter_records=parameter_records)
     return str(spec["units"])
+
+
+def _template_units_from_roles(
+    roles: Any,
+    *,
+    parameter_records: Mapping[str, ParameterRecord],
+) -> str:
+    """Units of an initial state from ``units_from_roles``: the product of the records' units, simplified by pint.
+
+    For example a dry mass per volume (``g/L``) times an amount per dry mass
+    (``mmol/g``) gives ``millimole / liter``. Only the units are taken; every
+    value placed in the state is converted to them by pint, and no constant
+    the records do not state enters.
+    """
+
+    if isinstance(roles, (str, bytes)) or not isinstance(roles, Sequence) or len(roles) < 2:
+        raise RegistryCaseBuildError("units_from_roles must list at least two parameter roles.")
+    product = Q_(1.0, "dimensionless")
+    for raw_role in roles:
+        role = str(raw_role)
+        product = product * Q_(1.0, _record_units(_template_parameter_record(parameter_records, role), role=role))
+    return str(product.to_reduced_units().units)
 
 
 def _template_parameter_record(

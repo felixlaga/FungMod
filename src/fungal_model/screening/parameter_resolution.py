@@ -283,6 +283,9 @@ def _initial_parameter_roles(template: CaseTemplateRecord) -> frozenset[str]:
             value = spec.get(field)
             if isinstance(value, str) and value:
                 roles.add(value)
+        listed = spec.get("units_from_roles")
+        if isinstance(listed, (list, tuple)):
+            roles.update(str(role) for role in listed if isinstance(role, str) and role)
     return frozenset(roles)
 
 

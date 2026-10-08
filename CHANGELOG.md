@@ -6,6 +6,40 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Enzyme-network links across amount bases through a stated, unit-bearing
+  yield (NETWORK-002): in a network dataset a solid pool (dry mass per volume)
+  may release a dissolved pool (amount per volume), or a molar final product,
+  when its `substrates.csv` row states `yield_basis` as an amount of product
+  per dry mass (for example `mmol/g`, checked with pint) with the new optional
+  columns `yield_evidence_type` (`measured`, `literature`, `estimate`) and
+  `yield_method` (required for measured and literature values). The yield
+  becomes a parameter record per strain and condition (role
+  `product_yield__<pool>`) bound to the release coefficient, so its evidence
+  sets the mode like any other input; FungMod never derives it from a molar
+  mass or a registry product map. Pools after the basis change are reported in
+  the entry's units times the yield's, simplified by pint (g/L x mmol/g =
+  `millimole / liter`); the closure ledger weighs the solid through the yield
+  (`{value, units}` weights, checked in pint) and `final_product_yield` keeps
+  its units across bases (`millimole / gram`). Core generalisation, generic and
+  opt-in: `ProductReleaseMap.coefficient_units`, unit-bearing product
+  coefficients in `HomogeneousMichaelisMentenProcess`
+  (`product_coefficient_units`, `product_state_units`; the compiled core
+  converts them once at build time), unit-bearing `parameter_role`
+  coefficients and closure weights in the composition builder, initial-state
+  `units_from_roles` on case templates, and `conserved_weight` in the
+  validators; the surface-catalysis and transglycosylation processes, the
+  factories of those and of the pH-ionization process, and the SBML exporter
+  refuse a unit-bearing coefficient instead of reading it as a pure number. Refused with file, row and column: a
+  dry-mass-to-amount link without such a yield, a unit-bearing yield on a link
+  between two solids, of the wrong dimension, on a dissolved row or outside a
+  network, a dissolved pool releasing a solid one, and missing or misplaced
+  yield evidence. Fixtures `network_solid_chain` (a cellulose-like solid in g/L
+  -> a disaccharide-like pool in mmol/L -> a monomer-like product, competitive
+  inhibition) and `network_solid_parallel` (two classes on a chitin-like solid
+  -> a dimer-like product in umol/L); illustrative estimates only. Every
+  existing registry case and user fixture assembles byte-identically (pinned
+  config and record digests) and its outputs are unchanged.
+
 - An enzyme network drafted for a fungus, substrates and conditions
   (ASSEMBLE-002): `assemble_user_tables(network=True)` and `fungmod assemble
   --network` draft the USERDATA-010 `enzyme_network` block with the requested
@@ -892,6 +926,24 @@ All notable public releases of FungMod are documented here.
 
 ### Fixed
 
+- A dimensionless parameter bound to a product-map coefficient in scaled units
+  was read as its raw number: a `culture.csv` `biomass_yield` of `0.5 mg/g`
+  acted as 0.5 g/g, a thousand times too large, and `350 mg/g` or `35 percent`
+  were refused as above 1 g/g. The composition builder now converts such a
+  record to a plain fraction with pint, and the culture bound is judged in
+  g/g. Records in `g/g` or `dimensionless`, every registry case and every
+  fixture are unchanged (their configs hash as before).
+
+- `final_metrics.csv` named a product stated in micromolar
+  `final_product_amount` (and would have called an amount per mass such as
+  `millimole / gram` a concentration): the label was chosen by matching unit
+  names as text. It is now chosen by pint's dimensionality: anything per volume
+  is `final_product_concentration`, anything else `final_product_amount`.
+  Output schema `2.2.1` (was `2.2.0`): no table, column or allowed value
+  changed, but bundles of earlier versions carry `final_product_amount` for
+  micromolar products (the esterase, oxidase and parallel-network fixtures,
+  for example), so do not pool the two names across versions; every other
+  label and every value is unchanged (NETWORK-002).
 - The homogeneous and pH-ionization Michaelis-Menten assembler labelled every
   substrate entity dissolved (`generic_dissolved` loader, `physical_state`
   `dissolved`, `homogeneous_dissolved` degradation model) whatever the

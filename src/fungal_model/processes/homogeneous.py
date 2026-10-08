@@ -328,7 +328,18 @@ class MassActionProcess(Process):
 
 @dataclass(frozen=True, init=False)
 class HomogeneousMichaelisMentenProcess(Process):
-    """Generic homogeneous Michaelis-Menten process."""
+    """Generic homogeneous Michaelis-Menten process.
+
+    The substrate is consumed at the rate and each product is formed at its
+    coefficient times the rate. A pure-number coefficient forms the product in
+    the substrate's units. A coefficient listed in ``product_coefficient_units``
+    carries those units (the amount of product per amount of substrate
+    consumed across two bases, for example ``mmol/g``): the product is then
+    declared in its own ``product_state_units`` entry, the dimension of
+    substrate units times coefficient units must be that of the product, and
+    ``contributions`` returns the unit-bearing product rate, which the compiled
+    core converts to the product's units once at build time.
+    """
 
     substrate_state: str
     product_state: str | None
@@ -341,6 +352,8 @@ class HomogeneousMichaelisMentenProcess(Process):
     kcat_symbol: str | None
     product_coefficients: dict[str, float]
     product_coefficient_bindings: dict[str, CoefficientBinding]
+    product_coefficient_units: dict[str, str]
+    product_state_units: dict[str, str]
 
     def __init__(
         self,
@@ -357,6 +370,8 @@ class HomogeneousMichaelisMentenProcess(Process):
         kcat_symbol: str | None = None,
         product_coefficients: Mapping[str, float] | None = None,
         product_coefficient_bindings: Mapping[str, CoefficientBinding] | None = None,
+        product_coefficient_units: Mapping[str, str] | None = None,
+        product_state_units: Mapping[str, str] | None = None,
         source: str = "Generic homogeneous Michaelis-Menten process.",
         notes: str = "",
     ) -> None:
@@ -373,10 +388,17 @@ class HomogeneousMichaelisMentenProcess(Process):
                 + ", ".join(unknown)
                 + "."
             )
+        coefficient_units, product_units = _unit_bearing_products(
+            name=name,
+            coefficients=coefficients,
+            substrate_units=substrate_units,
+            product_coefficient_units=product_coefficient_units,
+            product_state_units=product_state_units,
+        )
         required_states = [StateVariableSpec(substrate_state, substrate_units, role="substrate")]
         changed_states = [StateVariableSpec(substrate_state, substrate_units, role="reactant")]
         changed_states.extend(
-            StateVariableSpec(state_name, substrate_units, role="product")
+            StateVariableSpec(state_name, product_units.get(state_name, substrate_units), role="product")
             for state_name in coefficients
         )
         parameter_requirements = [
@@ -423,6 +445,8 @@ class HomogeneousMichaelisMentenProcess(Process):
         object.__setattr__(self, "kcat_symbol", kcat_symbol)
         object.__setattr__(self, "product_coefficients", coefficients)
         object.__setattr__(self, "product_coefficient_bindings", bindings)
+        object.__setattr__(self, "product_coefficient_units", coefficient_units)
+        object.__setattr__(self, "product_state_units", product_units)
 
     def rate(
         self,
@@ -549,8 +573,60 @@ class HomogeneousMichaelisMentenProcess(Process):
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
         contributions: dict[str, Quantity] = {self.substrate_state: cast(Quantity, -value)}
         for state_name, coefficient in self.product_coefficients.items():
-            contributions[state_name] = coefficient * value
+            units = self.product_coefficient_units.get(state_name)
+            # A unit-bearing coefficient converts the substrate's amount into the product's; pure numbers as before.
+            contributions[state_name] = coefficient * value if units is None else Q_(coefficient, units) * value
         return contributions
+
+
+def _unit_bearing_products(
+    *,
+    name: str,
+    coefficients: Mapping[str, float],
+    substrate_units: str,
+    product_coefficient_units: Mapping[str, str] | None,
+    product_state_units: Mapping[str, str] | None,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Check the unit-bearing product coefficients: (coefficient units, product state units) by product state.
+
+    Each listed coefficient must name a product of the process and parse as
+    dimensional units; its product must state its own units, and substrate
+    units times coefficient units must have the product's dimension. Product
+    state units are accepted only for products with a unit-bearing coefficient:
+    a pure-number coefficient forms its product in the substrate's units.
+    """
+
+    coefficient_units = {str(state): str(units) for state, units in (product_coefficient_units or {}).items()}
+    product_units = {str(state): str(units) for state, units in (product_state_units or {}).items()}
+    unknown = sorted(set(coefficient_units) - set(coefficients))
+    if unknown:
+        raise ValueError(
+            f"Process {name!r}: product coefficient units must name product states of the process; unknown: "
+            + ", ".join(unknown)
+            + "."
+        )
+    stray = sorted(set(product_units) - set(coefficient_units))
+    if stray:
+        raise ValueError(
+            f"Process {name!r}: product state units are given only for products whose coefficient carries units; "
+            f"{', '.join(stray)} have pure-number coefficients and are formed in the substrate's units."
+        )
+    for state, units in coefficient_units.items():
+        if state not in product_units:
+            raise ValueError(
+                f"Process {name!r}: product {state!r} has a coefficient in {units!r} and needs its own state units."
+            )
+        try:
+            formed = Q_(1.0, substrate_units) * Q_(1.0, units)
+            if formed.dimensionless:
+                raise ValueError("a unit-bearing coefficient must not be dimensionless")
+            formed.to(product_units[state])
+        except Exception as exc:  # pint raises several unrelated exception types for bad or mismatched units
+            raise ValueError(
+                f"Process {name!r}: the coefficient of product {state!r} in {units!r} times the substrate in "
+                f"{substrate_units!r} is not an amount in the product's units {product_units[state]!r} ({exc})."
+            ) from exc
+    return coefficient_units, product_units
 
 
 def _signed_stoichiometry(

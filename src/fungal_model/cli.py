@@ -2286,8 +2286,12 @@ def _print_enzyme_networks(dataset: UserDataset) -> None:
         for process in item["processes"]
     ]
     for item in dataset.enzyme_networks:
+        # A unit-bearing yield (a basis change) is a stated record: its evidence type follows its units.
         links = ", ".join(
-            f"{link['substrate_id']} -> {link['releases']} ({link['yield']:g} {link['yield_basis']})" for link in item["links"]
+            f"{link['substrate_id']} -> {link['releases']} ({link['yield']:g} {link['yield_basis']}"
+            + (f", {link['yield_evidence_type']}" if link.get("yield_evidence_type") else "")
+            + ")"
+            for link in item["links"]
         )
         print(f"  from {item['entry_substrate']}: {links}; strains {', '.join(item['strains'])}")
     headers = ("enzyme class", "pool", "rate form", "competitive inhibitor")
