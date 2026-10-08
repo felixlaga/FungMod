@@ -38,6 +38,12 @@ All notable public releases of FungMod are documented here.
   Without `network` drafts are byte-identical to the previous version (pinned
   digests).
 
+- A software-only paper draft for the Journal of Open Source Software,
+  `paper/joss/paper.md` with its bibliography (PAPER-003): no research
+  results, the journal's 2026 sections, author statements still to be
+  completed; a workflow builds its PDF with the journal's toolchain and
+  `tests/test_joss_paper.py` checks its sections, citations and length.
+
 - Several enzyme classes acting together in user data (USERDATA-010): an
   optional `enzyme_network` block in `user_dataset.yml` (`entry_substrates`)
   makes every case of the dataset an enzyme network instead of the one class

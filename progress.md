@@ -209,6 +209,44 @@ Next task: bind `responses.csv` laws per network process (then drafts can
 carry them); let the assembly follow cross-basis links once the loader
 accepts a dimensional product coefficient (solid entry to dissolved pools).
 
+## PAPER-003 A Software-Only Paper Draft For JOSS
+
+Date: 2026-10-06
+
+Status: draft written; author statements outstanding. The owner asked for a
+purely software paper with no new research results. `paper/joss/paper.md`
+(1302 words without references) follows the Journal of Open Source
+Software's 2026 format: Summary, Statement of need, State of the field,
+Software design, Research impact statement, AI usage disclosure,
+Acknowledgements, References. It describes the name-driven virtual
+experiment, record assembly, the two modes, the numerical core, calibration
+and frozen plans, the SABIO-RK and dbCAN intake routes and the spatial
+module, each with its present limits (one calibrated whole organism; the
+genome route assigns no rates and is not connected; the spatial module has
+no organism parameters). Every statement was checked against `main`.
+Seventeen references; the DOIs that could not be confirmed (Edelstein 1982,
+Boswell et al. 2003) are left out rather than guessed.
+
+Changed: `paper/joss/paper.md`, `paper/joss/paper.bib` (new);
+`.github/workflows/draft-pdf.yml` (new: builds the PDF with
+`openjournals/openjournals-draft-action` on changes to `paper/joss/`);
+`.gitignore` (the built PDF); `docs/reproducing-the-paper.md`;
+`CHANGELOG.md`; the state document (the owner's clarified goal, a gap
+survey against it and the publication decision).
+
+Tests: `tests/test_joss_paper.py` (new): front matter and author match
+`CITATION.cff`, the required sections in order, every citation resolves and
+every bibliography entry is cited, 750 to 1750 words, and no percentages or
+result phrases in the prose.
+
+Not changed: any code, model, parameter, registry record, study result or
+`paper/paper.tex`. Scientific impact: none. Open for the author: the
+research-impact evidence and the AI-usage statement, both marked in the
+draft; JOSS's 2026 policy can treat largely AI-generated submissions as out
+of scope, which the author must weigh before submitting.
+
+
+
 ## USERDATA-010 Several Enzyme Classes Acting Together In User Data
 
 Status: `complete` for the stated scope (2026-10-07); the tenth increment of the
