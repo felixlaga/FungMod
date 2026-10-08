@@ -1,0 +1,3 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
+pnp_butyrate,,4-Nitrophenyl butyrate,aryl_ester,dissolved,carboxylic_ester,p_nitrophenol,1,mol/mol,"FungMod FETCH-003 fixture; one 4-nitrophenol per ester bond hydrolysed"
+pnp_phosphate,,4-Nitrophenyl phosphate,aryl_phosphate,dissolved,phosphoric_monoester,p_nitrophenol,1,mol/mol,"FungMod FETCH-003 fixture; one 4-nitrophenol per phosphoester bond hydrolysed"

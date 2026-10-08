@@ -8,7 +8,9 @@ registry class of the repertoire that acts on a requested substrate (with
 frozen, digest-checked snapshot in the layout of
 ``fungal_model.sources.sabiork.fetch.fetch_and_save_export``; SABIO-RK is
 reached only with ``refresh=True`` (``--fetch``). The entries then follow the
-existing per-case rules of the assembly.
+existing per-case rules of the assembly. Classes a user dataset defines in
+``enzyme_classes.csv`` are looked up by their own EC number since FETCH-003
+(``tests/test_fetch_kinetics_user_classes.py``).
 
 Every SABIO-RK answer here is a SYNTHETIC TEST RESPONSE written by hand in the
 format of SABIO-RK's export API (``tests/fixtures/sabiork_kinetics_queries/``,
@@ -719,27 +721,8 @@ def test_a_second_class_and_substrate_follow_the_same_rules(sabio: _FakeSabio, t
 
 
 def test_classes_that_cannot_be_looked_up_are_listed_and_not_queried(sabio: _FakeSabio, tmp_path: Path) -> None:
-    # A user-defined class with an EC number: SABIO-RK entries become kinetics of registry classes only.
-    esterase = assemble_user_tables(
-        dataset_id="esterase_lookup",
-        fungus="strain_e1",
-        substrates=["p_nitrophenyl_butyrate"],
-        conditions=[{"temperature": 37, "temperature_units": "degC", "ph": 7.5}],
-        user_data=ESTERASE,
-        cache_dir=tmp_path / "kinetics",
-        fetch_kinetics=True,
-        refresh=True,
-    )
-    assert sabio.requested == []
-    lookup = esterase.assembly["kinetics_lookup"]
-    assert lookup["queries"] == []
-    (item,) = lookup["not_queried"]
-    assert item["enzyme_class"] == "carboxylesterase"
-    assert "an enzyme class of the user dataset (enzyme_classes.csv, EC 3.1.1.1)" in item["reason"]
-    assert [case["kinetics_status"] for case in esterase.assembly["cases"]] == ["user_data"]
-    assert "No query was made." in esterase.review
-
-    # A user class without an EC number, in a network draft.
+    # User classes without an EC number, in a network draft. (A user class WITH a complete EC number is looked up since
+    # FETCH-003; tests/test_fetch_kinetics_user_classes.py.)
     chain = assemble_user_tables(
         dataset_id="chain_lookup",
         fungus="strain_n1",
@@ -749,10 +732,16 @@ def test_classes_that_cannot_be_looked_up_are_listed_and_not_queried(sabio: _Fak
         network=True,
         cache_dir=tmp_path / "kinetics",
         fetch_kinetics=True,
+        refresh=True,
     )
-    reasons = {item["enzyme_class"]: item["reason"] for item in chain.assembly["kinetics_lookup"]["not_queried"]}
+    assert sabio.requested == []
+    lookup = chain.assembly["kinetics_lookup"]
+    assert lookup["queries"] == []
+    reasons = {item["enzyme_class"]: item["reason"] for item in lookup["not_queried"]}
     assert set(reasons) == {"depolymerase_like", "oligomer_hydrolase_like"}
     assert all("enzyme_classes.csv, no EC number" in reason for reason in reasons.values())
+    assert all("never by a class or enzyme name; nothing was queried" in reason for reason in reasons.values())
+    assert "No query was made." in chain.review
 
     # A new substrate whose categories are REVIEW fields: which classes act on it is not known, so nothing is queried.
     undetermined = _k1(tmp_path / "kinetics", substrates=["Synthetic undescribed substrate U1"], refresh=True)
@@ -979,15 +968,15 @@ def test_fungmod_assemble_lists_what_it_cannot_look_up_and_makes_no_request(sabi
     code, out, err = _cli(
         "assemble",
         "--fungus",
-        "strain_e1",
+        "strain_n1",
         "--user-data",
-        ESTERASE,
+        _plain_chain(tmp_path),
         "--substrate",
-        "p_nitrophenyl_butyrate",
+        "polymer_p1",
         "--temperature-c",
-        "37",
+        "30",
         "--ph",
-        "7.5",
+        "5",
         "--fetch-kinetics",
         "--fetch",
         "--cache-dir",
@@ -995,7 +984,7 @@ def test_fungmod_assemble_lists_what_it_cannot_look_up_and_makes_no_request(sabi
         "--registry",
         REGISTRY_INDEX,
         "--dataset-id",
-        "esterase_lookup",
+        "chain_lookup",
         "--output",
         tmp_path / "draft",
     )
@@ -1004,8 +993,8 @@ def test_fungmod_assemble_lists_what_it_cannot_look_up_and_makes_no_request(sabi
     assert sabio.requested == []
     assert "\n  no query was made\n" in out and "  network: " not in out
     assert (
-        "  not queried: carboxylesterase on p_nitrophenyl_butyrate: carboxylesterase is an enzyme class of the user "
-        "dataset (enzyme_classes.csv, EC 3.1.1.1)"
+        "  not queried: depolymerase_like on polymer_p1: depolymerase_like is an enzyme class of the user dataset "
+        "(enzyme_classes.csv, no EC number); SABIO-RK is queried by complete EC number only"
     ) in out
     assert not (tmp_path / "kinetics").exists()
 

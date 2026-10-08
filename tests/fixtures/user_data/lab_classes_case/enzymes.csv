@@ -1,0 +1,3 @@
+strain_id,enzyme_class,evidence,source
+strain_k6,lab_ester_hydrolase,activity assay (illustrative),"FungMod FETCH-003 fixture; illustrative, not a measurement"
+strain_k6,lab_phosphomonoesterase,activity assay (illustrative),"FungMod FETCH-003 fixture; illustrative, not a measurement"

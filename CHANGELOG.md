@@ -6,6 +6,29 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Kinetics of the enzyme classes a user dataset defines, looked up by their
+  own EC numbers (FETCH-003). `user_tables_from_sabiork(user_enzyme_classes=...)`
+  resolves an entry's EC number to a user-defined class (rows of an
+  `enzyme_classes.csv`) when both are the same complete EC number, and copies
+  that class's row unchanged into the draft; `assemble_user_tables` passes the
+  classes of its `user_data` (every row of the dataset's `enzyme_classes.csv`,
+  which includes every class the draft writes), so SABIO-RK entries, from
+  `kinetics_sources` or looked up, can become kinetics of a lab's own class
+  under the existing per-case rules (own species literature, other organisms
+  transferred estimates, conflicts, gaps). With `fetch_kinetics=True`
+  (`fungmod assemble --fetch-kinetics`) such a class is queried by the
+  `ec_number` of its row and the substrate's name, with the FETCH-002
+  snapshots, statuses and report; its query in
+  `assembly["kinetics_lookup"]` carries `class_defined_in` (the row and the
+  dataset), and the command line and `review.md` say "user-defined". An EC
+  number two classes share, two user-defined classes or a registry and a
+  user-defined class, is listed with both classes and the reason and never
+  chosen (by the conversion and by the lookup, on both sides), a partial EC
+  number matches nothing, and nothing is matched by a name. Tests:
+  `tests/test_fetch_kinetics_user_classes.py` with the user dataset
+  `tests/fixtures/user_data/lab_classes_case/` and two synthetic SABIO-RK
+  responses (not SABIO-RK data); not verified against live SABIO-RK.
+
 - Kinetics of the fungus's enzyme classes looked up in SABIO-RK by EC number
   (FETCH-002): `assemble_user_tables(fetch_kinetics=True)` and `fungmod
   assemble --fetch-kinetics` query SABIO-RK's kinetic-law export once per
@@ -866,6 +889,21 @@ All notable public releases of FungMod are documented here.
   remain explicit; no validated organism model or registry promotion is claimed.
 
 ### Changed
+
+- FETCH-003, behaviour: a class of `user_data` with a complete EC number is
+  now looked up by `fetch_kinetics` (FETCH-002 listed it as not queried), and
+  a SABIO-RK entry whose EC number a user-defined class shares with a registry
+  class is no longer converted for the registry class; it is listed with both
+  classes. Text: the lookup limitation of `fetch_kinetics` drafts says which
+  classes are looked up (the only change to drafts of registry classes, which
+  are otherwise byte-identical); a registry class with several EC numbers of
+  which some are not queried is now listed for those, beside the queries of
+  the others (FETCH-002 dropped them silently); the "does not resolve" reason
+  names user-defined classes when the dataset has any; for a substrate of the
+  user dataset, the assembled draft no longer repeats the conversion's
+  decisions about a `substrates.csv` row it does not write and says instead
+  that the user's row is kept; `fungmod assemble --help` describes the lookup
+  of user-defined classes. No numerical behaviour changes.
 
 - Text only (FETCH-002): `fungmod assemble --help` describes `--fetch` as the
   opt-in for the UniProt proteome and the kinetics lookup, and `--cache-dir`
