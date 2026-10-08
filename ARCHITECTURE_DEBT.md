@@ -114,6 +114,11 @@ pins its diffusion operator to the transport engines' Laplacian. The 1D and
 N-D reaction-diffusion engines remain the `Reaction` path for their own
 cases, and the mycelium core does not yet lift well-mixed `Process` kernels
 per cell nor supply a sparse compiled Jacobian; both are its next steps.
+SPATIAL-003 (2026-10-08) met the second: every shipped field process
+compiles an analytic Jacobian on its declared stencil, the model assembles
+it as a sparse matrix (a band for LSODA), and BDF, Radau and LSODA use it by
+default, pinned to centred differences by `tests/test_mycelium_jacobian.py`.
+Lifting well-mixed `Process` kernels per cell remains its next step.
 
 Containment: every shipped process and modifier compiles to a numeric kernel
 and `tests/test_compiled_process_models.py` fails if one falls back; the
