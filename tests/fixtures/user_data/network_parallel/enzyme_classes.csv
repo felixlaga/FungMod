@@ -1,0 +1,3 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+cleaver_a_like,Ester cleaver A-like class Q2,,ester_like_bond,ester_like_substrate,Illustrative user-defined class for the parallel enzyme-network fixture (no record of this class exists)
+cleaver_b_like,Ester cleaver B-like class Q2,,ester_like_bond,ester_like_substrate,Illustrative user-defined class for the parallel enzyme-network fixture (no record of this class exists)

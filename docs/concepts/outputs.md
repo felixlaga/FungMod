@@ -16,7 +16,7 @@ should be recoverable from an exported artifact.
 | `sampled_parameters.csv` | Every sampled value with source and allowed-use metadata. |
 | `uncertainty_summary.csv` | Summaries over sampled inputs and output metrics. |
 | `trajectory_quantiles.csv` | Time-indexed exploratory trajectory bands. |
-| `mechanism_summary.csv` | Active process laws and modifiers. |
+| `mechanism_summary.csv` | Active process laws and modifiers. An [enzyme network](../user-data.md#several-enzymes-acting-together) adds one `process_law` row per process (its enzyme class in `configured_by`) after the network row, and a provenance-bound competitive-inhibition modifier its own `rate_modifier` row; the columns and allowed values are unchanged. |
 | `assumption_summary.csv` | Explicit assumptions attached to cases and processes. |
 | `provenance_table.csv` | Source and provenance rows used by the run. |
 | `limitations_table.csv` | Known interpretation boundaries. |

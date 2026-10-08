@@ -972,6 +972,7 @@ def _check_data(args: argparse.Namespace) -> int:
             print(f"    measurement request: {gap['provenance']['measurement_request']}")
     _print_genome_resolution(dataset)
     _print_cultures(dataset)
+    _print_enzyme_networks(dataset)
     _print_timecourses(dataset)
     _print_fit_block(dataset)
     return EXIT_OK
@@ -2163,6 +2164,33 @@ def _print_cultures(dataset: UserDataset) -> None:
         for item in dataset.cultures
     ]
     headers = ("strain", "substrate", "consuming pool", "enzyme pools", "culture.csv rows")
+    for line in _table(headers, rows):
+        print(f"  {line}")
+
+
+def _print_enzyme_networks(dataset: UserDataset) -> None:
+    if not dataset.enzyme_networks:
+        return
+    print(
+        f"Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, "
+        f"enzyme_network): {len(dataset.enzyme_networks)}"
+    )
+    rows = [
+        (
+            str(process["enzyme_class"]),
+            str(process["pool"]),
+            str(process["rate_form"]),
+            str(process["inhibitor"] or "none"),
+        )
+        for item in dataset.enzyme_networks
+        for process in item["processes"]
+    ]
+    for item in dataset.enzyme_networks:
+        links = ", ".join(
+            f"{link['substrate_id']} -> {link['releases']} ({link['yield']:g} {link['yield_basis']})" for link in item["links"]
+        )
+        print(f"  from {item['entry_substrate']}: {links}; strains {', '.join(item['strains'])}")
+    headers = ("enzyme class", "pool", "rate form", "competitive inhibitor")
     for line in _table(headers, rows):
         print(f"  {line}")
 

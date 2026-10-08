@@ -67,6 +67,23 @@ never mixed with the enzyme-assay forms of ``kinetics.csv`` for the same strain
 and substrate, carries no response law and no time course in this version, and
 runs the existing process laws with no new numerics.
 
+An optional ``enzyme_network`` block in the manifest (``entry_substrates``)
+makes every case of the dataset an enzyme network instead of the one class the
+preflight selects: every declared class of the strain that acts on a pool of
+the network runs its own homogeneous Michaelis-Menten process (kcat or Vmax
+form) through the existing ``enzyme_network`` composition, processes on one
+pool add their rates, and a pool released by one class is the substrate of the
+next only where a substrate's ``substrates.csv`` product equals another
+``substrate_id``, with the stated yield. Intermediate pools and the final product
+start at zero. A ``ki`` row naming an ``inhibitor`` (a pool released downstream
+of its own) binds the existing provenance-bound competitive-inhibition modifier
+to that process; without one the process has no inhibition term. Cycles,
+ambiguous products, links between dissolved and dry-mass pools, a class on two
+pools of one network and strains with different member classes are refused;
+classes act additively and independently, with no synergy or competition for
+sites. Every class of a network dataset runs in its networks only, so the
+records of a dataset without the block are unchanged.
+
 An optional ``genomes.csv`` points each strain to a dbCAN ``overview.txt``
 inside the dataset directory. The annotation is resolved to enzyme classes
 with the existing ``CapabilityResolver`` and its curated CAZy family map.
@@ -175,7 +192,11 @@ from fungal_model.screening.case_builder import (
     PH_IONIZATION_MM_PARAMETER_ROLES,
     PH_IONIZATION_MM_PROCESS_TYPE,
 )
-from fungal_model.screening.culture_physiology import CULTURE_PHYSIOLOGY_PROCESS_TYPE
+from fungal_model.screening.culture_physiology import (
+    COMPETITIVE_INHIBITION_MODIFIER_TYPE,
+    CULTURE_PHYSIOLOGY_PROCESS_TYPE,
+)
+from fungal_model.screening.enzyme_network import ENZYME_NETWORK_PROCESS_TYPE
 from fungal_model.screening.template_environment_modifiers import (
     ENVIRONMENT_MODIFIER_CONDITIONS,
     ENVIRONMENT_MODIFIER_TYPES,
@@ -191,6 +212,8 @@ USER_DATASET_PROCESS_TYPE = "homogeneous_michaelis_menten"
 USER_DATASET_PH_IONIZATION_PROCESS_TYPE = PH_IONIZATION_MM_PROCESS_TYPE
 # The process law a culture.csv culture runs: the registry's culture_physiology composition.
 USER_DATASET_CULTURE_PROCESS_TYPE = CULTURE_PHYSIOLOGY_PROCESS_TYPE
+# The process type of an enzyme network: several enzyme classes acting together on a chain of pools.
+USER_DATASET_NETWORK_PROCESS_TYPE = ENZYME_NETWORK_PROCESS_TYPE
 
 USER_DATASET_MATURITY_MEASURED = "user_measured"
 USER_DATASET_MATURITY_LITERATURE = "user_reported_literature"
@@ -299,6 +322,7 @@ KINETIC_QUANTITIES = (
     "ph_max",
     "enzyme_dose",
     "reactivity_exponent",
+    "ki",
 )
 # The quantities only the pH-ionization rate form has; its enzyme concentration
 # and initial substrate are shared with the kcat form. The roles are those of the
@@ -347,7 +371,7 @@ _PK_PAIRS = (
 _PH_RANGE_QUANTITIES = ("ph_min", "ph_max")
 _DIMENSIONLESS_QUANTITIES = frozenset({*(name for pair in _PK_PAIRS for name in pair[:2]), *_PH_RANGE_QUANTITIES})
 _RATE_CONSTANT_QUANTITIES = frozenset({"kcat", "kcat_limiting"})
-_POSITIVE_QUANTITIES = frozenset({"km", "km_limiting"})
+_POSITIVE_QUANTITIES = frozenset({"km", "km_limiting", "ki"})
 _PH_SCALE = (0.0, 14.0)
 _YIELD_BASIS = "mol/mol"
 _YIELD_BASIS_BY_STATE = MappingProxyType(
@@ -386,6 +410,7 @@ _PROCESS_LABEL = {
     USER_DATASET_PROCESS_TYPE: "homogeneous Michaelis-Menten",
     USER_DATASET_PH_IONIZATION_PROCESS_TYPE: "pH-ionization Michaelis-Menten",
     USER_DATASET_CULTURE_PROCESS_TYPE: "culture physiology",
+    USER_DATASET_NETWORK_PROCESS_TYPE: "enzyme network",
 }
 _PROCESS_SENTENCE_LABEL = {
     USER_DATASET_PROCESS_TYPE: "Homogeneous Michaelis-Menten",
@@ -414,6 +439,20 @@ _VMAX_ROUTE_LABEL = {
     "assay_activity": "a saturating assay_activity on the case substrate",
 }
 _ACTIVITY_COLUMNS = ("activity_substrate", "activity_saturating")
+# The competitive inhibition constant of a process in an enzyme network, and the column naming its inhibitor: the
+# substrate_id of a pool the network forms downstream of the row's substrate, or the network's final product.
+INHIBITION_CONSTANT_QUANTITY = "ki"
+INHIBITOR_COLUMN = "inhibitor"
+# The law ``ki`` binds is the existing provenance-bound competitive-inhibition modifier (BIO-003). Its primary source
+# is the law provenance FungMod records for that modifier (foundation_progress/proposals/
+# BIO_003_COMPETITIVE_INHIBITION.yml); it supports the equation, not any user's Ki, which keeps its own row source.
+COMPETITIVE_INHIBITION_LAW_SOURCE = "https://pubmed.ncbi.nlm.nih.gov/7985803/"
+COMPETITIVE_INHIBITION_LAW_MATURITY = "literature_backed_software_tested"
+COMPETITIVE_INHIBITION_EQUATION = "rate x (Km + S) / (Km (1 + I / Ki) + S), i.e. Vmax S / (Km (1 + I / Ki) + S)"
+# The manifest switch of enzyme networks: entry_substrates lists the substrates each network starts from.
+NETWORK_MANIFEST_FIELD = "enzyme_network"
+NETWORK_ENTRY_FIELD = "entry_substrates"
+_NETWORK_FIELDS = frozenset({NETWORK_ENTRY_FIELD})
 _RETIRED_QUANTITY_HINTS = {
     "enzyme_activity": (
         "quantity 'enzyme_activity' is ambiguous; use specific_activity (amount per time per enzyme mass, "
@@ -472,6 +511,12 @@ _SOLID_REFUSED_QUANTITIES = MappingProxyType(
             "assay_activity is refused on a solid substrate: a saturating activity is not defined for an "
             "interfacial substrate, and an assay activity (for example FPU) is not a rate in substrate units. "
             "Give the activity as an enzyme concentration in assay units per volume with kcat, or give vmax."
+        ),
+        "ki": (
+            "ki is refused on a solid substrate: the competitive-inhibition law (Km + S) / (Km (1 + I / Ki) + S) "
+            "describes an inhibitor competing for the binding site of a dissolved substrate, while the Km of the "
+            "apparent law on a solid is a half-saturation constant, not a binding constant, and its products are "
+            "lumped dry-mass pools. No product inhibition is bound on a solid substrate in this version."
         ),
         **{
             quantity: (
@@ -570,7 +615,7 @@ _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "conditions.csv": (("condition_id", "temperature", "temperature_units", "ph"), ("notes",)),
     "kinetics.csv": (
         ("strain_id", "enzyme_class", "substrate_id", "condition_id", "quantity", "units", "evidence_type", "source"),
-        ("value", "lower", "upper", "method", "sd", "replicates", *_ACTIVITY_COLUMNS),
+        ("value", "lower", "upper", "method", "sd", "replicates", *_ACTIVITY_COLUMNS, INHIBITOR_COLUMN),
     ),
     "responses.csv": (
         ("strain_id", "enzyme_class", "substrate_id", "law", "parameter", "value", "units", "evidence_type", "source"),
@@ -601,7 +646,9 @@ _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 # Columns a table refuses with a specific reason instead of the generic unsupported-column message.
 _REFUSED_COLUMNS: Mapping[str, Mapping[str, str]] = MappingProxyType({"substrates.csv": _SURFACE_LAW_SUBSTRATE_COLUMNS})
 _TABLES_WITH_ROWS_REQUIRED = ("strains.csv", "enzymes.csv", "substrates.csv", "conditions.csv")
-_MANIFEST_FIELDS = frozenset({"dataset_id", "contributor", "date", "source", "notes", "simulation", "fit"})
+_MANIFEST_FIELDS = frozenset(
+    {"dataset_id", "contributor", "date", "source", "notes", "simulation", "fit", NETWORK_MANIFEST_FIELD}
+)
 _SIMULATION_FIELDS = frozenset({"duration", "units", "points"})
 _USER_SUBSTRATE_FIELDS = ("name", "substrate_class", "physical_state", "bond_classes")
 
@@ -863,6 +910,13 @@ class UserDataset:
     enzyme pools in template order, the generated fungus, substrate, template
     and compatibility ids, and the culture.csv rows of that strain (none for a
     strain whose culture cases are all gaps). It is empty without one.
+
+    With an ``enzyme_network`` block in the manifest, ``enzyme_networks`` lists
+    one entry per entry substrate: its chain of pools, the final product, the
+    links with their yields, the processes (enzyme class, pool, rate form,
+    process id, competitive inhibitor if a ki row binds one), the member classes,
+    the strains, and the generated template and compatibility ids. It is empty
+    without the block.
     """
 
     dataset_id: str
@@ -878,6 +932,7 @@ class UserDataset:
     unmapped_families: tuple[Mapping[str, Any], ...] = ()
     timecourses: Mapping[str, tuple[UserTimecourse, ...]] = field(default_factory=dict)
     cultures: tuple[Mapping[str, Any], ...] = ()
+    enzyme_networks: tuple[Mapping[str, Any], ...] = ()
     # The bytes of every input file (tables, manifest, annotation and fit-report files) by relative
     # path, and the parsed rows; ``fit_user_dataset`` writes its copies of the dataset from them.
     _raw_files: Mapping[str, bytes] = field(default_factory=dict, repr=False, compare=False)
@@ -972,11 +1027,12 @@ class UserDataset:
                 case_id: [item.to_dict() for item in series] for case_id, series in self.timecourses.items()
             },
             "cultures": [_plain(item) for item in self.cultures],
+            "enzyme_networks": [_plain(item) for item in self.enzyme_networks],
         }
 
     def summary(self) -> dict[str, Any]:
-        """Return the dataset id, digest, generated record counts, genome-resolution lists, time-course cases and
-        cultures."""
+        """Return the dataset id, digest, generated record counts, genome-resolution lists, time-course cases,
+        cultures and enzyme networks."""
 
         return {
             "dataset_id": self.dataset_id,
@@ -987,6 +1043,10 @@ class UserDataset:
             "cultures": [
                 {key: item[key] for key in ("strain_id", "substrate_id", "enzyme_class", "enzyme_pools")}
                 for item in self.cultures
+            ],
+            "enzyme_networks": [
+                {key: _plain(item[key]) for key in ("entry_substrate", "pools", "product", "enzyme_classes")}
+                for item in self.enzyme_networks
             ],
         }
 
@@ -1042,6 +1102,7 @@ def load_user_dataset(
     context = _Context(base=base, issues=issues)
     parsed = _parse_rows(tables, context, directory=directory)
     if parsed is not None:
+        parsed.network_entries = _network_entry_ids(manifest)
         _cross_validate(parsed, context)
         # Annotation files are inputs like the tables: their bytes enter the digest.
         raw_files = {**raw_files, **parsed.annotation_files}
@@ -1075,6 +1136,7 @@ def load_user_dataset(
         unmapped_families=genome_report["unmapped_families"],
         timecourses=_timecourse_series(parsed, dataset_id=dataset_id),
         cultures=_culture_report(parsed, dataset_id=dataset_id),
+        enzyme_networks=_network_report(parsed, dataset_id=dataset_id),
         _raw_files=MappingProxyType(dict(raw_files)),
         _parsed=parsed,
         _record_objects=MappingProxyType({name: tuple(generated.objects[name]) for name in _RECORD_TYPES}),
@@ -1369,6 +1431,8 @@ class _Kinetics:
     replicates: int | None
     activity_substrate: str = ""
     activity_saturating: str = ""
+    # The pool a ki row names as its competitive inhibitor; blank on every other row.
+    inhibitor: str = ""
 
     @property
     def case_key(self) -> tuple[str, str, str, str]:
@@ -1483,6 +1547,45 @@ class _CulturePair:
         return any(row is not None for row in self.pool_rows.values())
 
 
+@dataclass(frozen=True)
+class _NetworkProcess:
+    """One enzyme class consuming one pool of a network, in its pair's rate form."""
+
+    class_key: str
+    pool: str
+    form: str
+    # The pool whose state competitively inhibits this process (a ki row names it); blank without inhibition.
+    inhibitor: str = ""
+    # Whether the process binds the conversion-dependent reactivity factor (a solid entry pool only).
+    reactive: bool = False
+
+
+@dataclass(frozen=True)
+class _Network:
+    """The enzyme network that starts from one entry substrate.
+
+    ``pools`` are the substrate_ids of the chain, the entry first: each pool's
+    substrates.csv product is the next pool. ``product`` is the product of the
+    last pool, which is no substrate of the dataset: the network's final product.
+    ``classes`` are the member classes in declaration order and ``strains`` the
+    strains that declare them; ``entry_rows`` maps (strain, condition) to the
+    kinetics.csv row of the entry's initial concentration.
+    """
+
+    entry: str
+    pools: tuple[str, ...]
+    product: str
+    processes: tuple[_NetworkProcess, ...]
+    classes: tuple[str, ...]
+    strains: tuple[str, ...]
+    entry_rows: Mapping[tuple[str, str], _Kinetics]
+
+    def downstream(self, pool: str) -> tuple[str, ...]:
+        """The pools released after ``pool``, the final product last."""
+
+        return (*self.pools[self.pools.index(pool) + 1 :], self.product)
+
+
 @dataclass
 class _Parsed:
     strains: dict[str, _Strain]
@@ -1512,6 +1615,14 @@ class _Parsed:
     culture_pairs: dict[tuple[str, str], _CulturePair] = field(default_factory=dict)
     culture_classes: set[str] = field(default_factory=set)
     cultured: dict[tuple[str, str], str] = field(default_factory=dict)
+    # The manifest's network entry substrates (empty without enzyme_network, None when the manifest was unreadable),
+    # and, set by cross-validation, the enzyme network of every valid entry.
+    network_entries: tuple[str, ...] | None = None
+    networks: dict[str, _Network] = field(default_factory=dict)
+
+    @property
+    def network_dataset(self) -> bool:
+        return bool(self.network_entries)
 
 
 @dataclass
@@ -1609,6 +1720,8 @@ def _parse_manifest(raw: bytes | None, issues: list[dict[str, Any]]) -> dict[str
         issues.append(
             _issue(file, None, "fit", "fit must be the mapping fit_user_dataset writes to describe a fit.")
         )
+    if NETWORK_MANIFEST_FIELD in data:
+        issues.extend(_network_manifest_issues(data[NETWORK_MANIFEST_FIELD], file=file))
     if "date" in data:
         value = data["date"]
         if isinstance(value, date) and not isinstance(value, datetime):
@@ -1657,6 +1770,58 @@ def _parse_manifest(raw: bytes | None, issues: list[dict[str, Any]]) -> dict[str
     if len(issues) > count:
         return None
     return dict(data)
+
+
+def _network_manifest_issues(value: Any, *, file: str) -> list[dict[str, Any]]:
+    """Check the shape of the enzyme_network block: a mapping with a nonempty list of distinct substrate ids."""
+
+    field_name = NETWORK_MANIFEST_FIELD
+    if not isinstance(value, Mapping):
+        return [
+            _issue(
+                file,
+                None,
+                field_name,
+                f"{field_name} must be a mapping with {NETWORK_ENTRY_FIELD}: the substrate_ids each enzyme network "
+                "starts from.",
+            )
+        ]
+    issues: list[dict[str, Any]] = []
+    unknown = sorted(str(key) for key in value if str(key) not in _NETWORK_FIELDS)
+    if unknown:
+        issues.append(_issue(file, None, field_name, f"Unsupported {field_name} field(s): {', '.join(unknown)}."))
+    entries = value.get(NETWORK_ENTRY_FIELD)
+    column = f"{field_name}.{NETWORK_ENTRY_FIELD}"
+    if (
+        not isinstance(entries, list)
+        or not entries
+        or any(not isinstance(item, str) or not _IDENTIFIER_PATTERN.fullmatch(item) for item in entries)
+    ):
+        issues.append(
+            _issue(
+                file,
+                None,
+                column,
+                f"{NETWORK_ENTRY_FIELD} must be a nonempty list of substrate_ids of substrates.csv; each names a "
+                "substrate an enzyme network starts from.",
+            )
+        )
+    else:
+        repeated = sorted({item for item in entries if entries.count(item) > 1})
+        if repeated:
+            issues.append(_issue(file, None, column, f"{NETWORK_ENTRY_FIELD} lists {', '.join(repeated)} more than once."))
+    return issues
+
+
+def _network_entry_ids(manifest: Mapping[str, Any] | None) -> tuple[str, ...] | None:
+    """The entry substrates of the manifest's networks: empty without a network, ``None`` for an unread manifest."""
+
+    if manifest is None:
+        return None
+    block = manifest.get(NETWORK_MANIFEST_FIELD)
+    if not isinstance(block, Mapping):
+        return ()
+    return tuple(str(item) for item in block.get(NETWORK_ENTRY_FIELD, ()))
 
 
 def _parse_table(name: str, raw: bytes, issues: list[dict[str, Any]], *, rows_required: bool) -> _Table | None:
@@ -2868,11 +3033,13 @@ def _parse_kinetics(
             line=line,
             context=context,
         )
+        inhibitor_ok = _inhibitor_column_ok(row, quantity=quantity, file=file, line=line, context=context)
         source = _required_text(row, "source", file=file, line=line, context=context)
         sd = _optional_nonnegative(row, "sd", file=file, line=line, context=context)
         replicates = _optional_positive_int(row, "replicates", file=file, line=line, context=context)
         if (
             not activity_ok
+            or not inhibitor_ok
             or quantity is None
             or strain_id is None
             or class_key is None
@@ -2906,9 +3073,47 @@ def _parse_kinetics(
                 replicates=replicates if isinstance(replicates, int) and not isinstance(replicates, bool) else None,
                 activity_substrate=row.get("activity_substrate", ""),
                 activity_saturating=row.get("activity_saturating", ""),
+                inhibitor=row.get(INHIBITOR_COLUMN, ""),
             )
         )
     return rows
+
+
+def _inhibitor_column_ok(
+    row: Mapping[str, str],
+    *,
+    quantity: str | None,
+    file: str,
+    line: int,
+    context: _Context,
+) -> bool:
+    """Check the inhibitor column: required on ki rows (a pool id), refused on every other row."""
+
+    text = row.get(INHIBITOR_COLUMN, "")
+    if quantity != INHIBITION_CONSTANT_QUANTITY:
+        if text and quantity is not None:
+            context.add(file, line, INHIBITOR_COLUMN, f"{INHIBITOR_COLUMN} applies only to ki rows.")
+            return False
+        return True
+    if not text:
+        context.add(
+            file,
+            line,
+            INHIBITOR_COLUMN,
+            "ki rows must name their inhibitor: the substrate_id of a pool the enzyme network forms downstream of the "
+            "row's substrate, or the network's final product as written in substrates.csv. FungMod does not guess "
+            "which product inhibits.",
+        )
+        return False
+    if not _IDENTIFIER_PATTERN.fullmatch(text):
+        context.add(
+            file,
+            line,
+            INHIBITOR_COLUMN,
+            f"inhibitor {text!r} must be an identifier (letters, digits and single underscores), the id of a pool.",
+        )
+        return False
+    return True
 
 
 def _parse_culture(
@@ -4022,6 +4227,20 @@ def _quantity_units_error(quantity: str, units: str, *, solid: bool = False) -> 
         )
     if solid:
         return _solid_quantity_units_error(quantity, units)
+    if quantity == INHIBITION_CONSTANT_QUANTITY:
+        kind = _concentration_kind(units)
+        if kind == "molar":
+            return None
+        if kind == "mass":
+            return (
+                f"ki units {units!r} are a mass concentration; the pools of a dissolved network are amounts per "
+                f"volume with {_YIELD_BASIS} yields, so Ki must be an amount of the inhibiting product per volume "
+                "(for example mM or uM). FungMod does not convert between molar and mass concentrations."
+            )
+        return (
+            f"ki units {units!r} must be an amount of the inhibiting product per volume (for example mM or uM), "
+            "the unit basis of the product pool."
+        )
     if quantity in _RATE_CONSTANT_QUANTITIES:
         if _unit_dimension_error(units, _RATE_CONSTANT_REFERENCE_UNITS) is not None:
             return f"{quantity} units {units!r} must have the dimension 1/time (for example 1/s or 1/min)."
@@ -4233,6 +4452,7 @@ def _cross_validate(parsed: _Parsed, context: _Context) -> None:
     _validate_solid_cases(parsed, context)
     _validate_ph_ionization(parsed, context)
     _validate_responses(parsed, context)
+    _validate_networks(parsed, context)
     _validate_pairs(parsed, context)
 
 
@@ -4587,6 +4807,9 @@ def _pair_form(parsed: _Parsed, pair: tuple[str, str]) -> str:
 
 
 def _class_process_type(parsed: _Parsed, class_key: str) -> str:
+    if parsed.network_dataset:
+        # Every class of a network dataset runs in its networks only: no single-class compatibility is generated.
+        return USER_DATASET_NETWORK_PROCESS_TYPE
     if class_key in parsed.culture_classes:
         return USER_DATASET_CULTURE_PROCESS_TYPE
     return _FORM_PROCESS_TYPE[RATE_FORM_PH_IONIZATION if class_key in parsed.ionization_classes else RATE_FORM_KCAT]
@@ -5188,8 +5411,8 @@ def _validate_pairs(parsed: _Parsed, context: _Context) -> None:
                 )
                 continue
             by_substrate_class[substrate.substrate_class] = substrate
-            if (class_key, substrate.substrate_id) in parsed.culture_pairs:
-                # A culture model's state names are checked in _validate_cultures.
+            if (class_key, substrate.substrate_id) in parsed.culture_pairs or parsed.network_dataset:
+                # A culture model's state names are checked in _validate_cultures, a network's in _validate_networks.
                 continue
             states = _state_names(class_key, substrate, form=_pair_form(parsed, (class_key, substrate.substrate_id)))
             if len(set(states.values())) != len(states):
@@ -5259,6 +5482,9 @@ def _generate_records(
                 culture_substrates=tuple(
                     pair[1] for pair in parsed.culture_pairs if any(item.class_key == pair[0] for item in declared)
                 ),
+                network_entries=tuple(
+                    entry for entry, network in parsed.networks.items() if strain.strain_id in network.strains
+                ),
             ),
             origin=("strains.csv", strain.row, "strain_id"),
         )
@@ -5286,13 +5512,15 @@ def _generate_records(
         rows_by_case.setdefault(row.case_key, {})[row.quantity] = row
         if row.quantity in _KINETIC_CONSTANT_QUANTITIES:
             constant_conditions.setdefault((row.strain_id, row.class_key, row.substrate_id), set()).add(row.condition_id)
-    # Culture models are generated by _generate_culture_records below.
+    # Culture models are generated by _generate_culture_records and enzyme networks by _generate_network_records
+    # below; a network dataset has no single-class pairs.
     pairs: list[tuple[str, _Substrate]] = [
         (class_key, substrate)
         for class_key in used_classes
         for substrate in parsed.substrates.values()
         if _shared_bonds(parsed.classes[class_key], substrate) is not None
         and (class_key, substrate.substrate_id) not in parsed.culture_pairs
+        and not parsed.network_dataset
     ]
     for class_key, substrate in pairs:
         pair = (class_key, substrate.substrate_id)
@@ -5388,6 +5616,7 @@ def _generate_records(
             origin=("substrates.csv", substrate.row, "substrate_id"),
         )
     _generate_culture_records(parsed, context, generated, namespace)
+    _generate_network_records(parsed, context, generated, namespace)
     return generated
 
 
@@ -5408,6 +5637,8 @@ class _CaseContext:
     genome: _ClassEvidence | None = None
     # Other conditions at which this strain, class and substrate have kinetic constants, when this case has none.
     measured_elsewhere: tuple[_Condition, ...] = ()
+    # The name of the pool that competitively inhibits this process in an enzyme network (its ki gap names it).
+    inhibitor_name: str = ""
 
     @property
     def process_type(self) -> str:
@@ -5558,6 +5789,7 @@ def _fungus_mapping(
     *,
     genome_row: int | None = None,
     culture_substrates: Sequence[str] = (),
+    network_entries: Sequence[str] = (),
 ) -> dict[str, Any]:
     aliases = list(dict.fromkeys((strain.strain_id, *strain.aliases)))
     class_sources = (
@@ -5595,6 +5827,13 @@ def _fungus_mapping(
             f"{class_sources}. Its cases on {', '.join(culture_substrates)} are culture cases: the strain grows on "
             f"the substrate and secretes its enzyme pools following the culture_physiology model of {CULTURE_TABLE}; "
             "no other growth, secretion or uptake model is implied."
+        )
+    if network_entries:
+        mapping["notes"] = (
+            f"User-supplied strain {strain.strain_id} from dataset {namespace.dataset_id}. Its enzyme classes "
+            f"{class_sources}. Its cases on {', '.join(network_entries)} are enzyme networks: every declared class "
+            "that acts on a pool of the network runs its own Michaelis-Menten process, and the processes act together "
+            "only through their shared pools; no growth, secretion or uptake model is implied."
         )
     if strain.scientific_name:
         mapping["scientific_name"] = strain.scientific_name
@@ -6435,12 +6674,14 @@ def _gap_mapping(quantity: str, *, case: _CaseContext) -> dict[str, Any]:
 
 
 _GAP_DIMENSION = {
+    "ki": "concentration of the inhibiting product (amount per volume)",
     "kcat": "1/time",
     "vmax": "concentration per time (amount per volume per time)",
     "kcat_limiting": "1/time",
     **{quantity: "dimensionless" for quantity in sorted(_DIMENSIONLESS_QUANTITIES)},
 }
 _GAP_UNITS_TEXT = {
+    "ki": "amount of the inhibiting product per volume, for example mM",
     "kcat": "units of 1/time",
     "vmax": "concentration per time",
     "kcat_limiting": "units of 1/time",
@@ -6498,6 +6739,7 @@ _QUANTITY_LABEL = {
     "ph_min": "lowest fitted pH ph_min",
     "ph_max": "highest fitted pH ph_max",
     "reactivity_exponent": "substrate reactivity exponent",
+    "ki": "competitive inhibition constant Ki",
 }
 # What a measurement request asks for, per pH-ionization quantity.
 _PH_IONIZATION_REQUEST = {
@@ -6599,6 +6841,12 @@ def _measurement_request_text(quantity: str, *, case: _CaseContext, units_text: 
         )
     if quantity in {"km", "kcat"}:
         return f"Measure {quantity} of {info.name} from {strain.name} on {substrate.name} at {where} ({units_text})."
+    if quantity == INHIBITION_CONSTANT_QUANTITY:
+        return (
+            f"Measure the competitive inhibition constant Ki of {info.name} from {strain.name} on {substrate.name} by "
+            f"{case.inhibitor_name} at {where} ({units_text}), for example from initial rates at several "
+            f"{substrate.name} and {case.inhibitor_name} concentrations."
+        )
     if quantity == "substrate_initial_concentration":
         return (
             f"Specify the initial {substrate.name} concentration for {info.name} from {strain.name} "
@@ -7913,6 +8161,1102 @@ def _culture_compatibility_mapping(culture: _CulturePair, *, parsed: _Parsed, na
             f"{', '.join(culture.pools)}; the class consumes the substrate through the bond classes listed."
         ),
     }
+
+
+# ---------------------------------------------------------------------------
+# Enzyme networks: several enzyme classes acting together on a chain of pools
+
+
+_NETWORK_ENTRY_COLUMN = f"{NETWORK_MANIFEST_FIELD}.{NETWORK_ENTRY_FIELD}"
+_NETWORK_INITIAL_ROLE = "substrate_initial_concentration"
+_NETWORK_TABLE_REFUSALS = (
+    (
+        CULTURE_TABLE,
+        "culture_rows",
+        "culture.csv is not combined with enzyme_network in this version: a culture binds one consuming enzyme pool "
+        "and grows biomass, while a network runs several enzyme classes at stated concentrations. Keep cultures in a "
+        "dataset without enzyme_network.",
+    ),
+    (
+        TIMECOURSE_TABLE,
+        "timecourses",
+        "timecourse.csv is not combined with enzyme_network in this version: the comparison and the fit read the "
+        "substrate and product of a single-class case, and the intermediate pools of a network are not observables "
+        "of either yet.",
+    ),
+    (
+        "responses.csv",
+        "responses",
+        "responses.csv is not combined with enzyme_network in this version: response laws are bound per enzyme class "
+        "and substrate of a single-class case, and their binding to the processes of a network is a later increment. "
+        "Network kinetics apply at the condition of their rows.",
+    ),
+)
+
+
+def _validate_networks(parsed: _Parsed, context: _Context) -> None:
+    """Build the enzyme network of every entry substrate and refuse what a network cannot run.
+
+    Links between pools come only from explicit data: a substrate's
+    substrates.csv product that equals another substrate_id. The members of a
+    network are the dataset's declared classes that act on one of its pools by
+    the categorical rule; each runs one Michaelis-Menten process on its pool in
+    its pair's rate form. Refused: tables not combined with networks yet,
+    unknown entries, cycles, ambiguous products, links across amount bases, a
+    class on two pools of one network, strains with different member classes, the
+    pH-ionization form, initial amounts, doses and reactivity exponents on
+    intermediate pools, disagreeing initial concentrations of an entry, unused
+    substrates, colliding state names, and ki rows that name no downstream pool,
+    several inhibitors of one process or no network at all.
+    """
+
+    if parsed.network_entries is None:
+        return
+    if not parsed.network_entries:
+        for row in parsed.kinetics:
+            if row.quantity == INHIBITION_CONSTANT_QUANTITY:
+                context.add(
+                    "kinetics.csv",
+                    row.row,
+                    "quantity",
+                    "ki binds competitive product inhibition to a process of an enzyme network, which this version "
+                    f"supports in network datasets only: declare {NETWORK_MANIFEST_FIELD} with {NETWORK_ENTRY_FIELD} "
+                    "in user_dataset.yml (a network of one enzyme class is the single-class case with inhibition).",
+                )
+        return
+    for file, attribute, message in _NETWORK_TABLE_REFUSALS:
+        if getattr(parsed, attribute):
+            context.add(file, None, None, message)
+    entries = [entry for entry in parsed.network_entries if entry in parsed.substrates]
+    for entry in parsed.network_entries:
+        if entry not in parsed.substrates:
+            context.add(
+                USER_DATASET_MANIFEST,
+                None,
+                _NETWORK_ENTRY_COLUMN,
+                f"Entry substrate {entry!r} is not a substrate_id of substrates.csv.",
+            )
+    # Each substrate's link, decided once: (accepted, the pool its product releases or None for a final product).
+    links: dict[str, tuple[bool, str | None]] = {}
+    chains: dict[str, tuple[tuple[str, ...], str]] = {}
+    reported_cycles: set[frozenset[str]] = set()
+    for entry in entries:
+        chain = _follow_network_links(parsed, entry, links, reported_cycles, context)
+        if chain is not None:
+            chains[entry] = chain
+    class_order = list(dict.fromkeys(item.class_key for item in parsed.strain_classes))
+    intermediates = {pool for pools, _product in chains.values() for pool in pools[1:]}
+    in_networks = {pool for pools, _product in chains.values() for pool in pools}
+    for substrate in parsed.substrates.values():
+        if len(chains) == len(entries) and substrate.substrate_id not in in_networks:
+            context.add(
+                "substrates.csv",
+                substrate.row,
+                "substrate_id",
+                f"Substrate {substrate.substrate_id!r} is part of no enzyme network: it is no entry substrate and no "
+                f"entry's chain of products reaches it. List it in {NETWORK_ENTRY_FIELD} or remove it; a network "
+                "dataset simulates networks only.",
+            )
+    _refuse_intermediate_rows(parsed, context, entries=set(entries), intermediates=intermediates)
+    reported_classes: set[tuple[str, tuple[str, ...]]] = set()
+    reported_strains: set[tuple[str, tuple[str, ...]]] = set()
+    for entry, (pools, product) in chains.items():
+        network = _network_members(
+            parsed,
+            context,
+            entry=entry,
+            pools=pools,
+            product=product,
+            class_order=class_order,
+            intermediates=intermediates,
+            reported_classes=reported_classes,
+            reported_strains=reported_strains,
+        )
+        if network is not None:
+            parsed.networks[entry] = network
+    _validate_network_inhibitors(parsed, context)
+
+
+def _follow_network_links(
+    parsed: _Parsed,
+    entry: str,
+    links: dict[str, tuple[bool, str | None]],
+    reported_cycles: set[frozenset[str]],
+    context: _Context,
+) -> tuple[tuple[str, ...], str] | None:
+    """Follow substrates.csv products from ``entry``: (pools, final product), or None after a refusal."""
+
+    pools = [entry]
+    while True:
+        substrate = parsed.substrates[pools[-1]]
+        if substrate.substrate_id not in links:
+            links[substrate.substrate_id] = _network_link(parsed, substrate, context)
+        accepted, target = links[substrate.substrate_id]
+        if not accepted:
+            return None
+        if target is None:
+            return tuple(pools), substrate.product
+        if target in pools:
+            cycle = frozenset(pools[pools.index(target) :])
+            if cycle not in reported_cycles:
+                reported_cycles.add(cycle)
+                context.add(
+                    "substrates.csv",
+                    substrate.row,
+                    "product",
+                    f"Substrate {substrate.substrate_id!r} releases {target!r}, which is already a pool of the "
+                    f"enzyme network that starts from {entry!r} ({' -> '.join((*pools, target))}): the links form a "
+                    "cycle. A network's pools are released one into the next and FungMod does not break a cycle; "
+                    "change the product of one of these substrates.",
+                )
+            return None
+        pools.append(target)
+
+
+def _network_link(parsed: _Parsed, substrate: _Substrate, context: _Context) -> tuple[bool, str | None]:
+    """Whether a substrate's product is accepted, and the pool it releases (None: the network's final product)."""
+
+    product = substrate.product
+    for other in parsed.substrates.values():
+        if other.registry_id == product and other.substrate_id != product:
+            context.add(
+                "substrates.csv",
+                substrate.row,
+                "product",
+                f"The product {product!r} of substrate {substrate.substrate_id!r} is the registry substrate of "
+                f"substrates.csv row {other.row} (substrate_id {other.substrate_id!r}) but not a substrate_id. An "
+                "enzyme network links a product to a pool only when it equals a substrate_id, and FungMod does not "
+                f"guess which was meant: write the product as {other.substrate_id!r} to release that pool, or give "
+                "the product another name to keep it the network's final product.",
+            )
+            return False, None
+    if product not in parsed.substrates:
+        return True, None
+    target = parsed.substrates[product]
+    if target.is_solid != substrate.is_solid:
+        context.add(
+            "substrates.csv",
+            substrate.row,
+            "product",
+            f"Substrate {substrate.substrate_id!r} ({_basis_text(substrate)}) releases {product!r}, a "
+            f"{_basis_text(target)} substrate. The Michaelis-Menten law writes its product in the units of its "
+            "substrate, so linking a dry-mass pool with an amount-per-volume pool would need the molar mass of the "
+            "product as a dimensional yield, which FungMod does not apply. Keep the linked pools on one basis, or "
+            "give the product another name so that it stays the network's final product.",
+        )
+        return False, None
+    return True, product
+
+
+def _basis_text(substrate: _Substrate) -> str:
+    if substrate.is_solid:
+        return f"{substrate.physical_state}, dry mass per volume, yield g/g"
+    return f"{substrate.physical_state}, amount per volume, yield {_YIELD_BASIS}"
+
+
+def _refuse_intermediate_rows(
+    parsed: _Parsed,
+    context: _Context,
+    *,
+    entries: set[str],
+    intermediates: set[str],
+) -> None:
+    """Refuse kinetics.csv rows that would set an intermediate pool's own initial amount or reference."""
+
+    for row in parsed.kinetics:
+        if row.substrate_id not in intermediates:
+            continue
+        if row.quantity == "substrate_initial_concentration" and row.substrate_id not in entries:
+            context.add(
+                "kinetics.csv",
+                row.row,
+                "quantity",
+                f"Substrate {row.substrate_id!r} is an intermediate pool of an enzyme network: it is released by the "
+                "network and starts at zero, so it takes no initial concentration. List it in "
+                f"{NETWORK_ENTRY_FIELD} to start a network of its own from this initial concentration.",
+            )
+        elif row.quantity in {"enzyme_dose", REACTIVITY_EXPONENT_ROLE}:
+            what = (
+                "an enzyme_dose multiplies the pool's own initial loading"
+                if row.quantity == "enzyme_dose"
+                else "a reactivity_exponent refers to the pool's own initial amount (S / S0)^n"
+            )
+            context.add(
+                "kinetics.csv",
+                row.row,
+                "quantity",
+                f"Substrate {row.substrate_id!r} is an intermediate pool of an enzyme network, which starts at zero; "
+                f"{what}, which an intermediate does not have. Give the enzyme as enzyme_concentration, and leave "
+                "the reactivity factor to entry pools.",
+            )
+
+
+def _network_members(
+    parsed: _Parsed,
+    context: _Context,
+    *,
+    entry: str,
+    pools: tuple[str, ...],
+    product: str,
+    class_order: Sequence[str],
+    intermediates: set[str],
+    reported_classes: set[tuple[str, tuple[str, ...]]],
+    reported_strains: set[tuple[str, tuple[str, ...]]],
+) -> _Network | None:
+    """The member classes, processes, strains and entry rows of one network, refusing what it cannot run."""
+
+    count = len(context.issues)
+    acting = {
+        pool: [class_key for class_key in class_order if _shared_bonds(parsed.classes[class_key], parsed.substrates[pool])]
+        for pool in pools
+    }
+    for class_key in class_order:
+        on = tuple(pool for pool in pools if class_key in acting[pool])
+        if len(on) > 1 and (class_key, on) not in reported_classes:
+            reported_classes.add((class_key, on))
+            file, row = _first_class_row(parsed, class_key)
+            context.add(
+                file,
+                row,
+                "enzyme_class",
+                f"Enzyme class {class_key!r} acts on {len(on)} pools of the enzyme network that starts from "
+                f"{entry!r} ({', '.join(on)}). One enzyme acting on two substrates of one system competes for its "
+                "active site, which independent Michaelis-Menten processes do not represent, and FungMod binds no "
+                "competing-substrate law yet. Narrow the class's compatible substrate classes, or run the pools in "
+                "separate datasets.",
+            )
+    if not acting[entry]:
+        context.add(
+            USER_DATASET_MANIFEST,
+            None,
+            _NETWORK_ENTRY_COLUMN,
+            f"No declared enzyme class acts on entry substrate {entry!r}, so the network that starts from it has no "
+            "process; declare a class that acts on it, or remove the entry.",
+        )
+    members = tuple(class_key for class_key in class_order if any(class_key in acting[pool] for pool in pools))
+    declared: dict[str, set[str]] = {}
+    for item in parsed.strain_classes:
+        declared.setdefault(item.strain_id, set()).add(item.class_key)
+    strains: list[str] = []
+    for strain in parsed.strains.values():
+        have = declared.get(strain.strain_id, set()).intersection(members)
+        if not have:
+            continue
+        strains.append(strain.strain_id)
+        missing = tuple(class_key for class_key in members if class_key not in have)
+        if missing and (strain.strain_id, missing) not in reported_strains:
+            reported_strains.add((strain.strain_id, missing))
+            context.add(
+                "strains.csv",
+                strain.row,
+                "strain_id",
+                f"Strain {strain.strain_id!r} declares {', '.join(sorted(have))} of the enzyme network that starts "
+                f"from {entry!r} but not {', '.join(missing)}. One network serves every strain of a dataset (FungMod "
+                "selects a process by enzyme class and substrate class), so its strains must declare the same "
+                "classes; put strains with other enzyme sets in separate datasets.",
+            )
+    processes: list[_NetworkProcess] = []
+    for pool in pools:
+        for class_key in acting[pool]:
+            pair = (class_key, pool)
+            form = _pair_form(parsed, pair)
+            if form == RATE_FORM_PH_IONIZATION:
+                rows = [row for row in parsed.kinetics if row.pair_key == pair and row.quantity in PH_IONIZATION_QUANTITIES]
+                file, line = ("kinetics.csv", min(row.row for row in rows)) if rows else _first_class_row(parsed, class_key)
+                context.add(
+                    file,
+                    line,
+                    "quantity" if rows else "enzyme_class",
+                    f"Enzyme class {class_key!r} runs the pH-ionization form on {pool!r}, which an enzyme network does "
+                    "not bind in this version (its processes are homogeneous Michaelis-Menten laws in the kcat or "
+                    "Vmax form). Run pH-ionization cases in a dataset without enzyme_network.",
+                )
+                continue
+            reactive = pair in parsed.reactivity_pairs and pool == entry and pool not in intermediates
+            processes.append(_NetworkProcess(class_key=class_key, pool=pool, form=form, reactive=reactive))
+    entry_rows = _network_entry_rows(parsed, context, entry=entry, classes=acting[entry], strains=strains)
+    names: dict[str, str] = {}
+    for role, state in _network_state_names(parsed, pools, product, processes).items():
+        if state in names:
+            context.add(
+                USER_DATASET_MANIFEST,
+                None,
+                _NETWORK_ENTRY_COLUMN,
+                f"The enzyme network that starts from {entry!r} would give the state {state!r} to both {names[state]} "
+                f"and {role}; rename a substrate, product or enzyme class.",
+            )
+        names[state] = role
+    if len(context.issues) > count:
+        return None
+    return _Network(
+        entry=entry,
+        pools=pools,
+        product=product,
+        processes=tuple(processes),
+        classes=members,
+        strains=tuple(strains),
+        entry_rows=MappingProxyType(entry_rows),
+    )
+
+
+def _network_entry_rows(
+    parsed: _Parsed,
+    context: _Context,
+    *,
+    entry: str,
+    classes: Sequence[str],
+    strains: Sequence[str],
+) -> dict[tuple[str, str], _Kinetics]:
+    """The entry's initial-concentration row per (strain, condition); the rows of its classes must agree."""
+
+    by_case: dict[tuple[str, str], list[_Kinetics]] = {}
+    for row in parsed.kinetics:
+        if (
+            row.quantity == "substrate_initial_concentration"
+            and row.substrate_id == entry
+            and row.class_key in classes
+            and row.strain_id in strains
+        ):
+            by_case.setdefault((row.strain_id, row.condition_id), []).append(row)
+    chosen: dict[tuple[str, str], _Kinetics] = {}
+    for key, rows in by_case.items():
+        ordered = sorted(rows, key=lambda item: (list(classes).index(item.class_key), item.row))
+        first = ordered[0]
+        for other in ordered[1:]:
+            if (other.value, other.lower, other.upper, other.units) != (first.value, first.lower, first.upper, first.units):
+                context.add(
+                    "kinetics.csv",
+                    other.row,
+                    "value",
+                    f"Rows {first.row} and {other.row} give different initial concentrations of {entry!r} for strain "
+                    f"{key[0]!r} at condition {key[1]!r} ({_kinetics_value_text(first)} and "
+                    f"{_kinetics_value_text(other)}). The classes of an enzyme network act on one pool, whose initial "
+                    "concentration is one value; state it identically (value or range and units) on every class's row.",
+                )
+        chosen[key] = first
+    return chosen
+
+
+def _validate_network_inhibitors(parsed: _Parsed, context: _Context) -> None:
+    """A ki row names a pool released downstream of its own pool; one inhibitor per process."""
+
+    processes = {
+        (process.class_key, process.pool): network
+        for network in parsed.networks.values()
+        for process in network.processes
+    }
+    inhibitors: dict[tuple[str, str], tuple[str, int]] = {}
+    for row in parsed.kinetics:
+        if row.quantity != INHIBITION_CONSTANT_QUANTITY:
+            continue
+        network = processes.get(row.pair_key)
+        if network is None:
+            # The pair belongs to a network refused above, or to none; the refusal names the reason.
+            continue
+        downstream = network.downstream(row.substrate_id)
+        if row.inhibitor not in downstream:
+            context.add(
+                "kinetics.csv",
+                row.row,
+                INHIBITOR_COLUMN,
+                f"inhibitor {row.inhibitor!r} is not a pool the enzyme network releases downstream of "
+                f"{row.substrate_id!r} (released after it: {', '.join(downstream)}). ki binds competitive inhibition "
+                "of a process by a product of the network; inhibition by the substrate itself or by an upstream pool "
+                "is another law, which FungMod does not bind.",
+            )
+            continue
+        bound = inhibitors.setdefault(row.pair_key, (row.inhibitor, row.row))
+        if bound[0] != row.inhibitor:
+            context.add(
+                "kinetics.csv",
+                row.row,
+                INHIBITOR_COLUMN,
+                f"Row {bound[1]} names {bound[0]!r} as the inhibitor of {row.class_key!r} on {row.substrate_id!r} and "
+                f"row {row.row} names {row.inhibitor!r}. One process takes one competitive inhibitor: the core binds "
+                "at most one competitive-inhibition law to a process and composes no two of them, and every strain "
+                "and condition of a process shares one template.",
+            )
+    for network in list(parsed.networks.values()):
+        network_processes = tuple(
+            replace(process, inhibitor=inhibitors.get((process.class_key, process.pool), ("", 0))[0])
+            for process in network.processes
+        )
+        parsed.networks[network.entry] = replace(network, processes=network_processes)
+
+
+def _network_pool_role(network_pools: Sequence[str], pool: str) -> str:
+    """The template state role of a pool: ``substrate`` for the entry, ``intermediate_<position>`` after it."""
+
+    position = list(network_pools).index(pool)
+    return "substrate" if position == 0 else f"intermediate_{position}"
+
+
+def _network_enzyme_role(class_key: str) -> str:
+    return f"enzyme_{class_key}"
+
+
+def _network_next_role(network: _Network, pool: str) -> str:
+    position = network.pools.index(pool)
+    return "product" if position == len(network.pools) - 1 else _network_pool_role(network.pools, network.pools[position + 1])
+
+
+def _network_inhibitor_role(network: _Network, inhibitor: str) -> str:
+    return "product" if inhibitor == network.product else _network_pool_role(network.pools, inhibitor)
+
+
+def _network_state_names(
+    parsed: _Parsed,
+    pools: Sequence[str],
+    product: str,
+    processes: Sequence[_NetworkProcess],
+) -> dict[str, str]:
+    names = {
+        _network_pool_role(pools, pool): f"{parsed.substrates[pool].registry_id or pool}_concentration" for pool in pools
+    }
+    names["product"] = f"{product}_concentration"
+    for process in processes:
+        if process.form in _ENZYME_FORMS:
+            names[_network_enzyme_role(process.class_key)] = f"{process.class_key}_concentration"
+    return names
+
+
+def _network_roles(network: _Network) -> tuple[tuple[str, str, str, str], ...]:
+    """(template role, kinetics quantity, enzyme class, pool) of every parameter role of a network, in record order."""
+
+    roles: list[tuple[str, str, str, str]] = [(_NETWORK_INITIAL_ROLE, "substrate_initial_concentration", "", network.entry)]
+    for process in network.processes:
+        key, pool = process.class_key, process.pool
+        roles.append((f"km__{key}__{pool}", "km", key, pool))
+        if process.form == RATE_FORM_KCAT:
+            roles.append((f"kcat__{key}__{pool}", "kcat", key, pool))
+            roles.append((f"enzyme_initial_concentration__{key}", "enzyme_concentration", key, pool))
+        else:
+            roles.append((f"vmax__{key}__{pool}", "vmax", key, pool))
+        if process.reactive:
+            roles.append((f"{REACTIVITY_EXPONENT_ROLE}__{key}__{pool}", REACTIVITY_EXPONENT_ROLE, key, pool))
+        if process.inhibitor:
+            roles.append((f"ki__{key}__{pool}", INHIBITION_CONSTANT_QUANTITY, key, pool))
+    return tuple(roles)
+
+
+def _network_symbol(namespace: _Namespace, network: _Network, role: str) -> str:
+    return namespace.id("network", network.entry, role)
+
+
+def _network_template_id(namespace: _Namespace, network: _Network) -> str:
+    return namespace.id(network.entry, "enzyme_network_template")
+
+
+def _network_process_id(namespace: _Namespace, process: _NetworkProcess) -> str:
+    return namespace.id(process.class_key, process.pool, _PROCESS_ID_SUFFIX[USER_DATASET_PROCESS_TYPE])
+
+
+def _network_pool_name(parsed: _Parsed, network: _Network, pool: str) -> str:
+    return pool if pool == network.product else parsed.substrates[pool].name
+
+
+def _generate_network_records(
+    parsed: _Parsed,
+    context: _Context,
+    generated: _Generated,
+    namespace: _Namespace,
+) -> None:
+    """Emit the parameter records, case template and compatibilities of every enzyme network.
+
+    Every strain of a network gets one record per role and condition: the
+    kinetics.csv row of its class and pool (or the derived record of a Vmax
+    route or an enzyme dose), or an explicit gap with the measurement request of
+    the single-class route. The records carry the network's own symbols and are
+    selected per case (strain, entry substrate, condition); their provenance
+    names the class and pool. One compatibility per class acting on the entry
+    points to the one template, which is scientific only when every record bound
+    to it is exact and scientific-eligible.
+    """
+
+    rows_by_case: dict[tuple[str, str, str, str], dict[str, _Kinetics]] = {}
+    constant_conditions: dict[tuple[str, str, str], set[str]] = {}
+    for row in parsed.kinetics:
+        rows_by_case.setdefault(row.case_key, {})[row.quantity] = row
+        if row.quantity in _KINETIC_CONSTANT_QUANTITIES:
+            constant_conditions.setdefault((row.strain_id, row.class_key, row.substrate_id), set()).add(row.condition_id)
+    for network in parsed.networks.values():
+        entry = parsed.substrates[network.entry]
+        processes = {(process.class_key, process.pool): process for process in network.processes}
+        network_records: list[ParameterRecord] = []
+        for strain_id in network.strains:
+            strain = parsed.strains[strain_id]
+            items = {item.class_key: item for item in parsed.strain_classes if item.strain_id == strain_id}
+            for condition in parsed.conditions.values():
+                entry_row = network.entry_rows.get((strain_id, condition.condition_id))
+                for role, quantity, class_key, pool in _network_roles(network):
+                    if not class_key:
+                        # The entry's initial concentration: one pool, stated on the rows of its classes.
+                        class_key = entry_row.class_key if entry_row is not None else network.processes[0].class_key
+                        pool = network.entry
+                    process = processes[(class_key, pool)]
+                    case_rows = dict(rows_by_case.get((strain_id, class_key, pool, condition.condition_id), {}))
+                    if pool == network.entry and entry_row is not None:
+                        case_rows.setdefault("substrate_initial_concentration", entry_row)
+                    measured = constant_conditions.get((strain_id, class_key, pool), set())
+                    item = items[class_key]
+                    case = _CaseContext(
+                        strain=strain,
+                        info=parsed.classes[class_key],
+                        substrate=parsed.substrates[pool],
+                        condition=condition,
+                        namespace=namespace,
+                        case_rows=case_rows,
+                        form_started=(class_key, pool) in parsed.pair_forms,
+                        laws=(),
+                        form=process.form,
+                        genome=item.genome if item.genome_only else None,
+                        measured_elsewhere=(
+                            ()
+                            if condition.condition_id in measured
+                            else tuple(other for other in parsed.conditions.values() if other.condition_id in measured)
+                        ),
+                        inhibitor_name=(
+                            _network_pool_name(parsed, network, process.inhibitor) if process.inhibitor else ""
+                        ),
+                    )
+                    mapping, origin = _role_mapping(quantity, case)
+                    if role == _NETWORK_INITIAL_ROLE and entry_row is None:
+                        mapping = _network_initial_gap(mapping, network=network, entry=entry, case=case)
+                    mapping = _as_network_record(
+                        mapping,
+                        namespace=namespace,
+                        network=network,
+                        entry=entry,
+                        role=role,
+                        strain=strain,
+                        condition=condition,
+                        class_key="" if role == _NETWORK_INITIAL_ROLE else class_key,
+                        pool=pool,
+                    )
+                    record = _emit(generated, context, "parameter_records", mapping, origin=origin)
+                    if isinstance(record, ParameterRecord):
+                        network_records.append(record)
+        scientific = bool(network_records) and all(
+            record.value.is_exact and parameter_record_is_mode_eligible(record, mode="scientific")
+            for record in network_records
+        )
+        origin = ("substrates.csv", entry.row, "substrate_id")
+        _emit(
+            generated,
+            context,
+            "case_templates",
+            _network_template_mapping(network, parsed=parsed, namespace=namespace, scientific=scientific),
+            origin=origin,
+        )
+        for class_key in network.classes:
+            if (class_key, network.entry) in processes:
+                _emit(
+                    generated,
+                    context,
+                    "process_compatibility",
+                    _network_compatibility_mapping(network, class_key, parsed=parsed, namespace=namespace),
+                    origin=origin,
+                )
+
+
+def _network_initial_gap(
+    mapping: Mapping[str, Any],
+    *,
+    network: _Network,
+    entry: _Substrate,
+    case: _CaseContext,
+) -> dict[str, Any]:
+    """Word the entry's missing initial concentration as the network's, not as one class's."""
+
+    units = mapping["value"].get("units")
+    units_text = units if units else _GAP_UNITS_TEXT.get("substrate_initial_concentration", "concentration units")
+    request = (
+        f"Specify the initial {entry.name} concentration of the enzyme network of {case.strain.name} at "
+        f"{_condition_text(case.condition)} ({units_text}); every class of the network that acts on {entry.name} "
+        "acts on this one pool."
+    )
+    provenance = dict(mapping["provenance"])
+    provenance["measurement_request"] = request
+    return {
+        **mapping,
+        "name": (
+            f"Missing initial {entry.name} concentration of the enzyme network of {case.strain.name} at "
+            f"{case.condition.condition_id} ({case.namespace.dataset_id})"
+        ),
+        "provenance": provenance,
+    }
+
+
+def _as_network_record(
+    mapping: Mapping[str, Any],
+    *,
+    namespace: _Namespace,
+    network: _Network,
+    entry: _Substrate,
+    role: str,
+    strain: _Strain,
+    condition: _Condition,
+    class_key: str,
+    pool: str,
+) -> dict[str, Any]:
+    """Re-key a single-class record as one role of a network: its symbol, selectors and identifier.
+
+    The value, maturity, allowed use and provenance stay those of the row (or
+    derivation, or gap); the provenance adds the network, the role, the class
+    and the pool. The enzyme class selector is left empty, because one network
+    serves the compatibility of every class acting on its entry substrate.
+    """
+
+    gap = mapping["maturity"] == USER_DATASET_MATURITY_GAP
+    provenance = dict(mapping["provenance"])
+    dataset = dict(provenance[USER_DATASET_PROVENANCE_KEY])
+    dataset["enzyme_network"] = {
+        "entry_substrate": network.entry,
+        "role": role,
+        "enzyme_class": namespace.id(class_key) if class_key else None,
+        "pool": pool,
+    }
+    provenance[USER_DATASET_PROVENANCE_KEY] = dataset
+    record_id = namespace.id("network", network.entry, strain.strain_id, condition.condition_id, role)
+    return {
+        **mapping,
+        "record_id": f"{record_id}__gap" if gap else record_id,
+        "name": f"{mapping['name']} in the enzyme network from {entry.name}",
+        "provenance": provenance,
+        "parameter_symbol": _network_symbol(namespace, network, role),
+        "process_type": USER_DATASET_NETWORK_PROCESS_TYPE,
+        "enzyme_class": None,
+        "substrate_class": entry.substrate_class,
+        "substrate_id": entry.registry_id or namespace.id(entry.substrate_id),
+        "environment_id": namespace.id(condition.condition_id),
+    }
+
+
+_NETWORK_LIMITATIONS = (
+    "Parallel enzyme classes on one pool act additively and independently: each runs its own Michaelis-Menten law "
+    "on the shared pool and their rates add. No competition between classes for substrate binding or adsorption "
+    "sites, no synergy (for example endo- and exo-acting cooperation), and no interaction between the enzymes is "
+    "represented.",
+    "Pools are linked only where a substrate's substrates.csv product is another substrate_id of the dataset, with "
+    "the user-stated yield; intermediate pools and the final product start at zero, and every pool is reported in "
+    "the units of the entry's initial concentration.",
+    "Non-competitive, uncompetitive and mixed inhibition, inhibition of one process by several products, substrate "
+    "inhibition, competing substrates of one enzyme and transglycosylation are not represented.",
+    "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or uptake model; no temperature or pH "
+    "response law is bound, so the values apply at the condition of their rows only.",
+)
+
+
+def _network_inhibition_limitation(parsed: _Parsed, network: _Network, process: _NetworkProcess) -> str:
+    info = parsed.classes[process.class_key]
+    pool = parsed.substrates[process.pool].name
+    if not process.inhibitor:
+        return (
+            f"No product inhibition is represented for {info.name} on {pool}: kinetics.csv gives no ki for this "
+            "process, and FungMod assumes none."
+        )
+    inhibitor = _network_pool_name(parsed, network, process.inhibitor)
+    return (
+        f"Competitive product inhibition of {info.name} on {pool} by {inhibitor}: {COMPETITIVE_INHIBITION_EQUATION}, "
+        f"the existing competitive_inhibition modifier with this process's own Km and the Ki of kinetics.csv (law "
+        f"provenance {COMPETITIVE_INHIBITION_LAW_SOURCE}, maturity {COMPETITIVE_INHIBITION_LAW_MATURITY}; the source "
+        "supports the equation, not the Ki value)."
+    )
+
+
+def _network_weights(parsed: _Parsed, network: _Network) -> dict[str, float]:
+    """Closure weights from the yields: the final product weighs 1, each pool its yield times the next pool's."""
+
+    weights = {"product": 1.0}
+    weight = 1.0
+    for pool in reversed(network.pools):
+        weight = float(parsed.substrates[pool].product_yield) * weight
+        weights[_network_pool_role(network.pools, pool)] = weight
+    return weights
+
+
+def _network_template_mapping(
+    network: _Network,
+    *,
+    parsed: _Parsed,
+    namespace: _Namespace,
+    scientific: bool,
+) -> dict[str, Any]:
+    """The enzyme_network template of one network: one homogeneous Michaelis-Menten process per class and pool."""
+
+    entry = parsed.substrates[network.entry]
+    last = parsed.substrates[network.pools[-1]]
+    template_id = _network_template_id(namespace, network)
+    states = _network_state_names(parsed, network.pools, network.product, network.processes)
+    simulation = namespace.manifest["simulation"]
+    mode = "scientific" if scientific else "exploratory"
+    initial_state_mapping: dict[str, Any] = {
+        "substrate": {"parameter_role": _NETWORK_INITIAL_ROLE, "units_from_role": _NETWORK_INITIAL_ROLE},
+    }
+    for pool in network.pools[1:]:
+        initial_state_mapping[_network_pool_role(network.pools, pool)] = {
+            "value": 0.0,
+            "units_from_role": _NETWORK_INITIAL_ROLE,
+        }
+    initial_state_mapping["product"] = {"value": 0.0, "units_from_role": _NETWORK_INITIAL_ROLE}
+    for process in network.processes:
+        if process.form in _ENZYME_FORMS:
+            role = f"enzyme_initial_concentration__{process.class_key}"
+            initial_state_mapping[_network_enzyme_role(process.class_key)] = {"parameter_role": role, "units_from_role": role}
+    product_maps = []
+    for pool in network.pools:
+        substrate = parsed.substrates[pool]
+        next_role = _network_next_role(network, pool)
+        released = _network_pool_name(parsed, network, network.downstream(pool)[0])
+        unit = "g" if substrate.is_solid else "mol"
+        product_maps.append(
+            {
+                "id": namespace.id("network", network.entry, pool, "release_map"),
+                "name": f"{substrate.name} to {released} in the enzyme network from {entry.name} ({namespace.dataset_id})",
+                "product_map_type": "stoichiometric",
+                "reactants": {_network_pool_role(network.pools, pool): 1.0},
+                "products": {next_role: float(substrate.product_yield)},
+                "notes": (
+                    f"User-stated yield {_number_text(float(substrate.product_yield))} {unit} {substrate.product} per "
+                    f"{unit} {substrate.substrate_id} consumed (substrates.csv row {substrate.row})."
+                ),
+            }
+        )
+    process_templates = []
+    for process in network.processes:
+        info = parsed.classes[process.class_key]
+        pool = parsed.substrates[process.pool]
+        pool_role = _network_pool_role(network.pools, process.pool)
+        released = _network_pool_name(parsed, network, network.downstream(process.pool)[0])
+        state_roles: dict[str, str] = {"substrate": pool_role, "product": _network_next_role(network, process.pool)}
+        parameter_roles = {"km": f"km__{process.class_key}__{process.pool}"}
+        if process.form == RATE_FORM_KCAT:
+            state_roles["enzyme"] = _network_enzyme_role(process.class_key)
+            parameter_roles["kcat"] = f"kcat__{process.class_key}__{process.pool}"
+        else:
+            parameter_roles["vmax"] = f"vmax__{process.class_key}__{process.pool}"
+        modifiers: list[dict[str, Any]] = []
+        if process.reactive:
+            modifiers.append(
+                {
+                    "type": SUBSTRATE_REACTIVITY_MODIFIER_TYPE,
+                    "substrate_state_role": pool_role,
+                    "reference_concentration_role": _NETWORK_INITIAL_ROLE,
+                    "exponent_role": f"{REACTIVITY_EXPONENT_ROLE}__{process.class_key}__{process.pool}",
+                }
+            )
+        if process.inhibitor:
+            modifiers.append(
+                {
+                    "type": COMPETITIVE_INHIBITION_MODIFIER_TYPE,
+                    "substrate_state_role": pool_role,
+                    "inhibitor_state_role": _network_inhibitor_role(network, process.inhibitor),
+                    "michaelis_constant_role": parameter_roles["km"],
+                    "inhibition_constant_role": f"ki__{process.class_key}__{process.pool}",
+                    "primary_source": COMPETITIVE_INHIBITION_LAW_SOURCE,
+                    "maturity": COMPETITIVE_INHIBITION_LAW_MATURITY,
+                }
+            )
+        spec: dict[str, Any] = {
+            "id": _network_process_id(namespace, process),
+            "enzyme_class": namespace.id(process.class_key),
+            "process_type": USER_DATASET_PROCESS_TYPE,
+            "state_roles": state_roles,
+            "parameter_roles": parameter_roles,
+            "rate_units_from_state_role": pool_role,
+            "product_map": namespace.id("network", network.entry, process.pool, "release_map"),
+            "assumptions": [
+                f"{info.name} consumes {pool.name} by its own homogeneous Michaelis-Menten law ({_FORM_LABEL[process.form]}"
+                " form), independently of every other class of the network; processes on one pool add their rates.",
+                f"Consumed {pool.name} is released as {released} with the user-stated yield of substrates.csv.",
+            ],
+        }
+        if modifiers:
+            spec["modifiers"] = modifiers
+        process_templates.append(spec)
+    loader = "generic_solid" if entry.is_solid else "generic_dissolved"
+    substrate_entities = []
+    for pool in network.pools:
+        substrate = parsed.substrates[pool]
+        record_id = substrate.registry_id or namespace.id(pool)
+        substrate_entities.append(
+            {
+                "id": record_id,
+                "loader": loader,
+                "data": {
+                    "kind": "substrate",
+                    "name": substrate.name,
+                    "substrate_type": loader,
+                    "chemical_class": substrate.substrate_class,
+                    "physical_state": substrate.physical_state,
+                    "bond_types": list(substrate.bond_classes),
+                    "accessible_bonds": list(substrate.bond_classes),
+                    "required_enzyme_classes": [
+                        namespace.id(process.class_key) for process in network.processes if process.pool == pool
+                    ],
+                    "degradation_products": [
+                        {
+                            "name": substrate.product,
+                            "source": substrate.source,
+                            "notes": f"Product stated in substrates.csv row {substrate.row} of user dataset "
+                            f"{namespace.dataset_id}.",
+                        }
+                    ],
+                    "completeness": "partial",
+                    "default_degradation_model": "unknown" if substrate.is_solid else "homogeneous_dissolved",
+                    "water_activity_dependence": "unknown",
+                    "provenance": {
+                        "source": substrate.source,
+                        "confidence_level": "user_supplied",
+                        "notes": (
+                            f"Pool of the enzyme network from {entry.name}"
+                            + (
+                                "; a suspended solid represented as a bulk dry mass per volume, without surface area, "
+                                "crystallinity or particle size."
+                                if substrate.is_solid
+                                else "; dissolved and well mixed."
+                            )
+                        ),
+                    },
+                    "parameters": [],
+                },
+            }
+        )
+    enzymes = [
+        {
+            "id": namespace.id(class_key),
+            "data": {
+                "kind": "enzyme",
+                "name": parsed.classes[class_key].name,
+                "enzyme_class": namespace.id(class_key),
+                "target_bond_types": list(parsed.classes[class_key].target_bond_classes),
+                "target_substrate_classes": list(parsed.classes[class_key].compatible_substrate_classes),
+                "target_substrate_names": [
+                    parsed.substrates[process.pool].name for process in network.processes if process.class_key == class_key
+                ],
+                "validity_labels": [USER_DATASET_RECORD_MATURITY, "enzyme_network_member"],
+                "provenance": {
+                    "source": parsed.classes[class_key].source,
+                    "measurement_method": f"enzyme class of a user enzyme network ({NETWORK_MANIFEST_FIELD})",
+                    "confidence_level": "user_supplied",
+                    "notes": "Acts on its pool through its own Michaelis-Menten process.",
+                    "validity_range": f"Enzyme-network cases of user dataset {namespace.dataset_id} only",
+                    "units": "not_applicable",
+                },
+                "catalytic_parameters": [],
+                "adsorption_parameters": [],
+                "parameters": [],
+            },
+        }
+        for class_key in network.classes
+    ]
+    state_species: dict[str, dict[str, str]] = {
+        _network_pool_role(network.pools, pool): {
+            "entity_type": "substrate",
+            "species": parsed.substrates[pool].registry_id or namespace.id(pool),
+        }
+        for pool in network.pools
+    }
+    state_species["product"] = {"entity_type": "product", "species": network.product}
+    for process in network.processes:
+        if process.form in _ENZYME_FORMS:
+            state_species[_network_enzyme_role(process.class_key)] = {
+                "entity_type": "enzyme",
+                "species": namespace.id(process.class_key),
+            }
+    chain = " -> ".join((*network.pools, network.product))
+    basis = "dry mass per volume (yields g/g)" if entry.is_solid else f"amount per volume (yields {_YIELD_BASIS})"
+    vmax_processes = [process for process in network.processes if process.form == RATE_FORM_VMAX]
+    limitations = [
+        (
+            f"Enzyme network of user dataset {namespace.dataset_id} from {entry.substrate_id}: the pools {chain} "
+            f"({basis}), with {len(network.processes)} homogeneous Michaelis-Menten process(es) of the classes "
+            f"{', '.join(network.classes)}."
+        ),
+        *_NETWORK_LIMITATIONS,
+        *(_network_inhibition_limitation(parsed, network, process) for process in network.processes),
+    ]
+    if vmax_processes:
+        limitations.append(
+            "Processes in the Vmax form ("
+            + ", ".join(f"{process.class_key} on {process.pool}" for process in vmax_processes)
+            + f"): {_RATE_FORM_LIMITATION[RATE_FORM_VMAX]}"
+        )
+    if entry.is_solid:
+        limitations.extend(_solid_limitations(any(process.reactive for process in network.processes)))
+    rows = sorted(
+        {
+            row.row
+            for row in parsed.kinetics
+            if (row.class_key, row.substrate_id) in {(process.class_key, process.pool) for process in network.processes}
+        }
+    )
+    return {
+        "record_id": template_id,
+        "case_template_id": template_id,
+        "name": f"Enzyme network from {entry.name} template ({namespace.dataset_id})",
+        "maturity": USER_DATASET_RECORD_MATURITY,
+        "provenance": {
+            "source": namespace.source,
+            "confidence_level": "user_supplied",
+            USER_DATASET_PROVENANCE_KEY: namespace.provenance(
+                USER_DATASET_MANIFEST,
+                None,
+                substrate_row=entry.row,
+                kinetics_rows=rows,
+                network_field=NETWORK_MANIFEST_FIELD,
+                config_mode_rule=(
+                    "scientific only when every parameter record bound to this template is exact and "
+                    "scientific-eligible; otherwise exploratory"
+                ),
+            ),
+        },
+        "schema_version": CASE_TEMPLATE_SCHEMA_VERSION,
+        "process_type": USER_DATASET_NETWORK_PROCESS_TYPE,
+        "state_roles": dict(states),
+        "initial_state_mapping": initial_state_mapping,
+        # The release of the final product, as the single-step templates state it; every step's map is in
+        # process_state_metadata.product_maps, and each released role's yield from its precursor is listed below.
+        "product_map": {
+            "id": namespace.id("network", network.entry, last.substrate_id, "release_map"),
+            "product_map_type": "stoichiometric",
+            "substrate_state_role": _network_pool_role(network.pools, last.substrate_id),
+            "product_state_role": "product",
+            "stoichiometric_yield": float(last.product_yield),
+            "notes": "The last release step of the network; the yield of every step is in stoichiometric_yields.",
+        },
+        "stoichiometric_yields": {
+            _network_next_role(network, pool): float(parsed.substrates[pool].product_yield) for pool in network.pools
+        },
+        "time_grid": {
+            "start": 0.0,
+            "stop": float(simulation["duration"]),
+            "points": int(simulation["points"]),
+            "units": str(simulation["units"]),
+            "notes": f"From the simulation block of user dataset {namespace.dataset_id}.",
+        },
+        "observable_roles": [*states, "degradation_rate", "product_release_rate"],
+        "output_state_roles": dict(states),
+        "process_state_metadata": {
+            "config_name": (
+                f"User dataset {namespace.dataset_id}: enzyme network of {{fungus_id}} from {_template_text(entry.name)}"
+            ),
+            "config_mode": mode,
+            "config_maturity": mode,
+            "parameter_set_id": namespace.id(network.entry, "network_parameters"),
+            "public_path": True,
+            # Concentration-only: the network reads no vessel volume, so none is claimed.
+            "geometry": None,
+            "entities": {"substrates": substrate_entities, "enzymes": enzymes},
+            "state_species": state_species,
+            "product_maps": product_maps,
+            "process_templates": process_templates,
+            "conservation": {
+                "id": "network_pool_balance",
+                "closed_system": True,
+                "state_weights": _network_weights(parsed, network),
+            },
+        },
+        "limitations": limitations,
+        "validity_notes": [
+            f"Values come from user dataset {namespace.dataset_id} (sha256 {namespace.digest}); FungMod did not "
+            "check them against an external source.",
+            "The closure weights are the user-stated yields multiplied along the chain (the final product weighs 1), "
+            "so the conservation check tests the integration, not the yields.",
+            *([_SOLID_VALIDITY_NOTE] if entry.is_solid else []),
+        ],
+        "notes": (
+            f"Enzyme-network template generated from user dataset {namespace.dataset_id} for the network that starts "
+            f"from {network.entry}: pools {chain}; processes "
+            + ", ".join(f"{process.class_key} on {process.pool}" for process in network.processes)
+            + "."
+        ),
+    }
+
+
+def _network_compatibility_mapping(
+    network: _Network,
+    class_key: str,
+    *,
+    parsed: _Parsed,
+    namespace: _Namespace,
+) -> dict[str, Any]:
+    info = parsed.classes[class_key]
+    entry = parsed.substrates[network.entry]
+    symbols = {role: _network_symbol(namespace, network, role) for role, *_rest in _network_roles(network)}
+    return {
+        "record_id": namespace.id(class_key, network.entry, USER_DATASET_NETWORK_PROCESS_TYPE),
+        "name": f"{info.name} on {entry.name} enzyme network ({namespace.dataset_id})",
+        "maturity": USER_DATASET_RECORD_MATURITY,
+        "provenance": {
+            "source": namespace.source,
+            "confidence_level": "user_supplied",
+            USER_DATASET_PROVENANCE_KEY: namespace.provenance("substrates.csv", entry.row),
+        },
+        "enzyme_class": namespace.id(class_key),
+        "substrate_class": entry.substrate_class,
+        "required_bond_classes": list(_shared_bonds(info, entry) or ()),
+        "process_type": USER_DATASET_NETWORK_PROCESS_TYPE,
+        "required_parameters": list(symbols.values()),
+        "parameter_roles": dict(symbols),
+        "product_map_required": True,
+        "case_template_id": _network_template_id(namespace, network),
+        "notes": (
+            f"Enzyme-network compatibility generated from user dataset {namespace.dataset_id}: {class_key} acts on "
+            f"the entry substrate {network.entry} through the bond classes listed, and the case runs the whole network "
+            f"of classes {', '.join(network.classes)}. Every class acting on the entry has such a record, all pointing "
+            "to the one network template."
+        ),
+    }
+
+
+def _network_report(parsed: _Parsed, *, dataset_id: str) -> tuple[Mapping[str, Any], ...]:
+    """One entry per enzyme network: its pools, links, processes, strains and generated ids."""
+
+    namespace = _Namespace(dataset_id=dataset_id, digest="", manifest={})
+    entries: list[Mapping[str, Any]] = []
+    for network in parsed.networks.values():
+        entries.append(
+            MappingProxyType(
+                {
+                    "entry_substrate": network.entry,
+                    "pools": list(network.pools),
+                    "product": network.product,
+                    "links": [
+                        {
+                            "substrate_id": pool,
+                            "releases": network.downstream(pool)[0],
+                            "yield": float(parsed.substrates[pool].product_yield),
+                            "yield_basis": parsed.substrates[pool].yield_basis,
+                            "substrates_row": parsed.substrates[pool].row,
+                        }
+                        for pool in network.pools
+                    ],
+                    "processes": [
+                        {
+                            "enzyme_class": process.class_key,
+                            "pool": process.pool,
+                            "rate_form": _FORM_LABEL[process.form],
+                            "process_id": _network_process_id(namespace, process),
+                            "inhibitor": process.inhibitor or None,
+                            "reactivity_factor": process.reactive,
+                        }
+                        for process in network.processes
+                    ],
+                    "enzyme_classes": list(network.classes),
+                    "strains": list(network.strains),
+                    "substrate_record_id": parsed.substrates[network.entry].registry_id
+                    or namespace.id(network.entry),
+                    "case_template_id": _network_template_id(namespace, network),
+                    "process_compatibility_ids": [
+                        namespace.id(process.class_key, network.entry, USER_DATASET_NETWORK_PROCESS_TYPE)
+                        for process in network.processes
+                        if process.pool == network.entry
+                    ],
+                }
+            )
+        )
+    return tuple(entries)
 
 
 def _overlay_issues(dataset: UserDataset, base: FungModRegistry) -> list[dict[str, Any]]:

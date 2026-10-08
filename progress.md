@@ -26,6 +26,174 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## USERDATA-010 Several Enzyme Classes Acting Together In User Data
+
+Status: `complete` for the stated scope (2026-10-07); the tenth increment of the
+user-supplied-data route. For the owner's goal ("fungus X on substrate Y in
+conditions Z ... the code calculates all the stuff"), a user-data case ran the
+ONE enzyme class the preflight selected (FIX-SELECT-001). A fungus secretes
+several enzymes: several classes on one substrate in parallel, classes acting on
+the products of others, products inhibiting enzymes. The compiled core already
+integrates several processes on shared states (each process one stoichiometric
+column, `rhs = sum_j N[:, j] v_j`) and already has a provenance-bound
+competitive-inhibition modifier (BIO-003); user data could reach neither. Now it
+can, opt-in, with no new numerics. (The Langmuir surface law, named
+USERDATA-010 in the USERDATA-009 entry, is renumbered USERDATA-011.)
+
+Representation: an `enzyme_network` block in `user_dataset.yml`
+(`entry_substrates: [...]`), not a per-request switch: the network is a modelling
+choice of the dataset, it enters the dataset digest, and the generated records
+are fixed at load time like every other user record. Without the block nothing
+changes. Competitive inhibition is a new `kinetics.csv` quantity `ki` with a new
+optional column `inhibitor` (refused on every other row), in network datasets
+only.
+
+Design decisions (design note kept outside the repository):
+
+- Composition, not a new law: a new outer process type `enzyme_network`
+  (`screening/enzyme_network.py`, required roles `substrate`, `product`)
+  assembled by the `culture_physiology` builder, generalised to
+  `build_composed_process_config_data(process_type, non_negative_validator_id,
+  fallback_label, ...)`; each inner process is the existing
+  `homogeneous_michaelis_menten` law with `rate_units_from_state_role`. The
+  BIO-002 chain assembler was not reused: its registry path is toy-only,
+  exact-only and carries CASE-001 provenance prose.
+- Additive parallel action: classes on one pool are independent Michaelis-Menten
+  processes whose rates add. This ignores competition for substrate binding or
+  adsorption sites and any synergy; every network template, the mechanism rows
+  and the limitations table say so.
+- Links from explicit data only: a substrate's `substrates.csv` product that
+  equals another `substrate_id` (never a name, alias or registry id). Each
+  substrate has one product, so a network is a chain of pools with any number
+  of parallel classes per pool; the chain ends at the first product that is no
+  dataset substrate (the final product).
+- One network per entry substrate, shared by the strains of the dataset (the
+  culture precedent: FungMod selects a compatibility by enzyme class and
+  substrate class, not by strain); strains with different member classes are
+  refused. Every class acting on the entry gets a compatibility pointing to the
+  one template; the records carry the network's own symbols, process type
+  `enzyme_network`, the entry's substrate selectors and an empty enzyme-class
+  selector, and name class and pool in provenance. Every class of a network
+  dataset lists `enzyme_network` only, so the preflight never chooses between a
+  network and one of its classes.
+- All or nothing: a member class without kinetics is a gap with the single-class
+  measurement request, and the network is underparameterized; a class the
+  strain has is never silently left out.
+- Inhibition binds the competitive modifier only: `Vmax S / (Km (1 + I / Ki) + S)`
+  with the process's own Km, the inhibitor's state, the user's Ki and the BIO-003
+  law provenance (`https://pubmed.ncbi.nlm.nih.gov/7985803/`, maturity
+  `literature_backed_software_tested`). The generic `product_inhibition`
+  factor `1 / (1 + P / Ki)` is not bound: its own assumption text disclaims a
+  mechanism and it carries no law provenance. Non-competitive, uncompetitive
+  and mixed forms are not implemented and are refused by construction. A
+  process without `ki` has no inhibition term and its template says so.
+- Cross-basis links (dry mass to molar) refused outright: the Michaelis-Menten
+  process writes its products in its substrate's units, and a molar-mass yield
+  would need a dimensional stoichiometric coefficient the core does not have
+  (new numerics; next task).
+
+Changed:
+
+- `screening/culture_physiology.py`: `build_composed_process_config_data`
+  (the culture builder delegates to it); `state_species` may use the entity
+  type `product`; process templates may bind the existing
+  `competitive_inhibition` and `substrate_reactivity` modifiers (the role
+  collector ignores `*_state_role` keys, which name states); an optional
+  process-template `enzyme_class` becomes output metadata
+  (`process_enzyme_classes` of the case-template config, written only when a
+  template names one). The shipped culture case assembles byte-identically.
+- `screening/enzyme_network.py` (new) and `screening/case_builder.py`: the
+  `enzyme_network` assembler (scientific and toy modes, template mode match,
+  required metadata as for cultures); exported from `fungal_model.screening`.
+- `api/user_data.py`: manifest block `enzyme_network` (shape checks); `ki`
+  quantity (amount per volume, positive; refused on solids) and `inhibitor`
+  column; `_validate_networks` (chains, cycles, ambiguous products, bases,
+  members, one pool per class per network, strain consistency, pH-ionization,
+  intermediate inputs, entry loadings, unused substrates, state-name
+  collisions, inhibitors downstream and one per process, `ki` outside a
+  network, tables not combined with networks); `_generate_network_records`
+  (records re-keyed from the single-class mappings, so values, evidence,
+  maturity, derived Vmax and enzyme records and gap requests are the existing
+  ones; the entry's gap names the network); `_network_template_mapping`
+  (pools, enzymes, one product map per pool, one process per class and pool
+  with its modifiers, closure weights from the yields, limitations per
+  process); `UserDataset.enzyme_networks`, `to_dict()` and `summary()`.
+- `api/result_tables.py`: `enzyme_network` mechanism family, law, state
+  variables, limitations and a `not_modelled` limitation row; one `process_law`
+  row per network process naming its class (`configured_by`); a `rate_modifier`
+  row per `competitive_inhibition` modifier. No column or allowed value
+  changed: output schema stays 2.2.0.
+- `api/user_data_assembly.py`: a network dataset as `user_data` is refused
+  (drafts are single-class tables and would drop the network).
+- `cli.py`: `fungmod check-data` prints the networks (chain with yields and
+  strains, one row per process with class, pool, rate form, inhibitor).
+- Fixtures `tests/fixtures/user_data/network_chain/` (two user classes,
+  polymer-like -> oligomer-like -> monomer-like) and
+  `tests/fixtures/user_data/network_parallel/` (two user classes in parallel on
+  one ester-like substrate, kcat and Vmax forms, `ki` of one class for the
+  released product); every value an illustrative estimate, with READMEs.
+- Docs: `docs/user-data.md` section "Several enzymes acting together" (law,
+  pools and links, `ki`, worked example with real `check-data` and `run`
+  output, generated records, gaps, refusals, what is and is not modelled) and
+  updates to the fixture list, manifest, `kinetics.csv` columns and
+  quantities, solid limits, generated-records table and limitations;
+  `docs/cli.md`; `docs/concepts/outputs.md` (mechanism rows);
+  `docs/capabilities.md`; `README.md`; `CHANGELOG.md`.
+
+Tests: new `tests/test_user_data_network.py` (41 test functions, 57 cases):
+links, processes, templates, records and symbols of the chain; byte-identical
+records of the nine earlier fixtures without the block (digests from an export
+of base commit 67c8a74); the registered assembler; the composition builder's
+competitive binding, class metadata, validator id and refusals (unsourced law,
+blank class, wrong outer process type); analytic checks on the
+simulated outputs: chain closure `8 P + 2 O + M = 40 mM` (`rtol` 1e-9), each
+process rate equal to its class's own law, state rates the stoichiometric sums
+of process rates, parallel rates adding, the competitive law
+`Vmax S / (Km (1 + P / Ki) + S)` on every output time, no Ki < Ki 200 uM <
+Ki 20 uM in remaining substrate, the parallel first-order regime
+`S0 exp(-(Vmax_A / Km_A + Vmax_B / Km_B) t)` (`rtol` 2e-3; observed 1.6e-4), a
+one-class network equal to the single-class case (`rtol` 1e-7; observed
+2.5e-13), two solid classes in parallel with the reactivity factor; scientific
+mode with measured rows (`scientific_exact_unvalidated`) and one estimate
+making it exploratory; gaps (a class without kinetics blocks the network with
+the single-class request; a condition without rows runs as a partial run; a Ki
+gap names the inhibitor); refusals (cycle, ambiguous product, cross-basis link,
+class on two pools, strains with different classes, intermediate inputs, an
+intermediate listed as an entry starting its own network, disagreeing entry
+loadings, five malformed `ki` rows, `inhibitor` on another row, two inhibitors
+of one process, `ki` outside a network and on a solid, pH-ionization, response
+laws and cultures in a network, five malformed manifest blocks, an unused
+substrate); assembly refusal; `fungmod check-data` (listing and a refusal as
+`file:row:column`) and `fungmod run` (exploratory exit 0; a blocked network
+condition with `--runnable-only`, exit 4). Guardrails: network fixture tokens
+added to the user-data token list; the network assembler gets its own
+no-organism-token test.
+
+Not changed: no process law, factory, modifier, solver, registry record,
+registry case template, rate form, fit, comparison or preflight status rule;
+datasets without `enzyme_network` generate byte-identical records; the shipped
+culture case assembles byte-identically (pinned digests).
+
+Scientific impact: a user's several enzyme classes can now act together in one
+simulation (substrate loss summed over the classes, intermediates formed and
+consumed, the final product released with the stated yields, threshold times
+and rates of the entry and the final product), and a measured competitive Ki
+slows the inhibited process exactly by the implemented law. The model is
+honest about what it is: independent, additive Michaelis-Menten processes;
+synergy, site competition and other inhibition forms remain absent, and the
+outputs say so.
+
+Compatibility: additive (an optional manifest block, a new quantity and column,
+new exported names, a new `UserDataset.enzyme_networks` field and
+`to_dict()`/`summary()` key, new mechanism rows only for network cases).
+
+Next task: bind `responses.csv` laws per network process (the composition
+builder already accepts environment modifiers); then pH-ionization processes,
+time courses of intermediates and fitting on networks; cross-basis links with
+an explicit molar-mass conversion need a dimensional product coefficient in
+the core (new numerics); competing substrates of one enzyme need a
+multi-substrate denominator (a new law).
+
 ## FETCH-001 A Fungus's Enzyme Repertoire From Its Name
 
 Status: `complete` for the stated scope (2026-10-07), with the live UniProt

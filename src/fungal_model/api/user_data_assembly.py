@@ -631,6 +631,13 @@ def _user_source(user_data: str | Path | UserDataset | None, base: FungModRegist
     else:
         directory = Path(user_data)
         dataset = load_user_dataset(directory, registry=base)
+    if dataset.enzyme_networks:
+        # A network is a modelling choice of the dataset's manifest; drafts are single-class tables and would drop it.
+        raise UserTablesAssemblyError(
+            f"User dataset {dataset.dataset_id!r} declares enzyme networks (enzyme_network in user_dataset.yml, from "
+            f"{', '.join(str(item['entry_substrate']) for item in dataset.enzyme_networks)}); assembled drafts are "
+            "single-class tables and do not carry a network. Load that dataset with load_user_dataset directly."
+        )
     rows = {name: _read_rows(directory / name) for name in _TABLE_COLUMNS}
     return _UserSource(dataset=dataset, directory=directory, manifest=dict(dataset.manifest), rows=rows)
 

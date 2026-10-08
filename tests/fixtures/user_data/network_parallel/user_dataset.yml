@@ -1,0 +1,19 @@
+dataset_id: network_parallel
+contributor: FungMod maintainers
+date: 2026-10-07
+source: >-
+  Illustrative estimates for a user-defined strain with two user-defined enzyme classes that
+  cleave one user-defined dissolved ester-like substrate in parallel, one of them inhibited by
+  the released acid-like product; no measurement, literature value or registry record stands
+  behind them
+notes: >-
+  Second non-specific enzyme-network case of the user-data route (USERDATA-010): two classes
+  in parallel on one pool, one in the kcat form and one in the Vmax form, and a competitive
+  product-inhibition constant; every value an estimate, so the case runs in exploratory mode
+  only and scientific mode refuses it.
+simulation:
+  duration: 24
+  units: hour
+  points: 97
+enzyme_network:
+  entry_substrates: [ester_s2]

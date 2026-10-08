@@ -1,0 +1,8 @@
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,km,2,,,mM,estimate,illustrative estimate,Illustrative test note NW-1 p. 3
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,kcat,30,,,1/min,estimate,illustrative estimate,Illustrative test note NW-1 p. 3
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,substrate_initial_concentration,5,,,mM,estimate,illustrative estimate,Illustrative test note NW-1 p. 3
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,enzyme_concentration,0.002,,,mM,estimate,illustrative estimate,Illustrative test note NW-1 p. 3
+strain_n1,oligomer_hydrolase_like,oligomer_o1,c30_ph5,km,1,,,mM,estimate,illustrative estimate,Illustrative test note NW-1 p. 4
+strain_n1,oligomer_hydrolase_like,oligomer_o1,c30_ph5,kcat,60,,,1/min,estimate,illustrative estimate,Illustrative test note NW-1 p. 4
+strain_n1,oligomer_hydrolase_like,oligomer_o1,c30_ph5,enzyme_concentration,0.001,,,mM,estimate,illustrative estimate,Illustrative test note NW-1 p. 4
