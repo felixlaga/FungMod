@@ -25,7 +25,7 @@ from fungal_model.api.output_schema import (
     table_fieldnames,
 )
 from fungal_model.api.user_data import USER_DATASET_MATURITY_FITTED, USER_DATASET_PARAMETER_MATURITIES
-from fungal_model.core.units import ASSAY_BASE_UNITS, units_are_compatible
+from fungal_model.core.units import ASSAY_BASE_UNITS, Q_, units_are_compatible
 from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
@@ -1753,16 +1753,13 @@ def _final_metric_rows(
                     )
                 )
             else:
-                rows.append(
-                    _metric_row(
-                        base,
-                        "final_product_yield",
-                        (final_product - initial_product) / initial_substrate,
-                        "dimensionless",
-                        "computed",
-                        "",
-                    )
+                yield_value, yield_units = _final_product_yield(
+                    final_product - initial_product,
+                    product_units,
+                    initial_substrate,
+                    final_row.get(f"{substrate_state}_units", ""),
                 )
+                rows.append(_metric_row(base, "final_product_yield", yield_value, yield_units, "computed", ""))
     for metric_name, observable_name in _MAXIMUM_RATE_METRICS:
         role_rate = role_rates[observable_name]
         if role_rate.reason:
@@ -3116,6 +3113,33 @@ def _role_for_state(state_name: str, state_roles: Mapping[str, str]) -> str:
 
 def _is_surface_case(context: Mapping[str, Any]) -> bool:
     return context.get("process_type") == "surface_catalysis"
+
+
+def _final_product_yield(
+    product_formed: float,
+    product_units: str,
+    initial_substrate: float,
+    substrate_units: str,
+) -> tuple[float, str]:
+    """Product formed per initial substrate, with the units of that quotient.
+
+    With the product and the substrate in the same units the quotient is the
+    plain ratio, dimensionless, exactly as before. When they differ (a product
+    released across a basis change, for example an amount per volume from a
+    dry mass per volume) pint divides the two quantities: a dimensionless
+    quotient is converted to a pure number, any other keeps its simplified
+    units (for example ``millimole / gram``), so a yield across bases is never
+    labelled dimensionless.
+    """
+
+    if product_units == substrate_units or not product_units or not substrate_units:
+        # The arithmetic of every case whose product shares its substrate's units (or states none), as before.
+        return product_formed / initial_substrate, "dimensionless"
+    quotient = Q_(product_formed, product_units) / Q_(initial_substrate, substrate_units)
+    if quotient.dimensionless:
+        return float(quotient.to("dimensionless").magnitude), "dimensionless"
+    reduced = quotient.to_reduced_units()
+    return float(reduced.magnitude), str(reduced.units)
 
 
 def _final_product_metric_name(product_units: str) -> str:

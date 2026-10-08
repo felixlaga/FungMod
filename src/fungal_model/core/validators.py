@@ -720,20 +720,46 @@ def validate_non_negative(
     )
 
 
-def _as_weighted_quantity(values: Quantity, weight: float | Quantity) -> Quantity:
+def conserved_weight(weight: Any) -> float | Quantity:
+    """A closure weight as written in a config: a pure number, or a unit-bearing ``{value, units}`` mapping.
+
+    A unit-bearing weight converts its state into the ledger's units, for
+    example a yield in ``mmol/g`` weighting a dry mass per volume so that the
+    weighted term is an amount per volume. A pint quantity is returned as is.
+    """
+
     if is_quantity(weight):
-        return values * weight
-    return values * float(weight)
+        return cast(Quantity, weight)
+    if isinstance(weight, Mapping):
+        if set(weight) != {"value", "units"}:
+            raise ValueError(
+                f"A unit-bearing conserved weight must give exactly value and units; got {sorted(map(str, weight))}."
+            )
+        return cast(Quantity, Q_(float(weight["value"]), str(weight["units"])))
+    return float(weight)
+
+
+def _as_weighted_quantity(values: Quantity, weight: float | Quantity | Mapping[str, Any]) -> Quantity:
+    resolved = conserved_weight(weight)
+    if is_quantity(resolved):
+        return values * resolved
+    return values * float(resolved)
 
 
 def validate_mass_balance(
     result: Any,
     *,
-    conserved_weights: Mapping[str, float | Quantity] | None = None,
+    conserved_weights: Mapping[str, float | Quantity | Mapping[str, Any]] | None = None,
     closed_system: bool = True,
     relative_tolerance: Quantity | None = None,
 ) -> ValidationResult:
-    """Validate conservation of a weighted total for closed systems."""
+    """Validate conservation of a weighted total for closed systems.
+
+    A weight may carry units (a pint quantity or a ``{value, units}`` mapping):
+    every weighted term is converted to the units of the first, so a ledger
+    across bases is computed through the stated conversion, never by a bare
+    number.
+    """
 
     epsilon = relative_tolerance or DEFAULT_VALIDATION_RELATIVE_TOLERANCE.quantity
     epsilon_value = float(assert_compatible(epsilon, "dimensionless").magnitude)
@@ -1155,6 +1181,7 @@ __all__ = [
     "LimitingCase",
     "LimitingCaseSuite",
     "ValidationResult",
+    "conserved_weight",
     "validate_biomass_yield_limit",
     "validate_carbon_conservation",
     "validate_charge_balance",

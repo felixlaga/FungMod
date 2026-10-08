@@ -833,6 +833,8 @@ def test_an_ambiguous_product_is_refused(tmp_path: Path) -> None:
 
 
 def test_a_link_across_amount_bases_is_refused(tmp_path: Path) -> None:
+    """Without a unit-bearing yield (NETWORK-002) a solid still links to a dissolved pool on no basis; never the reverse."""
+
     header = "substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source\n"
     substrates = header + (
         "polymer_p1,,Soluble polymer-like substrate P1,soluble_polymer_like,solid_polymer,inner_glycosidic_like,dry_mass,"
@@ -840,7 +842,16 @@ def test_a_link_across_amount_bases_is_refused(tmp_path: Path) -> None:
         "oligomer_o1,,Oligomer-like pool O1,oligomer_like,dissolved,inner_glycosidic_like,,monomer_m1,2,mol/mol,Illustrative\n"
     )
     issues = _issues(tmp_path, CHAIN, {"substrates.csv": substrates})
-    assert _has_issue(issues, "substrates.csv", 2, "product", "would need the molar mass of the product")
+    assert _has_issue(issues, "substrates.csv", 2, "yield_basis", "needs a unit-bearing yield that converts the dry mass")
+    assert _has_issue(issues, "substrates.csv", 2, "yield_basis", "FungMod never derives it from a molar mass")
+    reverse = header + (
+        "polymer_p1,,Soluble polymer-like substrate P1,soluble_polymer_like,dissolved,inner_glycosidic_like,,"
+        "oligomer_o1,4,mol/mol,Illustrative\n"
+        "oligomer_o1,,Oligomer-like pool O1,oligomer_like,solid_polymer,inner_glycosidic_like,dry_mass,monomer_m1,2,g/g,"
+        "Illustrative\n"
+    )
+    issues = _issues(tmp_path / "reverse", CHAIN, {"substrates.csv": reverse})
+    assert _has_issue(issues, "substrates.csv", 2, "product", "forming a solid from a dissolved pool is not supported")
 
 
 def test_a_class_on_two_pools_of_one_network_is_refused(tmp_path: Path) -> None:

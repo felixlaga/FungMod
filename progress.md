@@ -26,6 +26,163 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## NETWORK-002 Enzyme-Network Links Across Amount Bases Through A Stated Yield
+
+Status: `complete` for the stated scope (2026-10-08). USERDATA-010 refused a
+network link from a solid pool on a dry-mass basis (g/L) to a dissolved pool on
+a molar basis (mM): the Michaelis-Menten process wrote its products in its
+substrate's units, and a conversion needs a dimensional yield. That blocked the
+canonical fungal cellulolytic system for the owner's goal ("fungus X on
+substrate Y in conditions Z ... the code calculates all the stuff"): a
+cellobiohydrolase-like class on a cellulose-like solid releasing a
+disaccharide in mM that a second class with molar kinetics (for example drafted
+from SABIO-RK) converts further. Now such a link runs, through a yield the user
+states with its own evidence; FungMod never derives it.
+
+Representation (reusing the existing columns): on the solid's `substrates.csv`
+row, `yield_basis` is an amount of product per dry mass (`mmol/g`, `umol/mg`,
+`mol/kg`; pint-checked against `mol / gram`) instead of `g/g`, and two new
+optional columns describe the value like a kinetics row: `yield_evidence_type`
+(`measured`, `literature`, `estimate`; required on a unit-bearing yield) and
+`yield_method` (required for measured and literature values; for example the
+molar masses the user computed it from). The row's `source` is the yield's
+source. Both columns are refused on `g/g` and `mol/mol` rows, which keep their
+USERDATA-008/010 meaning (template constants that do not set the mode).
+
+Design decisions (design note kept outside the repository):
+
+- The core already converted each process contribution with pint once at build
+  time (the compiled stoichiometry probe); the smallest honest generalisation is
+  a unit-bearing product coefficient, not a molar-mass conversion:
+  `ProductReleaseMap.coefficient_units` (written only when present) and
+  `HomogeneousMichaelisMentenProcess(product_coefficient_units=,
+  product_state_units=)`, which declares such a product in its own units,
+  refuses a coefficient whose units times the substrate's are not the
+  product's dimension, and returns `Q_(c, units) x rate` from `contributions`.
+  The surface-catalysis, pH-ionization and transglycosylation processes (and
+  their factories) and the SBML exporter refuse a unit-bearing coefficient;
+  `ProductReleaseMap.signed_coefficient` and `validate_weight_conservation`
+  refuse one instead of reading its magnitude.
+- The yield is a parameter record per strain and condition (role
+  `product_yield__<pool>`, symbol `<dataset>__network__<entry>__product_yield__<pool>`)
+  with the row's value, units, evidence type, method and source, bound to the
+  release coefficient through the existing `parameter_role` coefficient: the
+  composition builder now keeps a dimensional record's units (a dimensionless
+  record such as the culture biomass yield behaves exactly as before; a
+  complement of a dimensional record and a dimensional reactant coefficient are
+  refused). Its evidence therefore sets the template mode like every input.
+- Units: pools on the entry's basis keep the entry's initial-concentration
+  units; pools after the change and the final product use the new
+  initial-state option `units_from_roles` (the product of the records' units,
+  simplified by pint: g/L x mmol/g = `millimole / liter`), resolved per case at
+  build time in the case builder, the composition builder, exact-template
+  resolution and the case-template record validation.
+- Ledger: closure weights may be `{value, units}` mappings; upstream of the
+  unit-bearing yield a pool weighs the product of the yields with the yield's
+  units, so `2 x 3.0838 mmol/g x S + 2 D + M` is summed in mmol/L. The builder
+  checks every product map in pint when a weight or coefficient carries units
+  (the float path is unchanged otherwise); `validate_mass_balance`, the
+  conservation diagnostics and the mass-balance plot read such weights through
+  `conserved_weight`. Never a silent pass: a wrong weight dimension or value is
+  a build error.
+- Rules: solid -> dissolved pool needs a unit-bearing yield; solid -> solid takes
+  `g/g` (a unit-bearing yield is refused there as ambiguous); dissolved -> solid
+  is refused; a unit-bearing yield on the last solid pool makes the final
+  product an amount per volume; outside a network dataset a unit-bearing yield
+  is refused (the single-class solid route keeps `g/g`). A chain changes basis
+  at most once.
+- Metrics: `final_product_yield` keeps the old arithmetic when product and
+  substrate share units and is otherwise the pint quotient with its units
+  (`millimole / gram`); the rates carry their states' units.
+
+Changed:
+
+- `processes/surface.py`, `processes/homogeneous.py`, `processes/factories.py`,
+  `processes/transglycosylation.py`, `io/registries.py`, `standards/sbml.py`:
+  the unit-bearing coefficient and its refusals.
+- `screening/culture_physiology.py`, `screening/case_builder.py`,
+  `screening/parameter_resolution.py`, `registry/records.py`,
+  `registry/loaders.py`: dimensional `parameter_role` coefficients,
+  unit-bearing weights and their pint check, `units_from_roles`.
+- `core/validators.py` (`conserved_weight`), `workflows/configured_outputs.py`:
+  unit-bearing weights in the validator, the diagnostics and the plot.
+- `api/user_data.py`: the columns, `_Substrate.yield_units` /
+  `yield_evidence_type` / `yield_method`, the link rules in `_network_link`, the
+  yield records, the template (units, bound coefficient, weights, per-pool
+  loader, limitation and validity note), `links[].yield_evidence_type` in
+  `UserDataset.enzyme_networks`.
+- `api/result_tables.py`: `final_product_yield` units. `cli.py`: `check-data`
+  prints a unit-bearing yield with its evidence type.
+- Fixtures `tests/fixtures/user_data/network_solid_chain/` (a cellulose-like
+  solid, 10 g/L, -> a disaccharide-like pool via 3.0838 mmol/g -> a
+  monomer-like product, 2 mol/mol, competitively inhibiting the second class)
+  and `tests/fixtures/user_data/network_solid_parallel/` (two classes in
+  parallel on a chitin-like solid, kcat with a protein-mass enzyme and Vmax in
+  g/L/h, releasing the final product via 2460.6 umol/g); every value an
+  illustrative estimate with the user's arithmetic stated, with READMEs.
+- Docs: `docs/user-data.md` (new section "A solid releasing a dissolved pool"
+  with the rules, a worked example with real `check-data` and `run` output,
+  the `substrates.csv` columns, the network roles, refusals and limits, the
+  solid-route limits), `docs/concepts/outputs.md`, `docs/cli.md`,
+  `docs/capabilities.md`, `README.md`, `CHANGELOG.md`.
+
+Tests: new `tests/test_user_data_network_cross_basis.py` (31 test functions,
+51 cases): the core with artificial states (a 3 mmol/g coefficient gives a
+compiled column of 3 in mM and 3000 in uM, the product equals
+`c (X0 - X)` at every output time and the substrate the integrated MM law;
+dimension, missing-units and stray-units refusals; the product map's units,
+serialisation and numeric-helper refusals; surface and pH-ionization factories
+report the map incompatible; SBML export refuses it; `conserved_weight`;
+`final_product_yield`; `units_from_roles` record validation); the fixtures'
+links, yield record (value, units, maturity, allowed use, provenance), template
+(bound coefficient, unit-bearing weight, `units_from_roles`, per-pool loaders,
+limitations); the yield's evidence decides the mode (measured kinetics with an
+estimated yield stay exploratory and are refused in scientific mode; with a
+literature yield the case runs `scientific_exact_unvalidated`); analytic checks
+on the simulated outputs: units (`gram / liter`, `millimole / liter`), closure
+`2 Y S + 2 D + M = 2 Y S0` (rtol 1e-9), each process its own law (solid in g/L/h,
+dimer with the competitive law in mM/h), the compiled column and
+`dD/dt(0) = Y Vmax S0 / (Km + S0)`, a reactivity factor composing with the
+release, `P = Y (S0 - S)` in umol/L and the release rate `Y (r_A + r_B)` at
+every output time, the first-order regime `S0 exp(-(Va/Ka + Vb/Kb) t)`
+(rtol 1e-3), the ledger and validation report in mmol/L; the composition
+builder's refusals (wrong weight value or dimension, a complement of the yield,
+a dimensional reactant coefficient); refusals (four wrong dimensions, a `g/g`
+cross-basis link, a unit-bearing same-basis link, outside a network, five
+evidence-column cases, a dissolved row); `fungmod check-data` and `fungmod run`.
+Parity: the records of all eleven earlier fixtures and the assembled configs
+of the 19 shipped registry cases and 14 earlier fixture cases (ranged records
+at their lower bounds, so no random stream) are pinned to digests computed at
+base commit 56c8df4, and a run of all 33 existing cases (final metrics,
+thresholds, time series, conservation diagnostics) was compared before and
+after: identical. `tests/test_user_data_network.py`: the cross-basis refusal
+test now expects the new message and adds the dissolved-to-solid refusal.
+Guardrails: the fixtures' tokens join the user-data token list.
+
+Not changed: no process law, rate form, modifier, solver, kernel, fit,
+comparison or preflight rule; pure-number coefficients and weights take the
+code paths they took before; no registry record or case template; output
+schema unchanged by this entry.
+
+Scientific impact: a user's solid substrate can feed a dissolved pool whose
+classes have molar kinetics, so a solid-degrading class and a disaccharide- or
+dimer-converting class run in one simulation with the substrate loss in g/L,
+the products in mmol/L or umol/L, rates and threshold times in their own units
+and a mass-to-mole balance checked through the stated yield. The conversion is
+exactly the user's yield; its evidence type keeps an estimated conversion out
+of scientific mode.
+
+Compatibility: additive (two optional `substrates.csv` columns, a new kind of
+`yield_basis` on solid rows of network datasets, optional
+`coefficient_units`/`units_from_roles`/unit-bearing weights in templates and
+configs, new keyword arguments, `conserved_weight`, a new
+`links[].yield_evidence_type` key in `UserDataset.enzyme_networks`).
+
+Next task: the same unit-bearing release for the single-class solid route
+(a molar product from one class on a solid, outside a network), and response
+laws per network process; then pH-ionization processes, time courses of
+intermediates and fitting on networks.
+
 ## USERDATA-010 Several Enzyme Classes Acting Together In User Data
 
 Status: `complete` for the stated scope (2026-10-07); the tenth increment of the

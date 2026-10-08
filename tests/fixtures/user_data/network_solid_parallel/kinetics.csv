@@ -1,0 +1,8 @@
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source
+strain_r4,endo_cutter_like,solid_k4,c37_ph6,km,20,,,g/L,estimate,illustrative apparent half-saturation estimate,Illustrative test note XB-2 p. 3
+strain_r4,endo_cutter_like,solid_k4,c37_ph6,kcat,0.004,,,g/(mg*h),estimate,illustrative estimate,Illustrative test note XB-2 p. 3
+strain_r4,endo_cutter_like,solid_k4,c37_ph6,enzyme_concentration,25,,,mg/L,estimate,illustrative estimate,Illustrative test note XB-2 p. 3
+strain_r4,endo_cutter_like,solid_k4,c37_ph6,substrate_initial_concentration,2,,,g/L,estimate,illustrative estimate,Illustrative test note XB-2 p. 3
+strain_r4,exo_cutter_like,solid_k4,c37_ph6,km,40,,,g/L,estimate,illustrative apparent half-saturation estimate,Illustrative test note XB-2 p. 4
+strain_r4,exo_cutter_like,solid_k4,c37_ph6,vmax,0.05,,,g/L/h,estimate,illustrative initial-rate estimate of the exo-like activity in this virtual assay,Illustrative test note XB-2 p. 4
+strain_r4,exo_cutter_like,solid_k4,c37_ph6,substrate_initial_concentration,2,,,g/L,estimate,illustrative estimate,Illustrative test note XB-2 p. 3

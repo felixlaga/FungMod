@@ -11,7 +11,7 @@ should be recoverable from an exported artifact.
 | `case_summary.csv` | One row per requested case: sample counts, and `case_status` (`simulated`, or `not_simulated` with the reason in a [partial run](#partial-runs)). |
 | `modelability_items.csv` | Known, uncertain, missing, or unsupported inputs. |
 | `time_series_long.csv` | Long-form state and derived trajectories. |
-| `final_metrics.csv` | Final substrate/product metrics and maximum rates. |
+| `final_metrics.csv` | Final substrate/product metrics and maximum rates, each in its own state's units. `final_product_yield` (product formed per initial substrate) is the plain ratio, `dimensionless`, when product and substrate share units; across a [basis change](../user-data.md#a-solid-releasing-a-dissolved-pool) it is the pint quotient with its units (for example `millimole / gram`), never labelled dimensionless. |
 | `threshold_times.csv` | Times to configured degradation fractions. |
 | `sampled_parameters.csv` | Every sampled value with source and allowed-use metadata. |
 | `uncertainty_summary.csv` | Summaries over sampled inputs and output metrics. |
@@ -23,7 +23,7 @@ should be recoverable from an exported artifact.
 | `missing_parameters.csv` | Inputs that remain unavailable. |
 | `suggested_experiments.csv` | Measurements that would reduce missingness or uncertainty. |
 | `comparison_summary.csv` | Side-by-side metrics plus comparison/ranking guardrails. |
-| `conservation_diagnostics.csv` | Copied configured conservation diagnostics, when present. |
+| `conservation_diagnostics.csv` | Copied configured conservation diagnostics, when present. A weight may carry units (`{"value": ..., "units": ...}` in `weighted_states`, for example a stated yield in `mmol/g` weighing a solid in g/L), so a ledger across bases is summed in one unit through the stated conversion. |
 | `thermodynamic_diagnostics.csv` | Copied configured thermodynamic diagnostics, when present. |
 | `solver_diagnostics.csv` | Solver metadata without invented quality thresholds. |
 | `timecourse_comparison.csv` | Written on request by `result.compare_with_timecourses()`: simulated median and 5-95 % band at the user's observed times, residuals and RMSE; in-sample agreement, not validation (schema `2.1.0`). |

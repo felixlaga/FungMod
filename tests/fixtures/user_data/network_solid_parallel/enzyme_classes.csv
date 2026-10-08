@@ -1,0 +1,3 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+endo_cutter_like,Endo cutter-like class R4,,aminoglycosidic_like_bond,aminoglycan_like_solid,Illustrative user-defined class for the parallel cross-basis enzyme-network fixture (no record of this class exists)
+exo_cutter_like,Exo cutter-like class R4,,aminoglycosidic_like_bond,aminoglycan_like_solid,Illustrative user-defined class for the parallel cross-basis enzyme-network fixture (no record of this class exists)

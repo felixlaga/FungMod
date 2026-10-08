@@ -6,6 +6,40 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Enzyme-network links across amount bases through a stated, unit-bearing
+  yield (NETWORK-002): in a network dataset a solid pool (dry mass per volume)
+  may release a dissolved pool (amount per volume), or a molar final product,
+  when its `substrates.csv` row states `yield_basis` as an amount of product
+  per dry mass (for example `mmol/g`, checked with pint) with the new optional
+  columns `yield_evidence_type` (`measured`, `literature`, `estimate`) and
+  `yield_method` (required for measured and literature values). The yield
+  becomes a parameter record per strain and condition (role
+  `product_yield__<pool>`) bound to the release coefficient, so its evidence
+  sets the mode like any other input; FungMod never derives it from a molar
+  mass or a registry product map. Pools after the basis change are reported in
+  the entry's units times the yield's, simplified by pint (g/L x mmol/g =
+  `millimole / liter`); the closure ledger weighs the solid through the yield
+  (`{value, units}` weights, checked in pint) and `final_product_yield` keeps
+  its units across bases (`millimole / gram`). Core generalisation, generic and
+  opt-in: `ProductReleaseMap.coefficient_units`, unit-bearing product
+  coefficients in `HomogeneousMichaelisMentenProcess`
+  (`product_coefficient_units`, `product_state_units`; the compiled core
+  converts them once at build time), unit-bearing `parameter_role`
+  coefficients and closure weights in the composition builder, initial-state
+  `units_from_roles` on case templates, and `conserved_weight` in the
+  validators; the surface-catalysis, pH-ionization and transglycosylation
+  processes and the SBML exporter refuse a unit-bearing coefficient instead of
+  reading it as a pure number. Refused with file, row and column: a
+  dry-mass-to-amount link without such a yield, a unit-bearing yield on a link
+  between two solids, of the wrong dimension, on a dissolved row or outside a
+  network, a dissolved pool releasing a solid one, and missing or misplaced
+  yield evidence. Fixtures `network_solid_chain` (a cellulose-like solid in g/L
+  -> a disaccharide-like pool in mmol/L -> a monomer-like product, competitive
+  inhibition) and `network_solid_parallel` (two classes on a chitin-like solid
+  -> a dimer-like product in umol/L); illustrative estimates only. Every
+  existing registry case and user fixture assembles byte-identically (pinned
+  config and record digests) and its outputs are unchanged.
+
 - Several enzyme classes acting together in user data (USERDATA-010): an
   optional `enzyme_network` block in `user_dataset.yml` (`entry_substrates`)
   makes every case of the dataset an enzyme network instead of the one class
