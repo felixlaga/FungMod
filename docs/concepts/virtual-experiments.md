@@ -55,6 +55,23 @@ The label means the run satisfies FungMod's exact-input software gate. It does
 not by itself mean the model has been empirically validated for the requested
 system.
 
+## Requests with blocked cases
+
+By default `simulate` refuses a request in which the preflight blocks any
+case in the requested mode, and simulates nothing. To simulate the runnable
+cases and report the blocked ones, opt in explicitly:
+
+```python
+result = study.simulate(mode="exploratory", n_samples=128, seed=42, blocked="report")
+result.partial_run       # True when some requested cases were not simulated
+result.blocked_cases()   # their case ids, status, missing items and measurement requests
+```
+
+The rule of each mode is unchanged (scientific: `modelable` cases only), a
+request without any runnable case is still refused, and the blocked cases
+appear in the tables as `not_simulated`; see
+[partial runs](outputs.md#partial-runs).
+
 ## Environment grids
 
 ```python

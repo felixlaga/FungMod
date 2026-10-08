@@ -1,0 +1,4 @@
+condition_id,temperature,temperature_units,ph,notes
+load_10,29,degC,5.0,Batch culture with 10 g/L cellulose (Gelain 2020 10 g/L condition)
+load_20,29,degC,5.0,Batch culture with 20 g/L cellulose (Gelain 2020 20 g/L condition)
+load_30,29,degC,5.0,Batch culture with 30 g/L cellulose (Gelain 2020 30 g/L condition)

@@ -6,8 +6,9 @@ export in ``data/kinetic_records/sabiork/case_001_reaction_618_beta_glucosidase`
 ``tests/fixtures/user_data/genome_case`` (synthetic gene identifiers, not a
 real genome), and the illustrative ``oxidase_case``, ``esterase_case`` and
 ``literature_reentry`` user datasets. Review fields are filled by the tests
-with text that says so; the one in-memory registry extension (a glucoamylase
-class) is test-only, as in ``tests/test_user_data_genome.py``.
+with text that says so; the one in-memory registry change (the shipped
+glucoamylase class widened to a maltose class) is test-only, as in
+``tests/test_user_data_genome.py``.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import itertools
 import shutil
 import urllib.request
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -41,8 +43,7 @@ from fungal_model.api import VirtualExperimentError
 from fungal_model.api.user_data import REVIEW_MARKER, enzyme_class_acts_on
 from fungal_model.api.user_data_assembly import ASSEMBLY_STATUSES
 from fungal_model.registry import FungModRegistry, load_registry
-from fungal_model.registry.loaders import load_parameter_record_mapping, load_registry_record_mapping
-from fungal_model.registry.records import EnzymeClassRecord
+from fungal_model.registry.loaders import load_parameter_record_mapping
 from fungal_model.sources.sabiork import fetch as sabiork_fetch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -190,24 +191,27 @@ def test_kinetics_of_another_organism_are_transferred_estimates(tmp_path: Path) 
 def test_other_genome_classes_are_reported_as_the_genome_route_reports_them() -> None:
     draft = _g1()
     classes = {item["enzyme_class"]: item for item in draft.assembly["enzyme_classes"]}
-    assert set(classes) == {"beta_glucosidase", "cellulase_generic"}
+    # USERDATA-008: GH7 resolves to the registry's cellobiohydrolase record, and REGISTRY-002: GH10 and GH15
+    # resolve to the endo_xylanase and glucoamylase records; none of them acts on cellobiose.
+    assert set(classes) == {
+        "beta_glucosidase",
+        "cellobiohydrolase",
+        "cellulase_generic",
+        "endo_xylanase",
+        "glucoamylase",
+    }
     assert classes["beta_glucosidase"]["declared_in"] == "genomes.csv"
     (evidence,) = classes["beta_glucosidase"]["evidence"]
     assert evidence["kind"] == "genome_annotation"
     assert evidence["families"] == ["GH1", "GH3"]
     assert evidence["gene_ids"] == ["synthetic_g001", "synthetic_g002", "synthetic_g003"]
-    assert {item["enzyme_class"] for item in draft.assembly["unmodellable_enzyme_classes"]} == {
-        "cellobiohydrolase",
-        "endo_xylanase",
-        "glucoamylase",
-        "laccase",
-    }
+    assert {item["enzyme_class"] for item in draft.assembly["unmodellable_enzyme_classes"]} == {"laccase"}
     assert {item["family"] for item in draft.assembly["unmapped_families"]} == {"CBM1", "GT2"}
     (compatibility,) = draft.assembly["substrate_compatibility"]
     assert [item["enzyme_class"] for item in compatibility["acting"]] == ["beta_glucosidase"]
-    (not_acting,) = compatibility["not_acting"]
-    assert not_acting["enzyme_class"] == "cellulase_generic"
-    assert "substrate class 'cellobiose'" in not_acting["reason"]
+    not_acting = {item["enzyme_class"]: item for item in compatibility["not_acting"]}
+    assert set(not_acting) == {"cellobiohydrolase", "cellulase_generic", "endo_xylanase", "glucoamylase"}
+    assert all("substrate class 'cellobiose'" in item["reason"] for item in not_acting.values())
     # The annotation is copied and listed in genomes.csv, so the loader resolves the same classes.
     assert draft.annotation_files == {"annotations/strain_g1_overview.txt": ANNOTATION.read_bytes()}
     (genome_row,) = draft.genomes
@@ -217,6 +221,9 @@ def test_other_genome_classes_are_reported_as_the_genome_route_reports_them() ->
     )
     assert draft.enzymes == ()  # every class comes from the annotation alone
     assert "Does not act on it: cellulase_generic" in draft.review
+    assert "Does not act on it: cellobiohydrolase" in draft.review
+    assert "Does not act on it: endo_xylanase" in draft.review
+    assert "Does not act on it: glucoamylase" in draft.review
 
 
 # ---------------------------------------------------------------------------
@@ -624,7 +631,7 @@ def test_a_new_substrate_and_a_non_cellulose_class_follow_the_same_rules(
     base_registry: FungModRegistry,
     tmp_path: Path,
 ) -> None:
-    extended = _with_test_only_glucoamylase(base_registry)
+    extended = _with_glucoamylase_widened_to_maltose(base_registry)
     maltose = _csv_rows(GENOME / "substrates.csv")[1]
     described = {key: value for key, value in maltose.items() if key not in {"registry_substrate", "yield_basis"}}
     described["substrate"] = described.pop("name")
@@ -661,7 +668,7 @@ def test_a_new_substrate_and_a_non_cellulose_class_follow_the_same_rules(
         dataset, "maltose_assembly__genome_annotated_strain_g1__glucoamylase__maltose__c30_ph5__km__gap"
     )
     assert request.provenance["measurement_request"].startswith(
-        f"Measure km of glucoamylase from {G1} on maltose at 30 degC, pH 5 (mM)"
+        f"Measure km of Glucoamylase from {G1} on maltose at 30 degC, pH 5 (mM)"
     )
 
     undescribed = _g1(
@@ -857,34 +864,34 @@ def _ctmi(temperature: float, minimum: float, optimum: float, maximum: float) ->
     return numerator / denominator
 
 
-def _with_test_only_glucoamylase(base: FungModRegistry) -> FungModRegistry:
-    """The shipped registry plus a test-only glucoamylase class record (not shipped, no kinetics)."""
+def _with_glucoamylase_widened_to_maltose(base: FungModRegistry) -> FungModRegistry:
+    """The shipped registry with its glucoamylase record widened in memory to a dissolved maltose class.
 
-    record = load_registry_record_mapping(
-        "enzyme_classes",
-        {
-            "record_id": "glucoamylase",
-            "name": "glucoamylase",
-            "ec_number": "3.2.1.3",
-            "maturity": "exploratory_metadata",
-            "provenance": {
-                "source": "In-memory registry extension of tests/test_user_data_assembly.py; not a shipped record",
-                "confidence_level": "exploratory_assumption",
-            },
-            "target_bond_classes": ["alpha_1_4_glycosidic"],
-            "compatible_substrate_classes": ["maltose"],
-            "compatible_processes": ["homogeneous_michaelis_menten"],
-            "notes": "Exists only in this test module to exercise a resolved class on a non-cellulose substrate.",
+    REGISTRY-002 ships ``glucoamylase`` (EC 3.2.1.3, GH15) acting on the solid
+    starch class only, and the assembly drafts dissolved substrates only; this
+    test-only copy (not shipped, no kinetics) also lists ``maltose``.
+    """
+
+    shipped = base.enzyme_classes["glucoamylase"]
+    widened = replace(
+        shipped,
+        maturity="exploratory_metadata",
+        compatible_substrate_classes=(*shipped.compatible_substrate_classes, "maltose"),
+        provenance={
+            **shipped.provenance,
+            "test_only_change": "maltose added in memory by tests/test_user_data_assembly.py; not a shipped record",
         },
     )
-    assert isinstance(record, EnzymeClassRecord)
     return FungModRegistry.build(
         registry_id=base.registry_id,
         version=base.version,
         maturity=base.maturity,
         provenance=base.provenance,
         fungi=base.fungi.values(),
-        enzyme_classes=(*base.enzyme_classes.values(), record),
+        enzyme_classes=(
+            *(record for record in base.enzyme_classes.values() if record.record_id != "glucoamylase"),
+            widened,
+        ),
         substrates=base.substrates.values(),
         environments=base.environments.values(),
         process_compatibility=base.process_compatibility.values(),

@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from fungal_model.io.model_config import ModelConfig
+from fungal_model.modifiers.reactivity import SUBSTRATE_REACTIVITY_MODIFIER_TYPE
 from fungal_model.registry.records import (
     CaseTemplateRecord,
     ParameterRecord,
@@ -945,6 +946,16 @@ def _template_process_modifiers(
                 )
             )
             continue
+        if modifier_type == SUBSTRATE_REACTIVITY_MODIFIER_TYPE:
+            configured.append(
+                _template_substrate_reactivity_modifier(
+                    case_template=case_template,
+                    parameter_records=parameter_records,
+                    modifier=modifier,
+                    index=index,
+                )
+            )
+            continue
         if modifier_type in ENVIRONMENT_MODIFIER_TYPES:
             configured.append(
                 _template_environment_modifier(
@@ -992,6 +1003,48 @@ def _template_product_inhibition_modifier(
             parameter_records=parameter_records,
             role=inhibition_role,
             field_name="inhibition_constant_role",
+        ),
+    }
+
+
+def _template_substrate_reactivity_modifier(
+    *,
+    case_template: CaseTemplateRecord,
+    parameter_records: Mapping[str, ParameterRecord],
+    modifier: Mapping[str, Any],
+    index: int,
+) -> dict[str, Any]:
+    """Bind the conversion-dependent substrate reactivity factor ``(S / S_ref)^n`` from template roles.
+
+    The template names the substrate state role and the parameter roles of the
+    reference concentration and the exponent; nothing is defaulted, so the
+    reference is whatever record the template binds (for example the case's own
+    initial-substrate record).
+    """
+
+    fields = {}
+    for field_name in ("substrate_state_role", "reference_concentration_role", "exponent_role"):
+        value = str(modifier.get(field_name, "")).strip()
+        if not value:
+            raise RegistryCaseBuildError(
+                f"Case template {case_template.case_template_id!r} process_modifiers[{index}] requires "
+                f"{field_name}."
+            )
+        fields[field_name] = value
+    return {
+        "type": SUBSTRATE_REACTIVITY_MODIFIER_TYPE,
+        "substrate_state": _template_state(case_template, fields["substrate_state_role"]),
+        "reference_concentration": _template_parameter_symbol(
+            case_template=case_template,
+            parameter_records=parameter_records,
+            role=fields["reference_concentration_role"],
+            field_name="reference_concentration_role",
+        ),
+        "exponent": _template_parameter_symbol(
+            case_template=case_template,
+            parameter_records=parameter_records,
+            role=fields["exponent_role"],
+            field_name="exponent_role",
         ),
     }
 
@@ -1472,11 +1525,14 @@ def _enzyme_kinetics_config_data(
     parameter_records: Mapping[str, ParameterRecord],
     output_directory: str | None,
 ) -> dict[str, Any]:
-    """Assemble one dissolved enzyme-kinetics process (plain or pH-dependent Michaelis-Menten).
+    """Assemble one well-mixed enzyme-kinetics process (plain or pH-dependent Michaelis-Menten).
 
     ``state_roles`` are the template state roles of the selected role set, in
     the order they appear in the process states and validators: substrate,
-    product and, for enzyme-explicit role sets, enzyme.
+    product and, for enzyme-explicit role sets, enzyme. The substrate entity
+    carries the registry substrate's own physical state: a dissolved substrate
+    uses the dissolved loader, any other substrate (a suspended solid on which
+    the same law runs as an apparent bulk law) the solid loader.
     """
 
     states = {role: _template_state(case_template, role) for role in state_roles}
@@ -1515,7 +1571,7 @@ def _enzyme_kinetics_config_data(
         "substrates": [
             {
                 "id": substrate_id,
-                "loader": "generic_dissolved",
+                "loader": _substrate_loader(_configured_physical_state(substrate.physical_state)),
                 "data": _homogeneous_substrate_data(
                     substrate=substrate,
                     enzyme_class=compatibility.enzyme_class,
@@ -1627,12 +1683,13 @@ def _homogeneous_substrate_data(
     case_template: CaseTemplateRecord,
     provenance: Mapping[str, Any],
 ) -> dict[str, Any]:
+    physical_state = _configured_physical_state(substrate.physical_state)
     return {
         "kind": "substrate",
         "name": substrate.name,
-        "substrate_type": "generic_dissolved",
+        "substrate_type": _substrate_loader(physical_state),
         "chemical_class": substrate.substrate_class,
-        "physical_state": "dissolved",
+        "physical_state": physical_state,
         "bond_types": list(substrate.bond_classes),
         "accessible_bonds": list(substrate.bond_classes),
         "required_enzyme_classes": [enzyme_class],
@@ -1648,7 +1705,7 @@ def _homogeneous_substrate_data(
             for product in substrate.products
         ],
         "completeness": "partial",
-        "default_degradation_model": "homogeneous_dissolved",
+        "default_degradation_model": _default_degradation_model(physical_state),
         "water_activity_dependence": "unknown",
         "provenance": {
             "source": provenance["source"],
@@ -1658,6 +1715,23 @@ def _homogeneous_substrate_data(
         },
         "parameters": [],
     }
+
+
+def _substrate_loader(physical_state: str) -> str:
+    """The generic substrate loader of a declared physical state: dissolved, or a solid of any kind."""
+
+    return "generic_dissolved" if physical_state == "dissolved" else "generic_solid"
+
+
+def _default_degradation_model(physical_state: str) -> str:
+    """The degradation regime a substrate entity declares for its physical state.
+
+    A dissolved substrate is homogeneous. For a solid the well-mixed law is an
+    apparent bulk law that establishes no degradation regime of the material,
+    so the regime stays ``unknown``.
+    """
+
+    return "homogeneous_dissolved" if physical_state == "dissolved" else "unknown"
 
 
 def _homogeneous_enzyme_data(
@@ -1946,6 +2020,33 @@ def _culture_physiology_config_data(
     )
 
 
+def _enzyme_network_config_data(
+    *,
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord,
+    case_template: CaseTemplateRecord,
+    substrate: SubstrateRecord,
+    fungus_id: str,
+    substrate_id: str,
+    environment_id: str,
+    parameter_records: Mapping[str, ParameterRecord],
+    output_directory: str | None,
+) -> dict[str, Any]:
+    from fungal_model.screening.enzyme_network import build_enzyme_network_config_data
+
+    return build_enzyme_network_config_data(
+        registry=registry,
+        compatibility=compatibility,
+        case_template=case_template,
+        substrate=substrate,
+        fungus_id=fungus_id,
+        substrate_id=substrate_id,
+        environment_id=environment_id,
+        parameter_records=parameter_records,
+        output_directory=output_directory,
+    )
+
+
 def _homogeneous_mm_provenance(
     *,
     registry: FungModRegistry,
@@ -2190,6 +2291,26 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
             "exploratory screens sample the same template through the ensemble path."
         ),
         config_data_builder=_culture_physiology_config_data,
+    ),
+    "enzyme_network": RegistryProcessAssembler(
+        process_type="enzyme_network",
+        process_label="Enzyme network",
+        required_parameter_roles=(),
+        required_state_roles=("substrate", "product"),
+        deterministic_mode="scientific",
+        additional_supported_modes=("toy",),
+        required_process_state_metadata=(
+            "config_name",
+            "config_mode",
+            "config_maturity",
+            "parameter_set_id",
+        ),
+        enforce_template_mode_match=True,
+        unsupported_mode_message=(
+            "Enzyme-network registry assembly supports mode='scientific' or mode='toy'; "
+            "exploratory screens sample the same template through the ensemble path."
+        ),
+        config_data_builder=_enzyme_network_config_data,
     ),
     "extracellular_enzyme_chain": RegistryProcessAssembler(
         process_type="extracellular_enzyme_chain",

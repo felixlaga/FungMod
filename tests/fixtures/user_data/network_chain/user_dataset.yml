@@ -1,0 +1,17 @@
+dataset_id: network_chain
+contributor: FungMod maintainers
+date: 2026-10-07
+source: >-
+  Illustrative estimates for a user-defined strain whose two user-defined enzyme classes
+  degrade a soluble polymer-like substrate through an oligomer-like pool to a monomer-like
+  product; no measurement, literature value or registry record stands behind them
+notes: >-
+  Non-specific enzyme-network case of the user-data route (USERDATA-010): one class
+  releases the oligomer-like pool, another consumes it, every value an estimate, so the
+  case runs in exploratory mode only and scientific mode refuses it.
+simulation:
+  duration: 480
+  units: minute
+  points: 97
+enzyme_network:
+  entry_substrates: [polymer_p1]

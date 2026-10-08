@@ -87,3 +87,174 @@ records:
       the registry as the filter_paper_unit assay dimension. Preparation-specific
       effective constants that use this pool are not universal cellulose rate
       constants.
+
+  - record_id: cellobiohydrolase
+    name: Cellobiohydrolase
+    display_name: cellobiohydrolase
+    ec_number: 3.2.1.91
+    aliases:
+      - cellulose 1,4-beta-cellobiosidase
+      - EC 3.2.1.91
+      - 3.2.1.176
+      - EC 3.2.1.176
+    maturity: literature_metadata
+    provenance:
+      source: >-
+        IUBMB Enzyme Nomenclature (ExplorEnz): EC 3.2.1.91, cellulose
+        1,4-beta-cellobiosidase (non-reducing end), and EC 3.2.1.176, cellulose
+        1,4-beta-cellobiosidase (reducing end). CAZy families GH6 and GH7: Drula E,
+        Garron ML, Dogan S, Lombard V, Henrissat B, Terrapon N. The carbohydrate-active
+        enzyme database: functions and literature. Nucleic Acids Res.
+        2022;50(D1):D571-D577. doi:10.1093/nar/gkab1045
+      confidence_level: literature_curated
+      notes: >-
+        Categorical capability only: exo-acting hydrolysis of 1,4-beta-D-glucosidic
+        bonds in cellulose that releases cellobiose from a chain end. No kinetic value
+        is recorded or implied; processivity, chain-end specificity, adsorption,
+        binding modules and synergy with other cellulolytic enzymes are not
+        represented.
+    target_bond_classes:
+      - beta_1_4_glycosidic
+    compatible_substrate_classes:
+      - cellulose_particulate
+      - cellulose_film_generic
+    compatible_processes:
+      - homogeneous_michaelis_menten
+    notes: >-
+      Exo-acting cellobiohydrolase capability, the class the curated CAZy family map
+      assigns to GH6 and GH7. The record carries EC 3.2.1.91 (non-reducing-end
+      acting, typical of GH6 cellobiohydrolase II); EC 3.2.1.176 (reducing-end
+      acting, typical of GH7 cellobiohydrolase I) is recorded as an alias, so both
+      EC numbers resolve to this class. GH7 also contains endoglucanase I (EC 3.2.1.4),
+      which this class does not represent. Kinetics come only from user data or a
+      future curated record: the only process law listed is the apparent
+      Michaelis-Menten law on a suspended solid, with no adsorption, surface or
+      synergy law.
+
+  - record_id: endo_xylanase
+    name: Endo-1,4-beta-xylanase
+    display_name: endo-1,4-beta-xylanase
+    ec_number: 3.2.1.8
+    aliases:
+      - endo-xylanase
+      - endoxylanase
+      - xylanase
+      - EC 3.2.1.8
+    maturity: literature_metadata
+    provenance:
+      source: >-
+        IUBMB Enzyme Nomenclature (ExplorEnz): EC 3.2.1.8, endo-1,4-beta-xylanase,
+        endohydrolysis of (1->4)-beta-D-xylosidic linkages in xylans. CAZy families
+        GH10 and GH11: Drula E, Garron ML, Dogan S, Lombard V, Henrissat B, Terrapon N.
+        The carbohydrate-active enzyme database: functions and literature. Nucleic
+        Acids Res. 2022;50(D1):D571-D577. doi:10.1093/nar/gkab1045
+      confidence_level: literature_curated
+      notes: >-
+        Categorical capability only: endo-acting hydrolysis of the
+        (1->4)-beta-D-xylosidic backbone of xylan. No kinetic value is recorded or
+        implied; backbone substitution (arabinosyl, glucuronosyl and acetyl groups),
+        the different substrate tolerance and product spectra of GH10 and GH11,
+        binding modules and synergy with debranching enzymes and beta-xylosidase are
+        not represented.
+    target_bond_classes:
+      - beta_1_4_xylosidic
+    compatible_substrate_classes:
+      - xylan
+    compatible_processes:
+      - homogeneous_michaelis_menten
+    notes: >-
+      Endo-acting xylanase capability, the class the curated CAZy family map assigns
+      to GH10 and GH11. The enzyme releases mainly xylo-oligosaccharides; their
+      hydrolysis to xylose is the work of beta-xylosidase (EC 3.2.1.37), which this
+      class does not represent, so the registry substrate xylan declares its product
+      as D-xylose equivalents (mass of xylose on complete hydrolysis), not as free
+      xylose. Kinetics come only from user data or a future curated record: the only
+      process law listed is the apparent Michaelis-Menten law on a suspended solid,
+      with no adsorption, surface or synergy law.
+
+  - record_id: glucoamylase
+    name: Glucoamylase
+    display_name: glucoamylase
+    ec_number: 3.2.1.3
+    aliases:
+      - glucan 1,4-alpha-glucosidase
+      - amyloglucosidase
+      - EC 3.2.1.3
+    maturity: literature_metadata
+    provenance:
+      source: >-
+        IUBMB Enzyme Nomenclature (ExplorEnz): EC 3.2.1.3, glucan
+        1,4-alpha-glucosidase (glucoamylase), hydrolysis of terminal (1->4)-linked
+        alpha-D-glucose residues successively from the non-reducing ends of the chains
+        with release of beta-D-glucose; the entry's comment adds that most forms also
+        hydrolyse (1->6)-alpha-D-glucosidic bonds when the next bond in the sequence
+        is (1->4). CAZy family GH15: Drula E, Garron ML, Dogan S, Lombard V, Henrissat
+        B, Terrapon N. The carbohydrate-active enzyme database: functions and
+        literature. Nucleic Acids Res. 2022;50(D1):D571-D577. doi:10.1093/nar/gkab1045
+      confidence_level: literature_curated
+      notes: >-
+        Categorical capability only: exo-acting hydrolysis of alpha-glucan chains from
+        their non-reducing ends, releasing beta-D-glucose. No kinetic value is
+        recorded or implied; the slower hydrolysis of the (1->6) branch points,
+        granule binding (starch-binding modules), gelatinization and synergy with
+        alpha-amylase are not represented.
+    target_bond_classes:
+      - alpha_1_4_glycosidic
+      - alpha_1_6_glycosidic
+    compatible_substrate_classes:
+      - starch
+    compatible_processes:
+      - homogeneous_michaelis_menten
+    notes: >-
+      Exo-acting glucoamylase capability, the class the curated CAZy family map
+      assigns to GH15. Both bond classes of the registry substrate starch are listed
+      because the IUBMB entry describes hydrolysis of (1->4) linkages and, for most
+      forms, of (1->6) branch points; the bond classes are categorical, so a case
+      neither weights the two bond types nor resolves branch points, and the
+      apparent law consumes starch as one bulk dry mass. Kinetics come only from
+      user data or a future curated record: the only process law listed is the
+      apparent Michaelis-Menten law on a suspended solid, with no adsorption,
+      surface or synergy law. The class lists only the solid starch class, not
+      dissolved malto-oligosaccharides.
+
+  - record_id: chitinase
+    name: Chitinase
+    display_name: chitinase
+    ec_number: 3.2.1.14
+    aliases:
+      - endochitinase
+      - EC 3.2.1.14
+    maturity: literature_metadata
+    provenance:
+      source: >-
+        IUBMB Enzyme Nomenclature (ExplorEnz): EC 3.2.1.14, chitinase, random
+        endo-hydrolysis of N-acetyl-beta-D-glucosaminide (1->4)-beta-linkages in chitin
+        and chitodextrins. CAZy family GH18: Drula E, Garron ML, Dogan S, Lombard V,
+        Henrissat B, Terrapon N. The carbohydrate-active enzyme database: functions and
+        literature. Nucleic Acids Res. 2022;50(D1):D571-D577. doi:10.1093/nar/gkab1045
+      confidence_level: literature_curated
+      notes: >-
+        Categorical capability only: hydrolysis of the (1->4)-beta linkages between
+        N-acetyl-D-glucosamine units of chitin. No kinetic value is recorded or
+        implied; endo- and exo-acting (chitobiosidase) GH18 members are not
+        distinguished, and deacetylation, chitin polymorphs, binding modules,
+        processivity and synergy with LPMO or beta-N-acetylhexosaminidase are not
+        represented.
+    target_bond_classes:
+      - beta_1_4_n_acetylglucosaminidic
+    compatible_substrate_classes:
+      - chitin
+    compatible_processes:
+      - homogeneous_michaelis_menten
+    notes: >-
+      Chitinase capability, the class the curated CAZy family map assigns to GH18.
+      Fungi carry GH18 chitinases for cell-wall remodelling as well as nutrition, so
+      a chitinase resolved from a genome is a candidate capability on an external
+      chitin substrate, not evidence that the organism degrades chitin as a carbon
+      source. The enzyme releases mainly chitobiose and chito-oligosaccharides; their
+      hydrolysis to N-acetyl-D-glucosamine is the work of beta-N-acetylhexosaminidase
+      (EC 3.2.1.52), which this class does not represent, so the registry substrate
+      chitin declares its product as N-acetyl-D-glucosamine equivalents (mass on
+      complete hydrolysis). Kinetics come only from user data or a future curated
+      record: the only process law listed is the apparent Michaelis-Menten law on a
+      suspended solid, with no adsorption, surface or synergy law.

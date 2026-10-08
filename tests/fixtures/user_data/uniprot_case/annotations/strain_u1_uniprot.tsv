@@ -11,3 +11,4 @@ X0TEST09	SYN09_XTEST	Synthetic protein 09 (format fixture)	synth09	Synthetic for
 X0TEST10	SYN10_XTEST	Synthetic protein 10 (format fixture)	synth10	Synthetic format-fixture organism	0	3.2.1.37	GH3;	unreviewed	797
 X0TEST11	SYN11_XTEST	Synthetic protein 11 (format fixture)	synth11	Synthetic format-fixture organism	0	3.1.1.73; 3.2.1.-		unreviewed	355
 X0TEST12	SYN12_XTEST	Synthetic protein 12 (format fixture)	synth12	Synthetic format-fixture organism	0			unreviewed	201
+X0TEST13	SYN13_XTEST	Synthetic protein 13 (format fixture)	synth13	Synthetic format-fixture organism	0	1.10.3.2	AA1;	unreviewed	580

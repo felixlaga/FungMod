@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c25_ph7,25,degC,7.0,Illustrative assay condition for the parallel enzyme-network fixture

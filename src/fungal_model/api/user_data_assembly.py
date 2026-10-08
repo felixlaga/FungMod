@@ -1,10 +1,11 @@
 """Assemble one reviewable user dataset for a fungus, substrates and conditions (ASSEMBLE-001).
 
 ``assemble_user_tables`` answers the request "fungus X on substrate(s) Y at
-condition(s) Z" from the sources a user has: a dbCAN genome annotation of X,
-enzyme classes the user asserts for X, the registry record of X, an existing
-user dataset that holds X, and SABIO-RK kinetic-law entries (a proposal, a
-frozen snapshot or a downloaded export). It drafts ONE set of user-dataset
+condition(s) Z" from the sources a user has: a dbCAN genome annotation of X or
+a UniProtKB export of its proteome (a file, or a frozen snapshot written by
+``fungal_model.sources.uniprot``), enzyme classes the user asserts for X, the
+registry record of X, an existing user dataset that holds X, and SABIO-RK
+kinetic-law entries (a proposal, a frozen snapshot or a downloaded export). It drafts ONE set of user-dataset
 tables for exactly that request, together with a structured report
 (``AssembledTablesDraft.assembly``) and a ``review.md`` that state, per enzyme
 class, substrate and condition, what is known, from where, and what is missing.
@@ -13,9 +14,12 @@ The draft is reviewed and edited by a person and then loaded with
 
 Rules:
 
-- The enzyme repertoire of X comes only from its genome annotation, the
-  classes the user asserts, its own rows in the user dataset, or the registry
-  record of X; never from its name. Each class keeps its evidence.
+- The enzyme repertoire of X comes only from its genome annotation or
+  proteome export, the classes the user asserts, its own rows in the user
+  dataset, or the registry record of X; never from its name. Each class keeps
+  its evidence. (A name can select a proteome only through
+  ``fungal_model.sources.uniprot.resolve_proteome_name``, before assembling;
+  the classes then come from that proteome's entries.)
 - Whether a class acts on a substrate is decided by the categorical rule of
   the registry and of user datasets (``enzyme_class_acts_on``). Classes of X
   that do not act on a substrate are reported, and so are classes that act on
@@ -56,13 +60,17 @@ from types import MappingProxyType
 from typing import Any
 
 from fungal_model.api.user_data import (
+    _UNIPROT_PROTEOME_ID,
+    CULTURE_TABLE,
     GENOME_TABLE,
     RESPONSE_LAWS,
     REVIEW_MARKER,
+    UNIPROT_SOURCE_TYPE,
     USER_DATASET_MANIFEST,
     UserDataset,
     _Context,
     _genome_tool,
+    _names_uniprot,
     _read_overview,
     enzyme_class_acts_on,
     load_user_dataset,
@@ -86,6 +94,7 @@ from fungal_model.api.user_data_sources import (
 )
 from fungal_model.capability import CapabilityResolver, CazymeAnnotation, CazymeFamilyMap
 from fungal_model.capability.resolution import CapabilityResolutionError
+from fungal_model.capability.uniprot import decode_uniprot_tsv, parse_uniprot_tsv, resolve_uniprot_proteome
 from fungal_model.core.provenance import ProvenanceError
 from fungal_model.core.units import Q_, units_are_compatible
 from fungal_model.registry.loaders import load_registry
@@ -94,6 +103,7 @@ from fungal_model.registry.resolver import AmbiguousResolutionError, RegistryRes
 from fungal_model.registry.store import FungModRegistry
 from fungal_model.resources import default_registry_path
 from fungal_model.sources.sabiork import RegistryProposal, stable_sabiork_token
+from fungal_model.sources.uniprot import UniprotFetchError, UniprotSnapshot, load_proteome_snapshot, query_key
 
 # Kinetics statuses of a case, as reported in ``AssembledTablesDraft.assembly["cases"]``.
 STATUS_USER_DATA = "user_data"
@@ -202,15 +212,16 @@ _TIME_GRID_KEYS = frozenset({"duration", "units", "points"})
 _FLOAT_EQUALITY = 1e-12
 
 _LIMITATIONS = (
-    "One fungus per call; its enzyme repertoire comes only from its genome annotation, the classes you assert, "
-    "its own rows in a user dataset, or its registry record.",
-    "Offline sources only: a dbCAN overview.txt file, a user dataset directory, and SABIO-RK entries from a "
-    "RegistryProposal, a frozen snapshot or an export JSON. Nothing is fetched while assembling.",
+    "One fungus per call; its enzyme repertoire comes only from its genome annotation or proteome export, the "
+    "classes you assert, its own rows in a user dataset, or its registry record.",
+    "Offline sources only: a dbCAN overview.txt file or a UniProtKB TSV export (a file or a frozen UniProt "
+    "proteome snapshot), a user dataset directory, and SABIO-RK entries from a RegistryProposal, a frozen snapshot "
+    "or an export JSON. Nothing is fetched while assembling.",
     "Kinetics transferred from another organism's enzyme are estimates (exploratory mode only). FungMod never "
     "labels them literature or measured for this fungus; only you can change that, by editing kinetics.csv with "
     "your own evidence.",
-    "A genome annotation states which enzyme classes the fungus can encode; no rate, concentration, expression or "
-    "secretion is taken from it.",
+    "A genome annotation or proteome export states which enzyme classes the fungus can encode; no rate, "
+    "concentration, expression or secretion is taken from it.",
     "Kinetics are never reused at another condition. A requested condition is reached from a measured one only "
     "through a temperature or pH law in responses.csv, as an EnvironmentGrid condition.",
     "Homogeneous Michaelis-Menten kinetics on dissolved substrates only, as in every user dataset.",
@@ -324,6 +335,8 @@ def assemble_user_tables(
     annotation: str | Path | None = None,
     annotation_tool: str | None = None,
     annotation_source: str | None = None,
+    proteome: UniprotSnapshot | str | Path | None = None,
+    proteome_selection: str | None = None,
     enzyme_classes: Sequence[str | Mapping[str, str]] | None = None,
     kinetics_sources: RegistryProposal | str | Path | Sequence[RegistryProposal | str | Path] = (),
     user_data: str | Path | UserDataset | None = None,
@@ -358,7 +371,19 @@ def assemble_user_tables(
     ``annotation`` is a dbCAN ``overview.txt`` of the fungus, with
     ``annotation_tool`` (dbCAN and its version) and ``annotation_source`` (the
     genome or proteome annotated; a ``REVIEW:`` field when omitted); it is
-    copied into the draft and listed in ``genomes.csv``. ``enzyme_classes`` are
+    copied into the draft and listed in ``genomes.csv``. When
+    ``annotation_tool`` names UniProt (followed by the release or download
+    date), ``annotation`` is read as a UniProtKB TSV export instead, exactly as
+    a ``genomes.csv`` UniProt row. ``proteome`` is a frozen UniProt proteome
+    snapshot (a ``UniprotSnapshot`` or its directory, digest verified), the
+    alternative to ``annotation``: its TSV is copied to
+    ``annotations/<query key>.tsv`` and its ``genomes.csv`` row is the
+    snapshot's (``UniprotSnapshot.genomes_row``: the release or retrieval date
+    as the version, the organism, query, retrieval time, SHA-256 and URL as the
+    source). ``proteome_selection`` states how that proteome was chosen (for
+    example ``ProteomeNameResolution.statement``) and is recorded beside it.
+    Classes resolve through the existing UniProt route (CAZy families through
+    the family map, complete EC numbers through the registry). ``enzyme_classes`` are
     classes you assert for the fungus: names, aliases, EC numbers or IDs, or
     mappings with ``enzyme_class``, ``evidence`` and ``source`` (``REVIEW:``
     when omitted).
@@ -377,7 +402,9 @@ def assemble_user_tables(
     Returns an ``AssembledTablesDraft``; ``draft.write(directory)`` writes the
     tables, the annotation file, ``user_dataset.yml`` and ``review.md``, and
     ``draft.assembly`` is the per-case report. ``load_user_dataset`` refuses
-    the directory until every ``REVIEW:`` field is filled. Nothing is fetched.
+    the directory until every ``REVIEW:`` field is filled. Nothing is fetched:
+    a proteome snapshot is fetched beforehand, on explicit request, by
+    ``fungal_model.sources.uniprot``.
     """
 
     if not isinstance(dataset_id, str) or not _DATASET_ID.fullmatch(dataset_id):
@@ -403,6 +430,8 @@ def assemble_user_tables(
         annotation_tool=annotation_tool,
         annotation_source=annotation_source,
         asserted=enzyme_classes,
+        proteome=proteome,
+        proteome_selection=proteome_selection,
     )
     assembler.collect_entries(_source_tuple(kinetics_sources), entry_ids=entry_ids, same_species=same_species)
     assembler.collect_user_candidates()
@@ -602,6 +631,13 @@ def _user_source(user_data: str | Path | UserDataset | None, base: FungModRegist
     else:
         directory = Path(user_data)
         dataset = load_user_dataset(directory, registry=base)
+    if dataset.enzyme_networks:
+        # A network is a modelling choice of the dataset's manifest; drafts are single-class tables and would drop it.
+        raise UserTablesAssemblyError(
+            f"User dataset {dataset.dataset_id!r} declares enzyme networks (enzyme_network in user_dataset.yml, from "
+            f"{', '.join(str(item['entry_substrate']) for item in dataset.enzyme_networks)}); assembled drafts are "
+            "single-class tables and do not carry a network. Load that dataset with load_user_dataset directly."
+        )
     rows = {name: _read_rows(directory / name) for name in _TABLE_COLUMNS}
     return _UserSource(dataset=dataset, directory=directory, manifest=dict(dataset.manifest), rows=rows)
 
@@ -1038,8 +1074,28 @@ class _Assembler:
 
     def _user_target(self, index: int, text: str, row: dict[str, str]) -> _Target:
         reference = row.get("registry_substrate", "")
-        if reference:
-            record = self.base.get_substrate(self.resolver.resolve_substrate(reference).record_id)
+        record = (
+            self.base.get_substrate(self.resolver.resolve_substrate(reference).record_id) if reference else None
+        )
+        state = record.physical_state if record is not None else row.get("physical_state", "")
+        if state != "dissolved":
+            # A solid substrate of a user dataset is stated on a dry-mass basis (amount_basis, a g/g yield);
+            # drafted tables carry dissolved substrates only, so the row would lose its basis here. Drafts carry
+            # no culture.csv either: a culture of the dataset on this substrate would be lost.
+            assert self.user is not None
+            cultured = [item for item in self.user.dataset.cultures if item["substrate_id"] == row["substrate_id"]]
+            culture_text = (
+                f", and the dataset's {CULTURE_TABLE} has a culture on it (strain "
+                f"{', '.join(repr(item['strain_id']) for item in cultured)}), which drafts do not carry"
+                if cultured
+                else ""
+            )
+            raise UserTablesAssemblyError(
+                f"substrates[{index}] ({text!r}) is substrate {row['substrate_id']!r} of the user dataset with "
+                f"physical state {state!r}; assembled drafts cover dissolved substrates only{culture_text}. Load "
+                "that dataset with load_user_dataset directly."
+            )
+        if record is not None:
             return _Target(
                 index=index,
                 input=text,
@@ -1122,14 +1178,26 @@ class _Assembler:
         annotation_tool: str | None,
         annotation_source: str | None,
         asserted: Sequence[str | Mapping[str, str]] | None,
+        proteome: UniprotSnapshot | str | Path | None = None,
+        proteome_selection: str | None = None,
     ) -> None:
+        annotated = annotation is not None or annotation_tool is not None or annotation_source is not None
+        if proteome is not None and annotated:
+            raise UserTablesAssemblyError(
+                "annotation and proteome both give the fungus's annotation, and genomes.csv holds one annotation per "
+                "strain; give annotation (with annotation_tool) or proteome, not both."
+            )
+        if proteome is None and proteome_selection is not None:
+            raise UserTablesAssemblyError("proteome_selection states how proteome was chosen; give it with proteome.")
         if self.user is not None:
             self._user_classes()
         self._asserted_classes(asserted)
         if self.fungus_record is not None:
             self._registry_record_classes(self.fungus_record)
-        if annotation is not None or annotation_tool is not None or annotation_source is not None:
+        if annotated:
             self._annotation_classes(annotation, annotation_tool, annotation_source)
+        if proteome is not None:
+            self._proteome_snapshot_classes(proteome, proteome_selection)
         if not self.classes:
             raise UserTablesAssemblyError(
                 f"No enzyme class has evidence for {self.strain_name!r}: give a genome annotation, enzyme_classes you "
@@ -1327,10 +1395,26 @@ class _Assembler:
         if annotation_source is not None and (not isinstance(annotation_source, str) or not annotation_source.strip()):
             raise UserTablesAssemblyError("annotation_source must be nonblank text when given.")
         path = Path(annotation)
+        uniprot = _names_uniprot({"annotation_tool": str(annotation_tool)})
         if not path.is_file():
-            raise UserTablesAssemblyError(f"annotation {str(path)!r} is not a file; give a dbCAN overview.txt.")
+            expected = "a UniProtKB TSV export" if uniprot else "a dbCAN overview.txt"
+            raise UserTablesAssemblyError(f"annotation {str(path)!r} is not a file; give {expected}.")
         data = path.read_bytes()
         relative = f"{_ANNOTATION_DIRECTORY}/{path.name}"
+        if uniprot:
+            source = (
+                annotation_source.strip()
+                if annotation_source
+                else f"{REVIEW_MARKER} the UniProt proteome that was exported, ideally with its UP identifier"
+            )
+            self._proteome_classes(
+                data,
+                relative=relative,
+                tool_text=str(annotation_tool).strip(),
+                source=source,
+                origin=f"annotation {path.name}",
+            )
+            return
         context = _Context(base=self.base, issues=[])
         # The genome route's own checks, with its messages: the tool and version, then the overview format.
         tool = _genome_tool(
@@ -1417,6 +1501,170 @@ class _Assembler:
                 {
                     "family": family,
                     "gene_count": len(family_genes.get(family, ())),
+                    "reason": "the curated CAZy family map assigns no enzyme class to this family",
+                }
+            )
+
+    def _proteome_snapshot_classes(self, proteome: UniprotSnapshot | str | Path, selection: str | None) -> None:
+        """Read a frozen UniProt proteome snapshot (digest verified) as the fungus's proteome export."""
+
+        if selection is not None and (not isinstance(selection, str) or not selection.strip()):
+            raise UserTablesAssemblyError("proteome_selection must be nonblank text when given.")
+        if isinstance(proteome, UniprotSnapshot):
+            directory: str | Path = proteome.directory
+        elif isinstance(proteome, (str, Path)):
+            directory = proteome
+        else:
+            raise UserTablesAssemblyError(
+                "proteome must be a UniprotSnapshot or the directory of a frozen UniProt proteome snapshot."
+            )
+        try:
+            snapshot = load_proteome_snapshot(directory)
+        except UniprotFetchError as exc:
+            raise UserTablesAssemblyError(f"The UniProt proteome snapshot cannot be used: {exc}") from exc
+        relative = f"{_ANNOTATION_DIRECTORY}/{query_key(snapshot.query)}.tsv"
+        row = snapshot.genomes_row(strain_id=self.strain_id, annotation_file=relative)
+        self._proteome_classes(
+            snapshot.read_bytes(),
+            relative=relative,
+            tool_text=row["annotation_tool"],
+            source=row["source"],
+            origin=f"UniProt proteome snapshot {snapshot.directory}",
+            extra={
+                "snapshot": {
+                    "directory": str(snapshot.directory),
+                    "query": snapshot.query,
+                    "url": snapshot.url,
+                    "retrieved_at": snapshot.retrieved_at,
+                    "uniprot_release": snapshot.uniprot_release,
+                    "sha256": snapshot.sha256,
+                },
+                "selection": selection.strip() if selection else None,
+            },
+        )
+
+    def _proteome_classes(
+        self,
+        data: bytes,
+        *,
+        relative: str,
+        tool_text: str,
+        source: str,
+        origin: str,
+        extra: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Resolve a UniProtKB TSV export with the genomes.csv UniProt route's checks and resolver."""
+
+        if self.genome_rows:
+            raise UserTablesAssemblyError(
+                f"The user dataset already has a genome annotation for {self.strain_id!r} in {GENOME_TABLE}; a strain "
+                "has one annotation. Pass no proteome or annotation, or edit the dataset."
+            )
+        context = _Context(base=self.base, issues=[])
+        tool = _genome_tool({"annotation_tool": tool_text}, file=GENOME_TABLE, line=2, context=context)
+        if context.issues or tool is None:
+            raise UserTablesAssemblyError("; ".join(str(issue["message"]) for issue in context.issues))
+        identifiers = sorted(set(_UNIPROT_PROTEOME_ID.findall(source)))
+        if len(identifiers) > 1:
+            raise UserTablesAssemblyError(
+                f"The source of the UniProt export names several proteome identifiers ({', '.join(identifiers)}); "
+                "one genomes.csv row reads one proteome, so name only the one exported."
+            )
+        proteome_id = identifiers[0] if identifiers else None
+        label = f"Annotation file {relative!r}"
+        try:
+            proteome = parse_uniprot_tsv(decode_uniprot_tsv(data, source=label), source=label)
+            resolution = resolve_uniprot_proteome(
+                proteome,
+                capability_resolver=CapabilityResolver(
+                    family_map=CazymeFamilyMap.load(),
+                    registry_enzyme_classes=tuple(sorted(self.base.enzyme_classes)),
+                ),
+                registry=self.base,
+                organism=self.strain_name,
+                proteome_source=source,
+                annotation_tool=tool[0],
+                annotation_tool_version=tool[1],
+                annotation_date="not recorded when assembling",
+            )
+        except (CapabilityResolutionError, ProvenanceError) as exc:
+            raise UserTablesAssemblyError(f"The UniProt export could not be resolved: {exc}") from exc
+        self.annotation_files[relative] = data
+        self.genome_rows.append(
+            {
+                "strain_id": self.strain_id,
+                "annotation_file": relative,
+                "annotation_tool": tool_text,
+                "source": source,
+                "min_tools_agreeing": "",
+            }
+        )
+        resolved = resolution.to_dict()
+        self.annotation_report = {
+            "annotation_file": relative,
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "annotation_tool": tool_text,
+            "source": source,
+            "from": origin,
+            "source_type": UNIPROT_SOURCE_TYPE,
+            "proteome_id": proteome_id,
+            "organism": proteome.organism or None,
+            "organism_id": proteome.organism_id or None,
+            "entry_rows": len(proteome.entries),
+            "protein_counts": resolved["protein_counts"],
+            "unresolved_ec_numbers": resolved["unresolved_ec_numbers"],
+            "partial_ec_numbers": resolved["partial_ec_numbers"],
+            "ec_cazy_disagreements": resolved["ec_cazy_disagreements"],
+            "comparison_rule": resolved["comparison_rule"],
+            **dict(extra or {}),
+        }
+        named = f"UniProt proteome {proteome_id}" if proteome_id else f"UniProt export {relative}"
+        for support in resolution.capabilities:
+            count = len(support.accessions)
+            entry: dict[str, Any] = {
+                "enzyme_class": support.enzyme_class,
+                "families": list(support.families),
+                "ec_numbers": list(support.ec_numbers),
+                "accession_count": count,
+                "specificity": support.specificity,
+            }
+            if not support.modellable:
+                self.unmodellable.append(
+                    {
+                        **entry,
+                        "accessions": list(support.accessions),
+                        "reason": "no enzyme-class record in the registry; FungMod does not create one from a "
+                        "proteome export, so no case is assembled for it",
+                    }
+                )
+                continue
+            parts = [f"{count} {'protein' if count == 1 else 'proteins'}"]
+            if support.families:
+                parts.append(f"CAZy families {', '.join(support.families)}")
+            if support.ec_numbers:
+                parts.append(f"EC {', '.join(support.ec_numbers)}")
+            self._class_from_registry(support.enzyme_class).evidence.append(
+                _Evidence(
+                    kind="proteome_annotation",
+                    evidence=f"{named} ({', '.join(parts)})",
+                    source=source,
+                    details={
+                        **entry,
+                        "accessions": list(support.accessions),
+                        "accessions_by_basis": {
+                            basis: list(items) for basis, items in support.accessions_by_basis.items()
+                        },
+                        "reviewed_accessions": list(support.reviewed_accessions),
+                        "file": GENOME_TABLE,
+                    },
+                )
+            )
+        for family, accessions in resolution.unmapped_families.items():
+            self.unmapped.append(
+                {
+                    "family": family,
+                    "accession_count": len(accessions),
+                    "accessions": list(accessions),
                     "reason": "the curated CAZy family map assigns no enzyme class to this family",
                 }
             )
@@ -2460,8 +2708,11 @@ class _Assembler:
             parts.append(f"user dataset {self.user.dataset.dataset_id} (sha256 {self.user.dataset.digest})")
         if self.annotation_report:
             parts.append(
-                f"dbCAN annotation {self.annotation_report['annotation_file']} (sha256 {self.annotation_report['sha256']})"
+                f"{self._annotation_label()} {self.annotation_report['annotation_file']} "
+                f"(sha256 {self.annotation_report['sha256']})"
             )
+            if self.annotation_report.get("selection"):
+                parts.append(f"proteome choice: {self.annotation_report['selection']}")
         for source in self.sources:
             snapshots = ", ".join(f"{item['file']} (sha256 {item['sha256']})" for item in source["snapshots"])
             parts.append(f"SABIO-RK {source['description']}: {snapshots}")
@@ -2497,6 +2748,12 @@ class _Assembler:
             ),
             "simulation": simulation,
         }
+
+    def _annotation_label(self) -> str:
+        """How the manifest and review.md name the annotation: a UniProt export or a dbCAN annotation."""
+
+        tool = str(self.annotation_report.get("annotation_tool", ""))
+        return "UniProt proteome export" if _names_uniprot({"annotation_tool": tool}) else "dbCAN annotation"
 
     # -- report ----------------------------------------------------------------
 
@@ -2714,7 +2971,8 @@ class _Assembler:
             sources.append(f"user dataset `{self.user.dataset.dataset_id}` (sha256 `{self.user.dataset.digest}`)")
         if self.annotation_report:
             sources.append(
-                f"dbCAN annotation `{self.annotation_report['annotation_file']}` (sha256 `{self.annotation_report['sha256']}`)"
+                f"{self._annotation_label()} `{self.annotation_report['annotation_file']}` "
+                f"(sha256 `{self.annotation_report['sha256']}`)"
             )
         for source in self.sources:
             for snapshot in source["snapshots"]:
@@ -2724,6 +2982,8 @@ class _Assembler:
         if self.fungus_record is not None:
             sources.append(f"registry fungus record `{self.fungus_record.record_id}`")
         lines.append("- Sources: " + ("; ".join(sources) if sources else "the enzyme classes you asserted only"))
+        if self.annotation_report.get("selection"):
+            lines.append(f"- Proteome choice: {_md(str(self.annotation_report['selection']))}")
         lines.extend(["", "## Fields to fill", ""])
         if draft.review_fields:
             lines.extend(["| File | Row | Column | What to decide |", "| --- | --- | --- | --- |"])
@@ -2736,22 +2996,34 @@ class _Assembler:
             lines.append("None.")
         lines.extend(["", f"## Enzyme repertoire of {_md(self.strain_name)}", ""])
         lines.append(
-            "Only a genome annotation, the classes you assert, the fungus's own rows in a user dataset or its registry "
-            "record give a class; a name never does."
+            "Only a genome annotation or proteome export, the classes you assert, the fungus's own rows in a user "
+            "dataset or its registry record give a class; a name never does."
         )
         lines.extend(["", "| Enzyme class | Declared in | Evidence |", "| --- | --- | --- |"])
         for item in report["enzyme_classes"]:
             evidence = "; ".join(_evidence_text(entry["evidence"], entry["source"]) for entry in item["evidence"])
             lines.append(f"| {item['enzyme_class']} | {item['declared_in']} | {_md(evidence)} |")
-        if self.unmodellable or self.unmapped:
+        unresolved = list(self.annotation_report.get("unresolved_ec_numbers") or ())
+        disagreements = list(self.annotation_report.get("ec_cazy_disagreements") or ())
+        if self.unmodellable or self.unmapped or unresolved or disagreements:
             lines.extend(["", "Not added from the annotation:", ""])
             for item in self.unmodellable:
                 lines.append(
-                    f"- {item['enzyme_class']} (families {', '.join(item['families'])}, {item['gene_count']} gene(s)): "
+                    f"- {item['enzyme_class']} (families {', '.join(item['families'])}, {_count_text(item)}): "
                     f"{_md(str(item['reason']))}"
                 )
             for item in self.unmapped:
-                lines.append(f"- family {item['family']} ({item['gene_count']} gene(s)): {_md(str(item['reason']))}")
+                lines.append(f"- family {item['family']} ({_count_text(item)}): {_md(str(item['reason']))}")
+            for item in unresolved:
+                lines.append(
+                    f"- EC {item['ec_number']} ({item['accession_count']} protein(s)): {_md(str(item['reason']))}"
+                )
+            for item in disagreements:
+                lines.append(
+                    f"- {item['accession']}: CAZy {', '.join(item['cazy_families'])} names "
+                    f"{', '.join(item['cazy_classes']) or 'no class'}, EC {', '.join(item['ec_numbers'])} names "
+                    f"{', '.join(item['ec_classes']) or 'no class'}; {_md(str(item['outcome']))}"
+                )
         lines.extend(["", "## Which classes act on each substrate", ""])
         for entry in report["substrate_compatibility"]:
             lines.append(f"### {_md(entry['substrate'])}")
@@ -2917,6 +3189,14 @@ class _Assembler:
 
 def _with_review(draft: AssembledTablesDraft, review: str) -> AssembledTablesDraft:
     return replace(draft, review=review)
+
+
+def _count_text(item: Mapping[str, Any]) -> str:
+    """The gene count of a dbCAN entry or the protein count of a UniProt entry."""
+
+    if "gene_count" in item:
+        return f"{item['gene_count']} gene(s)"
+    return f"{item.get('accession_count', 0)} protein(s)"
 
 
 def _evidence_text(evidence: str, source: str) -> str:

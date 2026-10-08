@@ -54,7 +54,7 @@ import hashlib
 import io
 import math
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
@@ -413,6 +413,14 @@ def user_tables_from_sabiork(
     builder.not_selected = tuple(entry for entry in loaded.entries if entry not in selected)
     builder.duplicates = loaded.duplicates
     return builder.build(selected, loaded)
+
+
+# The kinetics databases user tables can be drafted from, keyed by the provider name that
+# ``source_proposal`` uses, with the drafting function of each. A caller that names no database
+# itself (the command line) offers these keys and calls the function of the provider the user names.
+USER_TABLE_PROVIDERS: Mapping[str, Callable[..., UserTablesDraft]] = MappingProxyType(
+    {"sabiork": user_tables_from_sabiork}
+)
 
 
 # ---------------------------------------------------------------------------
@@ -2371,6 +2379,7 @@ __all__ = [
     "PH_IONIZATION_LAW_PARAMETERS",
     "SABIORK_TEMPERATURE_UNITS",
     "SABIORK_UNIT_SPELLINGS",
+    "USER_TABLE_PROVIDERS",
     "UserTablesDraft",
     "UserTablesSourceError",
     "user_tables_from_sabiork",

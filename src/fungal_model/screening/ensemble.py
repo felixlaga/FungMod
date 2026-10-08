@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import product
 import json
 from pathlib import Path
@@ -104,9 +104,16 @@ class RegistryCaseEnsemble:
     sample_failures: tuple[EnsembleSampleFailure, ...] = ()
     environment_response: Mapping[str, Any] = field(default_factory=dict)
     """Environment-response summary of the assembled config (``provenance.environment_response``)."""
+    case_index: int | None = None
+    """Zero-based position of the case in the requested fungus x substrate x environment grid.
+
+    ``simulate_screen`` sets it; the standard tables name the case ``case_<index>`` after it, so a
+    case keeps its id when only some cases of the grid are simulated.
+    """
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "case_index": self.case_index,
             "fungus_id": self.fungus_id,
             "substrate_id": self.substrate_id,
             "environment_id": self.environment_id,
@@ -156,8 +163,25 @@ def simulate_screen(
     seed: int | None = None,
     output_dir: str | Path | None = None,
     mode: ScreenSimulationMode = "exploratory",
+    cases: Sequence[tuple[str, str, str]] | None = None,
 ) -> RegistryScreenResult:
-    """Run registry cases as sampled exploratory ensembles or exact scientific screens."""
+    """Run registry cases as sampled exploratory ensembles or exact scientific screens.
+
+    The requested grid is every ``(fungus_id, substrate_id, environment_id)``
+    combination in ``itertools.product`` order. ``cases=None`` simulates the
+    whole grid. ``cases`` simulates only the listed triples of that grid, in
+    the order given (nothing is reordered); a triple outside the grid, a triple
+    listed twice, an empty list and a grid that repeats a combination are
+    refused. Each case keeps its grid position as ``case_index``.
+
+    Seeds: the run seed draws one case seed per grid position, in grid order,
+    whether or not the position is simulated. A case's samples therefore depend
+    only on ``seed``, the grid and its position in it: they are the same when
+    the whole grid runs, when only some cases run and when it runs alone through
+    ``cases``. A different grid, such as a request naming only that case, gives
+    the case another position and therefore, unless it is the first position,
+    another seed.
+    """
 
     _validate_screen_inputs(
         fungus_ids=fungus_ids,
@@ -166,25 +190,27 @@ def simulate_screen(
         n_samples=n_samples,
         mode=mode,
     )
+    grid = tuple(product(fungus_ids, substrate_ids, environment_ids))
+    selected = _selected_case_indices(grid, cases)
     root = Path(output_dir) if output_dir is not None else Path("outputs/registry_screen")
     if mode == "scientific":
         n_samples = 1
     rng = np.random.default_rng(seed)
+    case_seeds = tuple(int(rng.integers(0, np.iinfo(np.uint32).max)) for _ in grid)
     case_results: list[RegistryCaseEnsemble] = []
-    for fungus_id, substrate_id, environment_id in product(fungus_ids, substrate_ids, environment_ids):
-        case_seed = int(rng.integers(0, np.iinfo(np.uint32).max))
-        case_results.append(
-            _simulate_case_ensemble(
-                fungus_id=fungus_id,
-                substrate_id=substrate_id,
-                environment_id=environment_id,
-                registry=registry,
-                n_samples=n_samples,
-                rng=np.random.default_rng(case_seed),
-                output_root=root,
-                mode=mode,
-            )
+    for case_index in selected:
+        fungus_id, substrate_id, environment_id = grid[case_index]
+        case_result = _simulate_case_ensemble(
+            fungus_id=fungus_id,
+            substrate_id=substrate_id,
+            environment_id=environment_id,
+            registry=registry,
+            n_samples=n_samples,
+            rng=np.random.default_rng(case_seeds[case_index]),
+            output_root=root,
+            mode=mode,
         )
+        case_results.append(replace(case_result, case_index=case_index))
     result = RegistryScreenResult(
         mode=mode,
         n_samples=n_samples,
@@ -879,7 +905,8 @@ def _write_screen_csv_outputs(
 
 def _sampled_parameter_rows(case_results: Sequence[RegistryCaseEnsemble]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for case_index, case in enumerate(case_results):
+    for position, case in enumerate(case_results):
+        case_index = _grid_case_index(case, position)
         for sample in case.samples:
             row = _base_sample_row(case=case, case_index=case_index, sample=sample)
             row["status"] = "success"
@@ -893,7 +920,8 @@ def _sampled_parameter_rows(case_results: Sequence[RegistryCaseEnsemble]) -> lis
 
 def _final_state_rows(case_results: Sequence[RegistryCaseEnsemble]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for case_index, case in enumerate(case_results):
+    for position, case in enumerate(case_results):
+        case_index = _grid_case_index(case, position)
         for sample in case.samples:
             row = _base_sample_row(case=case, case_index=case_index, sample=sample)
             row["status"] = "success"
@@ -908,7 +936,8 @@ def _final_state_rows(case_results: Sequence[RegistryCaseEnsemble]) -> list[dict
 
 def _failure_rows(case_results: Sequence[RegistryCaseEnsemble]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for case_index, case in enumerate(case_results):
+    for position, case in enumerate(case_results):
+        case_index = _grid_case_index(case, position)
         for failure in case.sample_failures:
             rows.append(
                 {
@@ -923,6 +952,12 @@ def _failure_rows(case_results: Sequence[RegistryCaseEnsemble]) -> list[dict[str
                 }
             )
     return rows
+
+
+def _grid_case_index(case: RegistryCaseEnsemble, position: int) -> int:
+    """The case's position in the requested grid, or its position in the results when it carries none."""
+
+    return position if case.case_index is None else case.case_index
 
 
 def _base_sample_row(
@@ -1003,6 +1038,36 @@ def _csv_value(value: Any) -> Any:
     if isinstance(value, np.generic):
         return value.item()
     return value
+
+
+def _selected_case_indices(
+    grid: Sequence[tuple[str, str, str]],
+    cases: Sequence[tuple[str, str, str]] | None,
+) -> tuple[int, ...]:
+    """Return the grid positions to simulate, in the order ``cases`` lists them."""
+
+    if cases is None:
+        return tuple(range(len(grid)))
+    positions = {case: index for index, case in enumerate(grid)}
+    if len(positions) != len(grid):
+        raise RegistryScreenSimulationError(
+            "cases selects grid positions by (fungus_id, substrate_id, environment_id), but the requested ids "
+            "repeat a combination; name each fungus, substrate and environment once."
+        )
+    selected: list[int] = []
+    for case in cases:
+        index = positions.get((case[0], case[1], case[2])) if len(case) == 3 else None
+        if index is None:
+            raise RegistryScreenSimulationError(
+                f"cases lists {tuple(case)!r}, which is not a (fungus_id, substrate_id, environment_id) "
+                "combination of the requested fungus_ids, substrate_ids and environment_ids."
+            )
+        if index in selected:
+            raise RegistryScreenSimulationError(f"cases lists {tuple(case)!r} more than once.")
+        selected.append(index)
+    if not selected:
+        raise RegistryScreenSimulationError("cases must list at least one case; use cases=None for the whole grid.")
+    return tuple(selected)
 
 
 def _validate_screen_inputs(

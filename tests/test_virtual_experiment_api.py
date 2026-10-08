@@ -103,7 +103,7 @@ def test_virtual_experiment_reaction_618_writes_standard_tables_and_quicklook(
     output_manifest = _json_mapping(output_dir / "output_manifest.json")
     output_schema = _json_mapping(output_dir / "virtual_experiment_output_schema.json")
 
-    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "2.1.0"
+    assert output_manifest["output_schema_version"] == OUTPUT_SCHEMA_VERSION == "2.2.0"
     assert output_schema["schema_version"] == OUTPUT_SCHEMA_VERSION
     assert "conservation_diagnostics.csv" in output_manifest["files"]
     assert "conservation_diagnostics" in output_manifest["tables"]

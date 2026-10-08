@@ -1,0 +1,14 @@
+dataset_id: culture_estimates
+contributor: FungMod maintainers
+date: 2026-10-07
+source: >-
+  Illustrative estimates for a user-defined fungus on a user-defined xylan-like solid;
+  no measurement, literature value or registry record stands behind them
+notes: >-
+  Non-specific culture case of the user-data route (USERDATA-009): one induced enzyme
+  pool stated as a protein mass, every value an estimate, so the case runs in
+  exploratory mode only and scientific mode refuses it.
+simulation:
+  duration: 120
+  units: hour
+  points: 121

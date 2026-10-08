@@ -75,6 +75,7 @@ The `fungmod` console script (also `python -m fungal_model`); see
         - UserTablesDraft
         - UserTablesSourceError
         - SABIORK_UNIT_SPELLINGS
+        - USER_TABLE_PROVIDERS
 
 ::: fungal_model.api.user_data_assembly
     options:

@@ -37,7 +37,16 @@ A loaded `UserDataset` can be passed as `user_data=` as well; it carries the
 `dataset_id`, a SHA-256 `digest` over the manifest and table bytes, the
 generated registry mappings (`records`) and `to_dict()`.
 
-Five complete examples live in the test fixtures:
+Every step on this page also runs from a shell ([command line](cli.md)):
+`fungmod check-data DIR` loads a directory and prints its gaps, genome or
+proteome resolution, cultures, time courses and fitted values, or every issue as
+`file:row:column: message`; `fungmod run --user-data DIR` simulates it;
+`fungmod assemble`, `fungmod draft-kinetics`, `fungmod run
+--compare-timecourses` and `fungmod fit` are the command-line forms of
+`assemble_user_tables`, `user_tables_from_sabiork`, `compare_with_timecourses`
+and `fit_user_dataset` (see [the user-data workflow from a shell](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
+
+Eleven complete examples live in the test fixtures:
 `tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on a
 user-defined aryl ester, `kcat` form, estimates only),
 `tests/fixtures/user_data/literature_reentry/` (the published SABIO-RK Reaction
@@ -55,7 +64,24 @@ classes come only from a hand-written dbCAN overview in `genomes.csv`; a format
 fixture with synthetic gene identifiers, not a real genome, and no kinetic
 values, so every resolved class is a gap). `tests/fixtures/user_data/uniprot_case/`
 does the same from a hand-written UniProtKB TSV export (a format fixture with
-synthetic accessions, not a real proteome).
+synthetic accessions, not a real proteome). `tests/fixtures/user_data/solid_case/`
+is a [solid substrate](#solid-substrates): the registry's apparent hydrolysis
+constants for a filter-paper activity pool re-entered as estimates on a
+user-defined particulate substrate in g/L, with enzyme doses in FPU per gram
+and a reactivity exponent. `tests/fixtures/user_data/culture_reentry/` and
+`tests/fixtures/user_data/culture_estimates/` are
+[fungal cultures](#fungal-culture-growth-and-secretion): the registry's
+*T. harzianum* culture case re-entered in `culture.csv` (FungMod's
+retrospective fit as estimates, the deposited initial conditions as
+literature), and a user-defined strain growing on a user-defined xylan-like
+solid with one protein-mass enzyme pool (estimates only).
+`tests/fixtures/user_data/network_chain/` and
+`tests/fixtures/user_data/network_parallel/` are
+[enzyme networks](#several-enzymes-acting-together): two user-defined classes
+degrading a soluble polymer-like substrate through an oligomer-like pool to a
+monomer-like product, and two user-defined classes in parallel on one ester-like
+substrate (kcat and Vmax forms) with competitive product inhibition of one of
+them (estimates only).
 
 To start from public kinetics instead of typing them in, draft the tables from
 SABIO-RK entries and review them; see
@@ -100,11 +126,30 @@ for case in draft.assembly["cases"]:
     print(case["enzyme_class"], case["condition"], case["kinetics_status"], case["reason"])
 ```
 
+From a shell, `fungmod assemble --fungus ... --substrate ... --temperature-c
+30 --temperature-c 40 --ph 5 --annotation ... --annotation-tool ...
+--kinetics-source ... --entry-id 35622 --dataset-id ... --output ...` writes the
+same draft and prints the per-case report, the `REVIEW:` fields and the next
+commands ([command line](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
+With `--fetch-proteome --fetch` in place of the annotation, the repertoire
+comes from the UniProt reference proteome found under the fungus's name
+([from a fungus name](#from-a-fungus-name)).
+When a case of the draft is a `gap` or a `conflict`, the printed `fungmod
+run` command carries `--runnable-only` and a line says why: once loaded, that
+case's kinetic constants are explicit gaps, so the preflight blocks it, and
+without the flag the whole command would simulate nothing (exit code 3).
+With it the runnable cases are simulated and the gaps are listed with their
+measurement requests (exit code 4, a
+[partial run](concepts/outputs.md#partial-runs)); in Python the same is
+`study.simulate(..., blocked="report")`.
+
 With the hand-written annotation of the `genome_case` fixture and the frozen
 Reaction 618 snapshot (`tests/test_user_data_assembly.py`), the strain has
-`beta_glucosidase` (GH1, GH3) and `cellulase_generic` (GH5) from its
-annotation; `cellulase_generic` does not act on cellobiose and is reported as
-such, and the four annotated classes without a registry record are listed. At
+`beta_glucosidase` (GH1, GH3), `cellobiohydrolase` (GH7),
+`cellulase_generic` (GH5), `endo_xylanase` (GH10) and `glucoamylase` (GH15)
+from its annotation; all but `beta_glucosidase` do not act on cellobiose and
+are reported as such, and the one annotated class without a registry record
+(`laccase`, AA1) is listed. At
 30 degC, pH 5 the beta-glucosidase kinetics are `transferred_estimate` from
 EntryID 35622, a rice enzyme. At 40 degC, pH 5 the case is a `gap`: the only
 kinetics were stated at 30 degC, and once loaded, its measurement requests
@@ -112,8 +157,11 @@ read "Measure km of beta-glucosidase from Genome-annotated strain G1 on
 Cellobiose at 40 degC, pH 5 (mM); kinetics.csv states kinetic constants of this
 strain, enzyme class and substrate only at c30_ph5 (30 degC, pH 5), and FungMod
 does not reuse kinetics measured at another condition; ...". The draft loads
-once its contributor is filled in, runs in exploratory mode, and is refused in
-scientific mode because the transferred values are estimates.
+once its contributor is filled in. In exploratory mode the request for both
+conditions runs as a partial run (`blocked="report"`, or `--runnable-only`):
+the 30 degC case is simulated and the 40 degC gap is listed as not simulated
+with those requests; without the opt-in the request is refused. In scientific
+mode both cases are refused, because the transferred values are estimates.
 
 ### Inputs
 
@@ -133,8 +181,11 @@ scientific mode because the transferred values are estimates.
   `temperature_units` (`degC` or `kelvin`), `ph` and optionally
   `condition_id` and `notes`. Nothing is invented.
 - Sources of the enzyme repertoire: `annotation` with `annotation_tool` and
-  `annotation_source` (checked like a `genomes.csv` row, copied into
-  `annotations/` and listed in `genomes.csv`), `enzyme_classes` you assert
+  `annotation_source` (a dbCAN `overview.txt`, or a UniProtKB TSV export when
+  the tool names UniProt; checked like a `genomes.csv` row, copied into
+  `annotations/` and listed in `genomes.csv`), or instead `proteome`, a
+  frozen UniProt proteome snapshot, with `proteome_selection` saying how it
+  was chosen ([from a fungus name](#from-a-fungus-name)), `enzyme_classes` you assert
   (a class name, alias, EC number or ID, or a mapping with `enzyme_class`,
   `evidence` and `source`; missing evidence or source is a `REVIEW:` field),
   the registry record of a registry fungus, and the strain's rows in
@@ -178,8 +229,11 @@ cases of a registry fungus.
 ### Rules
 
 - **The repertoire is evidence, never a name.** A class belongs to the fungus
-  only through its genome annotation, a class you assert, its own rows in your
-  dataset or its registry record. A SABIO-RK entry or a name never adds one.
+  only through its genome annotation or proteome export, a class you assert,
+  its own rows in your dataset or its registry record. A SABIO-RK entry or a
+  name never adds one; a name can at most select a UniProt reference proteome
+  ([from a fungus name](#from-a-fungus-name)), whose entries are then the
+  evidence.
 - **Which classes act on a substrate** is the registry's categorical rule (the
   substrate class is one of the class's substrate classes and they share a
   bond class; `enzyme_class_acts_on`). Classes of the fungus that do not act on
@@ -217,17 +271,29 @@ cases of a registry fungus.
 ### Limits
 
 - One fungus per call.
-- Offline sources only: a dbCAN `overview.txt` file, a user dataset and
-  SABIO-RK entries from a proposal, a frozen snapshot or an export; no other
-  kinetics database.
+- Offline sources only: a dbCAN `overview.txt` file or a UniProtKB export (a
+  file or a frozen UniProt proteome snapshot), a user dataset and SABIO-RK
+  entries from a proposal, a frozen snapshot or an export; no other kinetics
+  database. The proteome snapshot is fetched beforehand, only on request
+  (`fungmod assemble --fetch`, or `refresh=True` in Python).
 - Transferred kinetics are estimates; scientific mode needs your own, or
   same-species literature, values.
 - No rate, concentration, expression or secretion is taken from a genome.
 - The stored registry cases of a registry fungus are listed, not copied: they
   run without the draft.
-- Everything else is as for any user dataset (below): dissolved substrates and
-  homogeneous Michaelis-Menten kinetics only.
-- There is no command-line subcommand yet.
+- Dissolved substrates only: a requested substrate of `user_data` that is a
+  [solid substrate](#solid-substrates) is refused (the drafted tables carry no
+  `amount_basis`, and no `culture.csv`: the message names a culture on that
+  substrate); load such a dataset with `load_user_dataset` directly. Cultures
+  of a `user_data` dataset on other substrates are not carried, like any
+  substrate that was not requested.
+  Everything else is as for any user dataset (below).
+- From a shell, `fungmod assemble` takes the request as a grid of
+  `--temperature-c` and `--ph` values in degC, substrates by name and asserted
+  classes by name or with their evidence and source
+  ([command line](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)); kelvin temperatures, explicit condition ids
+  and notes, and the categories of a new substrate are set in the Python API
+  or while reviewing the tables.
 
 ## Directory layout
 
@@ -244,6 +310,7 @@ cases of a registry fungus.
 | `genomes.csv` | no | A dbCAN genome annotation or a UniProt proteome export per strain, from which enzyme classes are resolved. |
 | annotation files | with `genomes.csv` | The dbCAN `overview.txt` files and UniProt TSV exports that `genomes.csv` names, anywhere inside the directory. |
 | `timecourse.csv` | no | Measured substrate remaining and product formed over time (see [time courses](#time-courses-comparison-and-fitting)). |
+| `culture.csv` | no | A strain growing on a solid substrate and secreting its enzyme pools: the roles of the registry's culture model (see [fungal culture](#fungal-culture-growth-and-secretion)). |
 | `fit_report.json` | in a fitted dataset | The report of the fit that produced the dataset's `fitted` rows, named by the manifest `fit` block. |
 
 Any other CSV file in the directory is refused as unsupported in this version
@@ -271,8 +338,11 @@ simulation:                          # required; there is no default time grid
 ```
 
 `notes` is also accepted, and `fit` in a dataset written by `fit_user_dataset`
-(see [below](#fitting-kinetic-constants-to-time-courses)). Every generated
-identifier is prefixed with `<dataset_id>__`.
+(see [below](#fitting-kinetic-constants-to-time-courses)). An optional
+`enzyme_network` block with `entry_substrates` makes every case of the dataset
+an enzyme network of all the strain's classes acting together (see
+[several enzymes acting together](#several-enzymes-acting-together)). Every
+generated identifier is prefixed with `<dataset_id>__`.
 
 ### `strains.csv`
 
@@ -321,8 +391,8 @@ snake_case.
 ### `substrates.csv`
 
 Columns: `substrate_id`\*, `registry_substrate`, `name`, `substrate_class`,
-`physical_state`, `bond_classes`, `product`\*, `product_yield`\*,
-`yield_basis`\*, `source`\*.
+`physical_state`, `bond_classes`, `amount_basis`, `product`\*,
+`product_yield`\*, `yield_basis`\*, `source`\*.
 
 ```text
 substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
@@ -331,13 +401,21 @@ cellobiose,cellobiose,,,,,beta_D_glucose,2,mol/mol,Reaction equation of the sour
 ```
 
 - With `registry_substrate`, the registry record is referenced, not copied: the
-  row supplies only the product, yield and source, and the other descriptive
-  columns must stay blank. The registry substrate must be dissolved and must
-  already list the product.
-- Without it, every column is required and `physical_state` must be
-  `dissolved`.
-- The product yield is always explicit (`yield_basis` must be `mol/mol`); it is
-  never inferred.
+  row supplies only the product, yield, bases and source, and the other
+  descriptive columns must stay blank. The registry substrate must be
+  `dissolved` or `solid_polymer` and must already list the product (the
+  registry's solid polymers and their products are listed under
+  [registry polymers](#registry-polymers)).
+- Without it, `name`, `substrate_class`, `physical_state` and `bond_classes`
+  are required, and `physical_state` must be `dissolved` or `solid_polymer`.
+- A `dissolved` substrate is stated in amounts per volume: leave
+  `amount_basis` blank, and `yield_basis` must be `mol/mol`.
+- A `solid_polymer` substrate is one suspended polymer stated on a dry-mass
+  basis: `amount_basis` must be `dry_mass` and `yield_basis` must be `g/g`
+  (grams of product per gram of dry substrate consumed). See
+  [solid substrates](#solid-substrates).
+- The product yield is always explicit; it is never inferred, and no basis is
+  converted to another.
 
 ### `conditions.csv`
 
@@ -358,7 +436,7 @@ notes; pH must lie between 0 and 14.
 Columns: `strain_id`\*, `enzyme_class`\*, `substrate_id`\*, `condition_id`\*,
 `quantity`\*, `value`, `lower`, `upper`, `units`\*, `evidence_type`\*,
 `method`, `source`\*, `sd`, `replicates`, `activity_substrate`,
-`activity_saturating`.
+`activity_saturating`, `inhibitor`.
 
 ```text
 strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,sd,replicates
@@ -383,6 +461,9 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,enzyme_concentration
 | `pk_free_lower`, `pk_free_upper` | `dimensionless` | Lower and upper pK of the free enzyme (`pKe1`, `pKe2`). |
 | `pk_complex_lower`, `pk_complex_upper` | `dimensionless` | Lower and upper pK of the enzyme-substrate complex (`pKes1`, `pKes2`). |
 | `ph_min`, `ph_max` | `dimensionless` | The pH range the pH-ionization law was fitted over; exact values between 0 and 14. |
+| `enzyme_dose` | enzyme per dry substrate mass, e.g. mg/g or FPU/g | Enzyme per substrate mass; times `substrate_initial_concentration` it gives the enzyme concentration. [Solid substrates](#solid-substrates) only. |
+| `reactivity_exponent` | `dimensionless`, zero or positive | Exponent `n` of the conversion-dependent factor `(S / S0)^n`. [Solid substrates](#solid-substrates) only. |
+| `ki` | concentration, amount per volume | Competitive inhibition constant of the row's process by the pool named in `inhibitor` (positive). [Enzyme networks](#competitive-product-inhibition-ki) on dissolved substrates only. |
 
 `U` is the enzyme unit of the unit registry, one micromole per minute.
 `enzyme_activity` is refused as ambiguous: say `specific_activity` or
@@ -390,11 +471,12 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,enzyme_concentration
 
 - Give either `value` (exact) or `lower` and `upper` (a range, sampled
   uniformly in exploratory runs).
-- The concentration rows of one case must all be amount per volume: a mass
-  concentration next to a molar one would need a molar mass, and the mol/mol
-  yield cannot be applied to mass concentrations either, so both are refused.
-  For the same reason `vmax` and `assay_activity` must be amounts, not masses,
-  per volume per time.
+- On a dissolved substrate the concentration rows of one case must all be
+  amount per volume: a mass concentration next to a molar one would need a
+  molar mass, and the mol/mol yield cannot be applied to mass concentrations
+  either, so both are refused. For the same reason `vmax` and
+  `assay_activity` must be amounts, not masses, per volume per time. A
+  [solid substrate](#solid-substrates) has the opposite rule: dry masses only.
 - `method` is required for `measured`, `literature` and `design` rows, and for
   every `vmax` row whatever its evidence type: it must say how the maximum rate
   of the simulated system was obtained.
@@ -502,7 +584,8 @@ instead.
 #### Three routes to Vmax
 
 Vmax for a case comes from exactly one route; rows of two routes in one case
-are refused.
+are refused. On a [solid substrate](#solid-substrates) only the first route,
+an explicit `vmax` row, is accepted.
 
 1. **An explicit `vmax` row**, a rate for the simulated system itself, with a
    `method` saying how it was obtained. Refused without a method or in mass
@@ -701,10 +784,30 @@ Limits of the genome route:
   and nothing is downloaded at run time.
 - Family-level mapping: the curated map covers 18 CAZy families, a
   polyspecific family gives only a candidate class, and the `EC#` column is not
-  used. With the shipped registry only `beta_glucosidase` and
-  `cellulase_generic` among the mapped classes have a record, so most resolved
-  classes are reported as unmodellable; the resolver's `require_diagnostic`
-  filter is not exposed.
+  used. With the shipped registry, six of the thirteen mapped classes have a
+  record (`beta_glucosidase`, `cellobiohydrolase`, `cellulase_generic`,
+  `endo_xylanase`, `glucoamylase` and `chitinase`); LPMO, cellobiose
+  dehydrogenase, acetyl xylan esterase, laccase, class II peroxidase,
+  alpha-amylase and pectate lyase are reported as unmodellable. The
+  resolver's `require_diagnostic` filter is not exposed.
+- `cellobiohydrolase` (GH6, GH7) is a categorical record without kinetics
+  (EC 3.2.1.91, with the reducing-end EC 3.2.1.176 as an alias) whose
+  substrate classes are the registry's insoluble cellulose classes
+  (`cellulose_particulate`, `cellulose_film_generic`). It joins the strain, and
+  on a [solid substrate](#solid-substrates) of such a class its roles are gaps
+  whose requests ask for dry-mass units, for example "Measure km of
+  Cellobiohydrolase from Genome-annotated strain G1 on Particulate cellulose
+  lot G at 30 degC, pH 5.0 (dry mass per volume, for example g/L); the class
+  was inferred from the dbCAN annotation (families GH7)." It acts on no
+  dissolved substrate. Endoglucanase and LPMO have no record: GH5, GH12 and
+  GH45 still map to `cellulase_generic`, and AA9 to an LPMO class without a
+  record (no oxidative rate law exists).
+- `endo_xylanase` (GH10, GH11; EC 3.2.1.8), `glucoamylase` (GH15; EC 3.2.1.3)
+  and `chitinase` (GH18; EC 3.2.1.14) are categorical records without kinetics
+  (REGISTRY-002) acting on the registry polymers `xylan`, `starch` and
+  `chitin` ([registry polymers](#registry-polymers)). They join the strain,
+  and on a dataset substrate that references such a polymer their roles are
+  gaps with dry-mass requests. They act on no dissolved substrate.
 - Gene counts are annotated genes, not active enzymes, copy numbers or
   expression.
 - The test fixture is a format fixture written by hand; no real genome
@@ -770,8 +873,8 @@ entry has an EC number or a CAZy family.
 protein go through the same `CapabilityResolver` and curated family map as a
 dbCAN annotation; each complete EC number goes through the registry's enzyme
 class lookup (`RegistryResolver.resolve_enzyme_class`, which matches the
-`ec_number` of a registry record), so an EC number resolves only to a class
-with a registry record. An EC number no record carries is listed under
+`ec_number` or an alias of a registry record), so an EC number resolves only
+to a class with a registry record. An EC number no record carries is listed under
 `unresolved_ec_numbers`; one that two records carry is listed there as
 ambiguous, and FungMod picks neither.
 
@@ -785,10 +888,12 @@ it is listed under `ec_cazy_disagreements` with both sides (families and the
 classes they name, EC numbers and the classes they resolve to, and the
 contested classes), and FungMod does not choose between them. With the
 shipped registry, a GH7 protein annotated EC 3.2.1.21 (GH7 names
-cellobiohydrolase, the EC number beta-glucosidase) and a GH3 protein annotated
-EC 3.2.1.37 only (GH3 names beta-glucosidase, whose record carries EC
-3.2.1.21) both disagree. A protein whose EC numbers resolve to nothing and
-whose family classes carry no registry EC number cannot be compared: its
+cellobiohydrolase, the EC number beta-glucosidase; both classes are contested)
+and a GH3 protein annotated EC 3.2.1.37 only (GH3 names beta-glucosidase,
+whose record carries EC 3.2.1.21) both disagree, while a GH7 protein annotated
+EC 3.2.1.91 agrees on `cellobiohydrolase` and a GH11 protein annotated
+EC 3.2.1.8 on `endo_xylanase`. A protein whose EC numbers resolve to nothing
+and whose family classes carry no registry EC number cannot be compared: its
 family classes count, and its EC numbers are listed as unresolved. Every
 other protein supports the classes its families or EC numbers name, and each
 class records which accessions support it through both annotations
@@ -851,12 +956,13 @@ The response is parsed before it is stored; it is frozen under
 or changed snapshot is refused. A new response whose digest differs from the
 stored one is refused unless you pass `overwrite=True`. A taxonomy id query
 (`organism_id:<id>`) returns every UniProtKB entry of that organism, which may
-be more than its reference proteome. There is no lookup from a free-text
-organism name to a proteome: choosing the proteome is left to you (possible
-future work, which would show candidates rather than guess). The URL and the
-return-field names follow UniProt's REST documentation as known when the
-client was written; they were not checked against a live response in the
-environment it was written in, which could not reach rest.uniprot.org.
+be more than its reference proteome. To go from an organism name to its
+reference proteome, see [from a fungus name](#from-a-fungus-name): the
+candidates are shown, and only an exact name or a sole candidate is taken.
+The URL and the return-field names follow UniProt's REST documentation as
+known when the client was written; they were not checked against a live
+response in the environment it was written in, which could not reach
+rest.uniprot.org.
 
 Limits of the UniProt route:
 
@@ -868,11 +974,898 @@ Limits of the UniProt route:
 - CAZy cross-references cover only part of a proteome; a protein without one
   can still be a CAZyme. An export without CAZy cross-references resolves
   through EC numbers alone.
-- EC numbers resolve only to registry classes that carry an EC number (with
-  the shipped registry, only `beta_glucosidase`), so most EC numbers are
-  listed as unresolved, and an EC number can contradict a family only through
-  such a class.
+- EC numbers resolve only to registry classes that carry an EC number or list
+  it as an alias (with the shipped registry, `beta_glucosidase`, EC 3.2.1.21;
+  `cellobiohydrolase`, EC 3.2.1.91 and 3.2.1.176; `endo_xylanase`, EC 3.2.1.8;
+  `glucoamylase`, EC 3.2.1.3; and `chitinase`, EC 3.2.1.14; no EC number is
+  carried by two classes), so most EC numbers are listed as unresolved, and an
+  EC number can contradict a family only through such a class. A GH7 protein
+  annotated EC 3.2.1.4 (an endoglucanase I) therefore disagrees with the GH7
+  family call.
 - One organism per export; no merging of proteomes or strains.
+
+### From a fungus name
+
+`fungmod assemble --fetch-proteome` goes from the name of the fungus to the
+UniProtKB export of its UniProt reference proteome, so that you do not have to
+look up the `UP...` identifier and download the export yourself. The draft is
+the same as with an [export you downloaded](#from-a-uniprot-proteome): the
+classes come from the proteome's EC numbers and CAZy cross-references, and no
+kinetic value comes from it.
+
+```bash
+fungmod assemble --fungus "My strain" --scientific-name "Genus species" \
+  --fetch-proteome --fetch \
+  --substrate cellobiose --temperature-c 30 --ph 5 \
+  --dataset-id my_strain --output my_strain
+```
+
+1. **Search.** The name of `--scientific-name` (or, without it, of
+   `--fungus`) is searched among UniProt's reference proteomes:
+   `https://rest.uniprot.org/proteomes/search?query=organism_name:"<name>" AND proteome_type:1&fields=upid,organism,organism_id,protein_count&format=tsv&size=500`.
+   The phrase matches organism names that contain it, in any letter case, so a
+   species name also finds its strains.
+2. **Choice.** A proteome is taken only when exactly one candidate's organism
+   name equals the name (case-insensitive, spaces normalised), or when the
+   search has exactly one candidate (its organism name, for example with a
+   strain added, is printed and recorded). Refused, with every candidate
+   printed (proteome identifier, organism, taxonomy id, type, protein count):
+   no candidate; several candidates without exactly one exact match; and a
+   search with more results than one response holds (500; UniProt's
+   `X-Total-Results` header or a next-page link says so). FungMod never takes
+   the first, the largest or the best-annotated candidate. Choose one by
+   running the same command with `--proteome UP...`: with `--fetch-proteome`
+   kept, the identifier must be one of the candidates. A proteome that is not
+   a reference proteome, or that UniProt lists under another name, is used
+   only when you name it with `--proteome` alone.
+3. **Export.** The chosen proteome's UniProtKB entries are fetched as
+   [above](#from-a-uniprot-proteome) (`(proteome:UP...)`); the export's
+   `Organism (ID)` must equal the chosen candidate's taxonomy id.
+4. **Draft.** The export is copied to `annotations/proteome_UP....tsv` and is
+   the draft's `genomes.csv` row: `annotation_tool` is
+   `UniProt release <release>` from the `X-UniProt-Release` header, or
+   `UniProt downloaded <date> (no release header in the response)` when
+   UniProt sends none; `source` names the organism, its taxonomy id, the
+   query, the retrieval time, the release, the SHA-256 and the URL. Every
+   class without kinetics is a gap with measurement requests that name the
+   proteome and its accessions. How the proteome was chosen (one sentence
+   with the name, the rule, the number of candidates and the search
+   snapshot's digest) is recorded in the `source` of `user_dataset.yml`, in
+   `review.md` and in `draft.assembly["annotation"]["selection"]`.
+
+**Network and snapshots.** The command line reaches the network only with
+`--fetch`. Each response is parsed before it is stored and is frozen under
+`--snapshot-dir` (default `data/source_snapshots/uniprot`, relative to the
+current directory): the search as `organism_name_<name>_<digest>/proteomes.tsv`
+with `snapshot.json` (name, query, URL, retrieval time, HTTP status, the
+`X-UniProt-Release`, `X-UniProt-Release-Date` and `X-Total-Results` headers
+when sent, SHA-256, candidate count), the export as
+`proteome_UP.../uniprotkb.tsv` with its own `snapshot.json`. A search is
+stored whatever it finds, so that a refusal is reproducible as well. Without
+`--fetch` only these snapshots are read and their digests verified: the same
+command gives the same draft, byte for byte, without network. A missing
+snapshot is refused with the command that fetches it; a changed snapshot is
+refused; a new response whose bytes differ from a stored one is refused and
+the stored one kept (remove that snapshot directory, or choose another
+`--snapshot-dir`, to store the new one). An HTTP error or an unreadable
+response stores nothing. `--proteome UP...` without `--fetch-proteome` skips
+the search; `--annotation` and the proteome options are refused together,
+because `genomes.csv` holds one annotation per strain.
+
+In Python the same steps are `fungal_model.sources.uniprot`
+`fetch_proteome_by_name` (or `resolve_proteome_name`, made of
+`search_proteomes_by_name` and `choose_proteome`, then
+`fetch_proteome_snapshot`), and `assemble_user_tables(proteome=...)`, which
+takes the `UniprotSnapshot` or its directory instead of `annotation`:
+
+```python
+import fungmod as fm
+from fungal_model.sources.uniprot import fetch_proteome_by_name
+
+# refresh=True is the network opt-in; ProteomeChoiceError lists the candidates when none is taken
+resolution, snapshot = fetch_proteome_by_name("Genus species", refresh=True)
+draft = fm.assemble_user_tables(
+    dataset_id="my_strain",
+    fungus="My strain",
+    substrates=["cellobiose"],
+    conditions=[{"temperature": 30, "temperature_units": "degC", "ph": 5}],
+    proteome=snapshot,
+    proteome_selection=resolution.statement,
+)
+```
+
+An export you downloaded yourself also goes through `annotation`: with an
+`annotation_tool` naming UniProt and its release or download date (`--annotation
+export.tsv --annotation-tool "UniProt 2026_03"`), the file is read and checked
+like a `genomes.csv` UniProt row.
+
+**Not verified live.** The search URL, the query fields `organism_name` and
+`proteome_type` (`proteome_type:1` for reference proteomes), the return fields
+`upid`, `organism`, `organism_id` and `protein_count` with their TSV headers
+`Proteome Id`, `Organism`, `Organism Id` and `Protein count` (compared
+case-insensitively), the `X-Total-Results` header and the empty body for no
+match are as UniProt's REST documentation describes them, as known when the
+client was written. They were not checked against a live response, because
+the environment the client was written in could not reach rest.uniprot.org;
+the tests serve synthetic responses in that format
+(`tests/fixtures/uniprot_proteome_search/`). A response without these
+columns is refused and nothing is stored, so a change on UniProt's side stops
+the route rather than misleading it.
+
+Limits of the name route:
+
+- The name is matched as a phrase in UniProt's organism names. Synonyms,
+  misspellings and common names are UniProt's search to resolve; FungMod takes
+  only an exact name or a sole candidate.
+- Reference proteomes only, unless you name another proteome with
+  `--proteome`.
+- A reference proteome stands for its species, usually one strain; it is not
+  your strain's genome. The draft says which proteome was used; whether your
+  strain carries the same enzymes is for you to judge.
+- The limits of the UniProt route listed above apply unchanged.
+
+## Solid substrates
+
+A substrate can be one suspended solid polymer, for example a particulate
+polysaccharide, stated on a dry-mass basis. The homogeneous Michaelis-Menten
+process law then runs as an **apparent** bulk saturation law on the dry mass
+per volume:
+
+```text
+kcat form:  rate = kcat · E · S / (Km + S)
+Vmax form:  rate = Vmax · S / (Km + S)
+optional:   rate × (S / S0)^n          (reactivity_exponent n, S0 the case's initial substrate)
+```
+
+`S` is the dry mass of the solid per volume, `E` the enzyme as a protein mass
+or an assay activity per volume, `Km` an apparent half-saturation constant in
+dry mass per volume. This is the law of the registry's culture-physiology case
+(cellulose consumption `k_h F S / (K_h + S)` with filter-paper activity `F`),
+now reachable from your own tables. It is an effective law: `Km` is not a
+binding constant, and `kcat`, `Vmax` and `Km` hold for the substrate
+preparation and the enzyme and solids loadings at which they were measured.
+
+### Declaring a solid substrate
+
+In `substrates.csv`, a solid substrate has `physical_state` `solid_polymer`,
+`amount_basis` `dry_mass` and `yield_basis` `g/g`; the yield is grams of
+product per gram of dry substrate consumed, stated by you. A registry
+substrate whose record is `solid_polymer` is referenced the same way (the row
+gives `amount_basis`, the product, the yield and the source); see
+[registry polymers](#registry-polymers).
+
+### Units
+
+| `quantity` | On a solid substrate | Example |
+| --- | --- | --- |
+| `km`, `substrate_initial_concentration` | dry mass per volume | `g/L` |
+| `enzyme_concentration` | protein mass per volume, or an activity per volume in one of the registry's assay units (`filter_paper_unit`, `FPU`; `beta_glucosidase_assay_unit`, `BGU`) | `mg/L`, `FPU/L` |
+| `kcat` | substrate mass per time per enzyme amount | `g/(mg*h)` (which is 1/time), `g/FPU/h` |
+| `vmax` | dry mass per volume per time | `g/L/h` |
+| `enzyme_dose` | enzyme per dry substrate mass | `mg/g`, `FPU/g` |
+| `reactivity_exponent` | `dimensionless`, zero or positive | `1` |
+
+The units of `kcat` are checked per case with pint against the case's own
+enzyme and substrate rows: `kcat × E` must be the substrate's mass per volume
+per time. `kcat` in `g/(mg*h)` with an enzyme in `FPU/L`, or in `g/FPU/h`
+with an enzyme in `mg/L`, is refused on the `kcat` row. An assay unit is never
+converted to protein mass or molarity, and no molar mass, hydration factor or
+monomer equivalent is applied anywhere.
+
+### Worked example
+
+`tests/fixtures/user_data/solid_case/` re-enters the registry's apparent
+hydrolysis constants (`gelain_hydrolysis_k_h_calibrated` and
+`gelain_hydrolysis_Kh_calibrated`, a FungMod retrospective fit for
+*T. harzianum* P49P11 on Celufloc 200) as estimates on a user-defined
+particulate substrate, at two enzyme doses with the same temperature and pH:
+
+```text
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+particulate_lot_p1,,Particulate cellulose lot P1,cellulose_particulate,solid_polymer,beta_1_4_glycosidic,dry_mass,solubilized_substrate_mass,1,g/g,<source>
+```
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,sd,replicates
+strain_p1,cellulase_total_filter_paper_activity,particulate_lot_p1,dose_5,km,16.726013979440346,,,g/L,estimate,re-entered registry value (retrospective fit),<source>,,
+strain_p1,cellulase_total_filter_paper_activity,particulate_lot_p1,dose_5,kcat,0.018378579847405995,,,g/FPU/h,estimate,re-entered registry value (retrospective fit),<source>,,
+strain_p1,cellulase_total_filter_paper_activity,particulate_lot_p1,dose_5,substrate_initial_concentration,20,,,g/L,design,experimental design,<source>,,
+strain_p1,cellulase_total_filter_paper_activity,particulate_lot_p1,dose_5,enzyme_dose,5,,,FPU/g,design,experimental design,<source>,,
+strain_p1,cellulase_total_filter_paper_activity,particulate_lot_p1,dose_5,reactivity_exponent,1,,,dimensionless,estimate,assumed linear substrate reactivity factor (Kadam et al. 2004); not measured for this lot,<source>,,
+```
+
+(and the same rows at `dose_1_25` with an enzyme dose of 1.25 FPU/g).
+
+```python
+import fungmod as fm
+
+dataset = fm.load_user_dataset("tests/fixtures/user_data/solid_case")
+study = fm.virtual_experiment(
+    fungi="strain_p1",
+    substrates="particulate_lot_p1",
+    environments=["dose_5", "dose_1_25"],
+    user_data=dataset,
+)
+result = study.simulate(mode="exploratory", n_samples=1)
+```
+
+The doses give enzyme concentrations of 100 and 25 FPU/L, each one derived
+record. The case runs in exploratory mode only, because the constants are a
+fit typed in as estimates (scientific mode refuses it). Without the
+reactivity rows, the trajectory at 100 FPU/L equals the registry
+culture-physiology case's cellulose trajectory with the same constants when its
+enzyme synthesis and loss are switched off (`value_overrides`) and its
+filter-paper activity is set to 100 FPU/L, and both equal the integrated law
+`Km ln(S0/S) + (S0 - S) = kcat E t`, solved with the Lambert W function. With
+`n = 1` the time to reach `S` is `(S0 / (kcat E)) (Km (1/S - 1/S0) + ln(S0/S))`
+(`tests/test_user_data_solid_substrates.py`).
+
+### Registry polymers
+
+Instead of describing a solid yourself, you can reference a registry substrate
+whose record is `solid_polymer`. Since REGISTRY-002 the registry holds three
+generic polysaccharides, each with one registry enzyme class acting on it
+(categorical metadata from the IUBMB nomenclature and the CAZy families; no
+kinetic value):
+
+| Registry substrate | Bond classes | Declared product | Complete-hydrolysis yield (product map) | Registry class acting on it |
+| --- | --- | --- | --- | --- |
+| `xylan` | `beta_1_4_xylosidic` | `D_xylose_equivalent` | 1.136358 g/g (`xylan_to_d_xylose_equivalent_mass_yield`) | `endo_xylanase` (EC 3.2.1.8; GH10, GH11) |
+| `starch` | `alpha_1_4_glycosidic`, `alpha_1_6_glycosidic` | `beta_D_glucose` | 1.111107 g/g (`starch_to_beta_d_glucose_mass_yield`) | `glucoamylase` (EC 3.2.1.3; GH15) |
+| `chitin` | `beta_1_4_n_acetylglucosaminidic` | `N_acetyl_D_glucosamine_equivalent` | 1.088659 g/g (`chitin_to_n_acetyl_d_glucosamine_equivalent_mass_yield`) | `chitinase` (EC 3.2.1.14; GH18) |
+
+The insoluble cellulose `cellulose_film_generic` can be referenced the same
+way (product `soluble_cellulose_hydrolysis_product`); `cellulose_celufloc_200`
+declares no product, so a row cannot reference it. The names, aliases and EC
+numbers of the classes resolve in `enzymes.csv` and `kinetics.csv` (for
+example `xylanase`, `EC 3.2.1.8`, `amyloglucosidase`, `endochitinase`).
+
+What the records say, and what they do not:
+
+- **Products.** An endo-xylanase releases mainly xylo-oligosaccharides and a
+  chitinase mainly chitobiose and chito-oligosaccharides, so `xylan` and
+  `chitin` declare **monomer equivalents**: the mass of D-xylose or
+  N-acetyl-D-glucosamine that the solubilized polymer gives on complete
+  hydrolysis (for example measured by HPLC after acid post-hydrolysis), not
+  free monomer and not a reducing-sugar (DNS) equivalent. Glucoamylase
+  releases beta-D-glucose from the non-reducing chain ends, so `starch`
+  declares `beta_D_glucose`. A row naming another product (`D_xylose`, say) is
+  refused with the declared one.
+- **Yields.** Each product map is the theoretical mass yield of the idealized
+  homopolymer, `M(monomer) / M(monomer - H2O)` from the conventional atomic
+  weights (C 12.011, H 1.008, N 14.007, O 15.999), in the limit of a high
+  degree of polymerization; the formula is in its provenance. The yield in
+  `substrates.csv` is still yours: FungMod neither fills it from the map nor
+  checks it against it. Side chains of a real xylan, the lipid and protein of
+  a starch and the deacetylated units of a chitin change the true yield.
+- **Composition.** The substrate records are generic definitions
+  (`exploratory_metadata`): composition varies by source (xylan
+  substitution, the amylose/amylopectin ratio and gelatinization of starch,
+  the acetylation and polymorph of chitin) and none of it is recorded. The
+  starch bond classes are categorical: a case neither weights the (1->4) and
+  (1->6) bonds nor resolves branch points, and starch is one bulk dry mass.
+- **Classes.** A chitinase found in a fungal genome may serve cell-wall
+  remodelling rather than nutrition; it is a candidate capability on an
+  external chitin. The classes list only the solid polymer, not dissolved
+  oligosaccharides.
+
+A dataset written by `tests/test_registry_polysaccharide_classes.py` (strain,
+condition and illustrative estimates, not measurements) references `xylan`:
+
+```text
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+xylan,xylan,,,,,dry_mass,D_xylose_equivalent,1.136358,g/g,Complete-hydrolysis mass yield of registry product map xylan_to_d_xylose_equivalent_mass_yield
+```
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,sd,replicates
+strain_p2,endo_xylanase,xylan,c40_ph5,km,8.0,,,g/L,estimate,,LN-21 p. 2 (illustrative),,
+strain_p2,endo_xylanase,xylan,c40_ph5,kcat,0.6,,,g/(mg*h),estimate,,LN-21 p. 2 (illustrative),,
+strain_p2,endo_xylanase,xylan,c40_ph5,substrate_initial_concentration,10.0,,,g/L,design,experimental design,LN-21 p. 3,,
+strain_p2,endo_xylanase,xylan,c40_ph5,enzyme_concentration,0.5,,,mg/L,design,experimental design,LN-21 p. 3,,
+```
+
+with `enzymes.csv` declaring the class as `EC 3.2.1.8`. The case runs in
+exploratory mode only (the constants are estimates), the xylan trajectory
+equals the integrated law with `Vmax = kcat E` = 0.3 g/L/h, and the product is
+`1.136358 (S0 - S)` g/L at every time point. The same test runs starch with
+glucoamylase and chitin with chitinase. From a genome or proteome, GH10, GH11,
+GH15 and GH18 (or EC 3.2.1.8, 3.2.1.3 and 3.2.1.14) give these classes, and on
+a dataset that references the polymer their roles are gaps with dry-mass
+requests, for example "Measure km of Endo-1,4-beta-xylanase from
+Genome-annotated strain G1 on Generic insoluble xylan at 30 degC, pH 5.0 (dry
+mass per volume, for example g/L); the class was inferred from the dbCAN
+annotation (families GH10)."
+
+### The enzyme-dose route
+
+Laboratories usually report an enzyme loading per gram of substrate.
+`enzyme_dose` (enzyme per dry substrate mass, for example `mg/g` or `FPU/g`)
+times the case's `substrate_initial_concentration` gives the enzyme
+concentration, multiplied with pint. Like the specific-activity route to Vmax,
+it is **one derived record** for the enzyme-concentration role: its provenance
+lists both rows (value or range, units, evidence type, source, method), the
+formula and the unit conversion, and its maturity is the weaker of the two
+inputs. The dose row produces no record of its own; the initial-substrate row
+keeps its own record. A dose range times the exact initial substrate is again
+a uniform range. Refused: a dose next to an `enzyme_concentration` in the same
+case (both set the enzyme), a dose with a ranged initial substrate (the
+derived enzyme would be sampled independently of the substrate it is derived
+from), and a dose on a dissolved substrate. A dose without an initial
+substrate leaves the enzyme concentration a gap whose request asks for the
+initial substrate.
+
+### Conversion-dependent reactivity
+
+An optional `reactivity_exponent` row binds the existing
+`substrate_reactivity` modifier: the rate is multiplied by `(S / S0)^n`, with
+`S0` the case's **own** initial-substrate record (the same record that sets the
+initial state; no separate constant) and `n` zero or positive. `n = 1` is the
+linear substrate reactivity factor of Kadam, Rydholm and McMillan (2004,
+doi:10.1021/bp034316x), the provenance the modifier carries; `n = 0` removes
+it. The factor is phenomenological: it resolves no surface, crystallinity or
+particle structure, and nothing else of the Kadam model (adsorption, product
+inhibition) is implemented. When one case of a class and substrate gives the
+exponent, the pair binds the factor and every other strain and condition of
+the pair gets a gap for it. Without it, the template states that no
+conversion-dependent slowdown is represented. The exponent is refused on a
+dissolved substrate.
+
+### Refused on a solid substrate
+
+Each refusal names its file, row and column:
+
+- `specific_activity`, `enzyme_loading` and `assay_activity`, the activity
+  routes to Vmax: an activity in amount per time would need a molar mass of a
+  repeat unit, one in substrate mass per enzyme mass per time is the `kcat`
+  of the kcat form, and a saturating activity is not defined for an
+  interfacial substrate. Give `kcat` with an enzyme concentration or dose, or
+  `vmax`.
+- The pH-ionization form: its Km(pH) describes the ionization of a dissolved
+  enzyme-substrate complex, while the Km of the apparent law is not a binding
+  constant. An enzyme class in the pH-ionization form cannot act on a solid
+  substrate of the dataset either. Use a cardinal pH law in `responses.csv`.
+- Molar units on any substrate-side row, on `vmax` and on the enzyme.
+- `physical_state` `mixed_solid` or `solid_biomass` (composite substrates,
+  which would need a composition model) and `unknown`; a `yield_basis` other
+  than `g/g`; an `amount_basis` other than `dry_mass`.
+- Adsorption, binding-capacity and surface inputs: the `kinetics.csv`
+  quantities `adsorption_constant`, `adsorption_dissociation_constant`,
+  `binding_capacity`, `accessible_surface_area`, `specific_surface_area` and
+  `surface_rate_constant`, and the `substrates.csv` columns
+  `specific_surface_area`, `accessible_surface_area`, `surface_area`,
+  `binding_capacity`, `adsorption_capacity`, `crystallinity_index`,
+  `particle_size` and `accessible_fraction`. No law of this route reads them,
+  and FungMod does not store a value no law uses.
+- `timecourse.csv` rows on a solid substrate (comparison and fitting read
+  amounts per volume with a mol/mol yield).
+
+### Scientific mode
+
+Unchanged: a solid case reaches scientific mode only when every bound role,
+the reactivity exponent and the dose's inputs included, is an exact
+`measured`, `literature` or `design` value; an estimate anywhere keeps it
+exploratory. Scientific still means exact inputs and an implemented law, not
+validation.
+
+### Limits of the solid route
+
+- One polymer per substrate, as a bulk dry mass per volume; no composite
+  substrates (glucan, xylan and lignin fractions), no particle size,
+  crystallinity, porosity or accessible-area model.
+- No enzyme adsorption or partitioning between free and bound enzyme, and no
+  Langmuir surface law; the surface law is a later increment.
+- No synergy between enzyme classes acting on one solid, no product
+  inhibition, no oxidative (LPMO) kinetics; one enzyme class and one process
+  per case, except in an [enzyme network](#several-enzymes-acting-together),
+  where several classes on one solid act additively and independently (still
+  without synergy, adsorption competition or product inhibition).
+- The constants are apparent and preparation- and loading-specific; FungMod
+  does not extrapolate them to other loadings and does not warn when you do.
+- No conversion between dry mass, monomer equivalents and moles; the product
+  is a pool in grams with your stated g/g yield.
+- No time courses, comparison or fitting on solid substrates; the assembly
+  and SABIO-RK drafting routes draft dissolved substrates only.
+- The assembled substrate entity carries the substrate's own physical state
+  (`solid_polymer`, loaded with the generic solid loader) and an `unknown`
+  default degradation model: the apparent law establishes no degradation
+  regime of the material.
+
+## Fungal culture: growth and secretion
+
+The rate forms above simulate an enzyme at a concentration you state: an
+enzyme assay. An optional `culture.csv` instead simulates **the fungus growing
+on the substrate and secreting its enzymes over time**. It binds the same
+culture model as the registry's *T. harzianum* P49P11 case (the
+`culture_physiology` template of Gelain 2020; see
+[organism physiology](organism-physiology.md)) to your own strain, solid
+substrate and constants. The process laws and the assembler are the existing
+ones; FungMod adds no numerics for user cultures.
+
+```text
+consumption:   dS/dt = - k_h · E · S / (K_h + S)            (one consuming enzyme pool E)
+growth:        dX/dt = + Y · k_h · E · S / (K_h + S) - k_d · X
+ledgers:       (1 - Y) of the consumed substrate -> consumed substrate not retained as biomass
+               k_d · X                            -> biomass dry mass lost
+each pool P:   dP/dt = + q_P · X · S / (K_ind + S) - k_P · P
+```
+
+`S` is the substrate's dry mass per volume, `X` the biomass dry mass per volume
+(in the same unit as `S`), and each pool `P` an enzyme amount per volume in its
+own unit: a protein mass (for example `mg/L`) or an activity in one of the
+registry's assay units (`FPU/L`, `BGU/L`). Exactly one pool, the one whose
+class acts on the substrate, consumes it; every other pool is produced and lost
+only. All pools share one induction constant `K_ind`, as in the registry case.
+`S + X` and both ledgers form one closed dry-mass balance, which every run
+checks.
+
+### `culture.csv` (optional)
+
+| Column | Required | Meaning |
+| --- | --- | --- |
+| `strain_id`* | yes | A strain of `strains.csv`. |
+| `substrate_id`* | yes | A substrate of `substrates.csv`: a `solid_polymer` with `amount_basis` `dry_mass`. |
+| `condition_id`* | yes | A condition of `conditions.csv`: the culture's temperature and pH (metadata, as for every case without a response law). |
+| `quantity`* | yes | One role of the culture model (table below). |
+| `enzyme_class` | for pool quantities | The pool's enzyme class, which the strain declares in `enzymes.csv` or `genomes.csv`; blank for a quantity of the culture as a whole. |
+| `value` / `lower`, `upper` | yes | An exact value, or a range sampled in exploratory mode. |
+| `units`* | yes | Checked with pint against the role's dimension. |
+| `evidence_type`* | yes | `measured`, `literature`, `design` or `estimate` (`fitted` is refused: no culture constant is fitted). |
+| `method` | for `measured`, `literature`, `design` | How the value was obtained. |
+| `source`* | yes | Where the value comes from. |
+| `sd`, `replicates` | no | Kept as provenance, not sampled. |
+
+### Roles and units
+
+| `quantity` | `enzyme_class` | Template role | Units (dimension) | Example |
+| --- | --- | --- | --- | --- |
+| `substrate_initial_concentration` | blank | `initial_substrate` | dry mass per volume | `g/L` |
+| `initial_biomass` | blank | `initial_biomass` | biomass dry mass per volume, written exactly like the initial substrate's units | `g/L` |
+| `biomass_yield` | blank | `biomass_yield` | dimensionless, above 0 and at most 1 | `g/g` |
+| `biomass_loss_rate` | blank | `biomass_loss_rate` | 1/time | `1/h` |
+| `induction_half_saturation` | blank | `induction_half_saturation` | dry mass per volume, above 0 | `g/L` |
+| `hydrolysis_capacity` | the consuming pool | `hydrolysis_capacity` | substrate dry mass per time per pool amount | `g/FPU/h`, `g/mg/h` |
+| `hydrolysis_half_saturation` | the consuming pool | `hydrolysis_half_saturation` | dry mass per volume, above 0 | `g/L` |
+| `initial_enzyme_concentration` | each pool | `initial_enzyme_concentration__<class>` | protein mass or assay activity per volume | `FPU/L`, `mg/L` |
+| `specific_production_rate` | each pool | `specific_production_rate__<class>` | pool amount per biomass dry mass per time | `FPU/g/h`, `mg/g/h` |
+| `enzyme_loss_rate` | each pool | `enzyme_loss_rate__<class>` | 1/time | `1/h` |
+
+The units of a case are also checked together: `hydrolysis_capacity × E` must be
+the substrate's dry mass per volume per time with the consuming pool's own
+units, and `specific_production_rate × X` an amount of the pool per volume per
+time, so a pool in `FPU/L` with a rate per protein mass (or the reverse) is
+refused on the rate's row. A molar amount is refused on every substrate-side,
+biomass and pool row, and no pool is ever converted between protein mass,
+assay units and molarity.
+
+### Worked example
+
+`tests/fixtures/user_data/culture_estimates/` is a user-defined strain with
+one user-defined class (an endo-xylanase-like pool stated as a protein mass)
+on a user-defined xylan-like solid; every value is an illustrative estimate:
+
+```text
+strain_id,substrate_id,condition_id,quantity,enzyme_class,value,lower,upper,units,evidence_type,method,source
+strain_x1,xylan_lot_x1,c25,substrate_initial_concentration,,15,,,g/L,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,initial_biomass,,0.2,,,g/L,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,biomass_yield,,0.35,,,g/g,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,biomass_loss_rate,,0.01,,,1/h,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,induction_half_saturation,,0.5,,,g/L,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,hydrolysis_capacity,endo_xylanase_like,0.005,,,g/mg/h,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,hydrolysis_half_saturation,endo_xylanase_like,5,,,g/L,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,initial_enzyme_concentration,endo_xylanase_like,1,,,mg/L,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,specific_production_rate,endo_xylanase_like,5,,,mg/g/h,estimate,illustrative estimate,<source>
+strain_x1,xylan_lot_x1,c25,enzyme_loss_rate,endo_xylanase_like,0.02,,,1/h,estimate,illustrative estimate,<source>
+```
+
+`kinetics.csv` holds only its header. `fungmod check-data` lists the culture:
+
+```text
+$ fungmod check-data tests/fixtures/user_data/culture_estimates
+...
+Kinetic values: 10; gaps: 0
+Cultures (culture.csv; the strain grows on the substrate and secretes its enzyme pools, culture_physiology): 1
+  strain     substrate     consuming pool      enzyme pools        culture.csv rows
+  strain_x1  xylan_lot_x1  endo_xylanase_like  endo_xylanase_like  2-11
+```
+
+and `fungmod run` (or `virtual_experiment(..., user_data=...)`) simulates it:
+
+```text
+$ fungmod run --user-data tests/fixtures/user_data/culture_estimates --fungus strain_x1 \
+    --substrate xylan_lot_x1 --environment c25 --mode exploratory --samples 8 --seed 1 --output culture_run
+...
+  1  culture_estimates__strain_x1  culture_estimates__xylan_lot_x1  culture_estimates__c25  modelable  yes
+...
+    final_substrate_remaining          4.105e-06 [4.105e-06, 4.105e-06] gram / liter (n=8)
+    maximum_substrate_depletion_rate   0.4913 [0.4913, 0.4913] gram / hour / liter (n=8)
+  Threshold times (median [5th, 95th percentile] over samples):
+    time_to_10_percent_substrate_degradation  26.47 [26.47, 26.47] hour (n=8)
+    time_to_50_percent_substrate_degradation  49.02 [49.02, 49.02] hour (n=8)
+    time_to_90_percent_substrate_degradation  62.3 [62.3, 62.3] hour (n=8)
+```
+
+The time series hold the substrate, the biomass, every pool (in its own units;
+here `milligram / liter`) and both ledgers. Every value is exact, so the eight
+samples coincide; a range in `culture.csv` would be sampled. Because every row
+is an estimate, scientific mode refuses the case; with `measured`,
+`literature` or `design` rows throughout, the generated template is scientific
+and the run is labelled `scientific_exact_unvalidated` (exact inputs and
+implemented laws, not validation).
+
+`tests/fixtures/user_data/culture_reentry/` re-enters the registry's own
+*T. harzianum* culture case: the nine constants of FungMod's retrospective fit
+as `estimate` (they are a fit, neither a literature value nor a measurement of
+the strain) and the deposited initial biomass, initial activities and 10, 20
+and 30 g/L loadings as `literature`, with a filter-paper (`FPU`) pool that
+consumes the cellulose and a beta-glucosidase (`BGU`) pool that is produced and
+lost only. Its biomass, cellulose, both activity and both ledger trajectories
+equal the registry case's at every loading (`tests/test_user_data_culture.py`).
+
+### What is generated
+
+One culture model per consuming enzyme class and substrate, shared by every
+strain that declares the class (the strain's records are selected by its
+fungus id, as for the rate forms): a `culture_physiology` process compatibility
+(`<dataset>__<class>__<substrate>__culture_physiology`) and case template
+(`..._culture_template`) that composes the existing process laws (homogeneous
+Michaelis-Menten consumption with a stoichiometric biomass yield and closure
+ledger, first-order biomass loss, proportional induced synthesis and
+first-order loss of each pool), and for every such strain, role and condition
+one parameter record, or an explicit gap. The template declares no vessel
+geometry (the model is concentration-only), and each synthesis and consumption
+rate is in the units of the state it changes per unit of the dataset's time
+grid, so one template serves cases whose rows use different units. The
+template is scientific only when every bound record is exact and
+scientific-eligible; one estimate keeps it exploratory (the weakest input
+wins). The generated enzyme class of the consuming pool lists
+`culture_physiology` as its process; the other pools keep their own.
+`UserDataset.cultures` lists each strain's culture (consuming pool, pools,
+template and compatibility ids, rows).
+
+### Gaps
+
+A role without a row is an explicit unknown with a measurement request that
+names it in plain words, for example:
+
+```text
+culture_estimates__strain_x1__xylan_lot_x1__c25__culture__biomass_yield__gap
+  Measure the biomass yield of Illustrative culture strain X1 on Xylan-like solid lot X1 at condition c25
+  (25 degC, pH 6.0): grams of biomass dry mass formed per gram of dry Xylan-like solid lot X1 consumed
+  (g/g, dimensionless).
+culture_estimates__strain_x1__xylan_lot_x1__c25__culture__specific_production_rate__endo_xylanase_like__gap
+  Measure the specific production rate of Endo-xylanase-like pool X1 by Illustrative culture strain X1
+  growing on Xylan-like solid lot X1 at condition c25 (25 degC, pH 6.0): enzyme produced per biomass dry
+  mass per time at inducing substrate levels (amount of the pool per biomass dry mass per time; the pool is
+  stated in mg/L, culture.csv row 8).
+```
+
+Nothing is defaulted. A condition with no rows makes every role a gap whose
+request says at which conditions the culture has values; a strain that declares
+the consuming class without rows has a culture of gaps; a solid substrate the
+consuming class acts on without rows is a culture of gaps with the consuming
+pool only. With `--runnable-only` (`blocked="report"`) a culture case runs
+beside its gap cases ([partial runs](cli.md)).
+
+### Refused
+
+Each refusal names its file, row and column:
+
+- A culture on a substrate without the required basis: a dissolved substrate
+  (the culture closes a dry-mass balance and the yield is g/g), and a dissolved
+  substrate that a culture's consuming class acts on (a class runs one process
+  law on all of its substrates).
+- Mixing the culture with the enzyme-assay forms: a `kinetics.csv` row of a
+  strain and substrate that have a culture; a `kinetics.csv` row of another
+  strain on the culture's class and substrate (all strains of one class and
+  substrate share one generated process); a `kinetics.csv` row of a culture's
+  consuming class on any substrate. FungMod builds one model per strain,
+  substrate and condition and does not choose between a culture and an assay;
+  keep assay kinetics in a separate dataset.
+- A strain that declares the consuming class and another class acting on the
+  culture substrate (a class from a genome annotation included: run the
+  culture in a dataset without `genomes.csv`), and a strain that declares the
+  consuming class but not every pool of the culture.
+- A culture whose pools include no class acting on the substrate, or more
+  than one (synergy between pools is not modelled); `hydrolysis_capacity` or
+  `hydrolysis_half_saturation` on a pool that does not consume the substrate.
+- Units of the wrong dimension, units of one case that do not fit together
+  (above), an initial biomass in other units than the initial substrate, a
+  yield above 1 g/g or at zero, a zero half-saturation constant, an
+  `enzyme_class` on a culture-level quantity or a missing one on a pool
+  quantity, a class the strain does not declare, `fitted` evidence, a
+  `kinetics.csv` quantity such as `km`, and duplicate rows.
+- `responses.csv` rows of a culture: the culture model applies no temperature
+  or pH law, so its constants hold at the condition of their rows.
+- `timecourse.csv` rows of a culture case: the comparison and the fit read the
+  substrate and the product of an enzyme-assay case; a culture's biomass, pools
+  and ledgers are not observables of the comparison, and no culture constant is
+  fitted.
+- `assemble_user_tables` and `fungmod assemble` do not draft or carry
+  `culture.csv`: a culture's substrate is a solid, which assembled drafts
+  refuse with a message naming the culture; cultures on other substrates of a
+  `user_data` dataset are not carried, like any substrate that was not
+  requested. Load a culture dataset with `load_user_dataset` directly.
+
+### What is and is not modelled
+
+Modelled: one strain growing in a well-mixed batch on one suspended solid
+substrate (dry-mass basis); substrate consumption by one secreted enzyme pool
+with an apparent saturation law; biomass formation with an explicit yield and a
+closure ledger for the consumed substrate not retained as biomass; first-order
+biomass loss into a ledger; substrate-induced, biomass-proportional synthesis
+and first-order loss of every enzyme pool, each in its own units.
+
+Not modelled, and the template and outputs say so:
+
+- One fungus per case: no co-cultures, competition or cross-feeding.
+- The growth and induction laws are the existing ones: growth is driven only by
+  the consumed substrate (no Monod uptake of a soluble sugar, no maintenance,
+  no nutrient or oxygen limitation), induction saturates in the solid substrate
+  with one constant shared by all pools, and synthesis has no material cost,
+  repression or lag.
+- No spatial mycelium (the spatial colony models are separate and are not
+  bound by user data), no pellet or morphology, no vessel volume.
+- No oxygen or pH dynamics: the template declares none, and no response law is
+  bound; the temperature and pH of a condition are metadata.
+- No soluble products: the product named in `substrates.csv` is not released
+  by the culture (the row is still required by `substrates.csv`); consumed
+  substrate is biomass or ledger.
+- Pools other than the consuming one act on nothing; no synergy, product
+  inhibition, adsorption or surface law.
+- Constants are apparent and specific to the strain, substrate preparation and
+  conditions at which they were obtained; nothing extrapolates them.
+- No time courses, comparison or fitting of cultures; no assembly route.
+
+## Several enzymes acting together
+
+The rate forms above run **one** enzyme class of a strain on one substrate: the
+class the preflight selects. A fungus secretes several enzymes at once, and an
+optional `enzyme_network` block in `user_dataset.yml` makes every case of the
+dataset an enzyme network instead: every declared class of the strain that acts
+on a pool of the network runs its own Michaelis-Menten process, classes on one
+pool act in parallel, and a pool released by one class is the substrate of the
+next. The process law, the modifiers and the solver are the existing ones;
+FungMod adds no numerics. The compiled core sums the stoichiometric columns of
+every process, so processes on one pool add their rates:
+
+```text
+pool i:  dS_i/dt = - sum over classes j acting on i of  r_ij  +  y_(i-1) x sum over classes k acting on pool i-1 of  r_(i-1)k
+each r:  Vmax S / (Km + S)  or  kcat E S / (Km + S)          (the pair's own rate form and rows)
+with ki: r x (Km + S) / (Km (1 + I / Ki) + S)                 (competitive inhibition by a downstream pool I)
+```
+
+```yaml
+enzyme_network:
+  entry_substrates: [polymer_p1]   # the substrates each network starts from
+```
+
+Without the block nothing changes: the records of every dataset without it are
+byte-identical to those of the previous version.
+
+### Pools and links
+
+- A network starts from an **entry substrate** listed in `entry_substrates`.
+- The pool a substrate releases is its `substrates.csv` `product`, with its
+  stated `product_yield`. A **link** to another pool is made only when that
+  product equals another row's `substrate_id`; names, aliases and registry ids
+  are never matched. The chain of links ends at the first product that is no
+  substrate of the dataset, the network's **final product**. Each substrate has
+  one product, so the pools of a network form a chain (for example
+  polymer -> oligomer -> monomer) and any number of classes may act in parallel
+  on each pool.
+- The entry starts at its `substrate_initial_concentration`; every
+  intermediate pool and the final product start at zero. Every pool is reported
+  in the units of the entry's initial concentration, and pint converts each Km,
+  Vmax and Ki.
+- The members of a network are the declared classes (from `enzymes.csv` or a
+  genome annotation) that act on one of its pools by the categorical rule.
+  Each runs one process on its pool in its pair's rate form: the kcat form
+  (with its own enzyme state) or the Vmax form, with every route to Vmax and
+  to the enzyme concentration described above.
+- An intermediate pool may also be an entry; it then starts a network of its
+  own, from its own initial concentration.
+
+### Competitive product inhibition: `ki`
+
+A `kinetics.csv` row with quantity `ki` and the new column `inhibitor` binds the
+existing provenance-bound `competitive_inhibition` modifier to the process of
+its class and pool:
+
+```text
+rate = Vmax S / (Km (1 + I / Ki) + S)
+```
+
+`Km` is the process's own Michaelis constant, `I` the state of the pool named in
+`inhibitor`, and `Ki` the row's value. The inhibitor is a pool the network
+releases **downstream** of the row's substrate: an intermediate's
+`substrate_id`, or the final product as written in `substrates.csv`. `Ki` is an
+amount per volume (for example mM or uM), the unit basis of the product pool,
+checked with pint, and positive. The law's provenance is the primary source
+FungMod records for this modifier
+(BIO-003, <https://pubmed.ncbi.nlm.nih.gov/7985803/>, maturity
+`literature_backed_software_tested`); it supports the equation, not your Ki,
+which keeps its own row's source and evidence type. When one strain or
+condition gives `ki` for a process, every other strain and condition of that
+process gets a Ki gap with a measurement request. A process without a `ki` row
+has **no** inhibition term, and its template says so in its limitations; no
+inhibition constant is assumed.
+
+### Worked example: a chain and a parallel pair
+
+`tests/fixtures/user_data/network_chain/` is a user-defined strain with two
+user-defined classes: one cuts a soluble polymer-like substrate into four
+oligomer-like units, the other cuts each oligomer-like unit into two
+monomer-like units (every value an illustrative estimate):
+
+```text
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,product,product_yield,yield_basis,source
+polymer_p1,,Soluble polymer-like substrate P1,soluble_polymer_like,dissolved,inner_glycosidic_like,oligomer_o1,4,mol/mol,<source>
+oligomer_o1,,Oligomer-like pool O1,oligomer_like,dissolved,inner_glycosidic_like,monomer_m1,2,mol/mol,<source>
+```
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,km,2,,,mM,estimate,illustrative estimate,<source>
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,kcat,30,,,1/min,estimate,illustrative estimate,<source>
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,substrate_initial_concentration,5,,,mM,estimate,illustrative estimate,<source>
+strain_n1,depolymerase_like,polymer_p1,c30_ph5,enzyme_concentration,0.002,,,mM,estimate,illustrative estimate,<source>
+strain_n1,oligomer_hydrolase_like,oligomer_o1,c30_ph5,km,1,,,mM,estimate,illustrative estimate,<source>
+strain_n1,oligomer_hydrolase_like,oligomer_o1,c30_ph5,kcat,60,,,1/min,estimate,illustrative estimate,<source>
+strain_n1,oligomer_hydrolase_like,oligomer_o1,c30_ph5,enzyme_concentration,0.001,,,mM,estimate,illustrative estimate,<source>
+```
+
+```text
+$ fungmod check-data tests/fixtures/user_data/network_chain
+...
+Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, enzyme_network): 1
+  from polymer_p1: polymer_p1 -> oligomer_o1 (4 mol/mol), oligomer_o1 -> monomer_m1 (2 mol/mol); strains strain_n1
+  enzyme class             pool         rate form  competitive inhibitor
+  depolymerase_like        polymer_p1   kcat       none
+  oligomer_hydrolase_like  oligomer_o1  kcat       none
+
+$ fungmod run --user-data tests/fixtures/user_data/network_chain --fungus strain_n1 \
+    --substrate polymer_p1 --environment c30_ph5 --mode exploratory --samples 8 --seed 1 --output network_run
+...
+    final_substrate_remaining          3.395e-05 [3.395e-05, 3.395e-05] millimolar (n=8)
+    final_product_formed               39.98 [39.98, 39.98] millimolar (n=8)
+    maximum_product_release_rate       0.1095 [0.1095, 0.1095] millimolar / minute (n=8)
+    maximum_substrate_depletion_rate   0.04286 [0.04286, 0.04286] millimolar / minute (n=8)
+  Threshold times (median [5th, 95th percentile] over samples):
+    time_to_10_percent_substrate_degradation  11.85 [11.85, 11.85] minute (n=8)
+    time_to_50_percent_substrate_degradation  64.77 [64.77, 64.77] minute (n=8)
+    time_to_90_percent_substrate_degradation  151.8 [151.8, 151.8] minute (n=8)
+```
+
+The threshold times and the substrate depletion rate refer to the entry pool,
+`product_formed` and the product release rate to the final product. The time
+series hold every pool and enzyme (`state_role` `substrate`, `intermediate_1`,
+`product`, `enzyme_<class>`) and one `process_rate.<dataset>__<class>__<pool>__homogeneous_mm`
+per process, and `mechanism_summary.csv` has the network row followed by one
+process-law row per process naming its class (`configured_by`). Here the
+oligomer-like pool accumulates while the first class outpaces the second
+(10.45 mM at 145 minutes) and is then cleared; the closure `8 P + 2 O + M`
+stays at 40 mM in every run (`conservation_diagnostics.csv`, weights from the
+yields). In Python:
+
+```python
+dataset = fm.load_user_dataset("tests/fixtures/user_data/network_chain")
+print(dataset.enzyme_networks[0]["pools"], dataset.enzyme_networks[0]["product"])
+study = fm.virtual_experiment(
+    fungi="strain_n1", substrates="polymer_p1", environments="c30_ph5", user_data=dataset
+)
+result = study.simulate(mode="exploratory", n_samples=8, seed=1)
+```
+
+`tests/fixtures/user_data/network_parallel/` is the materially different case:
+two classes in parallel on one dissolved ester-like substrate, one in the kcat
+form and one in the Vmax form, and a `ki` of the first class for the released
+acid-like product:
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source,inhibitor
+strain_q2,cleaver_a_like,ester_s2,c25_ph7,ki,200,,,µM,estimate,illustrative estimate,<source>,acid_a2
+```
+
+Its tests check that the depletion rate is the sum of the two process rates at
+every output time, that the first class's rate equals
+`Vmax S / (Km (1 + P / Ki) + S)` on the simulated states, that a smaller Ki
+leaves more substrate, and that with an initial substrate far below both Km
+the substrate decays as `S0 exp(-(Vmax_A / Km_A + Vmax_B / Km_B) t)`
+(`tests/test_user_data_network.py`). A network of one class equals the
+single-class case of the same rows.
+
+### What a network generates
+
+| Record | Identifier |
+| --- | --- |
+| Case template per entry (`process_type` `enzyme_network`) | `<dataset_id>__<entry>__enzyme_network_template` |
+| Compatibility per class acting on the entry, all pointing to that template | `<dataset_id>__<class>__<entry>__enzyme_network` |
+| Parameter record per strain, condition and role | `<dataset_id>__network__<entry>__<strain>__<condition>__<role>` (`__gap` for a gap) |
+| Parameter symbol per role | `<dataset_id>__network__<entry>__<role>` |
+
+The roles are `substrate_initial_concentration` (the entry's), and per process
+`km__<class>__<pool>`, `kcat__<class>__<pool>` with
+`enzyme_initial_concentration__<class>` or `vmax__<class>__<pool>`, plus
+`ki__<class>__<pool>` and `reactivity_exponent__<class>__<pool>` when bound.
+Each record keeps the value, evidence, maturity and provenance of its row (or
+derivation, or gap) and adds the network, role, class and pool under
+`fungmod_user_dataset.enzyme_network`; its enzyme-class selector is empty
+because one network serves the compatibility of every class acting on its
+entry. The generated classes list `enzyme_network` as their only process, so a
+network dataset has no single-class cases: the preflight never chooses between
+a network and one of its classes. `UserDataset.enzyme_networks` (also in
+`to_dict()` and `summary()`) lists each network's pools, links and yields,
+processes (class, pool, rate form, process id, inhibitor), classes, strains and
+generated ids. The template is scientific only when every record bound to it is
+exact and scientific-eligible, as for every user template.
+
+### Gaps of a network
+
+Every role of every process at every condition for every strain of the network
+is a record or an explicit gap with the single-class route's measurement
+request, naming the class and the pool it acts on, for example "Measure kcat
+and the enzyme concentration of Oligomer hydrolase-like class N1 from
+Illustrative network strain N1 on Oligomer-like pool O1 at 30 degC, pH 5.0, or
+Vmax (or a specific activity and enzyme loading)." A network with a gap is
+underparameterized and not simulated: a class the strain has is never silently
+left out. With `--runnable-only` (`blocked="report"`) the complete cases run
+and the others are listed with their requests.
+
+### Refused in a network
+
+Each refusal names its file, row and column:
+
+- A product that equals the `registry_substrate` of a row with another
+  `substrate_id` (ambiguous: write the `substrate_id` to link, or another name
+  to end the network), and a cycle of products.
+- A link between pools on different bases, dissolved (amount per volume,
+  `mol/mol`) and solid (dry mass per volume, `g/g`): the Michaelis-Menten law
+  writes its product in the units of its substrate, and a conversion would need
+  a molar mass as a dimensional yield, which FungMod does not apply.
+- A class that acts on two pools of one network: one enzyme on two substrates
+  competes for its active site, which independent processes do not represent.
+- Strains of one dataset that declare different classes of a network (one
+  network serves every strain; put other enzyme sets in separate datasets).
+- On an intermediate pool: an initial concentration (unless the pool is an
+  entry), an `enzyme_dose` and a `reactivity_exponent`. Different initial
+  concentrations of one entry on the rows of its classes (they are one pool).
+- The pH-ionization form in a network; `culture.csv`, `timecourse.csv` and
+  `responses.csv` in a network dataset.
+- `ki` outside a network dataset (a network of one class is the single-class
+  case with inhibition), on a solid substrate (the apparent Km is not a binding
+  constant), naming a pool that is not downstream (the substrate itself or an
+  upstream pool), in mass units, two inhibitors of one process, and the
+  `inhibitor` column on any other row.
+- Unknown or repeated entries, an entry no declared class acts on, and a
+  substrate that is part of no network.
+- `assemble_user_tables` (and `fungmod assemble`) with a network dataset as
+  `user_data`: drafts are single-class tables and would drop the network.
+
+### What a network does and does not model
+
+Modelled: several enzyme classes of one strain acting on a chain of
+well-mixed pools, each by its own Michaelis-Menten law at its stated
+concentration, classes on one pool in parallel with additive rates, each pool
+released into the next with the stated yield, and optional competitive
+inhibition of a process by one downstream pool.
+
+Not modelled, and the template and outputs say so:
+
+- **Additive, independent action.** Classes on one pool do not compete for
+  substrate binding or adsorption sites, do not cooperate (no endo/exo
+  synergy) and do not interact; their rates simply add. Measured mixtures that
+  degrade faster or slower than the sum of their parts are outside this model.
+- One competitive inhibitor per process, and only competitive: no
+  non-competitive, uncompetitive or mixed inhibition, no inhibition by several
+  products of one process, no substrate inhibition, no competing substrates of
+  one enzyme, no transglycosylation.
+- Chains only (each substrate has one product), on one amount basis; no
+  branching products, no dry-mass-to-molar conversion.
+- No response laws, time courses, comparison, fitting, cultures or assembly
+  drafting of networks yet; the values hold at the condition of their rows.
+- An enzyme-kinetics model at stated enzyme concentrations, not a fungus
+  growing and secreting; the strain's class list decides which classes act.
 
 ## Evidence types, maturity and modes
 
@@ -924,27 +1917,36 @@ out of data you intend to simulate.
 | Record | Identifier |
 | --- | --- |
 | Fungus per strain, listing its namespaced classes (from `enzymes.csv` and `genomes.csv`) | `<dataset_id>__<strain_id>` |
-| Enzyme class per declared class, limited to the process law of its rate form (`homogeneous_michaelis_menten`, or `ph_ionization_michaelis_menten` for the pH-ionization form) | `<dataset_id>__<class>` |
-| Substrate per user-defined substrate (registry substrates are referenced) | `<dataset_id>__<substrate_id>` |
+| Enzyme class per declared class, limited to the process law of its rate form (`homogeneous_michaelis_menten`, or `ph_ionization_michaelis_menten` for the pH-ionization form, or `culture_physiology` for a culture's consuming class) | `<dataset_id>__<class>` |
+| Substrate per user-defined substrate, with its physical state (registry substrates are referenced) | `<dataset_id>__<substrate_id>` |
+| Enzyme concentration derived from an `enzyme_dose` ([solid substrates](#solid-substrates)) | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__enzyme_concentration` |
 | Environment per condition | `<dataset_id>__<condition_id>` |
 | Compatibility and case template per class and compatible substrate | `<dataset_id>__<class>__<substrate_id>__homogeneous_mm[_template]`, or `__ph_ionization_mm[_template]` in the pH-ionization form |
 | Parameter record per kinetics row of a role | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__<quantity>` |
 | Vmax record (explicit row, derived, or from an assay activity) | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__vmax` |
 | Response-law parameter record per `responses.csv` row | `<dataset_id>__<strain>__<class>__<substrate>__<law>__<parameter>` |
 | Explicit unknown per missing role or law parameter | the same identifier with `__gap` |
+| Culture compatibility and case template per consuming class and culture substrate ([fungal culture](#fungal-culture-growth-and-secretion)) | `<dataset_id>__<class>__<substrate_id>__culture_physiology`, `<dataset_id>__<class>__<substrate_id>__culture_template` |
+| Enzyme-network template per entry substrate, compatibility per class acting on it, and records per strain, condition and role ([several enzymes acting together](#what-a-network-generates)) | `<dataset_id>__<entry>__enzyme_network_template`, `<dataset_id>__<class>__<entry>__enzyme_network`, `<dataset_id>__network__<entry>__<strain>__<condition>__<role>` |
+| Culture parameter record per strain, condition and role (`<pool>` for a pool quantity only) | `<dataset_id>__<strain>__<substrate>__<condition>__culture__<quantity>[__<pool>]`, symbol `<dataset_id>__culture__<quantity>[__<pool>]__<class>__<substrate_id>` |
 
 The compatibility record binds the roles of the pair's rate form (`km`,
 `kcat`, `substrate_initial_concentration`, `enzyme_initial_concentration`;
 `km`, `vmax`, `substrate_initial_concentration`; or the ten roles of the
-pH-ionization form in the table [above](#three-rate-forms)) followed by the
-parameters of any bound law; the template of a Vmax-form pair has no enzyme
-state, and a pair with laws lists them under
-`process_state_metadata.process_modifiers`. The template of a pH-ionization
+pH-ionization form in the table [above](#three-rate-forms)), then
+`reactivity_exponent` when a solid pair binds the reactivity factor, followed
+by the parameters of any bound law; the template of a Vmax-form pair has no
+enzyme state, and a pair with laws or the reactivity factor lists them under
+`process_state_metadata.process_modifiers` (the reactivity factor as
+`substrate_reactivity` with `reference_concentration_role`
+`substrate_initial_concentration`). The template of a pH-ionization
 pair has the process type `ph_ionization_michaelis_menten`, so its assembled
 model reads the pH of the environment and reports
 `environment_effect_status = active_response_model` for pH.
 `specific_activity`, `enzyme_loading` and `assay_activity` rows produce no
-records of their own; they appear in the provenance of the Vmax record.
+records of their own; they appear in the provenance of the Vmax record, as an
+`enzyme_dose` row appears in the provenance of the derived enzyme
+concentration.
 
 A class and substrate are compatible when the substrate class is among the
 class's compatible substrate classes and they share a bond class. A
@@ -968,8 +1970,10 @@ role of the pair's rate form without a kinetics row becomes an explicit unknown
 parameter record with maturity `user_dataset_gap` and the allowed use
 `preflight_and_gap_analysis_only_requires_measurement_or_curation`. Its units
 come only from the user's own rows of the same case (a missing `km` takes the
-case's concentration units); otherwise the units stay empty and the notes
-state the dimension needed. Its provenance holds a measurement request such
+case's concentration units; on a [solid substrate](#solid-substrates) only the
+dry-mass rows `km` and `substrate_initial_concentration` lend their units);
+otherwise the units stay empty and the notes state the dimension needed, in
+dry-mass terms on a solid substrate. Its provenance holds a measurement request such
 as:
 
 > Measure kcat of carboxylesterase from Esterase source strain E1 on
@@ -1078,7 +2082,10 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,s200,product,10,minute,8.7,µM
 - `units` must be a concentration in amount per volume, the kind of the case's
   states (the product yield is mol/mol), for example µM or mM. Other
   dimensions, and mass concentrations such as g/L, are refused with the case's
-  own units in the message.
+  own units in the message. Time courses of a
+  [solid substrate](#solid-substrates), and of a
+  [culture](#fungal-culture-growth-and-secretion) case, are refused in this
+  version.
 - `sd` is a positive standard deviation in `units` when given, and
   `replicates` a positive integer; report replicates as their mean with `sd`.
 - One series (strain, class, substrate, condition and observable) uses one
@@ -1107,6 +2114,11 @@ comparison = result.compare_with_timecourses()   # or fm.compare_with_timecourse
 for series in comparison.series:
     print(series["series_id"], series["rmse"], series["units"], series["fraction_inside_band"])
 ```
+
+From a shell, `fungmod run --user-data DIR ... --compare-timecourses` does
+the same after simulating and prints each series' RMSE, mean residual,
+fraction inside the band and observations used in a fit
+([command line](cli.md#compare-with-your-time-courses)).
 
 For each simulated case with time courses, the median (`p50`) and the 5-95 %
 band (`p05`, `p95`) of `trajectory_quantiles.csv` are brought to each observed
@@ -1145,6 +2157,13 @@ for item in fit.quantities:
     print(item.quantity, item.value, item.units, item.identifiability, item.interval)
 fitted = fit.write("path/to/esterase_case_fitted")   # a new user dataset
 ```
+
+From a shell: `fungmod fit DIR --case strain_e1 carboxylesterase
+p_nitrophenyl_butyrate --fit km 10 5000 µM --fit kcat 1 300 1/min --initial km
+1000 --initial kcat 5 --output DIR_fitted` prints the fitted values, intervals
+and verdicts and writes the fitted dataset; an unidentified quantity exits
+with code 2 unless `--allow-unidentified`
+([command line](cli.md#fit-kinetic-constants-to-your-time-courses)).
 
 What the fit does:
 
@@ -1259,6 +2278,12 @@ draft = fm.user_tables_from_sabiork(
 draft.write("os3bglu6_sabiork")  # the tables, user_dataset.yml and review.md
 print(draft.review)                # every decision, and everything not converted
 ```
+
+From a shell: `fungmod draft-kinetics SOURCE --provider sabiork --dataset-id ID
+--output DIR`, with `SOURCE` an export file or a reaction ID read from the
+local snapshots and `--entry-id`, `--design QUANTITY=VALUE UNITS`,
+`--strain-for ORGANISM=STRAIN_ID` and `--propose-enzyme-classes` for the
+arguments above ([command line](cli.md#draft-tables-from-sabio-rk)).
 
 The draft does not load yet. Every field that needs a person's decision begins
 with `REVIEW:`: always the manifest's `contributor` and the simulation time grid
@@ -1414,7 +2439,8 @@ Limits of the SABIO-RK route:
 - Michaelis-Menten kinetics only, in the kcat form, the Vmax form or the
   diprotic pH-ionization form, one form per enzyme class and substrate, and
   the pH-ionization form on all substrates of an enzyme class or on none;
-  dissolved substrates only.
+  dissolved substrates, or one suspended solid polymer on a dry-mass basis
+  under the apparent law (see the [limits of the solid route](#limits-of-the-solid-route)).
 - The pH-ionization form reads the pH once from the environment: no pH
   dynamics, buffer identity, ionic strength or pH-dependent enzyme stability.
   Its constants are not rescaled with temperature except through a bound
@@ -1423,9 +2449,11 @@ Limits of the SABIO-RK route:
   itself check that the environment pH is exact; a pH range cannot come from
   `conditions.csv` or an `EnvironmentGrid`, and should one reach a case through
   another environment, assembly refuses it.
-- No unit conversion between molar and mass concentrations or rates, and the
-  product yield must be mol/mol. An assay activity is accepted only on the case
-  substrate at saturation; activities are never converted between substrates.
+- No unit conversion between molar and mass concentrations or rates; the
+  product yield must be mol/mol on a dissolved substrate and g/g on a solid
+  one. An assay activity is accepted only on the case substrate at saturation
+  (and never on a solid substrate); activities are never converted between
+  substrates.
 - Response laws are limited to the cardinal temperature, cardinal pH and
   Arrhenius laws, one per condition, and scale the rate only: `Km` and the
   concentrations are not rescaled, and no thermal inactivation is represented.
@@ -1435,7 +2463,17 @@ Limits of the SABIO-RK route:
   are rescaled by the law. When the dataset has several conditions for a case
   (gap records included) no condition-specific record is copied and the grid
   case reports the roles as missing.
-- No enzyme cocktails or multi-step chains, no growth, secretion or uptake.
+- Several enzyme classes act together only in an enzyme network
+  ([several enzymes acting together](#several-enzymes-acting-together)):
+  independent Michaelis-Menten processes whose rates add on shared pools, a
+  chain of pools linked by explicit products on one amount basis, and
+  optionally one competitive inhibitor per process; no synergy, competition for
+  sites, competing substrates of one enzyme, other inhibition forms, response
+  laws, time courses or cultures in a network. Growth and secretion only through
+  `culture.csv`, which binds the registry's culture model (one consuming pool,
+  an explicit yield, induced synthesis; see
+  [what is and is not modelled](#what-is-and-is-not-modelled)); no uptake of
+  soluble products.
 - Time courses measure the substrate state or the product formed of a
   simulated case; other observables (intermediates, biomass, rates) are not
   read. Comparison interpolates linearly on the simulated output grid and

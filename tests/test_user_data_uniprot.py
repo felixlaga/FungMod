@@ -26,6 +26,7 @@ import shutil
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -77,7 +78,10 @@ DATASET_ID = "uniprot_demo"
 FUNGUS = "uniprot_demo__strain_u1"
 STRAIN_NAME = "Proteome-annotated strain U1"
 BGL = "uniprot_demo__beta_glucosidase"
+# USERDATA-008: the registry has a cellobiohydrolase record (EC 3.2.1.91), so X0TEST05 now supports it.
+CBH = "uniprot_demo__cellobiohydrolase"
 CELLULASE = "uniprot_demo__cellulase_generic"
+# REGISTRY-002: the registry has a glucoamylase record (EC 3.2.1.3), so X0TEST09 (GH15, EC 3.2.1.3) now supports it.
 GLUCOAMYLASE = "uniprot_demo__glucoamylase"
 BGL_PREFIX = "uniprot_demo__strain_u1__beta_glucosidase__cellobiose__c30_ph5__"
 SOURCE = (
@@ -124,30 +128,42 @@ def proteome(base_registry: FungModRegistry) -> UserDataset:
 
 @pytest.fixture(scope="module")
 def extended_registry(base_registry: FungModRegistry) -> FungModRegistry:
-    """The shipped registry plus one test-only enzyme-class record (not shipped, no kinetics).
+    """The shipped registry with its glucoamylase record widened in memory to the fixture's maltose class.
 
-    It makes the family map's glucoamylase class (GH15) modellable and gives it
-    an EC number, so the route is exercised on a class acting on the
-    non-cellulose substrate maltose, with CAZy and EC evidence agreeing. The
-    shipped registry has no such record.
+    REGISTRY-002 ships ``glucoamylase`` (EC 3.2.1.3, GH15) as categorical
+    metadata acting on the solid starch class only. This test-only copy also
+    lists the user-defined dissolved ``maltose`` class (not shipped, no
+    kinetics), so the route is exercised on a class acting on a dissolved
+    non-cellulose substrate, with CAZy and EC evidence agreeing; with the
+    shipped record the class acts on no substrate of the fixture.
     """
 
-    return _registry_with(
-        base_registry,
-        {
-            "record_id": "glucoamylase",
-            "name": "glucoamylase",
-            "ec_number": "3.2.1.3",
-            "maturity": "exploratory_metadata",
-            "provenance": {
-                "source": "In-memory registry extension of tests/test_user_data_uniprot.py; not a shipped record",
-                "confidence_level": "exploratory_assumption",
-            },
-            "target_bond_classes": ["alpha_1_4_glycosidic"],
-            "compatible_substrate_classes": ["maltose"],
-            "compatible_processes": ["homogeneous_michaelis_menten"],
-            "notes": "Exists only in this test module to show that modellability follows the base registry.",
+    shipped = base_registry.enzyme_classes["glucoamylase"]
+    widened = replace(
+        shipped,
+        maturity="exploratory_metadata",
+        compatible_substrate_classes=(*shipped.compatible_substrate_classes, "maltose"),
+        provenance={
+            **shipped.provenance,
+            "test_only_change": "maltose added in memory by tests/test_user_data_uniprot.py; not a shipped record",
         },
+    )
+    return FungModRegistry.build(
+        registry_id=base_registry.registry_id,
+        version=base_registry.version,
+        maturity=base_registry.maturity,
+        provenance=base_registry.provenance,
+        fungi=base_registry.fungi.values(),
+        enzyme_classes=(
+            *(record for record in base_registry.enzyme_classes.values() if record.record_id != "glucoamylase"),
+            widened,
+        ),
+        substrates=base_registry.substrates.values(),
+        environments=base_registry.environments.values(),
+        process_compatibility=base_registry.process_compatibility.values(),
+        parameters=base_registry.parameters.values(),
+        case_templates=base_registry.case_templates.values(),
+        product_maps=base_registry.product_maps.values(),
     )
 
 
@@ -157,7 +173,7 @@ def extended_registry(base_registry: FungModRegistry) -> FungModRegistry:
 
 def test_classes_with_a_record_join_the_strain_with_the_accessions_behind_them(proteome: UserDataset) -> None:
     fungus = _records(proteome, "fungi")[FUNGUS]
-    assert fungus["enzyme_classes"] == [BGL, CELLULASE]
+    assert fungus["enzyme_classes"] == [BGL, CBH, CELLULASE, GLUCOAMYLASE]
 
     evidence = fungus["provenance"]["enzyme_class_evidence"][BGL]
     assert evidence["evidence"] == "UniProt proteome UP000000000 (3 proteins, CAZy families GH1, GH3, EC 3.2.1.21)"
@@ -178,7 +194,7 @@ def test_classes_with_a_record_join_the_strain_with_the_accessions_behind_them(p
     assert "unreviewed" in annotation["claim_boundary"]
 
     resolved = {item["enzyme_class"]: item for item in proteome.genome_resolved_classes}
-    assert set(resolved) == {"beta_glucosidase", "cellulase_generic"}
+    assert set(resolved) == {"beta_glucosidase", "cellobiohydrolase", "cellulase_generic", "glucoamylase"}
     assert resolved["beta_glucosidase"]["source_type"] == UNIPROT_SOURCE_TYPE
     assert resolved["beta_glucosidase"]["accession_count"] == 3
     assert resolved["beta_glucosidase"]["ec_numbers"] == ["3.2.1.21"]
@@ -186,6 +202,20 @@ def test_classes_with_a_record_join_the_strain_with_the_accessions_behind_them(p
     # GH5 resolves to cellulase_generic; the protein's EC 3.2.1.4 resolves to no class and cannot be compared.
     assert resolved["cellulase_generic"]["accessions_by_basis"]["cazy"] == ["X0TEST06"]
     assert resolved["cellulase_generic"]["ec_numbers"] == []
+    # GH7 and EC 3.2.1.91 both name the cellobiohydrolase record: the reviewed X0TEST05 agrees.
+    assert resolved["cellobiohydrolase"]["accessions_by_basis"] == {"cazy_and_ec": ["X0TEST05"], "cazy": [], "ec": []}
+    assert resolved["cellobiohydrolase"]["ec_numbers"] == ["3.2.1.91"]
+    assert resolved["cellobiohydrolase"]["specificity"] == DIAGNOSTIC
+    assert fungus["provenance"]["enzyme_class_evidence"][CBH]["evidence"] == (
+        "UniProt proteome UP000000000 (1 protein, CAZy families GH7, EC 3.2.1.91)"
+    )
+    # REGISTRY-002: GH15 and EC 3.2.1.3 both name the glucoamylase record: X0TEST09 agrees.
+    assert resolved["glucoamylase"]["accessions_by_basis"] == {"cazy_and_ec": ["X0TEST09"], "cazy": [], "ec": []}
+    assert resolved["glucoamylase"]["ec_numbers"] == ["3.2.1.3"]
+    assert resolved["glucoamylase"]["specificity"] == DIAGNOSTIC
+    assert fungus["provenance"]["enzyme_class_evidence"][GLUCOAMYLASE]["evidence"] == (
+        "UniProt proteome UP000000000 (1 protein, CAZy families GH15, EC 3.2.1.3)"
+    )
 
 
 def test_annotation_entry_reports_columns_counts_and_every_ec_outcome(proteome: UserDataset) -> None:
@@ -195,15 +225,25 @@ def test_annotation_entry_reports_columns_counts_and_every_ec_outcome(proteome: 
     assert read["organism"] == "Synthetic format-fixture organism"
     assert read["ignored_columns"] == ["Length"]
     assert "Reviewed" in read["read_columns"]
-    assert read["entry_rows"] == 12
-    assert read["review_counts"] == {"reviewed": 2, "unreviewed": 10, "not_stated": 0}
-    assert read["protein_counts"] == {"cazy_and_ec": 1, "cazy": 4, "ec": 1, "disagreement": 2, "no_class": 3}
+    # REGISTRY-002: the fixture gains X0TEST13 (AA1, EC 1.10.3.2), whose laccase class has no registry record.
+    assert read["entry_rows"] == 13
+    assert read["review_counts"] == {"reviewed": 2, "unreviewed": 11, "not_stated": 0}
+    # USERDATA-008: X0TEST05 (GH7, EC 3.2.1.91) moved from CAZy-only to agreeing CAZy and EC evidence;
+    # REGISTRY-002: X0TEST09 (GH15, EC 3.2.1.3) too, and X0TEST13 is CAZy-only.
+    assert read["protein_counts"] == {"cazy_and_ec": 3, "cazy": 3, "ec": 1, "disagreement": 2, "no_class": 3}
     assert read["family_map"]["sources"] == list(CazymeFamilyMap.load().sources)
-    assert read["ec_comparable_classes"] == ["beta_glucosidase"]
+    assert read["ec_comparable_classes"] == [
+        "beta_glucosidase",
+        "cellobiohydrolase",
+        "chitinase",
+        "endo_xylanase",
+        "glucoamylase",
+    ]
 
     unresolved = {item["ec_number"]: item for item in read["unresolved_ec_numbers"]}
-    assert set(unresolved) == {"3.1.1.73", "3.2.1.3", "3.2.1.37", "3.2.1.4", "3.2.1.91"}
-    assert unresolved["3.2.1.91"]["accessions"] == ["X0TEST05"]
+    assert set(unresolved) == {"1.10.3.2", "3.1.1.73", "3.2.1.37", "3.2.1.4"}
+    assert unresolved["1.10.3.2"]["accessions"] == ["X0TEST13"]
+    assert unresolved["3.2.1.4"]["accessions"] == ["X0TEST06"]
     assert all(item["reason"] == "no registry enzyme class carries this EC number" for item in unresolved.values())
     # A partial EC number is kept as written and never resolved, also beside a complete one.
     assert read["partial_ec_numbers"] == [
@@ -220,7 +260,8 @@ def test_disagreeing_proteins_are_reported_with_both_sides_and_support_no_class(
     gh7 = disagreements["X0TEST04"]
     assert (gh7["cazy_families"], gh7["cazy_classes"]) == (["CBM1", "GH7"], ["cellobiohydrolase"])
     assert (gh7["ec_numbers"], gh7["ec_classes"]) == (["3.2.1.21"], ["beta_glucosidase"])
-    assert gh7["contested_classes"] == ["beta_glucosidase"]
+    # Both classes carry a registry EC number now, so both are contested (USERDATA-008).
+    assert gh7["contested_classes"] == ["beta_glucosidase", "cellobiohydrolase"]
     # GH3 names beta_glucosidase, whose registry record carries an EC number the protein's EC does not match.
     gh3 = disagreements["X0TEST10"]
     assert (gh3["cazy_classes"], gh3["ec_numbers"], gh3["ec_classes"]) == (["beta_glucosidase"], ["3.2.1.37"], [])
@@ -236,10 +277,12 @@ def test_classes_without_a_registry_record_are_listed_not_fabricated(
     base_registry: FungModRegistry,
 ) -> None:
     unmodellable = {item["enzyme_class"]: item for item in proteome.unmodellable_enzyme_classes}
-    assert set(unmodellable) == {"cellobiohydrolase", "glucoamylase"}
-    assert unmodellable["cellobiohydrolase"]["accessions"] == ["X0TEST05"]
-    assert unmodellable["cellobiohydrolase"]["specificity"] == DIAGNOSTIC
-    assert unmodellable["glucoamylase"]["families"] == ["GH15"]
+    # USERDATA-008 (cellobiohydrolase) and REGISTRY-002 (glucoamylase): these classes have registry records now
+    # and are no longer listed here; the fixture's X0TEST13 (AA1) names laccase, which still has none.
+    assert set(unmodellable) == {"laccase"}
+    assert unmodellable["laccase"]["accessions"] == ["X0TEST13"]
+    assert unmodellable["laccase"]["specificity"] == POLYSPECIFIC
+    assert unmodellable["laccase"]["families"] == ["AA1"]
     assert all(item["source_type"] == UNIPROT_SOURCE_TYPE for item in unmodellable.values())
     assert all("from a proteome annotation" in item["reason"] for item in unmodellable.values())
 
@@ -248,7 +291,7 @@ def test_classes_without_a_registry_record_are_listed_not_fabricated(
     for enzyme_class in unmodellable:
         assert f"{DATASET_ID}__{enzyme_class}" not in generated
         assert not any(record_id.endswith(enzyme_class) for record_id in overlaid.enzyme_classes)
-    assert proteome.summary()["record_counts"]["enzyme_classes"] == 2
+    assert proteome.summary()["record_counts"]["enzyme_classes"] == 4
 
 
 def test_unmapped_families_are_listed_with_their_accessions(proteome: UserDataset) -> None:
@@ -303,8 +346,7 @@ def test_preflight_is_underparameterized_and_simulation_is_refused(proteome: Use
     assert annotation["source_type"] == UNIPROT_SOURCE_TYPE
     assert {item["accession"] for item in annotation["ec_cazy_disagreements"]} == {"X0TEST04", "X0TEST10"}
     assert {item["enzyme_class"]: item["accessions"] for item in resolution["unmodellable_enzyme_classes"]} == {
-        "cellobiohydrolase": ["X0TEST05"],
-        "glucoamylase": ["X0TEST09"],
+        "laccase": ["X0TEST13"],
     }
     assert all(item["source_type"] == UNIPROT_SOURCE_TYPE for item in resolution["genome_resolved_classes"])
     assert {item["family"] for item in resolution["unmapped_families"]} == {"CBM1", "GT2"}
@@ -364,27 +406,39 @@ def test_explicit_enzymes_row_wins_and_keeps_the_proteome_evidence(tmp_path: Pat
 
 
 # ---------------------------------------------------------------------------
-# A non-cellulose class (test-only registry record), exports with one evidence column
+# A non-cellulose class (shipped record widened in memory), exports with one evidence column
 
 
 def test_a_proteome_class_on_a_non_cellulose_substrate_follows_the_base_registry(
+    proteome: UserDataset,
     extended_registry: FungModRegistry,
 ) -> None:
+    gap_id = "uniprot_demo__strain_u1__glucoamylase__maltose__c30_ph5__km__gap"
+    # With the shipped record (solid starch only) the class joins the strain but acts on no fixture substrate.
+    assert _records(proteome, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CBH, CELLULASE, GLUCOAMYLASE]
+    assert gap_id not in _records(proteome, "parameter_records")
+
     dataset = load_user_dataset(UNIPROT, registry=extended_registry)
 
-    assert _records(dataset, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CELLULASE, GLUCOAMYLASE]
+    assert _records(dataset, "fungi")[FUNGUS]["enzyme_classes"] == [BGL, CBH, CELLULASE, GLUCOAMYLASE]
     resolved = {item["enzyme_class"]: item for item in dataset.genome_resolved_classes}
     # With an EC number on the class, GH15 and EC 3.2.1.3 of X0TEST09 agree.
     assert resolved["glucoamylase"]["accessions_by_basis"]["cazy_and_ec"] == ["X0TEST09"]
     assert "glucoamylase" not in {item["enzyme_class"] for item in dataset.unmodellable_enzyme_classes}
     (read,) = dataset.genome_annotations
     assert "3.2.1.3" not in {item["ec_number"] for item in read["unresolved_ec_numbers"]}
-    assert read["ec_comparable_classes"] == ["beta_glucosidase", "glucoamylase"]
+    assert read["ec_comparable_classes"] == [
+        "beta_glucosidase",
+        "cellobiohydrolase",
+        "chitinase",
+        "endo_xylanase",
+        "glucoamylase",
+    ]
 
-    gap = _parameter(dataset, "uniprot_demo__strain_u1__glucoamylase__maltose__c30_ph5__km__gap")
+    gap = _parameter(dataset, gap_id)
     assert gap.substrate_id == "uniprot_demo__maltose"
     assert gap.provenance["measurement_request"] == (
-        f"Measure km of glucoamylase from {STRAIN_NAME} on maltose at 30 degC, pH 5.0 "
+        f"Measure km of Glucoamylase from {STRAIN_NAME} on maltose at 30 degC, pH 5.0 "
         f"(concentration units){GLUCOAMYLASE_NOTE}"
     )
     report = virtual_experiment(
@@ -545,13 +599,15 @@ def test_export_reached_through_a_symbolic_link_outside_the_directory_is_refused
 
 def test_strain_whose_proteome_resolves_no_registry_class_is_refused(tmp_path: Path) -> None:
     lines = _tsv_lines()
-    tsv = lines[0] + "".join(line for line in lines if line.startswith(("X0TEST04", "X0TEST05", "X0TEST07")))
+    # USERDATA-008 and REGISTRY-002: X0TEST05 (GH7) and X0TEST09 (GH15) resolve to registry records now, so the
+    # export keeps X0TEST13 (AA1, EC 1.10.3.2), whose laccase class has no registry record.
+    tsv = lines[0] + "".join(line for line in lines if line.startswith(("X0TEST04", "X0TEST13", "X0TEST07")))
     issues = _issues(tmp_path, {ANNOTATION: tsv})
 
     message = next(issue["message"] for issue in issues if issue["file"] == "strains.csv")
     assert "its UniProt export (genomes.csv row 2) resolved no enzyme class with a registry record" in message
-    assert "cellobiohydrolase" in message
-    assert "3.2.1.91" in message
+    assert "laccase" in message
+    assert "1.10.3.2" in message
     assert "disagree: X0TEST04" in message
     assert "FungMod does not create enzyme classes from a proteome" in message
 
@@ -776,7 +832,7 @@ def test_refresh_fetches_the_stream_url_and_stores_a_verified_snapshot(
     assert metadata["uniprot_release_date"] == "06-October-2026"
     assert metadata["http_status"] == 200
     assert metadata["retrieved_at"].endswith("Z")
-    assert metadata["entry_rows"] == 12
+    assert metadata["entry_rows"] == 13  # REGISTRY-002 added X0TEST13 to the fixture export
     assert "not checked against a live response" in metadata["field_names_note"]
 
     # Later reads use the frozen snapshot, with urlopen failing again.
@@ -883,7 +939,12 @@ def test_a_fetched_snapshot_written_into_a_dataset_loads_with_the_suggested_row(
     assert read["annotation_tool_version"] == "release fixture_release"
     assert snapshot.sha256 in read["source"] and STREAM_URL in read["source"]
     assert read["annotation_sha256"] == snapshot.sha256
-    assert {item["enzyme_class"] for item in dataset.genome_resolved_classes} == {"beta_glucosidase", "cellulase_generic"}
+    assert {item["enzyme_class"] for item in dataset.genome_resolved_classes} == {
+        "beta_glucosidase",
+        "cellobiohydrolase",
+        "cellulase_generic",
+        "glucoamylase",
+    }
 
     with pytest.raises(UniprotFetchError, match="different content"):
         (dataset_dir / row["annotation_file"]).write_bytes(b"Entry\tCAZy\nX0TEST01\tGH3;\n")
@@ -894,14 +955,22 @@ def test_a_fetched_snapshot_written_into_a_dataset_loads_with_the_suggested_row(
             write_snapshot_to_user_dataset(snapshot, dataset_dir, strain_id="strain_u1", annotation_file=bad)
 
 
-def test_the_fetch_client_is_complete_and_names_no_organism_lookup() -> None:
+def test_the_fetch_client_is_complete_and_reaches_a_proteome_from_a_name_only_through_candidates() -> None:
+    """FETCH-001 replaced "no organism-name lookup" by a lookup that chooses only an exact name or a sole candidate.
+
+    The behaviour (exact match, unique candidate, refusals with every candidate) is pinned in
+    ``tests/test_fetch_by_name.py``; here the module stays complete and keeps no free-form name query.
+    """
+
     for name in uniprot_source.__all__:
         candidate = getattr(uniprot_source, name)
         if callable(candidate) and not isinstance(candidate, type):
             source = inspect.getsource(candidate).lower()
             assert "notimplementederror" not in source and "todo" not in source, name
-    assert "future work" in (uniprot_source.__doc__ or "")
+    assert "future work" not in (uniprot_source.__doc__ or "")
+    assert "resolve_proteome_name" in (uniprot_source.__doc__ or "")
     assert not hasattr(uniprot_source, "organism_name_query")
+    assert uniprot_source.proteome_name_query("Genus species").endswith(uniprot_source.REFERENCE_PROTEOME_CLAUSE)
 
 
 # ---------------------------------------------------------------------------

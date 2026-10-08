@@ -25,6 +25,7 @@ from fungal_model.api.output_schema import (
     table_fieldnames,
 )
 from fungal_model.api.user_data import USER_DATASET_MATURITY_FITTED, USER_DATASET_PARAMETER_MATURITIES
+from fungal_model.core.units import ASSAY_BASE_UNITS, units_are_compatible
 from fungal_model.registry.records import (
     ParameterRecord,
     ProcessCompatibilityRecord,
@@ -45,11 +46,17 @@ from fungal_model.screening.case_builder import (
     get_registry_process_assembler,
     select_registry_case_compatibility,
 )
+from fungal_model.screening.enzyme_network import ENZYME_NETWORK_PROCESS_TYPE
 from fungal_model.screening.modelability import missing_item_suggestion
 from fungal_model.screening.parameter_resolution import (
     ExactTemplateParameterError,
     resolve_exact_template_parameter_records,
 )
+
+
+# ``case_status`` of a ``case_summary.csv`` row.
+CASE_STATUS_SIMULATED = "simulated"
+CASE_STATUS_NOT_SIMULATED = "not_simulated"
 
 
 @dataclass(frozen=True)
@@ -68,8 +75,22 @@ def write_standard_tables(
     registry: FungModRegistry,
     preflight_reports: Sequence[ModelabilityReport],
     output_dir: str | Path,
+    blocked_reports: Mapping[int, ModelabilityReport] | None = None,
 ) -> WrittenTables:
-    """Write API-001 biological output tables."""
+    """Write API-001 biological output tables.
+
+    ``blocked_reports`` maps the grid position of every requested case that the
+    preflight blocked, and that was therefore not simulated (a partial run,
+    ``VirtualExperiment.simulate(blocked="report")``), to its preflight report.
+    Each such case is ``case_<position>`` and gets rows in
+    ``modelability_preflight``, ``modelability_items``, ``case_summary``
+    (``case_status`` ``not_simulated`` with ``not_simulated_reason``),
+    ``assumption_summary``, ``limitations_table``, ``missing_parameters`` and
+    ``suggested_experiments``; it has no samples, so it has no row in the
+    per-sample tables. With blocked reports, the case rows follow the grid
+    order. A report that allows simulation in its mode, or a position that
+    was simulated, is refused.
+    """
 
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
@@ -80,6 +101,7 @@ def write_standard_tables(
         screen_result=screen_result,
         registry=registry,
         reports_by_case=reports_by_case,
+        blocked_reports=blocked_reports or {},
     )
     paths = {
         "modelability_preflight": destination / "modelability_preflight.csv",
@@ -155,11 +177,39 @@ def write_preflight_tables(
     return WrittenTables(paths={name: str(path) for name, path in paths.items()})
 
 
+def standard_case_id(case_index: int) -> str:
+    """Return the ``case_id`` of the case at ``case_index`` in the requested grid."""
+
+    return f"case_{case_index:04d}"
+
+
+def not_simulated_reason(report: ModelabilityReport) -> str:
+    """Return why a case that its preflight blocks was not simulated (``case_summary.csv``).
+
+    Refuses a report whose preflight allows simulation in its mode: only a
+    blocked case is ever reported as not simulated.
+    """
+
+    policy = preflight_policy(report)
+    if policy["simulation_allowed_for_mode"]:
+        raise ValueError(
+            f"{report.fungus_id} + {report.substrate_id} + {report.environment_id} passes the {report.mode}-mode "
+            "preflight, so it is not a blocked case."
+        )
+    return (
+        f"blocked_by_preflight: the {report.mode}-mode preflight reports {report.status} (blocking reason "
+        f"{policy['blocking_reason']}; next action {policy['recommended_next_action']}). The case was not simulated, "
+        "so it has no samples, trajectories, metrics or threshold times; its missing inputs and measurement requests "
+        "are in missing_parameters.csv and suggested_experiments.csv."
+    )
+
+
 def _build_table_rows(
     *,
     screen_result: RegistryScreenResult,
     registry: FungModRegistry,
     reports_by_case: Mapping[tuple[str, str, str], ModelabilityReport],
+    blocked_reports: Mapping[int, ModelabilityReport],
 ) -> dict[str, list[dict[str, Any]]]:
     rows: dict[str, list[dict[str, Any]]] = {
         "modelability_preflight": [],
@@ -186,7 +236,12 @@ def _build_table_rows(
         "suggested_experiments": [],
     }
     varying_conditions = _varying_environment_conditions(registry, screen_result.case_results)
-    for case_index, case in enumerate(screen_result.case_results):
+    for case_index, case in _case_slots(screen_result, blocked_reports):
+        if case is None:
+            _add_not_simulated_case_rows(
+                rows, registry=registry, report=blocked_reports[case_index], case_index=case_index
+            )
+            continue
         report = reports_by_case.get(
             (case.fungus_id, case.substrate_id, case.environment_id),
             case.modelability_report,
@@ -213,7 +268,7 @@ def _build_table_rows(
         )
         rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
         rows["suggested_experiments"].extend(
-            _suggested_experiment_rows(context, registry, case, report, compatibility)
+            _suggested_experiment_rows(context, registry, report, compatibility)
         )
         rows["assumption_summary"].extend(_assumption_summary_rows(context, report))
         rows["mechanism_summary"].extend(
@@ -269,14 +324,17 @@ def _build_table_rows(
                 _solver_diagnostic_rows(sample_context=sample_context, sample=sample)
             )
     rows["summary_metrics"] = _summary_metric_rows(rows["final_metrics"], rows["threshold_times"])
+    # Environment and comparison summaries describe simulated cases; a blocked case has no outputs to summarize.
+    simulated_case_rows = [row for row in rows["case_summary"] if row["case_status"] == CASE_STATUS_SIMULATED]
+    simulated_case_ids = {row["case_id"] for row in simulated_case_rows}
     rows["environment_summary"] = _environment_summary_rows(
-        case_summary_rows=rows["case_summary"],
+        case_summary_rows=simulated_case_rows,
         final_metric_rows=rows["final_metrics"],
         threshold_rows=rows["threshold_times"],
-        limitation_rows=rows["limitations_table"],
+        limitation_rows=[row for row in rows["limitations_table"] if row["case_id"] in simulated_case_ids],
     )
     rows["comparison_summary"] = _comparison_summary_rows(
-        case_summary_rows=rows["case_summary"],
+        case_summary_rows=simulated_case_rows,
         final_metric_rows=rows["final_metrics"],
         threshold_rows=rows["threshold_times"],
         environment_summary_rows=rows["environment_summary"],
@@ -287,6 +345,88 @@ def _build_table_rows(
     )
     rows["trajectory_quantiles"] = _trajectory_quantile_rows(rows["time_series_long"])
     return rows
+
+
+def _case_slots(
+    screen_result: RegistryScreenResult,
+    blocked_reports: Mapping[int, ModelabilityReport],
+) -> list[tuple[int, RegistryCaseEnsemble | None]]:
+    """Return ``(grid position, simulated case or None for a blocked case)`` for every case to tabulate.
+
+    Without blocked reports the simulated cases keep the screen's order;
+    with them, every case is listed in grid order.
+    """
+
+    slots: list[tuple[int, RegistryCaseEnsemble | None]] = [
+        (_case_index(case, position), case) for position, case in enumerate(screen_result.case_results)
+    ]
+    simulated = [index for index, _case in slots]
+    if len(set(simulated)) != len(simulated):
+        raise ValueError(f"The screen result lists a case position more than once: {simulated}.")
+    if not blocked_reports:
+        return slots
+    for index, report in blocked_reports.items():
+        if index in simulated:
+            raise ValueError(
+                f"Case position {index} ({report.fungus_id} + {report.substrate_id} + {report.environment_id}) "
+                "was simulated, so it cannot also be reported as blocked."
+            )
+        not_simulated_reason(report)  # refuses a report that allows simulation
+        slots.append((index, None))
+    return sorted(slots, key=lambda slot: slot[0])
+
+
+def _case_index(case: RegistryCaseEnsemble, position: int) -> int:
+    """The case's grid position (``case_index``), or its position in the screen result when it carries none."""
+
+    return position if case.case_index is None else case.case_index
+
+
+def _add_not_simulated_case_rows(
+    rows: dict[str, list[dict[str, Any]]],
+    *,
+    registry: FungModRegistry,
+    report: ModelabilityReport,
+    case_index: int,
+) -> None:
+    """Add the case-level rows of a case that the preflight blocked: what is missing, why, and what to measure."""
+
+    context = _preflight_context(registry=registry, report=report, case_index=case_index)
+    compatibility = (
+        None
+        if report.selected_compatibility_id is None
+        else registry.process_compatibility.get(report.selected_compatibility_id)
+    )
+    rows["modelability_preflight"].append(_preflight_row(context, report))
+    rows["modelability_items"].extend(_modelability_item_rows(context, report))
+    rows["case_summary"].append(
+        {
+            **_case_columns(context),
+            "modelability_status": report.status,
+            "sample_count": 0,
+            "sample_failure_count": 0,
+            "simulated": False,
+            "preflight_guardrail": "modelability",
+            "case_status": CASE_STATUS_NOT_SIMULATED,
+            "not_simulated_reason": not_simulated_reason(report),
+        }
+    )
+    rows["limitations_table"].append(
+        _limitation_row(context, "not_simulated", "blocking", not_simulated_reason(report), "modelability")
+    )
+    for assumption in report.assumptions:
+        rows["limitations_table"].append(_limitation_row(context, "preflight", "info", assumption, "modelability"))
+    for item in report.missing:
+        rows["limitations_table"].append(
+            _limitation_row(context, "missing_input", "blocking", item.message, item.item_id)
+        )
+    for item in report.incompatible:
+        rows["limitations_table"].append(
+            _limitation_row(context, "incompatible_input", "blocking", item.message, item.item_id)
+        )
+    rows["missing_parameters"].extend(_missing_parameter_rows(context, report))
+    rows["suggested_experiments"].extend(_suggested_experiment_rows(context, registry, report, compatibility))
+    rows["assumption_summary"].extend(_assumption_summary_rows(context, report))
 
 
 def _build_preflight_table_rows(
@@ -331,7 +471,7 @@ def _case_context(
     )
     return {
         "output_schema_version": OUTPUT_SCHEMA_VERSION,
-        "case_id": f"case_{case_index:04d}",
+        "case_id": standard_case_id(case_index),
         "fungus_id": case.fungus_id,
         "fungus_name": fungus.name,
         "substrate_id": case.substrate_id,
@@ -361,7 +501,7 @@ def _preflight_context(
     environment_policy = _environment_policy("preflight_only")
     return {
         "output_schema_version": OUTPUT_SCHEMA_VERSION,
-        "case_id": f"case_{case_index:04d}",
+        "case_id": standard_case_id(case_index),
         "fungus_id": report.fungus_id,
         "fungus_name": fungus.name,
         "substrate_id": report.substrate_id,
@@ -697,6 +837,8 @@ def _case_summary_row(
         "sample_failure_count": len(case.sample_failures),
         "simulated": bool(case.samples),
         "preflight_guardrail": "modelability",
+        "case_status": CASE_STATUS_SIMULATED,
+        "not_simulated_reason": "",
     }
 
 
@@ -777,7 +919,91 @@ def _mechanism_summary_rows(
         compatibility=compatibility,
     )
     rows = [{**_case_columns(context), "mechanism_index": 0, **mechanism}]
+    if case.process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        rows.extend(
+            _network_process_mechanism_rows(
+                context=context, case=case, start_index=len(rows), maturity=str(mechanism["maturity"])
+            )
+        )
     rows.extend(_rate_modifier_mechanism_rows(context=context, case=case, start_index=len(rows)))
+    return rows
+
+
+def _sample_config_data(case: RegistryCaseEnsemble) -> Mapping[str, Any] | None:
+    """The assembled config of the case's first sample, or None when it is unavailable."""
+
+    if not case.samples:
+        return None
+    config_path = Path(case.samples[0].config_path)
+    if not config_path.exists():
+        return None
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    return data if isinstance(data, Mapping) else None
+
+
+def _network_process_mechanism_rows(
+    *,
+    context: Mapping[str, Any],
+    case: RegistryCaseEnsemble,
+    start_index: int,
+    maturity: str,
+) -> list[dict[str, Any]]:
+    """One row per process of an enzyme network: its enzyme class, pool, released pools, law and parameters."""
+
+    data = _sample_config_data(case)
+    if data is None:
+        return []
+    template = data.get("case_template", {})
+    enzyme_classes = template.get("process_enzyme_classes", {}) if isinstance(template, Mapping) else {}
+    process_configs = data.get("processes", [])
+    if not isinstance(process_configs, list) or not isinstance(enzyme_classes, Mapping):
+        return []
+    rows: list[dict[str, Any]] = []
+    for process in process_configs:
+        if not isinstance(process, Mapping):
+            continue
+        process_id = str(process.get("id", ""))
+        states = process.get("states", {})
+        parameters = process.get("parameters", {})
+        if not isinstance(states, Mapping) or not isinstance(parameters, Mapping):
+            continue
+        enzyme_class = str(enzyme_classes.get(process_id, ""))
+        state_text = ";".join(f"{field}:{state}" for field, state in states.items())
+        parameter_text = ";".join(
+            f"{field}:{symbol}" for field, symbol in parameters.items() if field != "rate_units"
+        )
+        assumptions = process.get("assumptions", [])
+        rows.append(
+            {
+                **_case_columns(context),
+                "mechanism_index": start_index + len(rows),
+                # Each process of a network is a process law of the case (output schema 2.2.0 mechanism kinds).
+                "mechanism_kind": "process_law",
+                "mechanism_id": process_id,
+                "mechanism_family": _mechanism_family(str(process.get("process_type", ""))),
+                "active": True,
+                "maturity": maturity,
+                "configured_by": enzyme_class,
+                "equation_or_law": _mechanism_law(str(process.get("process_type", ""))),
+                "state_variables": state_text,
+                "parameters": parameter_text,
+                "assumptions": "; ".join(str(item) for item in assumptions) if isinstance(assumptions, list) else "",
+                "limitations": (
+                    "Acts on its pool independently of the other processes of the network; their rates add on a "
+                    "shared pool. No competition for substrate or adsorption sites and no synergy."
+                ),
+                "provenance": json.dumps(
+                    {
+                        "process_id": process_id,
+                        "process_type": str(process.get("process_type", "")),
+                        "enzyme_class": enzyme_class,
+                        "product_map": str(process.get("product_map", "")),
+                        "source": "assembled_model_config",
+                    },
+                    sort_keys=True,
+                ),
+            }
+        )
     return rows
 
 
@@ -810,6 +1036,16 @@ def _rate_modifier_mechanism_rows(
             if not isinstance(modifier, Mapping):
                 continue
             modifier_type = str(modifier.get("type") or modifier.get("modifier_type") or "")
+            if modifier_type == "competitive_inhibition":
+                rows.append(
+                    _competitive_inhibition_mechanism_row(
+                        context=context,
+                        modifier=modifier,
+                        process_id=process_id,
+                        index=start_index + len(rows),
+                    )
+                )
+                continue
             if modifier_type != "product_inhibition":
                 continue
             product_state = str(modifier.get("product_state", ""))
@@ -852,6 +1088,62 @@ def _rate_modifier_mechanism_rows(
     return rows
 
 
+def _competitive_inhibition_mechanism_row(
+    *,
+    context: Mapping[str, Any],
+    modifier: Mapping[str, Any],
+    process_id: str,
+    index: int,
+) -> dict[str, Any]:
+    """The mechanism row of a configured provenance-bound competitive-inhibition modifier."""
+
+    fields = {
+        name: str(modifier.get(name, ""))
+        for name in (
+            "substrate_state",
+            "inhibitor_state",
+            "michaelis_constant",
+            "inhibition_constant",
+            "primary_source",
+            "maturity",
+        )
+    }
+    return {
+        **_case_columns(context),
+        "mechanism_index": index,
+        "mechanism_kind": "rate_modifier",
+        "mechanism_id": "competitive_inhibition",
+        "mechanism_family": "provenance-bound competitive Michaelis-Menten inhibition modifier",
+        "active": True,
+        "maturity": fields["maturity"],
+        "configured_by": process_id,
+        "equation_or_law": "rate_multiplier = (K_m + S) / (K_m * (1 + I / K_i) + S)",
+        "state_variables": f"substrate:{fields['substrate_state']};competitive_inhibitor:{fields['inhibitor_state']}",
+        "parameters": (
+            f"michaelis_constant:{fields['michaelis_constant']};inhibition_constant:{fields['inhibition_constant']}"
+        ),
+        "assumptions": (
+            "One inhibitor competes with the substrate of its homogeneous Michaelis-Menten base process; K_m is the "
+            "base process's own Michaelis constant."
+        ),
+        "limitations": (
+            "One competitive inhibitor per process; no non-competitive, uncompetitive, mixed, irreversible, "
+            "allosteric or multi-inhibitor law. The primary source supports the equation, not the configured K_i."
+        ),
+        "provenance": json.dumps(
+            {
+                "process_id": process_id,
+                "modifier_type": "competitive_inhibition",
+                "inhibitor_state": fields["inhibitor_state"],
+                "inhibition_constant": fields["inhibition_constant"],
+                "primary_source": fields["primary_source"],
+                "source": "assembled_model_config",
+            },
+            sort_keys=True,
+        ),
+    }
+
+
 def _process_mechanism_descriptor(
     *,
     context: Mapping[str, Any],
@@ -878,7 +1170,15 @@ def _process_mechanism_descriptor(
         "state_variables": ";".join(_mechanism_state_variables(process_type)),
         "parameters": ";".join(_mechanism_parameters(report, role_records)),
         "assumptions": "; ".join(report.assumptions),
-        "limitations": "; ".join(_mechanism_limitations(process_type)),
+        "limitations": "; ".join(
+            _mechanism_limitations(
+                process_type,
+                role_records,
+                pool_units=_culture_pool_units(registry, compatibility, role_records)
+                if process_type == "culture_physiology"
+                else (),
+            )
+        ),
         "provenance": json.dumps(
             {
                 "process_type": process_type,
@@ -901,6 +1201,8 @@ def _mechanism_family(process_type: str) -> str:
         return "generic two-step extracellular enzyme chain"
     if process_type == "culture_physiology":
         return "generic well-mixed culture physiology composed from registry process templates"
+    if process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        return "generic enzyme network: template-declared homogeneous Michaelis-Menten processes on shared pools"
     return "generic configured process law"
 
 
@@ -921,6 +1223,11 @@ def _mechanism_law(process_type: str) -> str:
             "template-declared composition of generic process laws (substrate conversion with explicit yield, "
             "first-order loss, producer-proportional synthesis) sharing one explicit closure ledger"
         )
+    if process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        return (
+            "dS_i/dt = -sum_j r_ij + sum_k y_k r_k over the processes on and into pool i, each r = Vmax * S / (Km + S) "
+            "or its explicit-enzyme form, optionally scaled by its configured modifiers"
+        )
     return "configured process law"
 
 
@@ -935,6 +1242,8 @@ def _mechanism_state_variables(process_type: str) -> tuple[str, ...]:
         return ("substrate", "intermediate", "product", "surface_catalyst", "homogeneous_catalyst")
     if process_type == "culture_physiology":
         return ("substrate", "biomass", "enzyme_pools", "ledger_pools")
+    if process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        return ("substrate", "intermediate_pools", "product", "enzymes_of_kcat_form_processes")
     return ()
 
 
@@ -966,7 +1275,47 @@ def _mechanism_maturity(process_type: str, role_records: Mapping[str, ParameterR
     return "software_tested_mixed_parameter_maturity"
 
 
-def _mechanism_limitations(process_type: str) -> tuple[str, ...]:
+def _has_calibrated_record(role_records: Mapping[str, ParameterRecord]) -> bool:
+    """Whether a case binds a retrospectively calibrated registry record, whose limits its outputs must state."""
+
+    return any(record.maturity == "calibrated" for record in role_records.values())
+
+
+def _culture_pool_units(
+    registry: FungModRegistry,
+    compatibility: ProcessCompatibilityRecord | None,
+    role_records: Mapping[str, ParameterRecord],
+) -> tuple[str, ...]:
+    """Units of the initial records of a culture template's enzyme-pool states (``state_species`` type enzyme)."""
+
+    template_id = getattr(compatibility, "case_template_id", "")
+    if not template_id or template_id not in registry.case_templates:
+        return ()
+    template = registry.case_templates[template_id]
+    species = template.process_state_metadata.get("state_species", {})
+    units: list[str] = []
+    if not isinstance(species, Mapping):
+        return ()
+    for role, binding in species.items():
+        if not isinstance(binding, Mapping) or binding.get("entity_type") != "enzyme":
+            continue
+        spec = template.initial_state_mapping.get(str(role), {})
+        record = role_records.get(str(spec.get("parameter_role", ""))) if isinstance(spec, Mapping) else None
+        if record is not None and record.value.units:
+            units.append(record.value.units)
+    return tuple(units)
+
+
+def _assay_activity_units(units: str) -> bool:
+    return any(units_are_compatible(units, f"{assay} / liter") for assay in ASSAY_BASE_UNITS)
+
+
+def _mechanism_limitations(
+    process_type: str,
+    role_records: Mapping[str, ParameterRecord] | None = None,
+    *,
+    pool_units: Sequence[str] = (),
+) -> tuple[str, ...]:
     if process_type == "homogeneous_michaelis_menten":
         return (
             "Well-mixed homogeneous process only.",
@@ -994,11 +1343,29 @@ def _mechanism_limitations(process_type: str) -> tuple[str, ...]:
             "No empirical validation claim is implied by simulation output.",
         )
     if process_type == "culture_physiology":
+        # The pool and calibration sentences follow the case's own records, never the organism.
+        pools = (
+            "Enzyme pools are assay activities and are not converted to protein mass or molarity."
+            if pool_units and all(_assay_activity_units(units) for units in pool_units)
+            else "Enzyme pools keep the units of their parameter records (a protein mass or an assay activity per "
+            "volume) and are not converted between protein mass, assay units and molarity."
+        )
         return (
             "Exactly the template-declared process laws are represented; nutrient, oxygen, maintenance, "
             "morphology, and pH dynamics are absent unless a template declares them.",
-            "Enzyme pools are assay activities and are not converted to protein mass or molarity.",
-            "Calibrated parameters are retrospective fits to published means; they are not validated predictions.",
+            pools,
+            *(
+                ("Calibrated parameters are retrospective fits to published means; they are not validated predictions.",)
+                if _has_calibrated_record(role_records or {})
+                else ()
+            ),
+            "No empirical validation claim is implied by simulation output.",
+        )
+    if process_type == ENZYME_NETWORK_PROCESS_TYPE:
+        return (
+            "Exactly the template-declared processes are represented; parallel processes on one pool act "
+            "additively and independently, without competition for substrate or adsorption sites or synergy.",
+            "Not a whole-fungus physiology, secretion, uptake, or biomass model.",
             "No empirical validation claim is implied by simulation output.",
         )
     return ("No empirical validation claim is implied by simulation output.",)
@@ -2369,12 +2736,26 @@ def _limitation_rows(
                 case.process_type,
             )
         )
+        if _has_calibrated_record(role_records):
+            rows.append(
+                _limitation_row(
+                    context,
+                    "retrospective_calibration",
+                    "important",
+                    "Calibrated parameter records are retrospective fits to published duplicate means without measured uncertainty; the trajectories are not validated predictions and must not be cited as independent evidence.",
+                    case.process_type,
+                )
+            )
+    if case.process_type == ENZYME_NETWORK_PROCESS_TYPE:
         rows.append(
             _limitation_row(
                 context,
-                "retrospective_calibration",
+                "not_modelled",
                 "important",
-                "Calibrated parameter records are retrospective fits to published duplicate means without measured uncertainty; the trajectories are not validated predictions and must not be cited as independent evidence.",
+                "This is an enzyme network of well-mixed Michaelis-Menten processes on shared pools: parallel "
+                "processes on one pool act additively and independently (no competition for substrate or adsorption "
+                "sites, no synergy), and it is not a whole-fungus growth, secretion, uptake, biomass, or respiration "
+                "model.",
                 case.process_type,
             )
         )
@@ -2480,7 +2861,6 @@ def _missing_parameter_rows(
 def _suggested_experiment_rows(
     context: Mapping[str, Any],
     registry: FungModRegistry,
-    case: RegistryCaseEnsemble,
     report: ModelabilityReport,
     compatibility: ProcessCompatibilityRecord | None,
 ) -> list[dict[str, Any]]:
@@ -3011,4 +3391,12 @@ def _float_or_blank(value: Any) -> Any:
     return "" if number is None else number
 
 
-__all__ = ["WrittenTables", "preflight_policy", "write_standard_tables"]
+__all__ = [
+    "CASE_STATUS_NOT_SIMULATED",
+    "CASE_STATUS_SIMULATED",
+    "WrittenTables",
+    "not_simulated_reason",
+    "preflight_policy",
+    "standard_case_id",
+    "write_standard_tables",
+]

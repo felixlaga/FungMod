@@ -69,7 +69,12 @@ With your own measurements, put them in a folder of small CSV tables
 (strains, their enzymes, substrates, conditions and kinetics) and pass
 `user_data="that/folder"`; FungMod checks every table, keeps each value's
 source and units, and turns anything missing into a named measurement request
-([user-supplied data](docs/user-data.md)).
+([user-supplied data](docs/user-data.md)). With `enzyme_network` in the
+dataset's manifest, all of the strain's enzyme classes act together: their rates
+add on a shared substrate, and the product one class releases is degraded by the
+next where your tables link them, without any synergy or competition for sites
+that the tables do not state
+([several enzymes acting together](docs/user-data.md#several-enzymes-acting-together)).
 To start from a request instead, `assemble_user_tables(fungus=..., substrates=...,
 conditions=...)` gathers what your sources say about that fungus (its dbCAN
 annotation, the enzyme classes you assert, a user dataset, SABIO-RK entries)
@@ -96,9 +101,45 @@ case, the limitations count and where the provenance and limitations tables
 are. `--mode`, and in exploratory mode `--samples` and `--seed`, are
 required, because there is no hidden default; scientific mode means exact
 inputs and implemented mechanisms, not experimental validation. A case the
-preflight blocks exits with code 3 and its measurement requests.
+preflight blocks exits with code 3 and its measurement requests; with
+`--runnable-only` the runnable cases are simulated, the blocked ones are
+listed as not simulated with their measurement requests, and the exit code
+is 4 (a partial run).
 `fungmod preflight`, `fungmod check-data DIR` and `fungmod list` cover the
 other steps ([command line](docs/cli.md)).
+
+For fungus X on substrate Y at conditions Z from your own sources, the whole
+user-data workflow runs from the shell too: `fungmod assemble` gathers the
+fungus's annotation, the enzyme classes you assert, a user dataset and
+SABIO-RK entries (an export file or a frozen snapshot; nothing is fetched)
+into one draft and prints every case's kinetics status, sources and reason
+and the `REVIEW:` fields to fill; then `check-data`, `run` (with
+`--compare-timecourses` to compare with your time courses) and `fit` (Km with
+kcat or Vmax, with identifiability verdicts; in-sample, exploratory only):
+
+```bash
+fungmod assemble --fungus "My strain" --substrate cellobiose \
+  --temperature-c 30 --temperature-c 40 --ph 5 \
+  --annotation overview.txt --annotation-tool "dbCAN 4.1.4" \
+  --kinetics-source sabiork_export.json --dataset-id my_strain --output my_strain
+# fill the REVIEW: fields it lists (my_strain/review.md explains each), then
+fungmod check-data my_strain
+fungmod run --user-data my_strain --fungus "My strain" --substrate cellobiose \
+  --condition c30_ph5 --condition c40_ph5 --runnable-only \
+  --mode exploratory --samples 32 --seed 1 --output runs/my_strain
+```
+
+`assemble` prints the `run` command with `--runnable-only` when the draft has
+gaps, so that the cases with kinetics run while the gaps are reported.
+Without an annotation file, `--fetch-proteome --fetch` in place of
+`--annotation` takes the enzyme repertoire from the UniProt reference proteome
+found under the fungus's name (`--scientific-name`, else `--fungus`); `--fetch`
+is the command line's only network access, and the responses are frozen so
+that the same command reruns offline
+([from a fungus name](docs/user-data.md#from-a-fungus-name)).
+
+`fungmod draft-kinetics SOURCE --provider sabiork` drafts tables from
+SABIO-RK entries alone ([user-data workflow](docs/cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
 
 Start with the [installation guide](https://fungmod.readthedocs.io/en/latest/install/),
 run a complete workflow in
@@ -113,8 +154,8 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
-| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) plus optional temperature and pH response laws, overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
-| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts ([command line](docs/cli.md)) |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) on dissolved substrates, or kcat or Vmax as an apparent Michaelis-Menten law on one suspended solid polymer in dry mass per volume (the enzyme as protein mass, assay activity or a dose per gram of substrate, with an optional conversion-dependent reactivity exponent), plus optional temperature and pH response laws, or a fungal culture in `culture.csv` (your strain growing on a solid substrate and secreting its enzyme pools, through the registry's existing culture model: consumption by one pool, an explicit biomass yield, induced synthesis and loss of each pool), or, with `enzyme_network` in the manifest, all of a strain's classes acting together (independent Michaelis-Menten processes whose rates add on shared pools, a pool released by one class degraded by the next where a substrate's stated product is another substrate of the dataset, optional competitive product inhibition through a `ki` row; no synergy or competition for sites), overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status ([user-supplied data](docs/user-data.md)) |
+| Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts (`--runnable-only`: the runnable cases of a request with gaps, exit code 4); the user-data workflow `assemble` (fungus X on substrate Y at conditions Z from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's status and the `REVIEW:` fields), `draft-kinetics`, `check-data`, `run --compare-timecourses` and `fit`, with nothing fetched unless you opt in: `assemble --fetch-proteome --fetch` finds the fungus's UniProt reference proteome by name (an exact name or a sole candidate is taken, anything else is refused with the candidates listed), freezes the responses as digest-checked snapshots and takes its enzyme classes, never a rate, through UniProt REST endpoints used as documented but not verified live ([command line](docs/cli.md#from-a-fungus-name-its-uniprot-reference-proteome)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
 | Outputs | Versioned tables, reports, plots, manifests, provenance, limitations, and suggested follow-up experiments |
@@ -870,8 +911,9 @@ configured conservation diagnostics copied from existing per-sample
 modelability item reports, assumption
 summaries, mechanism summaries, provenance, limitations, missing-parameter and
 suggested-experiment tables, and a versioned data dictionary/schema.
-In output schema `2.0.0` (current: `2.1.0`, which adds the on-request
-`timecourse_comparison.csv`), `time_series_long.csv` reports `degradation_rate`
+In output schema `2.0.0` (current: `2.2.0`; `2.1.0` added the on-request
+`timecourse_comparison.csv`, `2.2.0` the `case_status` and
+`not_simulated_reason` columns of `case_summary.csv` for partial runs), `time_series_long.csv` reports `degradation_rate`
 as -d[substrate]/dt and `product_release_rate` as +d[product]/dt of the case's
 mapped substrate and product states (source `simulation_state_rate`), each in
 that state's units per time unit. They are read from the per-sample
@@ -1084,7 +1126,33 @@ directly: `kcat_limiting`, `km_limiting`, the four pK values and the fitted
 the rate follows the condition or grid pH, each condition's pH must lie inside
 the fitted range, and the SABIO-RK drafting below emits this form for entries
 of SABIO-RK's "Michaelis-Menten (pH-dependent)" law
-([three rate forms](docs/user-data.md#three-rate-forms)). See
+([three rate forms](docs/user-data.md#three-rate-forms)). A substrate can
+instead be one suspended solid polymer stated on a dry-mass basis
+(`physical_state` `solid_polymer`, `amount_basis` `dry_mass`, a g/g yield):
+the same law then runs as an apparent bulk law in g/L, with the enzyme as a
+protein mass or an assay activity (such as FPU) per volume or as an
+`enzyme_dose` per gram of substrate (one derived record), `kcat` checked per
+case with pint, and an optional `reactivity_exponent` that binds the existing
+conversion-dependent factor `(S/S0)^n`; activity routes to Vmax, the
+pH-ionization form, composite substrates and adsorption or surface-area inputs
+are refused, and no adsorption, synergy, product inhibition or LPMO kinetics
+are represented ([solid substrates](docs/user-data.md#solid-substrates)). The
+registry's generic solid polymers `xylan`, `starch` and `chitin` can be
+referenced as such substrates; the registry classes `endo_xylanase`
+(GH10/GH11, EC 3.2.1.8), `glucoamylase` (GH15, EC 3.2.1.3) and `chitinase`
+(GH18, EC 3.2.1.14) act on them as categorical records without kinetics, and
+product maps give the complete-hydrolysis mass yields for reference
+([registry polymers](docs/user-data.md#registry-polymers)). An
+optional `culture.csv` simulates a strain growing on such a solid and secreting
+its enzymes: it binds the registry's existing `culture_physiology` model (the
+*T. harzianum* P49P11 case's composition: consumption by one enzyme pool,
+biomass with an explicit yield and a closure ledger, first-order biomass loss,
+substrate-induced synthesis and first-order loss of every pool) to your own
+constants, one row per role, with pools in protein mass or assay units (never
+converted), units checked with pint, every missing role a gap with a
+plain-words measurement request, and no new numerics; re-entering the registry
+case's records reproduces its trajectories
+([fungal culture](docs/user-data.md#fungal-culture-growth-and-secretion)). See
 `docs/user-data.md` for the table formats and limitations. An optional `genomes.csv` takes a strain's enzyme classes from
 its dbCAN genome annotation: classes with a registry record join the
 strain, classes without one and unmapped families are reported, and every
@@ -1110,7 +1178,12 @@ proteome: its CAZy cross-references resolve through the same family map, its
 EC numbers through the registry, a protein whose two annotations disagree
 supports neither, and the requests name the proteome and accessions.
 `fungal_model.sources.uniprot` fetches such an export only on explicit
-`refresh=True`, into a digest-checked snapshot.
+`refresh=True`, into a digest-checked snapshot, and `fetch_proteome_by_name`
+reaches it from an organism name through UniProt's reference-proteome search:
+only an exact organism name or a sole candidate is taken, anything else is
+refused with every candidate, and the search is frozen too (endpoint and
+column names as UniProt documents them, not verified against a live
+response).
 `assemble_user_tables` drafts one such dataset for a request "fungus X on
 substrate(s) Y at condition(s) Z": the repertoire comes only from the fungus's
 annotation, asserted classes, dataset rows or registry record; classes that act

@@ -611,6 +611,7 @@ def test_registry_substrate_rows_reference_without_copying(tmp_path: Path) -> No
         "yield_basis,source\n"
         "cellobiose,cellobiose,Cellobiose,,,,beta_D_glucose,2,mol/mol,stated\n"
         "film,cellulose_film_generic,,,,,soluble_cellulose_hydrolysis_product,1,mol/mol,stated\n"
+        "other_solid,toy_cellulose_like_solid,,,,,toy_sugar_product,1,mol/mol,stated\n"
     )
     dataset_dir = _copy_fixture(tmp_path, LITERATURE, edits={"substrates.csv": substrates})
 
@@ -619,7 +620,12 @@ def test_registry_substrate_rows_reference_without_copying(tmp_path: Path) -> No
 
     messages = {(issue["file"], issue["row"], issue["column"]): issue["message"] for issue in excinfo.value.issues}
     assert "must leave" in messages[("substrates.csv", 2, "name")]
-    assert "only dissolved substrates" in messages[("substrates.csv", 3, "registry_substrate")]
+    # USERDATA-008: a solid_polymer registry substrate may be referenced, on a dry-mass basis with a g/g yield
+    # (this row states neither); a registry substrate of any other physical state is still refused.
+    assert ("substrates.csv", 3, "registry_substrate") not in messages
+    assert "yield_basis must be 'g/g'" in messages[("substrates.csv", 3, "yield_basis")]
+    assert "must state amount_basis 'dry_mass'" in messages[("substrates.csv", 3, "amount_basis")]
+    assert "supported states are dissolved or solid_polymer" in messages[("substrates.csv", 4, "registry_substrate")]
 
 
 # ---------------------------------------------------------------------------

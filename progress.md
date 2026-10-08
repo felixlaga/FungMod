@@ -64,6 +64,1502 @@ of scope, which the author must weigh before submitting.
 
 
 
+## USERDATA-010 Several Enzyme Classes Acting Together In User Data
+
+Status: `complete` for the stated scope (2026-10-07); the tenth increment of the
+user-supplied-data route. For the owner's goal ("fungus X on substrate Y in
+conditions Z ... the code calculates all the stuff"), a user-data case ran the
+ONE enzyme class the preflight selected (FIX-SELECT-001). A fungus secretes
+several enzymes: several classes on one substrate in parallel, classes acting on
+the products of others, products inhibiting enzymes. The compiled core already
+integrates several processes on shared states (each process one stoichiometric
+column, `rhs = sum_j N[:, j] v_j`) and already has a provenance-bound
+competitive-inhibition modifier (BIO-003); user data could reach neither. Now it
+can, opt-in, with no new numerics. (The Langmuir surface law, named
+USERDATA-010 in the USERDATA-009 entry, is renumbered USERDATA-011.)
+
+Representation: an `enzyme_network` block in `user_dataset.yml`
+(`entry_substrates: [...]`), not a per-request switch: the network is a modelling
+choice of the dataset, it enters the dataset digest, and the generated records
+are fixed at load time like every other user record. Without the block nothing
+changes. Competitive inhibition is a new `kinetics.csv` quantity `ki` with a new
+optional column `inhibitor` (refused on every other row), in network datasets
+only.
+
+Design decisions (design note kept outside the repository):
+
+- Composition, not a new law: a new outer process type `enzyme_network`
+  (`screening/enzyme_network.py`, required roles `substrate`, `product`)
+  assembled by the `culture_physiology` builder, generalised to
+  `build_composed_process_config_data(process_type, non_negative_validator_id,
+  fallback_label, ...)`; each inner process is the existing
+  `homogeneous_michaelis_menten` law with `rate_units_from_state_role`. The
+  BIO-002 chain assembler was not reused: its registry path is toy-only,
+  exact-only and carries CASE-001 provenance prose.
+- Additive parallel action: classes on one pool are independent Michaelis-Menten
+  processes whose rates add. This ignores competition for substrate binding or
+  adsorption sites and any synergy; every network template, the mechanism rows
+  and the limitations table say so.
+- Links from explicit data only: a substrate's `substrates.csv` product that
+  equals another `substrate_id` (never a name, alias or registry id). Each
+  substrate has one product, so a network is a chain of pools with any number
+  of parallel classes per pool; the chain ends at the first product that is no
+  dataset substrate (the final product).
+- One network per entry substrate, shared by the strains of the dataset (the
+  culture precedent: FungMod selects a compatibility by enzyme class and
+  substrate class, not by strain); strains with different member classes are
+  refused. Every class acting on the entry gets a compatibility pointing to the
+  one template; the records carry the network's own symbols, process type
+  `enzyme_network`, the entry's substrate selectors and an empty enzyme-class
+  selector, and name class and pool in provenance. Every class of a network
+  dataset lists `enzyme_network` only, so the preflight never chooses between a
+  network and one of its classes.
+- All or nothing: a member class without kinetics is a gap with the single-class
+  measurement request, and the network is underparameterized; a class the
+  strain has is never silently left out.
+- Inhibition binds the competitive modifier only: `Vmax S / (Km (1 + I / Ki) + S)`
+  with the process's own Km, the inhibitor's state, the user's Ki and the BIO-003
+  law provenance (`https://pubmed.ncbi.nlm.nih.gov/7985803/`, maturity
+  `literature_backed_software_tested`). The generic `product_inhibition`
+  factor `1 / (1 + P / Ki)` is not bound: its own assumption text disclaims a
+  mechanism and it carries no law provenance. Non-competitive, uncompetitive
+  and mixed forms are not implemented and are refused by construction. A
+  process without `ki` has no inhibition term and its template says so.
+- Cross-basis links (dry mass to molar) refused outright: the Michaelis-Menten
+  process writes its products in its substrate's units, and a molar-mass yield
+  would need a dimensional stoichiometric coefficient the core does not have
+  (new numerics; next task).
+
+Changed:
+
+- `screening/culture_physiology.py`: `build_composed_process_config_data`
+  (the culture builder delegates to it); `state_species` may use the entity
+  type `product`; process templates may bind the existing
+  `competitive_inhibition` and `substrate_reactivity` modifiers (the role
+  collector ignores `*_state_role` keys, which name states); an optional
+  process-template `enzyme_class` becomes output metadata
+  (`process_enzyme_classes` of the case-template config, written only when a
+  template names one). The shipped culture case assembles byte-identically.
+- `screening/enzyme_network.py` (new) and `screening/case_builder.py`: the
+  `enzyme_network` assembler (scientific and toy modes, template mode match,
+  required metadata as for cultures); exported from `fungal_model.screening`.
+- `api/user_data.py`: manifest block `enzyme_network` (shape checks); `ki`
+  quantity (amount per volume, positive; refused on solids) and `inhibitor`
+  column; `_validate_networks` (chains, cycles, ambiguous products, bases,
+  members, one pool per class per network, strain consistency, pH-ionization,
+  intermediate inputs, entry loadings, unused substrates, state-name
+  collisions, inhibitors downstream and one per process, `ki` outside a
+  network, tables not combined with networks); `_generate_network_records`
+  (records re-keyed from the single-class mappings, so values, evidence,
+  maturity, derived Vmax and enzyme records and gap requests are the existing
+  ones; the entry's gap names the network); `_network_template_mapping`
+  (pools, enzymes, one product map per pool, one process per class and pool
+  with its modifiers, closure weights from the yields, limitations per
+  process); `UserDataset.enzyme_networks`, `to_dict()` and `summary()`.
+- `api/result_tables.py`: `enzyme_network` mechanism family, law, state
+  variables, limitations and a `not_modelled` limitation row; one `process_law`
+  row per network process naming its class (`configured_by`); a `rate_modifier`
+  row per `competitive_inhibition` modifier. No column or allowed value
+  changed: output schema stays 2.2.0.
+- `api/user_data_assembly.py`: a network dataset as `user_data` is refused
+  (drafts are single-class tables and would drop the network).
+- `cli.py`: `fungmod check-data` prints the networks (chain with yields and
+  strains, one row per process with class, pool, rate form, inhibitor).
+- Fixtures `tests/fixtures/user_data/network_chain/` (two user classes,
+  polymer-like -> oligomer-like -> monomer-like) and
+  `tests/fixtures/user_data/network_parallel/` (two user classes in parallel on
+  one ester-like substrate, kcat and Vmax forms, `ki` of one class for the
+  released product); every value an illustrative estimate, with READMEs.
+- Docs: `docs/user-data.md` section "Several enzymes acting together" (law,
+  pools and links, `ki`, worked example with real `check-data` and `run`
+  output, generated records, gaps, refusals, what is and is not modelled) and
+  updates to the fixture list, manifest, `kinetics.csv` columns and
+  quantities, solid limits, generated-records table and limitations;
+  `docs/cli.md`; `docs/concepts/outputs.md` (mechanism rows);
+  `docs/capabilities.md`; `README.md`; `CHANGELOG.md`.
+
+Tests: new `tests/test_user_data_network.py` (41 test functions, 57 cases):
+links, processes, templates, records and symbols of the chain; byte-identical
+records of the nine earlier fixtures without the block (digests from an export
+of base commit 67c8a74); the registered assembler; the composition builder's
+competitive binding, class metadata, validator id and refusals (unsourced law,
+blank class, wrong outer process type); analytic checks on the
+simulated outputs: chain closure `8 P + 2 O + M = 40 mM` (`rtol` 1e-9), each
+process rate equal to its class's own law, state rates the stoichiometric sums
+of process rates, parallel rates adding, the competitive law
+`Vmax S / (Km (1 + P / Ki) + S)` on every output time, no Ki < Ki 200 uM <
+Ki 20 uM in remaining substrate, the parallel first-order regime
+`S0 exp(-(Vmax_A / Km_A + Vmax_B / Km_B) t)` (`rtol` 2e-3; observed 1.6e-4), a
+one-class network equal to the single-class case (`rtol` 1e-7; observed
+2.5e-13), two solid classes in parallel with the reactivity factor; scientific
+mode with measured rows (`scientific_exact_unvalidated`) and one estimate
+making it exploratory; gaps (a class without kinetics blocks the network with
+the single-class request; a condition without rows runs as a partial run; a Ki
+gap names the inhibitor); refusals (cycle, ambiguous product, cross-basis link,
+class on two pools, strains with different classes, intermediate inputs, an
+intermediate listed as an entry starting its own network, disagreeing entry
+loadings, five malformed `ki` rows, `inhibitor` on another row, two inhibitors
+of one process, `ki` outside a network and on a solid, pH-ionization, response
+laws and cultures in a network, five malformed manifest blocks, an unused
+substrate); assembly refusal; `fungmod check-data` (listing and a refusal as
+`file:row:column`) and `fungmod run` (exploratory exit 0; a blocked network
+condition with `--runnable-only`, exit 4). Guardrails: network fixture tokens
+added to the user-data token list; the network assembler gets its own
+no-organism-token test.
+
+Not changed: no process law, factory, modifier, solver, registry record,
+registry case template, rate form, fit, comparison or preflight status rule;
+datasets without `enzyme_network` generate byte-identical records; the shipped
+culture case assembles byte-identically (pinned digests).
+
+Scientific impact: a user's several enzyme classes can now act together in one
+simulation (substrate loss summed over the classes, intermediates formed and
+consumed, the final product released with the stated yields, threshold times
+and rates of the entry and the final product), and a measured competitive Ki
+slows the inhibited process exactly by the implemented law. The model is
+honest about what it is: independent, additive Michaelis-Menten processes;
+synergy, site competition and other inhibition forms remain absent, and the
+outputs say so.
+
+Compatibility: additive (an optional manifest block, a new quantity and column,
+new exported names, a new `UserDataset.enzyme_networks` field and
+`to_dict()`/`summary()` key, new mechanism rows only for network cases).
+
+Next task: bind `responses.csv` laws per network process (the composition
+builder already accepts environment modifiers); then pH-ionization processes,
+time courses of intermediates and fitting on networks; cross-basis links with
+an explicit molar-mass conversion need a dimensional product coefficient in
+the core (new numerics); competing substrates of one enzyme need a
+multi-substrate denominator (a new law).
+
+## FETCH-001 A Fungus's Enzyme Repertoire From Its Name
+
+Status: `complete` for the stated scope (2026-10-07), with the live UniProt
+endpoint unverified (below). For the owner's goal ("fungus X on substrate Y in
+conditions Z, and then it automatically fetches the different enzymes in the
+fungus"), a user had to find the UniProt proteome identifier by hand, download
+a TSV and pass it. `fungmod assemble --fetch-proteome --fetch` now goes from
+the fungus's name to its UniProt reference proteome, freezes both responses,
+and drafts the dataset whose `genomes.csv` row is that proteome's export; the
+classes come from the existing UniProt route (USERDATA-007). Stacked on
+REGISTRY-002 and USERDATA-009 (branch `claude/fetch-by-name`).
+
+Decisions:
+
+- **Choice rule (no guess).** A proteome is taken only when exactly one
+  candidate's organism name equals the searched name (case-insensitive,
+  whitespace-normalized; `MATCH_EXACT_NAME`) or the search has exactly one
+  candidate (`MATCH_UNIQUE_CANDIDATE`; its organism name, for example with a
+  strain added, is printed and recorded). Refused with every candidate listed
+  (`ProteomeChoiceError`: identifier, organism, taxonomy id, type, protein
+  count): no candidate; several without one exact match; several exact
+  matches; a truncated search (`X-Total-Results` above the rows read, or a
+  next-page `Link`; page size 500). Never the first or the largest; a test
+  serves the rows in both orders.
+- **Which name.** `--scientific-name` when given, otherwise the `--fungus`
+  text as typed (printed as "from --scientific-name" or "from --fungus").
+- **Composition with `--proteome`.** `--proteome UP...` alone takes that
+  proteome without a search; with `--fetch-proteome` it chooses among the
+  name's candidates (`MATCH_PROTEOME_ID`) and is refused when it is not one,
+  so an ambiguous refusal is resolved by re-running the printed command with
+  `--proteome PROTEOME_ID`. `--annotation`, `--annotation-tool` or
+  `--annotation-source` with a proteome option is refused (one `genomes.csv`
+  row per strain); `--fetch` or `--snapshot-dir` without a proteome option is
+  refused.
+- **Network.** `assemble --fetch` is the command line's only network opt-in
+  (it maps to `refresh=True` of the sources module; `cli.py` itself imports no
+  `urllib` or `socket`). Without it only frozen snapshots under
+  `--snapshot-dir` (default the API's `data/source_snapshots/uniprot`, a new
+  option; `--cache-dir` stays the kinetics snapshots) are read and verified; a
+  missing one is refused with the exact command plus `--fetch`, quoted with
+  `shell_quote`. A search is stored whatever it finds, so that a refusal is
+  reproducible offline. A changed snapshot, or a new response that differs
+  from a stored one, is refused and the stored one kept (the CLI says which
+  directory to remove); an HTTP error or unreadable response stores nothing.
+- **Endpoint.** `GET https://rest.uniprot.org/proteomes/search?query=organism_name:"<name>" AND proteome_type:1&fields=upid,organism,organism_id,protein_count&format=tsv&size=500`,
+  TSV headers `Proteome Id`, `Organism`, `Organism Id`, `Protein count`
+  compared case-insensitively, an empty body read as no candidate. The type
+  printed for every candidate is "reference proteome (proteome_type:1)", taken
+  from the query filter because no return field for the type was relied on.
+  As documented by UniProt to the best of the author's knowledge; **not
+  verified live**: this container cannot reach rest.uniprot.org (the egress
+  proxy refuses the connection, `CONNECT tunnel failed, response 403`, and
+  fetching UniProt's REST documentation pages was blocked the same way). A
+  response without these columns is refused, nothing stored.
+- **Consistency check.** `fetch_proteome_by_name` refuses an export whose
+  `Organism (ID)` differs from the chosen candidate's taxonomy id.
+
+Changed:
+
+- `sources/uniprot.py`: `normalize_organism_name`, `proteome_name_query`,
+  `build_proteome_search_url`, `search_key` (case-folded slug plus a 12-hex
+  digest, so a case-insensitive file system cannot mix two names),
+  `ProteomeCandidate`, `parse_proteome_search_tsv`, `ProteomeSearchSnapshot`,
+  `load_proteome_search_snapshot`, `search_proteomes_by_name` (snapshot
+  `proteomes.tsv` + `snapshot.json`: kind, name and name key, query, URL,
+  fields, page size, retrieval time, HTTP status, release, release date, total
+  results, next page, truncated, SHA-256, size, candidate rows, field-names
+  note), `ProteomeNameResolution` (`statement`, `match_rule`, `to_dict`),
+  `choose_proteome`, `resolve_proteome_name`, `fetch_proteome_by_name`;
+  errors `ProteomeChoiceError`, `MissingSnapshotError`,
+  `SnapshotConflictError` (the latter two subclass `UniprotFetchError` and are
+  now raised by `fetch_proteome_snapshot` with unchanged messages);
+  `UniprotSnapshot.genomes_row` prefixes `source` with the organism and
+  taxonomy id. Module docstring: the "no organism-name lookup (future work)"
+  paragraph is replaced by the rule above.
+- `api/user_data_assembly.py`: `assemble_user_tables(proteome=...,
+  proteome_selection=...)`. A `UniprotSnapshot` (or its directory) is
+  re-verified, copied to `annotations/<query key>.tsv`, and its
+  `genomes_row` is the draft's row; `annotation` is read as a UniProtKB TSV
+  export when `annotation_tool` names UniProt (the `genomes.csv` dispatch rule;
+  before, such a call failed in the dbCAN reader). Both go through
+  `_proteome_classes`: `_genome_tool`, the one-proteome-identifier rule of the
+  loader, `parse_uniprot_tsv` and `resolve_uniprot_proteome` with the family
+  map and the base registry; evidence text identical to the loader's;
+  unmodellable classes, unmapped families, unresolved EC numbers and EC/CAZy
+  disagreements reported. The annotation report gains `source_type`,
+  `proteome_id`, organism, counts, the unresolved and disagreeing entries,
+  `snapshot` and `selection`; the manifest source and `review.md` name a
+  UniProt export as such (also a UniProt row reused from `user_data`, where
+  `review.md` previously raised `KeyError: 'gene_count'` for an unmodellable
+  class; reproduced on an export of `67c8a74`) and record the selection; two
+  limitation sentences name proteome exports.
+- `cli.py`: `--proteome`, `--fetch-proteome`, `--fetch`, `--snapshot-dir` in
+  the repertoire group; the proteome block printed before the assembly report
+  (network used or not, name and its option, query, candidate table with the
+  chosen row, rule, export and both snapshot digests, release or its absence);
+  unresolved EC numbers and disagreements printed with the classes;
+  `NO_FETCH_HELP` now says nothing is fetched unless `assemble --fetch`;
+  `FETCH_HELP`; assemble epilog and top epilog examples; module docstring.
+  `main` keeps the argument list (`args.command_line`) for printed commands.
+- `.gitattributes`: `tests/fixtures/uniprot_proteome_search/** -text`.
+- Fixtures `tests/fixtures/uniprot_proteome_search/` with README: four
+  synthetic proteome-search responses (exact match among two, sole candidate
+  with a strain name, two candidates without an exact match, header only) and
+  a five-entry synthetic UniProtKB export of a second organism (EC-only
+  beta-glucosidase, GH11/3.2.1.8, GH18/3.2.1.14 with CBM18, AA9 without a
+  record, an unresolved EC number). All labelled as hand-written synthetic
+  test responses, not UniProt data; placeholder identifiers `UP99999000x`,
+  taxonomy ids `900000000x`, accessions `X9B2P00x`.
+- Docs: `docs/user-data.md` "From a fungus name" (steps, network and
+  snapshots, Python, not verified live, limits) and updates to "From a UniProt
+  proteome", the assembly paragraph, inputs, rules and limits; `docs/cli.md`
+  section "From a fungus name: its UniProt reference proteome" with output
+  produced from the synthetic responses (labelled), the command table,
+  options table, the network paragraph, arguments and exit code 2;
+  `README.md` (command-line capability row, assemble paragraph, UniProt
+  paragraph); `docs/capabilities.md`; `CHANGELOG.md` (Added; Changed: text
+  only).
+
+Tests: new `tests/test_fetch_by_name.py` (30 test functions, 49 cases), every
+test with `urllib.request.urlopen` and `socket.socket.connect` patched to fail
+and a test asserting it; responses served by URL through `_FakeUniprot`:
+query, URL and key; parser (documented columns, case-insensitive headers,
+empty body, ten refusals); exact match stored with full metadata and reused
+offline with an identical digest and decision, in any letter case; sole
+candidate (second organism, no release header); ambiguous refused with every
+candidate, reproducible offline, resolved by `proteome_id`, refused for a
+non-candidate; no candidate (empty body, header only); two exact matches;
+truncated search (total-results header, next-page link); HTTP 503, unreachable,
+HTTP 204 and HTML store nothing; missing snapshot refused without fetching;
+tampered, foreign-name and wrong-kind snapshots refused; a different response
+kept unless `overwrite`; taxonomy mismatch refused; neither first nor largest
+taken (both row orders); assembly from a snapshot (row, file, classes,
+evidence, unmodellable, disagreements, statement in manifest and `review.md`,
+no kinetics row, same draft from the directory); proteome refusals (with
+`annotation`, selection without proteome, blank selection, missing and
+tampered snapshot); `annotation` with a UniProt tool (second organism; no
+version, two identifiers, a non-export file refused); reused UniProt row from
+`user_data` (the `KeyError` regression); CLI end to end (`--fetch-proteome
+--fetch`, exact requests, printed block, `genomes.csv` row, offline rerun
+byte-identical, `_fill`, `load_user_dataset`, `check-data`, preflight
+`underparameterized` with requests naming the proteome and accessions); CLI by
+`--scientific-name` for the second organism (date version); offline without a
+snapshot prints the command with `--fetch` and writes nothing; ambiguous lists
+candidates and is resolved by `--proteome`; no candidate; `--proteome` alone
+skips the search; newer response and tampered export refused; HTTP 500 stores
+nothing; six option refusals; help text. Modified:
+`tests/test_user_data_uniprot.py` (the "no organism lookup" contract test
+now pins the candidate-based lookup), `tests/test_guardrails_public_api.py`
+(ten new names exported, not placeholders), `tests/test_guardrails_no_hardcoding.py`
+(fixture tokens added to the user-data tokens and to the UniProt-module scan),
+`tests/test_cli_user_data_workflow.py` (the CLI opens no connection itself and
+passes `refresh` only from `--fetch`).
+
+Commands and results (worktree on `claude/fetch-by-name`, based on `67c8a74`,
+Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on `sources/uniprot.py`, `cli.py` and
+  `api/user_data_assembly.py`: 0 errors.
+- `mkdocs build --strict`: built, no warnings; both new anchors present.
+- `tests/test_fetch_by_name.py`: 49 passed.
+- Targeted run (new tests, UniProt, assembly, genome, sources, import, CLI,
+  CLI workflow, guardrails, documentation sync, hygiene, instruction
+  hierarchy, roadmap, shared progress, release configuration, capability
+  resolution, source providers, partial runs, git data integrity, packaged
+  distribution): 436 passed in 5 min 33 s.
+- Full suite (`pytest`, background, final code): 2630 passed in 42 min.
+- Not run: a live request to rest.uniprot.org (no network route from this
+  container); the CI matrix (macOS, Windows, Python 3.12 and 3.13).
+
+Not changed: no process law, rate form, registry record, family map, kinetics
+rule, preflight status or simulation; no output-table or manifest schema of a
+run; `load_user_dataset` and the `genomes.csv` UniProt route are unchanged;
+dbCAN drafts are unchanged except two limitation sentences in their report and
+`review.md`; `fetch_proteome_snapshot` raises the same messages.
+
+Scientific impact: none on numbers. The enzyme repertoire of a named fungus
+can now come from its UniProt reference proteome without manual lookup, with
+the choice explicit and auditable; classes stay presence-only evidence
+(UniProtKB annotation is mostly automatic), every class without kinetics is a
+gap with measurement requests, and nothing about rates comes from a
+proteome.
+
+Compatibility: additive (new options, functions, error subclasses and
+`assemble_user_tables` parameters). Text changes: `genomes_row` source
+prefix, `NO_FETCH_HELP`, the assembly limitations, UniProt labels in drafts.
+
+Risks and limitations: the live endpoint, `proteome_type:1` as the
+reference-proteome filter, the TSV headers, the empty body for no match and
+the `X-Total-Results` header are unverified (a mismatch is refused, not
+misread, except `proteome_type:1` meaning other than reference proteomes, which
+would mislabel the printed type); a reference proteome stands for its species,
+not the user's strain; names are matched as UniProt's phrase search does, so
+synonyms and common names depend on UniProt; reference proteomes only unless
+named by identifier; a snapshot can only be replaced by removing its
+directory (no CLI overwrite flag, deliberately).
+
+Ambiguities: whether a unique non-exact candidate should need confirmation
+(kept as the owner's rule, printed and recorded); whether to fall back to
+non-reference proteomes when none is found (not done; refused with guidance).
+
+Next task: verify the endpoint against a live UniProt response from a machine
+with network access (one `fungmod assemble --fetch-proteome --fetch` for a
+well-known fungus, compare the stored `proteomes.tsv` headers and
+`X-Total-Results`, then pin a recorded real response as a labelled fixture);
+then USERDATA-010 (the Langmuir surface law).
+
+## USERDATA-009 Fungal Culture In User Data: Growth And Secretion
+
+Status: `complete` for the stated scope (2026-10-07); the ninth increment of
+the user-supplied-data route. For the owner's goal ("fungus X on substrate Y in
+conditions Z; FungMod assembles the enzymes and kinetics and simulates"), the
+user-data route simulated only an enzyme at a concentration the user states
+(an enzyme assay). The whole-culture model (the fungus growing on the
+substrate and secreting its enzymes) existed only as the registry's
+`culture_physiology` template for *T. harzianum* P49P11 (Gelain 2020). It is
+now reachable from user tables for the user's own strain, solid substrate and
+constants, with no new numerics. (The Langmuir surface law, named USERDATA-009
+in the USERDATA-008 entry, is renumbered USERDATA-010.)
+
+Representation: a new optional table `culture.csv` (columns `strain_id`,
+`substrate_id`, `condition_id`, `quantity`, `units`, `evidence_type`, `source`
+required; `enzyme_class`, `value`/`lower`/`upper`, `method`, `sd`,
+`replicates`), not new `kinetics.csv` quantities. `kinetics.csv` rows are keyed
+by an enzyme class and drive the rate-form machinery (form detection per case
+and pair, molar/mass checks, fits); five of the culture's roles belong to the
+culture as a whole, where an enzyme class would be meaningless, and the
+culture/assay boundary (the mixing refusal) is then a table boundary. The
+culture vocabulary (`CULTURE_QUANTITIES`) stays separate from
+`KINETIC_QUANTITIES`, and `fit_user_dataset` never touches it.
+
+Roles (template role; units checked with pint; examples):
+
+| `culture.csv` quantity | `enzyme_class` | Template role | Dimension |
+| --- | --- | --- | --- |
+| `substrate_initial_concentration` | blank | `initial_substrate` | dry mass / volume (`g/L`) |
+| `initial_biomass` | blank | `initial_biomass` | dry mass / volume, same units text as the substrate |
+| `biomass_yield` | blank | `biomass_yield` | dimensionless, in (0, 1] (`g/g`) |
+| `biomass_loss_rate` | blank | `biomass_loss_rate` | 1/time |
+| `induction_half_saturation` | blank | `induction_half_saturation` | dry mass / volume, > 0 |
+| `hydrolysis_capacity` | consuming pool | `hydrolysis_capacity` | substrate mass / time / pool amount (`g/FPU/h`, `g/mg/h`) |
+| `hydrolysis_half_saturation` | consuming pool | `hydrolysis_half_saturation` | dry mass / volume, > 0 |
+| `initial_enzyme_concentration` | each pool | `initial_enzyme_concentration__<class>` | protein mass or assay activity / volume |
+| `specific_production_rate` | each pool | `specific_production_rate__<class>` | pool amount / biomass mass / time |
+| `enzyme_loss_rate` | each pool | `enzyme_loss_rate__<class>` | 1/time |
+
+Changed:
+
+- `api/user_data.py`: parses and validates `culture.csv` (`_parse_culture`,
+  `_culture_units_error`, `_culture_value_bounds`) and cross-validates it
+  (`_validate_cultures`, `_validate_culture_case_units`) before the rate forms.
+  A culture is the rows of one strain on one substrate; its pools are the
+  classes the rows name; exactly one acts on the substrate (the consuming pool,
+  found by the categorical `enzyme_class_acts_on` rule, never by name), the
+  others are produced and lost only. One culture model per consuming class and
+  substrate (`_CulturePair`) serves every strain that declares the class; a
+  solid substrate the class acts on without rows becomes a culture of gaps with
+  the consuming pool only. Per-case units: `initial_biomass` and
+  `substrate_initial_concentration` in identical units (the closure ledger adds
+  them with weight one; the assembler compares unit strings), `k_h x E` a
+  substrate dry mass per volume per time with the case's consuming pool, and
+  `q x X` an amount of the pool per volume per time; pools are never converted
+  between protein mass, assay units and molarity. Generation
+  (`_generate_culture_records`): one parameter record per strain, role and
+  condition (maturity from the evidence type; estimates stay exploratory, the
+  template is scientific only when every bound record is exact and
+  scientific-eligible), or an explicit gap whose measurement request names the
+  role in plain words (strain, substrate, condition, units; the measured
+  conditions when the case has none; the genome evidence of a genome-only
+  class; the pool's own units for a missing rate); a `culture_physiology`
+  compatibility `<dataset>__<class>__<substrate>__culture_physiology` and
+  template `..._culture_template` with the registry template's structure
+  (state roles `substrate`, `biomass`, `enzyme`, `enzyme_<class>`, two ledgers;
+  product map with `parameter_role` / `complement_of_parameter_role`
+  `biomass_yield`; processes consumption (`homogeneous_michaelis_menten`),
+  `biomass_loss` (`first_order`), and per pool `proportional_synthesis` and
+  `first_order` loss; dry-mass closure conservation), `geometry: null` and
+  `rate_units_from_state_role`. The consuming class's generated copy lists
+  `culture_physiology`; a strain with a culture says so in its notes (others
+  keep the earlier notes). `UserDataset.cultures` (also in `to_dict()` and
+  `summary()`). Refused, each with file, row and column: a culture on a
+  dissolved substrate (no dry-mass basis) and a dissolved substrate a culture
+  class acts on; `kinetics.csv` rows of a strain and substrate with a culture
+  (the mixing refusal), of the culture's class and substrate by another strain,
+  and of a culture class on any substrate; a strain declaring the consuming
+  class with another class acting on the substrate, or without every pool; no
+  or two consuming pools; consumption quantities on a non-consuming pool;
+  `responses.csv` rows of a culture; `timecourse.csv` rows of a culture case;
+  wrong dimensions, unparseable units, `fitted` and unknown evidence, a missing
+  method, `enzyme_class` given on a culture-level or missing on a pool
+  quantity, an undeclared class, a yield above one or at zero, a zero
+  half-saturation constant, `kinetics.csv` quantities and unknown quantities,
+  duplicate rows.
+- Mixing decision: refused rather than supported. FungMod selects one process
+  compatibility per case by enzyme class and substrate class, and the preflight
+  picks among candidates by status; a case with both a culture and an assay
+  model would have its model chosen by the preflight, not by the user, and an
+  enzyme class that lists two process laws makes preflight report the missing
+  one as incompatible (the same reason the pH-ionization form is per class).
+  Time-course decision: refused, because the comparison and the fit read the
+  `substrate` and `product` roles of an enzyme-assay case and fit only `km`,
+  `kcat` and `vmax`; biomass, pools and ledgers are not observables of the
+  comparison.
+- `screening/culture_physiology.py` (generic, no organism, substrate or enzyme
+  branch): a process template may give `rate_units_from_state_role` (the rate
+  in the units of that state's initial record per unit of the template time
+  grid; refused with a fixed `rate_units` or an undeclared state role), so one
+  per-pair template serves cases whose pools or substrate use different units;
+  `geometry` may be an explicit `null` (no geometry entity, as in the
+  enzyme-kinetics assemblers; a missing or empty geometry is still refused).
+  The assembler otherwise already assumed no fixed number of pools and no
+  organism names.
+- `api/result_tables.py`: the culture limitation "Calibrated parameter records
+  are retrospective fits ..." (row `retrospective_calibration` and the
+  mechanism sentence) is written only when the case binds a `calibrated`
+  record, and "Enzyme pools are assay activities" only when every pool's
+  initial record (found through the template's `state_species` of type enzyme)
+  is in an assay unit; otherwise a generic pool sentence. Both are true of the
+  registry case and were false of user cultures.
+- `api/user_data_assembly.py`: the solid-substrate refusal names a culture of
+  the `user_data` dataset on that substrate (drafts carry no `culture.csv`).
+- `cli.py`: `fungmod check-data` prints a "Cultures" table (strain, substrate,
+  consuming pool, pools, rows); `run` needs no change.
+- Fixtures: `tests/fixtures/user_data/culture_reentry/` (the registry case
+  re-entered: the nine calibrated constants as `estimate`, because they are
+  FungMod's retrospective fit, neither literature values nor measurements nor a
+  fit of this dataset; the four deposited initial conditions as `literature`,
+  matching their `literature_processed` maturity; three loadings; README with
+  the record-by-record table) and `tests/fixtures/user_data/culture_estimates/`
+  (a user-defined strain and endo-xylanase-like class on a user-defined
+  xylan-like solid, one protein-mass pool, every value an illustrative
+  estimate).
+- Docs: `docs/user-data.md` section "Fungal culture: growth and secretion"
+  (model equations, `culture.csv` columns, role table with units, worked
+  example with real `check-data` and `run` output, what is generated, gaps with
+  real requests, refusals, what is and is not modelled) and updates to the
+  fixture list, directory layout, assembly limits, time-course units and the
+  limitations; `docs/organism-physiology.md` (the two assembler additions and
+  "your own strain on this model"); `docs/cli.md`; `docs/capabilities.md`;
+  `README.md` (capability row and user-data paragraph); `CHANGELOG.md` (Added,
+  Changed); the USERDATA-008 entry's next task renumbered to USERDATA-010.
+
+Byte-identity of the shipped case: `yaml.safe_dump(config.to_dict(),
+sort_keys=False)` of the *T. harzianum* case in scientific mode at 10, 20 and
+30 g/L hashes to the values computed from an export of base commit `be50dd1`
+(pinned in `test_shipped_case_assembles_byte_identically`), and canonical JSON
+of the assembled config and of the raw builder output are identical before and
+after. A seeded scientific and exploratory (two samples) virtual experiment of
+the shipped case at the three loadings, before and after, normalised for the
+output directory name, differ only in the nine `run_environment.json`
+timestamps: tables, trajectories, limitations, mechanism rows, manifests and
+reports are byte-identical. The generated records of the seven earlier
+fixtures hash to their base-commit values.
+
+Tests: new `tests/test_user_data_culture.py` (26 test functions, 62 cases):
+records and roles of the re-entry (39 records, 13 roles, template structure,
+class processes, `cultures`); maturity per evidence type; parity: the
+re-entry's substrate, biomass, both pools and both ledgers equal the registry
+case's at 10, 20 and 30 g/L (`rtol` 1e-9; observed equal to the last digit)
+with the dry-mass closure `S + X + ledgers = S0 + X0`; the assembled user
+config has the registry config's process types, state roles, parameter values
+(converted to base units), product-map coefficients and closure weights, no
+geometry and per-state rate units; shipped config digests; record digests of
+the seven earlier fixtures; the two assembler additions and their refusals;
+the non-specific case (protein-mass pool in `milligram / liter`, closure,
+exploratory run, scientific refusal, mechanism maturity and pool sentence, no
+calibration row); a measured variant runs in scientific mode
+(`scientific_exact_unvalidated`) and one estimate makes it exploratory; ranges
+are sampled; gaps with exact plain-words requests (incl. the pool's own units),
+gap units of the initial biomass, preflight suggested experiments; a condition
+and a strain without rows; a partial run (`blocked="report"`) of a culture
+beside a gap case; 12 wrong-dimension and 4 per-case unit refusals; 13
+malformed-row refusals; dissolved substrate; mixing (same strain; other strain
+on the pair); a culture class on a second solid (gap culture), with assay rows
+and on a dissolved substrate; time course and response-law refusals; pool
+rules (none, two, a second declared acting class, a strain missing a pool, an
+undeclared pool, a duplicate role); a request for every role; the assembly
+refusal; `fungmod check-data` (table and a refusal as `file:row:column`) and
+`fungmod run` (exploratory exit 0, scientific exit 3). Guardrails: culture
+fixture tokens added to the user-data token list; the culture assembler gets
+its own no-organism-token test and joins the no-shortcut paths; the culture
+names are exported and not placeholders.
+
+Commands and results (worktree on `claude/user-data-culture`, based on `main`
+at `be50dd1`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`: all
+  checks passed.
+- `pyright --pythonpath <venv python>` on `api/user_data.py`,
+  `api/result_tables.py`, `api/user_data_assembly.py`, `cli.py` and
+  `screening/culture_physiology.py`: 0 errors (without `--pythonpath` pyright
+  cannot resolve numpy in this environment).
+- `mkdocs build --strict`: built, no warnings (`site/` removed).
+- Targeted run (`tests/test_user_data_*.py`, organism case, culture processes,
+  registry case builder, case-class selection, config-driven assembly, CLI and
+  CLI workflow, guardrails, partial runs, docs sync, hygiene, instruction
+  hierarchy, modelability, capability resolution, case templates, Gelain
+  culture benchmark): 721 passed; after the guardrail and docs edits, the
+  culture, solid, import, organism, guardrail, docs-sync, hygiene, roadmap,
+  colony-plan, CLI, partial-run, case-template, culture-process and
+  proportional-synthesis tests: 299 passed.
+- Full suite (`pytest`, nohup): 2539 passed in 51 min.
+- Byte-identity scripts against an export of `be50dd1`: shipped configs
+  (canonical JSON, YAML in insertion order, raw builder output) identical; 422
+  output files of the shipped virtual experiment identical except 9
+  `run_environment.json` timestamps; earlier fixtures' record digests
+  identical.
+
+Not changed: no process law, factory, modifier, solver, registry record, case
+template file, kinetics.csv rule, rate form, fit, comparison or preflight
+status; datasets without `culture.csv` generate byte-identical records; the
+shipped culture case assembles and simulates byte-identically.
+
+Scientific impact: a user's own culture data (growth yield, loss, induction,
+production and loss of each enzyme pool, initial biomass and pools) reach a
+simulation of the fungus growing and secreting over time through the culture
+model FungMod already implements for *T. harzianum*, with every value's units,
+evidence and maturity explicit, assay pools kept as assay pools, and every
+missing role a named measurement. Nothing is new about the biology: the laws,
+their assumptions and their limits are the registry template's, now stated in
+every generated template.
+
+Compatibility: additive (an optional table, new exported names, a new
+`UserDataset.cultures` field and `to_dict()`/`summary()` keys); a strain with a
+culture gets culture notes. Result-table text changes only for culture cases
+without calibrated or with non-assay records (none existed before).
+
+Limitations: one fungus per case; the growth and induction laws are the
+existing ones (growth driven by consumed substrate through one consuming pool,
+one induction constant shared by all pools, no maintenance, nutrient or oxygen
+limitation, no costed secretion); no spatial mycelium, morphology or vessel
+volume; no oxygen or pH dynamics and no response laws (condition temperature
+and pH are metadata); no soluble products (the `substrates.csv` product row is
+still required and unused by a culture); non-consuming pools act on nothing; a
+strain with a culture cannot carry another class acting on that substrate in
+the same dataset (a genome-derived one included); no time courses, comparison,
+fitting or assembly drafting of cultures.
+
+Ambiguities: whether the induction constant should be per pool (the registry
+template shares one; kept); whether a pool rate gap should take the pool's
+units (it names them in the request but leaves the record's units unknown);
+`Kinetic values` in `check-data` also counts culture values.
+
+Risk: medium-low. The new route is additive and refuses what it cannot run;
+the two assembler additions are opt-in fields that the shipped template does
+not use, checked byte for byte; the result-table change is conditional on
+record maturity and pool units and leaves the shipped case unchanged.
+
+Recommended next task: USERDATA-010, the Langmuir surface law for user data
+(as described in the USERDATA-008 entry); then culture observables (biomass
+and pool time courses) in the comparison, so a user culture can be compared
+with its own measurements.
+
+## REGISTRY-002 Xylan, Starch And Chitin And Their Hydrolase Classes
+
+Status: `complete` for the stated scope (2026-10-07). A fungal genome or
+proteome usually yields xylanases, glucoamylases and chitinases. The CAZy
+family map already assigned GH10/GH11, GH15 and GH18 to the class ids
+`endo_xylanase`, `glucoamylase` and `chitinase`, but no registry record
+existed, so the genome and UniProt routes reported them as unmodellable, and
+a user could not name xylan, starch or chitin as a registry substrate. This
+adds categorical registry metadata only, following the `cellobiohydrolase`
+precedent of USERDATA-008; no code changed.
+
+Changed (data):
+
+- `data_registry/enzymes/enzyme_classes.yml`: `endo_xylanase` (EC 3.2.1.8;
+  aliases `endo-xylanase`, `endoxylanase`, `xylanase`, `EC 3.2.1.8`; bond
+  class `beta_1_4_xylosidic`; substrate class `xylan`), `glucoamylase`
+  (EC 3.2.1.3; `glucan 1,4-alpha-glucosidase`, `amyloglucosidase`,
+  `EC 3.2.1.3`; `alpha_1_4_glycosidic` and `alpha_1_6_glycosidic`; `starch`)
+  and `chitinase` (EC 3.2.1.14; `endochitinase`, `EC 3.2.1.14`;
+  `beta_1_4_n_acetylglucosaminidic`; `chitin`). Each lists only
+  `homogeneous_michaelis_menten` (the apparent law on a solid of USERDATA-008),
+  maturity `literature_metadata`, provenance the IUBMB ExplorEnz entry
+  (accepted name and reaction) and the CAZy families (Drula et al. 2022,
+  doi:10.1093/nar/gkab1045), notes on what is not represented (substitution,
+  GH10/GH11 differences, branch-point rates, endo/exo GH18 members, binding
+  modules, synergy), and why the products are monomer equivalents. No EC
+  alias collides with another class's (checked by a test).
+- `data_registry/substrates/substrates.yml`: `xylan`, `starch` and `chitin`,
+  `physical_state` `solid_polymer`, `properties` empty, maturity
+  `exploratory_metadata`, provenance "Generic polysaccharide definition ...
+  Not a characterized preparation" with the linkage as named in the IUBMB
+  reaction, `confidence_level` `generic_class_definition`, and "Composition
+  varies by source" notes (xylan side chains; amylose/amylopectin ratio,
+  granules and gelatinization; acetylation and polymorph of chitin). Products:
+  `D_xylose_equivalent`, `beta_D_glucose`,
+  `N_acetyl_D_glucosamine_equivalent`. An endo-xylanase releases mainly
+  xylo-oligosaccharides and a chitinase mainly chitobiose and oligomers, so
+  xylan and chitin declare the monomer-equivalent mass on complete hydrolysis
+  rather than free monomer; glucoamylase releases beta-D-glucose itself
+  (IUBMB reaction of EC 3.2.1.3), so starch declares it directly. Starch lists
+  both alpha bond classes categorically: the schema records which bond types
+  exist, no rate depends on them, and the notes say that branch points are
+  not resolved and starch is one bulk dry mass.
+- `data_registry/product_maps/product_maps.yml` (until now empty): three
+  `stoichiometric` maps, `xylan_to_d_xylose_equivalent_mass_yield` 1.136358,
+  `starch_to_beta_d_glucose_mass_yield` 1.111107 and
+  `chitin_to_n_acetyl_d_glucosamine_equivalent_mass_yield` 1.088659 g/g, each
+  `M(monomer) / M(monomer - H2O)` from the conventional atomic weights
+  (C 12.011, H 1.008, N 14.007, O 15.999) with the formula and `yield_basis`
+  in the provenance, maturity `exploratory_metadata`. The notes state the
+  high-polymer limit, the mass (not molar) basis, the water not being a state,
+  and that no route reads the maps: a user dataset states its own yield, and
+  FungMod neither fills nor checks it from them.
+- No compatibility record, case template or parameter record: user data
+  generates its own compatibility and template for a referenced registry
+  solid, as for `cellulose_film_generic` in USERDATA-008. No family-map change;
+  no LPMO, endoglucanase or other record.
+- `tests/fixtures/user_data/uniprot_case/annotations/strain_u1_uniprot.tsv`
+  gains `X0TEST13` (AA1, EC 1.10.3.2, unreviewed): with `X0TEST09` (GH15,
+  EC 3.2.1.3) now resolving, the fixture had no class without a record left,
+  and the coexistence and refusal tests need one. Fixture READMEs updated.
+
+Tests: new `tests/test_registry_polysaccharide_classes.py` (41 cases): the
+records load and validate, carry the stated EC numbers, aliases, bond and
+substrate classes, process, provenance and maturity, and no parameter,
+compatibility or template names them; the family map resolves GH10, GH11,
+GH15 and GH18 to them as diagnostic; each class acts on its own polymer only
+(`enzyme_class_acts_on` over the whole registry); no LPMO, endoglucanase,
+laccase or alpha-amylase record; no EC number is carried by two classes;
+13 enzyme-class and 7 substrate names, aliases and EC numbers resolve through
+`RegistryResolver` and `resolve_any`; each product-map coefficient equals the
+yield recomputed from atomic weights (abs 5e-7) and its formula string; dbCAN
+GH10, GH15 and an added GH18 gene become four gaps each with dry-mass requests
+on the referenced registry polymers and the preflight lists them; a UniProt
+GH11/EC 3.2.1.8 row (and GH10/EC 3.2.1.8, GH15/EC 3.2.1.3, GH18/EC 3.2.1.14)
+agrees, GH11 with EC 3.2.1.3 is a disagreement on both classes, and in a
+dataset the request names the accession; user estimates (km, kcat in
+g/(mg*h)) with design loadings on registry `xylan` (endo-xylanase named as
+`EC 3.2.1.8`), `starch` (glucoamylase named `amyloglucosidase`) and `chitin`
+run in exploratory mode only (scientific refused), the substrate equals the
+Lambert W solution with `Vmax = kcat E` (rtol 1e-6) and the product equals
+`Y (S0 - S)` at every point with `Y` the product-map yield; a stated yield of
+0.9 is used as written; a row naming `D_xylose` on registry xylan is refused
+with the declared product. `tests/test_guardrails_no_hardcoding.py`: the
+user-data and UniProt token lists gain `starch`, `chitin`, `xylose`,
+`glucosamine`, `amylase`, `chitinase`, `3.2.1.8` and `3.2.1.14`, and a new
+test keeps the polysaccharide names out of every generic path, `api`,
+`capability`, `registry` and `screening`.
+
+Changed expectations (each because the new records exist):
+- `tests/test_registry_loading.py::test_load_toy_registry_index`: the registry's
+  product maps are the three new ids instead of empty.
+- `tests/test_capability_resolution.py`: the "nothing is modellable"
+  annotation uses CE1 (acetyl xylan esterase, no record) instead of GH10; the
+  white-rot resolution also asserts `endo_xylanase` and `chitinase` modellable.
+- `tests/test_user_data_genome.py`: the strain's classes gain `endo_xylanase`
+  and `glucoamylase` (after `cellulase_generic`), with their GH10 and GH15
+  evidence; `unmodellable_enzyme_classes` is `laccase` only (its family,
+  gene count and polyspecific label are asserted instead of endo-xylanase's);
+  generated enzyme classes 3 -> 5; the preflight resolution lists `laccase`
+  only and five resolved classes; with `min_tools_agreeing` 2 and 3 the GH10
+  and GH15 genes (three tools each) keep their classes; the "no registry
+  class" refusal uses an AA1-only annotation and names laccase.
+- `tests/test_user_data_uniprot.py`: the strain gains `glucoamylase`, which
+  `X0TEST09` supports through agreeing CAZy and EC; with `X0TEST13` the
+  export has 13 rows (11 unreviewed), `protein_counts` `cazy_and_ec` 3 and
+  `cazy` 3, `ec_comparable_classes` adds `chitinase`, `endo_xylanase` and
+  `glucoamylase`, and the unresolved EC numbers are 1.10.3.2, 3.1.1.73,
+  3.2.1.37 and 3.2.1.4; `unmodellable_enzyme_classes` is `laccase`
+  (`X0TEST13`, polyspecific) instead of `glucoamylase`; generated enzyme
+  classes 3 -> 4; the refusal export keeps `X0TEST13` instead of `X0TEST09`;
+  the fetched snapshot resolves `glucoamylase` too and its metadata counts 13
+  rows.
+- `tests/test_user_data_assembly.py`: the G1 repertoire gains `endo_xylanase`
+  and `glucoamylase`, both reported as not acting on cellobiose; `laccase` is
+  the only class without a record.
+- `tests/test_cli_user_data_workflow.py`: the G1 draft resolves 5 classes.
+- The in-memory test-only `glucoamylase` record of the genome, UniProt and
+  assembly tests would now duplicate the shipped id (the registry refuses
+  duplicates). Those tests exercise a resolved class acting on the fixtures'
+  dissolved `maltose`, which the shipped record (solid starch only) does not
+  list, and the assembly drafts dissolved substrates only; they now widen the
+  shipped record in memory to the `maltose` class (test-only provenance note,
+  maturity `exploratory_metadata`), and the genome and UniProt tests first
+  assert that with the shipped record no maltose case exists. The requests
+  name the shipped record's name, `Glucoamylase`.
+
+Docs: `docs/user-data.md` (new "Registry polymers" subsection of "Solid
+substrates": the registry polymers, bond classes, products, yields and
+acting classes, what the records do and do not say, the worked xylan example
+and the genome request; updates to the substrates table, the assembly
+example, the genome and UniProt limits and the CAZy/EC paragraph),
+`docs/capabilities.md` (genome row; five of ten white-rot classes have a
+record), `docs/cli.md` (the `assemble` and `check-data` example output),
+`data_registry/README.md`, `README.md` (user-data subsection),
+`CHANGELOG.md`.
+
+Commands and results (worktree on `claude/registry-polysaccharide-classes`,
+based on `main` be50dd1, Python 3.11 venv):
+- `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`: all
+  checks passed.
+- `pyright` (no source file changed) on the new and the eight changed test
+  files: 0 errors, 0 warnings.
+- `mkdocs build --strict`: built without warnings; `site/` removed; the new
+  anchor `#registry-polymers` and its links checked in the built HTML.
+- Targeted: `pytest` on `tests/test_registry_*.py`,
+  `tests/test_capability_resolution.py`, `tests/test_user_data_*.py`,
+  `tests/test_guardrails_*.py`, `tests/test_phase1_documentation_sync.py`,
+  `tests/test_repository_hygiene.py`, `tests/test_active_instruction_hierarchy.py`,
+  `tests/test_roadmap_orchestration_status.py`, `tests/test_preflight_fixes_docs001.py`,
+  `tests/test_cli.py`, `tests/test_cli_user_data_workflow.py`,
+  `tests/test_virtual_experiment_name_resolution.py` and
+  `tests/test_modelability_report.py`: 785 passed.
+- Full suite (`pytest`, run with nohup): 2517 passed in 48 min.
+- The records of the four dissolved user-data fixtures still hash to the
+  USERDATA-008 digests (`test_dissolved_datasets_generate_byte_identical_records`).
+
+Not changed: no source file, process law, solver, loader, schema, family
+mapping or output table; user-data rules are unchanged (a referenced registry
+solid already worked since USERDATA-008); no kinetic value anywhere; the
+legacy Stage 9 `StarchSubstrate` and `ChitinSubstrate` metadata modules are
+untouched and unrelated to the registry records.
+
+Scientific impact: GH10/GH11, GH15 and GH18 enzymes from a genome or
+proteome become explicit measurement requests on a named solid polymer
+instead of "unmodellable", and user kinetics on xylan, starch or chitin run
+through the existing apparent law with an explicit, sourced product identity.
+No rate is shipped or inferred; the yields are idealized stoichiometry for
+reference.
+
+Compatibility: additive for datasets. Genome and UniProt outputs change
+wherever GH10, GH11, GH15, GH18 or EC 3.2.1.8, 3.2.1.3 and 3.2.1.14 occur
+(listed above): those classes join a strain and appear in
+`genome_resolved_classes` rather than `unmodellable_enzyme_classes`, and a
+protein with one of these EC numbers can now agree or disagree with its CAZy
+family. A user `enzyme_classes.csv` row whose `class_id` or `name` equals one
+of the new names or aliases (for example `xylanase`) is now refused as a
+collision, and a user substrate named `xylan`, `starch` or `chitin` collides
+with the registry record.
+
+Limitations: generic polymers without composition, accessible area,
+crystallinity or particle size; the product maps hold for idealized
+homopolymers and are not applied or checked; no debranching, beta-xylosidase,
+beta-N-acetylhexosaminidase or alpha-amylase class, so complete hydrolysis to
+monomers is not itself modelled; GH18 endo- and exo-chitinases are one class;
+the classes act on the solid polymers only, not on dissolved oligosaccharides;
+the IUBMB and CAZy texts are cited from the curated sources without an online
+check in this session (no network).
+
+Ambiguities: whether `glucoamylase` should also list dissolved maltose and
+malto-oligosaccharides (IUBMB covers enzymes acting on polysaccharides more
+rapidly than on oligosaccharides); not added, to keep this record to the
+solid route, and the tests widen it in memory instead. Product names use
+"equivalent" for xylan and chitin rather than the literal "xylose" and
+"GlcNAc", because the endo-acting classes do not release free monomer.
+
+Risk: low. Data and test changes only; the user-data and genome behaviour
+changes are the documented consequences of new records.
+
+Recommended next task: USERDATA-009, the Langmuir surface law for user data
+(unchanged from USERDATA-008), or a follow-up that warns when a stated g/g
+yield on a registry polymer exceeds its product map's complete-hydrolysis
+yield.
+
+## RUN-001 Run The Runnable Cases Of A Request
+
+Status: `complete` for the stated scope (2026-10-07). For the owner's goal
+("fungus X on substrate Y in conditions Z, the code calculates"), an assembled
+dataset for a real fungus almost always has gaps: most enzyme classes of a
+genome have no kinetics, and a condition without measured constants is a gap.
+`VirtualExperiment.simulate` refused the whole request when any case failed
+its preflight (the command line: exit 3), so a draft with one gap simulated
+nothing, even when other cases were fully runnable. CLI-002 named this as the
+next task.
+
+Changed:
+
+- API, an explicit opt-in: `VirtualExperiment.simulate(..., blocked="refuse" |
+  "report")` (`BlockedCasePolicy`, `BLOCKED_CASE_POLICIES` in
+  `fungal_model.api.virtual_experiment`; an unknown value is refused).
+  `"refuse"` is the default and refuses exactly as before (same exception and
+  message). `"report"` simulates exactly the cases whose
+  `preflight_policy(report)["simulation_allowed_for_mode"]` is true (the
+  existing rule: scientific `modelable` only, exploratory also
+  `exploratory`), does not simulate the others, and lists them; with no
+  runnable case it refuses exactly as `"refuse"` does. A request without
+  blocked cases runs as a full run under either policy.
+  `DegradationScreenResult` gains `blocked_policy`, `blocked_reports` (grid
+  position -> preflight report), `partial_run` and `blocked_cases()` (case id,
+  ids, mode, status, blocking reason, next action, missing and incompatible
+  item ids, measurement requests, reason).
+- Simulating a subset: `simulate_screen(..., cases=None)`. `cases` lists
+  `(fungus_id, substrate_id, environment_id)` triples of the requested grid
+  (`itertools.product` order); they are simulated in the order given (no
+  reordering); a triple outside the grid, a repeated triple, an empty list
+  and a grid that repeats a combination are refused. The run seed draws one
+  case seed per grid position, in grid order, whether or not the position is
+  simulated (the same draws as before, taken up front), and each case gets
+  the seed of its position, so a case's samples are the same in a full run, a
+  partial run and a one-case selection of the same request.
+  `RegistryCaseEnsemble.case_index` records the grid position (also in
+  `to_dict()` and `screen_summary.json`, and as the `case` column of the
+  screen's own CSVs).
+- Tables, output schema `2.2.0` (minor bump, `OUTPUT_SCHEMA_VERSION`):
+  `write_standard_tables(..., blocked_reports=None)` names every case
+  `case_<grid position>` (`standard_case_id`), so ids do not shift when cases
+  are skipped, and adds for each blocked case rows in
+  `modelability_preflight.csv`, `modelability_items.csv`, `case_summary.csv`,
+  `assumption_summary.csv`, `limitations_table.csv` (a `not_simulated` row of
+  severity `blocking`, then its assumption and missing-input rows),
+  `missing_parameters.csv` and `suggested_experiments.csv` (the preflight's
+  requests, plus the case template's when the report selected a compatibility
+  record), in grid order between the simulated cases. A blocked case has no
+  samples and therefore no row in the per-sample tables;
+  `environment_summary.csv` and `comparison_summary.csv` cover simulated cases
+  only. `case_summary.csv` gains `case_status` (`simulated`,
+  `not_simulated`) and `not_simulated_reason` (`not_simulated_reason(report)`:
+  "blocked_by_preflight: the <mode>-mode preflight reports <status>
+  (blocking reason ...; next action ...). The case was not simulated, so it
+  has no samples, trajectories, metrics or threshold times; ..."; empty for
+  simulated cases). The `case_id` column description states the grid-position
+  rule. The writer refuses a blocked report whose preflight allows simulation
+  and a position that was also simulated.
+- Summary, manifest and report: `virtual_experiment_summary.json` and
+  `output_manifest.json` gain `blocked_policy`, `partial_run`,
+  `requested_case_count`, `simulated_case_count` and `blocked_cases` (a full
+  run: `false` and `[]`); the Markdown report's run summary starts with
+  "**Partial run:** N of M requested cases were simulated. Not simulated,
+  because the preflight blocked them: ..." and marks each blocked case "Not
+  simulated:" with the reason (read from `case_summary.csv`, so earlier
+  bundles render as before).
+- Command line: `fungmod run --runnable-only` -> `simulate(blocked="report")`.
+  It prints the preflight table and the blocked cases with their measurement
+  requests, says that it simulates the runnable ones, prints each blocked case
+  as "not simulated" with the reason beside the simulated cases' metrics, and
+  ends with "Partial run: K of M requested case(s) were blocked by the
+  preflight and not simulated (case ids); exit code 4". New exit code 4
+  (`EXIT_PARTIAL`, "partial run"), never 0 or 3 for a partial run; no runnable
+  case: exit 3 ("--runnable-only has nothing to simulate"); nothing blocked: a
+  full run, exit 0. Without the flag the behaviour and exit code (3) are
+  unchanged; the refusal adds one line suggesting the flag when some case is
+  runnable. Name: `--runnable-only` rather than the suggested `--run-runnable`,
+  because it says which cases run without repeating the subcommand (`fungmod
+  run --run-runnable`), and a printed command carrying it shows that some
+  requested cases may not run; the blocked cases are reported either way, the
+  flag only decides whether the runnable ones are simulated. Module
+  docstring, `--help` epilog (exit-code table) and `RUNNABLE_ONLY_HELP` state
+  code 4.
+- `fungmod assemble` prints its `run` command with `--runnable-only` when a
+  case of that command's conditions has kinetics status `gap` or `conflict`
+  (`STATUS_GAP`, `STATUS_CONFLICT` from the API), followed by a line that
+  names those cases and why (the preflight blocks them; without the flag
+  nothing is simulated, exit 3; with it the runnable cases run and the gaps
+  are listed, exit 4). A draft without gaps prints the command as before.
+- Docs: `docs/cli.md` (command table; new section "Run the runnable cases of
+  a request" with a real registry example, what blocked cases get, seeds and
+  ids, exit code 4 and the name; the assemble -> check-data -> run example now
+  runs the G1 draft partially with real output, whose 30 degC metrics equal
+  the earlier one-condition run; defaults; exit-code table with 3 and 4),
+  `docs/concepts/outputs.md` (`case_summary.csv` row, "Partial runs" section:
+  per-table rows, JSON keys, report, case ids and seeds),
+  `docs/concepts/virtual-experiments.md` ("Requests with blocked cases"),
+  `docs/user-data.md` (assembly section: the printed `--runnable-only`
+  command and why; the G1 example runs partially), `README.md` (command-line
+  quick start and capability row, schema `2.2.0`), `CHANGELOG.md`.
+
+Not changed: no process law, solver, registry record, user-data rule, loader,
+assembly, drafting, fit, comparison or preflight status; the default
+`blocked="refuse"` path simulates, samples and refuses as before. A
+before/after run of two seeded multi-case exploratory requests (base commit
+`adff1f2` against this change, outputs normalised for the directory name)
+gave byte-identical trajectories, sample configs and bundles; the standard
+tables differed only in `output_schema_version`, the two new `case_summary`
+columns and the `case_id` description of the data dictionary and schema, the
+JSON summaries only in the new keys, and `run_environment.json` only in its
+timestamp.
+
+Tests: new `tests/test_partial_runs.py` (10 tests):
+- refuse is the default and its message is unchanged and identical to
+  `blocked="refuse"`; with no runnable case `"report"` refuses with the same
+  message, nothing written; an unknown policy is refused;
+- registry mixed request (Reaction 618 runnable in exploratory mode, the toy
+  lab environment underparameterized): `"report"` simulates exactly the cases
+  `preflight_policy` allows; the simulated case's trajectories are
+  byte-identical, and its sampled values equal, to a run of that case alone
+  (same seed); the blocked case appears in `case_summary.csv`
+  (`not_simulated`, reason, zero samples), `modelability_preflight.csv`,
+  `modelability_items.csv`, `missing_parameters.csv`,
+  `suggested_experiments.csv` and `limitations_table.csv`, in no per-sample
+  table and not in the environment or comparison summaries; summary and
+  manifest say partial and list it with status, missing items and requests;
+  the report says "Partial run";
+- blocked case before the runnable one: ids `case_0000` (blocked) and
+  `case_0001` (simulated), samples and trajectories equal to
+  `simulate_screen(..., cases=[that case])` on the same request;
+- a fully runnable request under `"report"` writes the same tables as the
+  default (`partial_run` false);
+- scientific mode on T. harzianum and the BGL1A source x Celufloc 200 and
+  cellobiose at the Gelain 10 g/L culture: only the scientifically modelable
+  organism case runs (the BGL1A case, runnable in exploratory mode, is
+  blocked), the manifest keeps `scientific_exact_unvalidated` and the
+  not-validation note, the refusal keeps "it does not mean experimentally
+  validated", the trajectory equals a one-case scientific run; the same
+  request in exploratory mode also runs the BGL1A case;
+- seeds, on a user dataset written by the test (the esterase fixture at three
+  conditions with sampled kcat ranges): full run, `cases=` the whole grid, two
+  cases, one case and the two cases reversed give each case the same sampled
+  values and byte-identical trajectories (and keep the given order); a
+  dataset without kinetics at the middle condition runs partially with the
+  other two cases' samples equal to the full run's;
+- `simulate_screen` refuses triples outside the grid, repeats, an empty list
+  and a grid with a repeated combination; the table writer refuses a runnable
+  report or a simulated position as blocked; the `case_summary` schema
+  columns and version `2.2.0`.
+`tests/test_cli.py`: `--runnable-only` on the registry mixed request (exit 4,
+blocked list and requests, metrics of the simulated case only, the closing
+partial line, manifest, `case_summary.csv`, suggested experiments, report);
+without the flag exit 3 with the hint and nothing written; nothing runnable
+with the flag exit 3; nothing blocked with the flag exit 0; scientific
+`--runnable-only` (exit 4, scientific wording kept); help lines for exit codes
+3 and 4 and the flag; exit codes 0-4 distinct and code 4 in `docs/cli.md`.
+`tests/test_cli_user_data_workflow.py`: the printed G1 command now ends with
+`--runnable-only` and the reason line is printed; executed as printed it exits
+4, simulates c30_ph5, lists c40_ph5 with its measurement request in the
+output, `case_summary.csv` and the manifest; without the flag exit 3 and
+nothing written; the c30_ph5 case alone gives byte-identical trajectories;
+scientific mode exits 3 even with the flag (nothing runnable).
+`tests/test_virtual_experiment_api.py` and `tests/test_user_data_timecourse.py`:
+schema version `2.2.0`.
+
+Commands and results (worktree on `claude/run-runnable-cases`, stacked on
+`claude/cli-assemble-fit` bdec94a, Python 3.11 venv; the base's
+`shell_quote` quotes the `--runnable-only` command like every other printed
+command):
+- `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`: all
+  checks passed.
+- `pyright --pythonpath <venv python>` on `cli.py`, `api/__init__.py`,
+  `api/virtual_experiment.py`, `api/result_tables.py`, `api/output_schema.py`,
+  `api/report.py`, `screening/ensemble.py`, `tests/test_partial_runs.py`,
+  `tests/test_cli.py`, `tests/test_cli_user_data_workflow.py` and
+  `tests/test_user_data_timecourse.py`: 0 errors, 0 warnings.
+  `tests/test_virtual_experiment_api.py` (one changed line) reports the same
+  4 errors as on the base commit (`in` on `object`-typed JSON values, lines
+  108-111), none from this change.
+- `mkdocs build --strict`: built without warnings; `site/` removed; the new
+  anchors `#partial-runs` and `#run-the-runnable-cases-of-a-request` and
+  their links checked in the built HTML.
+- Targeted: `pytest tests/test_cli.py tests/test_cli_user_data_workflow.py
+  tests/test_partial_runs.py tests/test_virtual_experiment_api.py
+  tests/test_virtual_experiment_environment_grid.py
+  tests/test_virtual_experiment_name_resolution.py
+  tests/test_registry_ensemble_simulation.py
+  tests/test_registry_ensemble_homogeneous_mm.py
+  tests/test_case_class_selection.py
+  tests/test_api003_researcher_virtual_experiment.py tests/test_guardrails_*.py
+  tests/test_user_data*.py tests/test_phase1_documentation_sync.py
+  tests/test_repository_hygiene.py tests/test_release_configuration.py
+  tests/test_shared_progress.py tests/test_active_instruction_hierarchy.py
+  tests/test_roadmap_orchestration_status.py`: 520 passed (590.0 s). After
+  merging bdec94a: `pytest tests/test_cli.py tests/test_cli_user_data_workflow.py
+  tests/test_partial_runs.py tests/test_guardrails_no_hardcoding.py
+  tests/test_guardrails_public_api.py tests/test_guardrails_no_shortcuts.py`:
+  111 passed (197.6 s).
+- Full suite `pytest -q` (background, log in the session scratchpad, after the
+  merge): 2423 passed in 2428.3 s.
+
+Scientific impact: none on any simulated value. A request with gaps now
+yields the simulations it can support plus an explicit list of what blocks the
+rest, instead of nothing; the blocked cases are never simulated, never given
+guessed values and are labelled `not_simulated` with the reason and the
+measurement requests. Partial runs need an explicit opt-in and exit with a
+code of their own.
+
+Compatibility: the default refuses as before. Output schema `2.2.0` (minor):
+every row's `output_schema_version`, two new `case_summary.csv` columns, the
+`case_id` description, new keys in the summary, manifest and
+`RegistryCaseEnsemble.to_dict()` (`case_index`); readers that ignore unknown
+columns and keys are unaffected. `write_standard_tables` and `simulate_screen`
+gain optional keywords; `_suggested_experiment_rows` (private) lost an unused
+argument. New public names: `BlockedCasePolicy`, `BLOCKED_CASE_POLICIES`,
+`EXIT_PARTIAL`, `RUNNABLE_ONLY_HELP`, `CASE_STATUS_SIMULATED`,
+`CASE_STATUS_NOT_SIMULATED`, `standard_case_id`, `not_simulated_reason`.
+
+Ambiguities and limitations: seeds follow the case's position in the
+requested grid (the rule the screen has always used), so a case's samples are
+identical across full, partial and `cases=` runs of the same request, but a
+request that names the case alone gives it position 0 and therefore the same
+samples only when it is the first case of the larger request; a seed keyed on
+the case's ids would make them independent of the request but would change
+every existing seeded multi-case run. `VirtualExperiment.simulate` has no
+`cases=` of its own (use `simulate_screen`). Blocked cases get no rows in the
+per-sample tables (no samples exist); their reason is in `case_summary.csv`
+and `limitations_table.csv`. `assemble` adds `--runnable-only` for `gap` and
+`conflict` cases only; a requested substrate on which no class of the fungus
+acts has no case and still blocks its printed command (exit 3). The preflight
+table printed by `run` numbers cases from 1 while the tables use
+`case_0000`, as before. A partial run with `--compare-timecourses` whose
+comparison is refused exits with 2 (the comparison's code) after a complete
+partial bundle.
+
+Risk: low to moderate. The default path is unchanged (checked byte for byte
+on simulated outputs); the new path reuses the preflight policy, the table
+writers and the screen with an explicit subset, and refuses inconsistent
+inputs instead of guessing.
+
+Recommended next task: a machine-readable `--json` summary for `run`,
+`assemble` and `fit` (partial-run fields included), then `cases=` on
+`VirtualExperiment.simulate` for re-running chosen cases of a request with
+their original seeds.
+
+## CLI-002 The User-Data Workflow From The Command Line
+
+Status: `complete` for the stated scope (2026-10-07). The owner's goal, "i want
+fungi X on substrate Y in conditions Z, and then it automatically fetches (or
+from stored data, or even better input data) the different enzymes and stuff
+in the fungi, and then the code calculates all the stuff", now runs end to end
+from a shell: `fungmod assemble` gathers what the user's sources say about
+fungus X into one reviewable draft, the user fills its `REVIEW:` fields,
+`fungmod check-data` validates it, `fungmod run` simulates it (and with
+`--compare-timecourses` compares it with the user's time courses), and
+`fungmod fit` fits kinetic constants to those time courses. Every step was
+already in the API (ASSEMBLE-001, USERDATA-004, USERDATA-005); the command line
+before this exposed only `run`, `preflight`, `check-data` and `list`.
+
+Changed:
+
+- `fungal_model.cli`, three new subcommands and two extensions; the command
+  line only parses arguments and prints what the API returns, and an option
+  that is not given is not passed, so the API's own rule applies (a `REVIEW:`
+  field, or its documented default, stated in `--help`):
+  - `assemble` -> `assemble_user_tables`: `--fungus` (one per call; a second
+    is refused), `--substrate` (repeatable), conditions as every
+    `--temperature-c` x `--ph` pair in degC (the `run` grid's validation is
+    shared through `_grid_values`: both are needed), `--scientific-name`,
+    `--annotation`, `--annotation-tool`, `--annotation-source`,
+    `--enzyme-class CLASS` and `--enzyme-class-evidence CLASS EVIDENCE SOURCE`
+    (`enzyme_classes`, names or mappings, in command-line order),
+    `--kinetics-source` (`kinetics_sources`), `--entry-id`, `--same-species`,
+    `--user-data`, `--responses FILE` (a CSV with the `responses.csv` columns
+    and `substrate`), `--design QUANTITY=VALUE UNITS` or
+    `QUANTITY=LOWER:UPPER UNITS`, `--time-grid DURATION UNITS POINTS`,
+    `--cache-dir`, `--registry`, `--dataset-id` and `--output` (new or empty).
+    It writes the draft with `AssembledTablesDraft.write` and prints the
+    fungus, substrates and conditions as resolved, the enzyme classes with
+    their evidence, unmodellable classes and unmapped families, which classes
+    act on each substrate, the case table (fungus, class, substrate,
+    condition, kinetics status, condition route, source ids) with each case's
+    reason, transferred entries, every kinetic-law entry with its use and
+    reason, unused user rows, stored registry cases, the draft's limitations,
+    the files written, every `REVIEW:` field as `file:row:column: note`, and
+    the next commands (`check-data`, then `run` with the strain name,
+    substrates and `--condition` ids; a separate `--temperature-c`/`--ph`
+    command for each condition carried by a response law, which is an
+    `EnvironmentGrid` condition and not a `conditions.csv` row).
+  - `draft-kinetics SOURCE --provider PROVIDER` -> the provider's drafting
+    function (`user_tables_from_sabiork`): `--entry-id`, `--strain-for
+    ORGANISM=STRAIN_ID` (`strain_id_for_organism`), `--design`,
+    `--propose-enzyme-classes`, `--cache-dir`, `--registry`, `--dataset-id`,
+    `--output`. Prints the converted entry ids, every entry and parameter not
+    converted with the API's reason, the tables' row counts, strains,
+    substrates and conditions, the `REVIEW:` fields and the next commands.
+    Name: `draft-sabiork` was suggested, but
+    `tests/test_guardrails_no_hardcoding.py` forbids the token `sabio` in
+    `cli.py` ("the command line names no source database"), so the command
+    is source-neutral and the provider comes from a new table in the API (below).
+  - `fit DIR --case STRAIN_ID ENZYME_CLASS SUBSTRATE_ID --fit QUANTITY LOWER
+    UPPER UNITS ...` -> `fit_user_dataset` with every keyword: `--initial
+    QUANTITY VALUE`, `--condition`, `--error-model sd_weighted|unweighted`
+    (the API's names), `--allow-unidentified`, `--fitted-dataset-id`,
+    `--confidence-level`, `--profile-points`, `--diff-step`, `--max-nfev`,
+    `--registry` (`base_registry`), `--output` (new or empty;
+    `UserDatasetFit.write`). The suggested `--fit QUANTITY:LOWER:UPPER` and
+    `--case CASE_ID` became four and three separate values, because the API
+    takes bounds with units and a case as (strain, class, substrate) tuples
+    and units such as `1/min` would make a separator ambiguous. Prints the
+    case, conditions, observations and timecourse rows, error model,
+    objective, convergence, per quantity the value, units, interval at the
+    confidence level, identifiability verdict, bounds, start and the verdict's
+    method and reason, the warnings and the in-sample claim boundary, then the
+    fitted dataset's id, digest and report file and the next commands. A
+    refused fit (`UserDataFitError`) prints the verdicts the report holds and
+    exits with code 2; nothing is written.
+  - `run --compare-timecourses` -> `DegradationScreenResult.compare_with_timecourses()`
+    after the bundle is written: prints per series (case, observable) the
+    observation count, observations with `sd`, RMSE with units, mean residual,
+    fraction inside the 5-95 % band and observations used in a fit, the
+    case-to-time-course mapping, the not-compared series, the API's in-sample
+    note and interpolation rule and the table path. A flag of `run`, not a
+    `compare` subcommand, because the API compares a result in memory with the
+    dataset that built it and there is no API to reload a result. Without
+    `--user-data`, or with a dataset without `timecourse.csv`, it exits with 2
+    before simulating; a comparison the API refuses after the simulation
+    (observations beyond the simulated time) exits with 2, says that the
+    bundle is complete, and prints the issues.
+  - `check-data` also prints the genome or proteome resolution
+    (`genome_annotations` with the proteome id, unresolved EC numbers and
+    EC/CAZy disagreement counts where present and the claim boundary,
+    `genome_resolved_classes`, `unmodellable_enzyme_classes`,
+    `unmapped_families`), the time courses (`UserDataset.timecourses`: per
+    series strain, class, substrate, condition, observable, points, time range,
+    units, observations with `sd`) and a fitted dataset's `fit` block
+    (quantities, verdicts, intervals, claim boundary). After unfilled
+    `REVIEW:` fields (the loader's refusal, every field as
+    `file:row:column: message`) it adds one line saying to fill them.
+  - Exit codes unchanged in meaning: `UserTablesSourceError`,
+    `UserTablesAssemblyError`, `UserDataError` and `UserDataFitError` are
+    usage or input errors (2), printed as `file:row:column: message` where the
+    error carries issues. The non-empty-output message names the reason per
+    kind of output. The top-level help lists the workflow; `assemble` and
+    `draft-kinetics` help say that nothing is fetched, `fit` and `run` help
+    carry the in-sample note.
+- API, additive and behaviour-neutral: `USER_TABLE_PROVIDERS` in
+  `fungal_model.api.user_data_sources` (in its `__all__` and the API
+  reference), a read-only mapping from the provider name `sabiork` (the name
+  `source_proposal` uses, `AVAILABLE_SOURCE_PROVIDERS`) to
+  `user_tables_from_sabiork`, so that the command line offers the providers
+  without naming a database.
+- Docs: `docs/cli.md` (command table; new sections "Fungus X on substrate Y at
+  conditions Z, from your sources" with the whole assemble -> review ->
+  check-data -> run example and real output, the option-to-argument table,
+  "Draft tables from SABIO-RK", "Compare with your time courses", "Fit kinetic
+  constants to your time courses" with real output and the option table;
+  defaults and exit codes), `README.md` (Command line subsection with the
+  fungus-X-substrate-Y-conditions-Z workflow, capability row),
+  `docs/user-data.md` (the shell form of every step, linked from each
+  section; the "There is no command-line subcommand yet" limit replaced by
+  what `assemble` does not expose), `docs/quickstart.md`, `docs/api.md`,
+  `CHANGELOG.md`.
+
+Not changed: no process law, solver, registry record, user-data rule, loader
+check, assembly, drafting, comparison or fit behaviour, output table or schema,
+preflight status or numerical result. `run`, `preflight`, `list` and the
+existing `check-data` lines print what they printed before.
+
+Tests: new `tests/test_cli_user_data_workflow.py` (45 tests), every test with
+`urllib.request.urlopen`, the SABIO-RK fetch module's `urlopen` and
+`socket.socket.connect` patched to fail (module-scoped, so the module's
+datasets and fits are covered too):
+- assemble end to end on the `genome_case` annotation and the frozen Reaction
+  618 export (entry 35622, 30 and 40 degC at pH 5): the written draft is
+  byte-identical to `assemble_user_tables` with the same arguments; the case
+  table shows `transferred_estimate` at c30_ph5 and `gap` at c40_ph5 with each
+  reason; all eight `REVIEW:` fields are listed as the API reports them;
+  `check-data` refuses the draft (exit 2, every field, the hint), the fields
+  are filled with the assembly tests' reviewer answers, `check-data` passes
+  and prints the genome resolution; the printed `run` command, executed as
+  printed, exits 3 on the 40 degC gap with its measurement request, the
+  30 degC case runs in exploratory mode (exit 0, dataset id and digest in the
+  manifest) and is refused in scientific mode (exit 3);
+- the options reach the API unchanged (byte-identical drafts): annotation
+  source, `--same-species` (the rice entry becomes
+  `literature_same_organism`), a design value and a design range, the time
+  grid and cache directory (only the reviewer left to fill); asserted classes
+  by name and with evidence; a response law from `--responses` on the oxidase
+  dataset, whose law-carried 40 degC condition gets the printed grid command,
+  and both printed commands run (exit 0, `active_response_model`);
+- `draft-kinetics` on the export: byte-identical to `user_tables_from_sabiork`,
+  the five converted entries, all 24 listed entries and every listed parameter
+  with the API's reason, the review fields; the reaction-id form with
+  `--cache-dir`, `--entry-id 35622`, `--strain-for` and `--design`;
+  `--propose-enzyme-classes`; `USER_TABLE_PROVIDERS` equals
+  `{"sabiork": user_tables_from_sabiork}` and its keys
+  `AVAILABLE_SOURCE_PROVIDERS`;
+- `check-data` on the UniProt fixture prints the proteome resolution;
+- `run --compare-timecourses` on the synthetic esterase time courses of
+  `tests/test_user_data_timecourse.py` (helpers reused): the printed RMSE and
+  counts equal `timecourse_comparison.csv`, which joins the manifest;
+- `fit` on the same dataset (the fit tests' bounds and starting values,
+  `--profile-points 11`): printed values, intervals and verdicts equal
+  `fit_report.json`, which records the forwarded profile points; the fitted
+  dataset loads, `check-data` prints its fit block, the printed run command
+  works and its comparison marks all 8 observations per series as used in the
+  fit, and scientific mode refuses it (exit 3); the saturating case exits 2
+  with the API's refusal, the verdicts printed and nothing written, and with
+  `--allow-unidentified --fitted-dataset-id` writes the labelled dataset;
+- comparison refusals (no user data, no time courses: exit 2, nothing
+  simulated; observations beyond the simulated duration: exit 2 after a
+  complete bundle without `timecourse_comparison.csv`);
+- 29 usage and input errors (exit 2, nothing written), the API's bound check,
+  non-empty output for each new subcommand, help texts, and a source check
+  that `cli.py` names no source database and imports no network module.
+`tests/test_cli.py` and the guardrail tests are unchanged and pass
+(`cli.py` stays free of organism, substrate, enzyme and source-database tokens).
+
+Commands and results (worktree on `main` 5ac677e, Python 3.11 venv):
+- `ruff check src tests scripts/run_*.py scripts/reproduce_paper.py`: all
+  checks passed.
+- `pyright --pythonpath <venv python> src/fungal_model/cli.py
+  src/fungal_model/api/user_data_sources.py tests/test_cli.py
+  tests/test_cli_user_data_workflow.py`: 0 errors, 0 warnings. (Without
+  `--pythonpath`, pyright picks an interpreter without pytest and reports only
+  that `pytest` cannot be resolved in the test file.)
+- `mkdocs build --strict`: built without warnings; `site/` removed afterwards;
+  the eight new cross-page anchors checked in the built HTML.
+- `pytest tests/test_cli.py tests/test_cli_user_data_workflow.py
+  tests/test_guardrails_*.py tests/test_user_data*.py
+  tests/test_phase1_documentation_sync.py tests/test_repository_hygiene.py
+  tests/test_release_configuration.py tests/test_shared_progress.py
+  tests/test_active_instruction_hierarchy.py`: 420 passed (373.5 s).
+- Full suite `pytest -q` (background, log in the session scratchpad): 2408
+  passed in 2429.8 s.
+- After the last edit (the `--allow-unidentified` hint line of a refused
+  fit), `pytest tests/test_cli.py tests/test_cli_user_data_workflow.py
+  tests/test_guardrails_*.py tests/test_phase1_documentation_sync.py
+  tests/test_repository_hygiene.py tests/test_release_configuration.py
+  tests/test_active_instruction_hierarchy.py`: 125 passed (154.7 s).
+
+Scientific impact: none on any result. The same drafts, fits and comparisons
+become reachable from a shell; the command line adds no value, threshold or
+default of its own, and prints the API's honesty texts (transferred values
+are estimates, gaps with their measurement requests, the in-sample claim
+boundary and comparison note) beside the numbers.
+
+Compatibility: additive. Existing subcommands, options, output and exit codes
+are unchanged; `USER_TABLE_PROVIDERS` is a new public name.
+
+Ambiguities and limitations: `assemble` takes conditions as a degC grid of
+`--temperature-c` x `--ph` (as `run` does); kelvin, explicit condition ids
+and notes, and a new substrate's categories are not options (review the
+tables or use the Python API). Design values take the API's default source
+and method text. The printed `run` commands leave the mode, samples, seed and
+output to the user (no hidden defaults) and ask for every requested
+condition, so a draft with gaps is blocked (exit 3) until those cases are
+dropped or measured. The comparison is a flag of `run`; there is no way to
+compare an earlier run directory. `fit` prints values to four significant
+figures; `fit_report.json` holds full precision. No JSON output mode.
+
+Risk: low. The command line calls public API functions with the user's
+arguments and prints their results; the API change is one read-only mapping.
+
+Recommended next task: per-case selection in `run` so that the runnable
+cases of an assembled draft run while its gap cases are reported (today the
+40 degC gap blocks the whole printed command), then a machine-readable
+`--json` summary for `assemble`, `fit` and `run`.
+
+## USERDATA-008 Solid Substrates In User Data
+
+Status: `complete` for the stated scope (2026-10-07); the eighth increment of
+the user-supplied-data route. Until now every user substrate had to be
+dissolved, although the registry already ran an apparent bulk
+Michaelis-Menten law on a suspended solid in scientific mode (the
+*T. harzianum* culture case: cellulose in g/L, filter-paper activity in FPU/L,
+`k_h` in g/FPU/h, `K_h` in g/L). That law, and the existing conversion-dependent
+reactivity modifier, are now reachable from user tables for one suspended solid
+polymer on a dry-mass basis. No new numerics, process type or modifier.
+
+Changed:
+
+- `api/user_data.py`: `substrates.csv` accepts `physical_state`
+  `solid_polymer` with the new optional column `amount_basis` (`dry_mass`,
+  required for a solid, blank for a dissolved substrate) and `yield_basis`
+  `g/g` (a solid) or `mol/mol` (dissolved); a `solid_polymer` registry
+  substrate may be referenced. On a solid case `km` and
+  `substrate_initial_concentration` are dry mass per volume, `vmax` dry mass
+  per volume per time, the enzyme a protein mass or an activity in one of
+  `ASSAY_BASE_UNITS` per volume, and `kcat` a substrate mass per time per
+  enzyme amount, checked per case with pint against the case's own enzyme and
+  substrate rows (`kcat x E` must be the substrate's units per time). New
+  quantities: `enzyme_dose` (enzyme per dry substrate mass; times the case's
+  exact `substrate_initial_concentration` it is one derived
+  enzyme-concentration record whose provenance lists both rows, the formula and
+  the pint factor, at the weaker input's maturity, exactly like the
+  specific-activity route; a dose range is scaled, a ranged initial substrate,
+  an explicit `enzyme_concentration` beside a dose, and a dose on a dissolved
+  substrate are refused) and `reactivity_exponent` (binds the existing
+  `substrate_reactivity` modifier through the generated template with
+  `reference_concentration_role` `substrate_initial_concentration`, so `S0` is
+  the case's own initial-substrate record; dimensionless, zero or positive; a
+  pair with one row gives every other case of the pair a gap; refused on
+  dissolved substrates). Refused on a solid, each naming file, row and column:
+  `specific_activity`, `enzyme_loading` and `assay_activity` (an amount-based
+  activity needs a molar mass of a repeat unit, a mass-based one is the `kcat`
+  of the kcat form, and a saturating activity is undefined on an interface),
+  the pH-ionization quantities (its Km(pH) is the ionization of a dissolved
+  Michaelis complex) and an ionization class acting on a solid substrate,
+  molar units on substrate-side rows, `vmax` and the enzyme, composite
+  (`mixed_solid`, `solid_biomass`) and `unknown` states, a wrong yield or amount
+  basis, adsorption, binding-capacity and surface quantities in `kinetics.csv`
+  and the corresponding `substrates.csv` columns (with a dedicated message, not
+  the generic unsupported-column one), and `timecourse.csv` rows. Generated
+  substrate records carry the real physical state; templates carry the
+  apparent-law limitation (Km not a binding constant, constants preparation-
+  and loading-specific, no adsorption or partitioning, surface area,
+  crystallinity, synergy, product inhibition or LPMO action), either "no
+  conversion-dependent slowdown is represented" or the reactivity limitation
+  citing `KADAM_2004_SOURCE`, a g/g product-map note and a dry-mass validity
+  note; gap units and measurement requests use dry-mass wording and never
+  suggest the activity routes on a solid.
+- `screening/case_builder.py`, generic fix (a): the Michaelis-Menten (and
+  pH-ionization) assembler wrote every substrate entity as `generic_dissolved`,
+  `physical_state: dissolved`, `default_degradation_model:
+  homogeneous_dissolved`. It now reads the registry substrate's physical state
+  through the existing `_configured_physical_state`: dissolved keeps exactly
+  those labels, anything else gets `generic_solid`, its own state and an
+  `unknown` degradation model (no branch on substrate names).
+  `_template_process_modifiers` accepts `substrate_reactivity` with
+  `substrate_state_role`, `reference_concentration_role` and `exponent_role`,
+  none defaulted.
+- Generic fix (b) was verified and **not made, because the defect does not
+  exist**: the overlay keeps the parent registry class unchanged beside the new
+  `<dataset>__<class>` record, so nothing overwrites the parent's
+  `compatible_processes`. The namespaced copy deliberately lists only the law
+  its dataset generates compatibility records for; inheriting the parent's list
+  (for `cellulase_total_filter_paper_activity`, `culture_physiology`) would make
+  every case of the copy `underparameterized`, because preflight looks for a
+  compatibility record of every listed law. A test pins both facts with a
+  counterfactual registry.
+- `data_registry/enzymes/enzyme_classes.yml`: new class `cellobiohydrolase`
+  (EC 3.2.1.91; aliases `cellulose 1,4-beta-cellobiosidase`, `EC 3.2.1.91`,
+  `3.2.1.176`, `EC 3.2.1.176` so the reducing-end EC resolves too, explained in
+  the notes; bond class `beta_1_4_glycosidic`; substrate classes
+  `cellulose_particulate` and `cellulose_film_generic`, the registry's existing
+  insoluble cellulose classes; process `homogeneous_michaelis_menten`;
+  provenance IUBMB ExplorEnz EC 3.2.1.91/3.2.1.176 and CAZy GH6/GH7, Drula et
+  al. 2022; maturity `literature_metadata`; no kinetic value, parameter or
+  compatibility record). The CAZy family map is unchanged; no endoglucanase or
+  LPMO record.
+- `api/user_data_assembly.py`: a requested substrate of `user_data` that is
+  not dissolved is refused (drafts carry no `amount_basis`, so the row would
+  lose its basis).
+- Docs: `docs/user-data.md` section "Solid substrates" (declaration, units,
+  worked example, dose route, reactivity, refusals, scientific mode, limits)
+  and updates to the substrates, kinetics, genome, UniProt, generated-records,
+  gaps, time-course and limitations text; `docs/capabilities.md`, README
+  capability row and user-data subsection, `data_registry/README.md`,
+  changelog (Added, Fixed); fixture READMEs of `genome_case` and
+  `uniprot_case`.
+
+Tests: new `tests/test_user_data_solid_substrates.py` (24 test functions, 52 cases) with
+the fixture `tests/fixtures/user_data/solid_case/` (the registry's apparent
+hydrolysis constants re-entered as estimates on a user-defined particulate
+substrate, 20 g/L design, doses 5 and 1.25 FPU/g, reactivity exponent 1 as an
+assumption). Parity: the registry culture case, with cellulase synthesis and
+loss set to zero and the initial filter-paper activity set to 100 FPU/L
+through `value_overrides` (the culture's enzyme pool otherwise changes in
+time, so parity is not exact by construction), gives the same cellulose
+trajectory as the user case without the exponent (largest difference
+6.3e-8 g/L over 97 points; both within rtol 1e-6 of the Lambert W
+solution). Analytic: the integrated law at 100 and 25 FPU/L with mass closure
+`S + P/Y = S0`; with `n` = 1 and 2.5 the simulated times match an independent
+quadrature of `dt = dS / r(S)` to 1e-5 (and the closed form for `n` = 1). Dose
+route: derived values, provenance, weaker maturity, range scaling, the
+`FPU/kg` factor and a protein-mass dose. Reactivity: `S0` is the case's
+initial-substrate symbol. Fix (a): solid entity labels, and the BGL1A
+scientific config digest equals the base commit's. Fix (b): parent unchanged,
+counterfactual underparameterized. Modes: scientific with measured, literature
+and design inputs, exploratory once the exponent, the dose or `km` is an
+estimate. A user-defined endo-xylanase-like class on a user-defined xylan-like
+solid (protein-mass enzyme, estimates) runs exploratory and is refused in
+scientific mode. Genome and UniProt routes: GH7 / EC 3.2.1.91 cellobiohydrolase
+becomes four gaps with dry-mass requests on an added particulate substrate;
+EC 3.2.1.176 resolves through the alias and GH7 with EC 3.2.1.4 is a
+disagreement. 26 parametrized refusals with file, row and column, plus the
+refusals on dissolved substrates, of an ionization class acting on a solid and
+of solid time courses, the assembly refusal and
+the registry record. The records of the four dissolved fixtures hash to the
+values computed with base commit 5ac677e, and (checked with a script against
+an export of that commit) their assembled exploratory configs are
+byte-identical before and after.
+
+Changed expectations (all because `cellobiohydrolase` now has a registry
+record, except the last):
+`tests/test_user_data_genome.py` (the strain's classes gain
+`cellobiohydrolase` between `beta_glucosidase` and `cellulase_generic`; it is
+in `genome_resolved_classes` and no longer in `unmodellable_enzyme_classes`,
+whose expected set is endo-xylanase, glucoamylase and laccase; generated
+enzyme classes 2 -> 3; with `min_tools_agreeing` 2 and 3 the GH7 gene, called
+by three tools, keeps the class; the "no registry class" refusal now uses a
+GH10-only annotation), `tests/test_user_data_uniprot.py` (classes and resolved
+set gain it; `X0TEST05` moves from CAZy-only to agreeing CAZy and EC, so
+`protein_counts` become `cazy_and_ec` 2 and `cazy` 3; `ec_comparable_classes`
+gain it; 3.2.1.91 leaves `unresolved_ec_numbers`; `X0TEST04` contests both
+classes; `unmodellable_enzyme_classes` is glucoamylase only; generated enzyme
+classes 2 -> 3; the refusal export uses `X0TEST09` instead of `X0TEST05`),
+`tests/test_user_data_assembly.py` (the G1 repertoire gains
+`cellobiohydrolase`, reported as not acting on cellobiose; three classes
+without a record), `tests/test_capability_resolution.py` (cellobiohydrolase
+is modellable; LPMO stays without a model), and
+`tests/test_user_data_import.py` (a `solid_polymer` registry substrate is no
+longer refused for its state; the row is now refused for its mol/mol yield and
+missing `amount_basis`, and a `toy_solid` registry substrate is refused for
+its state). The guardrail token list gains `xylan` and `celufloc`. The
+assembled-config snapshot is unchanged and passes.
+
+Commands and results: `ruff check src tests scripts/run_*.py
+scripts/reproduce_paper.py` clean; `pyright` on the three changed source
+files 0 errors; `mkdocs build --strict` passes (site removed); targeted run
+(`tests/test_user_data_*.py`, `tests/test_registry_*.py`,
+`tests/test_guardrails_*.py`, case-builder, class-selection, config-driven
+assembly, organism-case, culture-process, capability-resolution, reactivity,
+docs-sync, instruction-hierarchy, hygiene, CLI, modelability, packaging,
+release, quality-config, BGL1A, Reaction 618, virtual-experiment and canonical
+API tests): 846 passed; full suite (`pytest`, run with nohup): 2415 passed in 46 min.
+
+Not changed: no process law, modifier, solver, family mapping or output table
+schema; the surface-catalysis assembler and its geometry fallbacks are
+untouched; the SABIO-RK and assembly drafting routes stay dissolved-only;
+datasets with dissolved substrates generate byte-identical records and
+configs; user data never reaches `data_registry`.
+
+Scientific impact: laboratory data on insoluble polymers (dry-mass loadings,
+protein or assay-unit enzyme amounts, loadings per gram) reach a simulation
+through a law FungMod already implements, with every amount's basis explicit
+and dimensions checked by pint, and with the law's apparent, loading-specific
+nature stated in every template. Nothing is converted between mass, moles and
+assay units. The `cellobiohydrolase` record turns a genome- or
+proteome-resolved CBH from an unmodellable class into explicit measurement
+requests on a solid cellulose substrate; it adds no kinetic value.
+
+Compatibility: additive for datasets (new optional column and quantities);
+refusal messages for non-dissolved physical states changed wording. Genome and
+UniProt outputs change wherever GH6/GH7 or EC 3.2.1.91/3.2.1.176 occur (listed
+above). Shipped and dissolved configs are byte-identical.
+
+Limitations: one polymer per substrate as a bulk dry mass; no adsorption or
+enzyme partitioning, Langmuir surface law, synergy, product inhibition or LPMO
+kinetics; constants are apparent and not extrapolated by any check; no time
+courses or fits on solids; the process class's own validity text still reads
+"Dissolved, well-mixed" (the template limitations override it in outputs, as
+for the registry culture case).
+
+Ambiguities: whether `cellulose_film_generic` (the BIO-001 scaffold class)
+belongs among the record's substrate classes; it is an insoluble cellulose
+class of the registry, so it was included. `3.2.1.176` is an alias of the
+record rather than a second record, so both EC numbers name one class.
+
+Risk: medium-low. Most changes are additive and refused on malformed input;
+the record changes genome and UniProt outputs for GH6/GH7, which the updated
+tests pin.
+
+Recommended next task: USERDATA-010 (numbered USERDATA-009 when this entry was written; that number went to the culture route), the Langmuir surface law for user data:
+refactor `_surface_catalysis_config_data` to the template-driven pattern (no
+BIO-001 or toy branch, no geometry fallback, scientific mode) and accept
+adsorption constant, surface rate constant and accessible area on a solid
+substrate in the amount convention.
+
 ## ASSEMBLE-001 One Dataset For Fungus, Substrate And Conditions
 
 Status: `complete` for the stated scope (2026-10-06). The step the owner's goal
