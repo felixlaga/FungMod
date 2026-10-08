@@ -1131,3 +1131,61 @@ def test_run_simulates_the_culture_from_the_command_line(capsys: pytest.CaptureF
     assert code == EXIT_NOT_RUNNABLE
     assert "underparameterized" in out
     assert not (tmp_path / "scientific").exists() or not any((tmp_path / "scientific").iterdir())
+
+
+def _estimates_run(directory: Path, output: Path) -> Any:
+    return virtual_experiment(
+        fungi=["strain_x1"],
+        substrates=["xylan_lot_x1"],
+        environments=["c25"],
+        registry=REGISTRY_INDEX,
+        user_data=directory,
+    ).simulate(mode="exploratory", n_samples=1, seed=4, output_dir=output, quicklook=False)
+
+
+@pytest.mark.parametrize(("value", "units"), [("350", "mg/g"), ("35", "percent")])
+def test_a_biomass_yield_in_scaled_dimensionless_units_is_a_plain_fraction(
+    tmp_path: Path, value: str, units: str
+) -> None:
+    """350 mg/g and 35 percent are 0.35 g/g: the bound and the product-map coefficient use the converted value."""
+
+    edited = _copy_fixture(
+        tmp_path / "scaled",
+        ESTIMATES,
+        edits={
+            CULTURE_TABLE: _culture(ESTIMATES, change={("biomass_yield", ""): {"value": value, "units": units}})
+        },
+    )
+    reference = _trajectories(_estimates_run(ESTIMATES, tmp_path / "reference"))
+    scaled = _trajectories(_estimates_run(edited, tmp_path / "scaled_run"))
+    assert reference.keys() == scaled.keys()
+    for key, (times, values, state_units) in reference.items():
+        np.testing.assert_array_equal(scaled[key][0], times)
+        np.testing.assert_allclose(scaled[key][1], values, rtol=1e-9, atol=1e-12)
+        assert scaled[key][2] == state_units
+
+
+def test_a_biomass_yield_above_one_in_scaled_units_is_refused(tmp_path: Path) -> None:
+    culture = _culture(ESTIMATES, change={("biomass_yield", ""): {"value": "1200", "units": "mg/g"}})
+    issues = _issues(tmp_path, {CULTURE_TABLE: culture}, source=ESTIMATES)
+    assert _has_issue(
+        issues, CULTURE_TABLE, _line(ESTIMATES, "biomass_yield", condition="c25"), "value", "must not exceed 1 g/g"
+    )
+
+
+def test_a_small_biomass_yield_in_mg_per_g_is_not_read_as_grams_per_gram(tmp_path: Path) -> None:
+    """0.5 mg/g passes the bound either way; it must act as 0.0005 g/g, never as 0.5 g/g."""
+
+    def run(value: str, units: str, name: str) -> dict[tuple[str, str], tuple[np.ndarray, np.ndarray, str]]:
+        change = {("biomass_yield", ""): {"value": value, "units": units}}
+        edited = _copy_fixture(tmp_path / name, ESTIMATES, edits={CULTURE_TABLE: _culture(ESTIMATES, change=change)})
+        return _trajectories(_estimates_run(edited, tmp_path / f"{name}_run"))
+
+    milligrams = run("0.5", "mg/g", "milligrams")
+    grams = run("0.0005", "g/g", "grams")
+    misread = run("0.5", "g/g", "misread")
+    environment = "culture_estimates__c25"
+    np.testing.assert_allclose(
+        milligrams[(environment, "biomass")][1], grams[(environment, "biomass")][1], rtol=1e-9, atol=1e-12
+    )
+    assert not np.allclose(milligrams[(environment, "biomass")][1], misread[(environment, "biomass")][1])
