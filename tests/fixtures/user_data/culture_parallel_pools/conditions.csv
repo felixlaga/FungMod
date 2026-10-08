@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c28_ph5,28,degC,5.0,Illustrative batch culture condition

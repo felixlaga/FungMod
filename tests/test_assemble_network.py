@@ -48,6 +48,7 @@ from fungal_model.api.user_data_assembly import (
     NETWORK_COMPLETE,
     NETWORK_CONDITION_STATUSES,
     NETWORK_KINETICS_COLUMNS,
+    _NETWORK_LIMITATIONS,
     AssembledTablesDraft,
     UserTablesAssemblyError,
     _Assembler,
@@ -338,7 +339,27 @@ def _baseline_drafts() -> dict[str, Any]:
     }
 
 
-def _draft_digest(draft: AssembledTablesDraft) -> str:
+# The last limitation of a network draft without response laws until ASSEMBLE-003. Since NETWORK-003 binds
+# responses.csv laws to network processes and ASSEMBLE-003 carries them into drafts, a network draft without laws says
+# instead that no law is bound (_NETWORK_LIMITATIONS[-1], NETWORK-003's wording). Network drafts pinned before then are
+# compared with this one sentence put back (``put_back=True``), which shows that nothing else changed.
+NETWORK_LIMITATION_BEFORE_ASSEMBLE_003 = (
+    "Response laws, the pH-ionization form, cultures and time courses are not combined with an enzyme network in "
+    "this version; the network's kinetics apply at the condition of their rows."
+)
+
+
+def _with_network_limitation_put_back(text: str, *, count: int) -> str:
+    """``text`` with the no-law network limitation of ASSEMBLE-003 replaced by the sentence it replaced."""
+
+    new, old = (
+        json.dumps(sentence)[1:-1] for sentence in (_NETWORK_LIMITATIONS[-1], NETWORK_LIMITATION_BEFORE_ASSEMBLE_003)
+    )
+    assert text.count(new) == count and old not in text
+    return text.replace(new, old)
+
+
+def _draft_digest(draft: AssembledTablesDraft, *, put_back: bool = False) -> str:
     payload = {
         "files": draft.file_texts(),
         "annotations": {
@@ -346,7 +367,11 @@ def _draft_digest(draft: AssembledTablesDraft) -> str:
         },
         "dict": draft.to_dict(),
     }
-    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+    text = json.dumps(payload, sort_keys=True)
+    if put_back:
+        # The sentence is in review.md and in assembly["limitations"], nowhere else.
+        text = _with_network_limitation_put_back(text, count=2)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 @pytest.mark.parametrize("name", sorted(DRAFT_DIGESTS_56C8DF4))

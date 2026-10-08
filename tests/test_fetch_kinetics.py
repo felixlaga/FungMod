@@ -79,6 +79,7 @@ from tests.test_assemble_network import (
     TIME_GRID,
     _draft_digest,
     _registry_chain_draft,
+    _with_network_limitation_put_back,
     _with_registry_chain,
     _without_network_block,
 )
@@ -124,7 +125,8 @@ K4 = "Synthetic kinetics organism K4"
 NO_EC_CLASS = "test_maltose_hydrolase_without_ec"
 
 # SHA-256 over the files, annotation digests and to_dict() of drafts WITHOUT fetch_kinetics, computed at 8a35ae5 (the
-# base of FETCH-002, before the lookup existed) with tests/test_assemble_network.py's _draft_digest.
+# base of FETCH-002, before the lookup existed) with tests/test_assemble_network.py's _draft_digest; the network drafts
+# with the no-law network limitation of ASSEMBLE-003 put back (NETWORK-003 binds laws to network processes).
 DRAFT_DIGESTS_8A35AE5 = {
     "g1_two_sources_duplicates": "89ef2e6515fc4658b149eed116da909fd131bb8e52f83c772d2322e32f945263",
     "g1_same_species": "2f28b12bb89e135f5e8e17cc2b786442255ef216c2128d6671e390382db1013a",
@@ -133,7 +135,8 @@ DRAFT_DIGESTS_8A35AE5 = {
     "network_user_chain": "5ddbb776dc0f6132a441ea6ee64dc5bf7b697363b03e7cc9e1dd4b36f10cc73f",
     "network_parallel_user_data": "8afb53c686c28285d858e034d6d0b1a9d186d4b4c26f19bda21f16e7c821cf67",
 }
-# SHA-256 of the stdout of a network assemble of the user chain (no --fetch-kinetics), run at 8a35ae5.
+# SHA-256 of the stdout of a network assemble of the user chain (no --fetch-kinetics), run at 8a35ae5; compared with the
+# no-law network limitation of ASSEMBLE-003 put back, as for the network drafts above.
 CLI_NETWORK_STDOUT_DIGEST_8A35AE5 = "832f02d076447f6e4ddf10eaab162d29fc2299ea2bace4e0f2d8e4602984de4e"
 
 
@@ -815,7 +818,7 @@ def _baseline_drafts(tmp_path: Path) -> dict[str, Any]:
 @pytest.mark.parametrize("name", sorted(DRAFT_DIGESTS_8A35AE5))
 def test_drafts_without_fetch_kinetics_are_byte_identical_to_the_base_commit(name: str, tmp_path: Path) -> None:
     draft = _baseline_drafts(tmp_path)[name]()
-    assert _draft_digest(draft) == DRAFT_DIGESTS_8A35AE5[name]
+    assert _draft_digest(draft, put_back="network" in draft.assembly) == DRAFT_DIGESTS_8A35AE5[name]
     assert "kinetics_lookup" not in draft.assembly
     assert all(item["kind"] == "sabiork" for item in draft.assembly["sources"])
 
@@ -849,6 +852,7 @@ def test_a_network_assemble_without_fetch_kinetics_prints_what_it_printed_before
         "chain_draft",
     )
     assert code == EXIT_OK, err
+    out = _with_network_limitation_put_back(out, count=1)
     assert hashlib.sha256(out.encode("utf-8")).hexdigest() == CLI_NETWORK_STDOUT_DIGEST_8A35AE5
 
 

@@ -509,12 +509,13 @@ Enzyme classes resolved from them: 5
 ```
 
 `check-data` also prints a dataset's cultures (one row per strain and
-culture substrate, with the consuming pool, every enzyme pool and the
+culture substrate, with the consuming pool or pools, every enzyme pool and the
 `culture.csv` rows; see
 [fungal culture](user-data.md#fungal-culture-growth-and-secretion)), its
 enzyme networks (each entry's chain of pools with the yields and strains, a
 unit-bearing yield with its evidence type, for example `(3.0838 mmol/g, estimate)`, and
-one row per process with its class, pool, rate form and competitive inhibitor;
+one row per process with its class, pool, rate form and competitive inhibitor,
+plus its response laws when `responses.csv` binds any;
 see [several enzymes acting together](user-data.md#several-enzymes-acting-together)), its time
 courses (one row per series, with its points, time range, units and how many
 observations carry an `sd`) and, for a fitted dataset, the fitted values with
@@ -732,14 +733,13 @@ prints, in its network block:
     oligomer_hydrolase_like on oligomer_o1: temperature_arrhenius_reference (reference_temperature 30 degC) from the responses argument; at_reference: c30_ph5: 30 degC equals reference_temperature 30 degC
   c30_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated)
   c40_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated; an EnvironmentGrid condition, not a conditions.csv row: the laws carry the kinetics of c30_ph5)
-  check-data: load_user_dataset of this version refuses responses.csv in an enzyme_network dataset (its message is in the limitations below); assemble without --network, with each pool a law names as a --substrate, to run the laws as single-class cases
 ```
 
 and its next steps run `--condition c30_ph5` and the grid `--temperature-c 40
---ph 5`. `check-data` of this version refuses the draft with the loader's
-message (`responses.csv:-:-: responses.csv is not combined with
-enzyme_network in this version: ...`, exit code 2), its only issue once the
-reviewer is filled in.
+--ph 5`. Once its reviewer is filled in, `check-data` lists the network with a
+`response laws` column (each law on its process), and the grid run reports
+`environment effect: active_response_model` and 50 % of the entry degraded in
+112.4 minutes at 40 degC, against 64.77 minutes at `c30_ph5`.
 
 ## From a fungus name: its UniProt reference proteome
 

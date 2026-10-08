@@ -1,0 +1,9 @@
+strain_id,enzyme_class,substrate_id,law,parameter,value,units,evidence_type,method,source,reference_tolerance,kinetics_at_reference
+strain_n1,depolymerase_like,polymer_p1,temperature_cardinal_rosso,minimum_temperature,5,degC,estimate,,Illustrative test note NW-2 p. 5,,
+strain_n1,depolymerase_like,polymer_p1,temperature_cardinal_rosso,optimum_temperature,30,degC,estimate,,Illustrative test note NW-2 p. 5,,
+strain_n1,depolymerase_like,polymer_p1,temperature_cardinal_rosso,maximum_temperature,45,degC,estimate,,Illustrative test note NW-2 p. 5,,
+strain_n1,depolymerase_like,polymer_p1,ph_cardinal_rosso,minimum_ph,3,dimensionless,estimate,,Illustrative test note NW-2 p. 6,,
+strain_n1,depolymerase_like,polymer_p1,ph_cardinal_rosso,optimum_ph,5,dimensionless,estimate,,Illustrative test note NW-2 p. 6,,
+strain_n1,depolymerase_like,polymer_p1,ph_cardinal_rosso,maximum_ph,8,dimensionless,estimate,,Illustrative test note NW-2 p. 6,,
+strain_n1,oligomer_hydrolase_like,oligomer_o1,temperature_arrhenius_reference,activation_energy,50,kJ/mol,estimate,,Illustrative test note NW-2 p. 7,,
+strain_n1,oligomer_hydrolase_like,oligomer_o1,temperature_arrhenius_reference,reference_temperature,30,degC,estimate,,Illustrative test note NW-2 p. 7,,

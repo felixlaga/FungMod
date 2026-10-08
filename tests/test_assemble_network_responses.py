@@ -11,18 +11,18 @@ constants sit at each law's reference condition; a law carries a member's
 kinetics to another requested condition (an ``EnvironmentGrid`` condition) only
 from there, exactly as a single-class draft carries a case.
 
-The loader of this version (``load_user_dataset``) refuses ``responses.csv`` in
-an ``enzyme_network`` dataset: binding laws to network processes is NETWORK-003
-(open pull request #125). The draft content is asserted here; the load of a
-drafted network with laws is a strict ``xfail`` until that loader lands, and a
-separate test pins the loader's existing refusal while it stands.
+``load_user_dataset`` binds each law to the network process of its class and
+pool (NETWORK-003), so the reviewed draft loads and runs: the draft of the plain
+chain with the laws below is the same network, laws included, as NETWORK-003's
+hand-written ``network_chain_laws`` fixture, and simulates like it at a
+requested ``EnvironmentGrid`` condition.
 
 Inputs: the ``network_chain`` fixture without its ``enzyme_network`` block (two
 user-defined classes on a soluble polymer-like substrate and the oligomer-like
 pool it releases; illustrative estimates at 30 degC, pH 5), the illustrative
-``oxidase_case`` dataset, the frozen SABIO-RK Reaction 618 export, and law rows
-written by the tests with the illustrative values of NETWORK-003's
-``network_chain_laws`` fixture (a cardinal temperature law 5/30/45 degC and a
+``oxidase_case`` dataset, the frozen SABIO-RK Reaction 618 export, the
+``network_chain_laws`` fixture, and law rows written by the tests with its
+illustrative values (a cardinal temperature law 5/30/45 degC and a
 cardinal pH law 3/5/8 on the first class, an Arrhenius law of 50 kJ/mol at
 30 degC on the second). Nothing here is a measurement.
 """
@@ -42,9 +42,8 @@ from typing import Any
 
 import pytest
 
-from fungal_model import UserDataError, assemble_user_tables, load_user_dataset
+from fungal_model import assemble_user_tables, load_user_dataset
 from fungal_model.api.user_data_assembly import (
-    _LOADER_NETWORK_LAW_REFUSAL,
     NETWORK_BLOCKED,
     NETWORK_COMPLETE,
     NETWORK_REFERENCE_STATUSES,
@@ -60,16 +59,20 @@ from fungal_model.sources.sabiork import fetch as sabiork_fetch
 from tests.test_assemble_network import (
     C30_PH5,
     C40_PH5,
+    FIXTURES,
     OXIDASE,
     REGISTRY_INDEX,
     _cli,
     _draft_digest,
+    _network_shape,
     _only,
     _registry_chain_draft,
     _review,
     _with_registry_chain,
 )
 from tests.test_fetch_kinetics import _plain_chain
+
+CHAIN_LAWS = FIXTURES / "network_chain_laws"
 
 C50_PH5 = {"temperature": 50, "temperature_units": "degC", "ph": 5}
 C50_PH6 = {"temperature": 50, "temperature_units": "degC", "ph": 6}
@@ -136,8 +139,9 @@ ARRHENIUS = [
 LAWS = [*CARDINAL_T, *CARDINAL_PH, *ARRHENIUS]
 
 # SHA-256 (tests/test_assemble_network.py's _draft_digest) of drafts WITHOUT the new combination (a network draft with
-# response laws), computed at 524df39, the base of ASSEMBLE-003: single-class drafts with laws, and network drafts
-# without laws, stay byte-identical.
+# response laws), computed at 524df39, the base of ASSEMBLE-003: single-class drafts with laws stay byte-identical, and
+# so do network drafts without laws once their last limitation is put back (put_back: with NETWORK-003 it says that no
+# response law is bound instead of that laws are not combined with a network).
 DRAFT_DIGESTS_524DF39 = {
     "ox_args": "865ceba603e567b62340f08876eab1351172e7c44cf80babcd15550d3395f85b",
     "ox_t_only": "98561abe0d76ae866143a258e819577a712633af9c919d9b137976a98263a585",
@@ -252,7 +256,7 @@ def _baseline_drafts(tmp_path: Path) -> dict[str, Callable[[], AssembledTablesDr
 @pytest.mark.parametrize("name", sorted(DRAFT_DIGESTS_524DF39))
 def test_drafts_without_the_new_combination_are_byte_identical_to_the_base_commit(name: str, tmp_path: Path) -> None:
     draft = _baseline_drafts(tmp_path)[name]()
-    assert _draft_digest(draft) == DRAFT_DIGESTS_524DF39[name]
+    assert _draft_digest(draft, put_back="network" in draft.assembly) == DRAFT_DIGESTS_524DF39[name]
     if "network" in draft.assembly:
         assert not draft.responses
         assert all(
@@ -446,18 +450,21 @@ def test_laws_are_written_against_the_members_they_name_and_carry_kinetics_from_
     }
     network = draft.assembly["network"]
     assert network["reference_condition_meaning"] == dict(NETWORK_REFERENCE_STATUSES)
-    assert network["loader_refusal"] == (_LOADER_NETWORK_LAW_REFUSAL or None)
+    assert "loader_refusal" not in network
 
-    # The limitations say what the laws scale, and (while it does) that this loader refuses them, in its words.
+    # The limitations say what the laws scale; nothing says that the loader refuses them (NETWORK-003 binds them).
     limitations = draft.assembly["limitations"]
     assert any(
         text.startswith("Response laws in an enzyme network draft: each responses.csv law") for text in limitations
     )
     assert not any(text.startswith("Response laws, the pH-ionization form") for text in limitations)
-    assert any(text.startswith("The pH-ionization form, cultures and time courses") for text in limitations)
-    refused = [text for text in limitations if text.startswith("load_user_dataset of this version refuses")]
-    assert len(refused) == (1 if _LOADER_NETWORK_LAW_REFUSAL else 0)
-    assert all(_LOADER_NETWORK_LAW_REFUSAL in text for text in refused)
+    assert (
+        "The pH-ionization form, cultures and time courses are not combined with an enzyme network in this version."
+    ) in limitations
+    assert not any(
+        "refuses responses.csv" in text or "no temperature or pH response law" in text for text in limitations
+    )
+    assert "refuses responses.csv" not in draft.review
 
     review = draft.review.split("## Enzyme network", 1)[1].split("\n## ", 1)[0]
     assert (
@@ -475,41 +482,65 @@ def test_laws_are_written_against_the_members_they_name_and_carry_kinetics_from_
     assert [item["column"] for item in draft.review_fields] == ["contributor"]
 
 
-# LOAD EXPECTATION. The draft above is what a loader that binds responses.csv laws to the network process of their
-# class and pool reads (NETWORK-003, open pull request #125). The loader of this version refuses responses.csv in an
-# enzyme_network dataset with its existing message (pinned below by
-# test_check_data_refuses_the_drafted_laws_with_the_loaders_message), so this load fails here with UserDataError.
-# When #125 lands it passes, the strict xfail flips, and the marker is removed then.
-@pytest.mark.xfail(strict=True, raises=UserDataError, reason="loader binds network laws only with NETWORK-003 (#125)")
-def test_a_reviewed_network_draft_with_laws_loads_with_each_law_on_its_process(tmp_path: Path) -> None:
+def _time_to_half(out: str) -> str:
+    (line,) = [line for line in out.splitlines() if line.strip().startswith("time_to_50_percent_substrate_degradation")]
+    return line.split(maxsplit=1)[1]
+
+
+def test_the_reviewed_draft_loads_and_runs_like_the_hand_written_network_with_laws(tmp_path: Path) -> None:
     directory = tmp_path / "chain_laws_draft"
     _chain(_plain_chain(tmp_path), responses=LAWS).write(directory)
     _review(directory)
+    # The drafted laws are, row for row, the responses.csv of NETWORK-003's hand-written fixture.
+    assert _rows_of(directory / "responses.csv") == _rows_of(CHAIN_LAWS / "responses.csv")
+
+    # load_user_dataset binds each law to the network process of its class and pool: the same network as the fixture.
     dataset = load_user_dataset(directory, registry=REGISTRY_INDEX)
-    network = _only(dataset.enzyme_networks)
+    assert _network_shape(dataset) == _network_shape(load_user_dataset(CHAIN_LAWS, registry=REGISTRY_INDEX))
     assert {
-        (process["enzyme_class"], process["pool"]): list(process["response_laws"]) for process in network["processes"]
+        (process["enzyme_class"], process["pool"]): list(process["response_laws"])
+        for process in _only(dataset.enzyme_networks)["processes"]
     } == {
         ("depolymerase_like", "polymer_p1"): ["temperature_cardinal_rosso", "ph_cardinal_rosso"],
         ("oligomer_hydrolase_like", "oligomer_o1"): ["temperature_arrhenius_reference"],
     }
-
-
-@pytest.mark.skipif(not _LOADER_NETWORK_LAW_REFUSAL, reason="the loader binds laws to network processes (NETWORK-003)")
-def test_check_data_refuses_the_drafted_laws_with_the_loaders_message(tmp_path: Path) -> None:
-    directory = tmp_path / "chain_laws_draft"
-    _chain(_plain_chain(tmp_path), responses=LAWS).write(directory)
-    _review(directory)
-    code, _out, err = _cli("check-data", directory, "--registry", REGISTRY_INDEX)
-    assert code == EXIT_USAGE
-    # The only issue is the loader's existing refusal of responses.csv in an enzyme_network dataset.
-    assert "is invalid. 1 issue(s):" in err
-    assert f"responses.csv:-:-: {_LOADER_NETWORK_LAW_REFUSAL}" in err
-    # Without the laws the same draft loads as a network (the rest of it is what the loader reads today).
-    (directory / "responses.csv").unlink()
     code, out, err = _cli("check-data", directory, "--registry", REGISTRY_INDEX)
     assert code == EXIT_OK, err
-    assert "Enzyme networks (user_dataset.yml enzyme_network" in out
+    assert "temperature_cardinal_rosso, ph_cardinal_rosso" in out
+
+    # The printed next step for 40 degC is a grid run: the laws carry the kinetics of c30_ph5 there, and the draft
+    # simulates exactly as the fixture does (slower than at 30 degC: 45 degC is the depolymerase's cardinal maximum).
+    def run(user_data: Path, output: str, *condition: str) -> str:
+        code, out, err = _cli(
+            "run",
+            "--user-data",
+            user_data,
+            "--fungus",
+            "strain_n1",
+            "--substrate",
+            "polymer_p1",
+            *condition,
+            "--registry",
+            REGISTRY_INDEX,
+            "--mode",
+            "exploratory",
+            "--samples",
+            "1",
+            "--seed",
+            "1",
+            "--no-plots",
+            "--output",
+            tmp_path / output,
+        )
+        assert code == EXIT_OK, err
+        assert "active_response_model" in out
+        return _time_to_half(out)
+
+    grid = ("--temperature-c", "40", "--ph", "5")
+    at_grid = run(directory, "draft_40", *grid)
+    assert at_grid == run(CHAIN_LAWS, "fixture_40", *grid)
+    assert run(directory, "draft_30", "--condition", "c30_ph5").startswith("64.77 ")
+    assert not at_grid.startswith("64.77 ")
 
 
 # ---------------------------------------------------------------------------
@@ -835,9 +866,7 @@ def test_the_command_line_drafts_a_network_with_laws(tmp_path: Path, monkeypatch
         "  c40_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated; an EnvironmentGrid "
         "condition, not a conditions.csv row: the laws carry the kinetics of c30_ph5)"
     ) in out
-    assert ("  check-data: load_user_dataset of this version refuses responses.csv" in out) == bool(
-        _LOADER_NETWORK_LAW_REFUSAL
-    )
+    assert "refuses responses.csv" not in out
     # The next steps run the conditions.csv row and the EnvironmentGrid condition; nothing is blocked.
     run_lines = [line.strip() for line in out.splitlines() if line.strip().startswith("fungmod run ")]
     assert len(run_lines) == 2

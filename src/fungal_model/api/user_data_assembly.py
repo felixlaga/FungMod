@@ -72,8 +72,8 @@ the law's reference condition (the loader's rule: equal, within the
 ``kinetics_at_reference``); otherwise the member is a gap there, and the report
 says per member whether its drafted kinetic constants are at the reference
 condition. No law is ever derived from kinetics measured at several
-conditions. A loader that refuses ``responses.csv`` in an ``enzyme_network``
-dataset is named in the draft's limitations, in its own words.
+conditions. The reviewed draft loads with each law bound to the network
+process of its class and pool (NETWORK-003).
 
 With ``fetch_kinetics=True`` (FETCH-002) the SABIO-RK entries need not be
 supplied: for every class of the repertoire that acts on a requested substrate
@@ -110,7 +110,6 @@ from typing import Any
 
 from fungal_model.api.user_data import (
     _KINETIC_CONSTANT_QUANTITIES,
-    _NETWORK_TABLE_REFUSALS,
     _UNIPROT_PROTEOME_ID,
     CULTURE_TABLE,
     GENOME_TABLE,
@@ -355,8 +354,10 @@ _NETWORK_LIMITATIONS = (
     "not link is not part of the network.",
     "A network runs only when every member class has kinetics at the condition (all or nothing): a member without "
     "kinetics is a gap that blocks the network there, never a class left out.",
-    "Response laws, the pH-ionization form, cultures and time courses are not combined with an enzyme network in "
-    "this version; the network's kinetics apply at the condition of their rows.",
+    # NETWORK-003 binds responses.csv laws to network processes; a network without laws keeps its rows' condition, in
+    # the loader's words for such a network.
+    "The pH-ionization form, cultures and time courses are not combined with an enzyme network in this version; no "
+    "temperature or pH response law is bound, so the network's kinetics apply at the condition of their rows only.",
 )
 # A network draft that carries response laws (ASSEMBLE-003) replaces the last network limitation by these.
 _NETWORK_LAW_LIMITATIONS = (
@@ -366,12 +367,6 @@ _NETWORK_LAW_LIMITATIONS = (
     "condition of its rows: a requested condition its rows do not state is a gap for it, and the network is blocked "
     "there. A requested condition is an EnvironmentGrid condition only when the laws carry every member there.",
     "The pH-ionization form, cultures and time courses are not combined with an enzyme network in this version.",
-)
-# The loader's own refusal of responses.csv in an enzyme_network dataset, while it has one (USERDATA-010). A network
-# draft with laws then says, in the loader's words, that load_user_dataset refuses it. A loader that binds laws to
-# network processes has no such refusal, and the statement is left out.
-_LOADER_NETWORK_LAW_REFUSAL = next(
-    (message for table, _attribute, message in _NETWORK_TABLE_REFUSALS if table == "responses.csv"), ""
 )
 # The constants a response law requires at its reference condition: the loader's kinetic constants and, in an enzyme
 # network, the competitive inhibition constant of the process (a constant of the rate at that condition, like Km).
@@ -3871,16 +3866,7 @@ class _Assembler:
         if not self.laws:
             output["limitations"] = [*report["limitations"], *_NETWORK_LIMITATIONS]
             return output
-        laws = [*_NETWORK_LIMITATIONS[:-1], *_NETWORK_LAW_LIMITATIONS]
-        if _LOADER_NETWORK_LAW_REFUSAL:
-            laws.append(
-                "load_user_dataset of this version refuses responses.csv in an enzyme_network dataset (its message: "
-                f'"{_LOADER_NETWORK_LAW_REFUSAL}"), so check-data refuses this draft while it holds the laws. Its '
-                "responses.csv rows already name the member class and pool each law scales; to run the laws now, "
-                "assemble without network with each pool a law names as a requested substrate, which binds each law "
-                "to its single-class case."
-            )
-        output["limitations"] = [*report["limitations"], *laws]
+        output["limitations"] = [*report["limitations"], *_NETWORK_LIMITATIONS[:-1], *_NETWORK_LAW_LIMITATIONS]
         return output
 
     def _network_report(
@@ -4026,9 +4012,6 @@ class _Assembler:
         }
         if self.laws:
             report["reference_condition_meaning"] = dict(NETWORK_REFERENCE_STATUSES)
-            # The loader's own refusal of responses.csv in an enzyme_network dataset, while it has one; None once the
-            # loader binds laws to network processes.
-            report["loader_refusal"] = _LOADER_NETWORK_LAW_REFUSAL or None
         return report
 
     def _member_laws(
@@ -4739,7 +4722,7 @@ class _Assembler:
             if not item["members"]:
                 lines.append("| - | - | " + " | ".join("-" for _ in item["conditions"]) + " |")
             lines.append("")
-            if "loader_refusal" in network:
+            if "reference_condition_meaning" in network:
                 lines.extend(self._network_laws_markdown(item))
             for entry in item["conditions"]:
                 blocked = f": {_md_text('; '.join(entry['blocked_by']))}" if entry["blocked_by"] else ""

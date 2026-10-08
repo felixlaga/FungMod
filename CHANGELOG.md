@@ -25,12 +25,11 @@ All notable public releases of FungMod are documented here.
   condition reuses (and `design` writes) the entry's initial concentration on
   the draft's one `conditions.csv` row; `review.md` and the command line show
   the laws per member. No law is derived from SABIO-RK entries measured at
-  several conditions. The loader of this version refuses `responses.csv` in an
-  `enzyme_network` dataset; the draft says so in the loader's words
-  (`assembly["network"]["loader_refusal"]`, a limitation, a command-line line),
-  so `check-data` refuses such a draft until the loader binds laws to network
-  processes. Tests: `tests/test_assemble_network_responses.py` (the load of a
-  drafted network with laws is a strict expected failure until then).
+  several conditions. The reviewed draft loads with each law bound to its
+  network process (NETWORK-003), and runs at the requested `EnvironmentGrid`
+  condition with `active_response_model`. The network limitation of every
+  network draft now says which laws scale which member (with laws) or that no
+  law is bound (without). Tests: `tests/test_assemble_network_responses.py`.
 
 - Kinetics of the enzyme classes a user dataset defines, looked up by their
   own EC numbers (FETCH-003). `user_tables_from_sabiork(user_enzyme_classes=...)`
@@ -54,6 +53,53 @@ All notable public releases of FungMod are documented here.
   `tests/test_fetch_kinetics_user_classes.py` with the user dataset
   `tests/fixtures/user_data/lab_classes_case/` and two synthetic SABIO-RK
   responses (not SABIO-RK data); not verified against live SABIO-RK.
+
+- A growing culture whose secreted pools act together (CULTURE-002): in
+  `culture.csv` every pool whose class acts on the culture substrate now
+  consumes it, each by its own existing homogeneous Michaelis-Menten law with
+  its own `hydrolysis_capacity` and `hydrolysis_half_saturation`; the
+  consumption processes add their rates (no competition for sites, no
+  synergy), every consumed gram feeds growth through the culture's one yield
+  with the closure ledger, and every pool is induced by the substrate with the
+  one shared constant. With several consuming pools the consumption roles are
+  per pool (`hydrolysis_capacity__<class>`), each consuming class gets a
+  compatibility pointing to the one template, the records' enzyme-class
+  selector is empty, and cultures of one substrate whose consuming pools
+  overlap are one model shared by every strain declaring one of its classes;
+  with one consuming pool every identifier, template and config is unchanged
+  (the existing culture fixtures and the shipped *T. harzianum* case assemble
+  byte-identically). Released soluble pools are not part of a culture:
+  FungMod has no uptake law for a soluble pool with an explicit yield that a
+  user table binds, so `culture.csv` stays refused in an `enzyme_network`
+  dataset, now with that reason. `UserDataset.cultures` entries gain
+  `consuming_pools` and `process_compatibility_ids`; `fungmod check-data`
+  lists every consuming pool. Fixtures `culture_parallel_pools` (two pools on a
+  cellulose-like solid and one acting on nothing) and `culture_shared_pools`
+  (two strains, ranges, a gap condition on a chitin-like solid); illustrative
+  estimates only. No new process law, numerics or output schema.
+
+- Temperature and pH response laws inside enzyme networks (NETWORK-003): in a
+  dataset with an `enzyme_network` block, a `responses.csv` row (cardinal
+  temperature, cardinal pH or Arrhenius) binds to the network process of its
+  strain, enzyme class and pool by the single-class rules: the existing
+  environment modifier of the composition builder scales that process's rate
+  and no other, the process's kinetic constants (and its `ki`) are required at
+  the law's reference condition, the law's parameter records (role
+  `<law>__<parameter>__<class>__<pool>`, one per strain, no environment
+  selector) reach `EnvironmentGrid` conditions, a strain without the rows
+  another strain gives gets law gaps with measurement requests, and the case
+  reports `active_response_model` with each law and the process it scales. A
+  process without a law keeps the constants of its rows' condition, and its
+  template says so. Refused, with file, row and column, as for single-class
+  cases (also a `ki` off the reference condition), and a row naming a class the
+  strain does not declare or a pool its class does not act on. `fungmod
+  check-data` adds a `response laws` column to the network table when a law is
+  bound, and `UserDataset.enzyme_networks` lists `response_laws` per process.
+  Fixture `network_chain_laws` (the `network_chain` network with a cardinal
+  temperature and a cardinal pH law on the first class and an Arrhenius law on
+  the second; illustrative estimates only). Networks without `responses.csv`
+  generate and assemble byte-identically (pinned record and config digests);
+  no process law, modifier, solver or output schema changes.
 
 - Kinetics of the fungus's enzyme classes looked up in SABIO-RK by EC number
   (FETCH-002): `assemble_user_tables(fetch_kinetics=True)` and `fungmod
@@ -919,9 +965,14 @@ All notable public releases of FungMod are documented here.
 - ASSEMBLE-003, behaviour: `assemble_user_tables(network=True)` (`fungmod
   assemble --network`) no longer refuses `responses` or the `responses.csv`
   rows of `user_data` on a pool; it writes them against their members (see
-  Added). Drafts without that combination are byte-identical, and so is every
-  single-class draft with laws. Text: `fungmod assemble --help` describes the
-  laws of a network draft. No numerical behaviour changes.
+  Added). Text: the last limitation of a network draft without laws no longer
+  says that response laws are not combined with a network ("The pH-ionization
+  form, cultures and time courses are not combined with an enzyme network in
+  this version; no temperature or pH response law is bound, so the network's
+  kinetics apply at the condition of their rows only.", NETWORK-003's wording);
+  otherwise drafts without laws are byte-identical, and so is every
+  single-class draft with laws. `fungmod assemble --help` describes the laws of
+  a network draft. No numerical behaviour changes.
 
 - FETCH-003, behaviour: a class of `user_data` with a complete EC number is
   now looked up by `fetch_kinetics` (FETCH-002 listed it as not queried), and
@@ -937,6 +988,16 @@ All notable public releases of FungMod are documented here.
   decisions about a `substrates.csv` row it does not write and says instead
   that the user's row is kept; `fungmod assemble --help` describes the lookup
   of user-defined classes. No numerical behaviour changes.
+
+- A culture naming two or more pools that act on its substrate is no longer
+  refused (CULTURE-002); the refusal of a declared class acting on a culture
+  substrate now says how to make it a consuming pool, and the refusal of
+  `culture.csv` in a network dataset gives the missing uptake law as its
+  reason.
+
+- `responses.csv` is no longer refused in an enzyme-network dataset
+  (NETWORK-003); its laws bind per network process (see Added). Assembled
+  network drafts carry them since ASSEMBLE-003 (above).
 
 - Text only (FETCH-002): `fungmod assemble --help` describes `--fetch` as the
   opt-in for the UniProt proteome and the kinetics lookup, and `--cache-dir`

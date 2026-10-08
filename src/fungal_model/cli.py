@@ -2080,7 +2080,7 @@ def _print_assembly_network(network: Mapping[str, Any]) -> None:
                 f"  members on {', '.join(item['undetermined_pools'])} are decided when the reviewed tables are loaded "
                 "(substrate class or bond classes under review)"
             )
-        if "loader_refusal" in network:
+        if "reference_condition_meaning" in network:
             _print_network_laws(item["members"])
         for entry in item["conditions"]:
             blocked = f": {'; '.join(entry['blocked_by'])}" if entry["blocked_by"] else ""
@@ -2097,12 +2097,6 @@ def _print_assembly_network(network: Mapping[str, Any]) -> None:
         for member in item["not_members"]:
             reasons = "; ".join(member["reasons"]) or "the pools are under review"
             print(f"  not a member (acts on no pool of this network): {member['enzyme_class']}: {reasons}")
-    if network.get("loader_refusal"):
-        print(
-            "  check-data: load_user_dataset of this version refuses responses.csv in an enzyme_network dataset (its "
-            "message is in the limitations below); assemble without --network, with each pool a law names as a "
-            "--substrate, to run the laws as single-class cases"
-        )
 
 
 def _print_network_laws(members: Sequence[Mapping[str, Any]]) -> None:
@@ -2411,17 +2405,25 @@ def _print_cultures(dataset: UserDataset) -> None:
         f"Cultures (culture.csv; the strain grows on the substrate and secretes its enzyme pools, "
         f"culture_physiology): {len(dataset.cultures)}"
     )
+    # Several pools may consume the substrate in parallel (CULTURE-002); one keeps the earlier column title.
+    several = any(len(item.get("consuming_pools", ())) > 1 for item in dataset.cultures)
     rows = [
         (
             str(item["strain_id"]),
             str(item["substrate_id"]),
-            str(item["enzyme_class"]),
+            ", ".join(str(pool) for pool in item.get("consuming_pools", (item["enzyme_class"],))),
             ", ".join(str(pool) for pool in item["enzyme_pools"]),
             _rows_text(item["rows"]) if item["rows"] else "none (every role a gap)",
         )
         for item in dataset.cultures
     ]
-    headers = ("strain", "substrate", "consuming pool", "enzyme pools", "culture.csv rows")
+    headers = (
+        "strain",
+        "substrate",
+        "consuming pools" if several else "consuming pool",
+        "enzyme pools",
+        "culture.csv rows",
+    )
     for line in _table(headers, rows):
         print(f"  {line}")
 
@@ -2433,12 +2435,15 @@ def _print_enzyme_networks(dataset: UserDataset) -> None:
         f"Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, "
         f"enzyme_network): {len(dataset.enzyme_networks)}"
     )
+    # The response-law column appears only when a responses.csv law is bound to a process (NETWORK-003).
+    laws = any(process.get("response_laws") for item in dataset.enzyme_networks for process in item["processes"])
     rows = [
         (
             str(process["enzyme_class"]),
             str(process["pool"]),
             str(process["rate_form"]),
             str(process["inhibitor"] or "none"),
+            *((", ".join(process["response_laws"]) or "none",) if laws else ()),
         )
         for item in dataset.enzyme_networks
         for process in item["processes"]
@@ -2452,7 +2457,7 @@ def _print_enzyme_networks(dataset: UserDataset) -> None:
             for link in item["links"]
         )
         print(f"  from {item['entry_substrate']}: {links}; strains {', '.join(item['strains'])}")
-    headers = ("enzyme class", "pool", "rate form", "competitive inhibitor")
+    headers = ("enzyme class", "pool", "rate form", "competitive inhibitor", *(("response laws",) if laws else ()))
     for line in _table(headers, rows):
         print(f"  {line}")
 

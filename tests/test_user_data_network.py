@@ -963,11 +963,7 @@ def test_the_ph_ionization_form_is_refused_in_a_network(tmp_path: Path) -> None:
 
 
 def test_tables_not_combined_with_networks_are_refused(tmp_path: Path) -> None:
-    source = FIXTURES / "oxidase_case"
-    substrate = _rows(source, "substrates.csv")[0]["substrate_id"]
-    manifest = _manifest(source, enzyme_network={"entry_substrates": [substrate]})
-    issues = _issues(tmp_path, source, {"user_dataset.yml": manifest})
-    assert _has_issue(issues, "responses.csv", None, None, "responses.csv is not combined with enzyme_network")
+    # responses.csv binds per network process since NETWORK-003 (tests/test_user_data_network_responses.py).
     culture = FIXTURES / "culture_estimates"
     culture_issues = _issues(
         tmp_path / "culture", culture, {"user_dataset.yml": _manifest(culture, enzyme_network={"entry_substrates": ["xylan_lot_x1"]})}

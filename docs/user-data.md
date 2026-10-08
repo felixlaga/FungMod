@@ -494,15 +494,13 @@ pH laws you state, never through a law fitted to anything (ASSEMBLE-003):
   conditions; with a stated law, several candidates that it could carry are a
   `conflict` until `entry_ids` chooses one. FungMod derives no law and no
   reference condition from them.
-- **What this version's loader does with them.** `load_user_dataset` of this
-  version refuses `responses.csv` in an `enzyme_network` dataset ("responses.csv
-  is not combined with enzyme_network in this version: ..."), so `check-data`
-  refuses a network draft that holds laws; `draft.assembly["network"]["loader_refusal"]`,
-  the limitations and the command line say so. The draft's rows already name
-  the member and pool each law scales, which is what a loader that binds laws
-  to network processes reads. To run the laws now, assemble without `network`
-  with each pool a law names as a requested substrate: each law then binds to
-  its single-class case.
+- **Loaded with its laws.** Once reviewed, `load_user_dataset` binds each law
+  to the network process of its class and pool
+  ([response laws in a network](#response-laws-in-a-network)), so the
+  printed grid command runs the network at the requested `EnvironmentGrid`
+  condition with `active_response_model`. The limitations of a network draft
+  say what the laws scale, or, without laws, that no law is bound and the
+  network's kinetics apply at the condition of their rows only.
 
 With the `my_chain` copy above and a `chain_laws.csv` of the illustrative laws
 of `tests/test_assemble_network_responses.py` (a cardinal temperature law of
@@ -539,11 +537,27 @@ Enzyme network (--network; user_dataset.yml enzyme_network, entry substrates pol
     oligomer_hydrolase_like on oligomer_o1: temperature_arrhenius_reference (reference_temperature 30 degC) from the responses argument; at_reference: c30_ph5: 30 degC equals reference_temperature 30 degC
   c30_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated)
   c40_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated; an EnvironmentGrid condition, not a conditions.csv row: the laws carry the kinetics of c30_ph5)
-  check-data: load_user_dataset of this version refuses responses.csv in an enzyme_network dataset (its message is in the limitations below); assemble without --network, with each pool a law names as a --substrate, to run the laws as single-class cases
 ```
 
 The draft's only `conditions.csv` row is `c30_ph5`, and its next steps run
-`--condition c30_ph5` and the grid `--temperature-c 40 --ph 5`. With the
+`--condition c30_ph5` and the grid `--temperature-c 40 --ph 5`. Its
+`responses.csv` is, row for row, that of the hand-written `network_chain_laws`
+fixture, and once its reviewer is filled in the draft loads as the same
+network, laws included; `fungmod check-data chain_laws_draft` lists:
+
+```text
+Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, enzyme_network): 1
+  from polymer_p1: polymer_p1 -> oligomer_o1 (4 mol/mol), oligomer_o1 -> monomer_m1 (2 mol/mol); strains strain_n1
+  enzyme class             pool         rate form  competitive inhibitor  response laws
+  depolymerase_like        polymer_p1   kcat       none                   temperature_cardinal_rosso, ph_cardinal_rosso
+  oligomer_hydrolase_like  oligomer_o1  kcat       none                   temperature_arrhenius_reference
+```
+
+With `--mode exploratory --samples 8 --seed 1`, the run at `c30_ph5` degrades
+50 % of the entry in 64.77 minutes (the reference condition, where every law's
+factor is one, so the `network_chain` value) and the grid run at 40 degC, pH 5
+in 112.4 minutes (`environment effect: active_response_model`), exactly as the
+fixture does there. With the
 Arrhenius reference temperature stated as 25 degC instead, the oligomer
 hydrolase-like member is `not_at_reference` ("30 degC differs from
 reference_temperature 25 degC by 5 degC; no reference_tolerance is given"),
@@ -1076,7 +1090,9 @@ Each row binds one parameter of one existing environment-response law to a
 strain, enzyme class and substrate. The law enters the generated case template
 as a process modifier, the same mechanism registry templates use, so a
 temperature or pH grid changes the rate through the law and the result tables
-report `environment_effect_status = active_response_model`.
+report `environment_effect_status = active_response_model`. In a dataset with
+an `enzyme_network` block the row binds to the network process of that class on
+that pool, by the same rules ([response laws in a network](#response-laws-in-a-network)).
 
 ```text
 strain_id,enzyme_class,substrate_id,law,parameter,value,units,evidence_type,method,source,reference_tolerance,kinetics_at_reference
@@ -1842,8 +1858,9 @@ substrate and constants. The process laws and the assembler are the existing
 ones; FungMod adds no numerics for user cultures.
 
 ```text
-consumption:   dS/dt = - k_h · E · S / (K_h + S)            (one consuming enzyme pool E)
-growth:        dX/dt = + Y · k_h · E · S / (K_h + S) - k_d · X
+consumption:   r_i = k_h,i · E_i · S / (K_h,i + S)           (each consuming enzyme pool E_i)
+               dS/dt = - sum_i r_i
+growth:        dX/dt = + Y · sum_i r_i - k_d · X
 ledgers:       (1 - Y) of the consumed substrate -> consumed substrate not retained as biomass
                k_d · X                            -> biomass dry mass lost
 each pool P:   dP/dt = + q_P · X · S / (K_ind + S) - k_P · P
@@ -1852,11 +1869,12 @@ each pool P:   dP/dt = + q_P · X · S / (K_ind + S) - k_P · P
 `S` is the substrate's dry mass per volume, `X` the biomass dry mass per volume
 (in the same unit as `S`), and each pool `P` an enzyme amount per volume in its
 own unit: a protein mass (for example `mg/L`) or an activity in one of the
-registry's assay units (`FPU/L`, `BGU/L`). Exactly one pool, the one whose
-class acts on the substrate, consumes it; every other pool is produced and lost
-only. All pools share one induction constant `K_ind`, as in the registry case.
-`S + X` and both ledgers form one closed dry-mass balance, which every run
-checks.
+registry's assay units (`FPU/L`, `BGU/L`). Every pool whose class acts on the
+substrate consumes it, by its own law; with
+[several such pools](#several-pools-consuming-the-substrate) their rates add.
+Every other pool is produced and lost only. All pools share one induction
+constant `K_ind`, as in the registry case. `S + X` and both ledgers form one
+closed dry-mass balance, which every run checks.
 
 ### `culture.csv` (optional)
 
@@ -1883,14 +1901,14 @@ checks.
 | `biomass_yield` | blank | `biomass_yield` | dimensionless, above 0 and at most 1 g/g; `mg/g` or `percent` are converted with pint (350 mg/g is 0.35 g/g) | `g/g` |
 | `biomass_loss_rate` | blank | `biomass_loss_rate` | 1/time | `1/h` |
 | `induction_half_saturation` | blank | `induction_half_saturation` | dry mass per volume, above 0 | `g/L` |
-| `hydrolysis_capacity` | the consuming pool | `hydrolysis_capacity` | substrate dry mass per time per pool amount | `g/FPU/h`, `g/mg/h` |
-| `hydrolysis_half_saturation` | the consuming pool | `hydrolysis_half_saturation` | dry mass per volume, above 0 | `g/L` |
+| `hydrolysis_capacity` | each consuming pool | `hydrolysis_capacity` (`hydrolysis_capacity__<class>` with several consuming pools) | substrate dry mass per time per pool amount | `g/FPU/h`, `g/mg/h` |
+| `hydrolysis_half_saturation` | each consuming pool | `hydrolysis_half_saturation` (`hydrolysis_half_saturation__<class>` with several) | dry mass per volume, above 0 | `g/L` |
 | `initial_enzyme_concentration` | each pool | `initial_enzyme_concentration__<class>` | protein mass or assay activity per volume | `FPU/L`, `mg/L` |
 | `specific_production_rate` | each pool | `specific_production_rate__<class>` | pool amount per biomass dry mass per time | `FPU/g/h`, `mg/g/h` |
 | `enzyme_loss_rate` | each pool | `enzyme_loss_rate__<class>` | 1/time | `1/h` |
 
 The units of a case are also checked together: `hydrolysis_capacity × E` must be
-the substrate's dry mass per volume per time with the consuming pool's own
+the substrate's dry mass per volume per time with each consuming pool's own
 units, and `specific_production_rate × X` an amount of the pool per volume per
 time, so a pool in `FPU/L` with a rate per protein mass (or the reverse) is
 refused on the rate's row. A molar amount is refused on every substrate-side,
@@ -1961,11 +1979,120 @@ consumes the cellulose and a beta-glucosidase (`BGU`) pool that is produced and
 lost only. Its biomass, cellulose, both activity and both ledger trajectories
 equal the registry case's at every loading (`tests/test_user_data_culture.py`).
 
+### Several pools consuming the substrate
+
+A fungus secretes several enzymes that attack its substrate at once. Every
+culture pool whose class acts on the culture substrate (the categorical rule,
+never a name) consumes it, each by its own `k_h,i E_i S / (K_h,i + S)` with its
+own `hydrolysis_capacity` and `hydrolysis_half_saturation` rows. The laws are
+the existing ones, composed as an enzyme network composes its classes: one
+homogeneous Michaelis-Menten process per consuming pool on the shared
+substrate, whose rates add. The decisions, none of which adds biology:
+
+- **What feeds growth.** Only the consumed culture substrate, as for one pool:
+  every consumed gram forms `Y` gram of biomass, whichever pool consumed it,
+  and `1 - Y` goes to the closure ledger. Soluble products are not resolved.
+- **Induction.** Every pool, consuming or not, is produced by the existing law
+  `q_P X S / (K_ind + S)`, induced by the culture substrate with the one shared
+  `K_ind`.
+- **One process, one law.** A consuming pool's process takes its constants from
+  `culture.csv` only (`hydrolysis_capacity` is its kcat per pool amount,
+  `hydrolysis_half_saturation` its apparent Km); `kinetics.csv` rows of a
+  culture class stay refused.
+- **Additive, independent action**, as in an enzyme network: no competition for
+  substrate or adsorption sites, no synergy, no product inhibition.
+- **No released pools.** A pool released by one enzyme and degraded by another
+  cannot be part of a growing culture: FungMod has no uptake law for a soluble
+  pool with an explicit yield that `culture.csv` could bind, so the substrate a
+  pool released would either be counted twice (as biomass and as the released
+  pool) or feed nothing, and splitting it between the two is a partition no
+  table states. `culture.csv` therefore stays refused in an `enzyme_network`
+  dataset, with this reason.
+
+`tests/fixtures/user_data/culture_parallel_pools/` is a user-defined strain
+whose endo- and exo-cutter-like pools (protein masses) consume a
+cellulose-like solid in parallel while a third pool acts on nothing in the
+culture; every value is an illustrative estimate:
+
+```text
+strain_id,substrate_id,condition_id,quantity,enzyme_class,value,lower,upper,units,evidence_type,method,source
+strain_g5,solid_g5,c28_ph5,substrate_initial_concentration,,12,,,g/L,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,initial_biomass,,0.15,,,g/L,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,biomass_yield,,0.4,,,g/g,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,biomass_loss_rate,,0.005,,,1/h,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,induction_half_saturation,,0.8,,,g/L,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,hydrolysis_capacity,endo_cutter_g5_like,0.004,,,g/mg/h,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,hydrolysis_half_saturation,endo_cutter_g5_like,6,,,g/L,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,initial_enzyme_concentration,endo_cutter_g5_like,0.5,,,mg/L,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,specific_production_rate,endo_cutter_g5_like,1.5,,,mg/g/h,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,enzyme_loss_rate,endo_cutter_g5_like,0.015,,,1/h,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,hydrolysis_capacity,exo_cutter_g5_like,0.006,,,g/mg/h,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,hydrolysis_half_saturation,exo_cutter_g5_like,10,,,g/L,estimate,illustrative estimate,<source>
+...                                              (the initial levels, production and loss rates of both other pools)
+```
+
+```text
+$ fungmod check-data tests/fixtures/user_data/culture_parallel_pools
+...
+Kinetic values: 18; gaps: 0
+Cultures (culture.csv; the strain grows on the substrate and secretes its enzyme pools, culture_physiology): 1
+  strain     substrate  consuming pools                          enzyme pools                                                      culture.csv rows
+  strain_g5  solid_g5   endo_cutter_g5_like, exo_cutter_g5_like  endo_cutter_g5_like, exo_cutter_g5_like, dimer_hydrolase_g5_like  2-19
+
+$ fungmod run --user-data tests/fixtures/user_data/culture_parallel_pools --fungus strain_g5 \
+    --substrate solid_g5 --environment c28_ph5 --mode exploratory --samples 8 --seed 1 --output culture_pools_run
+...
+    final_substrate_remaining          0.007365 [0.007365, 0.007365] gram / liter (n=8)
+    maximum_substrate_depletion_rate   0.2276 [0.2276, 0.2276] gram / hour / liter (n=8)
+  Threshold times (median [5th, 95th percentile] over samples):
+    time_to_10_percent_substrate_degradation  42.87 [42.87, 42.87] hour (n=8)
+    time_to_50_percent_substrate_degradation  78.7 [78.7, 78.7] hour (n=8)
+    time_to_90_percent_substrate_degradation  102.4 [102.4, 102.4] hour (n=8)
+```
+
+The time series hold one `process_rate.substrate_consumption__<class>` per
+consuming pool (here about 6.6 g/L of the solid consumed by the endo-cutter-like
+pool and 5.4 g/L by the exo-cutter-like pool over the 144 hours), the biomass
+(peaking at 3.96 g/L near 112 hours), every pool in its own units and both
+ledgers. The tests check at every output time that the dry-mass closure
+`S + X + ledgers = S0 + X0` holds, that growth equals the yield times the
+consumed substrate (`X - X0 + biomass lost = Y (S0 - S)`), that each consumption
+rate is its own pool's law, that the degradation rate is their sum, and that
+each synthesis and loss rate is its own law; that a second consuming pool with
+a zero `hydrolysis_capacity` reproduces the one-pool culture; and the
+materially different `tests/fixtures/user_data/culture_shared_pools/`: two
+strains sharing one model of two consuming pools on a chitin-like solid, one
+with its consumption capacities as ranges (each sample follows its own sampled
+laws and closes), and a condition without rows whose every role is a gap
+(`tests/test_user_data_culture_pools.py`).
+
+With one consuming pool nothing changes: the roles, symbols, records,
+templates and compatibilities are those of the previous version, and the
+existing culture fixtures and the registry's *T. harzianum* case assemble
+byte-identically. With several:
+
+- cultures of one substrate whose consuming pools overlap are one culture
+  model, named by the first consuming pool in `culture.csv`; every strain that
+  declares one of its consuming classes runs it, so it must declare every pool
+  of the model (a pool without rows is a gap) and no other class acting on the
+  substrate;
+- the consumption roles become per pool (`hydrolysis_capacity__<class>`,
+  `hydrolysis_half_saturation__<class>`, symbol
+  `<dataset_id>__culture__<quantity>__<class>__<first class>__<substrate_id>`),
+  one consumption process per pool (`substrate_consumption__<class>`) shares
+  the yield's product map, every consuming class gets a compatibility pointing
+  to the one template, and the records' enzyme-class selector is empty so each
+  compatibility selects them;
+- another solid substrate a consuming class acts on without rows is a culture
+  of gaps with the classes of its model that act on it.
+
 ### What is generated
 
-One culture model per consuming enzyme class and substrate, shared by every
-strain that declares the class (the strain's records are selected by its
-fungus id, as for the rate forms): a `culture_physiology` process compatibility
+One culture model per consuming enzyme class (or set of
+[consuming classes](#several-pools-consuming-the-substrate)) and substrate,
+shared by every strain that declares the class (the strain's records are
+selected by its fungus id, as for the rate forms): a `culture_physiology`
+process compatibility
 (`<dataset>__<class>__<substrate>__culture_physiology`) and case template
 (`..._culture_template`) that composes the existing process laws (homogeneous
 Michaelis-Menten consumption with a stoichiometric biomass yield and closure
@@ -1977,10 +2104,10 @@ rate is in the units of the state it changes per unit of the dataset's time
 grid, so one template serves cases whose rows use different units. The
 template is scientific only when every bound record is exact and
 scientific-eligible; one estimate keeps it exploratory (the weakest input
-wins). The generated enzyme class of the consuming pool lists
+wins). The generated enzyme class of each consuming pool lists
 `culture_physiology` as its process; the other pools keep their own.
-`UserDataset.cultures` lists each strain's culture (consuming pool, pools,
-template and compatibility ids, rows).
+`UserDataset.cultures` lists each strain's culture (the first consuming pool,
+every consuming pool, the pools, template and compatibility ids, rows).
 
 ### Gaps
 
@@ -2001,10 +2128,11 @@ culture_estimates__strain_x1__xylan_lot_x1__c25__culture__specific_production_ra
 
 Nothing is defaulted. A condition with no rows makes every role a gap whose
 request says at which conditions the culture has values; a strain that declares
-the consuming class without rows has a culture of gaps; a solid substrate the
+a consuming class without rows has a culture of gaps; a solid substrate a
 consuming class acts on without rows is a culture of gaps with the consuming
-pool only. With `--runnable-only` (`blocked="report"`) a culture case runs
-beside its gap cases ([partial runs](cli.md)).
+pools of its model that act on it. With `--runnable-only`
+(`blocked="report"`) a culture case runs beside its gap cases
+([partial runs](cli.md)).
 
 ### Refused
 
@@ -2021,13 +2149,17 @@ Each refusal names its file, row and column:
   consuming class on any substrate. FungMod builds one model per strain,
   substrate and condition and does not choose between a culture and an assay;
   keep assay kinetics in a separate dataset.
-- A strain that declares the consuming class and another class acting on the
-  culture substrate (a class from a genome annotation included: run the
-  culture in a dataset without `genomes.csv`), and a strain that declares the
-  consuming class but not every pool of the culture.
-- A culture whose pools include no class acting on the substrate, or more
-  than one (synergy between pools is not modelled); `hydrolysis_capacity` or
-  `hydrolysis_half_saturation` on a pool that does not consume the substrate.
+- A strain that declares a consuming class and another class acting on the
+  culture substrate that is no pool of the culture (give that class's rows in
+  `culture.csv` to make it a consuming pool; a class from a genome annotation
+  included: run the culture in a dataset without `genomes.csv`), and a strain
+  that declares a consuming class but not every pool of the culture.
+- A culture whose pools include no class acting on the substrate;
+  `hydrolysis_capacity` or `hydrolysis_half_saturation` on a pool that does not
+  consume the substrate.
+- `culture.csv` in a dataset with `enzyme_network`: no released pool can be
+  part of a growing culture
+  ([several pools consuming the substrate](#several-pools-consuming-the-substrate)).
 - Units of the wrong dimension, units of one case that do not fit together
   (above), an initial biomass in other units than the initial substrate, a
   yield above 1 g/g or at zero, a zero half-saturation constant, an
@@ -2049,11 +2181,12 @@ Each refusal names its file, row and column:
 ### What is and is not modelled
 
 Modelled: one strain growing in a well-mixed batch on one suspended solid
-substrate (dry-mass basis); substrate consumption by one secreted enzyme pool
-with an apparent saturation law; biomass formation with an explicit yield and a
-closure ledger for the consumed substrate not retained as biomass; first-order
-biomass loss into a ledger; substrate-induced, biomass-proportional synthesis
-and first-order loss of every enzyme pool, each in its own units.
+substrate (dry-mass basis); substrate consumption by every secreted enzyme pool
+that acts on it, each with its own apparent saturation law, in parallel;
+biomass formation with one explicit yield and a closure ledger for the consumed
+substrate not retained as biomass; first-order biomass loss into a ledger;
+substrate-induced, biomass-proportional synthesis and first-order loss of every
+enzyme pool, each in its own units.
 
 Not modelled, and the template and outputs say so:
 
@@ -2069,8 +2202,11 @@ Not modelled, and the template and outputs say so:
   bound; the temperature and pH of a condition are metadata.
 - No soluble products: the product named in `substrates.csv` is not released
   by the culture (the row is still required by `substrates.csv`); consumed
-  substrate is biomass or ledger.
-- Pools other than the consuming one act on nothing; no synergy, product
+  substrate is biomass or ledger. No pool degrades a product of another, and no
+  released pool feeds growth: FungMod has no uptake law for a soluble pool with
+  an explicit yield that a user table binds.
+- Pools other than the consuming ones act on nothing; consuming pools act
+  additively and independently: no synergy, competition for sites, product
   inhibition, adsorption or surface law.
 - Constants are apparent and specific to the strain, substrate preparation and
   conditions at which they were obtained; nothing extrapolates them.
@@ -2092,6 +2228,7 @@ every process, so processes on one pool add their rates:
 pool i:  dS_i/dt = - sum over classes j acting on i of  r_ij  +  y_(i-1) x sum over classes k acting on pool i-1 of  r_(i-1)k
 each r:  Vmax S / (Km + S)  or  kcat E S / (Km + S)          (the pair's own rate form and rows)
 with ki: r x (Km + S) / (Km (1 + I / Ki) + S)                 (competitive inhibition by a downstream pool I)
+with a responses.csv law: r x gamma(T or pH)                     (that process only; see response laws in a network)
 ```
 
 ```yaml
@@ -2364,6 +2501,104 @@ yield of 2460.6 umol/g, so the product is in umol/L, it equals
 `2460.6 umol/g x (S0 - S)` at every output time, and with the initial solid far
 below both Km the solid decays as `S0 exp(-(Vmax_A / Km_A + Vmax_B / Km_B) t)`.
 
+### Response laws in a network
+
+A [`responses.csv`](#responsescsv-optional) row names a strain, an enzyme class
+and a substrate. In a dataset with an `enzyme_network` block that is the
+network process of that class on that pool, and the law binds to it exactly as
+it binds to a single-class case: the existing environment modifier multiplies
+the rate of that process, and of no other. The single-class rules apply per
+process:
+
+- The kinetic constants of the process (`km`, `kcat` or `vmax`, every route to
+  Vmax, and in a network also its `ki`) must be stated at the law's reference
+  condition: exactly, within the reference row's `reference_tolerance`, or
+  declared with `kinetics_at_reference`. The concentrations, the enzyme
+  concentration, the yields (a unit-bearing one included), Km, Ki and the
+  `reactivity_exponent` are not rescaled; only the rate is.
+- One law per condition and process. Every strain of a network runs one
+  template, so the strains bind the same law for a condition of a process, and
+  a strain without the rows another strain gives gets explicit gaps with
+  measurement requests for the law's parameters.
+- A law's records apply at every environment of the case (no environment
+  selector), so the temperature and pH of an `EnvironmentGrid` condition reach
+  it, while the kinetics records of the dataset's one condition are reused
+  there, as for single-class cases. With several conditions in
+  `conditions.csv` (gap records included) no condition-specific record is
+  copied and the grid case reports the roles as missing.
+- A process without a law keeps the constants of its rows' condition: at
+  another temperature or pH its rate does not change, and its template says so
+  for that process. The network then responds to a condition only through the
+  laws it has; `environment_effect_status` is `active_response_model` whenever
+  one law reads the condition, and the config's `environment_response` names
+  each law with the process it scales.
+- The laws are the importable ones of `responses.csv` (cardinal temperature,
+  cardinal pH, Arrhenius). The pH-ionization form stays refused in a network,
+  so no law can count a pH effect twice.
+
+`tests/fixtures/user_data/network_chain_laws/` is the
+[chain example](#worked-example-a-chain-and-a-parallel-pair) at its reference
+condition (30 degC, pH 5) with a cardinal temperature law (5, 30 and 45 degC)
+and a cardinal pH law (3, 5 and 8) on the first class and an Arrhenius law
+(50 kJ/mol, reference 30 degC) on the second; every value is an illustrative
+estimate:
+
+```text
+strain_id,enzyme_class,substrate_id,law,parameter,value,units,evidence_type,method,source,reference_tolerance,kinetics_at_reference
+strain_n1,depolymerase_like,polymer_p1,temperature_cardinal_rosso,minimum_temperature,5,degC,estimate,,<source>,,
+strain_n1,depolymerase_like,polymer_p1,temperature_cardinal_rosso,optimum_temperature,30,degC,estimate,,<source>,,
+strain_n1,depolymerase_like,polymer_p1,temperature_cardinal_rosso,maximum_temperature,45,degC,estimate,,<source>,,
+strain_n1,depolymerase_like,polymer_p1,ph_cardinal_rosso,minimum_ph,3,dimensionless,estimate,,<source>,,
+strain_n1,depolymerase_like,polymer_p1,ph_cardinal_rosso,optimum_ph,5,dimensionless,estimate,,<source>,,
+strain_n1,depolymerase_like,polymer_p1,ph_cardinal_rosso,maximum_ph,8,dimensionless,estimate,,<source>,,
+strain_n1,oligomer_hydrolase_like,oligomer_o1,temperature_arrhenius_reference,activation_energy,50,kJ/mol,estimate,,<source>,,
+strain_n1,oligomer_hydrolase_like,oligomer_o1,temperature_arrhenius_reference,reference_temperature,30,degC,estimate,,<source>,,
+```
+
+```text
+$ fungmod check-data tests/fixtures/user_data/network_chain_laws
+...
+Kinetic values: 15; gaps: 0
+Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, enzyme_network): 1
+  from polymer_p1: polymer_p1 -> oligomer_o1 (4 mol/mol), oligomer_o1 -> monomer_m1 (2 mol/mol); strains strain_n1
+  enzyme class             pool         rate form  competitive inhibitor  response laws
+  depolymerase_like        polymer_p1   kcat       none                   temperature_cardinal_rosso, ph_cardinal_rosso
+  oligomer_hydrolase_like  oligomer_o1  kcat       none                   temperature_arrhenius_reference
+
+$ fungmod run --user-data tests/fixtures/user_data/network_chain_laws --fungus strain_n1 \
+    --substrate polymer_p1 --temperature-c 30 --temperature-c 37 --ph 5 \
+    --mode exploratory --samples 8 --seed 1 --output network_laws_run
+...
+Case case_0000: network_chain_laws__strain_n1 + network_chain_laws__polymer_p1 + temp_30C_ph_5p0_not_specified
+  environment effect: active_response_model (ph:ph_cardinal_rosso;temperature:temperature_cardinal_rosso;temperature:temperature_arrhenius_reference)
+...
+    time_to_50_percent_substrate_degradation  64.77 [64.77, 64.77] minute (n=8)
+...
+Case case_0001: network_chain_laws__strain_n1 + network_chain_laws__polymer_p1 + temp_37C_ph_5p0_not_specified
+  environment effect: active_response_model (ph:ph_cardinal_rosso;temperature:temperature_cardinal_rosso;temperature:temperature_arrhenius_reference)
+...
+    maximum_product_release_rate       0.1585 [0.1585, 0.1585] millimolar / minute (n=8)
+    maximum_substrate_depletion_rate   0.03425 [0.03425, 0.03425] millimolar / minute (n=8)
+...
+    time_to_50_percent_substrate_degradation  81.05 [81.05, 81.05] minute (n=8)
+```
+
+At 30 degC and pH 5, the reference condition of every law, the run equals the
+network without laws (64.77 minutes to half the entry). At 37 degC the first
+class runs at `gamma_T(37) = 0.799` of its reference rate, so the polymer-like
+pool degrades more slowly (81.05 minutes), while the Arrhenius law speeds the
+second class up by `exp(-E_a / R (1/310.15 K - 1/303.15 K)) = 1.565`, so the
+monomer-like product is released faster (0.1585 against 0.1095 mM/min at
+most). The tests check that each process rate equals its own law times its
+own factors at every output time of every grid condition, that the closure
+`8 P + 2 O + M` holds, that a one-class network with the oxidase example's two
+laws reproduces the single-class case on a grid, and the materially different
+case: a cardinal pH law on the class that cuts the cellulose-like solid of the
+[cross-basis example](#a-solid-releasing-a-dissolved-pool) (g/L), with no law on
+the competitively inhibited disaccharide step, whose rate stays its own law at
+every pH while the solid's rate follows `gamma_pH`
+(`tests/test_user_data_network_responses.py`).
+
 ### What a network generates
 
 | Record | Identifier |
@@ -2377,7 +2612,12 @@ The roles are `substrate_initial_concentration` (the entry's), then
 `product_yield__<pool>` for a [unit-bearing yield](#a-solid-releasing-a-dissolved-pool),
 and per process `km__<class>__<pool>`, `kcat__<class>__<pool>` with
 `enzyme_initial_concentration__<class>` or `vmax__<class>__<pool>`, plus
-`ki__<class>__<pool>` and `reactivity_exponent__<class>__<pool>` when bound.
+`ki__<class>__<pool>` and `reactivity_exponent__<class>__<pool>` when bound,
+and `<law>__<parameter>__<class>__<pool>` for each parameter of a
+[response law](#response-laws-in-a-network). A law parameter's record is one per
+strain, `<dataset_id>__network__<entry>__<strain>__<role>`, with no environment
+selector (it applies at every condition), its value in the single-class
+record's units (temperatures in kelvin).
 Each record keeps the value, evidence, maturity and provenance of its row (or
 derivation, or gap) and adds the network, role, class and pool under
 `fungmod_user_dataset.enzyme_network`; its enzyme-class selector is empty
@@ -2386,8 +2626,8 @@ entry. The generated classes list `enzyme_network` as their only process, so a
 network dataset has no single-class cases: the preflight never chooses between
 a network and one of its classes. `UserDataset.enzyme_networks` (also in
 `to_dict()` and `summary()`) lists each network's pools, links and yields,
-processes (class, pool, rate form, process id, inhibitor), classes, strains and
-generated ids. The template is scientific only when every record bound to it is
+processes (class, pool, rate form, process id, inhibitor, response laws),
+classes, strains and generated ids. The template is scientific only when every record bound to it is
 exact and scientific-eligible, as for every user template.
 
 ### Gaps of a network
@@ -2423,8 +2663,17 @@ Each refusal names its file, row and column:
 - On an intermediate pool: an initial concentration (unless the pool is an
   entry), an `enzyme_dose` and a `reactivity_exponent`. Different initial
   concentrations of one entry on the rows of its classes (they are one pool).
-- The pH-ionization form in a network; `culture.csv`, `timecourse.csv` and
-  `responses.csv` in a network dataset.
+- The pH-ionization form in a network; `culture.csv` (no released pool can be
+  part of a growing culture; see
+  [several pools consuming the substrate](#several-pools-consuming-the-substrate))
+  and `timecourse.csv` in a network dataset.
+- A `responses.csv` law that a single-class case refuses (see
+  [`responses.csv`](#responsescsv-optional)), applied per process: kinetic
+  constants or a `ki` of the process off the law's reference condition, two
+  laws on one condition of a process, different laws for one process across
+  strains, a condition with an unknown temperature or pH; and a row naming a
+  class the strain does not declare (no member of the network) or a pool its
+  class does not act on ([response laws in a network](#response-laws-in-a-network)).
 - `ki` outside a network dataset (a network of one class is the single-class
   case with inhibition), on a solid substrate (the apparent Km is not a binding
   constant), naming a pool that is not downstream (the substrate itself or an
@@ -2442,8 +2691,9 @@ Modelled: several enzyme classes of one strain acting on a chain of
 well-mixed pools, each by its own Michaelis-Menten law at its stated
 concentration, classes on one pool in parallel with additive rates, each pool
 released into the next with the stated yield (from a solid to a dissolved pool
-through a unit-bearing yield you state), and optional competitive inhibition of
-a process by one downstream pool.
+through a unit-bearing yield you state), optional competitive inhibition of a
+process by one downstream pool, and optional temperature and pH response laws
+that scale the rate of the process they are bound to.
 
 Not modelled, and the template and outputs say so:
 
@@ -2460,15 +2710,21 @@ Not modelled, and the template and outputs say so:
   final product, and only through a yield you state with its evidence; no
   dissolved pool releases a solid one, and FungMod derives no conversion from a
   molar mass.
-- No response laws, time courses, comparison, fitting or cultures in a
-  network yet; the values hold at the condition of their rows. Networks are
-  drafted for a fungus by `assemble_user_tables(network=True)`
+- A response law scales the rate of its own process only: Km, Ki, the
+  yields and the concentrations are not rescaled, a process without a law
+  keeps the constants of its rows' condition at every temperature and pH, and
+  no thermal inactivation, pH dynamics or interaction between conditions
+  beyond the product of the factors is represented.
+- No time courses, comparison or fitting in a network yet, and no culture: a
+  culture's secreted pools act together on its substrate in `culture.csv`
+  itself ([several pools consuming the substrate](#several-pools-consuming-the-substrate)),
+  but a released pool cannot be part of a growing culture, because no uptake
+  law exists for it. Networks are drafted for a fungus by `assemble_user_tables(network=True)`
   ([drafting an enzyme network](#drafting-an-enzyme-network)); drafts follow
   dissolved pools only, so a link from a solid to a dissolved pool, with its
   yield, is written in `substrates.csv` by hand, and they write the response
   laws you give against their members
-  ([response laws in a network draft](#response-laws-in-a-network-draft)),
-  which this loader refuses.
+  ([response laws in a network draft](#response-laws-in-a-network-draft)).
 - An enzyme-kinetics model at stated enzyme concentrations, not a fungus
   growing and secreting; the strain's class list decides which classes act.
 
@@ -2529,9 +2785,9 @@ out of data you intend to simulate.
 | Compatibility and case template per class and compatible substrate | `<dataset_id>__<class>__<substrate_id>__homogeneous_mm[_template]`, or `__ph_ionization_mm[_template]` in the pH-ionization form |
 | Parameter record per kinetics row of a role | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__<quantity>` |
 | Vmax record (explicit row, derived, or from an assay activity) | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__vmax` |
-| Response-law parameter record per `responses.csv` row | `<dataset_id>__<strain>__<class>__<substrate>__<law>__<parameter>` |
+| Response-law parameter record per `responses.csv` row | `<dataset_id>__<strain>__<class>__<substrate>__<law>__<parameter>`, or in a network `<dataset_id>__network__<entry>__<strain>__<law>__<parameter>__<class>__<pool>` |
 | Explicit unknown per missing role or law parameter | the same identifier with `__gap` |
-| Culture compatibility and case template per consuming class and culture substrate ([fungal culture](#fungal-culture-growth-and-secretion)) | `<dataset_id>__<class>__<substrate_id>__culture_physiology`, `<dataset_id>__<class>__<substrate_id>__culture_template` |
+| Culture compatibility per consuming class and culture substrate, and one case template per culture model, named by its first consuming class ([fungal culture](#fungal-culture-growth-and-secretion)) | `<dataset_id>__<class>__<substrate_id>__culture_physiology`, `<dataset_id>__<class>__<substrate_id>__culture_template` |
 | Enzyme-network template per entry substrate, compatibility per class acting on it, and records per strain, condition and role ([several enzymes acting together](#what-a-network-generates)) | `<dataset_id>__<entry>__enzyme_network_template`, `<dataset_id>__<class>__<entry>__enzyme_network`, `<dataset_id>__network__<entry>__<strain>__<condition>__<role>` |
 | Culture parameter record per strain, condition and role (`<pool>` for a pool quantity only) | `<dataset_id>__<strain>__<substrate>__<condition>__culture__<quantity>[__<pool>]`, symbol `<dataset_id>__culture__<quantity>[__<pool>]__<class>__<substrate_id>` |
 
@@ -3078,18 +3334,18 @@ Limits of the SABIO-RK route:
   are rescaled by the law. When the dataset has several conditions for a case
   (gap records included) no condition-specific record is copied and the grid
   case reports the roles as missing.
-- Several enzyme classes act together only in an enzyme network
+- Several enzyme classes act together in an enzyme network
   ([several enzymes acting together](#several-enzymes-acting-together)):
   independent Michaelis-Menten processes whose rates add on shared pools, a
   chain of pools linked by explicit products with at most one basis change
-  (from a solid, through a stated unit-bearing yield), and
-  optionally one competitive inhibitor per process; no synergy, competition for
-  sites, competing substrates of one enzyme, other inhibition forms, response
-  laws, time courses or cultures in a network. Growth and secretion only through
-  `culture.csv`, which binds the registry's culture model (one consuming pool,
-  an explicit yield, induced synthesis; see
-  [what is and is not modelled](#what-is-and-is-not-modelled)); no uptake of
-  soluble products.
+  (from a solid, through a stated unit-bearing yield), and optionally one
+  competitive inhibitor per process and response laws per process; no synergy,
+  competition for sites, competing substrates of one enzyme, other inhibition
+  forms, time courses or cultures in a network. Growth and secretion only
+  through `culture.csv`, which binds the registry's culture model (one or
+  several consuming pools in parallel, one explicit yield, induced synthesis;
+  see [what is and is not modelled](#what-is-and-is-not-modelled)); no uptake of
+  soluble products and no released pool in a culture.
 - Time courses measure the substrate state or the product formed of a
   simulated case; other observables (intermediates, biomass, rates) are not
   read. Comparison interpolates linearly on the simulated output grid and
@@ -3123,6 +3379,5 @@ Limits of the SABIO-RK route:
   [assembling fungus, substrate and conditions](#assembling-fungus-substrate-and-conditions)).
   A network draft follows pools only through stated products that equal a
   `substrate_id` or a registry substrate ID, holds dissolved pools only, and
-  writes the response laws you give against their members, which this
-  version's loader refuses in a network
+  writes the response laws you give against the members they scale
   ([response laws in a network draft](#response-laws-in-a-network-draft)).
