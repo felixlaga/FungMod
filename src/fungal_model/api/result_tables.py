@@ -46,6 +46,7 @@ from fungal_model.screening.case_builder import (
     get_registry_process_assembler,
     select_registry_case_compatibility,
 )
+from fungal_model.processes.inactivation import THERMAL_INACTIVATION_PROCESS_TYPE
 from fungal_model.screening.enzyme_network import ENZYME_NETWORK_PROCESS_TYPE
 from fungal_model.screening.modelability import missing_item_suggestion
 from fungal_model.screening.parameter_resolution import (
@@ -925,8 +926,101 @@ def _mechanism_summary_rows(
                 context=context, case=case, start_index=len(rows), maturity=str(mechanism["maturity"])
             )
         )
+    if case.process_type in _SINGLE_PROCESS_LAW_TYPES:
+        rows.extend(
+            _companion_process_mechanism_rows(
+                context=context, case=case, start_index=len(rows), maturity=str(mechanism["maturity"])
+            )
+        )
     rows.extend(_rate_modifier_mechanism_rows(context=context, case=case, start_index=len(rows)))
     return rows
+
+
+# Assemblers that build one process law per case, after which a template may declare further processes (the loss of
+# the enzyme state, ``enzyme_inactivation``); every such process gets a mechanism row of its own.
+_SINGLE_PROCESS_LAW_TYPES = frozenset({"homogeneous_michaelis_menten", "ph_ionization_michaelis_menten"})
+
+
+def _companion_process_mechanism_rows(
+    *,
+    context: Mapping[str, Any],
+    case: RegistryCaseEnsemble,
+    start_index: int,
+    maturity: str,
+) -> list[dict[str, Any]]:
+    """One row per configured process after the case's own process law (none in a case that declares none)."""
+
+    data = _sample_config_data(case)
+    if data is None:
+        return []
+    process_configs = data.get("processes", [])
+    if not isinstance(process_configs, list) or len(process_configs) < 2 or not isinstance(process_configs[0], Mapping):
+        return []
+    configured_by = str(process_configs[0].get("id", ""))
+    rows: list[dict[str, Any]] = []
+    for process in process_configs[1:]:
+        if not isinstance(process, Mapping):
+            continue
+        row = _configured_process_row(
+            context=context,
+            process=process,
+            index=start_index + len(rows),
+            maturity=maturity,
+            configured_by=configured_by,
+            limitations="; ".join(_mechanism_limitations(str(process.get("process_type", "")))),
+            provenance_key="configured_after",
+        )
+        if row is not None:
+            rows.append(row)
+    return rows
+
+
+def _configured_process_row(
+    *,
+    context: Mapping[str, Any],
+    process: Mapping[str, Any],
+    index: int,
+    maturity: str,
+    configured_by: str,
+    limitations: str,
+    provenance_key: str,
+) -> dict[str, Any] | None:
+    """The mechanism row of one configured process of an assembled config; None for a malformed entry."""
+
+    process_id = str(process.get("id", ""))
+    states = process.get("states", {})
+    parameters = process.get("parameters", {})
+    if not isinstance(states, Mapping) or not isinstance(parameters, Mapping):
+        return None
+    state_text = ";".join(f"{field}:{state}" for field, state in states.items())
+    parameter_text = ";".join(f"{field}:{symbol}" for field, symbol in parameters.items() if field != "rate_units")
+    assumptions = process.get("assumptions", [])
+    return {
+        **_case_columns(context),
+        "mechanism_index": index,
+        # Each configured process is a process law of the case (output schema 2.2.0 mechanism kinds).
+        "mechanism_kind": "process_law",
+        "mechanism_id": process_id,
+        "mechanism_family": _mechanism_family(str(process.get("process_type", ""))),
+        "active": True,
+        "maturity": maturity,
+        "configured_by": configured_by,
+        "equation_or_law": _mechanism_law(str(process.get("process_type", ""))),
+        "state_variables": state_text,
+        "parameters": parameter_text,
+        "assumptions": "; ".join(str(item) for item in assumptions) if isinstance(assumptions, list) else "",
+        "limitations": limitations,
+        "provenance": json.dumps(
+            {
+                "process_id": process_id,
+                "process_type": str(process.get("process_type", "")),
+                provenance_key: configured_by,
+                "product_map": str(process.get("product_map", "")),
+                "source": "assembled_model_config",
+            },
+            sort_keys=True,
+        ),
+    }
 
 
 def _sample_config_data(case: RegistryCaseEnsemble) -> Mapping[str, Any] | None:
@@ -962,48 +1056,23 @@ def _network_process_mechanism_rows(
     for process in process_configs:
         if not isinstance(process, Mapping):
             continue
-        process_id = str(process.get("id", ""))
-        states = process.get("states", {})
-        parameters = process.get("parameters", {})
-        if not isinstance(states, Mapping) or not isinstance(parameters, Mapping):
-            continue
-        enzyme_class = str(enzyme_classes.get(process_id, ""))
-        state_text = ";".join(f"{field}:{state}" for field, state in states.items())
-        parameter_text = ";".join(
-            f"{field}:{symbol}" for field, symbol in parameters.items() if field != "rate_units"
+        row = _configured_process_row(
+            context=context,
+            process=process,
+            index=start_index + len(rows),
+            maturity=maturity,
+            configured_by=str(enzyme_classes.get(str(process.get("id", "")), "")),
+            limitations=(
+                "Acts on its pool independently of the other processes of the network; their rates add on a "
+                "shared pool. No competition for substrate or adsorption sites and no synergy."
+                if process.get("product_map") is not None
+                # A process that releases no pool (the loss of an enzyme state) changes its own state only.
+                else "; ".join(_mechanism_limitations(str(process.get("process_type", ""))))
+            ),
+            provenance_key="enzyme_class",
         )
-        assumptions = process.get("assumptions", [])
-        rows.append(
-            {
-                **_case_columns(context),
-                "mechanism_index": start_index + len(rows),
-                # Each process of a network is a process law of the case (output schema 2.2.0 mechanism kinds).
-                "mechanism_kind": "process_law",
-                "mechanism_id": process_id,
-                "mechanism_family": _mechanism_family(str(process.get("process_type", ""))),
-                "active": True,
-                "maturity": maturity,
-                "configured_by": enzyme_class,
-                "equation_or_law": _mechanism_law(str(process.get("process_type", ""))),
-                "state_variables": state_text,
-                "parameters": parameter_text,
-                "assumptions": "; ".join(str(item) for item in assumptions) if isinstance(assumptions, list) else "",
-                "limitations": (
-                    "Acts on its pool independently of the other processes of the network; their rates add on a "
-                    "shared pool. No competition for substrate or adsorption sites and no synergy."
-                ),
-                "provenance": json.dumps(
-                    {
-                        "process_id": process_id,
-                        "process_type": str(process.get("process_type", "")),
-                        "enzyme_class": enzyme_class,
-                        "product_map": str(process.get("product_map", "")),
-                        "source": "assembled_model_config",
-                    },
-                    sort_keys=True,
-                ),
-            }
-        )
+        if row is not None:
+            rows.append(row)
     return rows
 
 
@@ -1203,6 +1272,10 @@ def _mechanism_family(process_type: str) -> str:
         return "generic well-mixed culture physiology composed from registry process templates"
     if process_type == ENZYME_NETWORK_PROCESS_TYPE:
         return "generic enzyme network: template-declared homogeneous Michaelis-Menten processes on shared pools"
+    if process_type == "first_order":
+        return "generic first-order loss of one state"
+    if process_type == THERMAL_INACTIVATION_PROCESS_TYPE:
+        return "generic first-order thermal inactivation with an Arrhenius rate constant"
     return "generic configured process law"
 
 
@@ -1228,6 +1301,10 @@ def _mechanism_law(process_type: str) -> str:
             "dS_i/dt = -sum_j r_ij + sum_k y_k r_k over the processes on and into pool i, each r = Vmax * S / (Km + S) "
             "or its explicit-enzyme form, optionally scaled by its configured modifiers"
         )
+    if process_type == "first_order":
+        return "dX/dt = -k * X"
+    if process_type == THERMAL_INACTIVATION_PROCESS_TYPE:
+        return "dA/dt = -k_d,ref * exp(-(E_d/R) * (1/T - 1/T_ref)) * A"
     return "configured process law"
 
 
@@ -1366,6 +1443,18 @@ def _mechanism_limitations(
             "Exactly the template-declared processes are represented; parallel processes on one pool act "
             "additively and independently, without competition for substrate or adsorption sites or synergy.",
             "Not a whole-fungus physiology, secretion, uptake, or biomass model.",
+            "No empirical validation claim is implied by simulation output.",
+        )
+    if process_type == "first_order":
+        return (
+            "Constant first-order loss of one state; no mechanism of the loss, no inactive pool and no dependence on "
+            "temperature, pH or other states is represented.",
+            "No empirical validation claim is implied by simulation output.",
+        )
+    if process_type == THERMAL_INACTIVATION_PROCESS_TYPE:
+        return (
+            "Irreversible first-order loss with an Arrhenius-scaled constant read once from the static environment; "
+            "no reversible unfolding, proteolysis, stabilizer, substrate-protection or pH-stability effects.",
             "No empirical validation claim is implied by simulation output.",
         )
     return ("No empirical validation claim is implied by simulation output.",)

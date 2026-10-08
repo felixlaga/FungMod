@@ -84,6 +84,12 @@ Temperature and pH laws in `responses.csv` bind to the network process of their
 class and pool, so at another temperature or pH each class's rate follows its
 own law and a class without one keeps the constants of its measured condition
 ([response laws in a network](docs/user-data.md#response-laws-in-a-network)).
+An enzyme that loses activity over the run takes an `inactivation_rate` row
+(the first-order constant at its condition, in 1/time), and optionally the
+Arrhenius `thermal_inactivation` law in `responses.csv` so that the constant
+follows the temperature; each enzyme of a network decays by its own constant,
+and an enzyme without a row is assumed stable, never given a default
+([enzyme inactivation](docs/user-data.md#enzyme-inactivation-over-the-run)).
 To start from a request instead, `assemble_user_tables(fungus=..., substrates=...,
 conditions=...)` gathers what your sources say about that fungus (its dbCAN
 annotation, the enzyme classes you assert, a user dataset, SABIO-RK entries)
@@ -173,7 +179,7 @@ or explore the [public API](https://fungmod.readthedocs.io/en/latest/api/).
 | Spatial mycelium | Exploratory continuum hyphal growth (tip extension, motion, branching, anastomosis, uptake, translocation, secretion) on a compiled finite-volume core; see [spatial mycelium](docs/spatial-mycelium.md) |
 | Mechanisms | Generic kinetic processes, inhibition, environment modifiers, fungal coupling, and reversible thermodynamics |
 | Evidence | Registry-backed provenance, explicit unknowns, maturity labels, and frozen source snapshots |
-| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) on dissolved substrates, or kcat or Vmax as an apparent Michaelis-Menten law on one suspended solid polymer in dry mass per volume (the enzyme as protein mass, assay activity or a dose per gram of substrate, with an optional conversion-dependent reactivity exponent), plus optional temperature and pH response laws, or a fungal culture in `culture.csv` (your strain growing on a solid substrate and secreting its enzyme pools, through the registry's existing culture model: consumption by every pool that acts on the substrate, several in parallel with their rates adding, one explicit biomass yield fed by the consumed substrate, induced synthesis and loss of each pool; no released soluble pool, since no uptake law for one exists), or, with `enzyme_network` in the manifest, all of a strain's classes acting together (independent Michaelis-Menten processes whose rates add on shared pools, a pool released by one class degraded by the next where a substrate's stated product is another substrate of the dataset, a solid in dry mass releasing a dissolved pool in moles only through a unit-bearing yield you state with its evidence type, optional competitive product inhibition through a `ki` row, and temperature and pH response laws of `responses.csv` bound per process so that each scales its own class's rate at an `EnvironmentGrid` condition; no synergy or competition for sites), overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status, as single-class cases or, with `network=True`, as one enzyme network of every class acting on the substrates and the pools they release ([user-supplied data](docs/user-data.md)) |
+| Your own data | Strain, enzyme, substrate, condition and kinetics tables (kcat with an enzyme concentration, Vmax, specific activity and enzyme loading, or a saturating assay activity) on dissolved substrates, or kcat or Vmax as an apparent Michaelis-Menten law on one suspended solid polymer in dry mass per volume (the enzyme as protein mass, assay activity or a dose per gram of substrate, with an optional conversion-dependent reactivity exponent), plus optional temperature and pH response laws and first-order enzyme inactivation (an `inactivation_rate`, optionally with its Arrhenius temperature law), or a fungal culture in `culture.csv` (your strain growing on a solid substrate and secreting its enzyme pools, through the registry's existing culture model: consumption by every pool that acts on the substrate, several in parallel with their rates adding, one explicit biomass yield fed by the consumed substrate, induced synthesis and loss of each pool; no released soluble pool, since no uptake law for one exists), or, with `enzyme_network` in the manifest, all of a strain's classes acting together (independent Michaelis-Menten processes whose rates add on shared pools, a pool released by one class degraded by the next where a substrate's stated product is another substrate of the dataset, a solid in dry mass releasing a dissolved pool in moles only through a unit-bearing yield you state with its evidence type, optional competitive product inhibition through a `ki` row, and temperature and pH response laws of `responses.csv` bound per process so that each scales its own class's rate at an `EnvironmentGrid` condition; no synergy or competition for sites), overlaid on the registry in memory, validated row by row, with gaps reported as measurement requests; your own time courses can be compared with a simulation and used to fit Km with kcat or Vmax, returned as labelled in-sample `fitted` values; drafts for review from SABIO-RK entries or assembled for one fungus, substrates and conditions from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's source and status, as single-class cases or, with `network=True`, as one enzyme network of every class acting on the substrates and the pools they release ([user-supplied data](docs/user-data.md)) |
 | Command line | `fungmod run`, `preflight`, `check-data` and `list`: fungus, substrate and conditions in, preflight table, metrics, threshold times and the output bundle out, with exit codes for scripts (`--runnable-only`: the runnable cases of a request with gaps, exit code 4); the user-data workflow `assemble` (fungus X on substrate Y at conditions Z from its annotation, asserted classes, a user dataset and SABIO-RK, with every case's status and the `REVIEW:` fields; `--network` drafts every class of the fungus acting together as one enzyme network), `draft-kinetics`, `check-data`, `run --compare-timecourses` and `fit`, with nothing fetched unless you opt in: `assemble --fetch-proteome --fetch` finds the fungus's UniProt reference proteome by name (an exact name or a sole candidate is taken, anything else is refused with the candidates listed), freezes the responses as digest-checked snapshots and takes its enzyme classes, never a rate, through UniProt REST endpoints used as documented but not verified live ([command line](docs/cli.md#from-a-fungus-name-its-uniprot-reference-proteome)) |
 | Uncertainty | Monte Carlo propagation, local sensitivity, variance-based global sensitivity for independent inputs, and posterior sampling with identifiability verdicts under explicit priors and error models ([Bayesian calibration](docs/bayesian-calibration.md)) |
 | Evaluation | Conservation checks, solver and thermodynamic diagnostics, calibration evidence audits, and literature time-course comparison |
@@ -1147,8 +1153,14 @@ directly: `kcat_limiting`, `km_limiting`, the four pK values and the fitted
 the rate follows the condition or grid pH, each condition's pH must lie inside
 the fitted range, and the SABIO-RK drafting below emits this form for entries
 of SABIO-RK's "Michaelis-Menten (pH-dependent)" law
-([three rate forms](docs/user-data.md#three-rate-forms)). A substrate can
-instead be one suspended solid polymer stated on a dry-mass basis
+([three rate forms](docs/user-data.md#three-rate-forms)). In the forms with an
+enzyme state an `inactivation_rate` (1/time at the row's condition) binds the
+existing first-order loss to the enzyme, `E(t) = E0 exp(-k_d t)`, and the
+`responses.csv` law `thermal_inactivation` makes `k_d` follow the Arrhenius law
+in temperature through the existing process law of that name; without a row the
+enzyme is not lost and no default constant is applied
+([enzyme inactivation](docs/user-data.md#enzyme-inactivation-over-the-run)).
+A substrate can instead be one suspended solid polymer stated on a dry-mass basis
 (`physical_state` `solid_polymer`, `amount_basis` `dry_mass`, a g/g yield):
 the same law then runs as an apparent bulk law in g/L, with the enzyme as a
 protein mass or an assay activity (such as FPU) per volume or as an
@@ -1715,9 +1727,10 @@ Current capability labels mean:
   empirical fit of a measured profile that does not represent buffer identity,
   ionic strength or pH-dependent stability. Only the ionization law is bound to
   a shipped registry case (*P. chrysosporium* BGL1A on cellobiose, pH 4 to 8,
-  exploratory mode only); the other laws act only where a config or template
-  binds them explicitly, and the repository holds no sourced cardinal values or
-  inactivation energies.
+  exploratory mode only); the other laws act only where a config, template or
+  user dataset binds them explicitly (a user's `inactivation_rate` and
+  `thermal_inactivation` rows bind the inactivation law to their own enzyme),
+  and the repository holds no sourced cardinal values or inactivation energies.
 - `FungalCouplingModel` can compose explicit capability-matched extracellular
   degradation, secretion, enzyme decay, secretion cost, assimilable-product
   uptake, biomass yield, and maintenance in one well-mixed ODE system. It is an

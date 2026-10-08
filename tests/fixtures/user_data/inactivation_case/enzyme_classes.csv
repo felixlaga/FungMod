@@ -1,0 +1,2 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+amide_hydrolase_like,Amide hydrolase-like class V1,,amide_like_bond,amide_like,Illustrative user-defined class for the enzyme-inactivation fixture (no record of this class exists)

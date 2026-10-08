@@ -46,7 +46,7 @@ proteome resolution, cultures, time courses and fitted values, or every issue as
 `assemble_user_tables`, `user_tables_from_sabiork`, `compare_with_timecourses`
 and `fit_user_dataset` (see [the user-data workflow from a shell](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
 
-Thirteen complete examples live in the test fixtures:
+Fifteen complete examples live in the test fixtures:
 `tests/fixtures/user_data/esterase_case/` (a user-defined carboxylesterase on a
 user-defined aryl ester, `kcat` form, estimates only),
 `tests/fixtures/user_data/literature_reentry/` (the published SABIO-RK Reaction
@@ -88,6 +88,13 @@ g/L releasing a dissolved disaccharide-like pool in mmol/L that a second class
 converts to a monomer-like product, and two classes in parallel on a chitin-like
 solid releasing a dimer-like product in umol/L, each through a unit-bearing
 yield the user states (estimates only).
+`tests/fixtures/user_data/inactivation_case/` and
+`tests/fixtures/user_data/inactivation_network/` are enzymes that
+[lose activity over the run](#enzyme-inactivation-over-the-run): a user-defined
+amide hydrolase-like class on a dissolved amide-like substrate with a
+first-order `inactivation_rate`, and two user-defined cutter-like classes in
+parallel on a particulate polymer-like solid, one losing activity through the
+Arrhenius `thermal_inactivation` law, the other stable (estimates only).
 
 To start from public kinetics instead of typing them in, draft the tables from
 SABIO-RK entries and review them; see
@@ -610,6 +617,7 @@ strain_e1,carboxylesterase,p_nitrophenyl_butyrate,c37_ph7_5,enzyme_concentration
 | `enzyme_dose` | enzyme per dry substrate mass, e.g. mg/g or FPU/g | Enzyme per substrate mass; times `substrate_initial_concentration` it gives the enzyme concentration. [Solid substrates](#solid-substrates) only. |
 | `reactivity_exponent` | `dimensionless`, zero or positive | Exponent `n` of the conversion-dependent factor `(S / S0)^n`. [Solid substrates](#solid-substrates) only. |
 | `ki` | concentration, amount per volume | Competitive inhibition constant of the row's process by the pool named in `inhibitor` (positive). [Enzyme networks](#competitive-product-inhibition-ki) on dissolved substrates only. |
+| `inactivation_rate` | 1/time, e.g. 1/h | First-order inactivation constant `k_d` of the case's enzyme, `dE/dt = -k_d E`, at the row's condition (zero or positive). Forms with an enzyme state only (kcat and pH-ionization, in a single-class case or a network); see [enzyme inactivation](#enzyme-inactivation-over-the-run). |
 
 `U` is the enzyme unit of the unit registry, one micromole per minute.
 `enzyme_activity` is refused as ambiguous: say `specific_activity` or
@@ -641,7 +649,7 @@ forms of Michaelis-Menten kinetics:
   model state.
 - **Vmax form**, `rate = Vmax · S / (Km + S)`: `km`, Vmax and
   `substrate_initial_concentration`. There is no enzyme state, so enzyme loss
-  or dilution cannot be simulated.
+  or dilution cannot be simulated (an `inactivation_rate` is refused).
 - **pH-ionization form**, the diprotic law FungMod implements as the process
   law `ph_ionization_michaelis_menten` (the law of the registry's BGL1A case,
   see [environment response laws](environment-response.md)):
@@ -787,12 +795,18 @@ strain_l1,laccase_like_oxidase,syringaldazine_like,ph_cardinal_rosso,maximum_ph,
 | `temperature_cardinal_rosso` | `minimum_temperature`, `optimum_temperature`, `maximum_temperature` (temperatures) | `optimum_temperature` | rate(T) = rate(T_opt) · γ_T(T), Rosso CTMI |
 | `ph_cardinal_rosso` | `minimum_ph`, `optimum_ph`, `maximum_ph` (`dimensionless`) | `optimum_ph` | rate(pH) = rate(pH_opt) · γ_pH(pH), Rosso CPM |
 | `temperature_arrhenius_reference` | `activation_energy` (energy per amount, e.g. kJ/mol), `reference_temperature` | `reference_temperature` | rate(T) = rate(T_ref) · exp(−Ea/R · (1/T − 1/T_ref)) |
+| `thermal_inactivation` | `activation_energy` (energy per amount, e.g. kJ/mol), `reference_temperature` | `reference_temperature` | k_d(T) = k_d(T_ref) · exp(−E_d/R · (1/T − 1/T_ref)); scales the enzyme's [inactivation constant](#enzyme-inactivation-over-the-run), not the rate |
 
-The laws are the implemented modifiers described in
+The first three laws are the implemented modifiers described in
 [environment response laws](environment-response.md); a law name FungMod does
 not implement is refused, and so are implemented laws this importer does not
 bind yet (Gaussian pH, oxygen, water activity) and the optional validity bounds
-of the Arrhenius law. On a pair in the pH-ionization form a pH law is refused
+of the Arrhenius laws. `thermal_inactivation` is the implemented process law of
+that name: it multiplies no rate, it replaces the first-order loss of the
+enzyme state by the Arrhenius law of `k_d`, so it composes with a temperature
+law on the rate of the same pair (the one-law-per-condition rule below applies
+to the laws that scale the rate), and it needs the pair's `inactivation_rate`
+stated at its reference temperature. On a pair in the pH-ionization form a pH law is refused
 as double-counting, because the ionization law already makes the rate depend on
 pH; a temperature law binds as usual. Validation:
 
@@ -820,7 +834,9 @@ reference parameter: the optimum of a cardinal law, the reference temperature
 of the Arrhenius law. The law therefore rescales the reference value, and the
 kinetic constants of that strain, enzyme class and substrate (`km`, `kcat`,
 `vmax`, `specific_activity`, `assay_activity`, `kcat_limiting`, `km_limiting`)
-must be stated at the reference condition. For every condition at which such rows exist, the condition's
+must be stated at the reference condition (for `thermal_inactivation` the constant it rescales is
+the `inactivation_rate`, so that is the row checked, and the kinetic constants
+are not). For every condition at which such rows exist, the condition's
 temperature or pH must equal the reference parameter exactly, or lie within
 the `reference_tolerance` stated on the reference parameter's row (a
 nonnegative number in that row's units; FungMod has no tolerance of its own).
@@ -1846,6 +1862,12 @@ Each refusal names its file, row and column:
   `kinetics.csv` quantity such as `km`, and duplicate rows.
 - `responses.csv` rows of a culture: the culture model applies no temperature
   or pH law, so its constants hold at the condition of their rows.
+- An `inactivation_rate` row (and the `thermal_inactivation` law) on a
+  culture's strain and substrate or a culture's consuming class: every culture
+  pool is already lost at its own first-order `enzyme_loss_rate` (the existing
+  `first_order` law), and FungMod adds no second loss law to a pool; two
+  first-order losses of one pool would be one constant stated twice
+  ([enzyme inactivation](#enzyme-inactivation-over-the-run)).
 - `timecourse.csv` rows of a culture case: the comparison and the fit read the
   substrate and the product of an enzyme-assay case; a culture's biomass, pools
   and ledgers are not observables of the comparison, and no culture constant is
@@ -2291,8 +2313,11 @@ The roles are `substrate_initial_concentration` (the entry's), then
 and per process `km__<class>__<pool>`, `kcat__<class>__<pool>` with
 `enzyme_initial_concentration__<class>` or `vmax__<class>__<pool>`, plus
 `ki__<class>__<pool>` and `reactivity_exponent__<class>__<pool>` when bound,
+`inactivation_rate__<class>__<pool>` when the class's enzyme state is lost
+([enzyme inactivation](#enzyme-inactivation-over-the-run)),
 and `<law>__<parameter>__<class>__<pool>` for each parameter of a
-[response law](#response-laws-in-a-network). A law parameter's record is one per
+[response law](#response-laws-in-a-network) (the `thermal_inactivation` law
+included). A law parameter's record is one per
 strain, `<dataset_id>__network__<entry>__<strain>__<role>`, with no environment
 selector (it applies at every condition), its value in the single-class
 record's units (temperatures in kelvin).
@@ -2304,8 +2329,9 @@ entry. The generated classes list `enzyme_network` as their only process, so a
 network dataset has no single-class cases: the preflight never chooses between
 a network and one of its classes. `UserDataset.enzyme_networks` (also in
 `to_dict()` and `summary()`) lists each network's pools, links and yields,
-processes (class, pool, rate form, process id, inhibitor, response laws),
-classes, strains and generated ids. The template is scientific only when every record bound to it is
+processes (class, pool, rate form, process id, inhibitor, response laws, the
+loss law of the class's enzyme state under `enzyme_inactivation`), classes,
+strains and generated ids. The template is scientific only when every record bound to it is
 exact and scientific-eligible, as for every user template.
 
 ### Gaps of a network
@@ -2352,6 +2378,9 @@ Each refusal names its file, row and column:
   strains, a condition with an unknown temperature or pH; and a row naming a
   class the strain does not declare (no member of the network) or a pool its
   class does not act on ([response laws in a network](#response-laws-in-a-network)).
+- An `inactivation_rate` or the `thermal_inactivation` law on a process in the
+  Vmax form, which has no enzyme state
+  ([enzyme inactivation](#enzyme-inactivation-over-the-run)).
 - `ki` outside a network dataset (a network of one class is the single-class
   case with inhibition), on a solid substrate (the apparent Km is not a binding
   constant), naming a pool that is not downstream (the substrate itself or an
@@ -2370,8 +2399,10 @@ well-mixed pools, each by its own Michaelis-Menten law at its stated
 concentration, classes on one pool in parallel with additive rates, each pool
 released into the next with the stated yield (from a solid to a dissolved pool
 through a unit-bearing yield you state), optional competitive inhibition of a
-process by one downstream pool, and optional temperature and pH response laws
-that scale the rate of the process they are bound to.
+process by one downstream pool, optional temperature and pH response laws
+that scale the rate of the process they are bound to, and optional first-order
+inactivation of each class's enzyme state by its own constant
+([enzyme inactivation](#enzyme-inactivation-over-the-run)).
 
 Not modelled, and the template and outputs say so:
 
@@ -2391,8 +2422,11 @@ Not modelled, and the template and outputs say so:
 - A response law scales the rate of its own process only: Km, Ki, the
   yields and the concentrations are not rescaled, a process without a law
   keeps the constants of its rows' condition at every temperature and pH, and
-  no thermal inactivation, pH dynamics or interaction between conditions
-  beyond the product of the factors is represented.
+  no pH dynamics or interaction between conditions beyond the product of the
+  factors is represented. An enzyme state is lost only where an
+  `inactivation_rate` binds it, by first-order loss (with the Arrhenius law of
+  `k_d` where `thermal_inactivation` is bound); no other loss of activity is
+  represented.
 - No time courses, comparison or fitting in a network yet, and no culture: a
   culture's secreted pools act together on its substrate in `culture.csv`
   itself ([several pools consuming the substrate](#several-pools-consuming-the-substrate)),
@@ -2404,6 +2438,236 @@ Not modelled, and the template and outputs say so:
   law (add the `responses.csv` rows while reviewing).
 - An enzyme-kinetics model at stated enzyme concentrations, not a fungus
   growing and secreting; the strain's class list decides which classes act.
+
+## Enzyme inactivation over the run
+
+An enzyme loses activity over a long degradation run. FungMod implements
+irreversible first-order inactivation, and a user dataset reaches it through
+one `kinetics.csv` quantity, `inactivation_rate`: the constant `k_d` of
+`dE/dt = -k_d E` for the enzyme of a case, in units of 1/time (checked with
+pint), at the row's condition. A row binds the existing `first_order` process
+law to the case's enzyme state, after the Michaelis-Menten process, so the
+enzyme decays as `E(t) = E0 exp(-k_d t)` while it degrades the substrate. Its
+evidence type, method and source work as on every kinetics row (a range is
+sampled uniformly in exploratory runs, and the weakest input sets the mode),
+and `k_d` may be zero (an enzyme measured to be stable) but not negative.
+
+Without a row the enzyme state is not lost: FungMod applies no default
+constant. All strains and conditions of one enzyme class and substrate share one
+generated process, so a row on one case binds the loss to every case of that
+class and substrate, and a case without its own row gets an explicit gap with a
+measurement request (never another case's value). When a dataset states
+inactivation for some enzyme state, the templates of its other enzyme states
+say "Enzyme activity assumed constant over the run" with the reason; a
+dataset without any `inactivation_rate` row generates exactly the records it
+generated before.
+
+The rate forms with an enzyme state take it: the kcat form and the
+pH-ionization form, on a dissolved or a [solid](#solid-substrates) substrate
+(an enzyme in protein mass, molar or assay units decays in its own units, an
+enzyme from an `enzyme_dose` included), in a single-class case or as a member
+of an [enzyme network](#several-enzymes-acting-together). The Vmax form has no
+enzyme state, so the row is refused there, and a [culture](#fungal-culture-growth-and-secretion)
+pool already has its own first-order loss, `enzyme_loss_rate` in `culture.csv`,
+so the row is refused there too.
+
+```text
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,lower,upper,units,evidence_type,method,source
+strain_v1,amide_hydrolase_like,amide_a1,c40_ph6,inactivation_rate,0.3,,,1/h,estimate,illustrative estimate (a half-life of about 2.3 h at this condition),<source>
+```
+
+A half-life is not a rate constant: state `k_d = ln 2 / t_half` yourself (the
+row's `method` can say so). FungMod converts no half-life.
+
+### Temperature dependence of `k_d`
+
+`k_d` holds at the row's condition. To let it follow the temperature, bind the
+`thermal_inactivation` law in [`responses.csv`](#responsescsv-optional) to the
+same strain, enzyme class and substrate: an `activation_energy` of inactivation
+(energy per amount, for example kJ/mol) and the `reference_temperature` at
+which the `inactivation_rate` is stated. The case then runs the existing
+`thermal_inactivation` process law instead of the constant loss:
+
+```text
+k_d(T) = k_d(T_ref) exp(-E_d / R (1/T - 1/T_ref))
+dE/dt  = -k_d(T) E
+```
+
+The temperature is read once from the environment, so an `EnvironmentGrid`
+over temperature changes `k_d` through the law and the result tables report
+`environment_effect_status = active_response_model` for temperature with
+`temperature:thermal_inactivation`. The law rescales the inactivation constant
+only, never `kcat`, `Km` or a Vmax: a temperature law on the rate is a
+separate `responses.csv` law, which composes with this one. The rules of
+response laws apply: the `inactivation_rate` must be stated at the reference
+temperature (exactly, within `reference_tolerance`, or declared with
+`kinetics_at_reference`), a condition with an unknown temperature cannot carry
+it, `design` is not an evidence type for a law, its records apply at every
+environment (no environment selector), and every strain of the class and
+substrate without the law rows gets explicit gaps for its parameters. The
+optional measured temperature bounds of the core law are not bound from user
+tables.
+
+### Worked example: an enzyme that tires
+
+`tests/fixtures/user_data/inactivation_case/` is the kcat form of a
+user-defined amide hydrolase-like class on a dissolved amide-like substrate at
+40 degC and pH 6: `km` 4 mM, `kcat` 60 1/min, 0.5 mM substrate, 0.001 mM
+enzyme and `inactivation_rate` 0.3 1/h (a half-life of about 2.3 hours); every
+value is an illustrative estimate.
+
+```text
+$ fungmod check-data tests/fixtures/user_data/inactivation_case
+...
+Kinetic values: 5; gaps: 0
+Enzyme inactivation (kinetics.csv inactivation_rate, responses.csv thermal_inactivation; every other enzyme state is not lost): 1
+  enzyme class          substrate  process law  kinetics.csv rows  responses.csv rows
+  amide_hydrolase_like  amide_a1   first_order  6                  none
+
+$ fungmod run --user-data tests/fixtures/user_data/inactivation_case --fungus strain_v1 \
+    --substrate amide_a1 --environment c40_ph6 --mode exploratory --samples 8 --seed 1 \
+    --output inactivation_run
+...
+  Final metrics (median [5th, 95th percentile] over samples):
+    final_substrate_remaining          0.03669 [0.03669, 0.03669] millimolar (n=8)
+    final_substrate_degraded_fraction  0.9266 [0.9266, 0.9266] dimensionless (n=8)
+...
+  Threshold times (median [5th, 95th percentile] over samples):
+    time_to_10_percent_substrate_degradation  8.066 [8.066, 8.066] minute (n=8)
+    time_to_50_percent_substrate_degradation  58.08 [58.08, 58.08] minute (n=8)
+    time_to_90_percent_substrate_degradation  327 [327, 327] minute (n=8)
+```
+
+Without the `inactivation_rate` row the same case reaches half conversion at
+50.39 minutes and 90 percent at 161 minutes, and leaves 0.000423 mM after
+eight hours. With it the enzyme's whole working life is
+`kcat E0 / k_d = 12` mM of turnover, which caps the conversion: the substrate
+never falls below about 0.028 mM however long the run. The tests check
+`E(t) = E0 exp(-k_d t)` at every output time, the exact substrate trajectory
+`Km ln(S/S0) + S - S0 = -kcat E0 (1 - exp(-k_d t)) / k_d` (solved with the
+Lambert W function), and, with 0.0004 mM substrate (`S << Km`), the
+first-order closed form `S(t) = S0 exp(-(kcat E0 / Km)(1 - exp(-k_d t)) / k_d)`
+within `S0 / Km`; that a fit of `kcat` to time courses of the decaying enzyme
+recovers it; and the pH-ionization form and an enzyme in FPU per litre on a
+solid losing activity by the same law (`tests/test_user_data_inactivation.py`).
+
+### In an enzyme network
+
+In a dataset with an `enzyme_network` block a row binds the loss to the enzyme
+state of the network process of its class and pool, and every class decays by
+its own constant (role `inactivation_rate__<class>__<pool>`; the
+`thermal_inactivation` law's roles are `thermal_inactivation__<parameter>__<class>__<pool>`).
+A class without a row keeps its enzyme, and the template says so for that
+class. `tests/fixtures/user_data/inactivation_network/` is the materially
+different case: two user-defined cutter-like classes in parallel on a
+particulate polymer-like solid (20 g/L on a dry-mass basis, protein-mass
+enzymes at 10 mg/L each), the fast cutter (`km` 8 g/L, `kcat` 0.05 g/(mg h))
+losing activity at 0.1 1/h at 55 degC with an activation energy of
+inactivation of 200 kJ/mol, the stable cutter (`km` 15 g/L, `kcat`
+0.01 g/(mg h)) not at all; every value is an illustrative estimate.
+
+```text
+strain_id,enzyme_class,substrate_id,law,parameter,value,units,evidence_type,method,source,reference_tolerance,kinetics_at_reference
+strain_w7,fast_cutter_w7,solid_w7,thermal_inactivation,activation_energy,200,kJ/mol,estimate,,<source>,,
+strain_w7,fast_cutter_w7,solid_w7,thermal_inactivation,reference_temperature,55,degC,estimate,,<source>,,
+```
+
+```text
+$ fungmod check-data tests/fixtures/user_data/inactivation_network
+...
+Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, enzyme_network): 1
+  from solid_w7: solid_w7 -> fragment_w7 (1 g/g); strains strain_w7
+  enzyme class      pool      rate form  competitive inhibitor
+  fast_cutter_w7    solid_w7  kcat       none
+  stable_cutter_w7  solid_w7  kcat       none
+Enzyme inactivation (kinetics.csv inactivation_rate, responses.csv thermal_inactivation; every other enzyme state is not lost): 1
+  enzyme class    substrate  process law           kinetics.csv rows  responses.csv rows
+  fast_cutter_w7  solid_w7   thermal_inactivation  6                  2, 3
+
+$ fungmod run --user-data tests/fixtures/user_data/inactivation_network --fungus strain_w7 \
+    --substrate solid_w7 --temperature-c 50 --temperature-c 55 --temperature-c 60 --ph 5 \
+    --mode exploratory --samples 8 --seed 1 --output inactivation_network_run
+...
+Case case_0000: inactivation_network__strain_w7 + inactivation_network__solid_w7 + temp_50C_ph_5p0_not_specified
+  environment effect: active_response_model (temperature:thermal_inactivation)
+...
+    final_substrate_degraded_fraction  0.5083 [0.5083, 0.5083] dimensionless (n=8)
+...
+Case case_0001: inactivation_network__strain_w7 + inactivation_network__solid_w7 + temp_55C_ph_5p0_not_specified
+...
+    final_substrate_degraded_fraction  0.2942 [0.2942, 0.2942] dimensionless (n=8)
+...
+Case case_0002: inactivation_network__strain_w7 + inactivation_network__solid_w7 + temp_60C_ph_5p0_not_specified
+...
+    final_substrate_degraded_fraction  0.1882 [0.1882, 0.1882] dimensionless (n=8)
+```
+
+The catalytic constants are those of 55 degC at every grid temperature (no law
+scales them), so the grid isolates the inactivation: `k_d` is 0.032, 0.1 and
+0.30 1/h at 50, 55 and 60 degC, and the hotter the run the sooner the fast
+cutter is gone and the less solid is degraded in 48 hours (50.8, 29.4 and 18.8
+percent; 77.6 percent at 55 degC without inactivation). The stable cutter keeps
+its 10 mg/L throughout. The tests check each enzyme against its own closed form
+at every output time of every grid temperature, each process rate against
+`kcat E S / (Km + S)` with its own enzyme, the degradation rate as their sum
+and the closure `S + P = 20 g/L`.
+
+### What is generated
+
+| Record | Identifier |
+| --- | --- |
+| `inactivation_rate` parameter record per case | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__inactivation_rate` (`__gap` for a gap), symbol `<dataset_id>__inactivation_rate__<class>__<substrate_id>`; in a network the network's record and symbol of role `inactivation_rate__<class>__<pool>` |
+| `thermal_inactivation` parameter record per strain and parameter | as every law parameter: `<dataset_id>__<strain>__<class>__<substrate>__thermal_inactivation__<parameter>` (kelvin for the temperature), no environment selector |
+| Loss process of a single-class template | `process_state_metadata.enzyme_inactivation`: process id `<dataset_id>__<class>__<substrate_id>__enzyme_inactivation`, process type `first_order` (role `rate_constant: inactivation_rate`) or `thermal_inactivation` (roles `reference_rate_constant`, `inactivation_energy`, `reference_temperature`), and its assumption |
+| Loss process of a network template | a process template `<dataset_id>__<class>__<pool>__enzyme_inactivation` after the Michaelis-Menten processes, on the state `enzyme_<class>` |
+
+The enzyme-kinetics assembler builds the declared loss as a second process of
+the case after the Michaelis-Menten process (it refuses a declaration on a
+role set without an enzyme state, an unknown law, missing or extra roles and a
+declaration without an assumption); the network composition builds it like
+every process template. The mechanism summary gets one row per loss process
+(`generic first-order loss of one state`, or `generic first-order thermal
+inactivation with an Arrhenius rate constant`), the template's limitation is
+in `limitations_table.csv`, and the enzyme's trajectory is in the time series.
+`UserDataset.enzyme_inactivation` (also in `to_dict()`) lists each enzyme class
+and substrate whose enzyme state is lost, with its law, process and template
+ids and the rows behind it; `fungmod check-data` prints it.
+
+### Refused
+
+- `inactivation_rate` in units that are not 1/time (a half-life included), a
+  negative value, two rows for one case, and `fitted` evidence (only `km`,
+  `kcat` and `vmax` are fitted).
+- `inactivation_rate` or the `thermal_inactivation` law on a pair in the Vmax
+  form: Vmax is a rate of the simulated system, so there is no enzyme amount to
+  lose.
+- `inactivation_rate` or the law on a culture's strain and substrate or a
+  culture's consuming class: the pool's `enzyme_loss_rate` is its first-order
+  loss, and no second loss law is added to it.
+- The `thermal_inactivation` law with an `inactivation_rate` off its reference
+  temperature (beyond `reference_tolerance`), a negative activation energy,
+  a missing parameter, measured temperature bounds, and a condition with an
+  unknown temperature carrying an `inactivation_rate` the law scales.
+
+### What is and is not modelled
+
+Modelled: irreversible single-exponential loss of the enzyme state of a case
+or of each network member, at a constant `k_d` stated at its condition or at a
+`k_d` that follows the Arrhenius law in temperature; the enzyme's trajectory,
+and through it the substrate, product, rates and threshold times.
+
+Not modelled, and the templates and outputs say so: reversible unfolding
+(Lumry-Eyring) and refolding, proteolysis, aggregation, protection by the
+substrate, the product or a stabiliser, loss by adsorption to a solid, an
+inactive enzyme pool, pH-dependent stability and temperature dynamics. The
+constant is only as transferable as the preparation and medium it was
+measured in, and it applies to the free enzyme of the well-mixed case as a
+whole. A culture keeps its own `enzyme_loss_rate`. `assemble_user_tables`
+keeps a user dataset's own `inactivation_rate` rows and `thermal_inactivation`
+law unchanged at their measured condition, like the dataset's other rows,
+drafts none from SABIO-RK, and never counts the `thermal_inactivation` law as
+a law that carries kinetics to another temperature (it rescales no catalytic
+constant): such a condition stays a gap.
 
 ## Evidence types, maturity and modes
 
@@ -2472,12 +2736,17 @@ The compatibility record binds the roles of the pair's rate form (`km`,
 `kcat`, `substrate_initial_concentration`, `enzyme_initial_concentration`;
 `km`, `vmax`, `substrate_initial_concentration`; or the ten roles of the
 pH-ionization form in the table [above](#three-rate-forms)), then
-`reactivity_exponent` when a solid pair binds the reactivity factor, followed
-by the parameters of any bound law; the template of a Vmax-form pair has no
-enzyme state, and a pair with laws or the reactivity factor lists them under
-`process_state_metadata.process_modifiers` (the reactivity factor as
-`substrate_reactivity` with `reference_concentration_role`
-`substrate_initial_concentration`). The template of a pH-ionization
+`reactivity_exponent` when a solid pair binds the reactivity factor and
+`inactivation_rate` when its enzyme state is lost, followed by the parameters
+of any bound law (the `thermal_inactivation` law's as
+`thermal_inactivation__activation_energy` and
+`thermal_inactivation__reference_temperature`); the template of a Vmax-form
+pair has no enzyme state, and a pair with laws or the reactivity factor lists
+them under `process_state_metadata.process_modifiers` (the reactivity factor
+as `substrate_reactivity` with `reference_concentration_role`
+`substrate_initial_concentration`). A pair whose enzyme state is lost declares
+the loss process under `process_state_metadata.enzyme_inactivation`
+([enzyme inactivation](#enzyme-inactivation-over-the-run)). The template of a pH-ionization
 pair has the process type `ph_ionization_michaelis_menten`, so its assembled
 model reads the pH of the environment and reports
 `environment_effect_status = active_response_model` for pH.
@@ -2995,7 +3264,10 @@ Limits of the SABIO-RK route:
   substrates.
 - Response laws are limited to the cardinal temperature, cardinal pH and
   Arrhenius laws, one per condition, and scale the rate only: `Km` and the
-  concentrations are not rescaled, and no thermal inactivation is represented.
+  concentrations are not rescaled. The enzyme state is lost only through a
+  stated `inactivation_rate` (irreversible first-order loss, with the
+  Arrhenius `thermal_inactivation` law of `k_d` when bound); otherwise the
+  enzyme is assumed stable over the run.
   Without `responses.csv`, user kinetics apply at their stated condition; in an
   `EnvironmentGrid` they are reused at grid conditions only as labelled
   context, as for registry records. With a law, the reused reference values

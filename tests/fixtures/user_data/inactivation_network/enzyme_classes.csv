@@ -1,0 +1,3 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+fast_cutter_w7,Fast cutter-like class W7,,inner_link_like,particulate_like,Illustrative user-defined class for the network inactivation fixture (no record of this class exists)
+stable_cutter_w7,Stable cutter-like class W7,,inner_link_like,particulate_like,Illustrative user-defined class for the network inactivation fixture (no record of this class exists)
